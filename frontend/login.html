@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaStore | Giriş Yap & Kayıt Ol</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            background-color: #F5F7FA;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .auth-container {
+            background: white;
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(15, 42, 67, 0.08);
+            text-align: center;
+        }
+
+        .auth-logo {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #0F2A43;
+            margin-bottom: 30px;
+            display: block;
+            text-decoration: none;
+        }
+
+        .auth-logo span {
+            color: #F7941D;
+        }
+
+        /* Sekme Butonları (Giriş / Kayıt) */
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 30px;
+            background: #F0F4F8;
+            border-radius: 10px;
+            padding: 5px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            font-family: 'Inter';
+            font-weight: 600;
+            font-size: 1rem;
+            color: #666;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #0F2A43;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Form Elemanları */
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #444;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #E0E0E0;
+            border-radius: 10px;
+            font-family: 'Inter';
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: #0F2A43;
+            outline: none;
+        }
+
+        .auth-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1rem;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        /* Form Gizleme/Gösterme */
+        #register-form {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="auth-container">
+        <a href="index.html" class="auth-logo">Nova<span>Store</span></a>
+
+        <div class="auth-tabs">
+            <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Giriş Yap</button>
+            <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Kayıt Ol</button>
+        </div>
+
+        <form id="login-form">
+            <div class="form-group">
+                <label>E-posta Adresiniz</label>
+                <input type="email" id="login-email" required placeholder="ornek@mail.com">
+            </div>
+            <div class="form-group">
+                <label>Şifreniz</label>
+                <input type="password" id="login-password" required placeholder="••••••••">
+                <div style="text-align: right; margin-top: 15px; margin-bottom: 25px;">
+                    <a href="forgot-password.html"
+                        style="color: #F7941D; font-size: 0.85rem; text-decoration: none; font-weight: 600;">Şifremi
+                        Unuttum?</a>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary auth-btn" id="login-btn">Giriş Yap</button>
+        </form>
+
+        <form id="register-form">
+            <div class="form-group">
+                <label>Adınız Soyadınız</label>
+                <input type="text" id="reg-name" required placeholder="Ahmet Yılmaz">
+            </div>
+            <div class="form-group">
+                <label>E-posta Adresiniz</label>
+                <input type="email" id="reg-email" required placeholder="ornek@mail.com">
+            </div>
+            <div class="form-group">
+                <label>Şifre Belirleyin</label>
+                <input type="password" id="reg-password" required placeholder="En az 6 karakter" minlength="6">
+            </div>
+            <button type="submit" class="btn btn-secondary auth-btn" id="register-btn"
+                style="background-color: #0F2A43; color: white;">Hesap Oluştur</button>
+        </form>
+    </div>
+
+    <script>
+        // Sekmeler Arası Geçiş Animasyonu
+        function switchTab(tab) {
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            const tabLogin = document.getElementById('tab-login');
+            const tabRegister = document.getElementById('tab-register');
+
+            if (tab === 'login') {
+                loginForm.style.display = 'block';
+                registerForm.style.display = 'none';
+                tabLogin.classList.add('active');
+                tabRegister.classList.remove('active');
+            } else {
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'block';
+                tabLogin.classList.remove('active');
+                tabRegister.classList.add('active');
+            }
+        }
+
+        // 1. KAYIT OLMA İŞLEMİ
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('register-btn');
+            btn.innerText = "Kaydediliyor..."; btn.disabled = true;
+
+            const userData = {
+                fullName: document.getElementById('reg-name').value,
+                email: document.getElementById('reg-email').value,
+                password: document.getElementById('reg-password').value
+            };
+
+            try {
+                const response = await fetch('http://localhost:5000/api/users/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert("🎉 " + result.mesaj + "\nLütfen şimdi giriş yapın.");
+                    document.getElementById('register-form').reset();
+                    switchTab('login'); // Başarılı kayıttan sonra otomatik giriş sekmesine at
+                } else {
+                    alert("❌ Hata: " + result.error);
+                }
+            } catch (error) {
+                alert("Sunucuya bağlanılamadı.");
+            } finally {
+                btn.innerText = "Hesap Oluştur"; btn.disabled = false;
+            }
+        });
+
+        // 2. GİRİŞ YAPMA İŞLEMİ
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            btn.innerText = "Giriş Yapılıyor..."; btn.disabled = true;
+
+            const loginData = {
+                email: document.getElementById('login-email').value,
+                password: document.getElementById('login-password').value
+            };
+
+            try {
+                const response = await fetch('http://localhost:5000/api/users/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(loginData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Başarılı girişte Dijital Anahtarı (Token) ve Kullanıcı bilgilerini tarayıcıya kaydet
+                    localStorage.setItem('nova_user_token', result.token);
+                    localStorage.setItem('nova_user_info', JSON.stringify(result.user));
+
+                    alert("✅ " + result.mesaj);
+                    window.location.href = "index.html"; // Ana sayfaya yönlendir
+                } else {
+                    alert("❌ Hata: " + result.error);
+                }
+            } catch (error) {
+                alert("Sunucuya bağlanılamadı.");
+            } finally {
+                btn.innerText = "Giriş Yap"; btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

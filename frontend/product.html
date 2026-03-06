@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaStore | Ürün Detayı</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            background-color: #F4F7F6;
+            color: #333;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 15px 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+            position: sticky;
+            top: 0;
+            z-index: 1005;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #0F2A43;
+            text-decoration: none;
+            letter-spacing: -0.5px;
+        }
+
+        .logo span {
+            color: #F7941D;
+        }
+
+        .back-btn {
+            color: #666;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: 0.3s;
+        }
+
+        .back-btn:hover {
+            color: #0F2A43;
+        }
+
+        .product-container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+        }
+
+        .image-section {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid #F0F0F0;
+        }
+
+        .main-image {
+            width: 100%;
+            max-height: 500px;
+            object-fit: cover;
+        }
+
+        .info-section {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .brand {
+            color: #0F2A43;
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .title {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #222;
+            margin: 0 0 15px 0;
+            line-height: 1.3;
+        }
+
+        /* GERÇEK YILDIZLAR İÇİN STİLLER */
+        .stars-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .star {
+            color: #FFC107;
+            font-size: 1.3rem;
+        }
+
+        .star-empty {
+            color: #E0E0E0;
+            font-size: 1.3rem;
+        }
+
+        .rating-text {
+            font-size: 0.95rem;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .price {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #2E7D32;
+            margin-bottom: 30px;
+        }
+
+        .description-box {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            border: 1px solid #EAEAEA;
+            margin-bottom: 30px;
+        }
+
+        .description-title {
+            font-weight: 700;
+            color: #0F2A43;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .description-text {
+            color: #555;
+            line-height: 1.8;
+            font-size: 1rem;
+        }
+
+        .btn-add-large {
+            border-radius: 12px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 10px 20px rgba(15, 42, 67, 0.15);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            background: #0F2A43;
+            color: white;
+            border: none;
+            padding: 20px;
+        }
+
+        .btn-buy-now {
+            border-radius: 12px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 10px 20px rgba(247, 148, 29, 0.15);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            color: #F7941D;
+            border: 2px solid #F7941D;
+            padding: 20px;
+        }
+
+        .btn-buy-now:hover {
+            background: #F7941D;
+            color: white;
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px rgba(247, 148, 29, 0.3);
+        }
+
+        .gallery-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .gallery-thumbnail {
+            width: 70px;
+            height: 70px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            opacity: 0.6;
+            transition: 0.3s;
+        }
+
+        .gallery-thumbnail.active,
+        .gallery-thumbnail:hover {
+            border-color: #F7941D;
+            opacity: 1;
+        }
+
+        .btn-add-large:hover {
+            background: #1a4a76;
+            transform: translateY(-3px);
+            box-shadow: 0 15px 25px rgba(15, 42, 67, 0.25);
+        }
+
+        /* --- ÜRÜN SORULARI (SATICIYA SOR) --- */
+        .bottom-sections-wrapper {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 40px;
+            border-top: 2px solid #F0F0F0;
+            padding-top: 40px;
+            align-items: start;
+        }
+
+        .qa-section {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #EAEAEA;
+        }
+
+        .qa-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #0F2A43;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .qa-card {
+            padding: 20px;
+            border: 1px solid #F0F0F0;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            background: #FAFAFA;
+        }
+
+        .qa-q {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .qa-a {
+            padding-left: 28px;
+            color: #555;
+            line-height: 1.5;
+            position: relative;
+        }
+
+        .qa-a::before {
+            content: "↳";
+            position: absolute;
+            left: 5px;
+            top: 0;
+            color: #00897B;
+            font-weight: bold;
+        }
+
+        .qa-form {
+            background: #F4F7FA;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+
+        .qa-form textarea {
+            width: 100%;
+            padding: 15px;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+            resize: vertical;
+            min-height: 80px;
+            margin-bottom: 15px;
+            font-family: inherit;
+        }
+
+        /* YORUMLAR BÖLÜMÜ STİLLERİ */
+        .reviews-section {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .reviews-title {
+            font-size: 1.8rem;
+            color: #0F2A43;
+            margin-bottom: 30px;
+            font-weight: 800;
+        }
+
+        .review-form-box {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            border: 1px solid #EAEAEA;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        }
+
+        .rating-select {
+            display: flex;
+            gap: 8px;
+            font-size: 2rem;
+            margin-bottom: 15px;
+            cursor: pointer;
+        }
+
+        .rating-select span {
+            color: #E0E0E0;
+            transition: 0.2s;
+        }
+
+        .rating-select span:hover,
+        .rating-select span.active {
+            color: #FFC107;
+        }
+
+        .review-input {
+            width: 100%;
+            padding: 15px;
+            border: 1px solid #DDD;
+            border-radius: 10px;
+            font-family: 'Inter';
+            font-size: 1rem;
+            margin-bottom: 15px;
+            resize: vertical;
+            min-height: 100px;
+            box-sizing: border-box;
+        }
+
+        .btn-submit-review {
+            background: #F7941D;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: 0.3s;
+        }
+
+        .btn-submit-review:hover {
+            background: #e08312;
+        }
+
+        .review-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #F0F0F0;
+            margin-bottom: 20px;
+        }
+
+        .review-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .reviewer-name {
+            font-weight: 700;
+            color: #0F2A43;
+            font-size: 1.05rem;
+        }
+
+        .review-date {
+            color: #888;
+            font-size: 0.85rem;
+        }
+
+        .review-text {
+            color: #444;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .product-container {
+                grid-template-columns: 1fr;
+            }
+
+            .bottom-sections-wrapper {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* SAĞ MENÜ (KULLANICI VE SEPET) */
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.95rem;
+        }
+
+        .welcome-text {
+            color: #555;
+            font-weight: 500;
+        }
+
+        .welcome-text strong {
+            color: #0F2A43;
+        }
+
+        .btn-profile {
+            background: #F0F4F8;
+            color: #0F2A43;
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+
+        .btn-profile:hover {
+            background: #E2E8F0;
+        }
+
+        .btn-logout {
+            background: #FFF0F0;
+            color: #E53935;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: #FFE0E0;
+        }
+
+        .btn-login {
+            background: #0F2A43;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+
+        .btn-login:hover {
+            background: #1a4a76;
+        }
+
+        /* SEPET BUTONU */
+        .cart-btn {
+            background: #F7941D;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.3s;
+            box-shadow: 0 4px 10px rgba(247, 148, 29, 0.3);
+        }
+
+        .cart-btn:hover {
+            background: #e08312;
+            transform: translateY(-2px);
+        }
+
+        .cart-badge {
+            background: white;
+            color: #F7941D;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+
+        /* HERO ALANI (AFİŞ) */
+        .hero-section {
+            max-width: 1200px;
+            margin: 40px auto;
+            background: linear-gradient(135deg, #0F2A43 0%, #1a4a76 100%);
+            border-radius: 24px;
+            padding: 60px 50px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 15px 40px rgba(15, 42, 67, 0.15);
+        }
+
+        .hero-content h1 {
+            font-size: 3rem;
+            margin: 0 0 15px 0;
+            line-height: 1.2;
+        }
+
+        .hero-content p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 25px;
+            max-width: 450px;
+            line-height: 1.6;
+        }
+
+        .btn-hero {
+            background: #F7941D;
+            color: white;
+            padding: 14px 30px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.1rem;
+            display: inline-block;
+            transition: 0.3s;
+        }
+
+        .btn-hero:hover {
+            background: #e08312;
+            box-shadow: 0 5px 15px rgba(247, 148, 29, 0.4);
+        }
+
+        /* ÜRÜNLER ALANI */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto 80px;
+            padding: 0 20px;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            color: #0F2A43;
+            margin-bottom: 30px;
+            font-weight: 700;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 30px;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+            transition: 0.3s;
+            border: 1px solid #F0F0F0;
+        }
+
+        .product-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.08);
+        }
+
+        .product-img {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .product-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #222;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .product-price {
+            color: #F7941D;
+            font-size: 1.4rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+        }
+
+        .btn-add {
+            background: #FAFAFA;
+            border: 1px solid #E0E0E0;
+            color: #333;
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+        }
+
+        .btn-add:hover {
+            background: #FFFFFF;
+            border-color: #C0C0C0;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* --- KUSURSUZ YANDAN KAYAN SEPET --- */
+        .cart-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 42, 67, 0.4);
+            backdrop-filter: blur(4px);
+            z-index: 9998;
+            opacity: 0;
+            visibility: hidden;
+            transition: 0.3s ease;
+        }
+
+        .cart-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .cart-sidebar {
+            position: fixed;
+            top: 0;
+            right: -600px;
+            width: 100%;
+            max-width: 550px;
+            height: 100vh;
+            background: white;
+            z-index: 9999;
+            box-shadow: -10px 0 40px rgba(0, 0, 0, 0.1);
+            transition: right 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .cart-sidebar.open {
+            right: 0;
+        }
+
+        .cart-header {
+            padding: 25px 30px;
+            border-bottom: 1px solid #EEE;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #FAFAFA;
+        }
+
+        .cart-header h2 {
+            margin: 0;
+            color: #0F2A43;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* DÜZELTİLEN KAPATMA TUŞU */
+        .close-cart {
+            background: white;
+            border: 1px solid #DDD;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            color: #666;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: 0.2s;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .close-cart:hover {
+            background: #FFE0E0;
+            color: #E53935;
+            border-color: #FFCACA;
+            transform: scale(1.05);
+        }
+
+        .cart-items {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 30px;
+        }
+
+        .cart-empty-msg {
+            text-align: center;
+            color: #888;
+            margin-top: 60px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #F0F0F0;
+            padding-bottom: 20px;
+        }
+
+        .cart-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .cart-item-title {
+            font-weight: 600;
+            color: #222;
+            font-size: 1rem;
+        }
+
+        .cart-item-price {
+            color: #F7941D;
+            font-weight: 800;
+            font-size: 1.1rem;
+        }
+
+        .remove-item {
+            background: #FFF0F0;
+            color: #E53935;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .remove-item:hover {
+            background: #E53935;
+            color: white;
+        }
+
+        .cart-footer {
+            padding: 30px;
+            border-top: 1px solid #EEE;
+            background: white;
+        }
+
+        .cart-total {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.3rem;
+            margin-bottom: 25px;
+            color: #666;
+        }
+
+        .cart-total strong {
+            color: #0F2A43;
+            font-size: 1.8rem;
+        }
+
+        .btn-checkout {
+            background: #0F2A43;
+            color: white;
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 5px 15px rgba(15, 42, 67, 0.2);
+        }
+
+        .btn-checkout:hover {
+            background: #1a4a76;
+            transform: translateY(-2px);
+        }
+
+        .btn-checkout:disabled {
+            background: #CCC;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .category-nav {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 0 5%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1000;
+        }
+
+        .category-menu {
+            list-style: none;
+            display: flex;
+            margin: 0;
+            padding: 0;
+        }
+
+        .category-item {
+            position: relative;
+            padding: 15px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #0F2A43;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .category-item:hover {
+            color: #F7941D;
+            background-color: #E8EEF2;
+        }
+
+        .subcategory-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            min-width: 200px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            border-radius: 0 0 8px 8px;
+            list-style: none;
+            padding: 10px 0;
+            z-index: 1000;
+            border: 1px solid #eee;
+        }
+
+        .category-item:hover .subcategory-menu {
+            display: block;
+        }
+
+        .subcategory-item {
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            color: #F7941D;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .subcategory-item:hover {
+            background: #f1f1f1;
+            color: #0F2A43;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="cart-overlay" id="cart-overlay" onclick="closeCart()"></div>
+    <div class="cart-sidebar" id="cart-sidebar">
+        <div class="cart-header">
+            <h2>🛍️ Sepetim</h2>
+            <button class="close-cart" onclick="closeCart()">✕</button>
+        </div>
+        <div class="cart-items" id="cart-items-container">
+        </div>
+        <div class="cart-footer">
+            <div class="cart-total">
+                <span>Toplam Tutar:</span>
+                <strong><span id="cart-total-price">0.00</span> TL</strong>
+            </div>
+            <button class="btn-checkout" id="btn-checkout" onclick="proceedToCheckout()">Ödemeye
+                Geç</button>
+        </div>
+    </div>
+
+    <header>
+        <a href="index.html" class="logo">Nova<span>Store</span></a>
+
+        <div style="flex: 1; display: flex; justify-content: center; margin: 0 20px;">
+            <form action="index.html" method="GET"
+                style="display: flex; align-items: center; background: #ffff; border-radius: 20px; padding: 4px 12px; border: 1px solid #EAEAEA; box-shadow: inset 0 2px 5px rgba(0,0,0,0.02); height: 42px; width: 100%; max-width: 500px;">
+                <input type="text" name="search" placeholder="Ürün Ara..."
+                    style="flex: 1; border: none; background: transparent; padding: 5px 10px; outline: none; font-size: 0.95rem; color: #333;"
+                    required>
+                <button type="submit"
+                    style="background: transparent; border: none; cursor: pointer; color: #0F2A43; font-size: 1.1rem; display: flex; align-items: center; padding: 0 5px;"><svg
+                        width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg></button>
+            </form>
+        </div>
+
+        <div class="nav-right">
+            <div id="user-menu" class="user-menu"></div>
+
+            <button class="cart-btn" onclick="openCart()"
+                style="position: relative; background: transparent; box-shadow: none; color: #0F2A43; padding: 5px 10px; border: 1px solid #E0E0E0; border-radius: 12px; font-size: 1.5rem;">
+                🛒
+                <span class="cart-badge" id="cart-count"
+                    style="background: #F7941D; color: white; margin-left: -5px; font-size: 0.9rem;">0</span>
+            </button>
+        </div>
+    </header>
+
+    <nav class="category-nav" id="category-nav">
+        <ul class="category-menu" id="category-menu">
+            <!-- Kategoriler JS ile buraya yüklenecek -->
+        </ul>
+    </nav>
+
+    <div class="product-container" id="product-detail-area">
+        <h2 style="text-align: center; width: 100%; grid-column: 1 / -1;">Ürün aranıyor...</h2>
+    </div>
+
+    <script>
+        // --- 1. KULLANICI KİMLİK KONTROLÜ ---
+        function checkUserStatus() {
+            const token = localStorage.getItem('nova_user_token');
+            const userInfoStr = localStorage.getItem('nova_user_info');
+            const userMenu = document.getElementById('user-menu');
+
+            if (token && userInfoStr) {
+                const user = JSON.parse(userInfoStr);
+                userMenu.innerHTML = `
+                    <span class="welcome-text">Merhaba, <strong>${user.fullName.split(' ')[0]}</strong></span>
+                    <a href="profile.html" class="btn-profile">👤 Hesabım</a>
+                    <button onclick="userLogout()" class="btn-logout">Çıkış</button>
+                `;
+            } else {
+                userMenu.innerHTML = `
+                    <a href="login.html" class="btn-login">Giriş Yap / Kayıt Ol</a>
+                `;
+            }
+        }
+
+        function userLogout() {
+            const uid = _getUserId();
+            localStorage.removeItem(`novastore_checkout_${uid}`);
+            localStorage.removeItem('nova_user_token');
+            localStorage.removeItem('nova_user_info');
+            window.location.reload();
+        }
+
+        // --- FAVORİ SİSTEMİ ---
+        function toggleFavorite(btn, event, productId) {
+            event.preventDefault();
+            event.stopPropagation();
+            btn.classList.toggle('active');
+            let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
+            if (btn.classList.contains('active')) {
+                if (!favs.includes(productId)) favs.push(productId);
+            } else {
+                favs = favs.filter(id => id !== productId);
+            }
+            localStorage.setItem(_favsKey(), JSON.stringify(favs));
+        }
+
+        // --- KULLANICIYA ÖZEL LOCALSTORAGE ANAHTARLARI ---
+        function _getUserId() {
+            try {
+                const info = JSON.parse(localStorage.getItem('nova_user_info'));
+                return info && info.id ? info.id : 'guest';
+            } catch (e) { return 'guest'; }
+        }
+        function _cartKey() { return `novastore_cart_${_getUserId()}`; }
+        function _favsKey() { return `novastore_favs_${_getUserId()}`; }
+        function _checkoutKey() { return `novastore_checkout_${_getUserId()}`; }
+
+        // --- 2. KUSURSUZ SEPET SİSTEMİ ---
+        let cart = JSON.parse(localStorage.getItem(_cartKey())) || [];
+
+        function openCart() {
+            document.getElementById('cart-sidebar').classList.add('open');
+            document.getElementById('cart-overlay').classList.add('open');
+            renderCartUI();
+        }
+
+        function closeCart() {
+            document.getElementById('cart-sidebar').classList.remove('open');
+            document.getElementById('cart-overlay').classList.remove('open');
+            document.getElementById('cart-sidebar').style.right = '-600px';
+        }
+
+        function renderCartUI() {
+            const container = document.getElementById('cart-items-container');
+            const totalEl = document.getElementById('cart-total-price');
+            const badge = document.getElementById('cart-count');
+            const checkoutBtn = document.getElementById('btn-checkout');
+
+            container.innerHTML = '';
+            let total = 0;
+            let totalItems = 0;
+            let selectedItemsCount = 0;
+
+            if (cart.length === 0) {
+                container.innerHTML = `
+                    <div class="cart-empty-msg">
+                        <span style="font-size: 3rem; display:block; margin-bottom:15px;">🛒</span>
+                        Sepetiniz şu an bomboş.<br>Hemen ürün eklemeye başlayın!
+                    </div>`;
+                totalEl.innerText = "0.00";
+                badge.innerText = "0";
+                if (checkoutBtn) checkoutBtn.disabled = true;
+                return;
+            }
+
+            cart.forEach((item, index) => {
+                const itemTotal = item.price * item.quantity;
+                totalItems += item.quantity;
+
+                let isChecked = item.selected !== false;
+                if (isChecked) {
+                    total += itemTotal;
+                    selectedItemsCount += item.quantity;
+                }
+
+                const imageUrl = item.image || 'https://via.placeholder.com/80?text=Görsel+Yok';
+
+                let priceSectionHtml = '';
+                if (item.old_price && parseFloat(item.old_price) > parseFloat(item.price)) {
+                    const discountRate = Math.round(((parseFloat(item.old_price) - parseFloat(item.price)) / parseFloat(item.old_price)) * 100);
+                    priceSectionHtml = `
+                        <div style="display: flex; align-items: center; background: #FAFAFA; border: 1px solid #EAEAEA; border-radius: 8px; padding: 6px 10px; margin-top: 8px; gap: 12px; width: fit-content;">
+                            <div style="color: #00897B; font-size: 0.75rem; font-weight: 700; line-height: 1.2; text-align: center;">
+                                Sepete<br>Özel
+                            </div>
+                            <div style="width: 1px; height: 32px; background: #EAEAEA;"></div>
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <div style="display: flex; align-items: center; gap: 6px; line-height: 1;">
+                                    <span style="color: #888; text-decoration: line-through; font-size: 0.75rem;">${parseFloat(item.old_price).toFixed(2)} TL</span>
+                                    <span style="background: #00897B; color: white; padding: 2px 5px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;">%${discountRate}</span>
+                                </div>
+                                <div style="color: #00897B; font-weight: 800; font-size: 1.1rem; line-height: 1;">
+                                    ${parseFloat(item.price).toFixed(2)} <span style="font-size: 0.8rem; font-weight: 600;">TL</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    priceSectionHtml = `
+                        <div style="display: flex; align-items: center; background: #FAFAFA; border: 1px solid #EAEAEA; border-radius: 8px; padding: 6px 10px; margin-top: 8px; width: fit-content;">
+                            <div style="color: #0F2A43; font-weight: 800; font-size: 1.1rem; line-height: 1;">
+                                ${parseFloat(item.price).toFixed(2)} <span style="font-size: 0.8rem; font-weight: 600;">TL</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML += `
+                    <div class="cart-item" style="display: flex; align-items: center; gap: 15px; padding: 15px; background: #fff; border: 1px solid #EAEAEA; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.02);">
+                        <input type="checkbox" class="cart-item-checkbox" ${isChecked ? 'checked' : ''} onchange="toggleCartItemSelection(${index})" style="width: 20px; height: 20px; cursor: pointer; accent-color: #00897B; flex-shrink: 0;">
+                        
+                        <img src="${imageUrl}" alt="${item.name}" style="width: 70px; height: 70px; object-fit: cover; border-radius: 8px; flex-shrink: 0; border: 1px solid #F0F0F0;">
+                        
+                        <div class="cart-item-info" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0;">
+                            <span class="cart-item-title" style="font-weight: 600; color: #333; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.name}">${item.name}</span>
+                            ${priceSectionHtml}
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 10px; flex-shrink: 0;">
+                            <button class="remove-item" onclick="removeFromCart(${index})" title="Ürünü Sil" style="background: #FFF0F0; color: #E53935; border: none; padding: 6px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s;">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                            
+                            <div style="display: flex; align-items: center; background: #F8F9FA; border: 1px solid #EAEAEA; border-radius: 6px; overflow: hidden;">
+                                <button onclick="updateCartQuantity(${index}, -1)" style="border: none; background: transparent; cursor: pointer; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #555; transition: 0.2s;">-</button>
+                                <span style="font-weight: 600; font-size: 0.95rem; width: 24px; text-align: center; color: #333;">${item.quantity}</span>
+                                <button onclick="updateCartQuantity(${index}, 1)" style="border: none; background: transparent; cursor: pointer; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #555; transition: 0.2s;">+</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            totalEl.innerText = total.toFixed(2);
+            badge.innerText = totalItems;
+            if (checkoutBtn) checkoutBtn.disabled = selectedItemsCount === 0;
+        }
+
+        function updateCartQuantity(index, change) {
+            if (cart[index]) {
+                cart[index].quantity += change;
+                if (cart[index].quantity <= 0) {
+                    cart[index].quantity = 1;
+                }
+                localStorage.setItem(_cartKey(), JSON.stringify(cart));
+                renderCartUI();
+            }
+        }
+
+        function toggleCartItemSelection(index) {
+            if (cart[index].selected === undefined) {
+                cart[index].selected = false;
+            } else {
+                cart[index].selected = !cart[index].selected;
+            }
+            localStorage.setItem(_cartKey(), JSON.stringify(cart));
+            renderCartUI();
+        }
+
+        function proceedToCheckout() {
+            const selectedItems = cart.filter(item => item.selected !== false);
+            if (selectedItems.length > 0) {
+                localStorage.setItem(_checkoutKey(), JSON.stringify(selectedItems));
+                window.location.href = 'checkout.html';
+            }
+        }
+
+        function buyNow(id, name, price) {
+            const image = '';
+            const buyNowItem = [{ id, name, price, quantity: 1, selected: true, isBuyNow: true, image }];
+            localStorage.setItem(_checkoutKey(), JSON.stringify(buyNowItem));
+            window.location.href = 'checkout.html';
+        }
+
+        function addToCart(id, name, price, image, old_price = null) {
+            const existingItem = cart.find(item => item.id === id);
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({ id, name, price, image: image || '', old_price: old_price, quantity: 1 });
+            }
+            localStorage.setItem(_cartKey(), JSON.stringify(cart));
+            renderCartUI();
+            openCart();
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            localStorage.setItem(_cartKey(), JSON.stringify(cart));
+            renderCartUI();
+        }
+
+        // --- KATEGORİ SİSTEMİ ---
+        async function fetchNavigationCategories() {
+            try {
+                const res = await fetch('http://localhost:5000/api/categories');
+                const categories = await res.json();
+
+                const menu = document.getElementById('category-menu');
+                menu.innerHTML = '';
+
+                const mainCats = categories.filter(c => c.parent_id === null);
+                const themeColors = ['#F7941D', '#1976D2', '#388E3C', '#D32F2F', '#7B1FA2', '#00796B', '#FBC02D', '#C2185B', '#0F2A43'];
+
+                mainCats.forEach((main, index) => {
+                    const subCats = categories.filter(c => c.parent_id === main.id);
+
+                    let subHtml = '';
+                    if (subCats.length > 0) {
+                        subHtml = '<ul class="subcategory-menu">';
+                        subCats.forEach(sub => {
+                            subHtml += `<li class="subcategory-item" onclick="window.location.href='index.html?category=${encodeURIComponent(sub.name)}'">${sub.name}</li>`;
+                        });
+                        subHtml += '</ul>';
+                    }
+
+                    const bottomColor = themeColors[index % themeColors.length];
+
+                    menu.innerHTML += `
+                        <li class="category-item" style="border-bottom-color: ${bottomColor};" onclick="if(event.target === this) window.location.href='index.html?category=${encodeURIComponent(main.name)}'">
+                            ${main.name}
+                            ${subHtml}
+                        </li>
+                    `;
+                });
+            } catch (err) {
+                console.error("Kategoriler yüklenirken hata:", err);
+            }
+        }
+        const urlParams = new URLSearchParams(window.location.search);
+        const productId = urlParams.get('id');
+
+
+        // Kullanıcı Giriş Kontrolü
+        const token = localStorage.getItem('nova_user_token');
+        const userInfoStr = localStorage.getItem('nova_user_info');
+        const user = userInfoStr ? JSON.parse(userInfoStr) : null;
+
+        let selectedRating = 0; // Formdaki seçili yıldız
+
+        // 1. ÜRÜN VE YORUMLARI ÇEKME
+        async function fetchProductAndReviews() {
+            if (!productId) {
+                document.getElementById('product-detail-area').innerHTML = '<h2 style="color:red; text-align:center; grid-column: 1/-1;">Hata: Ürün bulunamadı!</h2>';
+                return;
+            }
+
+            try {
+                // Hem ürünü hem yorumları aynı anda beynimizden istiyoruz
+                const [productRes, reviewsRes] = await Promise.all([
+                    fetch('http://localhost:5000/api/products/' + productId),
+                    fetch('http://localhost:5000/api/reviews/product/' + productId)
+                ]);
+
+                if (!productRes.ok) throw new Error("Ürün bulunamadı.");
+
+                const product = await productRes.json();
+                const reviewData = await reviewsRes.json();
+
+                const imageUrl = product.image_url || 'https://via.placeholder.com/500?text=Görsel+Yok';
+
+                // Yıldızları Çizdirme Algoritması (Örn: 4 ortalama varsa 4 sarı, 1 gri yıldız)
+                let avgStarsHtml = '';
+                const avgRating = Math.round(reviewData.average);
+                for (let i = 1; i <= 5; i++) {
+                    avgStarsHtml += i <= avgRating ? '<span class="star">★</span>' : '<span class="star-empty">★</span>';
+                }
+
+                // Yorum Ekleme Formu (Giriş yapana formu, yapmayana uyarıyı gösterir)
+                let reviewFormHtml = '';
+                if (user) {
+                    reviewFormHtml = `
+                        <div class="review-form-box">
+                            <h3 style="margin-top:0; color:#0F2A43;">Ürünü Değerlendir</h3>
+                            <div class="rating-select" id="star-selector">
+                                <span onclick="setRating(1)">★</span>
+                                <span onclick="setRating(2)">★</span>
+                                <span onclick="setRating(3)">★</span>
+                                <span onclick="setRating(4)">★</span>
+                                <span onclick="setRating(5)">★</span>
+                            </div>
+                            <textarea id="review-comment" class="review-input" placeholder="Bu ürün hakkında ne düşünüyorsunuz? (Opsiyonel)"></textarea>
+                            <button onclick="submitReview()" class="btn-submit-review">Yorumu Gönder</button>
+                        </div>
+                    `;
+                } else {
+                    reviewFormHtml = `
+                        <div class="review-form-box" style="text-align: center; background: #F8FBFF; border-color: #BBDEFB;">
+                            <h3 style="color:#1565C0;">Değerlendirme Yapmak İster Misiniz?</h3>
+                            <p style="color:#555; margin-bottom: 20px;">Bu ürüne yorum yapabilmek ve puan verebilmek için giriş yapmalısınız.</p>
+                            <a href="login.html" class="btn-submit-review" style="text-decoration:none;">Giriş Yap / Kayıt Ol</a>
+                        </div>
+                    `;
+                }
+
+                // Yorum Listesini Oluşturma
+                let reviewsListHtml = '';
+                if (reviewData.reviews.length === 0) {
+                    reviewsListHtml = '<p style="color:#888;">Henüz değerlendirme yapılmamış. İlk yorumu siz yapın!</p>';
+                } else {
+                    reviewData.reviews.forEach(r => {
+                        let rStars = '';
+                        for (let i = 1; i <= 5; i++) {
+                            rStars += i <= r.rating ? '<span class="star" style="font-size:1rem;">★</span>' : '<span class="star-empty" style="font-size:1rem;">★</span>';
+                        }
+                        const rDate = new Date(r.created_at).toLocaleDateString('tr-TR');
+
+                        reviewsListHtml += `
+                            <div class="review-card">
+                                <div class="review-header">
+                                    <div class="reviewer-name">${r.full_name}</div>
+                                    <div class="review-date">${rDate}</div>
+                                </div>
+                                <div style="margin-bottom: 10px;">${rStars}</div>
+                                <div class="review-text">${r.comment || ''}</div>
+                            </div>
+                        `;
+                    });
+                }
+
+                // Galeri oluşturma
+                let galleryHtml = '';
+                if (product.media && product.media.length > 0) {
+                    galleryHtml = '<div class="gallery-container">';
+                    product.media.forEach((m, i) => {
+                        const activeClass = i === 0 ? 'active' : '';
+                        if (m.media_url.endsWith('.mp4')) {
+                            galleryHtml += `<video src="${m.media_url}" class="gallery-thumbnail ${activeClass}" onclick="changeMainMedia('${m.media_url}', 'video', this)"></video>`;
+                        } else {
+                            galleryHtml += `<img src="${m.media_url}" class="gallery-thumbnail ${activeClass}" onclick="changeMainMedia('${m.media_url}', 'image', this)">`;
+                        }
+                    });
+                    galleryHtml += '</div>';
+                }
+
+                // İlk medya türünü bul (video mu resim mi)
+                let firstMediaIsVideo = false;
+                if (product.media && product.media.length > 0) {
+                    firstMediaIsVideo = product.media[0].media_url.endsWith('.mp4');
+                }
+
+                let mainMediaTag = firstMediaIsVideo
+                    ? `<video src="${product.media[0].media_url}" class="main-image" controls autoplay muted style="max-height: 500px; width: 100%; object-fit: cover;"></video>`
+                    : `<img src="${imageUrl}" class="main-image" id="main-product-image" style="object-fit: cover;" alt="${product.name}">`;
+
+                // GERÇEK İNDİRİM ALGORİTMASI (YEŞİL VERSİYON)
+                let priceHtml = '';
+                if (product.old_price && parseFloat(product.old_price) > parseFloat(product.price)) {
+                    const oldP = parseFloat(product.old_price);
+                    const newP = parseFloat(product.price);
+                    const discountRate = Math.round(((oldP - newP) / oldP) * 100);
+
+                    priceHtml = `
+                        <div style="display: inline-flex; gap: 15px; align-items: center; background: #FAFAFA; padding: 10px 15px; border-radius: 12px; border: 1px solid #F0F0F0; margin-bottom: 20px;">
+                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: #00897B; font-size: 0.85rem; font-weight: 800; line-height: 1.2; padding-right: 15px; border-right: 2px solid #E0E0E0;">
+                                <span>Sepete</span>
+                                <span>Özel</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; justify-content: center;">
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 2px;">
+                                    <span style="color: #777; text-decoration: line-through; font-size: 0.95rem;">${oldP.toFixed(2)} TL</span>
+                                    <span style="background: #00897B; color: white; padding: 2px 8px; border-radius: 6px; font-weight: bold; font-size: 0.85rem;">%${discountRate} İndirim</span>
+                                </div>
+                                <div style="color: #00897B; font-weight: 800; font-size: 1.8rem; line-height: 1;">${newP.toFixed(2)} <span style="font-size: 1.1rem; font-weight: 600;">TL</span></div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    priceHtml = `
+                        <div class="price" style="font-size: 1.8rem; margin-bottom: 20px;">${parseFloat(product.price).toFixed(2)} TL</div>
+                    `;
+                }
+
+                // Favori kontrolü
+                let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
+                let isFav = favs.includes(product.id) ? 'active' : '';
+
+                // EKRANI ÇİZİYORUZ
+                document.getElementById('product-detail-area').innerHTML = `
+                    <div class="image-section" style="flex-direction: column; position: relative;">
+                        <!-- Detay Sayfası Favori Butonu (Varsayılan Style.css ölçüleri: 36x36px) -->
+                        <button class="btn-favorite ${isFav}" onclick="toggleFavorite(this, event, ${product.id})" title="Favorilere Ekle">
+                            <svg class="heart-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                            </svg>
+                        </button>
+                        <div id="main-media-container" style="width: 100%; display:flex; justify-content:center;">
+                            ${mainMediaTag}
+                        </div>
+                        ${galleryHtml}
+                    </div>
+
+                    <div class="info-section">
+                        <div class="brand">NOVA STORE</div>
+                        <h1 class="title">${product.name}</h1>
+                        
+                        <div class="stars-container">
+                            <div>${avgStarsHtml}</div>
+                            <div class="rating-text">${reviewData.average} (${reviewData.totalReviews} Değerlendirme)</div>
+                        </div>
+
+                        ${priceHtml}
+
+                        <div class="description-box">
+                            <div class="description-title">Ürün Açıklaması</div>
+                            <div class="description-text">
+                                ${product.description ? product.description : 'Bu ürün için henüz bir açıklama girilmemiş.'}
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 15px; margin-top: 10px;">
+                            <button class="btn-add-large" style="flex: 1;" onclick="addToCart(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price}, '${imageUrl}', ${product.old_price ? `'${product.old_price}'` : 'null'})">
+                                🛒 Sepete Ekle
+                            </button>
+                            
+                            <button class="btn-buy-now" style="flex: 1;" onclick="buyNow(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price})">
+                                ⚡ Şimdi Al
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bottom-sections-wrapper">
+                        <div class="reviews-section">
+                            <h2 class="reviews-title">Müşteri Değerlendirmeleri</h2>
+                            ${reviewFormHtml}
+                            <div id="reviews-list">
+                                ${reviewsListHtml}
+                            </div>
+                        </div>
+
+                        <div class="qa-section" id="qa-container">
+                            <h2 class="qa-title">💬 Satıcıya Sorulanlar</h2>
+                            <div id="qa-form-area" style="display: none;">
+                                <div class="qa-form">
+                                    <h4 style="margin-top: 0; margin-bottom: 10px; color: #0F2A43;">Ürün Hakkında Soru Sor</h4>
+                                    <textarea id="question-text" placeholder="Ürünle ilgili merak ettiklerinizi buraya yazabilirsiniz..."></textarea>
+                                    <button class="btn-buy-now" style="width: auto; padding: 10px 20px;" onclick="submitQuestion()">Soruyu İlet</button>
+                                </div>
+                            </div>
+                            <div id="qa-list" style="margin-top: 20px;">
+                                <div style="text-align: center; color: #888;">Sorular yükleniyor...</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Kullanıcı giriş yapmışsa soru sorma formunu göster
+                if (user && user.id) {
+                    document.getElementById('qa-form-area').style.display = 'block';
+                }
+
+                // Soru verilerini çek
+                fetchProductQuestions();
+
+            } catch (error) {
+                document.getElementById('product-detail-area').innerHTML = '<h2 style="color:red; text-align:center; grid-column: 1/-1;">Bağlantı Hatası: Sunucu çalışmıyor olabilir.</h2>';
+            }
+        }
+
+        // GALERİ RESMİ DEĞİŞTİRME
+        function changeMainMedia(url, type, element) {
+            document.querySelectorAll('.gallery-thumbnail').forEach(el => el.classList.remove('active'));
+            if (element) element.classList.add('active');
+
+            const container = document.getElementById('main-media-container');
+            if (type === 'video') {
+                container.innerHTML = `<video src="${url}" class="main-image" controls autoplay style="max-height: 500px; width: 100%; object-fit: cover;"></video>`;
+            } else {
+                container.innerHTML = `<img src="${url}" class="main-image" style="max-height: 500px; width: 100%; object-fit: cover;">`;
+            }
+        }
+
+        // 2. YORUM FORMU İŞLEMLERİ (Sarı Yıldız Seçme Animasyonu)
+        function setRating(rating) {
+            selectedRating = rating;
+            const stars = document.getElementById('star-selector').children;
+            for (let i = 0; i < stars.length; i++) {
+                if (i < rating) {
+                    stars[i].classList.add('active');
+                } else {
+                    stars[i].classList.remove('active');
+                }
+            }
+        }
+
+        // 3. YORUMU VERİTABANINA GÖNDERME
+        async function submitReview() {
+            if (selectedRating === 0) {
+                alert("Lütfen önce bir yıldız puanı seçin.");
+                return;
+            }
+
+            const comment = document.getElementById('review-comment').value;
+
+            try {
+                const response = await fetch('http://localhost:5000/api/reviews', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        productId: productId,
+                        userId: user.id,
+                        rating: selectedRating,
+                        comment: comment
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert("✅ " + result.mesaj);
+                    window.location.reload(); // Yorumu listeye eklemek için sayfayı tazele
+                } else {
+                    alert("❌ Hata: " + result.error);
+                }
+            } catch (error) {
+                alert("Yorum gönderilirken sunucu hatası oluştu.");
+            }
+        }
+
+        // 4. SATICIYA SORU SORMA (Q&A) İŞLEMLERİ
+        async function fetchProductQuestions() {
+            try {
+                const response = await fetch(`http://localhost:5000/api/questions/product/${productId}`);
+                const questions = await response.json();
+
+                const qaList = document.getElementById('qa-list');
+                if (response.ok) {
+                    if (questions.length === 0) {
+                        qaList.innerHTML = '<p style="color:#888;">Henüz bu ürün için sorulmuş bir soru yok. İlk soruyu siz sorun!</p>';
+                    } else {
+                        let html = '';
+                        questions.forEach(q => {
+                            const dateStr = new Date(q.answered_at || q.created_at).toLocaleDateString('tr-TR');
+                            html += `
+                                <div class="qa-card">
+                                    <div class="qa-q">
+                                        <span style="background: #EAEAEA; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; height: fit-content;">Soru</span>
+                                        <div style="flex: 1;">
+                                            <div>${q.question}</div>
+                                            <div style="font-size: 0.75rem; color: #888; margin-top: 5px;">${q.user_name} - ${new Date(q.created_at).toLocaleDateString()}</div>
+                                        </div>
+                                    </div>
+                                    <div class="qa-a">
+                                        <div style="font-weight: 600; color: #00897B; margin-bottom: 5px; font-size: 0.85rem;">Satıcı Yanıtı <span style="color:#aaa; font-weight:normal; margin-left:10px;">${dateStr}</span></div>
+                                        <div>${q.answer || '<em>Satıcı henüz yanıtlamadı.</em>'}</div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        qaList.innerHTML = html;
+                    }
+                }
+            } catch (e) {
+                document.getElementById('qa-list').innerHTML = '<p style="color:red;">Sorular yüklenirken hata oluştu.</p>';
+            }
+        }
+
+        async function submitQuestion() {
+            const token = localStorage.getItem('nova_user_token');
+            if (!token) {
+                alert("Soru sormak için giriş yapmalısınız.");
+                return;
+            }
+
+            const qText = document.getElementById('question-text').value.trim();
+            if (!qText) {
+                alert("Lütfen sorunuzu yazın.");
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:5000/api/questions/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        product_id: productId,
+                        question: qText
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert("✅ " + result.mesaj);
+                    document.getElementById('question-text').value = '';
+                } else {
+                    alert("❌ Hata: " + result.error);
+                }
+            } catch (error) {
+                alert("Sorunuz gönderilirken sunucu hatası oluştu.");
+            }
+        }
+
+        // Sayfa açıldığında çalıştır
+        fetchProductAndReviews();
+        document.addEventListener('DOMContentLoaded', () => {
+            checkUserStatus();
+            renderCartUI();
+            fetchNavigationCategories();
+        });
+    </script>
+    <!-- Canlı Destek Modülü -->
+    <script src="chat.js"></script>
+
+</body>
+
+</html>

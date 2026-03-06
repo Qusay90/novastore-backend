@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaStore | Güvenli Ödeme</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            background-color: #F5F7FA;
+            padding: 40px 0;
+        }
+
+        .checkout-container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 30px;
+        }
+
+        .checkout-section {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            color: #0F2A43;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #F0F0F0;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: 'Inter';
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            border-color: #0F2A43;
+            outline: none;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .order-summary {
+            background: #FAFAFA;
+            padding: 30px;
+            border-radius: 16px;
+            position: sticky;
+            top: 20px;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+        }
+
+        .summary-total {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #EAEAEA;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #0F2A43;
+        }
+
+        /* --- GELİŞMİŞ VE UZUN KREDİ KARTI GÖRSELİ --- */
+        .credit-card-container {
+            perspective: 1000px;
+            width: 100%;
+            height: 290px;
+            margin-bottom: 25px;
+        }
+
+        .credit-card-box {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transition: transform 0.8s;
+            transform-style: preserve-3d;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(15, 42, 67, 0.3);
+        }
+
+        .credit-card-box.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .flip-card-front,
+        .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            background: linear-gradient(135deg, #0F2A43 0%, #1a4a76 100%);
+            color: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        /* Kartın Ön Yüzü Düzeni */
+        .flip-card-front {
+            display: flex;
+            flex-direction: column;
+            z-index: 2;
+            transform: rotateY(0deg);
+        }
+
+        /* Logo Sağ Üst Köşeye Sabitlendi */
+        .cc-logo {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            height: 35px;
+            opacity: 0.9;
+        }
+
+        /* Çip ve Numara: Merkeze alındıktan sonra 20px aşağı kaydırıldı */
+        .cc-middle {
+            margin-top: auto;
+            margin-bottom: auto;
+            transform: translateY(20px);
+        }
+
+        .cc-chip {
+            width: 50px;
+            height: 35px;
+            background: linear-gradient(135deg, #FFD700 0%, #d4af37 100%);
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .cc-chip::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .cc-chip::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 1px;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .cc-number-display {
+            font-size: 1.7rem;
+            letter-spacing: 2.5px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Alt Bilgiler */
+        .cc-bottom {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            align-items: flex-end;
+        }
+
+        .cc-label {
+            font-size: 0.65rem;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+
+        /* Kartın Arka Yüzü Düzeni */
+        .flip-card-back {
+            transform: rotateY(180deg);
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .magnetic-strip {
+            height: 50px;
+            background: #222;
+            width: 100%;
+            margin-top: 40px;
+        }
+
+        .cvv-band {
+            margin-top: 30px;
+            padding: 0 25px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+        }
+
+        .signature-box {
+            height: 40px;
+            background: #fff;
+            flex-grow: 1;
+            margin-right: 15px;
+            border-radius: 4px;
+            opacity: 0.8;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 50 Q 25 40, 50 50 T 100 50' stroke='%23eee' fill='none'/%3E%3C/svg%3E");
+        }
+
+        .cvv-display {
+            background: white;
+            color: #333;
+            font-weight: bold;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1rem;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .back-logo {
+            margin-top: auto;
+            text-align: right;
+            padding: 25px;
+        }
+
+        .back-logo img {
+            height: 30px;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .checkout-container {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+
+            .credit-card-container {
+                height: 260px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="checkout-container">
+        <div>
+            <form id="checkout-form">
+                <div class="checkout-section" style="position: relative;">
+                    <h2 class="section-title">1. Teslimat Bilgileri</h2>
+
+                    <div id="selected-address-card" onclick="openCheckoutAddressModal()"
+                        style="background: white; border: 1px solid #EAEAEA; border-radius: 12px; padding: 20px; cursor: pointer; transition: 0.3s; margin-bottom: 20px; position: relative;"
+                        onmouseover="this.style.borderColor='#0F2A43'" onmouseout="this.style.borderColor='#EAEAEA'">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <h3 id="checkout-addr-title"
+                                    style="margin-top: 0; color: #0F2A43; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                                    📍 Lütfen Adres Seçin
+                                </h3>
+                                <p id="checkout-addr-detail"
+                                    style="color: #666; font-size: 0.95rem; line-height: 1.5; margin: 0;">
+                                    Teslimat için kayıtlı adreslerinizden birini seçin veya yeni ekleyin.
+                                </p>
+                            </div>
+                            <div style="font-size: 1.5rem; color: #888;">▼</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Adres Seçimi Ekranı (Modal) -->
+                <div id="checkout-address-modal"
+                    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+                    <div
+                        style="background: white; border-radius: 16px; width: 90%; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.1); position: relative; overflow: hidden;">
+
+                        <div
+                            style="padding: 20px 30px; border-bottom: 1px solid #EEE; display: flex; justify-content: space-between; align-items: center; background: #FAFAFA;">
+                            <h3 style="margin: 0; color: #0F2A43; font-size: 1.3rem;">Kayıtlı Adreslerim</h3>
+                            <button type="button" onclick="closeCheckoutAddressModal()"
+                                style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: #666;">✕</button>
+                        </div>
+
+                        <div id="checkout-address-list"
+                            style="padding: 30px; overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 15px;">
+                            <!-- Adresler JS ile buraya gelecek -->
+                        </div>
+
+                        <div style="padding: 20px 30px; border-top: 1px solid #EEE; background: #FAFAFA;">
+                            <button type="button" onclick="openNewAddressFormInCheckout()"
+                                style="width: 100%; padding: 15px; background: white; border: 2px dashed #0F2A43; color: #0F2A43; font-weight: bold; border-radius: 12px; cursor: pointer; transition: 0.3s; font-size: 1.1rem;"
+                                onmouseover="this.style.background='#0F2A43'; this.style.color='white';"
+                                onmouseout="this.style.background='white'; this.style.color='#0F2A43';">
+                                + Yeni Adres Ekle
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Yeni Adres Ekleme Formu (Modal İçinde Modal veya Ayrı Görünüm) -->
+                <div id="new-address-modal"
+                    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+                    <div
+                        style="background: white; border-radius: 16px; width: 90%; max-width: 500px; padding: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); position: relative;">
+                        <button type="button" onclick="closeNewAddressForm()"
+                            style="position: absolute; top: 20px; right: 20px; background: #F0F0F0; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #666;">✕</button>
+                        <h3 style="margin-top: 0; color: #0F2A43; font-size: 1.3rem; margin-bottom: 25px;">📍 Yeni Adres
+                            Ekle</h3>
+
+                        <div id="new-address-form-content">
+                            <div class="form-group">
+                                <label>Ad Soyad (Teslim Alacak Kişi)</label>
+                                <input type="text" id="new-addr-fullname" class="form-control"
+                                    placeholder="Örn: Ahmet Yılmaz">
+                            </div>
+                            <div class="grid-2">
+                                <div class="form-group">
+                                    <label>Telefon</label>
+                                    <input type="tel" id="new-addr-phone" class="form-control"
+                                        placeholder="05XX XXX XX XX">
+                                </div>
+                                <div class="form-group">
+                                    <label>Adres Başlığı</label>
+                                    <input type="text" id="new-addr-title" class="form-control"
+                                        placeholder="Örn: Ev, İş">
+                                </div>
+                            </div>
+                            <div class="grid-2">
+                                <div class="form-group">
+                                    <label>İl</label>
+                                    <input type="text" id="new-addr-city" class="form-control"
+                                        placeholder="Örn: İstanbul">
+                                </div>
+                                <div class="form-group">
+                                    <label>İlçe</label>
+                                    <input type="text" id="new-addr-district" class="form-control"
+                                        placeholder="Örn: Kadıköy">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Açık Adres</label>
+                                <textarea id="new-addr-detail" class="form-control" rows="3"
+                                    placeholder="Mahalle, Sokak..."></textarea>
+                            </div>
+                            <button type="button" onclick="saveNewAddressFromCheckout()" class="btn btn-primary"
+                                style="width: 100%; border-radius: 8px;">Adresi Kaydet ve Kullan</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="checkout-section">
+                    <h2 class="section-title">2. Ödeme Bilgileri</h2>
+
+                    <div class="credit-card-container">
+                        <div class="credit-card-box" id="card-box">
+                            <div class="flip-card-front">
+                                <img src="" class="cc-logo" id="cc-brand-logo" style="display: none;">
+
+                                <div class="cc-middle">
+                                    <div class="cc-chip"></div>
+                                    <div class="cc-number-display" id="cc-display-number">•••• •••• •••• ••••</div>
+                                </div>
+
+                                <div class="cc-bottom">
+                                    <div>
+                                        <div class="cc-label">KART SAHİBİ</div>
+                                        <div id="cc-display-name">AD SOYAD</div>
+                                    </div>
+                                    <div>
+                                        <div class="cc-label">SON KULLANMA</div>
+                                        <div id="cc-display-date">AA/YY</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flip-card-back">
+                                <div class="magnetic-strip"></div>
+                                <div class="cvv-band">
+                                    <div class="signature-box"></div>
+                                    <div class="cvv-display" id="cc-display-cvv">•••</div>
+                                </div>
+                                <div class="back-logo">
+                                    <img src="" id="cc-brand-logo-back" style="display: none;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Kart Üzerindeki İsim</label>
+                        <input type="text" id="cardName" required placeholder="AHMET YILMAZ"
+                            oninput="updateCardVisuals()" onkeydown="focusNext(event, 'cardNumber')">
+                    </div>
+                    <div class="form-group">
+                        <label>Kart Numarası</label>
+                        <input type="text" id="cardNumber" required placeholder="0000 0000 0000 0000" maxlength="19"
+                            oninput="formatCardNumber(this)">
+                    </div>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>Son Kullanma (AA/YY)</label>
+                            <input type="text" id="cardExpiry" required placeholder="MM/YY" maxlength="5"
+                                oninput="formatExpiry(this)">
+                        </div>
+                        <div class="form-group">
+                            <label>CVV (Güvenlik Kodu)</label>
+                            <input type="text" id="cardCvv" required placeholder="123" maxlength="3" pattern="[0-9]{3}"
+                                oninput="updateCvv(this)" onfocus="flipCard(true)" onblur="flipCard(false)">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="submit-btn"
+                    style="width: 100%; font-size: 1.2rem; padding: 18px; border-radius: 12px;">Siparişi Tamamla ve
+                    Öde</button>
+            </form>
+        </div>
+
+        <div>
+            <div class="order-summary">
+                <h2 class="section-title" style="margin-top: 0;">Sipariş Özeti</h2>
+                <div id="checkout-items" style="margin-bottom: 20px;"></div>
+                <div class="summary-total"><span>Toplam:</span><span><span id="checkout-total">0</span> TL</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- KULLANICIYA ÖZEL LOCALSTORAGE ANAHTARLARI ---
+        function _getUserId() {
+            try {
+                const info = JSON.parse(localStorage.getItem('nova_user_info'));
+                return info && info.id ? info.id : 'guest';
+            } catch (e) { return 'guest'; }
+        }
+        function _cartKey() { return `novastore_cart_${_getUserId()}`; }
+        function _addrKey() { return `novastore_addresses_${_getUserId()}`; }
+        function _checkoutKey() { return `novastore_checkout_${_getUserId()}`; }
+
+        const cart = JSON.parse(localStorage.getItem(_checkoutKey())) || [];
+        let totalAmount = 0;
+        if (cart.length === 0) { alert("Ödenecek ürün bulanamadı. Lütfen seçim yapın."); window.location.href = "index.html"; }
+        const itemsContainer = document.getElementById('checkout-items');
+        cart.forEach(item => {
+            totalAmount += parseFloat(item.price) * item.quantity;
+            itemsContainer.innerHTML += `<div class="summary-item"><span>${item.quantity}x ${item.name}</span><span style="font-weight:600;">${(item.price * item.quantity).toFixed(2)} TL</span></div>`;
+        });
+        document.getElementById('checkout-total').innerText = totalAmount.toFixed(2);
+
+        function flipCard(isFlipped) {
+            const cardBox = document.getElementById('card-box');
+            if (isFlipped) { cardBox.classList.add('flipped'); }
+            else { cardBox.classList.remove('flipped'); }
+        }
+
+        function updateCvv(input) {
+            input.value = input.value.replace(/\D/g, '');
+            document.getElementById('cc-display-cvv').innerText = input.value || '•••';
+            if (input.value.length === 3) { input.blur(); }
+        }
+
+        function detectCardType(number) {
+            const re = {
+                visa: /^4/,
+                mastercard: /^5[1-5]/,
+                amex: /^3[47]/
+            };
+            if (re.visa.test(number)) return { type: 'visa', logo: 'https://cdn.visa.com/v2/assets/images/logos/visa/blue/logo.png' };
+            if (re.mastercard.test(number)) return { type: 'mastercard', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png' };
+            if (re.amex.test(number)) return { type: 'amex', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/American_Express_logo.svg/1200px-American_Express_logo.svg.png' };
+            return { type: null, logo: null };
+        }
+
+        function focusNext(event, nextElementId) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                document.getElementById(nextElementId).focus();
+            }
+        }
+
+        function formatCardNumber(input) {
+            let val = input.value.replace(/\D/g, '');
+            const cardType = detectCardType(val);
+            const logoFront = document.getElementById('cc-brand-logo');
+            const logoBack = document.getElementById('cc-brand-logo-back');
+
+            if (cardType.type) {
+                logoFront.src = cardType.logo; logoFront.style.display = 'block';
+                logoBack.src = cardType.logo; logoBack.style.display = 'block';
+            } else {
+                logoFront.style.display = 'none'; logoBack.style.display = 'none';
+            }
+
+            let formatted = val.match(/.{1,4}/g)?.join(' ') || val;
+            input.value = formatted;
+            document.getElementById('cc-display-number').innerText = formatted || '•••• •••• •••• ••••';
+
+            if (input.value.length === 19) { document.getElementById('cardExpiry').focus(); }
+        }
+
+        function formatExpiry(input) {
+            let val = input.value.replace(/\D/g, '');
+            if (val.length >= 2) { val = val.substring(0, 2) + '/' + val.substring(2, 4); }
+            input.value = val;
+            document.getElementById('cc-display-date').innerText = val || 'AA/YY';
+
+            if (input.value.length === 5) { document.getElementById('cardCvv').focus(); }
+        }
+
+        function updateCardVisuals() {
+            const name = document.getElementById('cardName').value.toUpperCase();
+            document.getElementById('cc-display-name').innerText = name || 'AD SOYAD';
+        }
+
+        let selectedAddressId = null;
+
+        function loadCheckoutAddresses() {
+            const addresses = JSON.parse(localStorage.getItem(_addrKey())) || [];
+
+            // Eğer daha önceden eksi formatta adres varsa ve listeye geçmemişse geçir
+            const oldAddress = localStorage.getItem('nova_user_address');
+            if (oldAddress && addresses.length === 0) {
+                let data = JSON.parse(oldAddress);
+                data.id = Date.now().toString();
+                data.fullName = JSON.parse(localStorage.getItem('nova_user_info'))?.fullName || '';
+                data.phone = '';
+                addresses.push(data);
+                localStorage.setItem(_addrKey(), JSON.stringify(addresses));
+                localStorage.removeItem('nova_user_address');
+            }
+
+            if (addresses.length > 0) {
+                // Varsayılan olarak ilk adresi seç
+                if (!selectedAddressId || !addresses.find(a => a.id === selectedAddressId)) {
+                    selectAddress(addresses[0].id);
+                }
+            } else {
+                document.getElementById('checkout-addr-title').innerText = "📍 Henüz Kayıtlı Adresiniz Yok";
+                document.getElementById('checkout-addr-detail').innerText = "Siparişi tamamlamak için lütfen yeni bir adres ekleyin.";
+                selectedAddressId = null;
+            }
+        }
+
+        function openCheckoutAddressModal() {
+            const addresses = JSON.parse(localStorage.getItem(_addrKey())) || [];
+            const listContainer = document.getElementById('checkout-address-list');
+            listContainer.innerHTML = '';
+
+            if (addresses.length === 0) {
+                listContainer.innerHTML = '<p style="text-align:center; color:#888;">Kayıtlı adresiniz bulunmuyor.</p>';
+            } else {
+                addresses.forEach(addr => {
+                    const isSelected = addr.id === selectedAddressId;
+                    const borderStyle = isSelected ? 'border: 2px solid #F7941D;' : 'border: 1px solid #EAEAEA;';
+                    const bgStyle = isSelected ? 'background: #FFFDFC;' : 'background: white;';
+
+                    listContainer.innerHTML += `
+                        <div onclick="selectAddress('${addr.id}')" style="${borderStyle} ${bgStyle} border-radius: 12px; padding: 20px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.borderColor='#F7941D'">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <h4 style="margin: 0; color: #0F2A43;">${addr.title} ${isSelected ? '<span style="color:#F7941D; font-size:0.8rem; margin-left:10px;">(Seçili)</span>' : ''}</h4>
+                                <div style="font-weight: 600; font-size: 0.9rem;">${addr.fullName || JSON.parse(localStorage.getItem('nova_user_info'))?.fullName || ''}</div>
+                            </div>
+                            <p style="margin: 0; color: #666; font-size: 0.9rem; line-height: 1.4;">
+                                ${addr.detail}<br>
+                                ${addr.district} / ${addr.city}
+                            </p>
+                            ${addr.phone ? `<div style="margin-top: 5px; color: #888; font-size: 0.85rem;">📞 ${addr.phone}</div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('checkout-address-modal').style.display = 'flex';
+        }
+
+        function closeCheckoutAddressModal() {
+            document.getElementById('checkout-address-modal').style.display = 'none';
+        }
+
+        function selectAddress(id) {
+            const addresses = JSON.parse(localStorage.getItem(_addrKey())) || [];
+            const addr = addresses.find(a => a.id === id);
+
+            if (addr) {
+                selectedAddressId = id;
+                document.getElementById('checkout-addr-title').innerHTML = `📍 ${addr.title}`;
+                let detailText = `<strong>${addr.fullName || ''}</strong><br>${addr.detail}, ${addr.district}/${addr.city}`;
+                if (addr.phone) detailText += `<br>${addr.phone}`;
+                document.getElementById('checkout-addr-detail').innerHTML = detailText;
+                closeCheckoutAddressModal();
+            }
+        }
+
+        function openNewAddressFormInCheckout() {
+            closeCheckoutAddressModal();
+            const userInfo = JSON.parse(localStorage.getItem('nova_user_info')) || {};
+            document.getElementById('new-addr-fullname').value = userInfo.fullName || '';
+            document.getElementById('new-address-modal').style.display = 'flex';
+        }
+
+        function closeNewAddressForm() {
+            document.getElementById('new-address-modal').style.display = 'none';
+        }
+
+        function saveNewAddressFromCheckout() {
+            const title = document.getElementById('new-addr-title').value;
+            const city = document.getElementById('new-addr-city').value;
+            const district = document.getElementById('new-addr-district').value;
+            const detail = document.getElementById('new-addr-detail').value;
+            const fullName = document.getElementById('new-addr-fullname').value;
+            const phone = document.getElementById('new-addr-phone').value;
+
+            if (!title || !city || !district || !detail || !fullName || !phone) {
+                alert("Lütfen tüm zorunlu adres alanlarını doldurun.");
+                return;
+            }
+
+            const newId = Date.now().toString();
+            const newAddr = {
+                id: newId,
+                title: title,
+                city: city,
+                district: district,
+                detail: detail,
+                fullName: fullName,
+                phone: phone
+            };
+
+            const addresses = JSON.parse(localStorage.getItem(_addrKey())) || [];
+            addresses.push(newAddr);
+            localStorage.setItem(_addrKey(), JSON.stringify(addresses));
+
+            closeNewAddressForm();
+            selectAddress(newId);
+        }
+
+        // Sayfa yüklendiğinde adresleri kontrol et
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCheckoutAddresses();
+        });
+
+        document.getElementById('checkout-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!selectedAddressId) {
+                alert("Lütfen teslimat için bir adres seçin veya ekleyin!");
+                openCheckoutAddressModal();
+                return;
+            }
+
+            const btn = document.getElementById('submit-btn'); btn.innerText = "Ödeme Alınıyor... Lütfen Bekleyin"; btn.disabled = true;
+            // Giriş yapmış bir müşteri varsa onun ID'sini al, yoksa null gönder
+            const userInfoStr = localStorage.getItem('nova_user_info');
+            const user = userInfoStr ? JSON.parse(userInfoStr) : null;
+
+            const addresses = JSON.parse(localStorage.getItem(_addrKey())) || [];
+            const selectedAddr = addresses.find(a => a.id === selectedAddressId) || {};
+
+            const orderData = {
+                fullName: selectedAddr.fullName || (user ? user.fullName : 'Misafir'),
+                email: user ? user.email : 'misafir@mail.com', // Opsiyonel, eklenebilir
+                phone: selectedAddr.phone || '',
+                address: `${selectedAddr.title}: ${selectedAddr.detail}, ${selectedAddr.district}/${selectedAddr.city}`,
+                totalAmount: totalAmount,
+                cartItems: cart,
+                userId: user ? user.id : null  // YENİ: Müşteri ID'sini ekledik
+            };
+            setTimeout(async () => {
+                try {
+                    const response = await fetch('http://localhost:5000/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orderData) });
+                    const result = await response.json();
+                    if (response.ok) {
+                        alert("🎉 ÖDEME BAŞARILI!\nSipariş No: " + result.siparisNo);
+
+                        let mainCart = JSON.parse(localStorage.getItem(_cartKey())) || [];
+                        cart.forEach(boughtItem => {
+                            if (!boughtItem.isBuyNow) {
+                                const idx = mainCart.findIndex(mc => mc.id === boughtItem.id);
+                                if (idx > -1) mainCart.splice(idx, 1);
+                            }
+                        });
+                        localStorage.setItem(_cartKey(), JSON.stringify(mainCart));
+                        localStorage.removeItem(_checkoutKey());
+
+                        window.location.href = "index.html";
+                    }
+                    else { alert("Hata: " + result.error); btn.innerText = "Siparişi Tamamla ve Öde"; btn.disabled = false; }
+                } catch (error) { alert("Sunucuya bağlanılamadı."); btn.innerText = "Siparişi Tamamla ve Öde"; btn.disabled = false; }
+            }, 1500);
+        });
+    </script>
+</body>
+
+</html>
