@@ -1,8 +1,9 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const { getDashboardStats } = require('../controllers/adminController');
+const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 
-// Admin panelinin özet istatistiklerini getiren yol
-router.get('/stats', getDashboardStats);
+// Admin panelinin ozet istatistiklerini getiren yol
+router.get('/stats', authenticate, requireAdmin, getDashboardStats);
 
 module.exports = router;

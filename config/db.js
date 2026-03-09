@@ -1,16 +1,16 @@
-//Bu dosya, Node.js ile PostgreSQL veritabanımız arasındaki köprüyü kuracak.
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Veritabanı bağlantı havuzunu oluşturuyoruz
+const connectionString = process.env.DATABASE_URL;
+const useSsl = String(process.env.DB_SSL || 'true').toLowerCase() !== 'false';
+
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    // Eğer bulut tabanlı bir veritabanı kullanacaksan aşağıdaki satırın başındaki // işaretlerini kaldır:
-    ssl: { rejectUnauthorized: false }
+    connectionString,
+    ssl: useSsl ? { rejectUnauthorized: false } : false
 });
 
 pool.on('connect', () => {
-    console.log('🔌 PostgreSQL veritabanına başarıyla bağlanıldı.');
+    console.log('PostgreSQL baglantisi hazir.');
 });
 
 module.exports = pool;

@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+﻿document.addEventListener('DOMContentLoaded', () => {
     const chatUsersList = document.getElementById('admin-chat-users');
     const chatMessages = document.getElementById('admin-chat-messages');
     const chatInput = document.getElementById('admin-chat-input');
@@ -7,6 +7,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentChatUserId = null;
     const adminToken = localStorage.getItem('nova_admin_token'); // admin token
+    let adminUserId = 1;
+    try {
+        const payload = JSON.parse(atob((adminToken || '').split('.')[1] || ''));
+        if (payload && Number.isInteger(Number(payload.id))) adminUserId = Number(payload.id);
+    } catch (_) { }
 
     // Admin sayfaya girdiğinde sohbet eden kullanıcıları getir
     async function loadChatUsers() {
@@ -70,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     chatMessages.innerHTML = '<div style="text-align: center; color: #999;">Sohbet geçmişi yok. İlk mesajı gönderin!</div>';
                 } else {
                     history.forEach(msg => {
-                        const type = msg.sender_id == 1 ? 'sent' : 'received';
+                        const type = msg.sender_id == adminUserId ? 'sent' : 'received';
                         addAdminMessageToUI(msg, type);
                     });
                 }
@@ -107,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatInput.value = '';
 
         const msgObj = {
-            sender_id: 1, // Admin
+            sender_id: adminUserId, // Admin
             receiver_id: currentChatUserId,
             message: messageText
         };
@@ -130,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Başarılıysa Socket ile müşteriye gönder
                 if (window.socket && window.socket.connected) {
-                    window.socket.emit('send_message', savedMsg);
+                    window.socket.emit('send_message', { ...savedMsg, receiver_role: 'customer' });
                 }
             } else {
                 console.error("Mesaj gönderilemedi");
@@ -155,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.socket) {
         window.socket.on('receive_message', (data) => {
             // Eğer müşteri admin'e yolladıysa
-            if (data.receiver_id == 1) {
+            if (data.receiver_id == adminUserId) {
                 // Eğer ilgili müşterinin sohbeti açıksa
                 if (currentChatUserId == data.sender_id) {
                     addAdminMessageToUI(data, 'received');
@@ -184,3 +189,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 });
+
+
+

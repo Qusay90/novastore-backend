@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaStore | Odeme Sonucu</title>
+    <style>
+        body { margin: 0; font-family: Inter, Arial, sans-serif; background: #f4f7fb; color: #1f2937; display: grid; place-items: center; min-height: 100vh; }
+        .box { width: min(560px, 92vw); background: #fff; border: 1px solid #e5eaf2; border-radius: 16px; padding: 28px; box-shadow: 0 10px 28px rgba(15, 42, 67, 0.08); text-align: center; }
+        h1 { margin: 0 0 10px; color: #0f2a43; }
+        p { color: #556070; line-height: 1.6; }
+        .ok { color: #127a44; }
+        .bad { color: #b42323; }
+        .btn { margin-top: 14px; background: #0f2a43; color: white; border: none; border-radius: 10px; padding: 11px 16px; font-weight: 700; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1 id="title">Odeme Sonucu</h1>
+        <p id="desc">Sonuc kontrol ediliyor...</p>
+        <button class="btn" onclick="window.location.href='profile.html?tab=orders'">Siparislerime Don</button>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+
+        function qs(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+
+        async function handleResult() {
+            const status = (qs('status') || 'failed').toUpperCase();
+            const paymentRef = qs('paymentRef');
+            const orderId = qs('orderId');
+
+            const title = document.getElementById('title');
+            const desc = document.getElementById('desc');
+
+            if (!paymentRef) {
+                title.innerText = 'Odeme Bilgisi Eksik';
+                desc.innerText = 'Odeme referansi bulunamadi.';
+                return;
+            }
+
+            try {
+                const payload = {
+                    eventId: `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    paymentRef,
+                    status: status === 'SUCCESS' ? 'SUCCESS' : 'FAILED',
+                    providerTransactionId: `mock-${paymentRef}`,
+                    orderId
+                };
+
+                const response = await fetch(`${API_BASE}/api/payments/webhook/iyzico`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Webhook islenemedi.');
+                }
+
+                if (status === 'SUCCESS') {
+                    title.innerText = 'Odeme Basarili';
+                    title.className = 'ok';
+                    desc.innerText = `Odemeniz alindi. Siparisiniz hazirlaniyor. (Ref: ${paymentRef})`;
+                } else {
+                    title.innerText = 'Odeme Basarisiz';
+                    title.className = 'bad';
+                    desc.innerText = 'Odeme tamamlanamadi. Dilerseniz tekrar deneyebilirsiniz.';
+                }
+            } catch (err) {
+                title.innerText = 'Odeme Sonucu Islenemedi';
+                title.className = 'bad';
+                desc.innerText = err.message || 'Beklenmeyen bir hata olustu.';
+            }
+        }
+
+        handleResult();
+    </script>
+</body>
+</html>

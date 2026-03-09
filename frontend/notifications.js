@@ -1,4 +1,4 @@
-/**
+﻿/**
  * NovaStore - Müşteri Bildirim Sistemi (notifications.js)
  * SADECE müşteri sayfaları için (index.html). Admin panelinin kendi sistemi var.
  * Tıklanınca → profile.html#orders veya ilgili sekme açılır.
@@ -6,6 +6,10 @@
 
 let _notifSocket = null;
 let _currentUserId = null;
+function _authHeaders(extra = {}) {
+    const token = localStorage.getItem('nova_user_token');
+    return token ? { ...extra, 'Authorization': `Bearer ${token}` } : { ...extra };
+}
 
 // Bildirim tiplerine göre meta
 const NOTIF_META = {
@@ -122,7 +126,7 @@ function _connectSocket(room) {
 // ─────────────────────────────────────────────────────────────────
 async function _fetchUserNotifications(userId) {
     try {
-        const res = await fetch(`http://localhost:5000/api/notifications/user/${userId}`);
+        const res = await fetch(`http://localhost:5000/api/notifications/user/${userId}`, { headers: _authHeaders() });
         const data = await res.json();
         _renderNotifications(data);
     } catch (e) { }
@@ -259,7 +263,7 @@ async function handleNotifClick(id, type, el) {
     // Okundu işaretle
     if (el.classList.contains('unread')) {
         try {
-            await fetch(`http://localhost:5000/api/notifications/${id}/read`, { method: 'PATCH' });
+            await fetch(`http://localhost:5000/api/notifications/${id}/read`, { method: 'PATCH', headers: _authHeaders() });
             el.classList.remove('unread');
             _updateBadge(-1);
         } catch (e) { }
@@ -272,7 +276,7 @@ async function handleNotifClick(id, type, el) {
 async function markAllNotificationsRead() {
     if (!_currentUserId) return;
     try {
-        await fetch(`http://localhost:5000/api/notifications/read-all/${_currentUserId}`, { method: 'PATCH' });
+        await fetch(`http://localhost:5000/api/notifications/read-all/${_currentUserId}`, { method: 'PATCH', headers: _authHeaders() });
         document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
         _setBadgeCount(0);
     } catch (e) { }
@@ -378,3 +382,6 @@ function _timeAgo(dateStr) {
     if (diff < 86400) return `${Math.floor(diff / 3600)} sa önce`;
     return `${Math.floor(diff / 86400)} gün önce`;
 }
+
+
+

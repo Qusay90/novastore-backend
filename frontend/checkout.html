@@ -99,7 +99,86 @@
             color: #0F2A43;
         }
 
-        /* --- GELİŞMİŞ VE UZUN KREDİ KARTI GÖRSELİ --- */
+
+        .legal-links {
+            margin: 14px 0 6px;
+            font-size: 0.88rem;
+            color: #4E5F73;
+            line-height: 1.6;
+        }
+
+        .legal-links a {
+            color: #0F2A43;
+            text-decoration: none;
+            font-weight: 600;
+            border-bottom: 1px dashed #9EB0C6;
+            cursor: pointer;
+        }
+
+        .legal-links a:hover {
+            color: #F7941D;
+            border-bottom-color: #F7941D;
+        }
+
+        .legal-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 20000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .legal-modal {
+            width: 100%;
+            max-width: 680px;
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 14px 50px rgba(0, 0, 0, 0.18);
+            border: 1px solid #EAEAEA;
+            overflow: hidden;
+        }
+
+        .legal-modal-head {
+            padding: 18px 22px;
+            border-bottom: 1px solid #F0F0F0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: #FAFAFA;
+        }
+
+        .legal-modal-title {
+            margin: 0;
+            font-size: 1.05rem;
+            color: #0F2A43;
+        }
+
+        .legal-modal-close {
+            border: none;
+            background: #fff;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.05rem;
+            color: #4B5563;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        .legal-modal-content {
+            padding: 18px 22px 24px;
+            color: #4B5563;
+            line-height: 1.65;
+            font-size: 0.92rem;
+            max-height: 62vh;
+            overflow-y: auto;
+        }
+
+        /* --- GELISMIS VE UZUN KREDI KARTI GORSELI --- */
         .credit-card-container {
             perspective: 1000px;
             width: 100%;
@@ -392,6 +471,18 @@
                 <div class="checkout-section">
                     <h2 class="section-title">2. Ödeme Bilgileri</h2>
 
+                    <div style="display: flex; gap: 12px; margin-bottom: 24px;" id="payment-method-toggle">
+                        <label id="method-card-label" onclick="selectPaymentMethod('card')" style="flex: 1; display: flex; align-items: center; gap: 10px; padding: 14px 18px; border: 2px solid #0F2A43; border-radius: 10px; cursor: pointer; background: #F8FBFF; transition: 0.2s;">
+                            <input type="radio" name="paymentMethod" value="card" checked style="width:16px;height:16px;accent-color:#0F2A43;pointer-events:none;">
+                            <span style="font-weight: 600; color: #0F2A43; font-size: 0.95rem;">Kredi / Banka Kartı</span>
+                        </label>
+                        <label id="method-havale-label" onclick="selectPaymentMethod('havale')" style="flex: 1; display: flex; align-items: center; gap: 10px; padding: 14px 18px; border: 2px solid #EAEAEA; border-radius: 10px; cursor: pointer; background: white; transition: 0.2s;">
+                            <input type="radio" name="paymentMethod" value="havale" style="width:16px;height:16px;accent-color:#0F2A43;pointer-events:none;">
+                            <span style="font-weight: 600; color: #555; font-size: 0.95rem;">Havale / EFT</span>
+                        </label>
+                    </div>
+
+                    <div id="card-payment-section">
                     <div class="credit-card-container">
                         <div class="credit-card-box" id="card-box">
                             <div class="flip-card-front">
@@ -449,11 +540,49 @@
                                 oninput="updateCvv(this)" onfocus="flipCard(true)" onblur="flipCard(false)">
                         </div>
                     </div>
+                    </div><!-- /#card-payment-section -->
+
+                    <div id="havale-payment-section" style="display:none; background:#F0F7FF; border:1px solid #BBDEFB; border-radius:12px; padding:24px;">
+                        <h4 style="margin:0 0 12px; color:#1565C0; font-size:1rem;">Havale / EFT Bilgileri</h4>
+                        <p style="margin:0 0 14px; color:#555; font-size:0.9rem; line-height:1.5;">Aşağıdaki IBAN'a siparişinizin toplam tutarını aktarın. Ödemeniz doğrulandıktan sonra siparişiniz işleme alınır.</p>
+                        <div style="background:white; border:1px solid #E3F2FD; border-radius:8px; padding:16px; display:flex; flex-direction:column; gap:10px;">
+                            <div style="display:flex; justify-content:space-between;"><span style="color:#888; font-size:0.85rem;">Hesap Sahibi</span><span style="font-weight:700; color:#0F2A43;">NovaStore Elektronik</span></div>
+                            <div style="display:flex; justify-content:space-between;"><span style="color:#888; font-size:0.85rem;">IBAN</span><span style="font-weight:700; color:#0F2A43; font-family:monospace; font-size:0.9rem;" id="display-iban">TR00 0000 0000 0000 0000 0000 00</span></div>
+                        </div>
+                        <p style="margin:12px 0 0; color:#E65100; font-size:0.82rem;">Havale sonrasında sipariş numaranızı açıklama kısmına ekleyin. 24 saat içinde ödeme onaylanmazsa sipariş iptal edilir.</p>
+                    </div>
                 </div>
 
                 <button type="submit" class="btn btn-primary" id="submit-btn"
                     style="width: 100%; font-size: 1.2rem; padding: 18px; border-radius: 12px;">Siparişi Tamamla ve
                     Öde</button>
+
+                <div style="display:flex; justify-content:center; align-items:center; gap:20px; flex-wrap:wrap; padding:14px 0; border-top:1px solid #F0F0F0; border-bottom:1px solid #F0F0F0; margin:14px 0;">
+                    <div style="display:flex; align-items:center; gap:6px; font-size:0.82rem; color:#555;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span>3D Güvenli Ödeme</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:0.82rem; color:#555;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1565C0" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.53"/></svg>
+                        <span>14 Gün İade Hakkı</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:0.82rem; color:#555;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                        <span>1-3 İş Günü Teslimat</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:0.82rem; color:#555;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7B1FA2" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span>256-bit SSL Şifreleme</span>
+                    </div>
+                </div>
+
+                <div class="legal-links">
+                    Siparişi tamamlayarak
+                    <a href="#" onclick="openLegalModal('return'); return false;">&#304;ade Politikas&#305;</a>,
+                    <a href="#" onclick="openLegalModal('privacy'); return false;">Gizlilik S&#246;zle&#351;mesi</a> ve
+                    <a href="#" onclick="openLegalModal('kvkk'); return false;">KVKK Ayd&#305;nlatma Metni</a>
+                    şartlarını kabul etmiş olursunuz.
+                </div>
             </form>
         </div>
 
@@ -461,11 +590,29 @@
             <div class="order-summary">
                 <h2 class="section-title" style="margin-top: 0;">Sipariş Özeti</h2>
                 <div id="checkout-items" style="margin-bottom: 20px;"></div>
+
+                <div style="margin-bottom: 16px;">
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="coupon-input" placeholder="Kupon kodu" style="flex:1; padding:10px 12px; border:1px solid #ddd; border-radius:8px; font-size:0.9rem; font-family:inherit; box-sizing:border-box;">
+                        <button type="button" onclick="applyCouponPreview()" style="padding:10px 16px; background:#0F2A43; color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.9rem; white-space:nowrap;">Uygula</button>
+                    </div>
+                    <div id="coupon-result" style="margin-top:8px; font-size:0.85rem;"></div>
+                </div>
+
                 <div class="summary-total"><span>Toplam:</span><span><span id="checkout-total">0</span> TL</span></div>
             </div>
         </div>
     </div>
 
+    <div id="legalModalOverlay" class="legal-modal-overlay" onclick="closeLegalModal(event)">
+        <div class="legal-modal" onclick="event.stopPropagation()">
+            <div class="legal-modal-head">
+                <h3 id="legalModalTitle" class="legal-modal-title">Yasal Metin</h3>
+                <button class="legal-modal-close" onclick="closeLegalModal()">✕</button>
+            </div>
+            <div id="legalModalContent" class="legal-modal-content"></div>
+        </div>
+    </div>
     <script>
         // --- KULLANICIYA ÖZEL LOCALSTORAGE ANAHTARLARI ---
         function _getUserId() {
@@ -553,6 +700,42 @@
             document.getElementById('cc-display-name').innerText = name || 'AD SOYAD';
         }
 
+        const LEGAL_TEXTS = {
+            return: {
+                title: 'İade Politikası',
+                html:
+                    '<p>NovaStore\'dan verilen siparişlerde teslim tarihinden itibaren 14 gün içinde iade talebi oluşturabilirsiniz.</p>' +
+                    '<p>Ürün kullanılmamış, tekrar satılabilir durumda ve orijinal ambalajında olmalıdır.</p>' +
+                    '<p>İade onayından sonra ödeme iadesi banka süreçlerine bağlı olarak 1-3 iş günü içinde tamamlanır.</p>'
+            },
+            privacy: {
+                title: 'Gizlilik Sözleşmesi',
+                html:
+                    '<p>NovaStore, sipariş ve üyelik süreçlerinde paylaşılan kişisel bilgileri yalnızca hizmet sunmak amacıyla işler.</p>' +
+                    '<p>Verileriniz, yasal yükümlülükler ve sipariş operasyonu dışında üçüncü kişilerle paylaşılmaz.</p>' +
+                    '<p>Detaylı gizlilik bilgileri için destek hattımız üzerinden talepte bulunabilirsiniz.</p>'
+            },
+            kvkk: {
+                title: 'KVKK Aydınlatma Metni',
+                html:
+                    '<p>6698 sayılı KVKK kapsamında kişisel verileriniz; sipariş yönetimi, faturalama, teslimat ve müşteri desteği amaçlarıyla işlenir.</p>' +
+                    '<p>Yasal saklama süreleri sonunda veriler güvenli şekilde silinir, yok edilir veya anonim hale getirilir.</p>' +
+                    '<p>KVKK kapsamındaki başvuru haklarınızı destek kanalımız üzerinden kullanabilirsiniz.</p>'
+            }
+        };
+
+        function openLegalModal(type) {
+            const item = LEGAL_TEXTS[type];
+            if (!item) return;
+            document.getElementById('legalModalTitle').innerText = item.title;
+            document.getElementById('legalModalContent').innerHTML = item.html;
+            document.getElementById('legalModalOverlay').style.display = 'flex';
+        }
+
+        function closeLegalModal(evt) {
+            if (evt && evt.target && evt.target.id !== 'legalModalOverlay') return;
+            document.getElementById('legalModalOverlay').style.display = 'none';
+        }
         let selectedAddressId = null;
 
         function loadCheckoutAddresses() {
@@ -680,6 +863,70 @@
             loadCheckoutAddresses();
         });
 
+        let selectedPaymentMethod = 'card';
+        let appliedCouponCode = null;
+
+        function selectPaymentMethod(method) {
+            selectedPaymentMethod = method;
+            const cardLabel = document.getElementById('method-card-label');
+            const havaleLabel = document.getElementById('method-havale-label');
+            const cardSection = document.getElementById('card-payment-section');
+            const havaleSection = document.getElementById('havale-payment-section');
+
+            if (method === 'card') {
+                cardLabel.style.borderColor = '#0F2A43';
+                cardLabel.style.background = '#F8FBFF';
+                cardLabel.querySelector('span').style.color = '#0F2A43';
+                havaleLabel.style.borderColor = '#EAEAEA';
+                havaleLabel.style.background = 'white';
+                havaleLabel.querySelector('span').style.color = '#555';
+                cardSection.style.display = 'block';
+                havaleSection.style.display = 'none';
+                document.getElementById('submit-btn').innerText = 'Siparişi Tamamla ve Öde';
+            } else {
+                havaleLabel.style.borderColor = '#0F2A43';
+                havaleLabel.style.background = '#F8FBFF';
+                havaleLabel.querySelector('span').style.color = '#0F2A43';
+                cardLabel.style.borderColor = '#EAEAEA';
+                cardLabel.style.background = 'white';
+                cardLabel.querySelector('span').style.color = '#555';
+                cardSection.style.display = 'none';
+                havaleSection.style.display = 'block';
+                document.getElementById('submit-btn').innerText = 'Sipariş Ver (Havale ile Öde)';
+            }
+            document.querySelectorAll('input[name="paymentMethod"]').forEach(r => {
+                r.checked = r.value === method;
+            });
+        }
+
+        async function applyCouponPreview() {
+            const code = document.getElementById('coupon-input').value.trim();
+            const resultEl = document.getElementById('coupon-result');
+            if (!code) { resultEl.innerHTML = ''; return; }
+
+            resultEl.innerHTML = '<span style="color:#888;">Kontrol ediliyor...</span>';
+            try {
+                const res = await fetch('http://localhost:5000/api/campaigns/quote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cartItems: cart, couponCode: code })
+                });
+                const data = await res.json();
+                if (!res.ok) { resultEl.innerHTML = `<span style="color:red;">${data.error || 'Hata'}</span>`; return; }
+
+                if (data.coupon && data.coupon.applied) {
+                    appliedCouponCode = code;
+                    resultEl.innerHTML = `<span style="color:#2E7D32; font-weight:600;">Kupon uygulandı! ${data.coupon.discountAmount.toFixed(2)} TL indirim.</span>`;
+                    document.getElementById('checkout-total').innerText = data.totals.total.toFixed(2);
+                } else {
+                    appliedCouponCode = null;
+                    resultEl.innerHTML = `<span style="color:#E65100;">${data.coupon.reason || 'Kupon geçerli değil.'}</span>`;
+                }
+            } catch (_) {
+                resultEl.innerHTML = '<span style="color:red;">Kupon doğrulanamadı.</span>';
+            }
+        }
+
         document.getElementById('checkout-form').addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -689,45 +936,76 @@
                 return;
             }
 
-            const btn = document.getElementById('submit-btn'); btn.innerText = "Ödeme Alınıyor... Lütfen Bekleyin"; btn.disabled = true;
-            // Giriş yapmış bir müşteri varsa onun ID'sini al, yoksa null gönder
+            const btn = document.getElementById('submit-btn');
+            btn.innerText = "İşleniyor... Lütfen Bekleyin";
+            btn.disabled = true;
+
             const userInfoStr = localStorage.getItem('nova_user_info');
             const user = userInfoStr ? JSON.parse(userInfoStr) : null;
+            const token = localStorage.getItem('nova_user_token');
 
             const addresses = JSON.parse(localStorage.getItem(_addrKey())) || [];
             const selectedAddr = addresses.find(a => a.id === selectedAddressId) || {};
 
-            const orderData = {
+            const couponCode = appliedCouponCode || (document.getElementById('coupon-input').value.trim() || null);
+
+            const payload = {
                 fullName: selectedAddr.fullName || (user ? user.fullName : 'Misafir'),
-                email: user ? user.email : 'misafir@mail.com', // Opsiyonel, eklenebilir
+                email: user ? user.email : 'misafir@mail.com',
                 phone: selectedAddr.phone || '',
                 address: `${selectedAddr.title}: ${selectedAddr.detail}, ${selectedAddr.district}/${selectedAddr.city}`,
-                totalAmount: totalAmount,
                 cartItems: cart,
-                userId: user ? user.id : null  // YENİ: Müşteri ID'sini ekledik
+                couponCode: couponCode || null,
+                paymentMethod: selectedPaymentMethod
             };
-            setTimeout(async () => {
-                try {
-                    const response = await fetch('http://localhost:5000/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orderData) });
-                    const result = await response.json();
-                    if (response.ok) {
-                        alert("🎉 ÖDEME BAŞARILI!\nSipariş No: " + result.siparisNo);
 
-                        let mainCart = JSON.parse(localStorage.getItem(_cartKey())) || [];
-                        cart.forEach(boughtItem => {
-                            if (!boughtItem.isBuyNow) {
-                                const idx = mainCart.findIndex(mc => mc.id === boughtItem.id);
-                                if (idx > -1) mainCart.splice(idx, 1);
-                            }
-                        });
-                        localStorage.setItem(_cartKey(), JSON.stringify(mainCart));
-                        localStorage.removeItem(_checkoutKey());
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = 'Bearer ' + token;
 
-                        window.location.href = "index.html";
+                const response = await fetch('http://localhost:5000/api/payments/initialize', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    alert("Hata: " + (result.error || 'Sipariş oluşturulamadı.'));
+                    btn.innerText = selectedPaymentMethod === 'havale' ? 'Sipariş Ver (Havale ile Öde)' : 'Siparişi Tamamla ve Öde';
+                    btn.disabled = false;
+                    return;
+                }
+
+                let mainCart = JSON.parse(localStorage.getItem(_cartKey())) || [];
+                cart.forEach(boughtItem => {
+                    if (!boughtItem.isBuyNow) {
+                        const idx = mainCart.findIndex(mc => mc.id === boughtItem.id);
+                        if (idx > -1) mainCart.splice(idx, 1);
                     }
-                    else { alert("Hata: " + result.error); btn.innerText = "Siparişi Tamamla ve Öde"; btn.disabled = false; }
-                } catch (error) { alert("Sunucuya bağlanılamadı."); btn.innerText = "Siparişi Tamamla ve Öde"; btn.disabled = false; }
-            }, 1500);
+                });
+                localStorage.setItem(_cartKey(), JSON.stringify(mainCart));
+                localStorage.removeItem(_checkoutKey());
+
+                if (selectedPaymentMethod === 'havale') {
+                    const iban = result.paymentAction && result.paymentAction.iban
+                        ? result.paymentAction.iban
+                        : 'TR00 0000 0000 0000 0000 0000 00';
+                    document.getElementById('display-iban').innerText = iban;
+                    btn.innerText = 'Sipariş Alındı';
+                    document.getElementById('havale-payment-section').scrollIntoView({ behavior: 'smooth' });
+                    alert(`Sipariş No: #${result.orderId}\n\nHavale bilgileri ekranda gösterilmektedir. 24 saat içinde ödeme yapmanız gerekmektedir.`);
+                } else {
+                    const successUrl = result.paymentAction && result.paymentAction.action && result.paymentAction.action.successUrl
+                        ? result.paymentAction.action.successUrl
+                        : `payment-result.html?status=success&paymentRef=${result.paymentRef}&orderId=${result.orderId}`;
+                    window.location.href = successUrl;
+                }
+            } catch (error) {
+                alert("Sunucuya bağlanılamadı.");
+                btn.innerText = selectedPaymentMethod === 'havale' ? 'Sipariş Ver (Havale ile Öde)' : 'Siparişi Tamamla ve Öde';
+                btn.disabled = false;
+            }
         });
     </script>
 </body>

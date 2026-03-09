@@ -1,4 +1,4 @@
-const pool = require('../config/db');
+﻿const pool = require('../config/db');
 const jwt = require('jsonwebtoken');
 
 // --- Müşteri İşlemleri ---
@@ -16,7 +16,7 @@ exports.askQuestion = async (req, res) => {
         const token = authHeader.split(' ')[1];
         let user_id;
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'gizli_anahtar_degistirilecek');
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
             user_id = decoded.id;
         } catch (err) {
             return res.status(401).json({ error: "Geçersiz veya süresi dolmuş token." });
@@ -55,7 +55,7 @@ exports.getProductQuestions = async (req, res) => {
 
         // name'i çekmek için join atıyoruz
         const questions = await pool.query(
-            `SELECT pq.id, pq.question, pq.answer, pq.created_at, pq.answered_at, u.name as user_name
+            `SELECT pq.id, pq.question, pq.answer, pq.created_at, pq.answered_at, COALESCE(u.full_name, u.name) as user_name
              FROM product_questions pq
              JOIN users u ON pq.user_id = u.id
              WHERE pq.product_id = $1 AND pq.answer IS NOT NULL
@@ -80,7 +80,7 @@ exports.getUserQuestions = async (req, res) => {
         const token = authHeader.split(' ')[1];
         let user_id;
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'gizli_anahtar_degistirilecek');
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
             user_id = decoded.id;
         } catch (err) {
             return res.status(401).json({ error: "Geçersiz veya süresi dolmuş token." });
@@ -116,7 +116,7 @@ exports.getAllQuestionsAdmin = async (req, res) => {
         }
         const token = authHeader.split(' ')[1];
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'gizli_anahtar_degistirilecek');
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
             if (decoded.role !== 'admin') {
                 console.log("❌ [ADMIN YETKİ KONTROLÜ] Yetkisiz rol:", decoded.role);
                 return res.status(403).json({ error: "Sadece yöneticiler bu işlemi yapabilir." });
@@ -131,7 +131,7 @@ exports.getAllQuestionsAdmin = async (req, res) => {
         const questions = await pool.query(
             `SELECT pq.id, pq.question, pq.answer, pq.created_at, pq.answered_at, 
                     p.name as product_name, p.image_url as product_image,
-                    u.name as user_name
+                    COALESCE(u.full_name, u.name) as user_name
              FROM product_questions pq
              JOIN products p ON pq.product_id = p.id
              JOIN users u ON pq.user_id = u.id
@@ -157,7 +157,7 @@ exports.answerQuestion = async (req, res) => {
         }
         const token = authHeader.split(' ')[1];
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'gizli_anahtar_degistirilecek');
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
             if (decoded.role !== 'admin') {
                 return res.status(403).json({ error: "Sadece yöneticiler bu işlemi yapabilir." });
             }
@@ -198,3 +198,5 @@ exports.answerQuestion = async (req, res) => {
         res.status(500).json({ error: "Sunucu hatası" });
     }
 };
+
+

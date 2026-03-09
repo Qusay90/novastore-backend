@@ -1,9 +1,10 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const { addReview, getProductReviews, getUserReviews } = require('../controllers/reviewController');
+const { authenticate, requireSelfOrAdmin } = require('../middlewares/authMiddleware');
 
-router.post('/', addReview); // Yorum yapma yolu
-router.get('/product/:productId', getProductReviews); // Yorumları çekme yolu
-router.get('/user/:userId', getUserReviews); // Kullanıcının yorumlarını çekme yolu
+router.post('/', authenticate, addReview);
+router.get('/product/:productId', getProductReviews);
+router.get('/user/:userId', authenticate, requireSelfOrAdmin('userId'), getUserReviews);
 
 module.exports = router;

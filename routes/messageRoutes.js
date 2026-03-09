@@ -1,14 +1,11 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const messageController = require('../controllers/messageController');
+const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 
-// İki kullanıcı arasındaki eski sohbet geçmişini getir
-router.get('/history/:userId', messageController.getChatHistory);
-
-// Sohbet eden tüm müşterilerin listesini getir (Admin için)
-router.get('/users', messageController.getChatUsers);
-
-// Yeni mesaj gönderimi (REST API)
-router.post('/send', messageController.sendMessage);
+router.get('/history/:userId', authenticate, messageController.getChatHistory);
+router.get('/users', authenticate, requireAdmin, messageController.getChatUsers);
+router.get('/handoffs', authenticate, requireAdmin, messageController.getAiHandoffs);
+router.post('/send', authenticate, messageController.sendMessage);
 
 module.exports = router;

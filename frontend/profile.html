@@ -289,6 +289,45 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
         }
 
+        .compact-order-card.is-cancelled {
+            border-color: #F1CACA;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F8 100%);
+        }
+
+        .compact-order-card.is-cancelled:hover {
+            border-color: #E7A7A7;
+            box-shadow: 0 8px 22px rgba(211, 47, 47, 0.08);
+        }
+
+        .compact-order-card.is-cancelled .compact-image-box {
+            border-color: #F4D4D4;
+            background: #FFF5F5;
+        }
+
+        .compact-order-card.is-cancelled .compact-badge {
+            background: #D32F2F;
+        }
+
+        .compact-order-card.is-cancelled .compact-total {
+            color: #C62828;
+        }
+
+        .compact-order-card.is-cancelled .compact-status-icon {
+            background: #D32F2F;
+            box-shadow: 0 0 0 4px rgba(211, 47, 47, 0.12);
+        }
+
+        .compact-order-card.is-cancelled .compact-order-details {
+            background: linear-gradient(180deg, #FFFDFD 0%, #FFF6F6 100%);
+        }
+
+        .compact-order-card.is-cancelled .compact-status-title {
+            color: #8E1C1C;
+        }
+
+        .compact-order-card.is-cancelled .compact-status-subtitle {
+            color: #B35C5C;
+        }
         .compact-order-header {
             padding: 20px;
             cursor: pointer;
@@ -371,12 +410,27 @@
         .compact-status {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             color: #666;
+        }
+
+        .compact-status-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .compact-status-title {
+            color: #55606F;
             font-weight: 700;
             font-size: 1rem;
         }
 
+        .compact-status-subtitle {
+            color: #98A2B3;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
         .compact-status-icon {
             background: #4CAF50;
             color: white;
@@ -788,6 +842,31 @@
         document.getElementById('user-email').innerText = user.email;
         document.getElementById('user-avatar').innerText = user.fullName.charAt(0).toUpperCase();
 
+        function decodeBase64Url(value) {
+            const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+            const padLen = (4 - (normalized.length % 4)) % 4;
+            return atob(normalized + '='.repeat(padLen));
+        }
+
+        function getAuthenticatedUserId() {
+            try {
+                const parts = String(token || '').split('.');
+                if (parts.length !== 3) return null;
+                const payload = JSON.parse(decodeBase64Url(parts[1]));
+                const id = Number(payload.id);
+                return Number.isInteger(id) ? id : null;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function authHeaders(extra = {}) {
+            const headers = { ...extra };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            return headers;
+        }
+
+
         function userLogout() {
             const uid = _getUserId();
             localStorage.removeItem(`novastore_checkout_${uid}`);
@@ -1071,7 +1150,7 @@
             ];
 
             if (status === 'İptal Edildi') {
-                return `<div class="progress-track"><div class="progress-bar-fill" style="width: 100%; background: #D32F2F;"></div><div class="progress-step cancel"><div class="step-icon">✕</div><div class="step-label">Sipariş İptal Edildi</div></div></div>`;
+                return `<div class="progress-track"><div class="progress-bar-fill" style="width: 75%; background: #D32F2F;"></div><div class="progress-step cancel"><div class="step-icon">✕</div><div class="step-label">Sipariş İptal Edildi</div></div></div>`;
             }
 
             if (status === 'Onay Bekliyor') { fillWidth = '0%'; steps[0].active = true; }
@@ -1100,8 +1179,12 @@
                     allProducts.forEach(p => { productImageMap[p.id] = p.image_url || ''; });
                 } catch (e) { /* ürünler yüklenemezse harita boş kalır */ }
 
-                const response = await fetch('http://localhost:5000/api/orders/user/' + user.id);
+                const effectiveUserId = getAuthenticatedUserId() || Number(user.id);
+                if (!Number.isInteger(effectiveUserId)) throw new Error('Oturum bilgisi dogrulanamadi.');
+
+                const response = await fetch('http://localhost:5000/api/orders/user/' + effectiveUserId, { headers: authHeaders() });
                 const orders = await response.json();
+                if (!response.ok) throw new Error(orders.error || 'Siparişler getirilemedi.');
                 const container = document.getElementById('orders-container');
                 container.innerHTML = '';
 
@@ -1141,13 +1224,40 @@
                         });
                     }
 
-                    if (order.status === 'Teslim Edildi') {
+                    const isCompactOrder = order.status === 'Teslim Edildi' || order.status === 'İptal Edildi';
+                    if (isCompactOrder) {
+                        const isCancelled = order.status === 'İptal Edildi';
                         const firstItem = products.length > 0 ? products[0] : null;
                         const firstItemQty = firstItem ? firstItem.quantity : 1;
-                        let firstItemImage = firstItem ? ((firstItem.image && firstItem.image.trim() !== '') ? firstItem.image : (productImageMap[firstItem.id] || fallbackSvg)) : fallbackSvg;
+                        const firstItemImage = firstItem ? ((firstItem.image && firstItem.image.trim() !== '') ? firstItem.image : (productImageMap[firstItem.id] || fallbackSvg)) : fallbackSvg;
+                        const compactCardClass = isCancelled ? 'compact-order-card is-cancelled' : 'compact-order-card';
+                        const statusIcon = isCancelled ? '✕' : '✓';
+                        const statusTitle = isCancelled ? 'Sipariş iptal edildi' : 'Sipariş tamamlandı';
+                        const statusSubtitle = isCancelled
+                            ? 'Detayları açıp iptal notunu ve ürünleri görebilirsiniz.'
+                            : 'Detayları açıp sipariş içeriğini görebilirsiniz.';
+                        const compactExtraHtml = isCancelled
+                            ? `
+                                <div style="margin-top:16px; display:grid; gap:12px;">
+                                    <div style="padding:14px 16px; border-radius:10px; background:#FFF1F1; border:1px solid #F7C8C8; color:#8A1F1F;">
+                                        <div style="font-weight:700; margin-bottom:6px;">İptal Notu</div>
+                                        <div style="font-size:0.92rem; line-height:1.55;">${order.cancel_reason || 'Sipariş bu kayıt için iptal edildi.'}</div>
+                                    </div>
+                                    ${order.refund_status && order.refund_status !== 'NONE'
+                                        ? `<div style="padding:12px 16px; border-radius:10px; background:#FFF8E7; border:1px solid #F5DEAE; color:#8A5A00; font-size:0.9rem;"><strong>İade / geri ödeme durumu:</strong> ${order.refund_status}</div>`
+                                        : ''}
+                                </div>
+                            `
+                            : `
+                                <div style="margin-top:16px;">
+                                    <button onclick="openReturnModal(${order.id}, ${order.total_amount})" style="background:#FFF0F0; color:#C62828; border:1px solid #FFCDD2; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.9rem; transition:0.2s;" onmouseover="this.style.background='#FFEBEE'" onmouseout="this.style.background='#FFF0F0'">
+                                        İade Talebi Oluştur
+                                    </button>
+                                </div>
+                            `;
 
                         container.innerHTML += `
-                            <div class="compact-order-card" id="compact-order-${order.id}">
+                            <div class="${compactCardClass}" id="compact-order-${order.id}">
                                 <div class="compact-order-header" onclick="toggleOrderDetails(${order.id})">
                                     <div class="compact-header-top">
                                         <div class="compact-image-box">
@@ -1163,19 +1273,44 @@
                                         </div>
                                     </div>
                                     <div class="compact-status">
-                                        <div class="compact-status-icon">✓</div>
-                                        Sipariş tamamlandı
+                                        <div class="compact-status-icon">${statusIcon}</div>
+                                        <div class="compact-status-copy">
+                                            <div class="compact-status-title">${statusTitle}</div>
+                                            <div class="compact-status-subtitle">${statusSubtitle}</div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="compact-order-details">
                                     <div style="padding-top:20px;">
                                         <div class="order-id" style="margin-bottom:15px; color:#0F2A43; font-weight:700;">Sipariş No: #000${order.id}</div>
                                         <div class="order-items-box"><div style="font-size: 0.85rem; color: #888; margin-bottom: 8px; font-weight: 600; text-transform: uppercase;">Paket İçeriği</div>${itemsHtml}</div>
+                                        ${compactExtraHtml}
                                     </div>
                                 </div>
                             </div>
                         `;
-                    } else {
+                    }
+                    else {
+                        let trackingHtml = '';
+                        if (order.status === 'Kargoya Verildi' && (order.tracking_url || order.tracking_no)) {
+                            const trackUrl = order.tracking_url || '#';
+                            const eta = order.eta_date || order.estimated_delivery_date;
+                            const etaStr = eta ? new Date(eta).toLocaleDateString('tr-TR') : '';
+                            trackingHtml = `
+                                <div style="margin:10px 0 0; padding:12px 16px; background:#E8F5E9; border-radius:10px; border-left:3px solid #2E7D32;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <span>🚚</span>
+                                            <span style="font-weight:600; color:#1B5E20; font-size:0.9rem;">Kargoda</span>
+                                            ${order.tracking_no ? `<span style="color:#555; font-size:0.82rem;">· Takip No: <strong>${order.tracking_no}</strong></span>` : ''}
+                                        </div>
+                                        ${etaStr ? `<div style="color:#2E7D32; font-size:0.82rem;"><strong>Tahmini Teslimat:</strong> ${etaStr}</div>` : ''}
+                                    </div>
+                                    <a href="${trackUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block; margin-top:8px; color:#1565C0; font-size:0.82rem; text-decoration:none; font-weight:600;">Kargonu Takip Et →</a>
+                                </div>
+                            `;
+                        }
+
                         container.innerHTML += `
                         <div class="order-card">
                             <div class="order-header">
@@ -1183,12 +1318,16 @@
                                 <div class="order-total">${order.total_amount} TL</div>
                             </div>
                             ${getProgressBarHtml(order.status)}
+                            ${trackingHtml}
                             <div class="order-items-box"><div style="font-size: 0.85rem; color: #888; margin-bottom: 8px; font-weight: 600; text-transform: uppercase;">Paket İçeriği</div>${itemsHtml}</div>
                         </div>`;
                     }
                 });
             } catch (error) {
-                document.getElementById('orders-container').innerHTML = '<p style="color:red; text-align:center;">Sunucuya bağlanılamadı!</p>';
+                const rawMsg = error && error.message ? error.message : 'Sunucuya baglanilamadi!';
+                const isAuthError = /Authentication required|Invalid or expired token|Access denied|403|401/i.test(rawMsg);
+                const msg = isAuthError ? 'Oturum suresi dolmus. Lutfen tekrar giris yapin.' : rawMsg;
+                document.getElementById('orders-container').innerHTML = '<p style="color:red; text-align:center;">' + msg + '</p>';
             }
         }
 
@@ -1477,10 +1616,14 @@
             container.innerHTML = '<p style="text-align:center; color:#888; padding: 40px 0;">Değerlendirmeleriniz yükleniyor...</p>';
 
             try {
-                const response = await fetch('http://localhost:5000/api/reviews/user/' + user.id);
-                if (!response.ok) throw new Error("Sunucu hatası");
+                const effectiveUserId = getAuthenticatedUserId() || Number(user.id);
+                if (!Number.isInteger(effectiveUserId)) throw new Error('Oturum bilgisi dogrulanamadi.');
 
+                const response = await fetch('http://localhost:5000/api/reviews/user/' + effectiveUserId, {
+                    headers: authHeaders()
+                });
                 const reviews = await response.json();
+                if (!response.ok) throw new Error(reviews.error || 'Degerlendirmeler getirilemedi.');
 
                 if (!reviews || reviews.length === 0) {
                     container.innerHTML = `
@@ -1533,8 +1676,12 @@
                 container.innerHTML = html;
 
             } catch (error) {
+                const rawMsg = error && error.message ? error.message : 'Degerlendirmeler alinamadi.';
+                const isAuthError = /Authentication required|Invalid or expired token|Access denied|403|401/i.test(rawMsg);
+                const msg = isAuthError ? 'Oturum suresi dolmus. Lutfen tekrar giris yapin.' : rawMsg;
                 console.error(error);
-                container.innerHTML = '<p style="color:red; text-align:center; padding: 40px 0;">Değerlendirmeler alınırken bir hata oluştu.</p>';
+                container.innerHTML = '<p style="color:red; text-align:center; padding: 40px 0;">' + msg + '</p>';
+
             }
         }
     </script>
@@ -1575,7 +1722,7 @@
 
         async function fetchProfileNotifications() {
             try {
-                const res = await fetch(`http://localhost:5000/api/notifications/user/${user.id}`);
+                const res = await fetch(`http://localhost:5000/api/notifications/user/${user.id}`, { headers: authHeaders() });
                 const data = await res.json();
                 const list = document.getElementById('profile-notif-list');
                 list.innerHTML = '';
@@ -1615,7 +1762,7 @@
                     item.style.background = 'white';
                     _profileNotifUnread = Math.max(0, _profileNotifUnread - 1);
                     updateProfileBadge();
-                    await fetch(`http://localhost:5000/api/notifications/${notif.id}/read`, { method: 'PATCH' });
+                    await fetch(`http://localhost:5000/api/notifications/${notif.id}/read`, { method: 'PATCH', headers: authHeaders() });
                     notif.is_read = true;
                 }
                 // İlgili sekmeye git
@@ -1719,7 +1866,7 @@
         }
 
         async function markAllProfileNotifRead() {
-            await fetch(`http://localhost:5000/api/notifications/read-all/${user.id}`, { method: 'PATCH' });
+            await fetch(`http://localhost:5000/api/notifications/read-all/${user.id}`, { method: 'PATCH', headers: authHeaders() });
             document.querySelectorAll('#profile-notif-list > div').forEach(el => el.style.background = 'white');
             _profileNotifUnread = 0;
             updateProfileBadge();
@@ -1784,6 +1931,106 @@
     </script>
 
     <div class="toast-container" id="toastContainer"></div>
+
+    <!-- İade Talebi Modalı -->
+    <div id="return-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:20000; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:white; border-radius:16px; width:90%; max-width:480px; padding:30px; box-shadow:0 10px 40px rgba(0,0,0,0.2); position:relative;">
+            <button onclick="closeReturnModal()" style="position:absolute; top:16px; right:16px; background:#F0F0F0; border:none; width:34px; height:34px; border-radius:50%; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#666;">✕</button>
+            <h3 style="margin:0 0 6px; color:#0F2A43; font-size:1.15rem;">İade Talebi Oluştur</h3>
+            <p id="return-order-label" style="margin:0 0 20px; color:#888; font-size:0.9rem;"></p>
+            <div style="margin-bottom:16px;">
+                <label style="display:block; margin-bottom:8px; font-weight:500; font-size:0.9rem; color:#555;">İade Nedeni</label>
+                <select id="return-reason-code" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; font-family:inherit; font-size:0.95rem; color:#333; background:white; box-sizing:border-box;">
+                    <option value="">Lütfen bir neden seçin...</option>
+                    <option value="DEFECTIVE">Ürün Arızalı / Hasarlı</option>
+                    <option value="WRONG_ITEM">Yanlış Ürün Gönderildi</option>
+                    <option value="NOT_AS_DESCRIBED">Ürün Açıklamayla Uyuşmuyor</option>
+                    <option value="CHANGED_MIND">Fikir Değişikliği</option>
+                    <option value="LATE_DELIVERY">Geç Teslimat</option>
+                    <option value="OTHER">Diğer</option>
+                </select>
+            </div>
+            <div style="margin-bottom:24px;">
+                <label style="display:block; margin-bottom:8px; font-weight:500; font-size:0.9rem; color:#555;">Açıklama <span style="color:#888; font-weight:400;">(Opsiyonel)</span></label>
+                <textarea id="return-note" placeholder="İade nedeninizi daha ayrıntılı açıklayın..." style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; font-family:inherit; font-size:0.9rem; resize:vertical; min-height:80px; box-sizing:border-box;"></textarea>
+            </div>
+            <button onclick="submitReturnRequest()" id="btn-submit-return" style="width:100%; padding:14px; background:#C62828; color:white; border:none; border-radius:8px; font-weight:700; font-size:1rem; cursor:pointer; transition:0.2s;">İade Talebi Gönder</button>
+            <div id="return-result-msg" style="margin-top:12px; font-size:0.9rem; text-align:center;"></div>
+        </div>
+    </div>
+
+    <script>
+        let returnModalOrderId = null;
+        let returnModalAmount = null;
+
+        function openReturnModal(orderId, amount) {
+            returnModalOrderId = orderId;
+            returnModalAmount = amount;
+            document.getElementById('return-order-label').innerText = `Sipariş No: #000${orderId} · ${parseFloat(amount).toFixed(2)} TL`;
+            document.getElementById('return-reason-code').value = '';
+            document.getElementById('return-note').value = '';
+            document.getElementById('return-result-msg').innerText = '';
+            document.getElementById('btn-submit-return').disabled = false;
+            document.getElementById('btn-submit-return').innerText = 'İade Talebi Gönder';
+            document.getElementById('return-modal-overlay').style.display = 'flex';
+        }
+
+        function closeReturnModal() {
+            document.getElementById('return-modal-overlay').style.display = 'none';
+            returnModalOrderId = null;
+            returnModalAmount = null;
+        }
+
+        document.getElementById('return-modal-overlay').addEventListener('click', function (e) {
+            if (e.target === this) closeReturnModal();
+        });
+
+        async function submitReturnRequest() {
+            const reasonCode = document.getElementById('return-reason-code').value;
+            if (!reasonCode) {
+                document.getElementById('return-result-msg').innerHTML = '<span style="color:red;">Lütfen iade nedeni seçin.</span>';
+                return;
+            }
+
+            const note = document.getElementById('return-note').value.trim();
+            const btn = document.getElementById('btn-submit-return');
+            btn.disabled = true;
+            btn.innerText = 'Gönderiliyor...';
+            document.getElementById('return-result-msg').innerText = '';
+
+            try {
+                const response = await fetch('http://localhost:5000/api/returns', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        order_id: returnModalOrderId,
+                        reason_code: reasonCode,
+                        note: note || undefined
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('return-result-msg').innerHTML = '<span style="color:#2E7D32; font-weight:600;">İade talebiniz alındı. En kısa sürede incelenecektir.</span>';
+                    btn.innerText = 'Gönderildi';
+                    setTimeout(() => closeReturnModal(), 2500);
+                } else {
+                    document.getElementById('return-result-msg').innerHTML = `<span style="color:red;">${result.error || 'İade talebi oluşturulamadı.'}</span>`;
+                    btn.disabled = false;
+                    btn.innerText = 'İade Talebi Gönder';
+                }
+            } catch (_) {
+                document.getElementById('return-result-msg').innerHTML = '<span style="color:red;">Sunucuya bağlanılamadı.</span>';
+                btn.disabled = false;
+                btn.innerText = 'İade Talebi Gönder';
+            }
+        }
+    </script>
+
     <!-- Canlı Destek Modülü -->
     <script src="chat.js"></script>
 

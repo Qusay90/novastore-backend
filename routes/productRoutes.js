@@ -1,19 +1,17 @@
-//Bu dosya, dışarıdan gelen /api/products isteklerini az önce yazdığımız controller'a yönlendirecek.
-
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const { getAllProducts, createProduct, getProductById, deleteProduct, updateProduct, deleteProductMedia } = require('../controllers/productController');
-const { upload } = require('../config/cloudinary'); // Yükleyiciyi dahil ettik
+const { upload } = require('../config/cloudinary');
+const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 
 router.get('/', getAllProducts);
-
-// POST isteğine "upload.array('media', 10)" ara yazılımını ekledik.
-// Bu, "media" adıyla gelen en fazla 10 dosyayı alıp Cloudinary'ye yükler.
-router.post('/', upload.array('media', 10), createProduct);
-
 router.get('/:id', getProductById);
-router.delete('/:id', deleteProduct); // Ürünü silme yolu
-router.put('/:id', upload.array('media', 10), updateProduct); // Ürünü güncelleme yolu
-router.delete('/media/:mediaId', deleteProductMedia); // Spesifik bir ürün görselini silme yolu
+
+// Medya yolu, '/:id' ile cakismamasi icin once tanimlanir
+router.delete('/media/:mediaId', authenticate, requireAdmin, deleteProductMedia);
+
+router.post('/', authenticate, requireAdmin, upload.array('media', 10), createProduct);
+router.put('/:id', authenticate, requireAdmin, upload.array('media', 10), updateProduct);
+router.delete('/:id', authenticate, requireAdmin, deleteProduct);
 
 module.exports = router;

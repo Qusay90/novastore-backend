@@ -1,15 +1,12 @@
 const pool = require('../config/db');
-
-// ─────────────────────────────────────────────────────
-// YARDIMCI FONKSİYON — Diğer controller'lar buraya çağırır
-// ─────────────────────────────────────────────────────
+const { emitWithRetry } = require('../services/notificationService');
 
 /**
- * Yeni bildirim oluşturur ve Socket.io ile gerçek zamanlı gönderir.
- * @param {number|null} userId  - Hedef kullanıcı ID (null ise admin bildirimi)
- * @param {string}      type    - 'order_update' | 'welcome' | 'new_order' | 'new_review' | 'low_stock'
- * @param {string}      message - Bildirim metni
- * @param {object}      io      - Socket.io instance (opsiyonel)
+ * Yeni bildirim olusturur ve Socket.io ile gercek zamanli gonderir.
+ * @param {number|null} userId
+ * @param {string} type
+ * @param {string} message
+ * @param {object} io
  */
 const createNotification = async (userId, type, message, io = null) => {
     try {
@@ -19,40 +16,43 @@ const createNotification = async (userId, type, message, io = null) => {
         );
         const notif = result.rows[0];
 
-        // Gerçek zamanlı gönder
-        if (io) {
-            const room = userId ? `user_${userId}` : 'admin_room';
-            io.to(room).emit('new_notification', notif);
-        }
+        const room = userId ? `user_${userId}` : 'admin_room';
+        await emitWithRetry({
+            io,
+            room,
+            eventName: 'new_notification',
+            payload: notif,
+            notificationId: notif.id,
+            retries: 3
+        });
 
         return notif;
     } catch (err) {
-        console.error('❌ Bildirim oluşturma hatası:', err.message);
+        console.error('Bildirim olusturma hatasi:', err.message);
+        return null;
     }
 };
 
-// ─────────────────────────────────────────────────────
-// 1. KULLANICI BİLDİRİMLERİNİ GETİR
 // GET /api/notifications/user/:userId
-// ─────────────────────────────────────────────────────
 const getUserNotifications = async (req, res) => {
     try {
-        const { userId } = req.params;
+        const userId = Number(req.params.userId);
+        if (!Number.isInteger(userId)) {
+            return res.status(400).json({ error: 'Gecersiz kullanici kimligi.' });
+        }
+
         const result = await pool.query(
             'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
             [userId]
         );
         res.status(200).json(result.rows);
     } catch (err) {
-        console.error('Bildirim getirme hatası:', err.message);
+        console.error('Bildirim getirme hatasi:', err.message);
         res.status(500).json({ error: 'Bildirimler getirilemedi.' });
     }
 };
 
-// ─────────────────────────────────────────────────────
-// 2. ADMİN BİLDİRİMLERİNİ GETİR (user_id = NULL olanlar)
 // GET /api/notifications/admin
-// ─────────────────────────────────────────────────────
 const getAdminNotifications = async (req, res) => {
     try {
         const result = await pool.query(
@@ -60,56 +60,70 @@ const getAdminNotifications = async (req, res) => {
         );
         res.status(200).json(result.rows);
     } catch (err) {
-        console.error('Admin bildirim hatası:', err.message);
+        console.error('Admin bildirim hatasi:', err.message);
         res.status(500).json({ error: 'Admin bildirimleri getirilemedi.' });
     }
 };
 
-// ─────────────────────────────────────────────────────
-// 3. TEKİL BİLDİRİMİ OKUNDU YAP
 // PATCH /api/notifications/:id/read
-// ─────────────────────────────────────────────────────
 const markAsRead = async (req, res) => {
     try {
-        const { id } = req.params;
-        const result = await pool.query(
-            'UPDATE notifications SET is_read = TRUE WHERE id = $1 RETURNING *',
-            [id]
-        );
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Bildirim bulunamadı.' });
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id)) {
+            return res.status(400).json({ error: 'Gecersiz bildirim kimligi.' });
         }
-        res.status(200).json({ mesaj: 'Bildirim okundu olarak işaretlendi.' });
+
+        const notifResult = await pool.query('SELECT id, user_id FROM notifications WHERE id = $1', [id]);
+        if (notifResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Bildirim bulunamadi.' });
+        }
+
+        const notif = notifResult.rows[0];
+
+        if (req.user.role !== 'admin') {
+            if (notif.user_id === null || Number(notif.user_id) !== req.user.id) {
+                return res.status(403).json({ error: 'Bu bildirime erisim yetkiniz yok.' });
+            }
+        }
+
+        await pool.query('UPDATE notifications SET is_read = TRUE WHERE id = $1', [id]);
+        res.status(200).json({ mesaj: 'Bildirim okundu olarak isaretlendi.' });
     } catch (err) {
-        res.status(500).json({ error: 'Bildirim güncellenemedi.' });
+        res.status(500).json({ error: 'Bildirim guncellenemedi.' });
     }
 };
 
-// ─────────────────────────────────────────────────────
-// 4. TÜM BİLDİRİMLERİ OKUNDU YAP
 // PATCH /api/notifications/read-all/:userId
-// ─────────────────────────────────────────────────────
 const markAllAsRead = async (req, res) => {
     try {
         const { userId } = req.params;
 
-        // userId = "admin" ise NULL olanları işaretle, değilse o kullanıcınınkileri
-        if (userId === 'admin') {
-            await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id IS NULL');
-        } else {
-            await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [userId]);
+        if (req.user.role === 'admin') {
+            if (userId === 'admin') {
+                await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id IS NULL');
+            } else {
+                const numericUserId = Number(userId);
+                if (!Number.isInteger(numericUserId)) {
+                    return res.status(400).json({ error: 'Gecersiz kullanici kimligi.' });
+                }
+                await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [numericUserId]);
+            }
+            return res.status(200).json({ mesaj: 'Tum bildirimler okundu olarak isaretlendi.' });
         }
 
-        res.status(200).json({ mesaj: 'Tüm bildirimler okundu olarak işaretlendi.' });
+        const requestedUserId = Number(userId);
+        if (!Number.isInteger(requestedUserId) || requestedUserId !== req.user.id) {
+            return res.status(403).json({ error: 'Bu islem icin yetkiniz yok.' });
+        }
+
+        await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [req.user.id]);
+        res.status(200).json({ mesaj: 'Tum bildirimler okundu olarak isaretlendi.' });
     } catch (err) {
-        res.status(500).json({ error: 'Bildirimler güncellenemedi.' });
+        res.status(500).json({ error: 'Bildirimler guncellenemedi.' });
     }
 };
 
-// ─────────────────────────────────────────────────────
-// 5. TEST BİLDİRİMİ GÖNDER (Geliştirme amaçlı)
 // POST /api/notifications/test
-// ─────────────────────────────────────────────────────
 const sendTestNotification = async (req, res) => {
     try {
         const { userId, type, message } = req.body;
@@ -117,10 +131,10 @@ const sendTestNotification = async (req, res) => {
         const notif = await createNotification(
             userId || null,
             type || 'order_update',
-            message || '🧪 Bu bir test bildirimidir!',
+            message || 'Bu bir test bildirimidir.',
             io
         );
-        res.status(201).json({ mesaj: 'Test bildirimi gönderildi!', bildirim: notif });
+        res.status(201).json({ mesaj: 'Test bildirimi gonderildi!', bildirim: notif });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

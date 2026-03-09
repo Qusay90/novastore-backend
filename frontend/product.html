@@ -1436,6 +1436,41 @@
                 // Soru verilerini çek
                 fetchProductQuestions();
 
+                // JSON-LD Structured Data
+                const existingLd = document.getElementById('product-jsonld');
+                if (existingLd) existingLd.remove();
+                const ldScript = document.createElement('script');
+                ldScript.type = 'application/ld+json';
+                ldScript.id = 'product-jsonld';
+                const ldData = {
+                    '@context': 'https://schema.org',
+                    '@type': 'Product',
+                    name: product.name,
+                    description: product.description || product.name,
+                    image: product.image_url || '',
+                    sku: String(product.id),
+                    brand: { '@type': 'Brand', name: 'NovaStore' },
+                    offers: {
+                        '@type': 'Offer',
+                        url: window.location.href,
+                        priceCurrency: 'TRY',
+                        price: parseFloat(product.price).toFixed(2),
+                        availability: Number(product.stock) > 0
+                            ? 'https://schema.org/InStock'
+                            : 'https://schema.org/OutOfStock',
+                        seller: { '@type': 'Organization', name: 'NovaStore' }
+                    }
+                };
+                if (reviewData.totalReviews > 0) {
+                    ldData.aggregateRating = {
+                        '@type': 'AggregateRating',
+                        ratingValue: reviewData.average,
+                        reviewCount: reviewData.totalReviews
+                    };
+                }
+                ldScript.textContent = JSON.stringify(ldData);
+                document.head.appendChild(ldScript);
+
             } catch (error) {
                 document.getElementById('product-detail-area').innerHTML = '<h2 style="color:red; text-align:center; grid-column: 1/-1;">Bağlantı Hatası: Sunucu çalışmıyor olabilir.</h2>';
             }

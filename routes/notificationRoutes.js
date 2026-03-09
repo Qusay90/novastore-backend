@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const {
     getUserNotifications,
@@ -7,20 +7,21 @@ const {
     markAllAsRead,
     sendTestNotification
 } = require('../controllers/notificationController');
+const { authenticate, requireAdmin, requireSelfOrAdmin } = require('../middlewares/authMiddleware');
 
-// Kullanıcının bildirimlerini getir
-router.get('/user/:userId', getUserNotifications);
+// Kullanici bildirimleri
+router.get('/user/:userId', authenticate, requireSelfOrAdmin('userId'), getUserNotifications);
 
-// Admin bildirimlerini getir
-router.get('/admin', getAdminNotifications);
+// Admin bildirimleri
+router.get('/admin', authenticate, requireAdmin, getAdminNotifications);
 
 // Tekil bildirimi okundu yap
-router.patch('/:id/read', markAsRead);
+router.patch('/:id/read', authenticate, markAsRead);
 
-// Tüm bildirimleri okundu yap (userId veya 'admin')
-router.patch('/read-all/:userId', markAllAsRead);
+// Tum bildirimleri okundu yap (userId veya 'admin')
+router.patch('/read-all/:userId', authenticate, markAllAsRead);
 
-// Test bildirimi gönder
-router.post('/test', sendTestNotification);
+// Test bildirimi gonder
+router.post('/test', authenticate, requireAdmin, sendTestNotification);
 
 module.exports = router;
