@@ -16,7 +16,7 @@
     // Admin sayfaya girdiğinde sohbet eden kullanıcıları getir
     async function loadChatUsers() {
         try {
-            const res = await fetch('http://localhost:5000/api/messages/users', {
+            const res = await fetch('https://novastore-backend.onrender.com/api/messages/users', {
                 headers: { 'Authorization': `Bearer ${adminToken}` }
             });
             if (res.ok) {
@@ -65,7 +65,7 @@
         chatMessages.innerHTML = '<div style="text-align: center; color: #999;">Mesajlar yükleniyor...</div>';
 
         try {
-            const res = await fetch(`http://localhost:5000/api/messages/history/${user.id}`, {
+            const res = await fetch(`https://novastore-backend.onrender.com/api/messages/history/${user.id}`, {
                 headers: { 'Authorization': `Bearer ${adminToken}` }
             });
             if (res.ok) {
@@ -121,7 +121,7 @@
         addAdminMessageToUI(msgObj, 'sent');
 
         try {
-            const res = await fetch(`http://localhost:5000/api/messages/send`, {
+            const res = await fetch(`https://novastore-backend.onrender.com/api/messages/send`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -153,7 +153,7 @@
     // Socket Dinleyicileri (admin panelinde window.socket tanımlı mı kontrol edeceğiz veya burada tanımlayacağız)
     // Eğer admin.html içinde <script src="/socket.io/socket.io.js"> varsa:
     if (typeof io !== 'undefined' && !window.socket) {
-        window.socket = io('http://localhost:5000');
+        window.socket = io('https://novastore-backend.onrender.com');
         window.socket.emit('join_room', 'admin_room');
     }
 

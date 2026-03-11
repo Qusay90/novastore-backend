@@ -367,35 +367,98 @@ footer {
     font-size: 0.9rem;
 }
 
-/* Responsive */
+/* ================================================================
+   📱 MOBİL UYUMLULUK (RESPONSIVE)
+   ================================================================ */
+
+/* Tablet ve küçük ekranlar */
+@media (max-width: 900px) {
+    .footer-content {
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+    }
+}
+
+/* Telefon boyutu */
 @media (max-width: 768px) {
+
+    /* HERO */
+    .hero {
+        padding: 100px 0 60px;
+    }
+
     .hero-content {
         flex-direction: column;
         text-align: center;
     }
 
     .hero-text h1 {
-        font-size: 2.5rem;
+        font-size: 2.2rem;
+    }
+
+    .hero-text p {
+        font-size: 1rem;
     }
 
     .hero-image {
         display: none;
     }
 
+    /* GÜVEN ROZETLER */
     .badges-grid {
         grid-template-columns: 1fr;
+        gap: 16px;
     }
 
+    /* ÜRÜN GRID */
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    /* BÖLÜM BAŞLIĞI */
+    .section-title {
+        font-size: 1.8rem;
+        margin-bottom: 28px;
+    }
+
+    /* FOOTER */
     .footer-content {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
+        gap: 24px;
     }
 
+    /* NAV */
     .nav-links {
         display: none;
     }
-
-    /* Mobilde menü gizlenir, hamburger menü gerekir */
 }
+
+/* Çok küçük telefon ekranları */
+@media (max-width: 480px) {
+    .hero-text h1 {
+        font-size: 1.8rem;
+    }
+
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .product-image {
+        height: 180px;
+    }
+
+    .product-info h3 {
+        font-size: 0.95rem;
+    }
+
+    .price {
+        font-size: 1.1rem;
+    }
+}
+
+
 
 /* --- SEPET SIDEBAR (YAN MENÜ) TASARIMI --- */
 .cart-sidebar {
@@ -1054,4 +1117,157 @@ footer {
 
 .toast.info {
     border-left-color: #3b82f6;
+}
+
+/* ================================================================
+   📱 MOBİL - BİLDİRİM, SEPET, SOHBET DÜZELTME
+   ================================================================ */
+
+/* Mobil uyarı bandı */
+#mobile-tip-banner {
+    display: none;
+    position: fixed;
+    bottom: 70px;
+    left: 12px;
+    right: 12px;
+    background: rgba(15, 42, 67, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #fff;
+    padding: 12px 16px 12px 14px;
+    border-radius: 14px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    z-index: 99999;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(247, 148, 29, 0.25);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+#mobile-tip-banner .tip-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+#mobile-tip-banner .tip-text {
+    flex: 1;
+}
+
+#mobile-tip-banner .tip-close {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.2s;
+}
+
+#mobile-tip-banner .tip-close:hover {
+    color: #fff;
+}
+
+@media (max-width: 768px) {
+
+    /* BİLDİRİM DROPDOWN - sola kaymasın */
+    .notification-dropdown {
+        width: calc(100vw - 24px);
+        right: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        max-height: 65vh;
+    }
+
+    .notification-dropdown.open {
+        display: flex;
+    }
+
+    .notification-dropdown::before {
+        display: none;
+    }
+
+    /* SEPET SIDEBAR - telefonda tam genişlik */
+    .cart-sidebar {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .cart-header {
+        padding: 16px 20px;
+    }
+
+    .cart-items {
+        padding: 16px;
+    }
+
+    .cart-footer {
+        padding: 16px 20px;
+    }
+
+    .cart-total {
+        font-size: 1rem;
+        margin-bottom: 14px;
+    }
+
+    .cart-total strong {
+        font-size: 1.4rem;
+    }
+
+    /* SOHBET (CHAT) WİDGET - taşmasın (Sadece pencereyi etkilesin, butonu bozmasın) */
+    #chat-window {
+        max-width: calc(100vw - 24px) !important;
+        left: 12px !important;
+        right: 12px !important;
+        bottom: 90px !important;
+        width: auto !important;
+    }
+
+    /* Ürün detay sayfası navbar düzelt */
+    .product-container {
+        grid-template-columns: 1fr !important;
+        gap: 20px !important;
+        margin: 20px auto !important;
+        padding: 0 12px !important;
+    }
+
+    .image-section {
+        padding: 20px !important;
+    }
+
+    .title {
+        font-size: 1.5rem !important;
+    }
+
+    .price {
+        font-size: 1.8rem !important;
+    }
+
+    .btn-add-large,
+    .btn-buy-now {
+        font-size: 1rem !important;
+        padding: 14px !important;
+    }
+
+    .bottom-sections-wrapper {
+        grid-template-columns: 1fr !important;
+        gap: 20px !important;
+        margin-top: 20px !important;
+        padding-top: 20px !important;
+    }
+
+    /* Mobil uyarı bandı - sadece mobilde göster */
+    #mobile-tip-banner {
+        display: flex;
+    }
+}
+
+@media (min-width: 769px) {
+    #mobile-tip-banner {
+        display: none !important;
+    }
 }

@@ -76,7 +76,7 @@
 
     document.body.insertAdjacentHTML('beforeend', chatHTML);
 
-    const API_BASE = 'http://localhost:5000';
+    const API_BASE = 'https://novastore-backend.onrender.com';
     const AI_HANDOFF_PREFIX = '[AI DESTEK DEVRI]';
     const chatFab = document.getElementById('chat-fab');
     const chatWindow = document.getElementById('chat-window');

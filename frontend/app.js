@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Ürünleri Çekme
 async function fetchProducts() {
     try {
-        const response = await fetch('http://localhost:5000/api/products');
+        const response = await fetch('https://novastore-backend.onrender.com/api/products');
         allProducts = await response.json();
         renderProducts(allProducts);
     } catch (error) {

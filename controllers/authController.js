@@ -1,4 +1,4 @@
-﻿const pool = require('../config/db');
+const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
@@ -53,6 +53,10 @@ const forgotPassword = async (req, res) => {
     try {
         ensureJwtSecret();
 
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+            return res.status(500).json({ message: 'E-posta servisi ayarlanmamis. Lutfen sunucu (.env veya Render) ayarlarini yapilandirin.' });
+        }
+
         const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
 
         if (userResult.rows.length === 0) {
@@ -104,7 +108,7 @@ const forgotPassword = async (req, res) => {
         if (String(error.message).includes('JWT config')) {
             return res.status(500).json({ message: 'Sunucu guvenlik ayari eksik.' });
         }
-        res.status(500).json({ message: 'Sunucu hatasi, lutfen daha sonra tekrar deneyin.' });
+        res.status(500).json({ message: 'Hatasi detayi: ' + (error.message || 'Bilinmeyen Hata') });
     }
 };
 

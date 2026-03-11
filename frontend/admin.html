@@ -1170,13 +1170,16 @@
             </div>
         </div>
 
-                        <!-- &#128172; M&#220;&#350;TER&#304; SORULARI (&#220;R&#220;N S&C) SEKMES&#304; -->
+        <!-- &#128172; M&#220;&#350;TER&#304; SORULARI (&#220;R&#220;N S&C) SEKMES&#304; -->
         <div id="tab-chat" class="tab-pane">
-            <div class="table-header" style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
+            <div class="table-header"
+                style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
                 <h2>M&uuml;&#351;teri Sorular&#305;</h2>
-                <button class="btn-add" type="button" onclick="openAiHandoffModal()" style="display:inline-flex; align-items:center; gap:10px;">
+                <button class="btn-add" type="button" onclick="openAiHandoffModal()"
+                    style="display:inline-flex; align-items:center; gap:10px;">
                     AI Devralmalar&#305;
-                    <span id="ai-handoff-count-badge" style="display:inline-flex; min-width:26px; height:26px; padding:0 8px; border-radius:999px; background:#FFF3E0; color:#E65100; font-size:0.8rem; font-weight:800; align-items:center; justify-content:center;">0</span>
+                    <span id="ai-handoff-count-badge"
+                        style="display:inline-flex; min-width:26px; height:26px; padding:0 8px; border-radius:999px; background:#FFF3E0; color:#E65100; font-size:0.8rem; font-weight:800; align-items:center; justify-content:center;">0</span>
                 </button>
             </div>
             <div class="table-container" style="overflow-x: auto;">
@@ -1212,15 +1215,22 @@
             </div>
             <div class="modal-body" style="padding:0;">
                 <div style="display:grid; grid-template-columns:320px 1fr; min-height:520px;">
-                    <div id="ai-handoff-list" style="border-right:1px solid var(--border); overflow-y:auto; background:var(--table-hover);">
+                    <div id="ai-handoff-list"
+                        style="border-right:1px solid var(--border); overflow-y:auto; background:var(--table-hover);">
                         <div style="padding:22px; color:#888; text-align:center;">Y&uuml;kleniyor...</div>
                     </div>
                     <div style="display:flex; flex-direction:column; min-width:0;">
-                        <div id="ai-handoff-preview" style="padding:18px 22px; border-bottom:1px solid var(--border); background:var(--card-bg); color:var(--text); font-weight:600;">Listeden bir m&uuml;&#351;teri se&ccedil;in.</div>
-                        <div id="ai-handoff-thread" style="flex:1; overflow-y:auto; padding:20px; background:#FBFCFE;"></div>
-                        <div style="padding:16px 20px; border-top:1px solid var(--border); background:var(--card-bg); display:flex; gap:10px;">
-                            <input id="ai-handoff-reply" class="form-control" placeholder="M&uuml;&#351;teriye yan&#305;t yaz&#305;n..." disabled>
-                            <button id="ai-handoff-send" class="btn-add" onclick="sendAiHandoffReply()" disabled>G&ouml;nder</button>
+                        <div id="ai-handoff-preview"
+                            style="padding:18px 22px; border-bottom:1px solid var(--border); background:var(--card-bg); color:var(--text); font-weight:600;">
+                            Listeden bir m&uuml;&#351;teri se&ccedil;in.</div>
+                        <div id="ai-handoff-thread" style="flex:1; overflow-y:auto; padding:20px; background:#FBFCFE;">
+                        </div>
+                        <div
+                            style="padding:16px 20px; border-top:1px solid var(--border); background:var(--card-bg); display:flex; gap:10px;">
+                            <input id="ai-handoff-reply" class="form-control"
+                                placeholder="M&uuml;&#351;teriye yan&#305;t yaz&#305;n..." disabled>
+                            <button id="ai-handoff-send" class="btn-add" onclick="sendAiHandoffReply()"
+                                disabled>G&ouml;nder</button>
                         </div>
                     </div>
                 </div>
@@ -1228,7 +1238,7 @@
         </div>
     </div>
 
-<!-- KATEGORİ MODAL -->
+    <!-- KATEGORİ MODAL -->
     <div class="modal-overlay" id="category-modal">
         <div class="modal-box" style="max-width: 400px;">
             <div class="modal-header">
@@ -1498,7 +1508,7 @@
             list.innerHTML = '<div style="padding:22px; color:#888; text-align:center;">Yükleniyor...</div>';
 
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/messages/handoffs');
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/messages/handoffs');
                 const items = await adminReadJson(res, 'AI devir listesi alınamadı.');
                 aiHandoffItems = Array.isArray(items) ? items : [];
                 updateAiHandoffBadge(aiHandoffItems.length);
@@ -1584,7 +1594,7 @@
             }
 
             try {
-                const res = await adminApiFetch(`http://localhost:5000/api/messages/history/${Number(userId)}`);
+                const res = await adminApiFetch(`https://novastore-backend.onrender.com/api/messages/history/${Number(userId)}`);
                 const history = await adminReadJson(res, 'Mesaj geçmişi alınamadı.');
                 if (thread) {
                     thread.innerHTML = renderAiThreadMessages(Array.isArray(history) ? history : []);
@@ -1614,13 +1624,19 @@
             }
 
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/messages/send', {
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/messages/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ receiver_id: Number(currentAiHandoffUserId), message })
                 });
-                await adminReadJson(res, 'Mesaj gönderilemedi.');
+                const savedMsg = await adminReadJson(res, 'Mesaj gönderilemedi.');
                 if (replyInput) replyInput.value = '';
+
+                // Yeni eklenen Socket.io bildirimi
+                if (window.socket && window.socket.connected) {
+                    window.socket.emit('send_message', { ...savedMsg, receiver_role: 'customer' });
+                }
+
                 await openAiHandoffThread(currentAiHandoffUserId, true);
                 await loadAiHandoffs(true);
             } catch (err) {
@@ -1636,7 +1652,7 @@
         // --- DASHBOARD ÖZEL GÜNCELLEMELERİ (GRAFİK VE BEKLEYEN İŞLER) ---
         async function fetchOrdersForDashboard() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/orders');
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/orders');
                 const orders = await adminReadJson(res, 'Siparişler getirilemedi.');
                 if (!Array.isArray(orders)) throw new Error('Sipariş verisi beklenen formatta değil.');
 
@@ -1740,7 +1756,7 @@
         // KATEGORİ YÖNETİMİ
         async function fetchCategories() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/categories');
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/categories');
                 globalCategories = await res.json();
 
                 const tbody = document.getElementById('categories-table-body');
@@ -1806,7 +1822,7 @@
         async function deleteCategory(id) {
             if (!confirm("Kategoriyi silerseniz alt kategoriler de silinir. Emin misiniz?")) return;
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/categories/' + id, { method: 'DELETE' });
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/categories/' + id, { method: 'DELETE' });
                 if (res.ok) fetchCategories();
                 else alert('Hata oluştu');
             } catch (e) { }
@@ -1826,7 +1842,7 @@
                             parent_id: parent_id ? parseInt(parent_id) : null
                         };
 
-                        await adminApiFetch('http://localhost:5000/api/categories', {
+                        await adminApiFetch('https://novastore-backend.onrender.com/api/categories', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(bodyData)
@@ -1843,7 +1859,7 @@
 
         async function fetchStats() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/admin/stats');
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/admin/stats');
                 const data = await adminReadJson(res, 'İstatistikler getirilemedi.');
                 document.getElementById('stat-revenue').innerText = data.totalRevenue + " TL";
                 document.getElementById('stat-orders').innerText = data.totalOrders;
@@ -1856,7 +1872,7 @@
 
         async function fetchOrders() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/orders');
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/orders');
                 const payload = await adminReadJson(res, 'Siparişler getirilemedi.');
                 if (!Array.isArray(payload)) throw new Error('Sipariş verisi beklenen formatta değil.');
 
@@ -1896,7 +1912,7 @@
 
         async function fetchProducts() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/products');
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/products');
                 globalProducts = await res.json();
                 const tbody = document.getElementById('products-table-body');
                 tbody.innerHTML = '';
@@ -1961,7 +1977,7 @@
             document.getElementById('existing-media-container').innerHTML = '';
 
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/products/' + id);
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/products/' + id);
                 const pDetails = await res.json();
                 if (pDetails.media && pDetails.media.length > 0) {
                     document.getElementById('existing-media-group').style.display = 'block';
@@ -1990,7 +2006,7 @@
             if (!confirm("Bu görseli silmek istediğinize emin misiniz?")) return;
             try {
                 btnEl.innerText = "...";
-                const res = await adminApiFetch('http://localhost:5000/api/products/media/' + mediaId, { method: 'DELETE' });
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/products/media/' + mediaId, { method: 'DELETE' });
                 if (res.ok) {
                     btnEl.parentElement.remove();
                 } else {
@@ -2003,7 +2019,7 @@
         async function deleteProduct(id) {
             if (!confirm("Silmek istediğinize emin misiniz?")) return;
             try {
-                const response = await adminApiFetch('http://localhost:5000/api/products/' + id, { method: 'DELETE' });
+                const response = await adminApiFetch('https://novastore-backend.onrender.com/api/products/' + id, { method: 'DELETE' });
                 if (response.ok) { alert("🗑️ Ürün silindi!"); fetchProducts(); fetchStats(); }
             } catch (e) { }
         }
@@ -2058,7 +2074,7 @@
         async function updateOrderStatus(orderId) {
             const newStatus = document.getElementById('status-select').value;
             try {
-                const response = await adminApiFetch('http://localhost:5000/api/orders/' + orderId + '/status', {
+                const response = await adminApiFetch('https://novastore-backend.onrender.com/api/orders/' + orderId + '/status', {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus })
                 });
                 await adminReadJson(response, 'Sipariş durumu güncellenemedi.');
@@ -2075,7 +2091,7 @@
         async function deleteOrder(orderId) {
             if (!confirm("Bu siparişi silmek istediğinize emin misiniz? Bu işlem geri alınamaz!")) return;
             try {
-                const response = await adminApiFetch('http://localhost:5000/api/orders/' + orderId, { method: 'DELETE' });
+                const response = await adminApiFetch('https://novastore-backend.onrender.com/api/orders/' + orderId, { method: 'DELETE' });
                 if (response.ok) {
                     alert("🗑️ Sipariş silindi!");
                     fetchOrders();
@@ -2105,9 +2121,9 @@
                     for (let i = 0; i < files.length; i++) { formData.append('media', files[i]); }
                 } if (editingProductId) {
                     await
-                        adminApiFetch('http://localhost:5000/api/products/' + editingProductId, { method: 'PUT', body: formData });
+                        adminApiFetch('https://novastore-backend.onrender.com/api/products/' + editingProductId, { method: 'PUT', body: formData });
                 } else {
-                    await adminApiFetch('http://localhost:5000/api/products', { method: 'POST', body: formData });
+                    await adminApiFetch('https://novastore-backend.onrender.com/api/products', { method: 'POST', body: formData });
                 }
                 document.getElementById('add-product-form').reset(); document.getElementById('upload-status').innerText = '';
                 closeModal('product-modal'); fetchProducts(); fetchStats();
@@ -2183,14 +2199,14 @@
             fetchAdminNotifications();
 
             // 3) Socket.io ile admin_room'a bağlan
-            const socket = io('http://localhost:5000');
-            socket.on('connect', () => {
+            window.socket = io('https://novastore-backend.onrender.com');
+            window.socket.on('connect', () => {
                 console.log('🔔 Socket bağlantısı kuruldu, admin_room odasına katılıyorum...');
-                socket.emit('join_room', 'admin_room');
+                window.socket.emit('join_room', 'admin_room');
             });
 
             // 4) Gerçek zamanlı bildirim gelince
-            socket.on('new_notification', (notif) => {
+            window.socket.on('new_notification', (notif) => {
                 addNotifToDropdown(notif, true);
                 incrementBadge();
                 ringBell();
@@ -2199,11 +2215,23 @@
                 if (notif.type === 'ai_handoff') loadAiHandoffs();
                 if (notif.type === 'new_question') loadAdminQuestions();
             });
+
+            // 5) Gerçek zamanlı mesaj gelince
+            window.socket.on('receive_message', (msg) => {
+                if (msg.receiver_id == 1 || msg.receiver_role === 'admin') {
+                    if (Number(currentAiHandoffUserId) === Number(msg.sender_id)) {
+                        openAiHandoffThread(currentAiHandoffUserId, true);
+                    } else {
+                        loadAiHandoffs(true);
+                    }
+                    ringBell();
+                }
+            });
         }
 
         async function fetchAdminNotifications() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/notifications/admin');
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/notifications/admin');
                 const data = await res.json();
                 const list = document.getElementById('notif-list');
                 list.innerHTML = '';
@@ -2287,12 +2315,12 @@
                 el.classList.remove('unread');
                 unreadCount = Math.max(0, unreadCount - 1);
                 updateBadge();
-                await adminApiFetch(`http://localhost:5000/api/notifications/${id}/read`, { method: 'PATCH' });
+                await adminApiFetch(`https://novastore-backend.onrender.com/api/notifications/${id}/read`, { method: 'PATCH' });
             }
         }
 
         async function markAllAdminRead() {
-            await adminApiFetch('http://localhost:5000/api/notifications/read-all/admin', { method: 'PATCH' });
+            await adminApiFetch('https://novastore-backend.onrender.com/api/notifications/read-all/admin', { method: 'PATCH' });
             document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
             unreadCount = 0;
             updateBadge();
@@ -2403,7 +2431,7 @@
         async function loadAdminQuestions() {
             try {
                 const token = localStorage.getItem('nova_admin_token');
-                const res = await adminApiFetch('http://localhost:5000/api/questions/admin/all', {
+                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/questions/admin/all', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -2489,7 +2517,7 @@
             }
 
             try {
-                const res = await adminApiFetch(`http://localhost:5000/api/questions/admin/answer/${id}`, {
+                const res = await adminApiFetch(`https://novastore-backend.onrender.com/api/questions/admin/answer/${id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ answer })
@@ -2554,11 +2582,3 @@
 </body>
 
 </html>
-
-
-
-
-
-
-
-

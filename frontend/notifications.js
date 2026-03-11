@@ -108,7 +108,8 @@ function _hidePermissionBanner() {
 function _connectSocket(room) {
     if (typeof io === 'undefined') return;
     try {
-        _notifSocket = io('http://localhost:5000', { transports: ['websocket', 'polling'] });
+        _notifSocket = io('https://novastore-backend.onrender.com', { transports: ['websocket', 'polling'] });
+        window.socket = _notifSocket;
         _notifSocket.on('connect', () => {
             _notifSocket.emit('join_room', room);
         });
@@ -126,7 +127,7 @@ function _connectSocket(room) {
 // ─────────────────────────────────────────────────────────────────
 async function _fetchUserNotifications(userId) {
     try {
-        const res = await fetch(`http://localhost:5000/api/notifications/user/${userId}`, { headers: _authHeaders() });
+        const res = await fetch(`https://novastore-backend.onrender.com/api/notifications/user/${userId}`, { headers: _authHeaders() });
         const data = await res.json();
         _renderNotifications(data);
     } catch (e) { }
@@ -263,7 +264,7 @@ async function handleNotifClick(id, type, el) {
     // Okundu işaretle
     if (el.classList.contains('unread')) {
         try {
-            await fetch(`http://localhost:5000/api/notifications/${id}/read`, { method: 'PATCH', headers: _authHeaders() });
+            await fetch(`https://novastore-backend.onrender.com/api/notifications/${id}/read`, { method: 'PATCH', headers: _authHeaders() });
             el.classList.remove('unread');
             _updateBadge(-1);
         } catch (e) { }
@@ -276,7 +277,7 @@ async function handleNotifClick(id, type, el) {
 async function markAllNotificationsRead() {
     if (!_currentUserId) return;
     try {
-        await fetch(`http://localhost:5000/api/notifications/read-all/${_currentUserId}`, { method: 'PATCH', headers: _authHeaders() });
+        await fetch(`https://novastore-backend.onrender.com/api/notifications/read-all/${_currentUserId}`, { method: 'PATCH', headers: _authHeaders() });
         document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
         _setBadgeCount(0);
     } catch (e) { }
