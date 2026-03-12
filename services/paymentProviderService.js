@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { getAppBaseUrl } = require('../config/appConfig');
 
 const buildPaymentRef = () => `NST-PMT-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 
@@ -16,7 +17,7 @@ const verifyWebhookSignature = (payload, signature, secret) => {
 const initializeIyzicoPayment = async ({ orderId, amount, currency }) => {
     const paymentRef = buildPaymentRef();
 
-    const callbackBase = process.env.APP_BASE_URL || 'http://localhost:5000';
+    const callbackBase = getAppBaseUrl();
     const successUrl = `${callbackBase}/payment-result.html?status=success&paymentRef=${paymentRef}&orderId=${orderId}`;
     const failUrl = `${callbackBase}/payment-result.html?status=failed&paymentRef=${paymentRef}&orderId=${orderId}`;
 

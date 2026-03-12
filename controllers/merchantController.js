@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { getAppBaseUrl } = require('../config/appConfig');
 
 const xmlEscape = (value = '') =>
     String(value)
@@ -9,7 +10,7 @@ const xmlEscape = (value = '') =>
         .replace(/'/g, '&apos;');
 
 const buildProductUrl = (productId) => {
-    const base = process.env.APP_BASE_URL || 'http://localhost:5000';
+    const base = getAppBaseUrl();
     return `${base}/product.html?id=${productId}`;
 };
 
@@ -48,7 +49,7 @@ const getMerchantFeed = async (req, res) => {
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
   <channel>
     <title>NovaStore Product Feed</title>
-    <link>${xmlEscape(process.env.APP_BASE_URL || 'http://localhost:5000')}</link>
+    <link>${xmlEscape(getAppBaseUrl())}</link>
     <description>NovaStore Google Merchant urun feed'i</description>
 ${itemsXml}
   </channel>

@@ -6,17 +6,12 @@ const { Server } = require('socket.io');
 const path = require('path');
 const { simpleRateLimit, sanitizeBody } = require('./middlewares/securityMiddleware');
 const pool = require('./config/db');
+const { getAllowedOrigins } = require('./config/appConfig');
 
 const app = express();
 const server = http.createServer(app);
 
-const parseAllowedOrigins = () => {
-    const raw = process.env.CLIENT_ORIGIN || '*';
-    if (raw === '*') return '*';
-    return raw.split(',').map((origin) => origin.trim()).filter(Boolean);
-};
-
-const allowedOrigins = parseAllowedOrigins();
+const allowedOrigins = getAllowedOrigins();
 const corsOptions = {
     origin: allowedOrigins,
     credentials: allowedOrigins !== '*'

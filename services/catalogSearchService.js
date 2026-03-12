@@ -1,6 +1,8 @@
 ﻿const pool = require('../config/db');
 
-const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5000';
+const { getAppBaseUrl } = require('../config/appConfig');
+
+const APP_BASE_URL = getAppBaseUrl();
 
 const STOPWORDS = new Set([
     've', 'veya', 'ile', 'icin', 'ama', 'gibi', 'bir', 'bu', 'su', 'bana', 'beni', 'olan', 'olanlar',

@@ -1,6 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
     const assistantIconMarkup = `
-        <img src="ai-logo.png" alt="NovaStore AI" style="width:32px; height:32px; object-fit:contain; border-radius:50%;">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v2"></path>
+            <path d="M7 9.5A5 5 0 0 1 12 5a5 5 0 0 1 5 4.5V14a2 2 0 0 0 1 1.73V17H6v-1.27A2 2 0 0 0 7 14V9.5Z"></path>
+            <path d="M9.5 12h.01"></path>
+            <path d="M14.5 12h.01"></path>
+            <path d="M9 17a3 3 0 0 0 6 0"></path>
+            <path d="M5 10H3"></path>
+            <path d="M21 10h-2"></path>
+        </svg>
     `;
     const supportIconMarkup = `
         <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -13,13 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const chatHTML = `
         <div id="customer-chat-widget">
-            <ul id="chat-fab-wrapper">
-                <li style="--i:#F7941D;--j:#0F2A43;" id="chat-fab" title="NovaStore Canlı Destek">
-                    <span class="nova-chat-icon">💬</span>
-                    <span class="nova-chat-title">Canlı Destek</span>
-                    <span id="chat-fab-badge" style="display: none; position: absolute; top: -5px; right: -5px; background: #E53935; color: white; width: 22px; height: 22px; border-radius: 50%; font-size: 12px; font-weight: bold; align-items: center; justify-content: center; z-index:2;">0</span>
-                </li>
-            </ul>
+            <button id="chat-fab" title="NovaStore AI Asistan" style="position: fixed; bottom: 20px; right: 20px; background: #0F2A43; color: white; border: none; width: 60px; height: 60px; border-radius: 50%; font-size: 24px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1000; transition: transform 0.3s; display: flex; align-items: center; justify-content: center;">
+                ${assistantIconMarkup}
+                <span id="chat-fab-badge" style="display: none; position: absolute; top: -5px; right: -5px; background: #E53935; color: white; width: 22px; height: 22px; border-radius: 50%; font-size: 12px; font-weight: bold; align-items: center; justify-content: center;">0</span>
+            </button>
 
             <div id="chat-window" style="display: none; position: fixed; bottom: 90px; right: 20px; width: 370px; height: 520px; background: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid #EAEAEA; z-index: 1000; flex-direction: column; overflow: hidden; animation: slideUp 0.3s ease;">
                 <div style="background: #0F2A43; color: white; padding: 15px 16px 12px; display: flex; flex-direction: column; gap: 12px;">
@@ -48,91 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
             <style>
-                /* --- UIVERSE ANİMASYONLU CHAT BUTONU --- */
-                #chat-fab-wrapper {
-                    position: fixed;
-                    bottom: 24px;
-                    right: 24px;
-                    z-index: 1050;
-                    list-style: none;
-                    margin: 0;
-                    padding: 0;
-                    display: flex;
-                }
-                #chat-fab-wrapper li {
-                    position: relative;
-                    list-style: none;
-                    width: 60px;
-                    height: 60px;
-                    background: linear-gradient(135deg, #0F2A43 0%, #F7941D 100%);
-                    border-radius: 60px;
-                    cursor: pointer;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-                    transition: 0.5s;
-                    user-select: none;
-                }
-                #chat-fab-wrapper li:hover {
-                    width: 180px;
-                    box-shadow: 0 10px 25px rgba(0,0,0,0);
-                }
-                #chat-fab-wrapper li::before {
-                    content: "";
-                    position: absolute;
-                    inset: 0;
-                    border-radius: 60px;
-                    background: linear-gradient(45deg, var(--i), var(--j));
-                    opacity: 0;
-                    transition: 0.5s;
-                }
-                #chat-fab-wrapper li:hover::before { opacity: 1; }
-                #chat-fab-wrapper li::after {
-                    content: "";
-                    position: absolute;
-                    top: 10px;
-                    width: 100%;
-                    height: 100%;
-                    border-radius: 60px;
-                    background: linear-gradient(45deg, var(--i), var(--j));
-                    transition: 0.5s;
-                    filter: blur(15px);
-                    z-index: -1;
-                    opacity: 0;
-                }
-                #chat-fab-wrapper li:hover::after { opacity: 0.5; }
-                #chat-fab-wrapper .nova-chat-icon {
-                    color: #fff;
-                    font-size: 1.75em;
-                    transition: 0.5s;
-                    transition-delay: 0.25s;
-                    position: absolute;
-                    z-index: 1;
-                }
-                #chat-fab-wrapper li:hover .nova-chat-icon {
-                    transform: scale(0);
-                    transition-delay: 0s;
-                }
-                #chat-fab-wrapper .nova-chat-title {
-                    position: absolute;
-                    color: #fff;
-                    font-size: 0.95em;
-                    font-weight: 700;
-                    font-family: 'Inter', sans-serif;
-                    letter-spacing: 0.05em;
-                    text-transform: uppercase;
-                    transform: scale(0);
-                    transition: 0.5s;
-                    transition-delay: 0s;
-                    z-index: 1;
-                    white-space: nowrap;
-                }
-                #chat-fab-wrapper li:hover .nova-chat-title {
-                    transform: scale(1);
-                    transition-delay: 0.25s;
-                }
-                /* --- DİĞER CHAT STİLLERİ --- */
                 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
                 @keyframes blink { 0%, 80%, 100% { opacity: 0.2; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
                 #chat-fab:hover { transform: scale(1.05); }

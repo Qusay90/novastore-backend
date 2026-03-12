@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { Resend } = require('resend');
+const { getAppBaseUrl, getMailFrom } = require('../config/appConfig');
 
 const ensureJwtSecret = () => {
     if (!process.env.JWT_SECRET) {
@@ -71,7 +72,7 @@ const forgotPassword = async (req, res) => {
             { expiresIn: '1h' }
         );
 
-        const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        const baseUrl = getAppBaseUrl(req);
         const resetLink = `${baseUrl}/reset-password.html?token=${resetToken}`;
 
         const displayName = user.full_name || user.name || 'Kullanici';
@@ -79,7 +80,7 @@ const forgotPassword = async (req, res) => {
         const resend = new Resend(process.env.RESEND_API_KEY);
 
         const { error } = await resend.emails.send({
-            from: 'NovaStore Destek <onboarding@resend.dev>',
+            from: getMailFrom(),
             to: user.email,
             subject: 'NovaStore - Sifre Sifirlama Talebi',
             html: `

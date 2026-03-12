@@ -84,7 +84,6 @@ exports.sendMessage = async (req, res) => {
     }
 };
 
-
 exports.getChatUsers = async (req, res) => {
     try {
         const adminId = await getPrimaryAdminId();
