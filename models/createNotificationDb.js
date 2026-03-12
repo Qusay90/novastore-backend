@@ -15,13 +15,8 @@ const createNotificationsTable = async () => {
         CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
     `;
 
-    try {
-        await pool.query(query);
-        console.log('✅ notifications tablosu başarıyla oluşturuldu.');
-    } catch (err) {
-        console.error('❌ notifications tablosu oluşturma hatası:', err.message);
-        throw err;
-    }
+    await pool.query(query);
+    console.log('notifications tablosu basariyla olusturuldu.');
 };
 
 module.exports = createNotificationsTable;

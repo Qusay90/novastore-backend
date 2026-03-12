@@ -1313,9 +1313,14 @@
                         </div>
                         <input type="file" id="prod-media" class="form-control" accept="image/*,video/mp4,image/gif"
                             multiple style="display: none;"
-                            onchange="document.getElementById('upload-status').innerText = this.files.length + ' dosya seçildi'">
+                            onchange="handleProductMediaSelection(this)">
                         <div id="upload-status"
                             style="margin-top: 5px; font-size: 0.85rem; color: #1565C0; font-weight: bold;"></div>
+                        <div id="pending-media-group" style="display:none; margin-top:12px;">
+                            <label style="display:block; margin-bottom:8px;">Yeni Eklenecek Gorseller</label>
+                            <div style="font-size:0.8rem; color:#98A2B3; margin-bottom:10px;">Sira icin ok tuslarini kullan. Ilk gorsel urun kartinda kapak olur.</div>
+                            <div id="pending-media-container" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
+                        </div>
                     </div>
                     <button type="submit" id="btn-save-product" class="btn-submit">Ürünü Kaydet</button>
                 </form>
@@ -1354,6 +1359,7 @@
         let globalProducts = [];
         let globalCategories = []; // Kategorileri tutacak
         let editingProductId = null;
+        let pendingProductMediaFiles = [];
         let salesChartInstance = null; // Grafiği sıfırlamak için
         const _nativeFetch = window.fetch.bind(window);
         function adminApiFetch(input, init = {}) {
@@ -1456,6 +1462,120 @@
                 .replace(/'/g, '&#39;');
         }
 
+        function releasePendingProductMedia(entries) {
+            (entries || []).forEach((entry) => {
+                if (entry && entry.previewUrl) {
+                    URL.revokeObjectURL(entry.previewUrl);
+                }
+            });
+        }
+
+        function updatePendingMediaStatus() {
+            const uploadStatus = document.getElementById('upload-status');
+            const pendingGroup = document.getElementById('pending-media-group');
+            if (!uploadStatus || !pendingGroup) return;
+
+            if (!pendingProductMediaFiles.length) {
+                uploadStatus.innerText = '';
+                pendingGroup.style.display = 'none';
+                return;
+            }
+
+            uploadStatus.innerText = `${pendingProductMediaFiles.length} dosya hazir. Ilk gorsel urun kartinda kapak olarak kullanilacak.`;
+            pendingGroup.style.display = 'block';
+        }
+
+        function renderPendingProductMediaFiles() {
+            const container = document.getElementById('pending-media-container');
+            if (!container) return;
+
+            if (!pendingProductMediaFiles.length) {
+                container.innerHTML = '';
+                updatePendingMediaStatus();
+                return;
+            }
+
+            container.innerHTML = pendingProductMediaFiles.map((entry, index) => {
+                const file = entry.file;
+                const isVideo = String(file.type || '').startsWith('video/');
+                const previewTag = isVideo
+                    ? `<video src="${entry.previewUrl}" muted playsinline style="width: 88px; height: 88px; object-fit: cover; border-radius: 8px; background: #0f172a;"></video>`
+                    : `<img src="${entry.previewUrl}" alt="${escapeAdminHtml(file.name)}" style="width: 88px; height: 88px; object-fit: cover; border-radius: 8px; background: #fff;">`;
+
+                return `
+                    <div style="width: 132px; background: rgba(15, 23, 42, 0.24); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+                        <div style="position: relative; display: flex; justify-content: center;">
+                            ${previewTag}
+                            ${index === 0 ? '<span style="position:absolute; top:6px; left:6px; background:#F7941D; color:#fff; font-size:0.68rem; font-weight:700; padding:3px 6px; border-radius:999px;">Kapak</span>' : ''}
+                        </div>
+                        <div style="font-size: 0.76rem; color: var(--text); line-height: 1.35; word-break: break-word;">${index + 1}. ${escapeAdminHtml(file.name)}</div>
+                        <div style="display:flex; gap:6px;">
+                            <button type="button" onclick="movePendingProductMedia(${index}, -1)" ${index === 0 ? 'disabled' : ''} style="flex:1; padding:6px 0; border:none; border-radius:6px; background:${index === 0 ? '#94a3b8' : '#1565C0'}; color:#fff; cursor:${index === 0 ? 'not-allowed' : 'pointer'};">Yukari</button>
+                            <button type="button" onclick="movePendingProductMedia(${index}, 1)" ${index === pendingProductMediaFiles.length - 1 ? 'disabled' : ''} style="flex:1; padding:6px 0; border:none; border-radius:6px; background:${index === pendingProductMediaFiles.length - 1 ? '#94a3b8' : '#455A64'}; color:#fff; cursor:${index === pendingProductMediaFiles.length - 1 ? 'not-allowed' : 'pointer'};">Asagi</button>
+                        </div>
+                        <button type="button" onclick="removePendingProductMedia(${index})" style="padding:6px 0; border:none; border-radius:6px; background:#C62828; color:#fff; cursor:pointer;">Kaldir</button>
+                    </div>
+                `;
+            }).join('');
+
+            updatePendingMediaStatus();
+        }
+
+        function resetPendingProductMediaSelection() {
+            releasePendingProductMedia(pendingProductMediaFiles);
+            pendingProductMediaFiles = [];
+
+            const mediaInput = document.getElementById('prod-media');
+            if (mediaInput) {
+                mediaInput.value = '';
+            }
+
+            renderPendingProductMediaFiles();
+        }
+
+        function handleProductMediaSelection(input) {
+            const selectedFiles = Array.from(input && input.files ? input.files : []);
+            if (!selectedFiles.length) {
+                updatePendingMediaStatus();
+                return;
+            }
+
+            const timestamp = Date.now();
+            const newEntries = selectedFiles.map((file, index) => ({
+                file,
+                previewUrl: URL.createObjectURL(file),
+                key: `${timestamp}-${index}-${file.name}-${file.size}`
+            }));
+
+            pendingProductMediaFiles = pendingProductMediaFiles.concat(newEntries);
+            if (input) {
+                input.value = '';
+            }
+
+            renderPendingProductMediaFiles();
+        }
+
+        function movePendingProductMedia(index, direction) {
+            const targetIndex = index + direction;
+            if (targetIndex < 0 || targetIndex >= pendingProductMediaFiles.length) return;
+
+            const updatedEntries = pendingProductMediaFiles.slice();
+            const [movedEntry] = updatedEntries.splice(index, 1);
+            updatedEntries.splice(targetIndex, 0, movedEntry);
+            pendingProductMediaFiles = updatedEntries;
+            renderPendingProductMediaFiles();
+        }
+
+        function removePendingProductMedia(index) {
+            if (index < 0 || index >= pendingProductMediaFiles.length) return;
+
+            const updatedEntries = pendingProductMediaFiles.slice();
+            const [removedEntry] = updatedEntries.splice(index, 1);
+            releasePendingProductMedia([removedEntry]);
+            pendingProductMediaFiles = updatedEntries;
+            renderPendingProductMediaFiles();
+        }
+
         function cleanAiSummary(message) {
             return String(message || '').replace('[AI DESTEK DEVRI]', '').trim();
         }
@@ -1508,11 +1628,12 @@
             list.innerHTML = '<div style="padding:22px; color:#888; text-align:center;">Yükleniyor...</div>';
 
             try {
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/messages/handoffs');
+                const res = await adminApiFetch('/api/messages/handoffs');
                 const items = await adminReadJson(res, 'AI devir listesi alınamadı.');
                 aiHandoffItems = Array.isArray(items) ? items : [];
                 updateAiHandoffBadge(aiHandoffItems.length);
                 renderAiHandoffList(aiHandoffItems);
+                attachAiHandoffActions();
 
                 if (!aiHandoffItems.length) {
                     currentAiHandoffUserId = null;
@@ -1529,6 +1650,84 @@
                 console.error('AI handoff yükleme hatası:', err);
                 list.innerHTML = `<div style="padding:22px; color:#C62828; text-align:center;">${escapeAdminHtml(err.message || 'AI devir listesi alınamadı.')}</div>`;
                 setAiHandoffEmptyState('AI devir bilgisi alınamadı.');
+            }
+        }
+
+        function attachAiHandoffActions() {
+            const list = document.getElementById('ai-handoff-list');
+            if (!list) return;
+
+            Array.from(list.children).forEach((node) => {
+                const openButton = node && node.matches && node.matches('button[onclick^="openAiHandoffThread"]')
+                    ? node
+                    : (node && node.querySelector ? node.querySelector('button[onclick^="openAiHandoffThread"]') : null);
+                if (!openButton || openButton.dataset.actionsBound === 'true') return;
+
+                const match = String(openButton.getAttribute('onclick') || '').match(/\((\d+)/);
+                const userId = match ? Number(match[1]) : null;
+                if (!Number.isInteger(userId)) return;
+
+                const wrapper = document.createElement('div');
+                wrapper.style.display = 'flex';
+                wrapper.style.alignItems = 'stretch';
+                wrapper.style.gap = '10px';
+                wrapper.style.padding = '0 12px';
+                wrapper.style.borderBottom = '1px solid var(--border)';
+                wrapper.style.background = openButton.style.background || 'transparent';
+
+                openButton.style.flex = '1';
+                openButton.style.width = 'auto';
+                openButton.style.borderBottom = 'none';
+                openButton.style.background = 'transparent';
+                openButton.dataset.actionsBound = 'true';
+
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.innerText = 'Sil';
+                deleteButton.style.alignSelf = 'center';
+                deleteButton.style.border = 'none';
+                deleteButton.style.borderRadius = '10px';
+                deleteButton.style.background = '#FEE2E2';
+                deleteButton.style.color = '#B42318';
+                deleteButton.style.padding = '10px 12px';
+                deleteButton.style.fontSize = '0.74rem';
+                deleteButton.style.fontWeight = '700';
+                deleteButton.style.cursor = 'pointer';
+                deleteButton.onclick = (event) => deleteAiHandoff(userId, event);
+
+                const parent = openButton.parentNode;
+                if (!parent) return;
+
+                parent.replaceChild(wrapper, openButton);
+                wrapper.appendChild(openButton);
+                wrapper.appendChild(deleteButton);
+            });
+        }
+
+        async function deleteAiHandoff(userId, event = null) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+
+            const numericUserId = Number(userId);
+            if (!Number.isInteger(numericUserId)) return;
+
+            const item = aiHandoffItems.find((entry) => Number(entry.id) === numericUserId);
+            const displayName = item && item.name ? item.name : `Musteri #${numericUserId}`;
+            const confirmed = confirm(`${displayName} icin kayitli tum AI devir ozetleri silinsin mi?`);
+            if (!confirmed) return;
+
+            try {
+                const response = await adminApiFetch(`/api/messages/handoffs/${numericUserId}`, { method: 'DELETE' });
+                const payload = await adminReadJson(response, 'AI devir kaydi silinemedi.');
+                if (Number(currentAiHandoffUserId) === numericUserId) {
+                    currentAiHandoffUserId = null;
+                }
+                await loadAiHandoffs(false);
+                alert(payload && payload.mesaj ? payload.mesaj : 'AI devir kaydi silindi.');
+            } catch (err) {
+                alert(err.message || 'AI devir kaydi silinemedi.');
             }
         }
 
@@ -1567,12 +1766,18 @@
         async function openAiHandoffThread(userId, silent = false) {
             currentAiHandoffUserId = Number(userId);
             renderAiHandoffList(aiHandoffItems);
+            attachAiHandoffActions();
 
             const preview = document.getElementById('ai-handoff-preview');
             const thread = document.getElementById('ai-handoff-thread');
             const replyInput = document.getElementById('ai-handoff-reply');
             const replyButton = document.getElementById('ai-handoff-send');
             const meta = aiHandoffItems.find((item) => Number(item.id) === Number(userId));
+
+            if (!meta) {
+                setAiHandoffEmptyState('AI devir kaydi bulunamadi.');
+                return;
+            }
 
             if (preview && meta) {
                 preview.innerHTML = `
@@ -1587,6 +1792,20 @@
                         </div>
                     </div>
                 `;
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.innerText = 'AI devrini sil';
+                deleteButton.style.marginTop = '14px';
+                deleteButton.style.border = 'none';
+                deleteButton.style.borderRadius = '10px';
+                deleteButton.style.background = '#FEE2E2';
+                deleteButton.style.color = '#B42318';
+                deleteButton.style.padding = '10px 14px';
+                deleteButton.style.fontSize = '0.78rem';
+                deleteButton.style.fontWeight = '700';
+                deleteButton.style.cursor = 'pointer';
+                deleteButton.onclick = () => deleteAiHandoff(Number(meta.id));
+                preview.appendChild(deleteButton);
             }
 
             if (thread) {
@@ -1594,7 +1813,7 @@
             }
 
             try {
-                const res = await adminApiFetch(`https://novastore-backend.onrender.com/api/messages/history/${Number(userId)}`);
+                const res = await adminApiFetch(`/api/messages/history/${Number(userId)}`);
                 const history = await adminReadJson(res, 'Mesaj geçmişi alınamadı.');
                 if (thread) {
                     thread.innerHTML = renderAiThreadMessages(Array.isArray(history) ? history : []);
@@ -1624,7 +1843,7 @@
             }
 
             try {
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/messages/send', {
+                const res = await adminApiFetch('/api/messages/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ receiver_id: Number(currentAiHandoffUserId), message })
@@ -1644,7 +1863,7 @@
             } finally {
                 if (replyButton) {
                     replyButton.disabled = false;
-                    replyButton.innerText = 'G?nder';
+                    replyButton.innerText = 'Gonder';
                 }
             }
         }
@@ -1652,7 +1871,7 @@
         // --- DASHBOARD ÖZEL GÜNCELLEMELERİ (GRAFİK VE BEKLEYEN İŞLER) ---
         async function fetchOrdersForDashboard() {
             try {
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/orders');
+                const res = await adminApiFetch('/api/orders');
                 const orders = await adminReadJson(res, 'Siparişler getirilemedi.');
                 if (!Array.isArray(orders)) throw new Error('Sipariş verisi beklenen formatta değil.');
 
@@ -1756,7 +1975,7 @@
         // KATEGORİ YÖNETİMİ
         async function fetchCategories() {
             try {
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/categories');
+                const res = await adminApiFetch('/api/categories');
                 globalCategories = await res.json();
 
                 const tbody = document.getElementById('categories-table-body');
@@ -1822,7 +2041,7 @@
         async function deleteCategory(id) {
             if (!confirm("Kategoriyi silerseniz alt kategoriler de silinir. Emin misiniz?")) return;
             try {
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/categories/' + id, { method: 'DELETE' });
+                const res = await adminApiFetch('/api/categories/' + id, { method: 'DELETE' });
                 if (res.ok) fetchCategories();
                 else alert('Hata oluştu');
             } catch (e) { }
@@ -1842,7 +2061,7 @@
                             parent_id: parent_id ? parseInt(parent_id) : null
                         };
 
-                        await adminApiFetch('https://novastore-backend.onrender.com/api/categories', {
+                        await adminApiFetch('/api/categories', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(bodyData)
@@ -1859,7 +2078,7 @@
 
         async function fetchStats() {
             try {
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/admin/stats');
+                const res = await adminApiFetch('/api/admin/stats');
                 const data = await adminReadJson(res, 'İstatistikler getirilemedi.');
                 document.getElementById('stat-revenue').innerText = data.totalRevenue + " TL";
                 document.getElementById('stat-orders').innerText = data.totalOrders;
@@ -1872,7 +2091,7 @@
 
         async function fetchOrders() {
             try {
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/orders');
+                const res = await adminApiFetch('/api/orders');
                 const payload = await adminReadJson(res, 'Siparişler getirilemedi.');
                 if (!Array.isArray(payload)) throw new Error('Sipariş verisi beklenen formatta değil.');
 
@@ -1912,8 +2131,9 @@
 
         async function fetchProducts() {
             try {
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/products');
-                globalProducts = await res.json();
+                const res = await adminApiFetch('/api/products');
+                const payload = await adminReadJson(res, 'Urunler getirilemedi.');
+                globalProducts = Array.isArray(payload) ? payload : [];
                 const tbody = document.getElementById('products-table-body');
                 tbody.innerHTML = '';
                 if (globalProducts.length === 0) {
@@ -1941,15 +2161,26 @@
     </tr>
     `;
                 });
-            } catch (e) { }
+            } catch (e) {
+                const tbody = document.getElementById('products-table-body');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="color:#C62828; text-align:center; padding:18px;">${e.message || 'Urunler getirilemedi.'}</td></tr>`;
+                }
+            }
         }
 
         // --- DİĞER MODAL VE FORM KODLARI BURADA ÇALIŞMAYA DEVAM EDECEK (SİLME, DÜZENLEME VB.) ---
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+            if (id === 'product-modal') {
+                resetPendingProductMediaSelection();
+            }
+        }
 
         function openProductModal() {
             editingProductId = null;
             document.getElementById('add-product-form').reset();
+            resetPendingProductMediaSelection();
             document.getElementById('modal-title-text').innerText = "Vitrine Yeni Ürün Ekle";
             document.getElementById('existing-media-group').style.display = 'none';
             document.getElementById('existing-media-container').innerHTML = '';
@@ -1963,6 +2194,7 @@
             const p = globalProducts.find(x => x.id === id);
             if (!p) return;
             editingProductId = p.id;
+            resetPendingProductMediaSelection();
             document.getElementById('modal-title-text').innerText = "Ürünü Düzenle: " + p.name;
             document.getElementById('prod-name').value = p.name;
             document.getElementById('prod-category').value = p.category || '';
@@ -1977,7 +2209,7 @@
             document.getElementById('existing-media-container').innerHTML = '';
 
             try {
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/products/' + id);
+                const res = await adminApiFetch('/api/products/' + id);
                 const pDetails = await res.json();
                 if (pDetails.media && pDetails.media.length > 0) {
                     document.getElementById('existing-media-group').style.display = 'block';
@@ -2003,25 +2235,30 @@
         }
 
         async function deleteSpecificMedia(mediaId, btnEl) {
-            if (!confirm("Bu görseli silmek istediğinize emin misiniz?")) return;
+            if (!confirm("Bu gorseli silmek istediginize emin misiniz?")) return;
             try {
                 btnEl.innerText = "...";
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/products/media/' + mediaId, { method: 'DELETE' });
-                if (res.ok) {
-                    btnEl.parentElement.remove();
-                } else {
-                    alert("Görsel silinemedi.");
-                    btnEl.innerText = "✕";
-                }
-            } catch (e) { console.error(e); }
+                const res = await adminApiFetch('/api/products/media/' + mediaId, { method: 'DELETE' });
+                await adminReadJson(res, 'Gorsel silinemedi.');
+                btnEl.parentElement.remove();
+            } catch (e) {
+                alert(e.message || 'Gorsel silinemedi.');
+                console.error(e);
+                btnEl.innerText = 'x';
+            }
         }
 
         async function deleteProduct(id) {
-            if (!confirm("Silmek istediğinize emin misiniz?")) return;
+            if (!confirm("Silmek istediginize emin misiniz?")) return;
             try {
-                const response = await adminApiFetch('https://novastore-backend.onrender.com/api/products/' + id, { method: 'DELETE' });
-                if (response.ok) { alert("🗑️ Ürün silindi!"); fetchProducts(); fetchStats(); }
-            } catch (e) { }
+                const response = await adminApiFetch('/api/products/' + id, { method: 'DELETE' });
+                await adminReadJson(response, 'Urun silinemedi.');
+                alert('Urun silindi!');
+                fetchProducts();
+                fetchStats();
+            } catch (e) {
+                alert(e.message || 'Urun silinemedi.');
+            }
         }
 
         function openOrderModal(orderId) {
@@ -2074,7 +2311,7 @@
         async function updateOrderStatus(orderId) {
             const newStatus = document.getElementById('status-select').value;
             try {
-                const response = await adminApiFetch('https://novastore-backend.onrender.com/api/orders/' + orderId + '/status', {
+                const response = await adminApiFetch('/api/orders/' + orderId + '/status', {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus })
                 });
                 await adminReadJson(response, 'Sipariş durumu güncellenemedi.');
@@ -2091,7 +2328,7 @@
         async function deleteOrder(orderId) {
             if (!confirm("Bu siparişi silmek istediğinize emin misiniz? Bu işlem geri alınamaz!")) return;
             try {
-                const response = await adminApiFetch('https://novastore-backend.onrender.com/api/orders/' + orderId, { method: 'DELETE' });
+                const response = await adminApiFetch('/api/orders/' + orderId, { method: 'DELETE' });
                 if (response.ok) {
                     alert("🗑️ Sipariş silindi!");
                     fetchOrders();
@@ -2106,7 +2343,7 @@
         document.getElementById('add-product-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-save-product');
-            btn.innerText = "Kaydediliyor..."; btn.disabled = true;
+            btn.innerText = 'Kaydediliyor...'; btn.disabled = true;
             try {
                 const formData = new FormData();
                 formData.append('name', document.getElementById('prod-name').value);
@@ -2116,19 +2353,37 @@
                 formData.append('description', document.getElementById('prod-desc').value);
                 formData.append('category', document.getElementById('prod-category').value);
 
-                const files = document.getElementById('prod-media')?.files;
-                if (files) {
-                    for (let i = 0; i < files.length; i++) { formData.append('media', files[i]); }
-                } if (editingProductId) {
-                    await
-                        adminApiFetch('https://novastore-backend.onrender.com/api/products/' + editingProductId, { method: 'PUT', body: formData });
-                } else {
-                    await adminApiFetch('https://novastore-backend.onrender.com/api/products', { method: 'POST', body: formData });
+                if (pendingProductMediaFiles.length > 0) {
+                    const mediaOrder = [];
+                    for (let i = 0; i < pendingProductMediaFiles.length; i++) {
+                        const file = pendingProductMediaFiles[i].file;
+                        mediaOrder.push({ index: i, name: file.name, size: file.size });
+                        formData.append('media', file);
+                    }
+                    formData.append('mediaOrder', JSON.stringify(mediaOrder));
                 }
-                document.getElementById('add-product-form').reset(); document.getElementById('upload-status').innerText = '';
-                closeModal('product-modal'); fetchProducts(); fetchStats();
-            } catch (error) { console.error(error); } finally {
-                btn.innerText = "Kaydet"; btn.disabled = false;
+
+                if (editingProductId) {
+                    const response = await adminApiFetch('/api/products/' + editingProductId, { method: 'PUT', body: formData });
+                    await adminReadJson(response, 'Urun guncellenemedi.');
+                    alert('Urun guncellendi.');
+                } else {
+                    const response = await adminApiFetch('/api/products', { method: 'POST', body: formData });
+                    await adminReadJson(response, 'Urun eklenemedi.');
+                    alert('Urun eklendi.');
+                }
+
+                document.getElementById('add-product-form').reset();
+                resetPendingProductMediaSelection();
+                closeModal('product-modal');
+                fetchProducts();
+                fetchStats();
+            } catch (error) {
+                alert(error.message || 'Urun kaydedilemedi.');
+                console.error(error);
+            } finally {
+                btn.innerText = editingProductId ? 'Degisiklikleri Kaydet' : 'Urunu Kaydet';
+                btn.disabled = false;
             }
         });
 
@@ -2199,7 +2454,7 @@
             fetchAdminNotifications();
 
             // 3) Socket.io ile admin_room'a bağlan
-            window.socket = io('https://novastore-backend.onrender.com');
+            window.socket = io();
             window.socket.on('connect', () => {
                 console.log('🔔 Socket bağlantısı kuruldu, admin_room odasına katılıyorum...');
                 window.socket.emit('join_room', 'admin_room');
@@ -2231,7 +2486,7 @@
 
         async function fetchAdminNotifications() {
             try {
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/notifications/admin');
+                const res = await adminApiFetch('/api/notifications/admin');
                 const data = await res.json();
                 const list = document.getElementById('notif-list');
                 list.innerHTML = '';
@@ -2315,12 +2570,12 @@
                 el.classList.remove('unread');
                 unreadCount = Math.max(0, unreadCount - 1);
                 updateBadge();
-                await adminApiFetch(`https://novastore-backend.onrender.com/api/notifications/${id}/read`, { method: 'PATCH' });
+                await adminApiFetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
             }
         }
 
         async function markAllAdminRead() {
-            await adminApiFetch('https://novastore-backend.onrender.com/api/notifications/read-all/admin', { method: 'PATCH' });
+            await adminApiFetch('/api/notifications/read-all/admin', { method: 'PATCH' });
             document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
             unreadCount = 0;
             updateBadge();
@@ -2431,7 +2686,7 @@
         async function loadAdminQuestions() {
             try {
                 const token = localStorage.getItem('nova_admin_token');
-                const res = await adminApiFetch('https://novastore-backend.onrender.com/api/questions/admin/all', {
+                const res = await adminApiFetch('/api/questions/admin/all', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -2517,7 +2772,7 @@
             }
 
             try {
-                const res = await adminApiFetch(`https://novastore-backend.onrender.com/api/questions/admin/answer/${id}`, {
+                const res = await adminApiFetch(`/api/questions/admin/answer/${id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ answer })
@@ -2582,3 +2837,5 @@
 </body>
 
 </html>
+
+

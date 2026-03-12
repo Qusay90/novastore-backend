@@ -143,13 +143,8 @@ const createCommerceSchema = async () => {
         CREATE INDEX IF NOT EXISTS idx_invoices_order_id ON invoices(order_id);
     `;
 
-    try {
-        await pool.query(query);
-        console.log('Commerce schema hazir.');
-    } catch (err) {
-        console.error('Commerce schema olusturma hatasi:', err.message);
-        throw err;
-    }
+    await pool.query(query);
+    console.log('Commerce schema hazir.');
 };
 
 module.exports = createCommerceSchema;

@@ -1263,7 +1263,7 @@
         // --- KATEGORİ SİSTEMİ ---
         async function fetchNavigationCategories() {
             try {
-                const res = await fetch('https://novastore-backend.onrender.com/api/categories');
+                const res = await fetch('/api/categories');
                 const categories = await res.json();
 
                 const menu = document.getElementById('category-menu');
@@ -1318,8 +1318,8 @@
             try {
                 // Hem ürünü hem yorumları aynı anda beynimizden istiyoruz
                 const [productRes, reviewsRes] = await Promise.all([
-                    fetch('https://novastore-backend.onrender.com/api/products/' + productId),
-                    fetch('https://novastore-backend.onrender.com/api/reviews/product/' + productId)
+                    fetch('/api/products/' + productId),
+                    fetch('/api/reviews/product/' + productId)
                 ]);
 
                 if (!productRes.ok) throw new Error("Ürün bulunamadı.");
@@ -1598,7 +1598,7 @@
             const comment = document.getElementById('review-comment').value;
 
             try {
-                const response = await fetch('https://novastore-backend.onrender.com/api/reviews', {
+                const response = await fetch('/api/reviews', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1625,7 +1625,7 @@
         // 4. SATICIYA SORU SORMA (Q&A) İŞLEMLERİ
         async function fetchProductQuestions() {
             try {
-                const response = await fetch(`https://novastore-backend.onrender.com/api/questions/product/${productId}`);
+                const response = await fetch(`/api/questions/product/${productId}`);
                 const questions = await response.json();
 
                 const qaList = document.getElementById('qa-list');
@@ -1674,7 +1674,7 @@
             }
 
             try {
-                const response = await fetch('https://novastore-backend.onrender.com/api/questions/ask', {
+                const response = await fetch('/api/questions/ask', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1707,7 +1707,7 @@
             fetchNavigationCategories();
         });
     </script>
-    <script src="https://novastore-backend.onrender.com/socket.io/socket.io.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <!-- Canlı Destek Modülü -->
     <script src="chat.js"></script>
 

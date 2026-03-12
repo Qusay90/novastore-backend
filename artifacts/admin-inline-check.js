@@ -1,4 +1,5 @@
-let globalOrders = [];
+
+        let globalOrders = [];
         let globalProducts = [];
         let globalCategories = []; // Kategorileri tutacak
         let editingProductId = null;
@@ -156,7 +157,7 @@ let globalOrders = [];
             list.innerHTML = '<div style="padding:22px; color:#888; text-align:center;">Yükleniyor...</div>';
 
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/messages/handoffs');
+                const res = await adminApiFetch('/api/messages/handoffs');
                 const items = await adminReadJson(res, 'AI devir listesi alınamadı.');
                 aiHandoffItems = Array.isArray(items) ? items : [];
                 updateAiHandoffBadge(aiHandoffItems.length);
@@ -242,7 +243,7 @@ let globalOrders = [];
             }
 
             try {
-                const res = await adminApiFetch(`http://localhost:5000/api/messages/history/${Number(userId)}`);
+                const res = await adminApiFetch(`/api/messages/history/${Number(userId)}`);
                 const history = await adminReadJson(res, 'Mesaj geçmişi alınamadı.');
                 if (thread) {
                     thread.innerHTML = renderAiThreadMessages(Array.isArray(history) ? history : []);
@@ -272,13 +273,19 @@ let globalOrders = [];
             }
 
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/messages/send', {
+                const res = await adminApiFetch('/api/messages/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ receiver_id: Number(currentAiHandoffUserId), message })
                 });
-                await adminReadJson(res, 'Mesaj gönderilemedi.');
+                const savedMsg = await adminReadJson(res, 'Mesaj gönderilemedi.');
                 if (replyInput) replyInput.value = '';
+
+                // Yeni eklenen Socket.io bildirimi
+                if (window.socket && window.socket.connected) {
+                    window.socket.emit('send_message', { ...savedMsg, receiver_role: 'customer' });
+                }
+
                 await openAiHandoffThread(currentAiHandoffUserId, true);
                 await loadAiHandoffs(true);
             } catch (err) {
@@ -294,7 +301,7 @@ let globalOrders = [];
         // --- DASHBOARD ÖZEL GÜNCELLEMELERİ (GRAFİK VE BEKLEYEN İŞLER) ---
         async function fetchOrdersForDashboard() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/orders');
+                const res = await adminApiFetch('/api/orders');
                 const orders = await adminReadJson(res, 'Siparişler getirilemedi.');
                 if (!Array.isArray(orders)) throw new Error('Sipariş verisi beklenen formatta değil.');
 
@@ -398,7 +405,7 @@ let globalOrders = [];
         // KATEGORİ YÖNETİMİ
         async function fetchCategories() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/categories');
+                const res = await adminApiFetch('/api/categories');
                 globalCategories = await res.json();
 
                 const tbody = document.getElementById('categories-table-body');
@@ -464,7 +471,7 @@ let globalOrders = [];
         async function deleteCategory(id) {
             if (!confirm("Kategoriyi silerseniz alt kategoriler de silinir. Emin misiniz?")) return;
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/categories/' + id, { method: 'DELETE' });
+                const res = await adminApiFetch('/api/categories/' + id, { method: 'DELETE' });
                 if (res.ok) fetchCategories();
                 else alert('Hata oluştu');
             } catch (e) { }
@@ -484,7 +491,7 @@ let globalOrders = [];
                             parent_id: parent_id ? parseInt(parent_id) : null
                         };
 
-                        await adminApiFetch('http://localhost:5000/api/categories', {
+                        await adminApiFetch('/api/categories', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(bodyData)
@@ -501,7 +508,7 @@ let globalOrders = [];
 
         async function fetchStats() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/admin/stats');
+                const res = await adminApiFetch('/api/admin/stats');
                 const data = await adminReadJson(res, 'İstatistikler getirilemedi.');
                 document.getElementById('stat-revenue').innerText = data.totalRevenue + " TL";
                 document.getElementById('stat-orders').innerText = data.totalOrders;
@@ -514,7 +521,7 @@ let globalOrders = [];
 
         async function fetchOrders() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/orders');
+                const res = await adminApiFetch('/api/orders');
                 const payload = await adminReadJson(res, 'Siparişler getirilemedi.');
                 if (!Array.isArray(payload)) throw new Error('Sipariş verisi beklenen formatta değil.');
 
@@ -554,8 +561,9 @@ let globalOrders = [];
 
         async function fetchProducts() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/products');
-                globalProducts = await res.json();
+                const res = await adminApiFetch('/api/products');
+                const payload = await adminReadJson(res, 'Urunler getirilemedi.');
+                globalProducts = Array.isArray(payload) ? payload : [];
                 const tbody = document.getElementById('products-table-body');
                 tbody.innerHTML = '';
                 if (globalProducts.length === 0) {
@@ -583,7 +591,12 @@ let globalOrders = [];
     </tr>
     `;
                 });
-            } catch (e) { }
+            } catch (e) {
+                const tbody = document.getElementById('products-table-body');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="color:#C62828; text-align:center; padding:18px;">${e.message || 'Urunler getirilemedi.'}</td></tr>`;
+                }
+            }
         }
 
         // --- DİĞER MODAL VE FORM KODLARI BURADA ÇALIŞMAYA DEVAM EDECEK (SİLME, DÜZENLEME VB.) ---
@@ -619,7 +632,7 @@ let globalOrders = [];
             document.getElementById('existing-media-container').innerHTML = '';
 
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/products/' + id);
+                const res = await adminApiFetch('/api/products/' + id);
                 const pDetails = await res.json();
                 if (pDetails.media && pDetails.media.length > 0) {
                     document.getElementById('existing-media-group').style.display = 'block';
@@ -645,25 +658,30 @@ let globalOrders = [];
         }
 
         async function deleteSpecificMedia(mediaId, btnEl) {
-            if (!confirm("Bu görseli silmek istediğinize emin misiniz?")) return;
+            if (!confirm("Bu gorseli silmek istediginize emin misiniz?")) return;
             try {
                 btnEl.innerText = "...";
-                const res = await adminApiFetch('http://localhost:5000/api/products/media/' + mediaId, { method: 'DELETE' });
-                if (res.ok) {
-                    btnEl.parentElement.remove();
-                } else {
-                    alert("Görsel silinemedi.");
-                    btnEl.innerText = "✕";
-                }
-            } catch (e) { console.error(e); }
+                const res = await adminApiFetch('/api/products/media/' + mediaId, { method: 'DELETE' });
+                await adminReadJson(res, 'Gorsel silinemedi.');
+                btnEl.parentElement.remove();
+            } catch (e) {
+                alert(e.message || 'Gorsel silinemedi.');
+                console.error(e);
+                btnEl.innerText = 'x';
+            }
         }
 
         async function deleteProduct(id) {
-            if (!confirm("Silmek istediğinize emin misiniz?")) return;
+            if (!confirm("Silmek istediginize emin misiniz?")) return;
             try {
-                const response = await adminApiFetch('http://localhost:5000/api/products/' + id, { method: 'DELETE' });
-                if (response.ok) { alert("🗑️ Ürün silindi!"); fetchProducts(); fetchStats(); }
-            } catch (e) { }
+                const response = await adminApiFetch('/api/products/' + id, { method: 'DELETE' });
+                await adminReadJson(response, 'Urun silinemedi.');
+                alert('Urun silindi!');
+                fetchProducts();
+                fetchStats();
+            } catch (e) {
+                alert(e.message || 'Urun silinemedi.');
+            }
         }
 
         function openOrderModal(orderId) {
@@ -716,7 +734,7 @@ let globalOrders = [];
         async function updateOrderStatus(orderId) {
             const newStatus = document.getElementById('status-select').value;
             try {
-                const response = await adminApiFetch('http://localhost:5000/api/orders/' + orderId + '/status', {
+                const response = await adminApiFetch('/api/orders/' + orderId + '/status', {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus })
                 });
                 await adminReadJson(response, 'Sipariş durumu güncellenemedi.');
@@ -733,7 +751,7 @@ let globalOrders = [];
         async function deleteOrder(orderId) {
             if (!confirm("Bu siparişi silmek istediğinize emin misiniz? Bu işlem geri alınamaz!")) return;
             try {
-                const response = await adminApiFetch('http://localhost:5000/api/orders/' + orderId, { method: 'DELETE' });
+                const response = await adminApiFetch('/api/orders/' + orderId, { method: 'DELETE' });
                 if (response.ok) {
                     alert("🗑️ Sipariş silindi!");
                     fetchOrders();
@@ -748,7 +766,7 @@ let globalOrders = [];
         document.getElementById('add-product-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-save-product');
-            btn.innerText = "Kaydediliyor..."; btn.disabled = true;
+            btn.innerText = 'Kaydediliyor...'; btn.disabled = true;
             try {
                 const formData = new FormData();
                 formData.append('name', document.getElementById('prod-name').value);
@@ -760,17 +778,35 @@ let globalOrders = [];
 
                 const files = document.getElementById('prod-media')?.files;
                 if (files) {
-                    for (let i = 0; i < files.length; i++) { formData.append('media', files[i]); }
-                } if (editingProductId) {
-                    await
-                        adminApiFetch('http://localhost:5000/api/products/' + editingProductId, { method: 'PUT', body: formData });
-                } else {
-                    await adminApiFetch('http://localhost:5000/api/products', { method: 'POST', body: formData });
+                    const mediaOrder = [];
+                    for (let i = 0; i < files.length; i++) {
+                        mediaOrder.push({ index: i, name: files[i].name, size: files[i].size });
+                        formData.append('media', files[i]);
+                    }
+                    formData.append('mediaOrder', JSON.stringify(mediaOrder));
                 }
-                document.getElementById('add-product-form').reset(); document.getElementById('upload-status').innerText = '';
-                closeModal('product-modal'); fetchProducts(); fetchStats();
-            } catch (error) { console.error(error); } finally {
-                btn.innerText = "Kaydet"; btn.disabled = false;
+
+                if (editingProductId) {
+                    const response = await adminApiFetch('/api/products/' + editingProductId, { method: 'PUT', body: formData });
+                    await adminReadJson(response, 'Urun guncellenemedi.');
+                    alert('Urun guncellendi.');
+                } else {
+                    const response = await adminApiFetch('/api/products', { method: 'POST', body: formData });
+                    await adminReadJson(response, 'Urun eklenemedi.');
+                    alert('Urun eklendi.');
+                }
+
+                document.getElementById('add-product-form').reset();
+                document.getElementById('upload-status').innerText = '';
+                closeModal('product-modal');
+                fetchProducts();
+                fetchStats();
+            } catch (error) {
+                alert(error.message || 'Urun kaydedilemedi.');
+                console.error(error);
+            } finally {
+                btn.innerText = editingProductId ? 'Degisiklikleri Kaydet' : 'Urunu Kaydet';
+                btn.disabled = false;
             }
         });
 
@@ -841,14 +877,14 @@ let globalOrders = [];
             fetchAdminNotifications();
 
             // 3) Socket.io ile admin_room'a bağlan
-            const socket = io('http://localhost:5000');
-            socket.on('connect', () => {
+            window.socket = io();
+            window.socket.on('connect', () => {
                 console.log('🔔 Socket bağlantısı kuruldu, admin_room odasına katılıyorum...');
-                socket.emit('join_room', 'admin_room');
+                window.socket.emit('join_room', 'admin_room');
             });
 
             // 4) Gerçek zamanlı bildirim gelince
-            socket.on('new_notification', (notif) => {
+            window.socket.on('new_notification', (notif) => {
                 addNotifToDropdown(notif, true);
                 incrementBadge();
                 ringBell();
@@ -857,11 +893,23 @@ let globalOrders = [];
                 if (notif.type === 'ai_handoff') loadAiHandoffs();
                 if (notif.type === 'new_question') loadAdminQuestions();
             });
+
+            // 5) Gerçek zamanlı mesaj gelince
+            window.socket.on('receive_message', (msg) => {
+                if (msg.receiver_id == 1 || msg.receiver_role === 'admin') {
+                    if (Number(currentAiHandoffUserId) === Number(msg.sender_id)) {
+                        openAiHandoffThread(currentAiHandoffUserId, true);
+                    } else {
+                        loadAiHandoffs(true);
+                    }
+                    ringBell();
+                }
+            });
         }
 
         async function fetchAdminNotifications() {
             try {
-                const res = await adminApiFetch('http://localhost:5000/api/notifications/admin');
+                const res = await adminApiFetch('/api/notifications/admin');
                 const data = await res.json();
                 const list = document.getElementById('notif-list');
                 list.innerHTML = '';
@@ -945,12 +993,12 @@ let globalOrders = [];
                 el.classList.remove('unread');
                 unreadCount = Math.max(0, unreadCount - 1);
                 updateBadge();
-                await adminApiFetch(`http://localhost:5000/api/notifications/${id}/read`, { method: 'PATCH' });
+                await adminApiFetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
             }
         }
 
         async function markAllAdminRead() {
-            await adminApiFetch('http://localhost:5000/api/notifications/read-all/admin', { method: 'PATCH' });
+            await adminApiFetch('/api/notifications/read-all/admin', { method: 'PATCH' });
             document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
             unreadCount = 0;
             updateBadge();
@@ -1061,7 +1109,7 @@ let globalOrders = [];
         async function loadAdminQuestions() {
             try {
                 const token = localStorage.getItem('nova_admin_token');
-                const res = await adminApiFetch('http://localhost:5000/api/questions/admin/all', {
+                const res = await adminApiFetch('/api/questions/admin/all', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -1147,7 +1195,7 @@ let globalOrders = [];
             }
 
             try {
-                const res = await adminApiFetch(`http://localhost:5000/api/questions/admin/answer/${id}`, {
+                const res = await adminApiFetch(`/api/questions/admin/answer/${id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ answer })

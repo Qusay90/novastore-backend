@@ -1,9 +1,9 @@
-﻿const pool = require('../config/db');
+const pool = require('../config/db');
 
 const AI_HANDOFF_PREFIX = '[AI DESTEK DEVRI]';
 
-const getPrimaryAdminId = async () => {
-    const result = await pool.query("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
+const getPrimaryAdminId = async (db = pool) => {
+    const result = await db.query("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
     if (result.rows.length === 0) return null;
     return Number(result.rows[0].id);
 };
@@ -83,6 +83,7 @@ exports.sendMessage = async (req, res) => {
         res.status(500).json({ error: 'Mesaj gonderilemedi' });
     }
 };
+
 
 exports.getChatUsers = async (req, res) => {
     try {
@@ -173,6 +174,64 @@ exports.getAiHandoffs = async (req, res) => {
     } catch (err) {
         console.error('AI handoff listesi cekilirken hata:', err);
         res.status(500).json({ error: 'AI handoff listesi alinamadi.' });
+    }
+};
+
+exports.deleteAiHandoffThread = async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+        const requestedUserId = Number(req.params.userId);
+        if (!Number.isInteger(requestedUserId)) {
+            return res.status(400).json({ error: 'Gecersiz kullanici kimligi.' });
+        }
+
+        await client.query('BEGIN');
+
+        const adminId = await getPrimaryAdminId(client);
+        if (!adminId) {
+            await client.query('ROLLBACK');
+            return res.status(500).json({ error: 'Admin hesabi bulunamadi.' });
+        }
+
+        const customerResult = await client.query(
+            "SELECT id FROM users WHERE id = $1 AND role = 'customer' LIMIT 1",
+            [requestedUserId]
+        );
+        if (customerResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Musteri bulunamadi.' });
+        }
+
+        const deleteMessagesResult = await client.query(
+            `DELETE FROM messages
+             WHERE ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1))
+               AND message LIKE $3`,
+            [requestedUserId, adminId, `${AI_HANDOFF_PREFIX}%`]
+        );
+
+        await client.query(
+            `DELETE FROM notifications
+             WHERE user_id IS NULL
+               AND type = 'ai_handoff'
+               AND message LIKE $1`,
+            [`%Musteri #${requestedUserId}%`]
+        );
+
+        await client.query('COMMIT');
+
+        res.status(200).json({
+            mesaj: deleteMessagesResult.rowCount > 0
+                ? 'AI devir kayitlari silindi.'
+                : 'Silinecek AI devir kaydi bulunamadi.',
+            deletedCount: Number(deleteMessagesResult.rowCount || 0)
+        });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('AI handoff silinirken hata:', err);
+        res.status(500).json({ error: 'AI devir kaydi silinemedi.' });
+    } finally {
+        client.release();
     }
 };
 

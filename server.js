@@ -1,10 +1,11 @@
-﻿require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const { simpleRateLimit, sanitizeBody } = require('./middlewares/securityMiddleware');
+const pool = require('./config/db');
 
 const app = express();
 const server = http.createServer(app);
@@ -12,7 +13,7 @@ const server = http.createServer(app);
 const parseAllowedOrigins = () => {
     const raw = process.env.CLIENT_ORIGIN || '*';
     if (raw === '*') return '*';
-    return raw.split(',').map((o) => o.trim()).filter(Boolean);
+    return raw.split(',').map((origin) => origin.trim()).filter(Boolean);
 };
 
 const allowedOrigins = parseAllowedOrigins();
@@ -117,7 +118,6 @@ app.use('/api/messages', messageRoutes);
 const assistantRoutes = require('./routes/assistantRoutes');
 app.use('/api/assistant', assistantRoutes);
 
-
 const questionRoutes = require('./routes/questionRoutes');
 app.use('/api/questions', questionRoutes);
 
@@ -125,16 +125,32 @@ const merchantRoutes = require('./routes/merchantRoutes');
 app.use('/api/merchant', merchantRoutes);
 app.use('/merchant', merchantRoutes);
 
+app.use((err, req, res, next) => {
+    console.error('Istek hatasi:', err && err.message ? err.message : err);
+
+    if (res.headersSent) {
+        return next(err);
+    }
+
+    const statusCode = Number(err && (err.statusCode || err.status)) || 500;
+    const message = err && err.message ? err.message : 'Sunucu hatasi meydana geldi.';
+    return res.status(statusCode).json({ error: message });
+});
+
 // Veritabani tablolari
+const createCoreSchema = require('./models/createCoreDb');
 const createNotificationsTable = require('./models/createNotificationDb');
 const createCommerceSchema = require('./models/createCommerceDb');
 
 (async () => {
     try {
+        await pool.query('SELECT 1');
+        console.log(`Veritabani baglantisi dogrulandi: ${pool.getTargetLabel()}`);
+        await createCoreSchema();
         await createNotificationsTable();
         await createCommerceSchema();
     } catch (err) {
-        console.error('Veritabani hazirlama hatasi:', err.message);
+        console.error('Veritabani hazirlama hatasi:', pool.formatError(err));
     }
 })();
 
@@ -144,5 +160,3 @@ server.listen(PORT, () => {
     console.log(`NovaStore sunucusu ${PORT} portunda baslatildi.`);
     console.log('Socket.io hazir!');
 });
-
-

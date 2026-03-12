@@ -925,7 +925,7 @@
             try {
                 const token = localStorage.getItem('nova_user_token');
 
-                const userRes = await fetch('https://novastore-backend.onrender.com/api/questions/user', {
+                const userRes = await fetch('/api/questions/user', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -1171,7 +1171,7 @@
                 // Önce tüm ürünleri çek ve ID -> image_url eşlemesi oluştur
                 let productImageMap = {};
                 try {
-                    const productsRes = await fetch('https://novastore-backend.onrender.com/api/products');
+                    const productsRes = await fetch('/api/products');
                     const allProducts = await productsRes.json();
                     allProducts.forEach(p => { productImageMap[p.id] = p.image_url || ''; });
                 } catch (e) { /* ürünler yüklenemezse harita boş kalır */ }
@@ -1179,7 +1179,7 @@
                 const effectiveUserId = getAuthenticatedUserId() || Number(user.id);
                 if (!Number.isInteger(effectiveUserId)) throw new Error('Oturum bilgisi dogrulanamadi.');
 
-                const response = await fetch('https://novastore-backend.onrender.com/api/orders/user/' + effectiveUserId, { headers: authHeaders() });
+                const response = await fetch('/api/orders/user/' + effectiveUserId, { headers: authHeaders() });
                 const orders = await response.json();
                 if (!response.ok) throw new Error(orders.error || 'Siparişler getirilemedi.');
                 const container = document.getElementById('orders-container');
@@ -1497,7 +1497,7 @@
             try {
                 // Tüm ürünleri çekip içinden favorileri filtreliyoruz.
                 // Gerçek bir senaryoda sadece seçili ID'ler veritabanından çekilebilir.
-                const response = await fetch('https://novastore-backend.onrender.com/api/products');
+                const response = await fetch('/api/products');
                 const allProducts = await response.json();
 
                 const favoriteProducts = allProducts.filter(p => favs.includes(p.id));
@@ -1616,7 +1616,7 @@
                 const effectiveUserId = getAuthenticatedUserId() || Number(user.id);
                 if (!Number.isInteger(effectiveUserId)) throw new Error('Oturum bilgisi dogrulanamadi.');
 
-                const response = await fetch('https://novastore-backend.onrender.com/api/reviews/user/' + effectiveUserId, {
+                const response = await fetch('/api/reviews/user/' + effectiveUserId, {
                     headers: authHeaders()
                 });
                 const reviews = await response.json();
@@ -1703,7 +1703,7 @@
             fetchProfileNotifications();
 
             // Socket.io bağlantısı
-            const socket = io('https://novastore-backend.onrender.com');
+            const socket = io();
             socket.on('connect', () => {
                 socket.emit('join_room', `user_${user.id}`);
             });
@@ -1719,7 +1719,7 @@
 
         async function fetchProfileNotifications() {
             try {
-                const res = await fetch(`https://novastore-backend.onrender.com/api/notifications/user/${user.id}`, { headers: authHeaders() });
+                const res = await fetch(`/api/notifications/user/${user.id}`, { headers: authHeaders() });
                 const data = await res.json();
                 const list = document.getElementById('profile-notif-list');
                 list.innerHTML = '';
@@ -1759,7 +1759,7 @@
                     item.style.background = 'white';
                     _profileNotifUnread = Math.max(0, _profileNotifUnread - 1);
                     updateProfileBadge();
-                    await fetch(`https://novastore-backend.onrender.com/api/notifications/${notif.id}/read`, { method: 'PATCH', headers: authHeaders() });
+                    await fetch(`/api/notifications/${notif.id}/read`, { method: 'PATCH', headers: authHeaders() });
                     notif.is_read = true;
                 }
                 // İlgili sekmeye git
@@ -1863,7 +1863,7 @@
         }
 
         async function markAllProfileNotifRead() {
-            await fetch(`https://novastore-backend.onrender.com/api/notifications/read-all/${user.id}`, { method: 'PATCH', headers: authHeaders() });
+            await fetch(`/api/notifications/read-all/${user.id}`, { method: 'PATCH', headers: authHeaders() });
             document.querySelectorAll('#profile-notif-list > div').forEach(el => el.style.background = 'white');
             _profileNotifUnread = 0;
             updateProfileBadge();
@@ -2005,7 +2005,7 @@
             document.getElementById('return-result-msg').innerText = '';
 
             try {
-                const response = await fetch('https://novastore-backend.onrender.com/api/returns', {
+                const response = await fetch('/api/returns', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -2039,7 +2039,7 @@
 
     <!-- Canlı Destek Modülü -->
     <!-- Socket.io connection script -->
-    <script src="https://novastore-backend.onrender.com/socket.io/socket.io.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script src="chat.js"></script>
 
 </body>

@@ -994,7 +994,7 @@
         // --- KATEGORİ SİSTEMİ ---
         async function fetchNavigationCategories() {
             try {
-                const res = await fetch('https://novastore-backend.onrender.com/api/categories');
+                const res = await fetch('/api/categories');
                 const categories = await res.json();
 
                 const menu = document.getElementById('category-menu');
@@ -1032,7 +1032,7 @@
         // --- 3. ÜRÜNLERİ VİTRİNE DİZME ---
         async function fetchProducts(categoryFilter = null, searchFilter = null) {
             try {
-                const response = await fetch('https://novastore-backend.onrender.com/api/products');
+                const response = await fetch('/api/products');
                 let products = await response.json();
 
                 if (categoryFilter) {
@@ -1175,7 +1175,7 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- Socket.io client -->
-    <script src="https://novastore-backend.onrender.com/socket.io/socket.io.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <!-- Bildirim JS -->
     <script src="notifications.js"></script>
     <!-- Canlı Destek Modülü -->
