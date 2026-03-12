@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 const ensureJwtSecret = () => {
     if (!process.env.JWT_SECRET) {
@@ -53,8 +53,8 @@ const forgotPassword = async (req, res) => {
     try {
         ensureJwtSecret();
 
-        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-            return res.status(500).json({ message: 'E-posta servisi ayarlanmamis. Lutfen sunucu (.env veya Render) ayarlarini yapilandirin.' });
+        if (!process.env.RESEND_API_KEY) {
+            return res.status(500).json({ message: 'E-posta servisi ayarlanmamis. RESEND_API_KEY eksik.' });
         }
 
         const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -74,20 +74,12 @@ const forgotPassword = async (req, res) => {
         const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
         const resetLink = `${baseUrl}/reset-password.html?token=${resetToken}`;
 
-        const transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 465,
-            secure: true,
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS
-            }
-        });
-
         const displayName = user.full_name || user.name || 'Kullanici';
 
-        const mailOptions = {
-            from: `"NovaStore Destek" <${process.env.EMAIL_USER}>`,
+        const resend = new Resend(process.env.RESEND_API_KEY);
+
+        const { error } = await resend.emails.send({
+            from: 'NovaStore Destek <onboarding@resend.dev>',
             to: user.email,
             subject: 'NovaStore - Sifre Sifirlama Talebi',
             html: `
@@ -100,9 +92,12 @@ const forgotPassword = async (req, res) => {
                     <p style="color: #999; font-size: 0.8rem;">Eger bu talebi siz yapmadiysaniz, bu e-postayi gormezden gelebilirsiniz.</p>
                 </div>
             `
-        };
+        });
 
-        await transporter.sendMail(mailOptions);
+        if (error) {
+            console.error('Resend hatasi:', error);
+            return res.status(500).json({ message: 'Mail gonderme hatasi: ' + error.message });
+        }
 
         res.status(200).json({ message: 'Sifre sifirlama linki e-postaniza gonderildi.' });
     } catch (error) {
