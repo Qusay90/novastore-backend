@@ -80,19 +80,19 @@ const forgotPassword = async (req, res) => {
         const resend = new Resend(process.env.RESEND_API_KEY);
 
         const { error } = await resend.emails.send({
-            from: getMailFrom(),
+            from: 'NovaStore Destek <destek@novastore.tr>', // SADECE BU SATIRI DEĞİŞTİRDİK
             to: user.email,
             subject: 'NovaStore - Sifre Sifirlama Talebi',
             html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-                    <h2 style="color: #0F2A43;">NovaStore Sifre Sifirlama</h2>
-                    <p>Merhaba <b>${displayName}</b>,</p>
-                    <p>Hesabinizin sifresini sifirlamak icin bir talepte bulundunuz. Asagidaki butona tiklayarak yeni sifrenizi belirleyebilirsiniz:</p>
-                    <a href="${resetLink}" style="background-color: #F7941D; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; margin: 20px 0;">Sifremi Sifirla</a>
-                    <p style="color: #666; font-size: 0.9rem;">Bu baglanti guvenliginiz icin <b>1 saat</b> sonra gecersiz olacaktir.</p>
-                    <p style="color: #999; font-size: 0.8rem;">Eger bu talebi siz yapmadiysaniz, bu e-postayi gormezden gelebilirsiniz.</p>
-                </div>
-            `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+            <h2 style="color: #0F2A43;">NovaStore Sifre Sifirlama</h2>
+            <p>Merhaba <b>${displayName}</b>,</p>
+            <p>Hesabinizin sifresini sifirlamak icin bir talepte bulundunuz. Asagidaki butona tiklayarak yeni sifrenizi belirleyebilirsiniz:</p>
+            <a href="${resetLink}" style="background-color: #F7941D; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; margin: 20px 0;">Sifremi Sifirla</a>
+            <p style="color: #666; font-size: 0.9rem;">Bu baglanti guvenliginiz icin <b>1 saat</b> sonra gecersiz olacaktir.</p>
+            <p style="color: #999; font-size: 0.8rem;">Eger bu talebi siz yapmadiysaniz, bu e-postayi gormezden gelebilirsiniz.</p>
+        </div>
+    `
         });
 
         if (error) {

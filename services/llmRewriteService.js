@@ -1,4 +1,4 @@
-const OPENAI_URL = 'https://api.openai.com/v1/responses';
+const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
 const SYSTEM_PROMPT = [
     'Sen NovaStore icin urun bulan, destek veren ve guven olusturan bir e-ticaret asistanisin.',
@@ -13,24 +13,9 @@ const SYSTEM_PROMPT = [
 ].join(' ');
 
 const extractOutputText = (payload) => {
-    if (typeof payload.output_text === 'string' && payload.output_text.trim()) {
-        return payload.output_text.trim();
+    if (payload.choices && payload.choices[0] && payload.choices[0].message) {
+        return payload.choices[0].message.content.trim();
     }
-
-    if (Array.isArray(payload.output)) {
-        const chunks = [];
-        payload.output.forEach((item) => {
-            (item.content || []).forEach((contentItem) => {
-                if (contentItem.type === 'output_text' && contentItem.text) {
-                    chunks.push(contentItem.text);
-                }
-            });
-        });
-        if (chunks.length > 0) {
-            return chunks.join('\n').trim();
-        }
-    }
-
     return null;
 };
 
@@ -38,7 +23,7 @@ const rewriteDraftReply = async ({ userMessage, draftReply, intent, context }) =
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return draftReply;
 
-    const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
     const inputText = [
         `Kullanici mesaji: ${userMessage}`,
         `Intent: ${intent}`,
@@ -56,16 +41,17 @@ const rewriteDraftReply = async ({ userMessage, draftReply, intent, context }) =
             },
             body: JSON.stringify({
                 model,
-                input: [
+                messages: [
                     {
                         role: 'system',
-                        content: [{ type: 'input_text', text: SYSTEM_PROMPT }]
+                        content: SYSTEM_PROMPT
                     },
                     {
                         role: 'user',
-                        content: [{ type: 'input_text', text: inputText }]
+                        content: inputText
                     }
-                ]
+                ],
+                temperature: 0.7
             })
         });
 

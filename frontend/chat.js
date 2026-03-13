@@ -1,4 +1,4 @@
-﻿document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     const assistantIconMarkup = `<img src="ai-logo.png" alt="" class="chat-header-avatar">`;
     const chatFabIconMarkup = `<img src="ai-logo.png" alt="" class="chat-fab-robot">`;
     const supportIconMarkup = `
@@ -752,7 +752,9 @@
 
     async function sendSupportMessage() {
         if (!token || !userId) {
-            alert('Canli destegi kullanabilmek icin giris yapmalisiniz.');
+            if (confirm('Canlı desteği kullanabilmek için giriş yapmalısınız. Giriş sayfasına gitmek ister misiniz?')) {
+                window.location.href = 'login.html';
+            }
             setMode('assistant');
             return;
         }
@@ -787,11 +789,11 @@
                 }
             } else {
                 const errorPayload = await res.json().catch(() => ({}));
-                renderBubble(escapeHtml(errorPayload.error || 'Mesaj gonderilemedi.'), 'received', Date.now());
+                renderBubble(escapeHtml(errorPayload.error || 'Mesaj gönderilemedi. Lütfen tekrar deneyin.'), 'received', Date.now());
             }
         } catch (err) {
             console.error('Mesaj gonderim hatasi:', err);
-            renderBubble('Canli destek su an baglanamiyor.', 'received', Date.now());
+            renderBubble('Canlı destek şu an bağlanamıyor. Lütfen internet bağlantınızı kontrol edin.', 'received', Date.now());
         }
     }
 
@@ -813,14 +815,21 @@
 
             const payload = await res.json();
             if (!res.ok) {
-                alert(payload.error || 'Canli destek devri yapilamadi.');
+                // Eğer oturum hatası ise daha net bilgi ver
+                if (res.status === 401) {
+                    if (confirm('Canlı desteğe bağlanmak için giriş yapmanız gerekiyor. Giriş sayfasına gitmek ister misiniz?')) {
+                        window.location.href = 'login.html';
+                    }
+                } else {
+                    alert(payload.error || 'Canlı destek devri şu an yapılamadı.');
+                }
                 return;
             }
 
             setMode('support');
         } catch (err) {
             console.error('Escalation hatasi:', err);
-            alert('Canli destek devri su an yapilamadi.');
+            alert('Canlı destek devri şu an yapılamadı. Lütfen internet bağlantınızı kontrol edin.');
         }
     }
 
