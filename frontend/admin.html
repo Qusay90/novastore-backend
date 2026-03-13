@@ -2263,13 +2263,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ receiver_id: Number(currentAiHandoffUserId), message })
                 });
-                const savedMsg = await adminReadJson(res, 'Mesaj gönderilemedi.');
+                await adminReadJson(res, 'Mesaj gönderilemedi.');
                 if (replyInput) replyInput.value = '';
-
-                // Yeni eklenen Socket.io bildirimi
-                if (window.socket && window.socket.connected) {
-                    window.socket.emit('send_message', { ...savedMsg, receiver_role: 'customer' });
-                }
 
                 await openAiHandoffThread(currentAiHandoffUserId, true);
                 await loadAiHandoffs(true);

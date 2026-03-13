@@ -388,6 +388,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (userRole === 'admin') return;
 
+    function ensureChatSocketConnection() {
+        if (typeof io === 'undefined' || !userId) return null;
+
+        const existingSocket = window.socket && typeof window.socket.on === 'function'
+            ? window.socket
+            : null;
+        const socket = existingSocket || io(undefined, { transports: ['websocket', 'polling'] });
+        window.socket = socket;
+
+        const roomName = `user_${userId}`;
+        const joinRoom = () => socket.emit('join_room', roomName);
+
+        if (!socket.__novaChatJoinRoom || socket.__novaChatJoinRoom !== roomName) {
+            socket.on('connect', joinRoom);
+            socket.__novaChatJoinRoom = roomName;
+        }
+
+        if (socket.connected) {
+            joinRoom();
+        }
+
+        return socket;
+    }
+
+    const chatSocket = ensureChatSocketConnection();
+
     let isChatOpen = false;
     let unreadCount = 0;
     let chatMode = 'assistant';
@@ -783,10 +809,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (res.ok) {
-                const savedMsg = await res.json();
-                if (window.socket && window.socket.connected) {
-                    window.socket.emit('send_message', { ...savedMsg, receiver_role: 'admin' });
-                }
+                await res.json();
             } else {
                 const errorPayload = await res.json().catch(() => ({}));
                 renderBubble(escapeHtml(errorPayload.error || 'Mesaj gönderilemedi. Lütfen tekrar deneyin.'), 'received', Date.now());
@@ -925,20 +948,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    setTimeout(() => {
-        if (window.socket) {
-            window.socket.on('receive_message', (data) => {
-                if (Number(data.receiver_id) === Number(userId)) {
-                    if (isChatOpen && chatMode === 'support') {
-                        renderBubble(formatSupportMessageHtml(data.message), 'received', data.created_at || Date.now());
-                    } else {
-                        unreadCount += 1;
-                        updateBadge();
-                    }
+    if (chatSocket && !chatSocket.__novaChatReceiveBound) {
+        chatSocket.on('receive_message', (data) => {
+            if (Number(data.receiver_id) === Number(userId)) {
+                if (isChatOpen && chatMode === 'support') {
+                    renderBubble(formatSupportMessageHtml(data.message), 'received', data.created_at || Date.now());
+                } else {
+                    unreadCount += 1;
+                    updateBadge();
                 }
-            });
-        }
-    }, 1500);
+            }
+        });
+        chatSocket.__novaChatReceiveBound = true;
+    }
 
     setMode('assistant');
 });

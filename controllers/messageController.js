@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { createNotification } = require('./notificationController');
 
 const AI_HANDOFF_PREFIX = '[AI DESTEK DEVRI]';
 
@@ -12,6 +13,55 @@ const normalizeMessageRow = (row) => ({
     ...row,
     is_ai_handoff: String(row.message || '').startsWith(AI_HANDOFF_PREFIX)
 });
+
+const emitRealtimeMessage = (messageRow, receiverRole) => {
+    try {
+        const { io } = require('../server');
+        if (!io || !messageRow) return;
+
+        const normalizedMessage = normalizeMessageRow(messageRow);
+        const targetRoom = receiverRole === 'admin'
+            ? 'admin_room'
+            : `user_${Number(normalizedMessage.receiver_id)}`;
+
+        io.to(targetRoom).emit('receive_message', {
+            ...normalizedMessage,
+            receiver_role: receiverRole
+        });
+    } catch (err) {
+        console.error('Gercek zamanli mesaj yayini hatasi:', err.message);
+    }
+};
+
+const ensureSupportHandoffThread = async ({ client, customerId, adminId, firstMessage }) => {
+    const existingHandoff = await client.query(
+        `SELECT id
+         FROM messages
+         WHERE ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1))
+           AND message LIKE $3
+         LIMIT 1`,
+        [customerId, adminId, `${AI_HANDOFF_PREFIX}%`]
+    );
+
+    if (existingHandoff.rows.length > 0) {
+        return null;
+    }
+
+    const summaryLines = [
+        AI_HANDOFF_PREFIX,
+        'Musteri dogrudan canli destek moduna gecti.',
+        `Ilk mesaj: ${String(firstMessage || '').trim().slice(0, 500)}`
+    ];
+
+    const handoffInsert = await client.query(
+        `INSERT INTO messages (sender_id, receiver_id, message)
+         VALUES ($1, $2, $3)
+         RETURNING *`,
+        [customerId, adminId, summaryLines.join('\n')]
+    );
+
+    return handoffInsert.rows[0];
+};
 
 exports.getChatHistory = async (req, res) => {
     try {
@@ -47,10 +97,13 @@ exports.getChatHistory = async (req, res) => {
 };
 
 exports.sendMessage = async (req, res) => {
+    const client = await pool.connect();
+
     try {
         const { receiver_id, message } = req.body;
+        const trimmedMessage = String(message || '').trim();
 
-        if (!message || !String(message).trim()) {
+        if (!trimmedMessage) {
             return res.status(400).json({ error: 'Mesaj icerigi bos olamaz.' });
         }
 
@@ -71,16 +124,56 @@ exports.sendMessage = async (req, res) => {
             receiverId = adminId;
         }
 
-        const query = `
-            INSERT INTO messages (sender_id, receiver_id, message)
-            VALUES ($1, $2, $3) RETURNING *
-        `;
+        await client.query('BEGIN');
 
-        const result = await pool.query(query, [senderId, receiverId, String(message).trim()]);
-        res.status(201).json(normalizeMessageRow(result.rows[0]));
+        let createdHandoffMessage = null;
+        if (req.user.role !== 'admin') {
+            createdHandoffMessage = await ensureSupportHandoffThread({
+                client,
+                customerId: senderId,
+                adminId: receiverId,
+                firstMessage: trimmedMessage
+            });
+        }
+
+        const insertResult = await client.query(
+            `INSERT INTO messages (sender_id, receiver_id, message)
+             VALUES ($1, $2, $3)
+             RETURNING *`,
+            [senderId, receiverId, trimmedMessage]
+        );
+
+        await client.query('COMMIT');
+
+        const savedMessage = insertResult.rows[0];
+        const normalizedSavedMessage = normalizeMessageRow(savedMessage);
+
+        if (createdHandoffMessage) {
+            emitRealtimeMessage(createdHandoffMessage, 'admin');
+            try {
+                const { io } = require('../server');
+                await createNotification(
+                    null,
+                    'ai_handoff',
+                    `Canli destek talebi olustu. Musteri #${senderId} size yazdi.`,
+                    io
+                );
+            } catch (err) {
+                console.error('Canli destek handoff bildirimi olusturulamadi:', err.message);
+            }
+        }
+
+        emitRealtimeMessage(savedMessage, req.user.role === 'admin' ? 'customer' : 'admin');
+
+        res.status(201).json(normalizedSavedMessage);
     } catch (err) {
+        try {
+            await client.query('ROLLBACK');
+        } catch (_) { }
         console.error('Mesaj gonderilirken hata:', err);
         res.status(500).json({ error: 'Mesaj gonderilemedi' });
+    } finally {
+        client.release();
     }
 };
 
