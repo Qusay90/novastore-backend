@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+﻿document.addEventListener('DOMContentLoaded', () => {
     const chatUsersList = document.getElementById('admin-chat-users');
     const chatMessages = document.getElementById('admin-chat-messages');
     const chatInput = document.getElementById('admin-chat-input');
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (payload && Number.isInteger(Number(payload.id))) adminUserId = Number(payload.id);
     } catch (_) { }
 
-    // Admin sayfaya girdi�inde sohbet eden kullan�c�lar� getir
+    // Admin sayfaya girdiï¿½inde sohbet eden kullanï¿½cï¿½larï¿½ getir
     async function loadChatUsers() {
         try {
             const res = await fetch('/api/messages/users', {
@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const users = await res.json();
                 renderChatUsers(users);
             } else {
-                chatUsersList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">Kullan�c�lar y�klenemedi.</div>';
+                chatUsersList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">Kullanï¿½cï¿½lar yï¿½klenemedi.</div>';
             }
         } catch (err) {
             console.error(err);
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderChatUsers(users) {
         if (users.length === 0) {
-            chatUsersList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">Hen�z mesaj yok.</div>';
+            chatUsersList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">Henï¿½z mesaj yok.</div>';
             return;
         }
 
@@ -57,12 +57,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function openUserChat(user) {
         currentChatUserId = user.id;
-        chatHeader.innerHTML = `<span>?? ${user.name} ile G�r���l�yor</span>`;
+        chatHeader.innerHTML = `<span>?? ${user.name} ile Gï¿½rï¿½ï¿½ï¿½lï¿½yor</span>`;
         chatInput.disabled = false;
         sendChatBtn.disabled = false;
         chatInput.focus();
 
-        chatMessages.innerHTML = '<div style="text-align: center; color: #999;">Mesajlar y�kleniyor...</div>';
+        chatMessages.innerHTML = '<div style="text-align: center; color: #999;">Mesajlar yï¿½kleniyor...</div>';
 
         try {
             const res = await fetch(`/api/messages/history/${user.id}`, {
@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const history = await res.json();
                 chatMessages.innerHTML = '';
                 if (history.length === 0) {
-                    chatMessages.innerHTML = '<div style="text-align: center; color: #999;">Sohbet ge�mi�i yok. �lk mesaj� g�nderin!</div>';
+                    chatMessages.innerHTML = '<div style="text-align: center; color: #999;">Sohbet geï¿½miï¿½i yok. ï¿½lk mesajï¿½ gï¿½nderin!</div>';
                 } else {
                     history.forEach(msg => {
                         const type = msg.sender_id == adminUserId ? 'sent' : 'received';
@@ -81,12 +81,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } catch (err) {
-            chatMessages.innerHTML = '<div style="text-align: center; color: #999;">Hata olu�tu.</div>';
+            chatMessages.innerHTML = '<div style="text-align: center; color: #999;">Hata oluï¿½tu.</div>';
         }
     }
 
     function addAdminMessageToUI(msg, type) {
-        // E�er placeholder varsa kald�r
+        // Eï¿½er placeholder varsa kaldï¿½r
         const placeholders = chatMessages.querySelectorAll('div[style*="text-align: center"]');
         placeholders.forEach(p => p.remove());
 
@@ -133,15 +133,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 const savedMsg = await res.json();
 
-                // Ba�ar�l�ysa Socket ile m��teriye g�nder
+                // Baï¿½arï¿½lï¿½ysa Socket ile mï¿½ï¿½teriye gï¿½nder
                 if (window.socket && window.socket.connected) {
                     window.socket.emit('send_message', { ...savedMsg, receiver_role: 'customer' });
                 }
             } else {
-                console.error("Mesaj g�nderilemedi");
+                console.error("Mesaj gï¿½nderilemedi");
             }
         } catch (err) {
-            console.error("Mesaj g�nderim hatas�:", err);
+            console.error("Mesaj gï¿½nderim hatasï¿½:", err);
         }
     }
 
@@ -150,8 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') sendAdminMessage();
     });
 
-    // Socket Dinleyicileri (admin panelinde window.socket tan�ml� m� kontrol edece�iz veya burada tan�mlayaca��z)
-    // E�er admin.html i�inde <script src="/socket.io/socket.io.js"> varsa:
+    // Socket Dinleyicileri (admin panelinde window.socket tanï¿½mlï¿½ mï¿½ kontrol edeceï¿½iz veya burada tanï¿½mlayacaï¿½ï¿½z)
+    // Eï¿½er admin.html iï¿½inde <script src="/socket.io/socket.io.js"> varsa:
     if (typeof io !== 'undefined' && !window.socket) {
         window.socket = io();
         window.socket.emit('join_room', 'admin_room');
@@ -159,15 +159,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (window.socket) {
         window.socket.on('receive_message', (data) => {
-            // E�er m��teri admin'e yollad�ysa
+            // Eï¿½er mï¿½ï¿½teri admin'e yolladï¿½ysa
             if (data.receiver_id == adminUserId) {
-                // E�er ilgili m��terinin sohbeti a��ksa
+                // Eï¿½er ilgili mï¿½ï¿½terinin sohbeti aï¿½ï¿½ksa
                 if (currentChatUserId == data.sender_id) {
                     addAdminMessageToUI(data, 'received');
                 } else {
-                    // Kullan�c� listesinde kullan�c� yoksa yenile veya unread flag ekle (Basit�e listeyi yeniliyoruz)
+                    // Kullanï¿½cï¿½ listesinde kullanï¿½cï¿½ yoksa yenile veya unread flag ekle (Basitï¿½e listeyi yeniliyoruz)
                     loadChatUsers();
-                    // Ses �al�nabiliyor
+                    // Ses ï¿½alï¿½nabiliyor
                     const notifBell = document.getElementById('notif-bell');
                     if (notifBell) {
                         notifBell.classList.add('ring');
@@ -178,9 +178,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // �lk y�kleme
-    // Sekme t�kland���nda listeyi g�ncellemesini sa�lamak i�in global switchTab'e kanca at�labilir
-    // Basit�e �imdilik 3 saniyede bir veya DOM y�klenince �al��t�ral�m
+    // ï¿½lk yï¿½kleme
+    // Sekme tï¿½klandï¿½ï¿½ï¿½nda listeyi gï¿½ncellemesini saï¿½lamak iï¿½in global switchTab'e kanca atï¿½labilir
+    // Basitï¿½e ï¿½imdilik 3 saniyede bir veya DOM yï¿½klenince ï¿½alï¿½ï¿½tï¿½ralï¿½m
     const originalSwitchTab = window.switchTab;
     window.switchTab = function (tabId, el) {
         if (originalSwitchTab) originalSwitchTab(tabId, el);
@@ -189,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 });
+
 
 
 

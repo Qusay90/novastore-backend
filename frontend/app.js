@@ -1,4 +1,4 @@
-let allProducts = [];
+﻿let allProducts = [];
 
 // Kullanıcıya özel localStorage anahtarı
 function _getCartKey() {
@@ -211,4 +211,5 @@ function goToCheckout() {
     }
     window.location.href = "checkout.html"; // Ödeme sayfasına yönlendir
 }
+
 
