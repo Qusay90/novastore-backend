@@ -720,6 +720,104 @@
             box-shadow: 0 0 0 3px rgba(15, 42, 67, 0.1);
         }
 
+        .rich-editor {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.22);
+            overflow: hidden;
+        }
+
+        .rich-editor-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(15, 23, 42, 0.34);
+        }
+
+        .rich-editor-toolbar button,
+        .rich-editor-toolbar select {
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text);
+            border-radius: 8px;
+            min-height: 36px;
+            padding: 0 12px;
+            font-size: 0.88rem;
+            font-family: inherit;
+        }
+
+        .rich-editor-toolbar button {
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .rich-editor-toolbar button:hover,
+        .rich-editor-toolbar select:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .rich-editor-toolbar button.is-active {
+            background: rgba(247, 148, 29, 0.14);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .rich-editor-surface {
+            min-height: 220px;
+            padding: 14px 15px;
+            color: var(--text);
+            line-height: 1.7;
+            font-size: 1rem;
+            outline: none;
+            overflow-y: auto;
+        }
+
+        .rich-editor-surface.is-empty::before {
+            content: attr(data-placeholder);
+            color: #94a3b8;
+            pointer-events: none;
+        }
+
+        .rich-editor-surface p,
+        .rich-editor-surface h2,
+        .rich-editor-surface h3,
+        .rich-editor-surface h4,
+        .rich-editor-surface ul,
+        .rich-editor-surface ol,
+        .rich-editor-surface blockquote {
+            margin: 0 0 12px;
+        }
+
+        .rich-editor-surface h2 {
+            font-size: 1.45rem;
+            color: var(--heading-color);
+        }
+
+        .rich-editor-surface h3 {
+            font-size: 1.2rem;
+            color: var(--heading-color);
+        }
+
+        .rich-editor-surface h4 {
+            font-size: 1.05rem;
+            color: var(--heading-color);
+        }
+
+        .rich-editor-surface ul,
+        .rich-editor-surface ol {
+            padding-left: 20px;
+        }
+
+        .rich-editor-surface blockquote {
+            border-left: 3px solid var(--accent);
+            padding-left: 12px;
+            color: #cbd5e1;
+            font-style: italic;
+        }
+
         .btn-submit {
             background: var(--accent);
             color: white;
@@ -1297,8 +1395,39 @@
                         <div class="form-group"><label style="color:#2E7D32;">Eski Fiyat (İndirim İçin)</label><input
                                 type="number" step="0.01" id="prod-old-price" class="form-control"></div>
                     </div>
-                    <div class="form-group"><label>Ürün Açıklaması</label><textarea id="prod-desc" class="form-control"
-                            style="min-height:80px;"></textarea></div>
+                    <div class="form-group">
+                        <label>Ürün Açıklaması</label>
+                        <div class="rich-editor">
+                            <div class="rich-editor-toolbar">
+                                <select id="prod-desc-block-style" onchange="applyDescriptionBlock(this.value); this.value='';">
+                                    <option value="">Başlık / Paragraf</option>
+                                    <option value="p">Paragraf</option>
+                                    <option value="h2">Başlık 1</option>
+                                    <option value="h3">Başlık 2</option>
+                                    <option value="h4">Başlık 3</option>
+                                    <option value="blockquote">Vurgu Kutusu</option>
+                                </select>
+                                <select id="prod-desc-font-size" onchange="applyDescriptionFontSize(this.value); this.value='';">
+                                    <option value="">Yazı Boyutu</option>
+                                    <option value="sm">Küçük</option>
+                                    <option value="md">Normal</option>
+                                    <option value="lg">Büyük</option>
+                                    <option value="xl">Çok Büyük</option>
+                                </select>
+                                <button type="button" onclick="applyDescriptionCommand('bold')"><strong>B</strong></button>
+                                <button type="button" onclick="applyDescriptionCommand('italic')"><em>İ</em></button>
+                                <button type="button" onclick="applyDescriptionCommand('underline')"><u>U</u></button>
+                                <button type="button" onclick="applyDescriptionCommand('insertUnorderedList')">• Liste</button>
+                                <button type="button" onclick="applyDescriptionCommand('insertOrderedList')">1. Liste</button>
+                                <button type="button" onclick="applyDescriptionCommand('justifyLeft')">Sola</button>
+                                <button type="button" onclick="applyDescriptionCommand('justifyCenter')">Ortala</button>
+                                <button type="button" onclick="clearDescriptionFormatting()">Temizle</button>
+                            </div>
+                            <div id="prod-desc-editor" class="rich-editor-surface is-empty" contenteditable="true"
+                                data-placeholder="Başlık, kalın, italik, liste ve vurgu ekleyerek ürün açıklamasını zenginleştirebilirsiniz."></div>
+                            <textarea id="prod-desc" class="form-control" style="display:none;"></textarea>
+                        </div>
+                    </div>
                     <div class="form-group" id="existing-media-group" style="display: none;">
                         <label>Mevcut Görseller/Videolar</label>
                         <div id="existing-media-container"
@@ -1460,6 +1589,292 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
+        }
+
+        const PRODUCT_DESCRIPTION_FONT_SIZE_MAP = {
+            2: '2',
+            3: '3',
+            4: '4',
+            5: '5',
+            sm: '2',
+            md: '3',
+            lg: '4',
+            xl: '5'
+        };
+        const PRODUCT_DESCRIPTION_ALLOWED_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'U', 'UL', 'OL', 'LI', 'H2', 'H3', 'H4', 'BLOCKQUOTE', 'SPAN']);
+        let productDescriptionSelection = null;
+
+        function getProductDescriptionEditor() {
+            return document.getElementById('prod-desc-editor');
+        }
+
+        function getProductDescriptionField() {
+            return document.getElementById('prod-desc');
+        }
+
+        function convertPlainTextDescriptionToHtml(value) {
+            const normalized = String(value || '').replace(/\r\n/g, '\n').trim();
+            if (!normalized) return '';
+
+            return normalized
+                .split(/\n{2,}/)
+                .map((paragraph) => `<p>${escapeAdminHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+                .join('');
+        }
+
+        function normalizeDescriptionFontSize(node) {
+            const styleValue = String(node.getAttribute('style') || '');
+            const styleMatch = styleValue.match(/font-size\s*:\s*([^;]+)/i);
+            if (styleMatch && styleMatch[1]) {
+                const value = styleMatch[1].trim().toLowerCase();
+                if (['0.9rem', '1rem', '1.15rem', '1.3rem'].includes(value)) return value;
+            }
+
+            const legacySize = String(node.getAttribute('size') || '').trim();
+            if (legacySize === '2') return '0.9rem';
+            if (legacySize === '3') return '1rem';
+            if (legacySize === '4') return '1.15rem';
+            if (legacySize === '5') return '1.3rem';
+            return '';
+        }
+
+        function normalizeDescriptionTextAlign(node) {
+            const alignAttr = String(node.getAttribute('align') || '').trim().toLowerCase();
+            if (['left', 'center', 'right'].includes(alignAttr)) return alignAttr;
+
+            const styleValue = String(node.getAttribute('style') || '');
+            const styleMatch = styleValue.match(/text-align\s*:\s*([^;]+)/i);
+            if (styleMatch && styleMatch[1]) {
+                const value = styleMatch[1].trim().toLowerCase();
+                if (['left', 'center', 'right'].includes(value)) return value;
+            }
+
+            return '';
+        }
+
+        function sanitizeDescriptionHtml(rawHtml) {
+            const parser = new DOMParser();
+            const parsed = parser.parseFromString(`<div>${String(rawHtml || '')}</div>`, 'text/html');
+            const sourceRoot = parsed.body.firstElementChild;
+            const safeRoot = document.createElement('div');
+
+            function appendChildren(target, sourceNode) {
+                Array.from(sourceNode.childNodes).forEach((child) => {
+                    const cleanedChild = sanitizeDescriptionNode(child);
+                    if (!cleanedChild) return;
+
+                    if (cleanedChild.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+                        target.appendChild(cleanedChild);
+                    } else {
+                        target.appendChild(cleanedChild);
+                    }
+                });
+            }
+
+            function sanitizeDescriptionNode(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return document.createTextNode(node.textContent || '');
+                }
+
+                if (node.nodeType !== Node.ELEMENT_NODE) {
+                    return null;
+                }
+
+                let tagName = node.tagName.toUpperCase();
+                if (tagName === 'B') tagName = 'STRONG';
+                if (tagName === 'I') tagName = 'EM';
+                if (tagName === 'DIV') tagName = 'P';
+                if (tagName === 'FONT') tagName = 'SPAN';
+                if (tagName === 'H1') tagName = 'H2';
+                if (tagName === 'H5' || tagName === 'H6') tagName = 'H4';
+
+                if (!PRODUCT_DESCRIPTION_ALLOWED_TAGS.has(tagName)) {
+                    const fragment = document.createDocumentFragment();
+                    appendChildren(fragment, node);
+                    return fragment;
+                }
+
+                const element = document.createElement(tagName.toLowerCase());
+                const fontSize = normalizeDescriptionFontSize(node);
+                const textAlign = normalizeDescriptionTextAlign(node);
+
+                if (fontSize && tagName === 'SPAN') {
+                    element.style.fontSize = fontSize;
+                }
+
+                if (textAlign && ['P', 'H2', 'H3', 'H4', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'SPAN'].includes(tagName)) {
+                    element.style.textAlign = textAlign;
+                }
+
+                appendChildren(element, node);
+
+                if (tagName === 'SPAN' && !element.getAttribute('style') && !element.textContent.trim()) {
+                    return null;
+                }
+
+                if (tagName === 'SPAN' && !element.getAttribute('style')) {
+                    const fragment = document.createDocumentFragment();
+                    appendChildren(fragment, element);
+                    return fragment;
+                }
+
+                return element;
+            }
+
+            if (sourceRoot) {
+                appendChildren(safeRoot, sourceRoot);
+            }
+
+            return safeRoot.innerHTML
+                .replace(/<p><\/p>/g, '')
+                .replace(/(<br>\s*){3,}/g, '<br><br>')
+                .trim();
+        }
+
+        function updateProductDescriptionPlaceholder() {
+            const editor = getProductDescriptionEditor();
+            if (!editor) return;
+            const hasMeaningfulContent = !!editor.textContent.trim() || !!editor.querySelector('img, video, ul, ol, blockquote, h2, h3, h4');
+            editor.classList.toggle('is-empty', !hasMeaningfulContent);
+        }
+
+        function setProductDescriptionEditorValue(value) {
+            const editor = getProductDescriptionEditor();
+            const field = getProductDescriptionField();
+            if (!editor || !field) return;
+
+            const source = String(value || '');
+            const preparedHtml = /<[a-z][\s\S]*>/i.test(source)
+                ? sanitizeDescriptionHtml(source)
+                : convertPlainTextDescriptionToHtml(source);
+
+            editor.innerHTML = preparedHtml;
+            field.value = preparedHtml;
+            productDescriptionSelection = null;
+            updateProductDescriptionPlaceholder();
+        }
+
+        function syncProductDescriptionField(normalizeEditor = false) {
+            const editor = getProductDescriptionEditor();
+            const field = getProductDescriptionField();
+            if (!editor || !field) return '';
+
+            const sanitizedHtml = sanitizeDescriptionHtml(editor.innerHTML);
+            field.value = sanitizedHtml;
+
+            if (normalizeEditor && editor.innerHTML !== sanitizedHtml) {
+                editor.innerHTML = sanitizedHtml;
+            }
+
+            updateProductDescriptionPlaceholder();
+            return sanitizedHtml;
+        }
+
+        function saveProductDescriptionSelection() {
+            const editor = getProductDescriptionEditor();
+            const selection = window.getSelection();
+            if (!editor || !selection || !selection.rangeCount) return;
+
+            const range = selection.getRangeAt(0);
+            if (!editor.contains(range.commonAncestorContainer)) return;
+            productDescriptionSelection = range.cloneRange();
+        }
+
+        function restoreProductDescriptionSelection() {
+            const editor = getProductDescriptionEditor();
+            if (!editor) return;
+
+            editor.focus();
+
+            const selection = window.getSelection();
+            if (!selection) return;
+            selection.removeAllRanges();
+
+            if (productDescriptionSelection) {
+                selection.addRange(productDescriptionSelection);
+                return;
+            }
+
+            const fallbackRange = document.createRange();
+            fallbackRange.selectNodeContents(editor);
+            fallbackRange.collapse(false);
+            selection.addRange(fallbackRange);
+        }
+
+        function applyDescriptionCommand(command, value = null) {
+            const editor = getProductDescriptionEditor();
+            if (!editor) return;
+
+            restoreProductDescriptionSelection();
+            document.execCommand('styleWithCSS', false, false);
+            document.execCommand(command, false, value);
+            saveProductDescriptionSelection();
+            syncProductDescriptionField();
+        }
+
+        function applyDescriptionBlock(blockTag) {
+            if (!blockTag) return;
+            restoreProductDescriptionSelection();
+            const tag = `<${blockTag}>`;
+            document.execCommand('formatBlock', false, tag);
+            saveProductDescriptionSelection();
+            syncProductDescriptionField();
+        }
+
+        function applyDescriptionFontSize(sizeKey) {
+            if (!sizeKey || !PRODUCT_DESCRIPTION_FONT_SIZE_MAP[sizeKey]) return;
+            restoreProductDescriptionSelection();
+            document.execCommand('fontSize', false, PRODUCT_DESCRIPTION_FONT_SIZE_MAP[sizeKey]);
+            saveProductDescriptionSelection();
+            syncProductDescriptionField(true);
+        }
+
+        function clearDescriptionFormatting() {
+            restoreProductDescriptionSelection();
+            document.execCommand('removeFormat', false, null);
+            document.execCommand('formatBlock', false, '<p>');
+            document.execCommand('justifyLeft', false, null);
+            saveProductDescriptionSelection();
+            syncProductDescriptionField(true);
+        }
+
+        function setupProductDescriptionEditor() {
+            const editor = getProductDescriptionEditor();
+            const toolbar = document.querySelector('.rich-editor-toolbar');
+            if (!editor || editor.dataset.ready === '1') return;
+
+            if (toolbar) {
+                toolbar.querySelectorAll('button').forEach((button) => {
+                    button.addEventListener('mousedown', (event) => {
+                        event.preventDefault();
+                        saveProductDescriptionSelection();
+                    });
+                });
+
+                toolbar.querySelectorAll('select').forEach((select) => {
+                    select.addEventListener('mousedown', () => saveProductDescriptionSelection());
+                    select.addEventListener('focus', () => saveProductDescriptionSelection());
+                });
+            }
+
+            editor.addEventListener('focus', saveProductDescriptionSelection);
+            editor.addEventListener('keyup', saveProductDescriptionSelection);
+            editor.addEventListener('mouseup', saveProductDescriptionSelection);
+            editor.addEventListener('blur', () => {
+                saveProductDescriptionSelection();
+                syncProductDescriptionField(true);
+            });
+            editor.addEventListener('input', () => {
+                saveProductDescriptionSelection();
+                syncProductDescriptionField();
+            });
+
+            try {
+                document.execCommand('defaultParagraphSeparator', false, 'p');
+            } catch (_) { }
+
+            setProductDescriptionEditorValue('');
+            editor.dataset.ready = '1';
         }
 
         function releasePendingProductMedia(entries) {
@@ -2181,6 +2596,7 @@
             editingProductId = null;
             document.getElementById('add-product-form').reset();
             resetPendingProductMediaSelection();
+            setProductDescriptionEditorValue('');
             document.getElementById('modal-title-text').innerText = "Vitrine Yeni Ürün Ekle";
             document.getElementById('existing-media-group').style.display = 'none';
             document.getElementById('existing-media-container').innerHTML = '';
@@ -2201,7 +2617,7 @@
             document.getElementById('prod-price').value = p.price;
             document.getElementById('prod-old-price').value = p.old_price || '';
             document.getElementById('prod-stock').value = p.stock;
-            document.getElementById('prod-desc').value = p.description || '';
+            setProductDescriptionEditorValue(p.description || '');
             document.getElementById('btn-save-product').innerText = "Değişiklikleri Kaydet";
             document.getElementById('upload-status').innerText = '';
 
@@ -2350,7 +2766,7 @@
                 formData.append('price', document.getElementById('prod-price').value);
                 formData.append('oldPrice', document.getElementById('prod-old-price').value);
                 formData.append('stock', document.getElementById('prod-stock').value);
-                formData.append('description', document.getElementById('prod-desc').value);
+                formData.append('description', syncProductDescriptionField(true));
                 formData.append('category', document.getElementById('prod-category').value);
 
                 if (pendingProductMediaFiles.length > 0) {
@@ -2421,6 +2837,7 @@
             const savedTheme = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', savedTheme);
             document.getElementById('theme-checkbox').checked = (savedTheme === 'dark');
+            setupProductDescriptionEditor();
 
             const aiReplyInput = document.getElementById('ai-handoff-reply');
             if (aiReplyInput) {
@@ -2837,6 +3254,3 @@
 </body>
 
 </html>
-
-
-

@@ -154,6 +154,60 @@
             font-size: 1rem;
         }
 
+        .description-text>*:first-child {
+            margin-top: 0;
+        }
+
+        .description-text>*:last-child {
+            margin-bottom: 0;
+        }
+
+        .description-text p,
+        .description-text ul,
+        .description-text ol,
+        .description-text blockquote,
+        .description-text h2,
+        .description-text h3,
+        .description-text h4 {
+            margin: 0 0 14px;
+        }
+
+        .description-text h2 {
+            color: #0F2A43;
+            font-size: 1.45rem;
+            line-height: 1.35;
+        }
+
+        .description-text h3 {
+            color: #0F2A43;
+            font-size: 1.22rem;
+            line-height: 1.4;
+        }
+
+        .description-text h4 {
+            color: #0F2A43;
+            font-size: 1.08rem;
+            line-height: 1.45;
+        }
+
+        .description-text ul,
+        .description-text ol {
+            padding-left: 22px;
+        }
+
+        .description-text li + li {
+            margin-top: 6px;
+        }
+
+        .description-text blockquote {
+            border-left: 4px solid #F7941D;
+            padding: 12px 14px;
+            border-radius: 0 12px 12px 0;
+            background: rgba(247, 148, 29, 0.08);
+            color: #0F2A43;
+            font-weight: 600;
+        }
+
         .btn-add-large {
             border-radius: 12px;
             font-size: 1.3rem;
@@ -1307,6 +1361,149 @@
         const user = userInfoStr ? JSON.parse(userInfoStr) : null;
 
         let selectedRating = 0; // Formdaki seçili yıldız
+        const PRODUCT_DESCRIPTION_ALLOWED_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'U', 'UL', 'OL', 'LI', 'H2', 'H3', 'H4', 'BLOCKQUOTE', 'SPAN']);
+
+        function escapeDescriptionText(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function convertStoredDescriptionToHtml(value) {
+            const normalized = String(value || '').replace(/\r\n/g, '\n').trim();
+            if (!normalized) return '';
+
+            return normalized
+                .split(/\n{2,}/)
+                .map((paragraph) => `<p>${escapeDescriptionText(paragraph).replace(/\n/g, '<br>')}</p>`)
+                .join('');
+        }
+
+        function normalizeProductDescriptionFontSize(node) {
+            const styleValue = String(node.getAttribute('style') || '');
+            const styleMatch = styleValue.match(/font-size\s*:\s*([^;]+)/i);
+            if (styleMatch && styleMatch[1]) {
+                const value = styleMatch[1].trim().toLowerCase();
+                if (['0.9rem', '1rem', '1.15rem', '1.3rem'].includes(value)) return value;
+            }
+
+            const legacySize = String(node.getAttribute('size') || '').trim();
+            if (legacySize === '2') return '0.9rem';
+            if (legacySize === '3') return '1rem';
+            if (legacySize === '4') return '1.15rem';
+            if (legacySize === '5') return '1.3rem';
+            return '';
+        }
+
+        function normalizeProductDescriptionTextAlign(node) {
+            const alignAttr = String(node.getAttribute('align') || '').trim().toLowerCase();
+            if (['left', 'center', 'right'].includes(alignAttr)) return alignAttr;
+
+            const styleValue = String(node.getAttribute('style') || '');
+            const styleMatch = styleValue.match(/text-align\s*:\s*([^;]+)/i);
+            if (styleMatch && styleMatch[1]) {
+                const value = styleMatch[1].trim().toLowerCase();
+                if (['left', 'center', 'right'].includes(value)) return value;
+            }
+
+            return '';
+        }
+
+        function sanitizeProductDescriptionHtml(rawHtml) {
+            const parser = new DOMParser();
+            const parsed = parser.parseFromString(`<div>${String(rawHtml || '')}</div>`, 'text/html');
+            const sourceRoot = parsed.body.firstElementChild;
+            const safeRoot = document.createElement('div');
+
+            function appendChildren(target, sourceNode) {
+                Array.from(sourceNode.childNodes).forEach((child) => {
+                    const cleanedChild = sanitizeNode(child);
+                    if (!cleanedChild) return;
+                    target.appendChild(cleanedChild);
+                });
+            }
+
+            function sanitizeNode(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return document.createTextNode(node.textContent || '');
+                }
+
+                if (node.nodeType !== Node.ELEMENT_NODE) {
+                    return null;
+                }
+
+                let tagName = node.tagName.toUpperCase();
+                if (tagName === 'B') tagName = 'STRONG';
+                if (tagName === 'I') tagName = 'EM';
+                if (tagName === 'DIV') tagName = 'P';
+                if (tagName === 'FONT') tagName = 'SPAN';
+                if (tagName === 'H1') tagName = 'H2';
+                if (tagName === 'H5' || tagName === 'H6') tagName = 'H4';
+
+                if (!PRODUCT_DESCRIPTION_ALLOWED_TAGS.has(tagName)) {
+                    const fragment = document.createDocumentFragment();
+                    appendChildren(fragment, node);
+                    return fragment;
+                }
+
+                const element = document.createElement(tagName.toLowerCase());
+                const fontSize = normalizeProductDescriptionFontSize(node);
+                const textAlign = normalizeProductDescriptionTextAlign(node);
+
+                if (fontSize && tagName === 'SPAN') {
+                    element.style.fontSize = fontSize;
+                }
+
+                if (textAlign && ['P', 'H2', 'H3', 'H4', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'SPAN'].includes(tagName)) {
+                    element.style.textAlign = textAlign;
+                }
+
+                appendChildren(element, node);
+
+                if (tagName === 'SPAN' && !element.getAttribute('style') && !element.textContent.trim()) {
+                    return null;
+                }
+
+                if (tagName === 'SPAN' && !element.getAttribute('style')) {
+                    const fragment = document.createDocumentFragment();
+                    appendChildren(fragment, element);
+                    return fragment;
+                }
+
+                return element;
+            }
+
+            if (sourceRoot) {
+                appendChildren(safeRoot, sourceRoot);
+            }
+
+            return safeRoot.innerHTML
+                .replace(/<p><\/p>/g, '')
+                .replace(/(<br>\s*){3,}/g, '<br><br>')
+                .trim();
+        }
+
+        function getSafeProductDescriptionHtml(value) {
+            const source = String(value || '');
+            if (!source.trim()) {
+                return '<p>Bu ürün için henüz bir açıklama girilmemiş.</p>';
+            }
+
+            if (/<[a-z][\s\S]*>/i.test(source)) {
+                return sanitizeProductDescriptionHtml(source) || '<p>Bu ürün için henüz bir açıklama girilmemiş.</p>';
+            }
+
+            return convertStoredDescriptionToHtml(source) || '<p>Bu ürün için henüz bir açıklama girilmemiş.</p>';
+        }
+
+        function stripProductDescriptionHtml(value) {
+            const parser = new DOMParser();
+            const parsed = parser.parseFromString(`<div>${String(value || '')}</div>`, 'text/html');
+            return String(parsed.body.textContent || '').replace(/\s+/g, ' ').trim();
+        }
 
         // 1. ÜRÜN VE YORUMLARI ÇEKME
         async function fetchProductAndReviews() {
@@ -1444,6 +1641,8 @@
                 // Favori kontrolü
                 let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
                 let isFav = favs.includes(product.id) ? 'active' : '';
+                const safeDescriptionHtml = getSafeProductDescriptionHtml(product.description);
+                const safeDescriptionText = stripProductDescriptionHtml(safeDescriptionHtml) || product.name;
 
                 // EKRANI ÇİZİYORUZ
                 document.getElementById('product-detail-area').innerHTML = `
@@ -1474,7 +1673,7 @@
                         <div class="description-box">
                             <div class="description-title">Ürün Açıklaması</div>
                             <div class="description-text">
-                                ${product.description ? product.description : 'Bu ürün için henüz bir açıklama girilmemiş.'}
+                                ${safeDescriptionHtml}
                             </div>
                         </div>
 
@@ -1532,7 +1731,7 @@
                     '@context': 'https://schema.org',
                     '@type': 'Product',
                     name: product.name,
-                    description: product.description || product.name,
+                    description: safeDescriptionText,
                     image: product.image_url || '',
                     sku: String(product.id),
                     brand: { '@type': 'Brand', name: 'NovaStore' },
@@ -1714,4 +1913,3 @@
 </body>
 
 </html>
-
