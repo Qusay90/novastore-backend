@@ -1364,6 +1364,21 @@
         const userInfoStr = localStorage.getItem('nova_user_info');
         const user = userInfoStr ? JSON.parse(userInfoStr) : null;
 
+        function buildApiHeaders(includeJson = false) {
+            const headers = {};
+            const currentToken = localStorage.getItem('nova_user_token');
+
+            if (includeJson) {
+                headers['Content-Type'] = 'application/json';
+            }
+
+            if (currentToken) {
+                headers['Authorization'] = 'Bearer ' + currentToken;
+            }
+
+            return headers;
+        }
+
         let selectedRating = 0; // Formdaki seçili yıldız
         const PRODUCT_DESCRIPTION_ALLOWED_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'U', 'UL', 'OL', 'LI', 'H2', 'H3', 'H4', 'BLOCKQUOTE', 'SPAN']);
 
@@ -1518,9 +1533,14 @@
 
             try {
                 // Hem ürünü hem yorumları aynı anda beynimizden istiyoruz
+                const reviewRequestHeaders = {};
+                if (token) {
+                    reviewRequestHeaders.Authorization = 'Bearer ' + token;
+                }
+
                 const [productRes, reviewsRes] = await Promise.all([
                     fetch('/api/products/' + productId),
-                    fetch('/api/reviews/product/' + productId)
+                    fetch('/api/reviews/product/' + productId, { headers: reviewRequestHeaders })
                 ]);
 
                 if (!productRes.ok) throw new Error("Ürün bulunamadı.");
@@ -1537,9 +1557,18 @@
                     avgStarsHtml += i <= avgRating ? '<span class="star">★</span>' : '<span class="star-empty">★</span>';
                 }
 
-                // Yorum Ekleme Formu (Giriş yapana formu, yapmayana uyarıyı gösterir)
+                // Yorum Ekleme Formu
+                const reviewPermission = reviewData.reviewPermission || {
+                    canReview: false,
+                    requiresAuth: !token,
+                    code: token ? 'DELIVERY_REQUIRED' : 'AUTH_REQUIRED',
+                    message: token
+                        ? 'Bu ürüne yalnızca satın alıp siparişi teslim edilmiş müşteriler değerlendirme yapabilir.'
+                        : 'Bu ürüne yorum yapabilmek ve puan verebilmek için giriş yapmalısınız.'
+                };
+
                 let reviewFormHtml = '';
-                if (user) {
+                if (reviewPermission.canReview) {
                     reviewFormHtml = `
                         <div class="review-form-box">
                             <h3 style="margin-top:0; color:#0F2A43;">Ürünü Değerlendir</h3>
@@ -1554,12 +1583,23 @@
                             <button onclick="submitReview()" class="btn-submit-review">Yorumu Gönder</button>
                         </div>
                     `;
-                } else {
+                } else if (reviewPermission.requiresAuth) {
                     reviewFormHtml = `
                         <div class="review-form-box" style="text-align: center; background: #F8FBFF; border-color: #BBDEFB;">
                             <h3 style="color:#1565C0;">Değerlendirme Yapmak İster Misiniz?</h3>
                             <p style="color:#555; margin-bottom: 20px;">Bu ürüne yorum yapabilmek ve puan verebilmek için giriş yapmalısınız.</p>
                             <a href="login.html" class="btn-submit-review" style="text-decoration:none;">Giriş Yap / Kayıt Ol</a>
+                        </div>
+                    `;
+                } else {
+                    const reviewInfoTitle = reviewPermission.code === 'ALREADY_REVIEWED'
+                        ? 'Bu Ürünü Zaten Değerlendirdiniz'
+                        : 'Yalnızca Teslim Edilmiş Siparişler Değerlendirebilir';
+
+                    reviewFormHtml = `
+                        <div class="review-form-box" style="text-align: center; background: #FFF9F1; border-color: #F5C17C;">
+                            <h3 style="color:#A55A00;">${reviewInfoTitle}</h3>
+                            <p style="color:#555; margin-bottom: 0;">${reviewPermission.message || 'Bu ürün için şu anda değerlendirme bırakamazsınız.'}</p>
                         </div>
                     `;
                 }
@@ -1798,15 +1838,20 @@
                 return;
             }
 
+            const authToken = localStorage.getItem('nova_user_token');
+            if (!authToken) {
+                alert("Yorum yapmak için giriş yapmalısınız.");
+                return;
+            }
+
             const comment = document.getElementById('review-comment').value;
 
             try {
                 const response = await fetch('/api/reviews', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: buildApiHeaders(true),
                     body: JSON.stringify({
                         productId: productId,
-                        userId: user.id,
                         rating: selectedRating,
                         comment: comment
                     })
