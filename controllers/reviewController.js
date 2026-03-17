@@ -32,7 +32,7 @@ const getReviewPermission = async (userId, productId) => {
             canReview: false,
             requiresAuth: true,
             code: 'AUTH_REQUIRED',
-            message: 'Degerlendirme yapabilmek icin giris yapmalisiniz.'
+            message: 'Değerlendirme yapabilmek için giriş yapmalısınız.'
         };
     }
 
@@ -46,7 +46,7 @@ const getReviewPermission = async (userId, productId) => {
             canReview: false,
             requiresAuth: false,
             code: 'ALREADY_REVIEWED',
-            message: 'Bu urunu zaten degerlendirdiniz.'
+            message: 'Bu ürünü zaten değerlendirdiniz.'
         };
     }
 
@@ -56,7 +56,7 @@ const getReviewPermission = async (userId, productId) => {
             canReview: false,
             requiresAuth: false,
             code: 'DELIVERY_REQUIRED',
-            message: 'Bu urune sadece satin alip siparisi teslim edilen musteriler degerlendirme yapabilir.'
+            message: 'Bu ürüne sadece satın alıp siparişi teslim edilen müşteriler değerlendirme yapabilir.'
         };
     }
 
@@ -75,17 +75,17 @@ const addReview = async (req, res) => {
         const userId = req.user.id;
 
         if (!productId || !rating) {
-            return res.status(400).json({ error: 'Urun ve puan bilgisi zorunludur.' });
+            return res.status(400).json({ error: 'Ürün ve puan bilgisi zorunludur.' });
         }
 
         const numericProductId = Number(productId);
         if (!Number.isInteger(numericProductId) || numericProductId <= 0) {
-            return res.status(400).json({ error: 'Gecerli bir urun secmelisiniz.' });
+            return res.status(400).json({ error: 'Geçerli bir ürün seçmelisiniz.' });
         }
 
         const numericRating = Number(rating);
         if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
-            return res.status(400).json({ error: 'Puan 1 ile 5 arasinda olmalidir.' });
+            return res.status(400).json({ error: 'Puan 1 ile 5 arasında olmalıdır.' });
         }
 
         const permission = await getReviewPermission(userId, numericProductId);
@@ -99,7 +99,7 @@ const addReview = async (req, res) => {
             [numericProductId, userId, numericRating, comment || null]
         );
 
-        res.status(201).json({ mesaj: 'Degerlendirmeniz basariyla eklendi!' });
+        res.status(201).json({ mesaj: 'Degerlendirmeniz başarıyla eklendi!' });
 
         // Admin'e yeni yorum bildirimi (asenkron)
         try {
@@ -107,13 +107,13 @@ const addReview = async (req, res) => {
             await createNotification(
                 null,
                 'new_review',
-                `Yeni bir urun yorumu eklendi! Urun ID: #${numericProductId} - Puan: ${numericRating}/5`,
+                `Yeni bir ürün yorumu eklendi! Ürün ID: #${numericProductId} - Puan: ${numericRating}/5`,
                 io
             );
         } catch (_) { }
     } catch (err) {
-        console.error('Yorum ekleme hatasi:', err.message);
-        res.status(500).json({ error: 'Yorum eklenirken hata olustu.' });
+        console.error('Yorum ekleme hatası:', err.message);
+        res.status(500).json({ error: 'Yorum eklenirken hata oluştu.' });
     }
 };
 
@@ -122,7 +122,7 @@ const getProductReviews = async (req, res) => {
     try {
         const productId = Number(req.params.productId);
         if (!Number.isInteger(productId) || productId <= 0) {
-            return res.status(400).json({ error: 'Gecersiz urun kimligi.' });
+            return res.status(400).json({ error: 'Gecersiz ürün kimliği.' });
         }
 
         const authUser = getUserFromRequestIfAny(req);
@@ -152,12 +152,12 @@ const getProductReviews = async (req, res) => {
             reviewPermission
         });
     } catch (err) {
-        console.error('Yorumlari getirme hatasi:', err.message);
+        console.error('Yorumları getirme hatası:', err.message);
         res.status(500).json({ error: 'Yorumlar getirilemedi.' });
     }
 };
 
-// 3. Bir musterinin tum yorumlarini getirme
+// 3. Bir müşterinin tüm yorumlarını getirme
 const getUserReviews = async (req, res) => {
     try {
         const { userId } = req.params;
@@ -172,8 +172,8 @@ const getUserReviews = async (req, res) => {
 
         res.status(200).json(reviews.rows);
     } catch (err) {
-        console.error('Kullanici yorumlari getirme hatasi:', err);
-        res.status(500).json({ error: 'Yorumlariniz getirilemedi.' });
+        console.error('Kullanıcı yorumları getirme hatası:', err);
+        res.status(500).json({ error: 'Yorumlarınız getirilemedi.' });
     }
 };
 

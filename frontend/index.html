@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 
 <head>
@@ -229,12 +229,27 @@
             box-shadow: 0 12px 25px rgba(0, 0, 0, 0.08);
         }
 
-        .product-img {
+        .product-media-frame {
             width: 100%;
             height: 220px;
-            object-fit: cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F7FAFC 100%);
+            border: 1px solid #F0F3F6;
+            border-radius: 26px;
+            padding: 14px;
             margin-bottom: 20px;
-            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+        }
+
+        .product-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            border-radius: 20px;
         }
 
         .product-title {
@@ -636,8 +651,14 @@
                 padding: 12px;
             }
 
-            .product-img {
+            .product-media-frame {
                 height: 160px;
+                border-radius: 22px;
+                padding: 10px;
+            }
+
+            .product-img {
+                height: 100%;
             }
 
             .product-title {
@@ -675,8 +696,7 @@
     <!-- 📱 MOBİL İPUCU BANERI -->
     <div id="mobile-tip-banner">
         <span class="tip-icon">⋮</span>
-        <span class="tip-text">Daha iyi bir görünüm için sağ üstteki <strong>⋮</strong> menüsünden <strong>"Masaüstü
-                sitesi"</strong> seçeneğini aktif edin.</span>
+        <span class="tip-text">Daha iyi bir görünüm için sağ üstteki <strong>⋮</strong> menüsünden <strong>"Masaüstü sitesi"</strong> seçeneğini aktif edin.</span>
         <button class="tip-close" onclick="dismissMobileTip()" aria-label="Kapat">✕</button>
     </div>
     <script>
@@ -1133,7 +1153,9 @@
                                 </svg>
                             </button>
                             ${discountBadge} <a href="product.html?id=${product.id}" style="text-decoration: none; color: inherit;">
-                                <img src="${imageUrl}" class="product-img" alt="${product.name}">
+                                <div class="product-media-frame">
+                                    <img src="${imageUrl}" class="product-img" alt="${product.name}">
+                                </div>
                                 <div class="product-title" style="transition: 0.2s; cursor: pointer;" onmouseover="this.style.color='#F7941D'" onmouseout="this.style.color='#222'">${product.name}</div>
                             </a>
                             ${starsDiv}

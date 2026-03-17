@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 
 <head>
@@ -73,14 +73,35 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: stretch;
             border: 1px solid #F0F0F0;
+        }
+
+        .main-media-container {
+            width: 100%;
+            min-height: 420px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 18px;
+            border-radius: 30px;
+            border: 1px solid #F0F3F6;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F7FAFC 100%);
+            overflow: hidden;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
         }
 
         .main-image {
             width: 100%;
             max-height: 500px;
-            object-fit: cover;
+            object-fit: contain;
+            display: block;
+            cursor: zoom-in;
+        }
+
+        .main-image.is-video {
+            border-radius: 22px;
+            background: #0B1220;
         }
 
         .info-section {
@@ -266,18 +287,94 @@
         .gallery-thumbnail {
             width: 70px;
             height: 70px;
-            object-fit: cover;
-            border-radius: 8px;
+            object-fit: contain;
+            background: #FFFFFF;
+            padding: 4px;
+            border-radius: 18px;
             cursor: pointer;
             border: 2px solid transparent;
             opacity: 0.6;
             transition: 0.3s;
         }
 
+        .gallery-thumbnail.video-thumb {
+            object-fit: cover;
+            background: #0B1220;
+            padding: 0;
+        }
+
         .gallery-thumbnail.active,
         .gallery-thumbnail:hover {
             border-color: #F7941D;
             opacity: 1;
+        }
+
+        .media-lightbox {
+            position: fixed;
+            inset: 0;
+            background: rgba(7, 15, 28, 0.82);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            z-index: 10050;
+        }
+
+        .media-lightbox.is-open {
+            display: flex;
+        }
+
+        .media-lightbox-dialog {
+            position: relative;
+            max-width: min(92vw, 1120px);
+            max-height: 90vh;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .media-lightbox-close {
+            position: absolute;
+            top: -12px;
+            right: -12px;
+            width: 42px;
+            height: 42px;
+            border: none;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.14);
+            color: #FFFFFF;
+            font-size: 1.7rem;
+            line-height: 1;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .media-lightbox-body {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .media-lightbox-media {
+            max-width: 100%;
+            max-height: 88vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+            border-radius: 20px;
+            background: #FFFFFF;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+        }
+
+        .media-lightbox-media.is-video {
+            width: min(92vw, 1120px);
+            background: #000000;
         }
 
         .btn-add-large:hover {
@@ -473,6 +570,20 @@
 
             .bottom-sections-wrapper {
                 grid-template-columns: 1fr;
+            }
+
+            .main-media-container {
+                min-height: 280px;
+                padding: 8px;
+            }
+
+            .media-lightbox {
+                padding: 16px;
+            }
+
+            .media-lightbox-close {
+                top: -8px;
+                right: -4px;
             }
 
             /* Header: dikeyde de sığsın */
@@ -727,9 +838,9 @@
         .product-img {
             width: 100%;
             height: 220px;
-            object-fit: cover;
+            object-fit: contain;
             margin-bottom: 20px;
-            border-radius: 8px;
+            border-radius: 20px;
         }
 
         .product-title {
@@ -1013,7 +1124,7 @@
             color: #F7941D;
             font-weight: 500;
             cursor: pointer;
-            transition: background 0.2s, color 0.2s;
+            transition: background-color 0.2s, color 0.2s;
         }
 
         .subcategory-item:hover {
@@ -1028,10 +1139,16 @@
     <!-- 📱 MOBİL İPUCU BANERI -->
     <div id="mobile-tip-banner">
         <span class="tip-icon">⋮</span>
-        <span class="tip-text">Daha iyi bir görünüm için sağ üstteki <strong>⋮</strong> menüsünden <strong>"Masaüstü
-                sitesi"</strong> seçeneğini aktif edin.</span>
+        <span class="tip-text">Daha iyi bir görünüm için sağ üstteki <strong>⋮</strong> menüsünden <strong>"Masaüstü sitesi"</strong> seçeneğini aktif edin.</span>
         <button class="tip-close" onclick="dismissMobileTip()" aria-label="Kapat">✕</button>
     </div>
+    <div id="media-lightbox" class="media-lightbox" aria-hidden="true" onclick="handleMediaLightboxBackdrop(event)">
+        <div class="media-lightbox-dialog">
+            <button type="button" class="media-lightbox-close" aria-label="Kapat" onclick="closeMediaLightbox(event)">&times;</button>
+            <div id="media-lightbox-body" class="media-lightbox-body"></div>
+        </div>
+    </div>
+
     <script>
         (function () {
             var dismissed = localStorage.getItem('nova_mobile_tip_dismissed');
@@ -1391,6 +1508,79 @@
                 .replace(/'/g, '&#39;');
         }
 
+        function escapeHtmlAttribute(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function isVideoMedia(url) {
+            return /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(String(url || ''));
+        }
+
+        function buildMainMediaMarkup(url, type, altText) {
+            const safeUrl = escapeHtmlAttribute(url);
+            const safeAlt = escapeHtmlAttribute(altText || 'Urun medyasi');
+            const urlArg = JSON.stringify(String(url || ''));
+            const typeArg = JSON.stringify(type === 'video' ? 'video' : 'image');
+            const altArg = JSON.stringify(String(altText || ''));
+
+            if (type === 'video') {
+                return `<video src="${safeUrl}" class="main-image is-video" autoplay muted loop playsinline preload="metadata" onclick='openMediaLightbox(${urlArg}, ${typeArg}, ${altArg})' title="Videoyu ac"></video>`;
+            }
+
+            return `<img src="${safeUrl}" class="main-image" id="main-product-image" alt="${safeAlt}" onclick='openMediaLightbox(${urlArg}, ${typeArg}, ${altArg})' title="Gorseli ac">`;
+        }
+
+        function openMediaLightbox(url, type, altText) {
+            if (!url) return;
+
+            const lightbox = document.getElementById('media-lightbox');
+            const lightboxBody = document.getElementById('media-lightbox-body');
+            if (!lightbox || !lightboxBody) return;
+
+            const safeUrl = escapeHtmlAttribute(url);
+            const safeAlt = escapeHtmlAttribute(altText || 'Urun medyasi');
+
+            if (type === 'video') {
+                lightboxBody.innerHTML = `<video src="${safeUrl}" class="media-lightbox-media is-video" controls autoplay playsinline></video>`;
+            } else {
+                lightboxBody.innerHTML = `<img src="${safeUrl}" class="media-lightbox-media" alt="${safeAlt}">`;
+            }
+
+            lightbox.classList.add('is-open');
+            lightbox.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeMediaLightbox(event) {
+            if (event) event.stopPropagation();
+
+            const lightbox = document.getElementById('media-lightbox');
+            const lightboxBody = document.getElementById('media-lightbox-body');
+            if (!lightbox || !lightboxBody) return;
+
+            lightbox.classList.remove('is-open');
+            lightbox.setAttribute('aria-hidden', 'true');
+            lightboxBody.innerHTML = '';
+            document.body.style.overflow = '';
+        }
+
+        function handleMediaLightboxBackdrop(event) {
+            if (event.target && event.target.id === 'media-lightbox') {
+                closeMediaLightbox();
+            }
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeMediaLightbox();
+            }
+        });
+
         function convertStoredDescriptionToHtml(value) {
             const normalized = String(value || '').replace(/\r\n/g, '\n').trim();
             if (!normalized) return '';
@@ -1634,25 +1824,27 @@
                 if (product.media && product.media.length > 0) {
                     galleryHtml = '<div class="gallery-container">';
                     product.media.forEach((m, i) => {
+                        const mediaUrl = String(m.media_url || '');
+                        const mediaType = isVideoMedia(mediaUrl) ? 'video' : 'image';
                         const activeClass = i === 0 ? 'active' : '';
-                        if (m.media_url.endsWith('.mp4')) {
-                            galleryHtml += `<video src="${m.media_url}" class="gallery-thumbnail ${activeClass}" onclick="changeMainMedia('${m.media_url}', 'video', this)"></video>`;
+                        const urlArg = JSON.stringify(mediaUrl);
+                        const typeArg = JSON.stringify(mediaType);
+                        const altArg = JSON.stringify(String(product.name || ''));
+                        if (mediaType === 'video') {
+                            galleryHtml += `<video src="${escapeHtmlAttribute(mediaUrl)}" class="gallery-thumbnail video-thumb ${activeClass}" muted playsinline preload="metadata" onclick='changeMainMedia(${urlArg}, ${typeArg}, this, ${altArg})'></video>`;
                         } else {
-                            galleryHtml += `<img src="${m.media_url}" class="gallery-thumbnail ${activeClass}" onclick="changeMainMedia('${m.media_url}', 'image', this)">`;
+                            galleryHtml += `<img src="${escapeHtmlAttribute(mediaUrl)}" class="gallery-thumbnail ${activeClass}" alt="${escapeHtmlAttribute(product.name || '')}" onclick='changeMainMedia(${urlArg}, ${typeArg}, this, ${altArg})'>`;
                         }
                     });
                     galleryHtml += '</div>';
                 }
 
                 // İlk medya türünü bul (video mu resim mi)
-                let firstMediaIsVideo = false;
-                if (product.media && product.media.length > 0) {
-                    firstMediaIsVideo = product.media[0].media_url.endsWith('.mp4');
-                }
-
-                let mainMediaTag = firstMediaIsVideo
-                    ? `<video src="${product.media[0].media_url}" class="main-image" controls autoplay muted style="max-height: 500px; width: 100%; object-fit: cover;"></video>`
-                    : `<img src="${imageUrl}" class="main-image" id="main-product-image" style="object-fit: cover;" alt="${product.name}">`;
+                const firstMediaUrl = product.media && product.media.length > 0
+                    ? String(product.media[0].media_url || imageUrl)
+                    : imageUrl;
+                const firstMediaType = isVideoMedia(firstMediaUrl) ? 'video' : 'image';
+                const mainMediaTag = buildMainMediaMarkup(firstMediaUrl, firstMediaType, product.name);
 
                 // GERÇEK İNDİRİM ALGORİTMASI (YEŞİL VERSİYON)
                 let priceHtml = '';
@@ -1697,7 +1889,7 @@
                                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                             </svg>
                         </button>
-                        <div id="main-media-container" style="width: 100%; display:flex; justify-content:center;">
+                        <div id="main-media-container" class="main-media-container">
                             ${mainMediaTag}
                         </div>
                         ${galleryHtml}
@@ -1806,16 +1998,13 @@
         }
 
         // GALERİ RESMİ DEĞİŞTİRME
-        function changeMainMedia(url, type, element) {
+        function changeMainMedia(url, type, element, altText) {
             document.querySelectorAll('.gallery-thumbnail').forEach(el => el.classList.remove('active'));
             if (element) element.classList.add('active');
 
             const container = document.getElementById('main-media-container');
-            if (type === 'video') {
-                container.innerHTML = `<video src="${url}" class="main-image" controls autoplay style="max-height: 500px; width: 100%; object-fit: cover;"></video>`;
-            } else {
-                container.innerHTML = `<img src="${url}" class="main-image" style="max-height: 500px; width: 100%; object-fit: cover;">`;
-            }
+            if (!container) return;
+            container.innerHTML = buildMainMediaMarkup(url, type, altText);
         }
 
         // 2. YORUM FORMU İŞLEMLERİ (Sarı Yıldız Seçme Animasyonu)

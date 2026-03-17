@@ -93,7 +93,7 @@ const createReturnRequest = async (req, res) => {
             await createNotification(
                 order.user_id,
                 'order_update',
-                `?? Siparis #${orderId} icin iade talebiniz alindi.`,
+                `Siparis #${orderId} icin iade talebiniz alindi.`,
                 io
             );
         }
@@ -101,7 +101,7 @@ const createReturnRequest = async (req, res) => {
         await createNotification(
             null,
             'new_order',
-            `?? Iade talebi olustu. Siparis #${orderId}, neden: ${reasonCode}.`,
+            `Iade talebi olustu. Siparis #${orderId}, neden: ${reasonCode}.`,
             io
         );
 

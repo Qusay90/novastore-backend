@@ -166,7 +166,7 @@ const initializePayment = async (req, res) => {
             await createNotification(
                 userId,
                 'order_update',
-                `?? Siparis #${order.id} icin odeme adimi baslatildi.`,
+                `Siparis #${order.id} icin odeme adimi baslatildi.`,
                 io
             );
         }
@@ -174,7 +174,7 @@ const initializePayment = async (req, res) => {
         await createNotification(
             null,
             'new_order',
-            `?? Yeni siparis olusturuldu (#${order.id}). Odeme adimi: ${paymentMethod}.`,
+            `Yeni siparis olusturuldu (#${order.id}). Odeme adimi: ${paymentMethod}.`,
             io
         );
 
@@ -333,8 +333,8 @@ const webhookIyzico = async (req, res) => {
                 payment.user_id,
                 'order_update',
                 isSuccess
-                    ? `? Siparis #${payment.order_id} odemesi basariyla alindi.`
-                    : `? Siparis #${payment.order_id} odemesi basarisiz oldu.`,
+                    ? `Siparis #${payment.order_id} odemesi basariyla alindi.`
+                    : `Siparis #${payment.order_id} odemesi basarisiz oldu.`,
                 io
             );
         }

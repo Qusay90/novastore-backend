@@ -360,6 +360,7 @@
         const footer = document.createElement('footer');
         footer.id = 'nova-site-footer';
         footer.className = 'nova-site-footer';
+        footer.lang = 'tr';
         footer.innerHTML = `
             <div class="nova-site-footer-inner">
                 <div class="nova-site-footer-grid">
@@ -370,22 +371,22 @@
                             </div>
                             <div class="nova-footer-brand-copy">
                                 <h3>NOVA<span>STORE</span></h3>
-                                <p>NovaStore; guvenli odeme, hizli teslimat ve kategori bazli duzenli alisveris deneyimi sunan modern bir e-ticaret vitrini olarak tasarlandi. Urun kesfi, destek ve siparis takibini tek merkezde toplar.</p>
+                                <p>NovaStore; güvenli ödeme, hızlı teslimat ve kategori bazlı düzenli alışveriş deneyimi sunan modern bir e-ticaret vitrini olarak tasarlandı. Ürün keşfi, destek ve sipariş takibini tek merkezde toplar.</p>
                             </div>
                         </div>
                     </section>
 
                     <section>
-                        <h4 class="nova-footer-column-title">Kategoriler</h4>
+                        <h4 class="nova-footer-column-title">KATEGORİLER</h4>
                         <div id="nova-footer-categories" class="nova-footer-category-list">
-                            <span class="nova-footer-loading">Kategoriler yukleniyor...</span>
+                            <span class="nova-footer-loading">Kategoriler yükleniyor...</span>
                         </div>
                     </section>
 
                     <section>
-                        <h4 class="nova-footer-column-title">Iletisim ve Topluluk</h4>
+                        <h4 class="nova-footer-column-title">İLETİŞİM VE TOPLULUK</h4>
                         <div class="nova-footer-note">
-                            NovaStore ekibi; siparis, urun secimi ve destek surecinde hizli geri donus icin tek merkezden hizmet verir. Bizimle mail, telefon ve sosyal medya uzerinden iletisime gecebilirsiniz.
+                            NovaStore ekibi; sipariş, ürün seçimi ve destek sürecinde hızlı geri dönüş için tek merkezden hizmet verir. Bizimle mail, telefon ve sosyal medya üzerinden iletişime geçebilirsiniz.
                         </div>
                         <ul class="nova-footer-contact-list">
                             <li class="nova-footer-contact-item">
@@ -411,8 +412,8 @@
                 </div>
 
                 <div class="nova-footer-bottom">
-                    <span>&copy; <span id="nova-footer-year"></span> NovaStore. Tum haklari saklidir.</span>
-                    <span>Kategoriler admin panelinden eklenir ve footer alani otomatik guncellenir.</span>
+                    <span>&copy; <span id="nova-footer-year"></span> NovaStore. Tüm hakları saklıdır.</span>
+                    <span>Kategoriler admin panelinden eklenir ve footer alanı otomatik güncellenir.</span>
                 </div>
             </div>
         `;
@@ -448,12 +449,12 @@
 
         try {
             const response = await fetch('/api/categories');
-            if (!response.ok) throw new Error('Kategori istegi basarisiz.');
+            if (!response.ok) throw new Error('Kategori isteği başarısız.');
             const categories = await response.json();
             const items = getFooterCategoryItems(categories);
 
             if (!items.length) {
-                container.innerHTML = '<span class="nova-footer-loading">Henuz kategori olusturulmamis.</span>';
+                container.innerHTML = '<span class="nova-footer-loading">Henüz kategori oluşturulmamış.</span>';
                 return;
             }
 
@@ -461,7 +462,7 @@
                 .map((item) => `<a class="nova-footer-category-item" href="index.html?category=${encodeURIComponent(item.name)}">${item.name}</a>`)
                 .join('');
         } catch (_) {
-            container.innerHTML = '<span class="nova-footer-loading">Kategoriler simdi alinamadi.</span>';
+            container.innerHTML = '<span class="nova-footer-loading">Kategoriler şu anda alınamadı.</span>';
         }
     }
 

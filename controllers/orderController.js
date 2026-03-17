@@ -56,7 +56,7 @@ const notifyOrderCreated = async (orderId, userId, customerName) => {
         await createNotification(
             userId,
             'order_update',
-            `? #${orderId} numarali siparisiniz alindi ve odeme sureci baslatildi.`,
+            `#${orderId} numarali siparisiniz alindi ve odeme sureci baslatildi.`,
             io
         );
     }
@@ -64,7 +64,7 @@ const notifyOrderCreated = async (orderId, userId, customerName) => {
     await createNotification(
         null,
         'new_order',
-        `?? Yeni siparis alindi! Siparis No: #${orderId} — Musteri: ${customerName}`,
+        `Yeni siparis alindi! Siparis No: #${orderId} - Musteri: ${customerName}`,
         io
     );
 };
@@ -74,17 +74,17 @@ const statusMessageForUser = (status, orderId) => {
 
     switch (normalized) {
         case ORDER_STATUS.ONAY_BEKLIYOR:
-            return `? Siparis #${orderId} onay bekliyor.`;
+            return `Siparis #${orderId} onay bekliyor.`;
         case ORDER_STATUS.HAZIRLANIYOR:
-            return `?? Siparis #${orderId} hazirlaniyor.`;
+            return `Siparis #${orderId} hazirlaniyor.`;
         case ORDER_STATUS.KARGOYA_VERILDI:
-            return `?? Siparis #${orderId} kargoya verildi!`;
+            return `Siparis #${orderId} kargoya verildi!`;
         case ORDER_STATUS.TESLIM_EDILDI:
-            return `? Siparis #${orderId} teslim edildi, keyifli kullanimlar!`;
+            return `Siparis #${orderId} teslim edildi, keyifli kullanimlar!`;
         case ORDER_STATUS.IPTAL_EDILDI:
-            return `? Siparis #${orderId} iptal edildi.`;
+            return `Siparis #${orderId} iptal edildi.`;
         default:
-            return `?? Siparis #${orderId} durumu guncellendi: ${status}`;
+            return `Siparis #${orderId} durumu guncellendi: ${status}`;
     }
 };
 
@@ -333,7 +333,7 @@ const cancelOrder = async (req, res) => {
             await createNotification(
                 order.user_id,
                 'order_update',
-                `? Siparis #${orderId} iptal edildi.`,
+                `Siparis #${orderId} iptal edildi.`,
                 io
             );
         }

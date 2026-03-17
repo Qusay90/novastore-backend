@@ -120,7 +120,7 @@ const createShipment = async (req, res) => {
             await createNotification(
                 order.user_id,
                 'order_update',
-                `?? Siparis #${orderId} kargoya verildi. Takip No: ${finalTrackingNo}`,
+                `Siparis #${orderId} kargoya verildi. Takip No: ${finalTrackingNo}`,
                 io
             );
         }

@@ -23,6 +23,22 @@
             --card-bg: #FFFFFF;
             --table-hover: #FAFAFA;
             --heading-color: #0F2A43;
+            --muted-text: #667085;
+            --soft-text: #98A2B3;
+            --editor-shell-bg: #F8FAFC;
+            --editor-toolbar-bg: #E9EEF5;
+            --editor-control-bg: #FFFFFF;
+            --editor-control-hover-bg: #FFF7ED;
+            --editor-surface-bg: #FFFFFF;
+            --editor-placeholder: #94A3B8;
+            --editor-quote-text: #475569;
+            --media-card-bg: #F8FAFC;
+            --media-preview-bg: #FFFFFF;
+            --media-action-primary: #1565C0;
+            --media-action-neutral: #455A64;
+            --media-action-danger: #C62828;
+            --media-action-disabled: #94A3B8;
+            --upload-status-color: #1565C0;
         }
 
         [data-theme="dark"] {
@@ -35,11 +51,28 @@
             --card-bg: rgba(30, 41, 59, 0.75);
             --table-hover: rgba(51, 65, 85, 0.5);
             --heading-color: #F7941D;
+            --muted-text: #94A3B8;
+            --soft-text: #A8B3C7;
+            --editor-shell-bg: rgba(15, 23, 42, 0.88);
+            --editor-toolbar-bg: rgba(30, 41, 59, 0.96);
+            --editor-control-bg: rgba(255, 255, 255, 0.06);
+            --editor-control-hover-bg: rgba(247, 148, 29, 0.12);
+            --editor-surface-bg: rgba(15, 23, 42, 0.42);
+            --editor-placeholder: #7C8CA5;
+            --editor-quote-text: #CBD5E1;
+            --media-card-bg: rgba(30, 41, 59, 0.88);
+            --media-preview-bg: rgba(15, 23, 42, 0.96);
+            --media-action-primary: #2563EB;
+            --media-action-neutral: #475569;
+            --media-action-danger: #DC2626;
+            --media-action-disabled: #64748B;
+            --upload-status-color: #93C5FD;
         }
 
         /* Dark Mode Select Options Fix */
-        [data-theme="dark"] select.form-control option {
-            background-color: #0f172a;
+        [data-theme="dark"] select.form-control option,
+        [data-theme="dark"] .rich-editor-toolbar select option {
+            background-color: #162033;
             color: #e2e8f0;
         }
 
@@ -242,7 +275,7 @@
             align-items: center;
             gap: 10px;
             font-weight: 600;
-            color: #555;
+            color: var(--muted-text);
         }
 
         .admin-avatar {
@@ -432,7 +465,7 @@
         }
 
         .pending-name {
-            color: #666;
+            color: var(--muted-text);
             font-size: 0.85rem;
         }
 
@@ -499,7 +532,7 @@
         th {
             text-align: left;
             padding: 15px;
-            color: #888;
+            color: var(--muted-text);
             font-weight: 600;
             font-size: 0.9rem;
             border-bottom: 2px solid var(--border);
@@ -678,7 +711,7 @@
             border: none;
             font-size: 1.5rem;
             cursor: pointer;
-            color: #888;
+            color: var(--muted-text);
             transition: 0.3s;
         }
 
@@ -726,9 +759,10 @@
 
         .rich-editor {
             border: 1px solid var(--border);
-            border-radius: 12px;
-            background: rgba(15, 23, 42, 0.22);
+            border-radius: 16px;
+            background: var(--editor-shell-bg);
             overflow: hidden;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
         }
 
         .rich-editor-toolbar {
@@ -737,13 +771,13 @@
             gap: 8px;
             padding: 10px;
             border-bottom: 1px solid var(--border);
-            background: rgba(15, 23, 42, 0.34);
+            background: var(--editor-toolbar-bg);
         }
 
         .rich-editor-toolbar button,
         .rich-editor-toolbar select {
             border: 1px solid var(--border);
-            background: rgba(255, 255, 255, 0.04);
+            background: var(--editor-control-bg);
             color: var(--text);
             border-radius: 8px;
             min-height: 36px;
@@ -757,16 +791,28 @@
             font-weight: 700;
         }
 
+        .rich-editor-toolbar select {
+            cursor: pointer;
+        }
+
+        .rich-editor-toolbar select option {
+            background: #FFFFFF;
+            color: #1F2937;
+        }
+
         .rich-editor-toolbar button:hover,
         .rich-editor-toolbar select:hover {
             border-color: var(--accent);
             color: var(--accent);
+            background: var(--editor-control-hover-bg);
         }
 
-        .rich-editor-toolbar button.is-active {
+        .rich-editor-toolbar button.is-active,
+        .rich-editor-toolbar select.is-active {
             background: rgba(247, 148, 29, 0.14);
             border-color: var(--accent);
             color: var(--accent);
+            font-weight: 700;
         }
 
         .rich-editor-surface {
@@ -777,11 +823,12 @@
             font-size: 1rem;
             outline: none;
             overflow-y: auto;
+            background: var(--editor-surface-bg);
         }
 
         .rich-editor-surface.is-empty::before {
             content: attr(data-placeholder);
-            color: #94a3b8;
+            color: var(--editor-placeholder);
             pointer-events: none;
         }
 
@@ -818,8 +865,11 @@
         .rich-editor-surface blockquote {
             border-left: 3px solid var(--accent);
             padding-left: 12px;
-            color: #cbd5e1;
+            color: var(--editor-quote-text);
             font-style: italic;
+            background: rgba(247, 148, 29, 0.08);
+            padding: 10px 12px;
+            border-radius: 0 12px 12px 0;
         }
 
         .btn-submit {
@@ -871,6 +921,12 @@
             border-color: var(--accent);
         }
 
+        .upload-area.is-dragover {
+            border-color: var(--accent);
+            background: rgba(247, 148, 29, 0.08);
+            box-shadow: 0 0 0 4px rgba(247, 148, 29, 0.14);
+        }
+
         .upload-area:hover::before {
             height: 100%;
             border-radius: 8px;
@@ -879,6 +935,159 @@
         .upload-area:active::before {
             opacity: 0.3;
             transition: 0.1s;
+        }
+
+        .upload-area-icon {
+            font-size: 2rem;
+            color: var(--soft-text);
+        }
+
+        .upload-area-text {
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+
+        .upload-status {
+            margin-top: 5px;
+            font-size: 0.85rem;
+            color: var(--upload-status-color);
+            font-weight: 700;
+        }
+
+        .media-preview-grid {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .pending-media-title {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .pending-media-note {
+            font-size: 0.8rem;
+            color: var(--muted-text);
+            margin-bottom: 10px;
+        }
+
+        .pending-media-card {
+            width: 132px;
+            background: var(--media-card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+        }
+
+        .pending-media-preview-wrap {
+            position: relative;
+            display: flex;
+            justify-content: center;
+        }
+
+        .pending-media-preview {
+            width: 88px;
+            height: 88px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: var(--media-preview-bg);
+            border: 1px solid var(--border);
+            padding: 6px;
+        }
+
+        .pending-media-preview.is-video {
+            object-fit: cover;
+            background: #0f172a;
+            padding: 0;
+        }
+
+        .pending-media-file {
+            font-size: 0.76rem;
+            color: var(--text);
+            line-height: 1.35;
+            word-break: break-word;
+        }
+
+        .pending-media-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .pending-media-action {
+            flex: 1;
+            padding: 6px 0;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .pending-media-action.primary {
+            background: var(--media-action-primary);
+        }
+
+        .pending-media-action.neutral {
+            background: var(--media-action-neutral);
+        }
+
+        .pending-media-action.danger {
+            background: var(--media-action-danger);
+        }
+
+        .pending-media-action:disabled {
+            background: var(--media-action-disabled);
+            cursor: not-allowed;
+        }
+
+        .existing-media-card {
+            position: relative;
+            width: 92px;
+            height: 92px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
+            border-radius: 16px;
+            background: var(--media-card-bg);
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        .existing-media-preview {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 12px;
+            background: var(--media-preview-bg);
+        }
+
+        .existing-media-preview.is-video {
+            object-fit: cover;
+            background: #0f172a;
+        }
+
+        .existing-media-delete {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: var(--media-action-danger);
+            color: white;
+            border: none;
+            border-radius: 999px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.24);
         }
 
         @media (max-width: 900px) {
@@ -1403,7 +1612,7 @@
                         <label>Ürün Açıklaması</label>
                         <div class="rich-editor">
                             <div class="rich-editor-toolbar">
-                                <select id="prod-desc-block-style" onchange="applyDescriptionBlock(this.value); this.value='';">
+                                <select id="prod-desc-block-style" data-default-label="Başlık / Paragraf" onchange="applyDescriptionBlock(this.value);">
                                     <option value="">Başlık / Paragraf</option>
                                     <option value="p">Paragraf</option>
                                     <option value="h2">Başlık 1</option>
@@ -1411,20 +1620,20 @@
                                     <option value="h4">Başlık 3</option>
                                     <option value="blockquote">Vurgu Kutusu</option>
                                 </select>
-                                <select id="prod-desc-font-size" onchange="applyDescriptionFontSize(this.value); this.value='';">
+                                <select id="prod-desc-font-size" data-default-label="Yazı Boyutu" onchange="applyDescriptionFontSize(this.value);">
                                     <option value="">Yazı Boyutu</option>
                                     <option value="sm">Küçük</option>
                                     <option value="md">Normal</option>
                                     <option value="lg">Büyük</option>
                                     <option value="xl">Çok Büyük</option>
                                 </select>
-                                <button type="button" onclick="applyDescriptionCommand('bold')"><strong>B</strong></button>
-                                <button type="button" onclick="applyDescriptionCommand('italic')"><em>İ</em></button>
-                                <button type="button" onclick="applyDescriptionCommand('underline')"><u>U</u></button>
-                                <button type="button" onclick="applyDescriptionCommand('insertUnorderedList')">• Liste</button>
-                                <button type="button" onclick="applyDescriptionCommand('insertOrderedList')">1. Liste</button>
-                                <button type="button" onclick="applyDescriptionCommand('justifyLeft')">Sola</button>
-                                <button type="button" onclick="applyDescriptionCommand('justifyCenter')">Ortala</button>
+                                <button type="button" data-desc-command="bold" onclick="applyDescriptionCommand('bold')"><strong>B</strong></button>
+                                <button type="button" data-desc-command="italic" onclick="applyDescriptionCommand('italic')"><em>İ</em></button>
+                                <button type="button" data-desc-command="underline" onclick="applyDescriptionCommand('underline')"><u>U</u></button>
+                                <button type="button" data-desc-command="insertUnorderedList" onclick="applyDescriptionCommand('insertUnorderedList')">• Liste</button>
+                                <button type="button" data-desc-command="insertOrderedList" onclick="applyDescriptionCommand('insertOrderedList')">1. Liste</button>
+                                <button type="button" data-desc-command="justifyLeft" onclick="applyDescriptionCommand('justifyLeft')">Sola</button>
+                                <button type="button" data-desc-command="justifyCenter" onclick="applyDescriptionCommand('justifyCenter')">Ortala</button>
                                 <button type="button" onclick="clearDescriptionFormatting()">Temizle</button>
                             </div>
                             <div id="prod-desc-editor" class="rich-editor-surface is-empty" contenteditable="true"
@@ -1434,25 +1643,23 @@
                     </div>
                     <div class="form-group" id="existing-media-group" style="display: none;">
                         <label>Mevcut Görseller/Videolar</label>
-                        <div id="existing-media-container"
-                            style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
+                        <div id="existing-media-container" class="media-preview-grid"></div>
                     </div>
                     <div class="form-group" id="image-upload-group">
                         <label>Yeni Görsel/Video Ekle</label>
                         <div class="upload-area" onclick="document.getElementById('prod-media').click()">
-                            <span style="font-size: 2rem; color: #888;">📁</span><br>
-                            <span style="color: var(--text); font-size: 0.9rem;">Sürükle ve Bırak veya Tıklayarak
+                            <span class="upload-area-icon">📁</span><br>
+                            <span class="upload-area-text">Sürükle ve Bırak veya Tıklayarak
                                 Seç</span>
                         </div>
                         <input type="file" id="prod-media" class="form-control" accept="image/*,video/mp4,image/gif"
                             multiple style="display: none;"
                             onchange="handleProductMediaSelection(this)">
-                        <div id="upload-status"
-                            style="margin-top: 5px; font-size: 0.85rem; color: #1565C0; font-weight: bold;"></div>
+                        <div id="upload-status" class="upload-status"></div>
                         <div id="pending-media-group" style="display:none; margin-top:12px;">
-                            <label style="display:block; margin-bottom:8px;">Yeni Eklenecek Gorseller</label>
-                            <div style="font-size:0.8rem; color:#98A2B3; margin-bottom:10px;">Sira icin ok tuslarini kullan. Ilk gorsel urun kartinda kapak olur.</div>
-                            <div id="pending-media-container" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
+                            <label class="pending-media-title">Yeni Eklenecek Görseller</label>
+                            <div class="pending-media-note">Sıra için ok tuşlarını kullan. İlk görsel ürün kartında kapak olur.</div>
+                            <div id="pending-media-container" class="media-preview-grid"></div>
                         </div>
                     </div>
                     <button type="submit" id="btn-save-product" class="btn-submit">Ürünü Kaydet</button>
@@ -1595,6 +1802,10 @@
                 .replace(/'/g, '&#39;');
         }
 
+        function isProductMediaVideo(url) {
+            return /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(String(url || ''));
+        }
+
         const PRODUCT_DESCRIPTION_FONT_SIZE_MAP = {
             2: '2',
             3: '3',
@@ -1605,8 +1816,41 @@
             lg: '4',
             xl: '5'
         };
+        const PRODUCT_DESCRIPTION_FONT_SIZE_KEY_BY_VALUE = {
+            '0.9rem': 'sm',
+            '1rem': 'md',
+            '1.15rem': 'lg',
+            '1.3rem': 'xl'
+        };
+        const PRODUCT_DESCRIPTION_BLOCK_LABELS = {
+            '': 'Başlık / Paragraf',
+            p: 'Paragraf',
+            h2: 'Başlık 1',
+            h3: 'Başlık 2',
+            h4: 'Başlık 3',
+            blockquote: 'Vurgu Kutusu'
+        };
+        const PRODUCT_DESCRIPTION_FONT_SIZE_LABELS = {
+            '': 'Yazı Boyutu',
+            sm: 'Küçük',
+            md: 'Normal',
+            lg: 'Büyük',
+            xl: 'Çok Büyük'
+        };
         const PRODUCT_DESCRIPTION_ALLOWED_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'U', 'UL', 'OL', 'LI', 'H2', 'H3', 'H4', 'BLOCKQUOTE', 'SPAN']);
+        const PRODUCT_DESCRIPTION_DEFAULT_TOOLBAR_STATE = {
+            block: '',
+            fontSize: '',
+            bold: false,
+            italic: false,
+            underline: false,
+            insertUnorderedList: false,
+            insertOrderedList: false,
+            justifyLeft: false,
+            justifyCenter: false
+        };
         let productDescriptionSelection = null;
+        let productDescriptionToolbarState = { ...PRODUCT_DESCRIPTION_DEFAULT_TOOLBAR_STATE };
 
         function getProductDescriptionEditor() {
             return document.getElementById('prod-desc-editor');
@@ -1614,6 +1858,112 @@
 
         function getProductDescriptionField() {
             return document.getElementById('prod-desc');
+        }
+
+        function getCurrentProductDescriptionNode() {
+            const editor = getProductDescriptionEditor();
+            if (!editor) return null;
+
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount) {
+                const range = selection.getRangeAt(0);
+                if (editor.contains(range.commonAncestorContainer)) {
+                    return range.startContainer.nodeType === Node.TEXT_NODE
+                        ? range.startContainer.parentElement
+                        : range.startContainer;
+                }
+            }
+
+            if (productDescriptionSelection) {
+                const startNode = productDescriptionSelection.startContainer;
+                const candidate = startNode && startNode.nodeType === Node.TEXT_NODE
+                    ? startNode.parentElement
+                    : startNode;
+                if (candidate && editor.contains(candidate)) {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
+        function findClosestDescriptionElement(node, selector) {
+            const editor = getProductDescriptionEditor();
+            let current = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+
+            while (current) {
+                if (current.matches && current.matches(selector)) return current;
+                if (current === editor) break;
+                current = current.parentElement;
+            }
+
+            return null;
+        }
+
+        function hasDescriptionAncestor(node, selector) {
+            return !!findClosestDescriptionElement(node, selector);
+        }
+
+        function hasDescriptionTextDecoration(node, expectedValue) {
+            const editor = getProductDescriptionEditor();
+            let current = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+
+            while (current) {
+                if (current.nodeType === Node.ELEMENT_NODE) {
+                    const style = current.style || {};
+                    const textDecoration = String(style.textDecoration || style.textDecorationLine || '').toLowerCase();
+                    if (textDecoration.includes(expectedValue)) return true;
+                }
+                if (current === editor) break;
+                current = current.parentElement;
+            }
+
+            return false;
+        }
+
+        function resetProductDescriptionToolbarState() {
+            productDescriptionToolbarState = { ...PRODUCT_DESCRIPTION_DEFAULT_TOOLBAR_STATE };
+        }
+
+        function setProductDescriptionToolbarState(nextState = {}) {
+            productDescriptionToolbarState = {
+                ...productDescriptionToolbarState,
+                ...nextState
+            };
+        }
+
+        function getProductDescriptionCommandState(command) {
+            try {
+                return !!document.queryCommandState(command);
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function updateToolbarSelectState(select, value, labels) {
+            if (!select) return;
+            const resolvedValue = value && labels[value] ? value : '';
+            select.value = resolvedValue;
+            select.classList.toggle('is-active', !!resolvedValue);
+            select.setAttribute('aria-label', labels[resolvedValue] || labels[''] || '');
+            select.title = labels[resolvedValue] || labels[''] || '';
+        }
+
+        function updateProductDescriptionToolbarState() {
+            const toolbar = document.querySelector('.rich-editor-toolbar');
+            if (!toolbar) return;
+
+            const blockSelect = document.getElementById('prod-desc-block-style');
+            const fontSizeSelect = document.getElementById('prod-desc-font-size');
+            const buttonStates = productDescriptionToolbarState;
+
+            updateToolbarSelectState(blockSelect, productDescriptionToolbarState.block, PRODUCT_DESCRIPTION_BLOCK_LABELS);
+            updateToolbarSelectState(fontSizeSelect, productDescriptionToolbarState.fontSize, PRODUCT_DESCRIPTION_FONT_SIZE_LABELS);
+
+            toolbar.querySelectorAll('[data-desc-command]').forEach((button) => {
+                const command = button.dataset.descCommand || '';
+                button.classList.toggle('is-active', !!buttonStates[command]);
+            });
         }
 
         function convertPlainTextDescriptionToHtml(value) {
@@ -1755,7 +2105,9 @@
             editor.innerHTML = preparedHtml;
             field.value = preparedHtml;
             productDescriptionSelection = null;
+            resetProductDescriptionToolbarState();
             updateProductDescriptionPlaceholder();
+            updateProductDescriptionToolbarState();
         }
 
         function syncProductDescriptionField(normalizeEditor = false) {
@@ -1811,26 +2163,85 @@
 
             restoreProductDescriptionSelection();
             document.execCommand('styleWithCSS', false, false);
-            document.execCommand(command, false, value);
+
+            if (command === 'justifyCenter') {
+                const willDisableCenter = !!productDescriptionToolbarState.justifyCenter;
+                if (willDisableCenter) {
+                    if (getProductDescriptionCommandState('justifyCenter')) {
+                        document.execCommand('justifyLeft', false, value);
+                    }
+                } else if (!getProductDescriptionCommandState('justifyCenter')) {
+                    document.execCommand('justifyCenter', false, value);
+                }
+                setProductDescriptionToolbarState({
+                    justifyCenter: !willDisableCenter,
+                    justifyLeft: false
+                });
+            } else if (command === 'justifyLeft') {
+                const willDisableLeft = !!productDescriptionToolbarState.justifyLeft;
+                if (!willDisableLeft && !getProductDescriptionCommandState('justifyLeft')) {
+                    document.execCommand('justifyLeft', false, value);
+                }
+                setProductDescriptionToolbarState({
+                    justifyLeft: !willDisableLeft,
+                    justifyCenter: false
+                });
+            } else {
+                const willDisableCommand = !!productDescriptionToolbarState[command];
+                const commandStateBefore = getProductDescriptionCommandState(command);
+                if (willDisableCommand) {
+                    if (commandStateBefore) {
+                        document.execCommand(command, false, value);
+                    }
+                } else if (!commandStateBefore) {
+                    document.execCommand(command, false, value);
+                }
+
+                const nextState = {
+                    [command]: !willDisableCommand
+                };
+
+                if (command === 'insertUnorderedList' && nextState.insertUnorderedList) {
+                    nextState.insertOrderedList = false;
+                }
+
+                if (command === 'insertOrderedList' && nextState.insertOrderedList) {
+                    nextState.insertUnorderedList = false;
+                }
+
+                setProductDescriptionToolbarState(nextState);
+            }
+
             saveProductDescriptionSelection();
             syncProductDescriptionField();
+            updateProductDescriptionToolbarState();
         }
 
         function applyDescriptionBlock(blockTag) {
-            if (!blockTag) return;
+            if (!blockTag) {
+                updateProductDescriptionToolbarState();
+                return;
+            }
             restoreProductDescriptionSelection();
             const tag = `<${blockTag}>`;
             document.execCommand('formatBlock', false, tag);
+            setProductDescriptionToolbarState({ block: blockTag });
             saveProductDescriptionSelection();
             syncProductDescriptionField();
+            updateProductDescriptionToolbarState();
         }
 
         function applyDescriptionFontSize(sizeKey) {
-            if (!sizeKey || !PRODUCT_DESCRIPTION_FONT_SIZE_MAP[sizeKey]) return;
+            if (!sizeKey || !PRODUCT_DESCRIPTION_FONT_SIZE_MAP[sizeKey]) {
+                updateProductDescriptionToolbarState();
+                return;
+            }
             restoreProductDescriptionSelection();
             document.execCommand('fontSize', false, PRODUCT_DESCRIPTION_FONT_SIZE_MAP[sizeKey]);
+            setProductDescriptionToolbarState({ fontSize: sizeKey });
             saveProductDescriptionSelection();
             syncProductDescriptionField(true);
+            updateProductDescriptionToolbarState();
         }
 
         function clearDescriptionFormatting() {
@@ -1838,8 +2249,10 @@
             document.execCommand('removeFormat', false, null);
             document.execCommand('formatBlock', false, '<p>');
             document.execCommand('justifyLeft', false, null);
+            resetProductDescriptionToolbarState();
             saveProductDescriptionSelection();
             syncProductDescriptionField(true);
+            updateProductDescriptionToolbarState();
         }
 
         function setupProductDescriptionEditor() {
@@ -1861,9 +2274,12 @@
                 });
             }
 
-            editor.addEventListener('focus', saveProductDescriptionSelection);
+            editor.addEventListener('focus', () => {
+                saveProductDescriptionSelection();
+            });
             editor.addEventListener('keyup', saveProductDescriptionSelection);
             editor.addEventListener('mouseup', saveProductDescriptionSelection);
+            editor.addEventListener('click', saveProductDescriptionSelection);
             editor.addEventListener('blur', () => {
                 saveProductDescriptionSelection();
                 syncProductDescriptionField(true);
@@ -1871,6 +2287,13 @@
             editor.addEventListener('input', () => {
                 saveProductDescriptionSelection();
                 syncProductDescriptionField();
+            });
+            document.addEventListener('selectionchange', () => {
+                const currentSelection = window.getSelection();
+                if (!currentSelection || !currentSelection.rangeCount) return;
+                const activeRange = currentSelection.getRangeAt(0);
+                if (!editor.contains(activeRange.commonAncestorContainer)) return;
+                saveProductDescriptionSelection();
             });
 
             try {
@@ -1900,7 +2323,7 @@
                 return;
             }
 
-            uploadStatus.innerText = `${pendingProductMediaFiles.length} dosya hazir. Ilk gorsel urun kartinda kapak olarak kullanilacak.`;
+            uploadStatus.innerText = `${pendingProductMediaFiles.length} dosya hazır. İlk görsel ürün kartında kapak olarak kullanılacak.`;
             pendingGroup.style.display = 'block';
         }
 
@@ -1918,21 +2341,21 @@
                 const file = entry.file;
                 const isVideo = String(file.type || '').startsWith('video/');
                 const previewTag = isVideo
-                    ? `<video src="${entry.previewUrl}" muted playsinline style="width: 88px; height: 88px; object-fit: cover; border-radius: 8px; background: #0f172a;"></video>`
-                    : `<img src="${entry.previewUrl}" alt="${escapeAdminHtml(file.name)}" style="width: 88px; height: 88px; object-fit: cover; border-radius: 8px; background: #fff;">`;
+                    ? `<video src="${entry.previewUrl}" class="pending-media-preview is-video" muted playsinline></video>`
+                    : `<img src="${entry.previewUrl}" alt="${escapeAdminHtml(file.name)}" class="pending-media-preview">`;
 
                 return `
-                    <div style="width: 132px; background: rgba(15, 23, 42, 0.24); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-                        <div style="position: relative; display: flex; justify-content: center;">
+                    <div class="pending-media-card">
+                        <div class="pending-media-preview-wrap">
                             ${previewTag}
                             ${index === 0 ? '<span style="position:absolute; top:6px; left:6px; background:#F7941D; color:#fff; font-size:0.68rem; font-weight:700; padding:3px 6px; border-radius:999px;">Kapak</span>' : ''}
                         </div>
-                        <div style="font-size: 0.76rem; color: var(--text); line-height: 1.35; word-break: break-word;">${index + 1}. ${escapeAdminHtml(file.name)}</div>
-                        <div style="display:flex; gap:6px;">
-                            <button type="button" onclick="movePendingProductMedia(${index}, -1)" ${index === 0 ? 'disabled' : ''} style="flex:1; padding:6px 0; border:none; border-radius:6px; background:${index === 0 ? '#94a3b8' : '#1565C0'}; color:#fff; cursor:${index === 0 ? 'not-allowed' : 'pointer'};">Yukari</button>
-                            <button type="button" onclick="movePendingProductMedia(${index}, 1)" ${index === pendingProductMediaFiles.length - 1 ? 'disabled' : ''} style="flex:1; padding:6px 0; border:none; border-radius:6px; background:${index === pendingProductMediaFiles.length - 1 ? '#94a3b8' : '#455A64'}; color:#fff; cursor:${index === pendingProductMediaFiles.length - 1 ? 'not-allowed' : 'pointer'};">Asagi</button>
+                        <div class="pending-media-file">${index + 1}. ${escapeAdminHtml(file.name)}</div>
+                        <div class="pending-media-actions">
+                            <button type="button" class="pending-media-action primary" onclick="movePendingProductMedia(${index}, -1)" ${index === 0 ? 'disabled' : ''}>Yukarı</button>
+                            <button type="button" class="pending-media-action neutral" onclick="movePendingProductMedia(${index}, 1)" ${index === pendingProductMediaFiles.length - 1 ? 'disabled' : ''}>Aşağı</button>
                         </div>
-                        <button type="button" onclick="removePendingProductMedia(${index})" style="padding:6px 0; border:none; border-radius:6px; background:#C62828; color:#fff; cursor:pointer;">Kaldir</button>
+                        <button type="button" class="pending-media-action danger" onclick="removePendingProductMedia(${index})">Kaldır</button>
                     </div>
                 `;
             }).join('');
@@ -1952,8 +2375,7 @@
             renderPendingProductMediaFiles();
         }
 
-        function handleProductMediaSelection(input) {
-            const selectedFiles = Array.from(input && input.files ? input.files : []);
+        function appendPendingProductMediaFiles(selectedFiles, input = null) {
             if (!selectedFiles.length) {
                 updatePendingMediaStatus();
                 return;
@@ -1972,6 +2394,52 @@
             }
 
             renderPendingProductMediaFiles();
+        }
+
+        function handleProductMediaSelection(input) {
+            const selectedFiles = Array.from(input && input.files ? input.files : []);
+            appendPendingProductMediaFiles(selectedFiles, input);
+        }
+
+        function setupProductMediaDropzone() {
+            const uploadArea = document.querySelector('#image-upload-group .upload-area');
+            const mediaInput = document.getElementById('prod-media');
+            if (!uploadArea || !mediaInput || uploadArea.dataset.ready === '1') return;
+
+            const setDragState = (isActive) => {
+                uploadArea.classList.toggle('is-dragover', !!isActive);
+            };
+
+            ['dragenter', 'dragover'].forEach((eventName) => {
+                uploadArea.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setDragState(true);
+                });
+            });
+
+            ['dragleave', 'dragend'].forEach((eventName) => {
+                uploadArea.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const relatedTarget = event.relatedTarget;
+                    if (relatedTarget && uploadArea.contains(relatedTarget)) return;
+                    setDragState(false);
+                });
+            });
+
+            uploadArea.addEventListener('drop', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setDragState(false);
+
+                const droppedFiles = Array.from(event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files : []);
+                if (!droppedFiles.length) return;
+
+                appendPendingProductMediaFiles(droppedFiles, mediaInput);
+            });
+
+            uploadArea.dataset.ready = '1';
         }
 
         function movePendingProductMedia(index, direction) {
@@ -2546,7 +3014,7 @@
         async function fetchProducts() {
             try {
                 const res = await adminApiFetch('/api/products');
-                const payload = await adminReadJson(res, 'Urunler getirilemedi.');
+                const payload = await adminReadJson(res, 'Ürünler getirilemedi.');
                 globalProducts = Array.isArray(payload) ? payload : [];
                 const tbody = document.getElementById('products-table-body');
                 tbody.innerHTML = '';
@@ -2578,7 +3046,7 @@
             } catch (e) {
                 const tbody = document.getElementById('products-table-body');
                 if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="7" style="color:#C62828; text-align:center; padding:18px;">${e.message || 'Urunler getirilemedi.'}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" style="color:#C62828; text-align:center; padding:18px;">${e.message || 'Ürünler getirilemedi.'}</td></tr>`;
                 }
             }
         }
@@ -2630,15 +3098,15 @@
                     document.getElementById('existing-media-group').style.display = 'block';
                     const container = document.getElementById('existing-media-container');
                     pDetails.media.forEach(m => {
-                        let mediaTag = m.media_url.endsWith('.mp4')
-                            ? `<video src="${m.media_url}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 6px;"></video>`
-                            : `<img src="${m.media_url}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 6px;">`;
+                        let mediaTag = isProductMediaVideo(m.media_url)
+                            ? `<video src="${m.media_url}" class="existing-media-preview is-video"></video>`
+                            : `<img src="${m.media_url}" class="existing-media-preview">`;
 
                         container.innerHTML += `
-    <div style="position: relative; display: inline-block;">
+    <div class="existing-media-card">
         ${mediaTag}
         <button type="button" onclick="deleteSpecificMedia(${m.id}, this)"
-            style="position: absolute; top: -5px; right: -5px; background: red; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 12px; display:flex; align-items:center; justify-content:center;">✕</button>
+            class="existing-media-delete">✕</button>
     </div>
     `;
                     });
@@ -2650,29 +3118,29 @@
         }
 
         async function deleteSpecificMedia(mediaId, btnEl) {
-            if (!confirm("Bu gorseli silmek istediginize emin misiniz?")) return;
+            if (!confirm("Bu görseli silmek istediğinize emin misiniz?")) return;
             try {
                 btnEl.innerText = "...";
                 const res = await adminApiFetch('/api/products/media/' + mediaId, { method: 'DELETE' });
-                await adminReadJson(res, 'Gorsel silinemedi.');
+                await adminReadJson(res, 'Görsel silinemedi.');
                 btnEl.parentElement.remove();
             } catch (e) {
-                alert(e.message || 'Gorsel silinemedi.');
+                alert(e.message || 'Görsel silinemedi.');
                 console.error(e);
                 btnEl.innerText = 'x';
             }
         }
 
         async function deleteProduct(id) {
-            if (!confirm("Silmek istediginize emin misiniz?")) return;
+            if (!confirm("Silmek istediğinize emin misiniz?")) return;
             try {
                 const response = await adminApiFetch('/api/products/' + id, { method: 'DELETE' });
-                await adminReadJson(response, 'Urun silinemedi.');
-                alert('Urun silindi!');
+                await adminReadJson(response, 'Ürün silinemedi.');
+                alert('Ürün silindi!');
                 fetchProducts();
                 fetchStats();
             } catch (e) {
-                alert(e.message || 'Urun silinemedi.');
+                alert(e.message || 'Ürün silinemedi.');
             }
         }
 
@@ -2780,12 +3248,12 @@
 
                 if (editingProductId) {
                     const response = await adminApiFetch('/api/products/' + editingProductId, { method: 'PUT', body: formData });
-                    await adminReadJson(response, 'Urun guncellenemedi.');
-                    alert('Urun guncellendi.');
+                    await adminReadJson(response, 'Ürün güncellenemedi.');
+                    alert('Ürün güncellendi.');
                 } else {
                     const response = await adminApiFetch('/api/products', { method: 'POST', body: formData });
-                    await adminReadJson(response, 'Urun eklenemedi.');
-                    alert('Urun eklendi.');
+                    await adminReadJson(response, 'Ürün eklenemedi.');
+                    alert('Ürün eklendi.');
                 }
 
                 document.getElementById('add-product-form').reset();
@@ -2794,10 +3262,10 @@
                 fetchProducts();
                 fetchStats();
             } catch (error) {
-                alert(error.message || 'Urun kaydedilemedi.');
+                alert(error.message || 'Ürün kaydedilemedi.');
                 console.error(error);
             } finally {
-                btn.innerText = editingProductId ? 'Degisiklikleri Kaydet' : 'Urunu Kaydet';
+                btn.innerText = editingProductId ? 'Değişiklikleri Kaydet' : 'Ürünü Kaydet';
                 btn.disabled = false;
             }
         });
@@ -2837,6 +3305,7 @@
             document.documentElement.setAttribute('data-theme', savedTheme);
             document.getElementById('theme-checkbox').checked = (savedTheme === 'dark');
             setupProductDescriptionEditor();
+            setupProductMediaDropzone();
 
             const aiReplyInput = document.getElementById('ai-handoff-reply');
             if (aiReplyInput) {
