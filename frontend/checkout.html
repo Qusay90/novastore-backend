@@ -629,6 +629,45 @@
         function _addrKey() { return `novastore_addresses_${_getUserId()}`; }
         function _checkoutKey() { return `novastore_checkout_${_getUserId()}`; }
 
+        function getStoredCheckoutAddresses() {
+            const scopedKey = _addrKey();
+            const scopedAddresses = JSON.parse(localStorage.getItem(scopedKey) || '[]');
+            if (scopedAddresses.length > 0) {
+                return scopedAddresses;
+            }
+
+            const legacyList = JSON.parse(localStorage.getItem('novastore_user_addresses') || '[]');
+            if (legacyList.length > 0) {
+                localStorage.setItem(scopedKey, JSON.stringify(legacyList));
+                localStorage.removeItem('novastore_user_addresses');
+                return legacyList;
+            }
+
+            const oldAddress = localStorage.getItem('nova_user_address');
+            if (!oldAddress) {
+                return [];
+            }
+
+            try {
+                const data = JSON.parse(oldAddress);
+                const migrated = [{
+                    ...data,
+                    id: data.id || Date.now().toString(),
+                    fullName: data.fullName || JSON.parse(localStorage.getItem('nova_user_info'))?.fullName || '',
+                    phone: data.phone || ''
+                }];
+                localStorage.setItem(scopedKey, JSON.stringify(migrated));
+                localStorage.removeItem('nova_user_address');
+                return migrated;
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function persistCheckoutAddresses(addresses) {
+            localStorage.setItem(_addrKey(), JSON.stringify(addresses));
+        }
+
         const cart = JSON.parse(localStorage.getItem(_checkoutKey())) || [];
         let totalAmount = 0;
         if (cart.length === 0) { alert("Ödenecek ürün bulanamadı. Lütfen seçim yapın."); window.location.href = "index.html"; }
@@ -743,19 +782,7 @@
         let selectedAddressId = null;
 
         function loadCheckoutAddresses() {
-            const addresses = JSON.parse(localStorage.getItem(_addrKey())) || [];
-
-            // Eğer daha önceden eksi formatta adres varsa ve listeye geçmemişse geçir
-            const oldAddress = localStorage.getItem('nova_user_address');
-            if (oldAddress && addresses.length === 0) {
-                let data = JSON.parse(oldAddress);
-                data.id = Date.now().toString();
-                data.fullName = JSON.parse(localStorage.getItem('nova_user_info'))?.fullName || '';
-                data.phone = '';
-                addresses.push(data);
-                localStorage.setItem(_addrKey(), JSON.stringify(addresses));
-                localStorage.removeItem('nova_user_address');
-            }
+            const addresses = getStoredCheckoutAddresses();
 
             if (addresses.length > 0) {
                 // Varsayılan olarak ilk adresi seç
@@ -770,7 +797,7 @@
         }
 
         function openCheckoutAddressModal() {
-            const addresses = JSON.parse(localStorage.getItem(_addrKey())) || [];
+            const addresses = getStoredCheckoutAddresses();
             const listContainer = document.getElementById('checkout-address-list');
             listContainer.innerHTML = '';
 
@@ -806,7 +833,7 @@
         }
 
         function selectAddress(id) {
-            const addresses = JSON.parse(localStorage.getItem(_addrKey())) || [];
+            const addresses = getStoredCheckoutAddresses();
             const addr = addresses.find(a => a.id === id);
 
             if (addr) {
@@ -854,9 +881,9 @@
                 phone: phone
             };
 
-            const addresses = JSON.parse(localStorage.getItem(_addrKey())) || [];
+            const addresses = getStoredCheckoutAddresses();
             addresses.push(newAddr);
-            localStorage.setItem(_addrKey(), JSON.stringify(addresses));
+            persistCheckoutAddresses(addresses);
 
             closeNewAddressForm();
             selectAddress(newId);
@@ -948,7 +975,7 @@
             const user = userInfoStr ? JSON.parse(userInfoStr) : null;
             const token = localStorage.getItem('nova_user_token');
 
-            const addresses = JSON.parse(localStorage.getItem(_addrKey())) || [];
+            const addresses = getStoredCheckoutAddresses();
             const selectedAddr = addresses.find(a => a.id === selectedAddressId) || {};
 
             const couponCode = appliedCouponCode || (document.getElementById('coupon-input').value.trim() || null);

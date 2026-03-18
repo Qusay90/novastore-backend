@@ -413,10 +413,15 @@
 
                 <div class="nova-footer-bottom">
                     <span>&copy; <span id="nova-footer-year"></span> NovaStore. Tüm hakları saklıdır.</span>
-                    <span>Kategoriler admin panelinden eklenir ve footer alanı otomatik güncellenir.</span>
                 </div>
             </div>
         `;
+
+        const footerBottomNotes = footer.querySelectorAll('.nova-footer-bottom span');
+        if (footerBottomNotes.length > 1) {
+            footerBottomNotes[1].remove();
+        }
+
         return footer;
     }
 

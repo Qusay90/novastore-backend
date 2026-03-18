@@ -83,6 +83,8 @@ const statusMessageForUser = (status, orderId) => {
             return `Siparis #${orderId} teslim edildi, keyifli kullanimlar!`;
         case ORDER_STATUS.IPTAL_EDILDI:
             return `Siparis #${orderId} iptal edildi.`;
+        case ORDER_STATUS.IADE_EDILDI:
+            return `Siparis #${orderId} iade edildi.`;
         default:
             return `Siparis #${orderId} durumu guncellendi: ${status}`;
     }

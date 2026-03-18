@@ -333,6 +333,74 @@
             color: #B35C5C;
         }
 
+        .compact-order-card.has-return-flow {
+            border-color: #F5DEAE;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF9F0 100%);
+        }
+
+        .compact-order-card.has-return-flow:hover {
+            border-color: #E7B56A;
+            box-shadow: 0 8px 22px rgba(247, 148, 29, 0.1);
+        }
+
+        .compact-order-card.has-return-flow .compact-image-box {
+            border-color: #F4D7A6;
+            background: #FFFDF8;
+        }
+
+        .compact-order-card.has-return-flow .compact-status-icon {
+            background: #F59E0B;
+            box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.15);
+        }
+
+        .compact-order-card.has-return-flow .compact-status-title {
+            color: #9A6700;
+        }
+
+        .compact-order-card.has-return-flow .compact-status-subtitle {
+            color: #B07A14;
+        }
+
+        .compact-order-card.is-returned {
+            border-color: #CDE7D1;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F4FBF5 100%);
+        }
+
+        .compact-order-card.is-returned:hover {
+            border-color: #8AC495;
+            box-shadow: 0 8px 22px rgba(46, 125, 50, 0.09);
+        }
+
+        .compact-order-card.is-returned .compact-image-box {
+            border-color: #D5EED9;
+            background: #F8FFF8;
+        }
+
+        .compact-order-card.is-returned .compact-badge {
+            background: #2E7D32;
+        }
+
+        .compact-order-card.is-returned .compact-total {
+            color: #2E7D32;
+        }
+
+        .compact-order-card.is-returned .compact-status-icon {
+            background: #2E7D32;
+            box-shadow: 0 0 0 4px rgba(46, 125, 50, 0.14);
+        }
+
+        .compact-order-card.is-returned .compact-order-details {
+            background: linear-gradient(180deg, #FCFFFC 0%, #F3FAF4 100%);
+        }
+
+        .compact-order-card.is-returned .compact-status-title {
+            color: #1E5E2B;
+        }
+
+        .compact-order-card.is-returned .compact-status-subtitle {
+            color: #4F8A5A;
+        }
+
         .compact-order-header {
             padding: 20px;
             cursor: pointer;
@@ -1141,6 +1209,95 @@
         });
 
         // --- 3. SİPARİŞ GEÇMİŞİ ÇEKME ---
+        function getRefundStatusMeta(refundStatus) {
+            const normalized = String(refundStatus || '').trim().toUpperCase();
+            const statusMap = {
+                REQUESTED: {
+                    label: 'İade talebi alındı',
+                    title: 'İade talebi oluşturuldu',
+                    subtitle: 'Talebiniz alındı, inceleme için sıraya eklendi.',
+                    icon: '↩',
+                    bg: '#FFF8E7',
+                    border: '#F5DEAE',
+                    color: '#8A5A00'
+                },
+                IN_REVIEW: {
+                    label: 'İade inceleniyor',
+                    title: 'İade inceleniyor',
+                    subtitle: 'Ürün ve talep detayları şu an kontrol ediliyor.',
+                    icon: '↻',
+                    bg: '#EFF8FF',
+                    border: '#BFDBFE',
+                    color: '#1D4ED8'
+                },
+                APPROVED: {
+                    label: 'İade onaylandı',
+                    title: 'İade onaylandı',
+                    subtitle: 'İade talebiniz onaylandı, son işlem adımları hazırlanıyor.',
+                    icon: '✓',
+                    bg: '#F0FDF4',
+                    border: '#BBF7D0',
+                    color: '#166534'
+                },
+                PENDING: {
+                    label: 'Geri ödeme bekleniyor',
+                    title: 'Geri ödeme bekleniyor',
+                    subtitle: 'Ödeme iadesi için finansal süreç devam ediyor.',
+                    icon: '₺',
+                    bg: '#FFF8E7',
+                    border: '#F5DEAE',
+                    color: '#8A5A00'
+                },
+                COMPLETED: {
+                    label: 'İade tamamlandı',
+                    title: 'İade edildi',
+                    subtitle: 'İade süreci tamamlandı, siparişiniz iade edildi olarak güncellendi.',
+                    icon: '↩',
+                    bg: '#F0FDF4',
+                    border: '#BBF7D0',
+                    color: '#166534'
+                },
+                REJECTED: {
+                    label: 'İade reddedildi',
+                    title: 'İade reddedildi',
+                    subtitle: 'Talebiniz onaylanmadı. Detaylar için destek ekibiyle görüşebilirsiniz.',
+                    icon: '!',
+                    bg: '#FEF2F2',
+                    border: '#FECACA',
+                    color: '#B91C1C'
+                },
+                FAILED: {
+                    label: 'İade başarısız',
+                    title: 'İade tamamlanamadı',
+                    subtitle: 'İade veya geri ödeme sürecinde bir sorun oluştu.',
+                    icon: '!',
+                    bg: '#FEF2F2',
+                    border: '#FECACA',
+                    color: '#B91C1C'
+                }
+            };
+
+            return statusMap[normalized] || null;
+        }
+
+        function buildRefundStatusBannerHtml(refundStatus, fallbackLabel = '') {
+            const meta = getRefundStatusMeta(refundStatus);
+            if (!meta && !fallbackLabel) return '';
+
+            const label = meta ? meta.label : fallbackLabel;
+            const subtitle = meta ? meta.subtitle : '';
+            const bg = meta ? meta.bg : '#FFF8E7';
+            const border = meta ? meta.border : '#F5DEAE';
+            const color = meta ? meta.color : '#8A5A00';
+
+            return `
+                <div style="padding:12px 16px; border-radius:10px; background:${bg}; border:1px solid ${border}; color:${color}; font-size:0.9rem;">
+                    <strong>İade / geri ödeme durumu:</strong> ${label}
+                    ${subtitle ? `<div style="margin-top:6px; font-size:0.84rem; line-height:1.55;">${subtitle}</div>` : ''}
+                </div>
+            `;
+        }
+
         function getProgressBarHtml(status) {
             let fillWidth = '0%';
             let steps = [
@@ -1152,6 +1309,10 @@
 
             if (status === 'İptal Edildi') {
                 return `<div class="progress-track"><div class="progress-bar-fill" style="width: 75%; background: #D32F2F;"></div><div class="progress-step cancel"><div class="step-icon">✕</div><div class="step-label">Sipariş İptal Edildi</div></div></div>`;
+            }
+
+            if (status === 'İade Edildi') {
+                return `<div class="progress-track"><div class="progress-bar-fill" style="width: 100%; background: #2E7D32;"></div><div class="progress-step active"><div class="step-icon">↩</div><div class="step-label">Sipariş İade Edildi</div></div></div>`;
             }
 
             if (status === 'Onay Bekliyor') { fillWidth = '0%'; steps[0].active = true; }
@@ -1225,18 +1386,37 @@
                         });
                     }
 
-                    const isCompactOrder = order.status === 'Teslim Edildi' || order.status === 'İptal Edildi';
+                    const isCompactOrder = order.status === 'Teslim Edildi' || order.status === 'İptal Edildi' || order.status === 'İade Edildi';
                     if (isCompactOrder) {
                         const isCancelled = order.status === 'İptal Edildi';
+                        const isReturned = order.status === 'İade Edildi';
+                        const refundMeta = getRefundStatusMeta(order.refund_status);
+                        const hasReturnFlow = !isCancelled && !isReturned && !!refundMeta;
                         const firstItem = products.length > 0 ? products[0] : null;
                         const firstItemQty = firstItem ? firstItem.quantity : 1;
                         const firstItemImage = firstItem ? ((firstItem.image && firstItem.image.trim() !== '') ? firstItem.image : (productImageMap[firstItem.id] || fallbackSvg)) : fallbackSvg;
-                        const compactCardClass = isCancelled ? 'compact-order-card is-cancelled' : 'compact-order-card';
-                        const statusIcon = isCancelled ? '✕' : '✓';
-                        const statusTitle = isCancelled ? 'Sipariş iptal edildi' : 'Sipariş tamamlandı';
+                        const compactCardClass = isCancelled
+                            ? 'compact-order-card is-cancelled'
+                            : isReturned
+                                ? 'compact-order-card is-returned'
+                                : hasReturnFlow
+                                    ? 'compact-order-card has-return-flow'
+                                    : 'compact-order-card';
+                        const statusIcon = isCancelled ? '✕' : (isReturned ? '↩' : (hasReturnFlow ? refundMeta.icon : '✓'));
+                        const statusTitle = isCancelled
+                            ? 'Sipariş iptal edildi'
+                            : isReturned
+                                ? 'İade edildi'
+                                : hasReturnFlow
+                                    ? refundMeta.title
+                                    : 'Sipariş tamamlandı';
                         const statusSubtitle = isCancelled
                             ? 'Detayları açıp iptal notunu ve ürünleri görebilirsiniz.'
-                            : 'Detayları açıp sipariş içeriğini görebilirsiniz.';
+                            : isReturned
+                                ? 'İade süreci tamamlandı, detayları açıp bilgileri görebilirsiniz.'
+                                : hasReturnFlow
+                                    ? refundMeta.subtitle
+                                    : 'Detayları açıp sipariş içeriğini görebilirsiniz.';
                         const compactExtraHtml = isCancelled
                             ? `
                                 <div style="margin-top:16px; display:grid; gap:12px;">
@@ -1245,8 +1425,20 @@
                                         <div style="font-size:0.92rem; line-height:1.55;">${order.cancel_reason || 'Sipariş bu kayıt için iptal edildi.'}</div>
                                     </div>
                                     ${order.refund_status && order.refund_status !== 'NONE'
-                                ? `<div style="padding:12px 16px; border-radius:10px; background:#FFF8E7; border:1px solid #F5DEAE; color:#8A5A00; font-size:0.9rem;"><strong>İade / geri ödeme durumu:</strong> ${order.refund_status}</div>`
+                                ? buildRefundStatusBannerHtml(order.refund_status)
                                 : ''}
+                                </div>
+                            `
+                            : isReturned
+                                ? `
+                                <div style="margin-top:16px; display:grid; gap:12px;">
+                                    ${buildRefundStatusBannerHtml(order.refund_status, 'İade tamamlandı')}
+                                </div>
+                            `
+                                : hasReturnFlow
+                                    ? `
+                                <div style="margin-top:16px; display:grid; gap:12px;">
+                                    ${buildRefundStatusBannerHtml(order.refund_status)}
                                 </div>
                             `
                             : `
@@ -1333,17 +1525,44 @@
         }
 
         // --- 4. ÇOKLU ADRES YÖNETİMİ ---
-        let addresses = JSON.parse(localStorage.getItem('novastore_user_addresses')) || [];
+        function getStoredAddresses() {
+            const scopedKey = _addrKey();
+            const scopedAddresses = JSON.parse(localStorage.getItem(scopedKey) || '[]');
+            if (scopedAddresses.length > 0) {
+                return scopedAddresses;
+            }
 
-        // Eski sistemdeki tek adresi (varsa) listeye dönüştür (Geriye dönük uyumluluk)
-        const oldAddress = localStorage.getItem('nova_user_address');
-        if (oldAddress && addresses.length === 0) {
-            let data = JSON.parse(oldAddress);
-            data.id = Date.now().toString();
-            addresses.push(data);
-            localStorage.setItem('novastore_user_addresses', JSON.stringify(addresses));
-            localStorage.removeItem('nova_user_address');
+            const legacyList = JSON.parse(localStorage.getItem('novastore_user_addresses') || '[]');
+            if (legacyList.length > 0) {
+                localStorage.setItem(scopedKey, JSON.stringify(legacyList));
+                localStorage.removeItem('novastore_user_addresses');
+                return legacyList;
+            }
+
+            const oldAddress = localStorage.getItem('nova_user_address');
+            if (!oldAddress) {
+                return [];
+            }
+
+            try {
+                const data = JSON.parse(oldAddress);
+                const migrated = [{
+                    ...data,
+                    id: data.id || Date.now().toString()
+                }];
+                localStorage.setItem(scopedKey, JSON.stringify(migrated));
+                localStorage.removeItem('nova_user_address');
+                return migrated;
+            } catch (_) {
+                return [];
+            }
         }
+
+        function persistAddresses() {
+            localStorage.setItem(_addrKey(), JSON.stringify(addresses));
+        }
+
+        let addresses = getStoredAddresses();
 
         function renderAddresses() {
             const container = document.getElementById('address-grid');
@@ -1415,7 +1634,7 @@
                 addresses.push(addressData); // Yeni ekle
             }
 
-            localStorage.setItem(_addrKey(), JSON.stringify(addresses));
+            persistAddresses();
 
             setTimeout(() => {
                 btn.innerText = "Kaydedildi!";
@@ -1443,12 +1662,13 @@
         function deleteAddress(id) {
             if (confirm('Bu adresi silmek istediğinize emin misiniz?')) {
                 addresses = addresses.filter(a => a.id !== id);
-                localStorage.setItem(_addrKey(), JSON.stringify(addresses));
+                persistAddresses();
                 renderAddresses();
             }
         }
 
         function loadAddress() {
+            addresses = getStoredAddresses();
             renderAddresses();
         }
 
