@@ -108,6 +108,21 @@ const createCoreSchema = async () => {
         ALTER TABLE reviews ADD COLUMN IF NOT EXISTS comment TEXT;
         ALTER TABLE reviews ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
+        CREATE TABLE IF NOT EXISTS review_media (
+            id SERIAL PRIMARY KEY,
+            review_id INTEGER REFERENCES reviews(id) ON DELETE CASCADE,
+            media_url TEXT NOT NULL,
+            media_type VARCHAR(20) DEFAULT 'image',
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        ALTER TABLE review_media ADD COLUMN IF NOT EXISTS media_url TEXT;
+        ALTER TABLE review_media ADD COLUMN IF NOT EXISTS media_type VARCHAR(20) DEFAULT 'image';
+        ALTER TABLE review_media ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+        ALTER TABLE review_media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+        ALTER TABLE review_media ALTER COLUMN media_url TYPE TEXT;
+
         CREATE TABLE IF NOT EXISTS product_media (
             id SERIAL PRIMARY KEY,
             product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
@@ -127,6 +142,7 @@ const createCoreSchema = async () => {
         CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(sender_id, receiver_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_product_questions_product_id ON product_questions(product_id);
         CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON reviews(product_id);
+        CREATE INDEX IF NOT EXISTS idx_review_media_review_id ON review_media(review_id);
         CREATE INDEX IF NOT EXISTS idx_product_media_product_id ON product_media(product_id);
     `;
 

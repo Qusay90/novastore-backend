@@ -9,15 +9,26 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-const storage = new CloudinaryStorage({
-    cloudinary,
-    params: {
-        folder: 'novastore_products',
-        resource_type: 'auto',
-        allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4']
-    }
-});
+const allowedFormats = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'webm', 'ogg', 'mov'];
 
-const upload = multer({ storage });
+const createUpload = (folder) => {
+    const storage = new CloudinaryStorage({
+        cloudinary,
+        params: {
+            folder,
+            resource_type: 'auto',
+            allowed_formats: allowedFormats
+        }
+    });
 
-module.exports = { upload };
+    return multer({ storage });
+};
+
+const upload = createUpload('novastore_products');
+const reviewUpload = createUpload('novastore_reviews');
+
+module.exports = {
+    upload,
+    reviewUpload,
+    createUpload
+};

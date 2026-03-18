@@ -4,6 +4,9 @@ const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
 const { ORDER_STATUS } = require('../constants/orderStatus');
 const { maskFullName } = require('../services/privacyService');
 
+const MAX_REVIEW_MEDIA_COUNT = 4;
+const MAX_REVIEW_COMMENT_LENGTH = 2000;
+
 const findEligibleDeliveredOrder = async (userId, productId) => {
     return pool.query(
         `SELECT o.id
@@ -32,7 +35,7 @@ const getReviewPermission = async (userId, productId) => {
             canReview: false,
             requiresAuth: true,
             code: 'AUTH_REQUIRED',
-            message: 'Değerlendirme yapabilmek için giriş yapmalısınız.'
+            message: 'Degerlendirme yapabilmek icin giris yapmalisiniz.'
         };
     }
 
@@ -46,7 +49,7 @@ const getReviewPermission = async (userId, productId) => {
             canReview: false,
             requiresAuth: false,
             code: 'ALREADY_REVIEWED',
-            message: 'Bu ürünü zaten değerlendirdiniz.'
+            message: 'Bu urunu zaten degerlendirdiniz.'
         };
     }
 
@@ -56,7 +59,7 @@ const getReviewPermission = async (userId, productId) => {
             canReview: false,
             requiresAuth: false,
             code: 'DELIVERY_REQUIRED',
-            message: 'Bu ürüne sadece satın alıp siparişi teslim edilen müşteriler değerlendirme yapabilir.'
+            message: 'Bu urune sadece satin alip siparisi teslim edilen musteriler degerlendirme yapabilir.'
         };
     }
 
@@ -68,24 +71,94 @@ const getReviewPermission = async (userId, productId) => {
     };
 };
 
+const normalizeReviewComment = (value) => {
+    if (value === undefined || value === null) return null;
+    const normalized = String(value).trim();
+    return normalized || null;
+};
+
+const normalizeReviewMediaUrl = (file) => {
+    if (!file) return null;
+    return String(file.path || file.secure_url || file.url || '').trim() || null;
+};
+
+const getReviewMediaType = (file, mediaUrl) => {
+    const mimeType = String(file?.mimetype || '').toLowerCase();
+    if (mimeType.startsWith('video/')) return 'video';
+    return /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(String(mediaUrl || '')) ? 'video' : 'image';
+};
+
+const buildReviewMediaPayload = (files) => {
+    if (!Array.isArray(files) || files.length === 0) return [];
+
+    return files
+        .map((file, index) => {
+            const mediaUrl = normalizeReviewMediaUrl(file);
+            if (!mediaUrl) return null;
+
+            return {
+                media_url: mediaUrl,
+                media_type: getReviewMediaType(file, mediaUrl),
+                sort_order: index
+            };
+        })
+        .filter(Boolean);
+};
+
+const loadReviewMediaMap = async (reviewIds) => {
+    if (!Array.isArray(reviewIds) || reviewIds.length === 0) {
+        return new Map();
+    }
+
+    const mediaResult = await pool.query(
+        `SELECT id, review_id, media_url, media_type, sort_order
+         FROM review_media
+         WHERE review_id = ANY($1::int[])
+         ORDER BY sort_order ASC, id ASC`,
+        [reviewIds]
+    );
+
+    const mediaMap = new Map();
+    mediaResult.rows.forEach((row) => {
+        if (!mediaMap.has(row.review_id)) {
+            mediaMap.set(row.review_id, []);
+        }
+        mediaMap.get(row.review_id).push(row);
+    });
+
+    return mediaMap;
+};
+
 // 1. Urune yorum ekleme
 const addReview = async (req, res) => {
+    let client;
+
     try {
         const { productId, rating, comment } = req.body;
         const userId = req.user.id;
 
         if (!productId || !rating) {
-            return res.status(400).json({ error: 'Ürün ve puan bilgisi zorunludur.' });
+            return res.status(400).json({ error: 'Urun ve puan bilgisi zorunludur.' });
         }
 
         const numericProductId = Number(productId);
         if (!Number.isInteger(numericProductId) || numericProductId <= 0) {
-            return res.status(400).json({ error: 'Geçerli bir ürün seçmelisiniz.' });
+            return res.status(400).json({ error: 'Gecerli bir urun secmelisiniz.' });
         }
 
         const numericRating = Number(rating);
         if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
-            return res.status(400).json({ error: 'Puan 1 ile 5 arasında olmalıdır.' });
+            return res.status(400).json({ error: 'Puan 1 ile 5 arasinda olmalidir.' });
+        }
+
+        const normalizedComment = normalizeReviewComment(comment);
+        if (normalizedComment && normalizedComment.length > MAX_REVIEW_COMMENT_LENGTH) {
+            return res.status(400).json({ error: 'Yorum metni cok uzun. Lutfen daha kisa bir yorum yazin.' });
+        }
+
+        const reviewMedia = buildReviewMediaPayload(req.files);
+        if (reviewMedia.length > MAX_REVIEW_MEDIA_COUNT) {
+            return res.status(400).json({ error: 'En fazla 4 gorsel veya video ekleyebilirsiniz.' });
         }
 
         const permission = await getReviewPermission(userId, numericProductId);
@@ -94,12 +167,32 @@ const addReview = async (req, res) => {
             return res.status(statusCode).json({ error: permission.message, code: permission.code });
         }
 
-        await pool.query(
-            'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES ($1, $2, $3, $4) RETURNING *',
-            [numericProductId, userId, numericRating, comment || null]
+        client = await pool.connect();
+        await client.query('BEGIN');
+
+        const reviewResult = await client.query(
+            `INSERT INTO reviews (product_id, user_id, rating, comment)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id`,
+            [numericProductId, userId, numericRating, normalizedComment]
         );
 
-        res.status(201).json({ mesaj: 'Degerlendirmeniz başarıyla eklendi!' });
+        const reviewId = reviewResult.rows[0].id;
+
+        for (const media of reviewMedia) {
+            await client.query(
+                `INSERT INTO review_media (review_id, media_url, media_type, sort_order)
+                 VALUES ($1, $2, $3, $4)`,
+                [reviewId, media.media_url, media.media_type, media.sort_order]
+            );
+        }
+
+        await client.query('COMMIT');
+
+        res.status(201).json({
+            mesaj: 'Degerlendirmeniz basariyla eklendi!',
+            reviewId
+        });
 
         // Admin'e yeni yorum bildirimi (asenkron)
         try {
@@ -107,13 +200,21 @@ const addReview = async (req, res) => {
             await createNotification(
                 null,
                 'new_review',
-                `Yeni bir ürün yorumu eklendi! Ürün ID: #${numericProductId} - Puan: ${numericRating}/5`,
+                `Yeni bir urun yorumu eklendi! Urun ID: #${numericProductId} - Puan: ${numericRating}/5`,
                 io
             );
         } catch (_) { }
     } catch (err) {
-        console.error('Yorum ekleme hatası:', err.message);
-        res.status(500).json({ error: 'Yorum eklenirken hata oluştu.' });
+        if (client) {
+            try {
+                await client.query('ROLLBACK');
+            } catch (_) { }
+        }
+
+        console.error('Yorum ekleme hatasi:', err.message);
+        res.status(500).json({ error: 'Yorum eklenirken hata olustu.' });
+    } finally {
+        if (client) client.release();
     }
 };
 
@@ -122,18 +223,21 @@ const getProductReviews = async (req, res) => {
     try {
         const productId = Number(req.params.productId);
         if (!Number.isInteger(productId) || productId <= 0) {
-            return res.status(400).json({ error: 'Gecersiz ürün kimliği.' });
+            return res.status(400).json({ error: 'Gecersiz urun kimligi.' });
         }
 
         const authUser = getUserFromRequestIfAny(req);
 
-        const reviews = await pool.query(`
-            SELECT r.id, r.rating, r.comment, r.created_at, COALESCE(u.full_name, u.name) AS full_name
-            FROM reviews r
-            JOIN users u ON r.user_id = u.id
-            WHERE r.product_id = $1
-            ORDER BY r.created_at DESC
-        `, [productId]);
+        const reviewResult = await pool.query(
+            `SELECT r.id, r.rating, r.comment, r.created_at, COALESCE(u.full_name, u.name) AS full_name
+             FROM reviews r
+             JOIN users u ON r.user_id = u.id
+             WHERE r.product_id = $1
+             ORDER BY r.created_at DESC`,
+            [productId]
+        );
+
+        const mediaMap = await loadReviewMediaMap(reviewResult.rows.map((review) => review.id));
 
         const avgResult = await pool.query(
             'SELECT AVG(rating) as average, COUNT(id) as total FROM reviews WHERE product_id = $1',
@@ -143,37 +247,46 @@ const getProductReviews = async (req, res) => {
         const reviewPermission = await getReviewPermission(authUser ? authUser.id : null, productId);
 
         res.status(200).json({
-            reviews: reviews.rows.map((review) => ({
+            reviews: reviewResult.rows.map((review) => ({
                 ...review,
-                full_name: maskFullName(review.full_name)
+                full_name: maskFullName(review.full_name),
+                media: mediaMap.get(review.id) || []
             })),
             average: avgResult.rows[0].average ? parseFloat(avgResult.rows[0].average).toFixed(1) : 0,
             totalReviews: parseInt(avgResult.rows[0].total, 10) || 0,
             reviewPermission
         });
     } catch (err) {
-        console.error('Yorumları getirme hatası:', err.message);
+        console.error('Yorumlari getirme hatasi:', err.message);
         res.status(500).json({ error: 'Yorumlar getirilemedi.' });
     }
 };
 
-// 3. Bir müşterinin tüm yorumlarını getirme
+// 3. Bir musterinin tum yorumlarini getirme
 const getUserReviews = async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const reviews = await pool.query(`
-            SELECT r.id, r.rating, r.comment, r.created_at, p.name as product_name, p.image_url, p.id as product_id
-            FROM reviews r
-            JOIN products p ON r.product_id = p.id
-            WHERE r.user_id = $1
-            ORDER BY r.created_at DESC
-        `, [userId]);
+        const reviewResult = await pool.query(
+            `SELECT r.id, r.rating, r.comment, r.created_at, p.name as product_name, p.image_url, p.id as product_id
+             FROM reviews r
+             JOIN products p ON r.product_id = p.id
+             WHERE r.user_id = $1
+             ORDER BY r.created_at DESC`,
+            [userId]
+        );
 
-        res.status(200).json(reviews.rows);
+        const mediaMap = await loadReviewMediaMap(reviewResult.rows.map((review) => review.id));
+
+        res.status(200).json(
+            reviewResult.rows.map((review) => ({
+                ...review,
+                media: mediaMap.get(review.id) || []
+            }))
+        );
     } catch (err) {
-        console.error('Kullanıcı yorumları getirme hatası:', err);
-        res.status(500).json({ error: 'Yorumlarınız getirilemedi.' });
+        console.error('Kullanici yorumlari getirme hatasi:', err);
+        res.status(500).json({ error: 'Yorumlariniz getirilemedi.' });
     }
 };
 

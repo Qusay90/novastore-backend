@@ -516,6 +516,118 @@
             box-sizing: border-box;
         }
 
+        .review-upload-box {
+            margin-bottom: 16px;
+            padding: 16px;
+            border: 1px dashed #D7DFE8;
+            border-radius: 14px;
+            background: #F8FBFF;
+        }
+
+        .review-upload-trigger {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            border-radius: 999px;
+            border: 1px solid #D7DFE8;
+            background: white;
+            color: #0F2A43;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s ease;
+        }
+
+        .review-upload-trigger:hover {
+            border-color: #F7941D;
+            color: #F7941D;
+        }
+
+        .review-upload-input {
+            display: none;
+        }
+
+        .review-upload-hint {
+            margin-top: 10px;
+            color: #6B7280;
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
+
+        .review-preview-grid,
+        .review-media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(90px, 110px));
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .review-preview-item,
+        .review-media-button {
+            position: relative;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid #E5E7EB;
+            background: white;
+        }
+
+        .review-media-button {
+            padding: 0;
+            cursor: pointer;
+            width: 100%;
+            border: 1px solid #E5E7EB;
+        }
+
+        .review-preview-thumb,
+        .review-media-thumb {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            display: block;
+            background: #F3F6F9;
+        }
+
+        .review-preview-thumb.is-video,
+        .review-media-thumb.is-video {
+            background: #0B1220;
+        }
+
+        .review-preview-meta {
+            padding: 8px 10px;
+            background: white;
+        }
+
+        .review-preview-name {
+            font-size: 0.78rem;
+            color: #334155;
+            font-weight: 600;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .review-preview-remove,
+        .review-media-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            border-radius: 999px;
+            padding: 4px 8px;
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+
+        .review-preview-remove {
+            border: none;
+            background: rgba(15, 42, 67, 0.86);
+            color: white;
+            cursor: pointer;
+        }
+
+        .review-media-badge {
+            background: rgba(15, 42, 67, 0.8);
+            color: white;
+        }
+
         .btn-submit-review {
             background: #F7941D;
             color: white;
@@ -561,6 +673,10 @@
         .review-text {
             color: #444;
             line-height: 1.6;
+        }
+
+        .review-media-grid {
+            margin-top: 16px;
         }
 
         @media (max-width: 768px) {
@@ -1497,6 +1613,9 @@
         }
 
         let selectedRating = 0; // Formdaki seçili yıldız
+        let selectedReviewFiles = [];
+        let reviewPreviewUrls = [];
+        const MAX_REVIEW_MEDIA_FILES = 4;
         const PRODUCT_DESCRIPTION_ALLOWED_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'U', 'UL', 'OL', 'LI', 'H2', 'H3', 'H4', 'BLOCKQUOTE', 'SPAN']);
 
         function escapeDescriptionText(value) {
@@ -1511,10 +1630,19 @@
         function escapeHtmlAttribute(value) {
             return String(value || '')
                 .replace(/&/g, '&amp;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;')
                 .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
         function isVideoMedia(url) {
@@ -1573,6 +1701,134 @@
             if (event.target && event.target.id === 'media-lightbox') {
                 closeMediaLightbox();
             }
+        }
+
+        function revokeReviewPreviewUrls() {
+            reviewPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+            reviewPreviewUrls = [];
+        }
+
+        function syncReviewMediaInput() {
+            const input = document.getElementById('review-media-input');
+            if (!input) return;
+
+            const dataTransfer = new DataTransfer();
+            selectedReviewFiles.forEach((file) => dataTransfer.items.add(file));
+            input.files = dataTransfer.files;
+        }
+
+        function isSupportedReviewMediaFile(file) {
+            const mimeType = String(file?.type || '').toLowerCase();
+            return mimeType.startsWith('image/')
+                || ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'].includes(mimeType);
+        }
+
+        function renderReviewMediaPreviews() {
+            const container = document.getElementById('review-media-preview');
+            const hint = document.getElementById('review-media-hint');
+            if (!container || !hint) return;
+
+            revokeReviewPreviewUrls();
+
+            if (selectedReviewFiles.length === 0) {
+                container.innerHTML = '';
+                hint.textContent = 'En fazla 4 gorsel veya video ekleyebilirsiniz. Ilk kare yorum kartinda kucuk onizleme olarak gorunur.';
+                return;
+            }
+
+            hint.textContent = `${selectedReviewFiles.length}/${MAX_REVIEW_MEDIA_FILES} dosya hazir. Yorum gonderildiginde gorseller ve videolar birlikte yollanacak.`;
+            container.innerHTML = selectedReviewFiles.map((file, index) => {
+                const previewUrl = URL.createObjectURL(file);
+                reviewPreviewUrls.push(previewUrl);
+                const isVideo = String(file.type || '').startsWith('video/');
+                const previewTag = isVideo
+                    ? `<video src="${escapeHtmlAttribute(previewUrl)}" class="review-preview-thumb is-video" muted playsinline preload="metadata"></video>`
+                    : `<img src="${escapeHtmlAttribute(previewUrl)}" class="review-preview-thumb" alt="${escapeHtmlAttribute(file.name)}">`;
+
+                return `
+                    <div class="review-preview-item">
+                        ${previewTag}
+                        <button type="button" class="review-preview-remove" onclick="removeSelectedReviewMedia(${index})">Kaldir</button>
+                        <div class="review-preview-meta">
+                            <div class="review-preview-name">${escapeHtml(file.name)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function handleReviewMediaSelection(event) {
+            const nextFiles = Array.from(event?.target?.files || []);
+            if (nextFiles.length === 0) {
+                renderReviewMediaPreviews();
+                return;
+            }
+
+            const invalidFiles = [];
+            const availableSlots = Math.max(0, MAX_REVIEW_MEDIA_FILES - selectedReviewFiles.length);
+            const validFiles = nextFiles.filter((file) => {
+                if (!isSupportedReviewMediaFile(file)) {
+                    invalidFiles.push(file.name || 'Bilinmeyen dosya');
+                    return false;
+                }
+                return true;
+            });
+
+            if (availableSlots <= 0) {
+                alert('En fazla 4 gorsel veya video ekleyebilirsiniz.');
+                syncReviewMediaInput();
+                renderReviewMediaPreviews();
+                return;
+            }
+
+            selectedReviewFiles = selectedReviewFiles.concat(validFiles.slice(0, availableSlots));
+
+            if (validFiles.length > availableSlots) {
+                alert(`En fazla ${MAX_REVIEW_MEDIA_FILES} dosya ekleyebilirsiniz.`);
+            } else if (invalidFiles.length > 0) {
+                alert(`Su dosyalar desteklenmedi: ${invalidFiles.join(', ')}`);
+            }
+
+            syncReviewMediaInput();
+            renderReviewMediaPreviews();
+        }
+
+        function removeSelectedReviewMedia(index) {
+            selectedReviewFiles = selectedReviewFiles.filter((_, fileIndex) => fileIndex !== index);
+            syncReviewMediaInput();
+            renderReviewMediaPreviews();
+        }
+
+        function buildReviewMediaMarkup(mediaItems, labelBase) {
+            if (!Array.isArray(mediaItems) || mediaItems.length === 0) return '';
+
+            const itemsHtml = mediaItems.map((media, index) => {
+                const mediaUrl = String(media?.media_url || '');
+                if (!mediaUrl) return '';
+
+                const mediaType = media?.media_type === 'video' || isVideoMedia(mediaUrl) ? 'video' : 'image';
+                const urlArg = JSON.stringify(mediaUrl);
+                const typeArg = JSON.stringify(mediaType);
+                const altText = `${labelBase || 'Yorum'} medya ${index + 1}`;
+                const altArg = JSON.stringify(altText);
+
+                if (mediaType === 'video') {
+                    return `
+                        <button type="button" class="review-media-button" onclick='openMediaLightbox(${urlArg}, ${typeArg}, ${altArg})'>
+                            <video src="${escapeHtmlAttribute(mediaUrl)}" class="review-media-thumb is-video" muted playsinline preload="metadata"></video>
+                            <span class="review-media-badge">Video</span>
+                        </button>
+                    `;
+                }
+
+                return `
+                    <button type="button" class="review-media-button" onclick='openMediaLightbox(${urlArg}, ${typeArg}, ${altArg})'>
+                        <img src="${escapeHtmlAttribute(mediaUrl)}" class="review-media-thumb" alt="${escapeHtmlAttribute(altText)}">
+                    </button>
+                `;
+            }).join('');
+
+            return itemsHtml ? `<div class="review-media-grid">${itemsHtml}</div>` : '';
         }
 
         document.addEventListener('keydown', (event) => {
@@ -1770,6 +2026,19 @@
                                 <span onclick="setRating(5)">★</span>
                             </div>
                             <textarea id="review-comment" class="review-input" placeholder="Bu ürün hakkında ne düşünüyorsunuz? (Opsiyonel)"></textarea>
+                            <div class="review-upload-box">
+                                <label for="review-media-input" class="review-upload-trigger">📷 Gorsel veya Video Ekle</label>
+                                <input
+                                    id="review-media-input"
+                                    class="review-upload-input"
+                                    type="file"
+                                    accept="image/*,video/mp4,video/webm,video/ogg,video/quicktime,.mov"
+                                    multiple
+                                    onchange="handleReviewMediaSelection(event)"
+                                >
+                                <div id="review-media-hint" class="review-upload-hint">En fazla 4 gorsel veya video ekleyebilirsiniz. Ilk kare yorum kartinda kucuk onizleme olarak gorunur.</div>
+                                <div id="review-media-preview" class="review-preview-grid"></div>
+                            </div>
                             <button onclick="submitReview()" class="btn-submit-review">Yorumu Gönder</button>
                         </div>
                     `;
@@ -1805,15 +2074,20 @@
                             rStars += i <= r.rating ? '<span class="star" style="font-size:1rem;">★</span>' : '<span class="star-empty" style="font-size:1rem;">★</span>';
                         }
                         const rDate = new Date(r.created_at).toLocaleDateString('tr-TR');
+                        const safeReviewerName = escapeHtml(r.full_name || 'Musteri');
+                        const safeComment = escapeHtml(r.comment || '');
+                        const reviewTextHtml = safeComment ? `<div class="review-text">${safeComment}</div>` : '';
+                        const reviewMediaHtml = buildReviewMediaMarkup(r.media, `${r.full_name || 'Musteri'} yorumu`);
 
                         reviewsListHtml += `
                             <div class="review-card">
                                 <div class="review-header">
-                                    <div class="reviewer-name">${r.full_name}</div>
+                                    <div class="reviewer-name">${safeReviewerName}</div>
                                     <div class="review-date">${rDate}</div>
                                 </div>
                                 <div style="margin-bottom: 10px;">${rStars}</div>
-                                <div class="review-text">${r.comment || ''}</div>
+                                ${reviewTextHtml}
+                                ${reviewMediaHtml}
                             </div>
                         `;
                     });
@@ -1954,6 +2228,14 @@
                     document.getElementById('qa-form-area').style.display = 'block';
                 }
 
+                if (reviewPermission.canReview) {
+                    selectedReviewFiles = [];
+                    renderReviewMediaPreviews();
+                } else {
+                    selectedReviewFiles = [];
+                    revokeReviewPreviewUrls();
+                }
+
                 // Soru verilerini çek
                 fetchProductQuestions();
 
@@ -2034,21 +2316,24 @@
             }
 
             const comment = document.getElementById('review-comment').value;
+            const formData = new FormData();
+            formData.append('productId', productId);
+            formData.append('rating', selectedRating);
+            formData.append('comment', comment);
+            selectedReviewFiles.forEach((file) => formData.append('media', file));
 
             try {
                 const response = await fetch('/api/reviews', {
                     method: 'POST',
-                    headers: buildApiHeaders(true),
-                    body: JSON.stringify({
-                        productId: productId,
-                        rating: selectedRating,
-                        comment: comment
-                    })
+                    headers: buildApiHeaders(),
+                    body: formData
                 });
 
                 const result = await response.json();
 
                 if (response.ok) {
+                    selectedReviewFiles = [];
+                    revokeReviewPreviewUrls();
                     alert("✅ " + result.mesaj);
                     window.location.reload(); // Yorumu listeye eklemek için sayfayı tazele
                 } else {
@@ -2135,6 +2420,8 @@
                 alert("Sorunuz gönderilirken sunucu hatası oluştu.");
             }
         }
+
+        window.addEventListener('beforeunload', revokeReviewPreviewUrls);
 
         // Sayfa açıldığında çalıştır
         fetchProductAndReviews();

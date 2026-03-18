@@ -1611,6 +1611,45 @@
             }
         }
 
+        function isReviewVideoMedia(url, mediaType) {
+            if (mediaType === 'video') return true;
+            return /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(String(url || ''));
+        }
+
+        function buildProfileReviewMediaHtml(mediaItems) {
+            if (!Array.isArray(mediaItems) || mediaItems.length === 0) return '';
+
+            const itemsHtml = mediaItems.map((media, index) => {
+                const mediaUrl = String(media?.media_url || '').trim();
+                if (!mediaUrl) return '';
+
+                if (isReviewVideoMedia(mediaUrl, media?.media_type)) {
+                    return `
+                        <a href="${mediaUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+                            <div style="width: 78px; height: 78px; border-radius: 12px; border: 1px solid #E5E7EB; background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; font-size: 0.76rem; font-weight: 700;">
+                                <span style="font-size: 1.1rem;">🎬</span>
+                                <span>Video ${index + 1}</span>
+                            </div>
+                        </a>
+                    `;
+                }
+
+                return `
+                    <a href="${mediaUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+                        <img src="${mediaUrl}" alt="Yorum medyası ${index + 1}" style="width: 78px; height: 78px; object-fit: cover; border-radius: 12px; border: 1px solid #E5E7EB; display: block; background: #F8FAFC;">
+                    </a>
+                `;
+            }).join('');
+
+            if (!itemsHtml) return '';
+
+            return `
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px;">
+                    ${itemsHtml}
+                </div>
+            `;
+        }
+
         // --- 6. DEĞERLENDİRMELERİMİ GETİRME ---
         async function fetchMyReviews() {
             const container = document.getElementById('reviews-container');
@@ -1640,6 +1679,13 @@
                 reviews.forEach(review => {
                     const date = new Date(review.created_at).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
                     const imageUrl = review.image_url || 'https://via.placeholder.com/100?text=Görsel+Yok';
+                    const reviewTextHtml = review.comment
+                        ? `
+                                <p style="color: #444; font-size: 0.95rem; line-height: 1.5; margin: 0; background: white; padding: 15px; border-radius: 8px; border: 1px solid #F0F0F0;">
+                                    "${review.comment}"
+                                </p>
+                          `
+                        : '';
 
                     // Yıldızları oluştur
                     let starsHtml = '';
@@ -1665,9 +1711,8 @@
                                 <div style="display: flex; gap: 3px; margin-bottom: 12px;">
                                     ${starsHtml}
                                 </div>
-                                <p style="color: #444; font-size: 0.95rem; line-height: 1.5; margin: 0; background: white; padding: 15px; border-radius: 8px; border: 1px solid #F0F0F0;">
-                                    "${review.comment}"
-                                </p>
+                                ${reviewTextHtml}
+                                ${buildProfileReviewMediaHtml(review.media)}
                             </div>
                         </div>
                     `;
