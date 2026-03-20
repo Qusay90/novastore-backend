@@ -242,6 +242,25 @@
             margin-bottom: 20px;
             overflow: hidden;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+            position: relative;
+        }
+
+        .product-media-track {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+            will-change: transform;
+        }
+
+        .product-media-slide {
+            min-width: 100%;
+            width: 100%;
+            height: 100%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .product-img {
@@ -250,6 +269,67 @@
             object-fit: contain;
             display: block;
             border-radius: 20px;
+        }
+
+        .product-img.is-video {
+            background: #0B1220;
+        }
+
+        .product-media-indicators {
+            position: absolute;
+            left: 50%;
+            bottom: 14px;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.78);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            opacity: 0;
+            transition: opacity 0.24s ease;
+        }
+
+        .product-card:hover .product-media-indicators,
+        .product-card.is-previewing .product-media-indicators {
+            opacity: 1;
+        }
+
+        .product-media-indicator {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: rgba(15, 42, 67, 0.22);
+            transition: width 0.24s ease, background 0.24s ease;
+        }
+
+        .product-media-indicator.active {
+            width: 20px;
+            background: #F7941D;
+        }
+
+        .product-hover-hint {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(15, 42, 67, 0.85);
+            color: #FFFFFF;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            opacity: 0;
+            transform: translateY(-4px);
+            transition: opacity 0.24s ease, transform 0.24s ease;
+        }
+
+        .product-card:hover .product-hover-hint,
+        .product-card.is-previewing .product-hover-hint {
+            opacity: 1;
+            transform: translateY(0);
         }
 
         .product-title {
@@ -661,6 +741,18 @@
                 height: 100%;
             }
 
+            .product-media-indicators {
+                bottom: 10px;
+                padding: 6px 8px;
+            }
+
+            .product-hover-hint {
+                top: 10px;
+                left: 10px;
+                font-size: 0.68rem;
+                padding: 6px 10px;
+            }
+
             .product-title {
                 font-size: 0.92rem;
             }
@@ -819,6 +911,170 @@
         function _cartKey() { return `novastore_cart_${_getUserId()}`; }
         function _favsKey() { return `novastore_favs_${_getUserId()}`; }
         function _checkoutKey() { return `novastore_checkout_${_getUserId()}`; }
+        const productCardSliderState = new WeakMap();
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function escapeHtmlAttribute(value) {
+            return escapeHtml(value);
+        }
+
+        function isVideoMedia(url) {
+            return /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(String(url || ''));
+        }
+
+        function normalizeProductCardMedia(product) {
+            const productName = String(product?.name || 'Urun');
+            const rawMediaItems = Array.isArray(product?.media) ? product.media : [];
+            const normalizedItems = rawMediaItems
+                .map((mediaItem, index) => {
+                    const mediaUrl = String(mediaItem?.media_url || '').trim();
+                    if (!mediaUrl) return null;
+
+                    return {
+                        url: mediaUrl,
+                        type: isVideoMedia(mediaUrl) ? 'video' : 'image',
+                        altText: index === 0 ? productName : `${productName} gorsel ${index + 1}`
+                    };
+                })
+                .filter(Boolean);
+
+            const imageOnlyItems = normalizedItems.filter((item) => item.type === 'image');
+            const preferredItems = imageOnlyItems.length > 0 ? imageOnlyItems : normalizedItems;
+
+            if (preferredItems.length > 0) {
+                return preferredItems;
+            }
+
+            const fallbackUrl = String(product?.image_url || 'https://via.placeholder.com/250?text=No+Image').trim();
+            return fallbackUrl ? [{
+                url: fallbackUrl,
+                type: isVideoMedia(fallbackUrl) ? 'video' : 'image',
+                altText: productName
+            }] : [];
+        }
+
+        function buildProductCardMediaMarkup(mediaItems, productName) {
+            const safeProductName = escapeHtmlAttribute(productName || 'Urun');
+            const slidesHtml = mediaItems.map((mediaItem) => {
+                const safeUrl = escapeHtmlAttribute(mediaItem.url);
+                const safeAlt = escapeHtmlAttribute(mediaItem.altText);
+
+                if (mediaItem.type === 'video') {
+                    return `
+                        <div class="product-media-slide">
+                            <video src="${safeUrl}" class="product-img is-video" muted playsinline preload="metadata"></video>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="product-media-slide">
+                        <img src="${safeUrl}" class="product-img" alt="${safeAlt}">
+                    </div>
+                `;
+            }).join('');
+
+            const hintHtml = mediaItems.length > 1
+                ? `<div class="product-hover-hint">${mediaItems.length} gorsel onizleme</div>`
+                : '';
+            const indicatorsHtml = mediaItems.length > 1
+                ? `
+                    <div class="product-media-indicators">
+                        ${mediaItems.map((_, index) => `<span class="product-media-indicator ${index === 0 ? 'active' : ''}"></span>`).join('')}
+                    </div>
+                `
+                : '';
+
+            return `
+                <div class="product-media-frame ${mediaItems.length > 1 ? 'has-gallery' : ''}" data-slide-count="${mediaItems.length}" data-active-index="0" aria-label="${safeProductName}">
+                    <div class="product-media-track">
+                        ${slidesHtml}
+                    </div>
+                    ${hintHtml}
+                    ${indicatorsHtml}
+                </div>
+            `;
+        }
+
+        function updateProductCardSlider(card, nextIndex) {
+            const frame = card.querySelector('.product-media-frame');
+            const track = card.querySelector('.product-media-track');
+            if (!frame || !track) return;
+
+            const slideCount = Number(frame.dataset.slideCount || 1);
+            const normalizedIndex = slideCount > 0
+                ? ((Number(nextIndex) % slideCount) + slideCount) % slideCount
+                : 0;
+
+            frame.dataset.activeIndex = String(normalizedIndex);
+            track.style.transform = `translateX(-${normalizedIndex * 100}%)`;
+
+            card.querySelectorAll('.product-media-indicator').forEach((indicator, indicatorIndex) => {
+                indicator.classList.toggle('active', indicatorIndex === normalizedIndex);
+            });
+
+            track.querySelectorAll('video').forEach((video, videoIndex) => {
+                if (videoIndex === normalizedIndex) {
+                    const playAttempt = video.play?.();
+                    if (playAttempt && typeof playAttempt.catch === 'function') {
+                        playAttempt.catch(() => { });
+                    }
+                } else if (typeof video.pause === 'function') {
+                    video.pause();
+                }
+            });
+        }
+
+        function stopProductCardSlider(card, shouldReset = true) {
+            const currentState = productCardSliderState.get(card);
+            if (currentState?.intervalId) {
+                window.clearInterval(currentState.intervalId);
+            }
+
+            productCardSliderState.delete(card);
+            card.classList.remove('is-previewing');
+
+            if (shouldReset) {
+                updateProductCardSlider(card, 0);
+            }
+        }
+
+        function startProductCardSlider(card) {
+            const frame = card.querySelector('.product-media-frame');
+            if (!frame) return;
+
+            const slideCount = Number(frame.dataset.slideCount || 1);
+            if (slideCount <= 1 || window.matchMedia('(hover: none)').matches) {
+                return;
+            }
+
+            stopProductCardSlider(card, false);
+            card.classList.add('is-previewing');
+            updateProductCardSlider(card, 0);
+
+            const intervalId = window.setInterval(() => {
+                const activeIndex = Number(frame.dataset.activeIndex || 0);
+                updateProductCardSlider(card, activeIndex + 1);
+            }, 1500);
+
+            productCardSliderState.set(card, { intervalId });
+        }
+
+        function initializeProductCardSliders() {
+            document.querySelectorAll('.product-card').forEach((card) => {
+                updateProductCardSlider(card, 0);
+                card.onmouseenter = () => startProductCardSlider(card);
+                card.onmouseleave = () => stopProductCardSlider(card);
+            });
+        }
 
         // --- 1. KULLANICI KİMLİK KONTROLÜ ---
         function checkUserStatus() {
@@ -1080,8 +1336,14 @@
                     return;
                 }
 
+                let cardsHtml = '';
+
                 products.forEach(product => {
-                    const imageUrl = product.image_url || 'https://via.placeholder.com/250?text=Görsel+Yok';
+                    const productMediaItems = normalizeProductCardMedia(product);
+                    const previewImageUrl = productMediaItems[0]?.url || product.image_url || 'https://via.placeholder.com/250?text=Görsel+Yok';
+                    const safeProductName = escapeHtml(product.name || 'Urun');
+                    const safeProductNameAttr = escapeHtmlAttribute(product.name || 'Urun');
+                    const productMediaMarkup = buildProductCardMediaMarkup(productMediaItems, product.name);
 
                     // GERÇEK İNDİRİM ALGORİTMASI (YEŞİL VERSİYON)
                     let priceHtml = '';
@@ -1145,7 +1407,7 @@
                     let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
                     let isFav = favs.includes(product.id) ? 'active' : '';
 
-                    container.innerHTML += `
+                    cardsHtml += `
                         <div class="product-card" style="position: relative; display: flex; flex-direction: column;">
                             <button class="btn-favorite ${isFav}" onclick="toggleFavorite(this, event, ${product.id})" title="Favorilere Ekle">
                                 <svg class="heart-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
@@ -1153,16 +1415,14 @@
                                 </svg>
                             </button>
                             ${discountBadge} <a href="product.html?id=${product.id}" style="text-decoration: none; color: inherit;">
-                                <div class="product-media-frame">
-                                    <img src="${imageUrl}" class="product-img" alt="${product.name}">
-                                </div>
-                                <div class="product-title" style="transition: 0.2s; cursor: pointer;" onmouseover="this.style.color='#F7941D'" onmouseout="this.style.color='#222'">${product.name}</div>
+                                ${productMediaMarkup}
+                                <div class="product-title" style="transition: 0.2s; cursor: pointer;" onmouseover="this.style.color='#F7941D'" onmouseout="this.style.color='#222'">${safeProductName}</div>
                             </a>
                             ${starsDiv}
                             
                             <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 5px;">
                                 ${priceHtml} 
-                                <button class="btn-add" onclick="addToCart(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price}, '${imageUrl}', ${product.old_price ? `'${product.old_price}'` : 'null'})" title="Sepete Ekle">
+                                <button class="btn-add" onclick="addToCart(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price}, '${previewImageUrl}', ${product.old_price ? `'${product.old_price}'` : 'null'})" title="Sepete Ekle" aria-label="${safeProductNameAttr} ürününü sepete ekle">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                        <circle cx="8" cy="21" r="2"></circle>
                                        <circle cx="20" cy="21" r="2"></circle>
@@ -1176,6 +1436,9 @@
                         </div>
                     `;
                 });
+
+                container.innerHTML = cardsHtml;
+                initializeProductCardSliders();
             } catch (error) {
                 document.getElementById('products-container').innerHTML = '<p>Sunucuya bağlanılamadı. Backend çalışıyor mu?</p>';
             }

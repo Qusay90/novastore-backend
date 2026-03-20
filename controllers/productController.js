@@ -182,18 +182,46 @@ const buildProductPayload = (body, files, existingProduct = null) => {
     };
 };
 
+const buildProductMediaMap = (mediaRows) => {
+    const mediaByProductId = new Map();
+
+    mediaRows.forEach((mediaRow) => {
+        const productId = Number(mediaRow.product_id);
+        if (!mediaByProductId.has(productId)) {
+            mediaByProductId.set(productId, []);
+        }
+        mediaByProductId.get(productId).push(mediaRow);
+    });
+
+    return mediaByProductId;
+};
+
 const getAllProducts = async (req, res) => {
     try {
-        const result = await pool.query(`
-            SELECT p.*,
-                   ROUND(COALESCE(AVG(r.rating), 0), 1) AS average_rating,
-                   CAST(COUNT(r.id) AS INTEGER) AS review_count
-            FROM products p
-            LEFT JOIN reviews r ON p.id = r.product_id
-            GROUP BY p.id
-            ORDER BY p.created_at DESC
-        `);
-        res.status(200).json(result.rows);
+        const [productsResult, mediaResult] = await Promise.all([
+            pool.query(`
+                SELECT p.*,
+                       ROUND(COALESCE(AVG(r.rating), 0), 1) AS average_rating,
+                       CAST(COUNT(r.id) AS INTEGER) AS review_count
+                FROM products p
+                LEFT JOIN reviews r ON p.id = r.product_id
+                GROUP BY p.id
+                ORDER BY p.created_at DESC
+            `),
+            pool.query(`
+                SELECT *
+                FROM product_media
+                ORDER BY product_id ASC, is_main DESC, sort_order ASC, id ASC
+            `)
+        ]);
+
+        const mediaByProductId = buildProductMediaMap(mediaResult.rows);
+        const products = productsResult.rows.map((product) => ({
+            ...product,
+            media: mediaByProductId.get(Number(product.id)) || []
+        }));
+
+        res.status(200).json(products);
     } catch (err) {
         console.error('Urun listeleme hatasi:', err.message);
         res.status(500).json({ error: 'Urunler getirilirken sunucu hatasi olustu.' });
