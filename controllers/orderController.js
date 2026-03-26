@@ -111,7 +111,8 @@ const createOrder = async (req, res) => {
             address,
             cartItems,
             paymentMethod = 'havale',
-            couponCode = null
+            couponCode = null,
+            analyticsSessionKey = null
         } = req.body;
 
         if (!fullName || !email || !address) {
@@ -126,6 +127,7 @@ const createOrder = async (req, res) => {
         const { order, pricing } = await createOrderWithReservation({
             client,
             userId,
+            analyticsSessionKey,
             fullName,
             email,
             phone,

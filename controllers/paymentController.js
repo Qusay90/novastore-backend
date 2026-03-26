@@ -15,6 +15,7 @@ const readIdempotencyKey = (req) => {
 
 const createDeterministicKeyFromBody = (body) => {
     const seed = JSON.stringify({
+        analyticsSessionKey: body.analyticsSessionKey,
         fullName: body.fullName,
         email: body.email,
         phone: body.phone,
@@ -47,7 +48,8 @@ const initializePayment = async (req, res) => {
             address,
             cartItems,
             couponCode = null,
-            paymentMethod = 'card'
+            paymentMethod = 'card',
+            analyticsSessionKey = null
         } = req.body;
 
         if (!fullName || !email || !address) {
@@ -89,6 +91,7 @@ const initializePayment = async (req, res) => {
         const { order, pricing } = await createOrderWithReservation({
             client,
             userId,
+            analyticsSessionKey,
             fullName,
             email,
             phone,

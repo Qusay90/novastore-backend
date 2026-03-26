@@ -65,6 +65,7 @@ const parseItems = (orderRow) => {
 const createOrderWithReservation = async ({
     client = pool,
     userId = null,
+    analyticsSessionKey = null,
     fullName,
     email,
     phone,
@@ -84,9 +85,9 @@ const createOrderWithReservation = async ({
     const orderInsert = await client.query(
         `INSERT INTO orders
             (user_id, total_amount, status, customer_name, email, phone, address, items, payment_status,
-             payment_method, refund_status, shipment_status, currency)
+             payment_method, refund_status, shipment_status, currency, analytics_session_key)
          VALUES
-            ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13)
+            ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14)
          RETURNING *`,
         [
             userId,
@@ -101,13 +102,15 @@ const createOrderWithReservation = async ({
             paymentMethod,
             REFUND_STATUS.NONE,
             SHIPMENT_STATUS.NONE,
-            pricing.totals.currency
+            pricing.totals.currency,
+            analyticsSessionKey
         ]
     );
 
     const order = orderInsert.rows[0];
 
     await appendOrderEvent(client, order.id, 'ORDER_CREATED', 'Siparis olusturuldu.', {
+        analyticsSessionKey,
         paymentMethod,
         totals: pricing.totals,
         campaigns: pricing.campaigns,

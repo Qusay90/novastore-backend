@@ -485,6 +485,16 @@
         }
 
         populateFooterCategories();
+
+        if (!document.getElementById('nova-analytics-script')) {
+            const analyticsScript = document.createElement('script');
+            analyticsScript.id = 'nova-analytics-script';
+            analyticsScript.src = 'analytics.js';
+            analyticsScript.defer = true;
+            document.body.appendChild(analyticsScript);
+        } else if (window.NovaAnalytics && typeof window.NovaAnalytics.init === 'function') {
+            window.NovaAnalytics.init();
+        }
     }
 
     if (document.readyState === 'loading') {

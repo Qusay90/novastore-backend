@@ -987,7 +987,10 @@
                 address: `${selectedAddr.title}: ${selectedAddr.detail}, ${selectedAddr.district}/${selectedAddr.city}`,
                 cartItems: cart,
                 couponCode: couponCode || null,
-                paymentMethod: selectedPaymentMethod
+                paymentMethod: selectedPaymentMethod,
+                analyticsSessionKey: window.NovaAnalytics && typeof window.NovaAnalytics.getSessionId === 'function'
+                    ? window.NovaAnalytics.getSessionId()
+                    : null
             };
 
             try {

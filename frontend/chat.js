@@ -480,6 +480,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        if (window.NovaAnalytics && typeof window.NovaAnalytics.trackAddToCart === 'function') {
+            window.NovaAnalytics.trackAddToCart({ id: product.id, name: product.name }, 1);
+        }
         writeCart(cart);
         syncCartUi(true);
     }

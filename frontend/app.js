@@ -53,6 +53,7 @@ function renderProducts(products) {
 // 🛒 SEPETE ÜRÜN EKLEME FONKSİYONU
 function addToCart(productId) {
     const productToAdd = allProducts.find(p => p.id === productId);
+    if (!productToAdd) return;
     const existingItem = cart.find(item => item.id === productId);
 
     if (existingItem) {
@@ -68,6 +69,9 @@ function addToCart(productId) {
         });
     }
 
+    if (window.NovaAnalytics && typeof window.NovaAnalytics.trackAddToCart === 'function') {
+        window.NovaAnalytics.trackAddToCart({ id: productToAdd.id, name: productToAdd.name }, 1);
+    }
     localStorage.setItem(_getCartKey(), JSON.stringify(cart));
     updateCartUI();
     toggleCart();
@@ -211,5 +215,4 @@ function goToCheckout() {
     }
     window.location.href = "checkout.html"; // Ödeme sayfasına yönlendir
 }
-
 

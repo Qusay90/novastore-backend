@@ -1393,6 +1393,37 @@
                 </div>
             </div>
 
+            <div class="stats-grid" style="margin-bottom: 30px;">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #E8F5E9; color: #2E7D32;">👀</div>
+                    <div class="stat-info">
+                        <h3>Toplam Ziyaret</h3>
+                        <p id="stat-visits">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #E3F2FD; color: #1565C0;">🧭</div>
+                    <div class="stat-info">
+                        <h3>Benzersiz Ziyaretçi</h3>
+                        <p id="stat-unique-visitors">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #FFF3E0; color: #E65100;">⏱️</div>
+                    <div class="stat-info">
+                        <h3>Ort. Oturum Süresi</h3>
+                        <p id="stat-avg-session">0 sn</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: #F3E5F5; color: #6A1B9A;">🎯</div>
+                    <div class="stat-info">
+                        <h3>Siparişe Dönüşüm</h3>
+                        <p id="stat-conversion-rate">%0</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="dashboard-widgets">
                 <div class="widget-box">
                     <h3 class="widget-title">Satış Grafiği (Son 7 Gün)</h3>
@@ -1420,6 +1451,162 @@
                     <ul class="pending-list" id="dashboard-returns-list">
                         <li class="pending-item"><span style="color:#888;">Şu an bekleyen iade talebi yok.</span></li>
                     </ul>
+                </div>
+            </div>
+
+            <div class="dashboard-widgets" style="grid-template-columns: 1fr 1fr; margin-top: 25px;">
+                <div class="widget-box">
+                    <h3 class="widget-title">
+                        🛍️ En Çok İncelenen Ürünler
+                        <span style="font-size: 0.8rem; color: var(--muted-text); font-weight: 600;">Son 30 gün</span>
+                    </h3>
+                    <div style="overflow-x:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Ürün</th>
+                                    <th>Görüntülenme</th>
+                                    <th>Ort. Süre</th>
+                                    <th>Sipariş</th>
+                                </tr>
+                            </thead>
+                            <tbody id="behavior-products-body">
+                                <tr>
+                                    <td colspan="4" style="text-align:center; color:#888;">Davranış verisi yükleniyor...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="widget-box">
+                    <h3 class="widget-title">
+                        🧠 Son Oturumlar
+                        <span style="font-size: 0.8rem; color: var(--muted-text); font-weight: 600;">Ürün ilgisi + dönüşüm</span>
+                    </h3>
+                    <div style="overflow-x:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Ziyaretçi</th>
+                                    <th>Ürünler</th>
+                                    <th>Süre</th>
+                                    <th>Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-sessions-body">
+                                <tr>
+                                    <td colspan="4" style="text-align:center; color:#888;">Oturum verisi yükleniyor...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-widgets" style="grid-template-columns: 1fr 1fr; margin-top: 25px;">
+                <div class="widget-box">
+                    <h3 class="widget-title">
+                        📈 Ziyaret ve Dönüşüm Trendi
+                        <span style="font-size: 0.8rem; color: var(--muted-text); font-weight: 600;">Son 14 gün</span>
+                    </h3>
+                    <div style="position:relative; height:320px;">
+                        <canvas id="behaviorTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="widget-box">
+                    <h3 class="widget-title">
+                        ⚖️ İlgi ve Satış Karşılaştırması
+                        <span style="font-size: 0.8rem; color: var(--muted-text); font-weight: 600;">Top ürünler</span>
+                    </h3>
+                    <div style="position:relative; height:320px;">
+                        <canvas id="productInsightChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-widgets" style="grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 25px;">
+                <div class="widget-box">
+                    <h3 class="widget-title">
+                        🔥 En Çok Satan Ürünler
+                        <span style="font-size: 0.8rem; color: var(--muted-text); font-weight: 600;">Adet + ciro</span>
+                    </h3>
+                    <div style="overflow-x:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Ürün</th>
+                                    <th>Adet</th>
+                                    <th>Ciro</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-selling-products-body">
+                                <tr>
+                                    <td colspan="3" style="text-align:center; color:#888;">Satış verisi yükleniyor...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="widget-box">
+                    <h3 class="widget-title">
+                        🛒 Sepete En Çok Eklenenler
+                        <span style="font-size: 0.8rem; color: var(--muted-text); font-weight: 600;">Eklenme + dönüşüm</span>
+                    </h3>
+                    <div style="overflow-x:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Ürün</th>
+                                    <th>Ekleme</th>
+                                    <th>Dönüşüm</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-cart-products-body">
+                                <tr>
+                                    <td colspan="3" style="text-align:center; color:#888;">Sepet verisi yükleniyor...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="widget-box">
+                    <h3 class="widget-title">
+                        🕒 En Çok Durulan Ürünler
+                        <span style="font-size: 0.8rem; color: var(--muted-text); font-weight: 600;">Dikkat süresi</span>
+                    </h3>
+                    <div style="overflow-x:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Ürün</th>
+                                    <th>Toplam</th>
+                                    <th>Ort.</th>
+                                </tr>
+                            </thead>
+                            <tbody id="linger-products-body">
+                                <tr>
+                                    <td colspan="3" style="text-align:center; color:#888;">Dikkat verisi yükleniyor...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="widget-box">
+                    <h3 class="widget-title">
+                        💡 Analiz Sonuçları ve Öneriler
+                        <span style="font-size: 0.8rem; color: var(--muted-text); font-weight: 600;">Otomatik içgörü</span>
+                    </h3>
+                    <div id="behavior-insight-summary" style="display:grid; gap:10px; margin-bottom: 18px;">
+                        <div style="color:#888; font-size:0.92rem;">İçgörüler hazırlanıyor...</div>
+                    </div>
+                    <div id="behavior-recommendations-list" style="display:grid; gap:12px;">
+                        <div style="color:#888; font-size:0.92rem;">Öneriler hazırlanıyor...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1747,6 +1934,10 @@
         let editingProductId = null;
         let pendingProductMediaFiles = [];
         let salesChartInstance = null; // Grafiği sıfırlamak için
+        let behaviorTrendChartInstance = null;
+        let productInsightChartInstance = null;
+        let behaviorAnalyticsSnapshot = null;
+        const analyticsLookbackDays = 30;
         const _nativeFetch = window.fetch.bind(window);
         function adminApiFetch(input, init = {}) {
             const url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
@@ -1796,6 +1987,7 @@
 
             if (tabId === 'dashboard') {
                 fetchStats();
+                fetchBehaviorAnalytics();
                 fetchReturnsForDashboard();
             }
             if (tabId === 'orders') fetchOrders();
@@ -3225,6 +3417,582 @@
             }
         }
 
+        function formatAnalyticsDuration(totalSeconds) {
+            const safeSeconds = Math.max(0, Number(totalSeconds) || 0);
+            if (safeSeconds < 60) return `${safeSeconds} sn`;
+            const minutes = Math.floor(safeSeconds / 60);
+            const seconds = safeSeconds % 60;
+            if (minutes < 60) return seconds > 0 ? `${minutes} dk ${seconds} sn` : `${minutes} dk`;
+            const hours = Math.floor(minutes / 60);
+            const restMinutes = minutes % 60;
+            return restMinutes > 0 ? `${hours} sa ${restMinutes} dk` : `${hours} sa`;
+        }
+
+        function formatAnalyticsMoney(value) {
+            return `${Number(value || 0).toFixed(2)} TL`;
+        }
+
+        function getAnalyticsThemePalette() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            return {
+                isDark,
+                textColor: isDark ? '#e2e8f0' : '#667085',
+                gridColor: isDark ? 'rgba(148, 163, 184, 0.18)' : 'rgba(15, 42, 67, 0.08)',
+                orange: '#F7941D',
+                navy: '#0F2A43',
+                blue: '#1565C0',
+                green: '#2E7D32',
+                purple: '#6A1B9A'
+            };
+        }
+
+        function createChartGradient(ctx, color) {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            return gradient;
+        }
+
+        function formatVisitorLabel(session) {
+            const baseName = escapeAdminHtml(session.visitorName || 'Misafir');
+            const email = session.visitorEmail
+                ? `<div style="font-size:0.8rem; color:var(--muted-text);">${escapeAdminHtml(session.visitorEmail)}</div>`
+                : '';
+            const guestToken = !session.visitorEmail && session.visitorKey
+                ? `<div style="font-size:0.75rem; color:var(--soft-text);">Ziyaretçi • ${escapeAdminHtml(String(session.visitorKey).slice(-6))}</div>`
+                : '';
+            return `
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-weight:700; color:var(--heading-color);">${baseName}</span>
+                    ${email || guestToken}
+                </div>
+            `;
+        }
+
+        function renderBehaviorTrendChart(trends) {
+            const canvas = document.getElementById('behaviorTrendChart');
+            if (!canvas) return;
+            if (behaviorTrendChartInstance) behaviorTrendChartInstance.destroy();
+
+            if (!Array.isArray(trends) || trends.length === 0) {
+                behaviorTrendChartInstance = null;
+                return;
+            }
+
+            const ctx = canvas.getContext('2d');
+            const palette = getAnalyticsThemePalette();
+
+            behaviorTrendChartInstance = new Chart(ctx, {
+                data: {
+                    labels: trends.map((item) => item.label),
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Sayfa Goruntuleme',
+                            data: trends.map((item) => item.totalPageViews),
+                            yAxisID: 'y1',
+                            backgroundColor: palette.isDark ? 'rgba(247, 148, 29, 0.24)' : 'rgba(247, 148, 29, 0.18)',
+                            borderColor: palette.orange,
+                            borderWidth: 1,
+                            borderRadius: 8
+                        },
+                        {
+                            type: 'line',
+                            label: 'Oturum',
+                            data: trends.map((item) => item.totalSessions),
+                            yAxisID: 'y',
+                            borderColor: palette.navy,
+                            backgroundColor: createChartGradient(ctx, palette.isDark ? 'rgba(15, 42, 67, 0.32)' : 'rgba(15, 42, 67, 0.18)'),
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: palette.navy
+                        },
+                        {
+                            type: 'line',
+                            label: 'Donusen Oturum',
+                            data: trends.map((item) => item.convertedSessions),
+                            yAxisID: 'y',
+                            borderColor: palette.green,
+                            backgroundColor: 'transparent',
+                            tension: 0.35,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: palette.green
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: palette.textColor,
+                                usePointStyle: true
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: palette.textColor },
+                            grid: { display: false }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: palette.textColor, precision: 0 },
+                            grid: { color: palette.gridColor }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            ticks: { color: palette.textColor, precision: 0 },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function buildProductInsightRows(topSellingProducts, topAddToCartProducts, lingerProducts, topViewedProducts) {
+            const bucket = new Map();
+
+            [topSellingProducts, topAddToCartProducts, lingerProducts, topViewedProducts].forEach((list) => {
+                if (!Array.isArray(list)) return;
+                list.slice(0, 6).forEach((item) => {
+                    if (!item || !item.id) return;
+                    const current = bucket.get(item.id) || {
+                        id: item.id,
+                        name: item.name,
+                        unitsSold: 0,
+                        addToCartCount: 0,
+                        views: 0,
+                        avgDurationSeconds: 0,
+                        totalDurationSeconds: 0
+                    };
+
+                    current.name = item.name || current.name;
+                    current.unitsSold = Math.max(current.unitsSold, Number(item.unitsSold || 0));
+                    current.addToCartCount = Math.max(current.addToCartCount, Number(item.addToCartCount || 0));
+                    current.views = Math.max(current.views, Number(item.views || 0));
+                    current.avgDurationSeconds = Math.max(current.avgDurationSeconds, Number(item.avgDurationSeconds || 0));
+                    current.totalDurationSeconds = Math.max(current.totalDurationSeconds, Number(item.totalDurationSeconds || 0));
+                    bucket.set(item.id, current);
+                });
+            });
+
+            return Array.from(bucket.values())
+                .sort((a, b) => ((b.unitsSold * 8) + (b.addToCartCount * 4) + b.views + (b.totalDurationSeconds / 30)) - ((a.unitsSold * 8) + (a.addToCartCount * 4) + a.views + (a.totalDurationSeconds / 30)))
+                .slice(0, 6);
+        }
+
+        function renderProductInsightChart(topSellingProducts, topAddToCartProducts, lingerProducts, topViewedProducts) {
+            const canvas = document.getElementById('productInsightChart');
+            if (!canvas) return;
+            if (productInsightChartInstance) productInsightChartInstance.destroy();
+
+            const rows = buildProductInsightRows(topSellingProducts, topAddToCartProducts, lingerProducts, topViewedProducts);
+            if (rows.length === 0) {
+                productInsightChartInstance = null;
+                return;
+            }
+
+            const ctx = canvas.getContext('2d');
+            const palette = getAnalyticsThemePalette();
+
+            productInsightChartInstance = new Chart(ctx, {
+                data: {
+                    labels: rows.map((row) => row.name),
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Satis Adedi',
+                            data: rows.map((row) => row.unitsSold),
+                            yAxisID: 'y',
+                            backgroundColor: palette.isDark ? 'rgba(46, 125, 50, 0.7)' : 'rgba(46, 125, 50, 0.82)',
+                            borderRadius: 8
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Goruntuleme',
+                            data: rows.map((row) => row.views),
+                            yAxisID: 'y',
+                            backgroundColor: palette.isDark ? 'rgba(21, 101, 192, 0.64)' : 'rgba(21, 101, 192, 0.74)',
+                            borderRadius: 8
+                        },
+                        {
+                            type: 'line',
+                            label: 'Sepete Ekleme',
+                            data: rows.map((row) => row.addToCartCount),
+                            yAxisID: 'y',
+                            borderColor: palette.orange,
+                            backgroundColor: 'transparent',
+                            borderWidth: 3,
+                            tension: 0.35,
+                            pointRadius: 4,
+                            pointBackgroundColor: palette.orange
+                        },
+                        {
+                            type: 'line',
+                            label: 'Ort. Inceleme (dk)',
+                            data: rows.map((row) => Number((row.avgDurationSeconds / 60).toFixed(2))),
+                            yAxisID: 'y1',
+                            borderColor: palette.purple,
+                            backgroundColor: 'transparent',
+                            borderWidth: 3,
+                            tension: 0.35,
+                            pointRadius: 4,
+                            pointBackgroundColor: palette.purple
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: palette.textColor,
+                                usePointStyle: true
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: palette.textColor },
+                            grid: { display: false }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: palette.textColor, precision: 0 },
+                            grid: { color: palette.gridColor }
+                        },
+                        y1: {
+                            beginAtZero: true,
+                            position: 'right',
+                            ticks: { color: palette.textColor },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderBehaviorProducts(products) {
+            const tbody = document.getElementById('behavior-products-body');
+            if (!tbody) return;
+
+            if (!Array.isArray(products) || products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#888;">Henüz ürün davranış verisi oluşmadı.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = products.map((product) => `
+                <tr>
+                    <td>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <span style="font-weight:700; color:var(--heading-color);">${escapeAdminHtml(product.name)}</span>
+                            <span style="font-size:0.78rem; color:var(--muted-text);">${product.uniqueSessions} farklı oturum</span>
+                        </div>
+                    </td>
+                    <td style="font-weight:700;">${product.views}</td>
+                    <td>${formatAnalyticsDuration(product.avgDurationSeconds)}</td>
+                    <td><span class="status-badge ${product.orderCount > 0 ? 'status-delivered' : 'status-default'}">${product.orderCount}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function renderTopSellingProducts(products) {
+            const tbody = document.getElementById('top-selling-products-body');
+            if (!tbody) return;
+
+            if (!Array.isArray(products) || products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888;">Henüz satış lideri oluşmadı.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = products.map((product) => `
+                <tr>
+                    <td>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <span style="font-weight:700; color:var(--heading-color);">${escapeAdminHtml(product.name)}</span>
+                            <span style="font-size:0.78rem; color:var(--muted-text);">${product.orderCount} sipariş</span>
+                        </div>
+                    </td>
+                    <td style="font-weight:700;">${product.unitsSold}</td>
+                    <td style="font-weight:700; color:var(--accent);">${formatAnalyticsMoney(product.revenue)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderTopCartProducts(products) {
+            const tbody = document.getElementById('top-cart-products-body');
+            if (!tbody) return;
+
+            if (!Array.isArray(products) || products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888;">Henüz sepet aksiyonu oluşmadı.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = products.map((product) => `
+                <tr>
+                    <td>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <span style="font-weight:700; color:var(--heading-color);">${escapeAdminHtml(product.name)}</span>
+                            <span style="font-size:0.78rem; color:var(--muted-text);">${product.uniqueSessions} oturum • ${product.orderCount} sipariş</span>
+                        </div>
+                    </td>
+                    <td style="font-weight:700;">${product.addToCartCount}</td>
+                    <td><span class="status-badge ${product.cartConversionRate >= 20 ? 'status-delivered' : 'status-default'}">%${Number(product.cartConversionRate || 0).toFixed(1)}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function renderLingerProducts(products) {
+            const tbody = document.getElementById('linger-products-body');
+            if (!tbody) return;
+
+            if (!Array.isArray(products) || products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888;">Henüz dikkat verisi oluşmadı.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = products.map((product) => `
+                <tr>
+                    <td>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <span style="font-weight:700; color:var(--heading-color);">${escapeAdminHtml(product.name)}</span>
+                            <span style="font-size:0.78rem; color:var(--muted-text);">${product.views} görüntülenme</span>
+                        </div>
+                    </td>
+                    <td>${formatAnalyticsDuration(product.totalDurationSeconds)}</td>
+                    <td>${formatAnalyticsDuration(product.avgDurationSeconds)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function deriveLingerProducts(products) {
+            if (!Array.isArray(products)) return [];
+            return [...products]
+                .sort((left, right) => (
+                    Number(right.totalDurationSeconds || 0) - Number(left.totalDurationSeconds || 0) ||
+                    Number(right.avgDurationSeconds || 0) - Number(left.avgDurationSeconds || 0)
+                ))
+                .slice(0, 8);
+        }
+
+        function buildBehaviorInsightSummary(rawInsights, topProducts, topSellingProducts, lingerProducts, topAddToCartProducts) {
+            const insights = { ...(rawInsights || {}) };
+
+            if (!insights.bestSeller && Array.isArray(topSellingProducts) && topSellingProducts[0]) {
+                insights.bestSeller = {
+                    id: topSellingProducts[0].id,
+                    name: topSellingProducts[0].name,
+                    unitsSold: topSellingProducts[0].unitsSold
+                };
+            }
+
+            if (!insights.bestViewed && Array.isArray(topProducts) && topProducts[0]) {
+                insights.bestViewed = {
+                    id: topProducts[0].id,
+                    name: topProducts[0].name,
+                    views: topProducts[0].views
+                };
+            }
+
+            if (!insights.bestLinger && Array.isArray(lingerProducts) && lingerProducts[0]) {
+                insights.bestLinger = {
+                    id: lingerProducts[0].id,
+                    name: lingerProducts[0].name,
+                    avgDurationSeconds: lingerProducts[0].avgDurationSeconds
+                };
+            }
+
+            if (!insights.bestCarted && Array.isArray(topAddToCartProducts) && topAddToCartProducts[0]) {
+                insights.bestCarted = {
+                    id: topAddToCartProducts[0].id,
+                    name: topAddToCartProducts[0].name,
+                    addToCartCount: topAddToCartProducts[0].addToCartCount
+                };
+            }
+
+            return insights;
+        }
+
+        function renderRecentSessions(sessions) {
+            const tbody = document.getElementById('recent-sessions-body');
+            if (!tbody) return;
+
+            if (!Array.isArray(sessions) || sessions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#888;">Henüz ziyaretçi oturumu oluşmadı.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = sessions.map((session) => {
+                const visitedProducts = Array.isArray(session.visitedProducts) && session.visitedProducts.length > 0
+                    ? session.visitedProducts.map((item) => `<div style="margin-bottom:4px;">${escapeAdminHtml(item)}</div>`).join('')
+                    : '<span style="color:var(--muted-text);">Ürün sayfası görüntülenmedi</span>';
+
+                const conversionBadge = session.converted
+                    ? `<span class="status-badge status-delivered">Sipariş #${session.orderId || '-'}</span>`
+                    : '<span class="status-badge status-default">Sipariş yok</span>';
+
+                return `
+                    <tr>
+                        <td>${formatVisitorLabel(session)}</td>
+                        <td>
+                            <div style="max-width:250px; font-size:0.86rem; line-height:1.45;">
+                                ${visitedProducts}
+                                <div style="margin-top:6px; color:var(--soft-text); font-size:0.75rem;">${escapeAdminHtml(session.landingPath || '/')}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div style="display:flex; flex-direction:column; gap:4px;">
+                                <span style="font-weight:700;">${formatAnalyticsDuration(session.totalDurationSeconds)}</span>
+                                <span style="font-size:0.78rem; color:var(--muted-text);">${session.pageViewCount} sayfa</span>
+                            </div>
+                        </td>
+                        <td>${conversionBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderBehaviorInsightSummary(insights) {
+            const container = document.getElementById('behavior-insight-summary');
+            if (!container) return;
+
+            const cards = [];
+            if (insights && insights.bestSeller) {
+                cards.push(`
+                    <div style="padding:12px 14px; border-radius:12px; background:rgba(46, 125, 50, 0.08); border:1px solid rgba(46, 125, 50, 0.16);">
+                        <div style="font-size:0.78rem; color:#2E7D32; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Satis Lideri</div>
+                        <div style="font-weight:800; color:var(--heading-color); margin-top:6px;">${escapeAdminHtml(insights.bestSeller.name)}</div>
+                        <div style="color:var(--muted-text); font-size:0.86rem; margin-top:4px;">${insights.bestSeller.unitsSold} adet satildi</div>
+                    </div>
+                `);
+            }
+            if (insights && insights.bestViewed) {
+                cards.push(`
+                    <div style="padding:12px 14px; border-radius:12px; background:rgba(21, 101, 192, 0.08); border:1px solid rgba(21, 101, 192, 0.16);">
+                        <div style="font-size:0.78rem; color:#1565C0; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">En Cok Incelenen</div>
+                        <div style="font-weight:800; color:var(--heading-color); margin-top:6px;">${escapeAdminHtml(insights.bestViewed.name)}</div>
+                        <div style="color:var(--muted-text); font-size:0.86rem; margin-top:4px;">${insights.bestViewed.views} görüntülenme</div>
+                    </div>
+                `);
+            }
+            if (insights && insights.bestLinger) {
+                cards.push(`
+                    <div style="padding:12px 14px; border-radius:12px; background:rgba(106, 27, 154, 0.08); border:1px solid rgba(106, 27, 154, 0.16);">
+                        <div style="font-size:0.78rem; color:#6A1B9A; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">En Uzun Incelenen</div>
+                        <div style="font-weight:800; color:var(--heading-color); margin-top:6px;">${escapeAdminHtml(insights.bestLinger.name)}</div>
+                        <div style="color:var(--muted-text); font-size:0.86rem; margin-top:4px;">Ort. ${formatAnalyticsDuration(insights.bestLinger.avgDurationSeconds)}</div>
+                    </div>
+                `);
+            }
+            if (insights && insights.bestCarted) {
+                cards.push(`
+                    <div style="padding:12px 14px; border-radius:12px; background:rgba(247, 148, 29, 0.08); border:1px solid rgba(247, 148, 29, 0.16);">
+                        <div style="font-size:0.78rem; color:#F7941D; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Sepete En Cok Eklenen</div>
+                        <div style="font-weight:800; color:var(--heading-color); margin-top:6px;">${escapeAdminHtml(insights.bestCarted.name)}</div>
+                        <div style="color:var(--muted-text); font-size:0.86rem; margin-top:4px;">${insights.bestCarted.addToCartCount} kez sepete eklendi</div>
+                    </div>
+                `);
+            }
+
+            container.innerHTML = cards.length > 0
+                ? cards.join('')
+                : '<div style="color:#888; font-size:0.92rem;">Henüz öne çıkan bir içgörü oluşmadı.</div>';
+        }
+
+        function renderBehaviorRecommendations(recommendations) {
+            const container = document.getElementById('behavior-recommendations-list');
+            if (!container) return;
+
+            if (!Array.isArray(recommendations) || recommendations.length === 0) {
+                container.innerHTML = '<div style="color:#888; font-size:0.92rem;">Henüz öneri üretilemedi.</div>';
+                return;
+            }
+
+            const toneMeta = {
+                growth: { border: 'rgba(46, 125, 50, 0.22)', bg: 'rgba(46, 125, 50, 0.06)', tag: '#2E7D32' },
+                warning: { border: 'rgba(230, 81, 0, 0.22)', bg: 'rgba(230, 81, 0, 0.06)', tag: '#E65100' },
+                insight: { border: 'rgba(21, 101, 192, 0.22)', bg: 'rgba(21, 101, 192, 0.06)', tag: '#1565C0' }
+            };
+
+            container.innerHTML = recommendations.map((item, index) => {
+                const meta = toneMeta[item.tone] || toneMeta.insight;
+                return `
+                    <div style="padding:14px 15px; border-radius:14px; border:1px solid ${meta.border}; background:${meta.bg};">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;">
+                            <div style="font-weight:800; color:var(--heading-color);">${index + 1}. ${escapeAdminHtml(item.title)}</div>
+                            <span style="font-size:0.72rem; font-weight:800; color:${meta.tag}; text-transform:uppercase; letter-spacing:0.04em;">Öneri</span>
+                        </div>
+                        <div style="font-size:0.88rem; color:var(--muted-text); line-height:1.6; margin-bottom:8px;">${escapeAdminHtml(item.detail)}</div>
+                        <div style="font-size:0.86rem; color:var(--heading-color); font-weight:700; line-height:1.55;">Aksiyon: ${escapeAdminHtml(item.action)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function fetchBehaviorAnalytics() {
+            try {
+                const res = await adminApiFetch(`/api/admin/behavior?days=${analyticsLookbackDays}`);
+                const data = await adminReadJson(res, 'Davranış analitiği getirilemedi.');
+                const overview = data && data.overview ? data.overview : {};
+                const topProducts = Array.isArray(data.topProducts) ? data.topProducts : [];
+                const topSellingProducts = Array.isArray(data.topSellingProducts) ? data.topSellingProducts : [];
+                const topAddToCartProducts = Array.isArray(data.topAddToCartProducts) ? data.topAddToCartProducts : [];
+                const lingerProducts = Array.isArray(data.lingerProducts) && data.lingerProducts.length > 0
+                    ? data.lingerProducts
+                    : deriveLingerProducts(topProducts);
+                const insights = buildBehaviorInsightSummary(
+                    data.insights || {},
+                    topProducts,
+                    topSellingProducts,
+                    lingerProducts,
+                    topAddToCartProducts
+                );
+
+                behaviorAnalyticsSnapshot = {
+                    ...data,
+                    topProducts,
+                    topSellingProducts,
+                    topAddToCartProducts,
+                    lingerProducts,
+                    insights
+                };
+
+                document.getElementById('stat-visits').innerText = overview.totalSessions || 0;
+                document.getElementById('stat-unique-visitors').innerText = overview.uniqueVisitors || 0;
+                document.getElementById('stat-avg-session').innerText = formatAnalyticsDuration(overview.avgSessionSeconds || 0);
+                document.getElementById('stat-conversion-rate').innerText = `%${overview.conversionRate || 0}`;
+
+                renderBehaviorProducts(topProducts);
+                renderTopSellingProducts(topSellingProducts);
+                renderTopCartProducts(topAddToCartProducts);
+                renderLingerProducts(lingerProducts);
+                renderRecentSessions(data.recentSessions || []);
+                renderBehaviorInsightSummary(insights);
+                renderBehaviorRecommendations(data.recommendations || []);
+                renderBehaviorTrendChart(data.trends || []);
+                renderProductInsightChart(topSellingProducts, topAddToCartProducts, lingerProducts, topProducts);
+            } catch (e) {
+                console.error('Davranış analitiği alınamadı:', e);
+                behaviorAnalyticsSnapshot = null;
+                renderBehaviorProducts([]);
+                renderTopSellingProducts([]);
+                renderTopCartProducts([]);
+                renderLingerProducts([]);
+                renderRecentSessions([]);
+                renderBehaviorInsightSummary({});
+                renderBehaviorRecommendations([]);
+                renderBehaviorTrendChart([]);
+                renderProductInsightChart([], [], [], []);
+            }
+        }
+
         async function fetchOrders() {
             try {
                 const res = await adminApiFetch('/api/orders');
@@ -3460,6 +4228,7 @@
                 fetchReturnRequests();
                 fetchReturnsForDashboard();
                 fetchStats();
+                fetchBehaviorAnalytics();
             } catch (e) {
                 alert(e.message || 'Sipariş durumu güncellenemedi.');
             }
@@ -3476,6 +4245,7 @@
                     fetchReturnRequests();
                     fetchReturnsForDashboard();
                     fetchStats();
+                    fetchBehaviorAnalytics();
                 } else {
                     alert("Silme işlemi başarısız.");
                 }
@@ -3544,6 +4314,16 @@
                 window.salesChart.options.scales.y.ticks.color = isDark ? '#e2e8f0' : '#888';
                 window.salesChart.update();
             }
+
+            if (behaviorAnalyticsSnapshot) {
+                renderBehaviorTrendChart(behaviorAnalyticsSnapshot.trends || []);
+                renderProductInsightChart(
+                    behaviorAnalyticsSnapshot.topSellingProducts || [],
+                    behaviorAnalyticsSnapshot.topAddToCartProducts || [],
+                    behaviorAnalyticsSnapshot.lingerProducts || [],
+                    behaviorAnalyticsSnapshot.topProducts || []
+                );
+            }
         }
         document.addEventListener('DOMContentLoaded', () => {
             // 🔐 Admin token kontrolü — geçersizse login'e yönlendir
@@ -3573,7 +4353,7 @@
                 });
             }
 
-            fetchStats(); fetchOrdersForDashboard(); fetchReturnsForDashboard(); fetchCategories();
+            fetchStats(); fetchBehaviorAnalytics(); fetchOrdersForDashboard(); fetchReturnsForDashboard(); fetchCategories();
 
             // Bildirim sistemini başlat
             initAdminNotifications();

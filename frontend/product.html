@@ -1721,6 +1721,9 @@
             } else {
                 cart.push({ id, name, price, image: image || '', old_price: old_price, quantity: 1 });
             }
+            if (window.NovaAnalytics && typeof window.NovaAnalytics.trackAddToCart === 'function') {
+                window.NovaAnalytics.trackAddToCart({ id, name }, 1);
+            }
             localStorage.setItem(_cartKey(), JSON.stringify(cart));
             renderCartUI();
             openCart();

@@ -117,6 +117,9 @@ app.use('/api/messages', messageRoutes);
 const assistantRoutes = require('./routes/assistantRoutes');
 app.use('/api/assistant', assistantRoutes);
 
+const analyticsRoutes = require('./routes/analyticsRoutes');
+app.use('/api/analytics', analyticsRoutes);
+
 const questionRoutes = require('./routes/questionRoutes');
 app.use('/api/questions', questionRoutes);
 
@@ -140,6 +143,7 @@ app.use((err, req, res, next) => {
 const createCoreSchema = require('./models/createCoreDb');
 const createNotificationsTable = require('./models/createNotificationDb');
 const createCommerceSchema = require('./models/createCommerceDb');
+const createAnalyticsSchema = require('./models/createAnalyticsDb');
 
 (async () => {
     try {
@@ -148,6 +152,7 @@ const createCommerceSchema = require('./models/createCommerceDb');
         await createCoreSchema();
         await createNotificationsTable();
         await createCommerceSchema();
+        await createAnalyticsSchema();
     } catch (err) {
         console.error('Veritabani hazirlama hatasi:', pool.formatError(err));
     }
