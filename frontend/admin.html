@@ -3607,7 +3607,7 @@
                     datasets: [
                         {
                             type: 'bar',
-                            label: 'Satis Adedi',
+                            label: 'Satış Adedi',
                             data: rows.map((row) => row.unitsSold),
                             yAxisID: 'y',
                             backgroundColor: palette.isDark ? 'rgba(46, 125, 50, 0.7)' : 'rgba(46, 125, 50, 0.82)',
@@ -3867,16 +3867,16 @@
             if (insights && insights.bestSeller) {
                 cards.push(`
                     <div style="padding:12px 14px; border-radius:12px; background:rgba(46, 125, 50, 0.08); border:1px solid rgba(46, 125, 50, 0.16);">
-                        <div style="font-size:0.78rem; color:#2E7D32; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Satis Lideri</div>
+                        <div style="font-size:0.78rem; color:#2E7D32; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Satış Lideri</div>
                         <div style="font-weight:800; color:var(--heading-color); margin-top:6px;">${escapeAdminHtml(insights.bestSeller.name)}</div>
-                        <div style="color:var(--muted-text); font-size:0.86rem; margin-top:4px;">${insights.bestSeller.unitsSold} adet satildi</div>
+                        <div style="color:var(--muted-text); font-size:0.86rem; margin-top:4px;">${insights.bestSeller.unitsSold} adet satıldı</div>
                     </div>
                 `);
             }
             if (insights && insights.bestViewed) {
                 cards.push(`
                     <div style="padding:12px 14px; border-radius:12px; background:rgba(21, 101, 192, 0.08); border:1px solid rgba(21, 101, 192, 0.16);">
-                        <div style="font-size:0.78rem; color:#1565C0; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">En Cok Incelenen</div>
+                        <div style="font-size:0.78rem; color:#1565C0; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">En Çok İncelenen</div>
                         <div style="font-weight:800; color:var(--heading-color); margin-top:6px;">${escapeAdminHtml(insights.bestViewed.name)}</div>
                         <div style="color:var(--muted-text); font-size:0.86rem; margin-top:4px;">${insights.bestViewed.views} görüntülenme</div>
                     </div>
@@ -3885,7 +3885,7 @@
             if (insights && insights.bestLinger) {
                 cards.push(`
                     <div style="padding:12px 14px; border-radius:12px; background:rgba(106, 27, 154, 0.08); border:1px solid rgba(106, 27, 154, 0.16);">
-                        <div style="font-size:0.78rem; color:#6A1B9A; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">En Uzun Incelenen</div>
+                        <div style="font-size:0.78rem; color:#6A1B9A; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">En Uzun İncelenen</div>
                         <div style="font-weight:800; color:var(--heading-color); margin-top:6px;">${escapeAdminHtml(insights.bestLinger.name)}</div>
                         <div style="color:var(--muted-text); font-size:0.86rem; margin-top:4px;">Ort. ${formatAnalyticsDuration(insights.bestLinger.avgDurationSeconds)}</div>
                     </div>
@@ -3894,7 +3894,7 @@
             if (insights && insights.bestCarted) {
                 cards.push(`
                     <div style="padding:12px 14px; border-radius:12px; background:rgba(247, 148, 29, 0.08); border:1px solid rgba(247, 148, 29, 0.16);">
-                        <div style="font-size:0.78rem; color:#F7941D; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Sepete En Cok Eklenen</div>
+                        <div style="font-size:0.78rem; color:#F7941D; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;">Sepete En Çok Eklenen</div>
                         <div style="font-weight:800; color:var(--heading-color); margin-top:6px;">${escapeAdminHtml(insights.bestCarted.name)}</div>
                         <div style="color:var(--muted-text); font-size:0.86rem; margin-top:4px;">${insights.bestCarted.addToCartCount} kez sepete eklendi</div>
                     </div>

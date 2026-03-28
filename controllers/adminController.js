@@ -26,19 +26,19 @@ const buildRecommendationPack = ({ overview, topViewedProducts, topSellingProduc
 
     if (bestSeller) {
         recommendations.push({
-            title: 'Satis liderini vitrine tasi',
+            title: 'Satış liderini vitrine taşı',
             tone: 'growth',
-            detail: `${bestSeller.name} son donemde ${bestSeller.unitsSold} adet satti ve ${bestSeller.orderCount} sipariste yer aldi.`,
-            action: 'Ana sayfa hero alaninda, kategori ustunde ve kampanya bannerlarinda bu urunu one cikarin.'
+            detail: `${bestSeller.name} son dönemde ${bestSeller.unitsSold} adet sattı ve ${bestSeller.orderCount} siparişte yer aldı.`,
+            action: 'Ana sayfa hero alanında, kategori üstünde ve kampanya bannerlarında bu ürünü öne çıkarın.'
         });
     }
 
     if (bestCarted && (!bestSeller || bestCarted.id !== bestSeller.id)) {
         recommendations.push({
-            title: 'Sepete en cok giren urunu takip et',
+            title: 'Sepete en çok giren ürünü takip et',
             tone: 'insight',
-            detail: `${bestCarted.name} ${bestCarted.addToCartCount} kez sepete eklendi ve ${bestCarted.uniqueSessions} farkli oturumda ilgi gordu.`,
-            action: 'Bu urunun fiyat, stok guveni ve teslimat bilgisini daha gorunur yaparak siparise gecisi hizlandirin.'
+            detail: `${bestCarted.name} ${bestCarted.addToCartCount} kez sepete eklendi ve ${bestCarted.uniqueSessions} farklı oturumda ilgi gördü.`,
+            action: 'Bu ürünün fiyat, stok güveni ve teslimat bilgisini daha görünür yaparak siparişe geçişi hızlandırın.'
         });
     }
 
@@ -50,10 +50,10 @@ const buildRecommendationPack = ({ overview, topViewedProducts, topSellingProduc
 
     if (lowConversionInterest) {
         recommendations.push({
-            title: 'Yuksek ilgi var ama siparis dusuk',
+            title: 'Yüksek ilgi var ama sipariş düşük',
             tone: 'warning',
-            detail: `${lowConversionInterest.name} ${lowConversionInterest.views} kez incelendi ama siparise donusmesi zayif kaldi.`,
-            action: 'Fiyat avantaji, yorumlar, teslimat vaadi ve urun faydasini daha net gosteren bloklar ekleyin.'
+            detail: `${lowConversionInterest.name} ${lowConversionInterest.views} kez incelendi ama siparişe dönüşmesi zayıf kaldı.`,
+            action: 'Fiyat avantajı, yorumlar, teslimat vaadi ve ürün faydasını daha net gösteren bloklar ekleyin.'
         });
     }
 
@@ -65,46 +65,46 @@ const buildRecommendationPack = ({ overview, topViewedProducts, topSellingProduc
 
     if (highCartLowOrder) {
         recommendations.push({
-            title: 'Sepete giriyor ama satisa donmuyor',
+            title: 'Sepete giriyor ama satışa dönmüyor',
             tone: 'warning',
-            detail: `${highCartLowOrder.name} ${highCartLowOrder.addToCartCount} kez sepete eklendi fakat siparise donusmesi sinirli kaldi.`,
-            action: 'Sepet adiminda bu urune kupon, capraz satis veya guven rozetleri ekleyerek terk oranini azaltin.'
+            detail: `${highCartLowOrder.name} ${highCartLowOrder.addToCartCount} kez sepete eklendi fakat siparişe dönüşmesi sınırlı kaldı.`,
+            action: 'Sepet adımında bu ürüne kupon, çapraz satış veya güven rozetleri ekleyerek terk oranını azaltın.'
         });
     }
 
     if (bestLinger && (!bestSeller || bestLinger.id !== bestSeller.id)) {
         recommendations.push({
-            title: 'Kararsizlik yaratan urunu aciklayin',
+            title: 'Kararsızlık yaratan ürünü açıklayın',
             tone: 'insight',
-            detail: `${bestLinger.name} uzerinde ortalama ${Math.round(toSafeNumber(bestLinger.avgDurationSeconds))} saniye geciriliyor.`,
-            action: 'Bu urune karsilastirma tablosu, sik sorulan sorular ve kisa video/demo eklemek donusumu arttirabilir.'
+            detail: `${bestLinger.name} üzerinde ortalama ${Math.round(toSafeNumber(bestLinger.avgDurationSeconds))} saniye geçiriliyor.`,
+            action: 'Bu ürüne karşılaştırma tablosu, sık sorulan sorular ve kısa video/demo eklemek dönüşümü arttırabilir.'
         });
     }
 
     if (toSafeNumber(overview.conversionRate) < 3 && toSafeNumber(overview.totalSessions) >= 20) {
         recommendations.push({
-            title: 'Genel donusum hizi iyilestirilebilir',
+            title: 'Genel dönüşüm hızı iyileştirilebilir',
             tone: 'warning',
-            detail: `Donusum orani su an %${toSafeNumber(overview.conversionRate).toFixed(1)} seviyesinde.`,
-            action: 'Checkout oncesi guven unsurlari, kupon tetikleyicileri ve yeniden hedefleme mesajlari test edin.'
+            detail: `Dönüşüm oranı şu an %${toSafeNumber(overview.conversionRate).toFixed(1)} seviyesinde.`,
+            action: 'Checkout öncesi güven unsurları, kupon tetikleyicileri ve yeniden hedefleme mesajları test edin.'
         });
     }
 
     if (toSafeNumber(overview.avgSessionSeconds) < 75 && toSafeNumber(overview.totalSessions) >= 15) {
         recommendations.push({
-            title: 'Oturum suresi kisa kaliyor',
+            title: 'Oturum süresi kısa kalıyor',
             tone: 'warning',
-            detail: `Ziyaretciler sitede ortalama ${Math.round(toSafeNumber(overview.avgSessionSeconds))} saniye kaliyor.`,
-            action: 'Acilis sayfasinda kategori yonlendirmelerini guclendirin ve daha hizli urun kesfi saglayin.'
+            detail: `Ziyaretçiler sitede ortalama ${Math.round(toSafeNumber(overview.avgSessionSeconds))} saniye kalıyor.`,
+            action: 'Açılış sayfasında kategori yönlendirmelerini güçlendirin ve daha hızlı ürün keşfi sağlayın.'
         });
     }
 
     if (recommendations.length === 0) {
         recommendations.push({
-            title: 'Veri saglikli gorunuyor',
+            title: 'Veri sağlıklı görünüyor',
             tone: 'growth',
-            detail: 'Ilgi ve satis dagilimi dengeli ilerliyor, bariz bir sorun sinyali yok.',
-            action: 'En cok satan ve en cok incelenen urunleri donemsel kampanyalarda birlikte kullanarak momentumu koruyun.'
+            detail: 'İlgi ve satış dağılımı dengeli ilerliyor, bariz bir sorun sinyali yok.',
+            action: 'En çok satan ve en çok incelenen ürünleri dönemsel kampanyalarda birlikte kullanarak momentumu koruyun.'
         });
     }
 
