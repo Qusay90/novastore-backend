@@ -1,4 +1,19 @@
 const pool = require('../config/db');
+const { cloudinary } = require('../config/cloudinary');
+const DEFAULT_PRODUCT_CATEGORY = 'Kategorisiz';
+const BACKGROUND_REMOVAL_TRANSFORMATION = [
+    { effect: 'background_removal' },
+    {
+        background: 'white',
+        crop: 'pad',
+        gravity: 'center',
+        width: 1200,
+        height: 1200,
+        quality: 'auto',
+        format: 'jpg'
+    }
+];
+const PRODUCT_MEDIA_PREVIEW_FOLDER = 'novastore_product_previews/';
 
 const parseProductId = (value) => {
     const id = Number(value);
@@ -17,9 +32,88 @@ const parseStock = (value) => {
     return Number.isInteger(numericValue) && numericValue >= 0 ? numericValue : Number.NaN;
 };
 
+const parseBooleanFlag = (value) => {
+    if (typeof value === 'boolean') return value;
+
+    const normalizedValue = String(value || '').trim().toLocaleLowerCase('tr-TR');
+    return ['1', 'true', 'on', 'yes', 'evet'].includes(normalizedValue);
+};
+
+const dedupeCategories = (values) => {
+    const seen = new Set();
+    const normalized = [];
+
+    values.forEach((value) => {
+        const categoryName = String(value || '').trim();
+        if (!categoryName) return;
+
+        const lookupKey = categoryName.toLocaleLowerCase('tr-TR');
+        if (seen.has(lookupKey)) return;
+        seen.add(lookupKey);
+        normalized.push(categoryName);
+    });
+
+    return normalized;
+};
+
+const getExistingProductCategories = (existingProduct = null) => {
+    if (!existingProduct) return [];
+
+    const fallbackCategories = Array.isArray(existingProduct.categories) && existingProduct.categories.length > 0
+        ? existingProduct.categories
+        : [existingProduct.category];
+
+    return dedupeCategories(fallbackCategories);
+};
+
+const parseProductCategories = (body = {}, existingProduct = null) => {
+    let rawCategories = [];
+
+    if (Array.isArray(body.categories)) {
+        rawCategories = body.categories;
+    } else if (typeof body.categories === 'string' && body.categories.trim()) {
+        try {
+            const parsed = JSON.parse(body.categories);
+            rawCategories = Array.isArray(parsed) ? parsed : [body.categories];
+        } catch (_) {
+            rawCategories = [body.categories];
+        }
+    }
+
+    if (rawCategories.length === 0 && body.category !== undefined) {
+        rawCategories = [body.category];
+    }
+
+    if (rawCategories.length === 0) {
+        rawCategories = getExistingProductCategories(existingProduct);
+    }
+
+    const categories = dedupeCategories(rawCategories);
+    return categories.length > 0 ? categories : [DEFAULT_PRODUCT_CATEGORY];
+};
+
+const normalizeProductRow = (product = {}) => {
+    const categories = dedupeCategories(
+        Array.isArray(product.categories) && product.categories.length > 0
+            ? product.categories
+            : [product.category]
+    );
+    const primaryCategory = categories[0] || String(product.category || '').trim() || DEFAULT_PRODUCT_CATEGORY;
+
+    return {
+        ...product,
+        category: primaryCategory,
+        categories: categories.length > 0 ? categories : [primaryCategory]
+    };
+};
+
 const normalizeMediaUrl = (file) => {
     if (!file) return null;
     return file.path || file.secure_url || file.url || null;
+};
+
+const getUploadedPublicId = (file) => {
+    return String(file?.filename || file?.public_id || '').trim();
 };
 
 const getUploadedFileName = (file) => {
@@ -45,6 +139,210 @@ const getUploadedFileSize = (file) => {
     return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : null;
 };
 
+const getBackgroundRemovalRequestedForFile = (mediaEntry, fallbackValue = false) => {
+    if (!mediaEntry || typeof mediaEntry !== 'object' || !('file' in mediaEntry)) {
+        return fallbackValue;
+    }
+
+    return fallbackValue || parseBooleanFlag(mediaEntry.removeBackground);
+};
+
+const formatBackgroundRemovalFailureReason = (reason) => {
+    const normalizedReason = String(reason || '').trim();
+    if (!normalizedReason) {
+        return 'Arka plan kaldirma onizlemesi Cloudinary tarafinda hazirlanamadi.';
+    }
+
+    if (/less than 64x64/i.test(normalizedReason) || /too small/i.test(normalizedReason)) {
+        return 'Gorsel cok kucuk. Arka plan kaldirma onizlemesi icin en az 64x64 px gorsel gerekiyor.';
+    }
+
+    if (/unsupported/i.test(normalizedReason)) {
+        return 'Bu gorsel formati arka plan kaldirma onizlemesinde desteklenmiyor.';
+    }
+
+    return `Arka plan kaldirma onizlemesi hazirlanamadi: ${normalizedReason}`;
+};
+
+const extractCloudinaryAssetFromUrl = (mediaUrl) => {
+    try {
+        const parsedUrl = new URL(String(mediaUrl || '').trim());
+        if (!/cloudinary\.com$/i.test(parsedUrl.hostname)) {
+            return null;
+        }
+
+        const segments = parsedUrl.pathname.split('/').filter(Boolean);
+        const uploadIndex = segments.findIndex((segment) => segment === 'upload');
+        if (uploadIndex < 1) {
+            return null;
+        }
+
+        const resourceType = segments[uploadIndex - 1];
+        const versionIndex = segments.findIndex((segment, index) => index > uploadIndex && /^v\d+$/i.test(segment));
+        if (versionIndex < 0 || versionIndex === segments.length - 1) {
+            return null;
+        }
+
+        const publicIdWithExtension = segments.slice(versionIndex + 1).join('/');
+        const publicId = stripFileExtension(publicIdWithExtension);
+        const extensionMatch = publicIdWithExtension.match(/\.([a-z0-9]+)$/i);
+
+        if (!publicId) {
+            return null;
+        }
+
+        return {
+            resourceType,
+            publicId,
+            extension: extensionMatch ? extensionMatch[1].toLocaleLowerCase('tr-TR') : '',
+            mediaUrl: parsedUrl.toString()
+        };
+    } catch (_) {
+        return null;
+    }
+};
+
+const isBackgroundRemovedUrl = (mediaUrl) => {
+    return /e_background_removal/i.test(String(mediaUrl || ''));
+};
+
+const isBackgroundRemovalEligibleForAsset = (asset) => {
+    if (!asset || asset.resourceType !== 'image') {
+        return false;
+    }
+
+    return asset.extension !== 'gif';
+};
+
+const isBackgroundRemovalEligible = (file) => {
+    const mimeType = String(file?.mimetype || '').trim().toLocaleLowerCase('tr-TR');
+    const fileName = getUploadedFileName(file).toLocaleLowerCase('tr-TR');
+
+    const looksLikeImage = mimeType.startsWith('image/')
+        || /\.(avif|bmp|heic|heif|jpe?g|png|tiff?|webp)$/i.test(fileName);
+
+    if (!looksLikeImage) return false;
+    if (mimeType === 'image/gif' || /\.gif$/i.test(fileName)) return false;
+    return true;
+};
+
+const buildBackgroundRemovedMediaUrl = (publicId) => {
+    return cloudinary.url(publicId, {
+        secure: true,
+        resource_type: 'image',
+        type: 'upload',
+        transformation: BACKGROUND_REMOVAL_TRANSFORMATION
+    });
+};
+
+const buildBackgroundRemovalPreviewForAsset = async (asset) => {
+    if (!asset || !asset.publicId || !isBackgroundRemovalEligibleForAsset(asset)) {
+        return {
+            url: null,
+            warning: 'Bu medya icin arka plan kaldirma onizlemesi kullanilamaz.'
+        };
+    }
+
+    try {
+        const explicitResult = await cloudinary.uploader.explicit(asset.publicId, {
+            type: 'upload',
+            resource_type: 'image',
+            eager: [BACKGROUND_REMOVAL_TRANSFORMATION],
+            eager_async: false
+        });
+
+        const eagerResult = explicitResult?.eager?.[0] || null;
+        if (String(eagerResult?.status || '').toLocaleLowerCase('tr-TR') === 'failed') {
+            return {
+                url: null,
+                warning: formatBackgroundRemovalFailureReason(eagerResult?.reason)
+            };
+        }
+
+        const transformedUrl = eagerResult?.secure_url || buildBackgroundRemovedMediaUrl(asset.publicId);
+        if (!transformedUrl) {
+            return {
+                url: null,
+                warning: formatBackgroundRemovalFailureReason('Cloudinary transformed URL uretmedi.')
+            };
+        }
+
+        return { url: transformedUrl, warning: null };
+    } catch (error) {
+        console.error(`Arka plan kaldirma hatasi (${asset.publicId}):`, error.message);
+        return {
+            url: null,
+            warning: formatBackgroundRemovalFailureReason(error.message)
+        };
+    }
+};
+
+const destroyCloudinaryAsset = async (publicId, resourceType = 'image') => {
+    if (!publicId) return;
+
+    try {
+        await cloudinary.uploader.destroy(publicId, {
+            invalidate: true,
+            type: 'upload',
+            resource_type: resourceType
+        });
+    } catch (error) {
+        console.error(`Cloudinary varlik silme hatasi (${publicId}):`, error.message);
+    }
+};
+
+const applyBackgroundRemovalToFile = async (file) => {
+    const originalUrl = normalizeMediaUrl(file);
+    const publicId = getUploadedPublicId(file);
+
+    if (!originalUrl || !publicId || !isBackgroundRemovalEligible(file)) {
+        return { url: originalUrl, warning: null };
+    }
+
+    const previewResult = await buildBackgroundRemovalPreviewForAsset({
+        publicId,
+        resourceType: 'image',
+        extension: stripFileExtension(getUploadedFileName(file)) === getUploadedFileName(file)
+            ? ''
+            : String(getUploadedFileName(file)).split('.').pop().toLocaleLowerCase('tr-TR')
+    });
+
+    if (!previewResult.url || previewResult.warning) {
+        return {
+            url: originalUrl,
+            warning: `${getUploadedFileName(file) || 'Bir gorsel'} icin ${previewResult.warning || 'Arka plan kaldirma uygulanamadi; orijinal dosya korundu.'}`
+        };
+    }
+
+    return { url: previewResult.url, warning: null };
+};
+
+const buildProductMediaUrls = async (mediaEntries, shouldRemoveBackground = false) => {
+    if (!Array.isArray(mediaEntries) || mediaEntries.length === 0) {
+        return { mediaUrls: [], warnings: [] };
+    }
+
+    const processedFiles = await Promise.all(mediaEntries.map(async (mediaEntry) => {
+        const file = mediaEntry && typeof mediaEntry === 'object' && 'file' in mediaEntry
+            ? mediaEntry.file
+            : mediaEntry;
+
+        if (!getBackgroundRemovalRequestedForFile(mediaEntry, shouldRemoveBackground)) {
+            return {
+                url: normalizeMediaUrl(file),
+                warning: null
+            };
+        }
+
+        return applyBackgroundRemovalToFile(file);
+    }));
+
+    return {
+        mediaUrls: processedFiles.map((item) => item.url).filter(Boolean),
+        warnings: processedFiles.map((item) => item.warning).filter(Boolean)
+    };
+};
+
 const parseMediaOrder = (rawValue) => {
     if (!rawValue) return [];
 
@@ -56,7 +354,8 @@ const parseMediaOrder = (rawValue) => {
             .map((item, index) => ({
                 index: Number.isInteger(Number(item?.index)) ? Number(item.index) : index,
                 name: String(item?.name || '').trim(),
-                size: Number.isFinite(Number(item?.size)) ? Number(item.size) : null
+                size: Number.isFinite(Number(item?.size)) ? Number(item.size) : null,
+                removeBackground: parseBooleanFlag(item?.removeBackground)
             }))
             .filter((item) => item.name);
     } catch (_) {
@@ -68,7 +367,12 @@ const reorderUploadedFiles = (files, rawMediaOrder) => {
     if (!Array.isArray(files) || files.length === 0) return [];
 
     const mediaOrder = parseMediaOrder(rawMediaOrder);
-    if (mediaOrder.length === 0) return files;
+    if (mediaOrder.length === 0) {
+        return files.map((file) => ({
+            file,
+            removeBackground: false
+        }));
+    }
 
     const usedOrderIndexes = new Set();
 
@@ -96,7 +400,8 @@ const reorderUploadedFiles = (files, rawMediaOrder) => {
             return {
                 file,
                 fallbackIndex,
-                sortIndex: matchIndex >= 0 ? mediaOrder[matchIndex].index : mediaOrder.length + fallbackIndex
+                sortIndex: matchIndex >= 0 ? mediaOrder[matchIndex].index : mediaOrder.length + fallbackIndex,
+                removeBackground: matchIndex >= 0 ? mediaOrder[matchIndex].removeBackground : false
             };
         })
         .sort((left, right) => {
@@ -104,8 +409,7 @@ const reorderUploadedFiles = (files, rawMediaOrder) => {
                 return left.sortIndex - right.sortIndex;
             }
             return left.fallbackIndex - right.fallbackIndex;
-        })
-        .map((item) => item.file);
+        });
 };
 
 const setMainMediaForProduct = async (client, productId, mediaUrl = null) => {
@@ -144,14 +448,16 @@ const syncMainMediaFromDatabase = async (client, productId) => {
     return nextMedia.media_url;
 };
 
-const buildProductPayload = (body, files, existingProduct = null) => {
+const buildProductPayload = async (body, files, existingProduct = null) => {
     const orderedFiles = reorderUploadedFiles(files, body.mediaOrder);
     const name = String(body.name || '').trim();
     const description = String(body.description || '').trim() || null;
-    const category = String(body.category || '').trim() || 'Kategorisiz';
+    const categories = parseProductCategories(body, existingProduct);
+    const category = categories[0] || DEFAULT_PRODUCT_CATEGORY;
     const price = parsePrice(body.price);
     const oldPrice = parsePrice(body.oldPrice, null);
     const stock = parseStock(body.stock);
+    const removeBackground = parseBooleanFlag(body.removeBackground);
 
     if (!name) {
         return { error: 'Urun adi zorunludur.' };
@@ -166,18 +472,18 @@ const buildProductPayload = (body, files, existingProduct = null) => {
         return { error: 'Stok bilgisi gecersiz.' };
     }
 
-    const mediaUrls = orderedFiles
-        .map(normalizeMediaUrl)
-        .filter(Boolean);
+    const { mediaUrls, warnings } = await buildProductMediaUrls(orderedFiles, removeBackground);
 
     return {
         name,
         description,
         category,
+        categories,
         price,
         oldPrice,
         stock,
         mediaUrls,
+        warnings,
         mainImageUrl: mediaUrls[0] || existingProduct?.image_url || null
     };
 };
@@ -217,7 +523,7 @@ const getAllProducts = async (req, res) => {
 
         const mediaByProductId = buildProductMediaMap(mediaResult.rows);
         const products = productsResult.rows.map((product) => ({
-            ...product,
+            ...normalizeProductRow(product),
             media: mediaByProductId.get(Number(product.id)) || []
         }));
 
@@ -232,7 +538,7 @@ const createProduct = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        const payload = buildProductPayload(req.body, req.files);
+        const payload = await buildProductPayload(req.body, req.files);
         if (payload.error) {
             return res.status(400).json({ error: payload.error });
         }
@@ -240,8 +546,8 @@ const createProduct = async (req, res) => {
         await client.query('BEGIN');
 
         const insertResult = await client.query(
-            `INSERT INTO products (name, price, old_price, stock, description, image_url, category)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `INSERT INTO products (name, price, old_price, stock, description, image_url, category, categories)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING *`,
             [
                 payload.name,
@@ -250,7 +556,8 @@ const createProduct = async (req, res) => {
                 payload.stock,
                 payload.description,
                 payload.mainImageUrl,
-                payload.category
+                payload.category,
+                payload.categories
             ]
         );
 
@@ -271,7 +578,8 @@ const createProduct = async (req, res) => {
 
         res.status(201).json({
             mesaj: 'Urun basariyla vitrine eklendi.',
-            product
+            warnings: payload.warnings,
+            product: normalizeProductRow(product)
         });
     } catch (err) {
         await client.query('ROLLBACK');
@@ -305,7 +613,7 @@ const getProductById = async (req, res) => {
             [id]
         );
 
-        const product = result.rows[0];
+        const product = normalizeProductRow(result.rows[0]);
         product.media = mediaResult.rows;
 
         res.status(200).json(product);
@@ -351,6 +659,166 @@ const deleteProduct = async (req, res) => {
     }
 };
 
+const previewProductMediaBackgroundRemoval = async (req, res) => {
+    const uploadedFile = req.file;
+    if (!uploadedFile) {
+        return res.status(400).json({ error: 'Onizleme icin bir gorsel secin.' });
+    }
+
+    const publicId = getUploadedPublicId(uploadedFile);
+    if (!isBackgroundRemovalEligible(uploadedFile)) {
+        await destroyCloudinaryAsset(publicId);
+        return res.status(400).json({ error: 'Arka plan kaldirma onizlemesi yalnizca standart gorsellerde kullanilabilir. Video ve GIF dosyalari desteklenmiyor.' });
+    }
+
+    try {
+        const previewResult = await applyBackgroundRemovalToFile(uploadedFile);
+        if (!previewResult.url || previewResult.warning) {
+            await destroyCloudinaryAsset(publicId);
+            return res.status(422).json({ error: previewResult.warning || 'Onizleme olusturulamadi.' });
+        }
+
+        return res.status(200).json({
+            mesaj: 'Arka plan kaldirma onizlemesi hazir.',
+            originalUrl: normalizeMediaUrl(uploadedFile),
+            previewPublicId: publicId,
+            previewUrl: previewResult.url
+        });
+    } catch (error) {
+        await destroyCloudinaryAsset(publicId);
+        console.error('Arka plan kaldirma onizleme hatasi:', error.message);
+        return res.status(500).json({ error: 'Arka plan kaldirma onizlemesi hazirlanamadi.' });
+    }
+};
+
+const previewExistingProductMediaBackgroundRemoval = async (req, res) => {
+    try {
+        const mediaId = parseProductId(req.params.mediaId);
+        if (!mediaId) {
+            return res.status(400).json({ error: 'Gecersiz medya kimligi.' });
+        }
+
+        const mediaResult = await pool.query(
+            'SELECT id, media_url FROM product_media WHERE id = $1',
+            [mediaId]
+        );
+
+        if (mediaResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Medya bulunamadi.' });
+        }
+
+        const mediaRow = mediaResult.rows[0];
+        const asset = extractCloudinaryAssetFromUrl(mediaRow.media_url);
+        if (!isBackgroundRemovalEligibleForAsset(asset)) {
+            return res.status(400).json({ error: 'Arka plan kaldirma onizlemesi yalnizca standart gorsellerde kullanilabilir. Video ve GIF dosyalari desteklenmiyor.' });
+        }
+
+        const previewResult = await buildBackgroundRemovalPreviewForAsset(asset);
+        if (!previewResult.url || previewResult.warning) {
+            return res.status(422).json({ error: previewResult.warning || 'Arka plan kaldirma onizlemesi hazirlanamadi.' });
+        }
+
+        return res.status(200).json({
+            mesaj: 'Arka plan kaldirma onizlemesi hazir.',
+            mediaId,
+            previewUrl: previewResult.url
+        });
+    } catch (error) {
+        console.error('Mevcut medya arka plan onizleme hatasi:', error.message);
+        return res.status(500).json({ error: 'Arka plan kaldirma onizlemesi hazirlanamadi.' });
+    }
+};
+
+const applyExistingProductMediaBackgroundRemoval = async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+        const mediaId = parseProductId(req.params.mediaId);
+        if (!mediaId) {
+            return res.status(400).json({ error: 'Gecersiz medya kimligi.' });
+        }
+
+        const previewUrl = String(req.body?.previewUrl || '').trim();
+        if (!previewUrl) {
+            return res.status(400).json({ error: 'Onizleme gorseli bulunamadi.' });
+        }
+
+        await client.query('BEGIN');
+
+        const mediaResult = await client.query(
+            `SELECT pm.id, pm.product_id, pm.media_url, pm.is_main, p.image_url
+             FROM product_media pm
+             INNER JOIN products p ON p.id = pm.product_id
+             WHERE pm.id = $1
+             FOR UPDATE`,
+            [mediaId]
+        );
+
+        if (mediaResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Medya bulunamadi.' });
+        }
+
+        const mediaRow = mediaResult.rows[0];
+        const sourceAsset = extractCloudinaryAssetFromUrl(mediaRow.media_url);
+        const previewAsset = extractCloudinaryAssetFromUrl(previewUrl);
+
+        if (!isBackgroundRemovalEligibleForAsset(sourceAsset)) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Arka plan kaldirma yalnizca standart gorsellerde kullanilabilir.' });
+        }
+
+        const previewBelongsToSameAsset = previewAsset
+            && previewAsset.publicId === sourceAsset.publicId
+            && previewAsset.resourceType === 'image'
+            && isBackgroundRemovedUrl(previewUrl);
+
+        const nextMediaUrl = previewBelongsToSameAsset
+            ? previewUrl
+            : buildBackgroundRemovedMediaUrl(sourceAsset.publicId);
+
+        await client.query(
+            'UPDATE product_media SET media_url = $1 WHERE id = $2',
+            [nextMediaUrl, mediaId]
+        );
+
+        if (mediaRow.is_main || mediaRow.image_url === mediaRow.media_url) {
+            await client.query(
+                'UPDATE products SET image_url = $1 WHERE id = $2',
+                [nextMediaUrl, mediaRow.product_id]
+            );
+        }
+
+        await client.query('COMMIT');
+
+        return res.status(200).json({
+            mesaj: 'Mevcut gorsel arka plansiz guncellendi.',
+            media: {
+                id: mediaRow.id,
+                product_id: mediaRow.product_id,
+                media_url: nextMediaUrl,
+                is_main: mediaRow.is_main
+            }
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Mevcut medya arka plan uygulama hatasi:', error.message);
+        return res.status(500).json({ error: 'Mevcut gorsel arka plansiz guncellenemedi.' });
+    } finally {
+        client.release();
+    }
+};
+
+const cleanupProductMediaPreview = async (req, res) => {
+    const publicId = String(req.body?.publicId || '').trim();
+    if (!publicId || !publicId.startsWith(PRODUCT_MEDIA_PREVIEW_FOLDER)) {
+        return res.status(400).json({ error: 'Gecersiz onizleme kimligi.' });
+    }
+
+    await destroyCloudinaryAsset(publicId);
+    return res.status(200).json({ mesaj: 'Onizleme temizlendi.' });
+};
+
 const updateProduct = async (req, res) => {
     const client = await pool.connect();
 
@@ -373,7 +841,7 @@ const updateProduct = async (req, res) => {
         }
 
         const existingProduct = existingResult.rows[0];
-        const payload = buildProductPayload(req.body, req.files, existingProduct);
+        const payload = await buildProductPayload(req.body, req.files, existingProduct);
         if (payload.error) {
             await client.query('ROLLBACK');
             return res.status(400).json({ error: payload.error });
@@ -389,8 +857,9 @@ const updateProduct = async (req, res) => {
                  stock = $4,
                  description = $5,
                  category = $6,
-                 image_url = $7
-             WHERE id = $8
+                 categories = $7,
+                 image_url = $8
+             WHERE id = $9
              RETURNING *`,
             [
                 payload.name,
@@ -399,6 +868,7 @@ const updateProduct = async (req, res) => {
                 payload.stock,
                 payload.description,
                 payload.category,
+                payload.categories,
                 nextMainImageUrl,
                 id
             ]
@@ -424,7 +894,8 @@ const updateProduct = async (req, res) => {
         await client.query('COMMIT');
         res.status(200).json({
             mesaj: 'Urun bilgileri guncellendi.',
-            product: updateResult.rows[0]
+            warnings: payload.warnings,
+            product: normalizeProductRow(updateResult.rows[0])
         });
     } catch (err) {
         await client.query('ROLLBACK');
@@ -485,5 +956,9 @@ module.exports = {
     getProductById,
     deleteProduct,
     updateProduct,
-    deleteProductMedia
+    deleteProductMedia,
+    previewProductMediaBackgroundRemoval,
+    previewExistingProductMediaBackgroundRemoval,
+    applyExistingProductMediaBackgroundRemoval,
+    cleanupProductMediaPreview
 };

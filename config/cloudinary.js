@@ -26,9 +26,12 @@ const createUpload = (folder) => {
 
 const upload = createUpload('novastore_products');
 const reviewUpload = createUpload('novastore_reviews');
+const previewUpload = createUpload('novastore_product_previews');
 
 module.exports = {
+    cloudinary,
     upload,
     reviewUpload,
+    previewUpload,
     createUpload
 };

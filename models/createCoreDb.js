@@ -32,15 +32,23 @@ const createCoreSchema = async () => {
             stock INTEGER DEFAULT 0,
             image_url TEXT,
             category VARCHAR(100) DEFAULT 'Kategorisiz',
+            categories TEXT[] DEFAULT ARRAY['Kategorisiz']::TEXT[],
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
         ALTER TABLE products ADD COLUMN IF NOT EXISTS old_price DECIMAL(10, 2);
         ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'Kategorisiz';
+        ALTER TABLE products ADD COLUMN IF NOT EXISTS categories TEXT[] DEFAULT ARRAY['Kategorisiz']::TEXT[];
         ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER DEFAULT 0;
         ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT;
         ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
         ALTER TABLE products ALTER COLUMN image_url TYPE TEXT;
+        UPDATE products
+        SET categories = ARRAY[COALESCE(NULLIF(category, ''), 'Kategorisiz')]::TEXT[]
+        WHERE categories IS NULL OR array_length(categories, 1) IS NULL;
+        UPDATE products
+        SET category = COALESCE(NULLIF(category, ''), categories[1], 'Kategorisiz')
+        WHERE category IS NULL OR category = '';
 
         CREATE TABLE IF NOT EXISTS categories (
             id SERIAL PRIMARY KEY,

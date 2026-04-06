@@ -602,11 +602,60 @@
             font-weight: 600;
         }
 
+        .selected-category-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            min-height: 18px;
+        }
+
+        .selected-category-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #E3F2FD;
+            color: #1565C0;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 0.86rem;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        .selected-category-remove {
+            border: none;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            padding: 0;
+            font-size: 0.95rem;
+            font-weight: 700;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .selected-category-empty {
+            color: #94A3B8;
+            font-size: 0.84rem;
+        }
+
         [data-theme="dark"] .cat-badge {
             background: rgba(247, 148, 29, 0.15);
             /* Turuncu hafif transparan */
             color: var(--accent);
             /* Turuncu yazı */
+        }
+
+        [data-theme="dark"] .selected-category-chip {
+            background: rgba(247, 148, 29, 0.15);
+            color: var(--accent);
+        }
+
+        [data-theme="dark"] .selected-category-empty {
+            color: var(--muted);
         }
 
         .btn-edit {
@@ -959,6 +1008,48 @@
             font-weight: 700;
         }
 
+        .upload-option-toggle {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--media-card-bg);
+            color: var(--text);
+        }
+
+        .upload-option-icon {
+            flex: 0 0 34px;
+            width: 34px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: rgba(247, 148, 29, 0.14);
+            color: var(--accent);
+            font-size: 1rem;
+            font-weight: 800;
+            border: 1px solid rgba(247, 148, 29, 0.22);
+        }
+
+        .upload-option-title {
+            display: block;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .upload-option-help {
+            display: block;
+            margin-top: 3px;
+            font-size: 0.78rem;
+            line-height: 1.4;
+            color: var(--muted-text);
+        }
+
         .media-preview-grid {
             display: flex;
             gap: 10px;
@@ -995,6 +1086,10 @@
             justify-content: center;
         }
 
+        .pending-media-preview-wrap.is-clickable {
+            cursor: zoom-in;
+        }
+
         .pending-media-preview {
             width: 88px;
             height: 88px;
@@ -1023,14 +1118,157 @@
             gap: 6px;
         }
 
+        .pending-media-tools {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .pending-media-icon-button {
+            width: 34px;
+            height: 34px;
+            border: 1px solid rgba(21, 101, 192, 0.18);
+            border-radius: 10px;
+            background: #EFF6FF;
+            color: #1565C0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.2s ease;
+        }
+
+        .pending-media-icon-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 16px rgba(21, 101, 192, 0.14);
+        }
+
+        .pending-media-icon-button.is-active {
+            background: rgba(46, 125, 50, 0.12);
+            color: #2E7D32;
+            border-color: rgba(46, 125, 50, 0.24);
+        }
+
+        .pending-media-icon-button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .pending-media-flag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.72rem;
+            line-height: 1.3;
+            color: #2E7D32;
+            background: rgba(46, 125, 50, 0.10);
+            border: 1px solid rgba(46, 125, 50, 0.18);
+            border-radius: 10px;
+            padding: 6px 8px;
+        }
+
+        .pending-media-preview-stage {
+            display: none;
+            margin-top: 14px;
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(21, 101, 192, 0.06);
+            border: 1px solid rgba(21, 101, 192, 0.12);
+        }
+
+        .pending-media-preview-stage.is-visible {
+            display: block;
+        }
+
+        .pending-media-preview-stage.is-loading {
+            min-height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted-text);
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+
+        .pending-media-preview-stage-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .pending-media-preview-stage-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--heading-color);
+        }
+
+        .pending-media-preview-stage-subtitle {
+            margin-top: 4px;
+            font-size: 0.82rem;
+            line-height: 1.45;
+            color: var(--muted-text);
+            word-break: break-word;
+        }
+
+        .pending-media-preview-stage-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .pending-media-preview-confirm,
+        .pending-media-preview-cancel {
+            border: none;
+            border-radius: 999px;
+            padding: 7px 12px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .pending-media-preview-confirm {
+            background: #2E7D32;
+            color: #fff;
+        }
+
+        .pending-media-preview-cancel {
+            background: #ECEFF1;
+            color: #455A64;
+        }
+
+        .pending-media-preview-stage-body {
+            display: flex;
+            justify-content: center;
+        }
+
+        .pending-media-preview-image {
+            width: 100%;
+            max-width: 360px;
+            height: 260px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: #fff;
+            border: 1px solid var(--border);
+            padding: 10px;
+        }
+
         .pending-media-action {
-            flex: 1;
             padding: 6px 0;
             border: none;
             border-radius: 8px;
             color: #fff;
             font-weight: 700;
             cursor: pointer;
+        }
+
+        .pending-media-actions .pending-media-action {
+            flex: 1;
         }
 
         .pending-media-action.primary {
@@ -1043,11 +1281,69 @@
 
         .pending-media-action.danger {
             background: var(--media-action-danger);
+            margin-top: auto;
         }
 
         .pending-media-action:disabled {
             background: var(--media-action-disabled);
             cursor: not-allowed;
+        }
+
+        [data-theme="dark"] .upload-option-icon {
+            background: rgba(247, 148, 29, 0.18);
+            border-color: rgba(247, 148, 29, 0.28);
+        }
+
+        [data-theme="dark"] .pending-media-icon-button {
+            background: rgba(37, 99, 235, 0.14);
+            color: #93C5FD;
+            border-color: rgba(37, 99, 235, 0.28);
+        }
+
+        [data-theme="dark"] .pending-media-icon-button.is-active {
+            background: rgba(46, 125, 50, 0.20);
+            color: #A5D6A7;
+            border-color: rgba(165, 214, 167, 0.24);
+        }
+
+        [data-theme="dark"] .pending-media-flag {
+            color: #A5D6A7;
+            background: rgba(46, 125, 50, 0.16);
+            border-color: rgba(165, 214, 167, 0.22);
+        }
+
+        [data-theme="dark"] .pending-media-preview-stage {
+            background: rgba(37, 99, 235, 0.10);
+            border-color: rgba(147, 197, 253, 0.18);
+        }
+
+        [data-theme="dark"] .pending-media-preview-cancel {
+            background: rgba(71, 85, 105, 0.9);
+            color: #E2E8F0;
+        }
+
+        .pending-media-lightbox-box {
+            max-width: min(720px, 94vw);
+            width: min(720px, 94vw);
+            padding: 0;
+        }
+
+        .pending-media-lightbox-body {
+            padding: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            max-height: min(76vh, 820px);
+        }
+
+        .pending-media-lightbox-image {
+            width: 100%;
+            max-height: 70vh;
+            object-fit: contain;
+            border-radius: 16px;
+            background: #fff;
+            border: 1px solid var(--border);
+            padding: 12px;
         }
 
         .existing-media-card {
@@ -1062,6 +1358,17 @@
             background: var(--media-card-bg);
             border: 1px solid var(--border);
             box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        .existing-media-item {
+            width: 108px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .existing-media-card.is-clickable {
+            cursor: zoom-in;
         }
 
         .existing-media-preview {
@@ -1093,6 +1400,11 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 8px 18px rgba(15, 23, 42, 0.24);
+        }
+
+        .existing-media-tools {
+            display: flex;
+            justify-content: flex-end;
         }
 
         @media (max-width: 900px) {
@@ -1828,9 +2140,11 @@
                             class="form-control" required></div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div class="form-group"><label>Kategori</label><select id="prod-category" class="form-control"
-                                required>
+                                onchange="handleProductCategorySelect(this.value)">
                                 <option value="">Kategori Seçin</option>
-                            </select></div>
+                            </select>
+                            <div id="selected-product-categories" class="selected-category-list"></div>
+                            <small style="display:block; margin-top:6px; color:#6B7280;">Birden fazla kategori ekleyebilirsiniz. İlk eklenen kategori ana kategori olarak kullanılır.</small></div>
                         <div class="form-group"><label>Stok Adedi</label><input type="number" id="prod-stock"
                                 class="form-control" required></div>
                     </div>
@@ -1876,9 +2190,17 @@
                     <div class="form-group" id="existing-media-group" style="display: none;">
                         <label>Mevcut Görseller/Videolar</label>
                         <div id="existing-media-container" class="media-preview-grid"></div>
+                        <div id="existing-media-preview-stage" class="pending-media-preview-stage"></div>
                     </div>
                     <div class="form-group" id="image-upload-group">
                         <label>Yeni Görsel/Video Ekle</label>
+                        <div class="upload-option-toggle">
+                            <span class="upload-option-icon" aria-hidden="true">BG</span>
+                            <span>
+                                <span class="upload-option-title">Arka planı kaldır ve beyaz zemine yerleştir</span>
+                                <span class="upload-option-help">Görsel kartının altındaki simgeye basınca önizleme hazırlanır. Kabul edersen yalnızca o görsel arka plansız kaydedilir.</span>
+                            </span>
+                        </div>
                         <div class="upload-area" onclick="document.getElementById('prod-media').click()">
                             <span class="upload-area-icon">📁</span><br>
                             <span class="upload-area-text">Sürükle ve Bırak veya Tıklayarak
@@ -1892,10 +2214,23 @@
                             <label class="pending-media-title">Yeni Eklenecek Görseller</label>
                             <div class="pending-media-note">Sıra için ok tuşlarını kullan. İlk görsel ürün kartında kapak olur.</div>
                             <div id="pending-media-container" class="media-preview-grid"></div>
+                            <div id="pending-media-preview-stage" class="pending-media-preview-stage"></div>
                         </div>
                     </div>
                     <button type="submit" id="btn-save-product" class="btn-submit">Ürünü Kaydet</button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="pending-media-lightbox" style="display:none;" onclick="closePendingMediaLightbox()">
+        <div class="modal-box pending-media-lightbox-box" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 id="pending-media-lightbox-title">Görsel Önizleme</h2>
+                <button class="close-modal" onclick="closePendingMediaLightbox()">✕</button>
+            </div>
+            <div class="modal-body pending-media-lightbox-body">
+                <img id="pending-media-lightbox-image" class="pending-media-lightbox-image" alt="Büyük görsel önizleme">
             </div>
         </div>
     </div>
@@ -1932,7 +2267,11 @@
         let globalProducts = [];
         let globalCategories = []; // Kategorileri tutacak
         let editingProductId = null;
+        let selectedProductCategories = [];
         let pendingProductMediaFiles = [];
+        let activePendingMediaPreviewKey = '';
+        let currentProductExistingMedia = [];
+        let activeExistingMediaPreviewId = null;
         let salesChartInstance = null; // Grafiği sıfırlamak için
         let behaviorTrendChartInstance = null;
         let productInsightChartInstance = null;
@@ -2046,6 +2385,15 @@
 
         function isProductMediaVideo(url) {
             return /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(String(url || ''));
+        }
+
+        function isExistingMediaBackgroundRemovalEligible(mediaUrl) {
+            const normalizedUrl = String(mediaUrl || '').toLowerCase();
+            return !isProductMediaVideo(normalizedUrl) && !/\.gif(?:$|[?#])/i.test(normalizedUrl);
+        }
+
+        function hasBackgroundRemovalInUrl(mediaUrl) {
+            return /e_background_removal/i.test(String(mediaUrl || ''));
         }
 
         const PRODUCT_DESCRIPTION_FONT_SIZE_MAP = {
@@ -2546,12 +2894,150 @@
             editor.dataset.ready = '1';
         }
 
+        function isPendingBackgroundRemovalEligible(file) {
+            const mimeType = String(file && file.type ? file.type : '').trim().toLowerCase();
+            const fileName = String(file && file.name ? file.name : '').trim().toLowerCase();
+            const looksLikeImage = mimeType.startsWith('image/')
+                || /\.(avif|bmp|heic|heif|jpe?g|png|tiff?|webp)$/i.test(fileName);
+
+            if (!looksLikeImage) return false;
+            if (mimeType === 'image/gif' || /\.gif$/i.test(fileName)) return false;
+            return true;
+        }
+
+        async function cleanupBackgroundPreviewAsset(publicId) {
+            const normalizedPublicId = String(publicId || '').trim();
+            if (!normalizedPublicId) return;
+
+            try {
+                await adminApiFetch('/api/products/media-preview/cleanup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ publicId: normalizedPublicId })
+                });
+            } catch (_) { }
+        }
+
+        function createPendingProductMediaEntry(file, index, timestamp) {
+            return {
+                file,
+                previewUrl: URL.createObjectURL(file),
+                key: `${timestamp}-${index}-${file.name}-${file.size}`,
+                removeBackground: false,
+                backgroundPreviewState: 'idle',
+                backgroundPreviewUrl: '',
+                backgroundPreviewPublicId: '',
+                backgroundPreviewError: ''
+            };
+        }
+
+        function getPendingMediaEntryIndexByKey(key) {
+            return pendingProductMediaFiles.findIndex((entry) => entry.key === key);
+        }
+
+        function getActivePendingMediaPreviewEntry() {
+            const activeIndex = getPendingMediaEntryIndexByKey(activePendingMediaPreviewKey);
+            return activeIndex >= 0 ? pendingProductMediaFiles[activeIndex] : null;
+        }
+
+        function clearPendingMediaBackgroundPreviewState(entry) {
+            if (!entry) return;
+            entry.backgroundPreviewState = 'idle';
+            entry.backgroundPreviewUrl = '';
+            entry.backgroundPreviewPublicId = '';
+            entry.backgroundPreviewError = '';
+        }
+
+        function closePendingMediaPreviewByKey(key, shouldCleanup = true) {
+            const entryIndex = getPendingMediaEntryIndexByKey(key);
+            if (entryIndex < 0) {
+                if (activePendingMediaPreviewKey === key) {
+                    activePendingMediaPreviewKey = '';
+                }
+                return;
+            }
+
+            const entry = pendingProductMediaFiles[entryIndex];
+            const previewPublicId = entry.backgroundPreviewPublicId;
+            clearPendingMediaBackgroundPreviewState(entry);
+
+            if (activePendingMediaPreviewKey === key) {
+                activePendingMediaPreviewKey = '';
+            }
+
+            if (shouldCleanup && previewPublicId) {
+                cleanupBackgroundPreviewAsset(previewPublicId);
+            }
+        }
+
+        function closeOtherPendingMediaPreviews(exceptKey = '') {
+            pendingProductMediaFiles.forEach((entry) => {
+                if (entry.key === exceptKey) return;
+                if (entry.backgroundPreviewState === 'idle' && !entry.backgroundPreviewPublicId) return;
+                closePendingMediaPreviewByKey(entry.key, true);
+            });
+        }
+
+        function closePendingMediaLightbox() {
+            const lightbox = document.getElementById('pending-media-lightbox');
+            const image = document.getElementById('pending-media-lightbox-image');
+            const title = document.getElementById('pending-media-lightbox-title');
+            if (image) {
+                image.removeAttribute('src');
+            }
+            if (title) {
+                title.textContent = 'Görsel Önizleme';
+            }
+            if (lightbox) {
+                lightbox.style.display = 'none';
+            }
+        }
+
+        function openMediaLightbox(src, titleText = 'Görsel Önizleme') {
+            const lightbox = document.getElementById('pending-media-lightbox');
+            const image = document.getElementById('pending-media-lightbox-image');
+            const title = document.getElementById('pending-media-lightbox-title');
+            if (!lightbox || !image || !title) return;
+
+            image.src = src;
+            title.textContent = titleText;
+            lightbox.style.display = 'flex';
+        }
+
+        function openPendingMediaLightbox(index) {
+            const entry = pendingProductMediaFiles[index];
+            if (!entry || !entry.file || String(entry.file.type || '').startsWith('video/')) return;
+
+            openMediaLightbox(entry.previewUrl, `${index + 1}. ${entry.file.name}`);
+        }
+
+        function openExistingMediaLightbox(mediaId) {
+            const media = currentProductExistingMedia.find((item) => Number(item.id) === Number(mediaId));
+            if (!media || isProductMediaVideo(media.media_url)) return;
+
+            openMediaLightbox(media.media_url, 'Mevcut Görsel Önizleme');
+        }
+
         function releasePendingProductMedia(entries) {
+            const previewIds = [];
+
             (entries || []).forEach((entry) => {
                 if (entry && entry.previewUrl) {
                     URL.revokeObjectURL(entry.previewUrl);
                 }
+
+                const previewPublicId = String(entry && entry.backgroundPreviewPublicId ? entry.backgroundPreviewPublicId : '').trim();
+                if (previewPublicId) {
+                    previewIds.push(previewPublicId);
+                }
             });
+
+            if (previewIds.length > 0) {
+                Promise.allSettled(previewIds.map((previewId) => cleanupBackgroundPreviewAsset(previewId)));
+            }
+
+            activePendingMediaPreviewKey = '';
+            closePendingMediaLightbox();
         }
 
         function updatePendingMediaStatus() {
@@ -2569,6 +3055,148 @@
             pendingGroup.style.display = 'block';
         }
 
+        function renderPendingMediaPreviewStage() {
+            const stage = document.getElementById('pending-media-preview-stage');
+            if (!stage) return;
+
+            const entry = getActivePendingMediaPreviewEntry();
+            if (!entry || entry.backgroundPreviewState === 'idle') {
+                stage.className = 'pending-media-preview-stage';
+                stage.innerHTML = '';
+                return;
+            }
+
+            const activeIndex = getPendingMediaEntryIndexByKey(entry.key);
+            if (entry.backgroundPreviewState === 'loading') {
+                stage.className = 'pending-media-preview-stage is-visible is-loading';
+                stage.innerHTML = 'Önizleme hazırlanıyor...';
+                return;
+            }
+
+            if (entry.backgroundPreviewState === 'ready' && entry.backgroundPreviewUrl && activeIndex >= 0) {
+                stage.className = 'pending-media-preview-stage is-visible';
+                stage.innerHTML = `
+                    <div class="pending-media-preview-stage-header">
+                        <div>
+                            <div class="pending-media-preview-stage-title">Arka plan kaldırma önizlemesi</div>
+                            <div class="pending-media-preview-stage-subtitle">${activeIndex + 1}. ${escapeAdminHtml(entry.file && entry.file.name ? entry.file.name : 'Seçilen görsel')}</div>
+                        </div>
+                        <div class="pending-media-preview-stage-actions">
+                            <button type="button" class="pending-media-preview-confirm" onclick="acceptBackgroundRemovalPreview(${activeIndex})">Kabul</button>
+                            <button type="button" class="pending-media-preview-cancel" onclick="cancelBackgroundRemovalPreview(${activeIndex})">İptal</button>
+                        </div>
+                    </div>
+                    <div class="pending-media-preview-stage-body">
+                        <img src="${entry.backgroundPreviewUrl}" alt="${escapeAdminHtml(entry.file && entry.file.name ? entry.file.name : 'önizleme')} önizleme" class="pending-media-preview-image">
+                    </div>
+                `;
+                return;
+            }
+
+            stage.className = 'pending-media-preview-stage';
+            stage.innerHTML = '';
+        }
+
+        function resetExistingProductMediaState() {
+            currentProductExistingMedia = [];
+            activeExistingMediaPreviewId = null;
+            renderExistingProductMedia();
+        }
+
+        function renderExistingMediaPreviewStage() {
+            const stage = document.getElementById('existing-media-preview-stage');
+            if (!stage) return;
+
+            const activeMedia = currentProductExistingMedia.find((media) => Number(media.id) === Number(activeExistingMediaPreviewId));
+            if (!activeMedia || activeMedia.backgroundPreviewState === 'idle') {
+                stage.className = 'pending-media-preview-stage';
+                stage.innerHTML = '';
+                return;
+            }
+
+            if (activeMedia.backgroundPreviewState === 'loading') {
+                stage.className = 'pending-media-preview-stage is-visible is-loading';
+                stage.innerHTML = 'Önizleme hazırlanıyor...';
+                return;
+            }
+
+            if (activeMedia.backgroundPreviewState === 'ready' && activeMedia.backgroundPreviewUrl) {
+                stage.className = 'pending-media-preview-stage is-visible';
+                stage.innerHTML = `
+                    <div class="pending-media-preview-stage-header">
+                        <div>
+                            <div class="pending-media-preview-stage-title">Mevcut görsel önizlemesi</div>
+                            <div class="pending-media-preview-stage-subtitle">${escapeAdminHtml(activeMedia.media_url || 'Mevcut görsel')}</div>
+                        </div>
+                        <div class="pending-media-preview-stage-actions">
+                            <button type="button" class="pending-media-preview-confirm" onclick="acceptExistingMediaBackgroundPreview(${Number(activeMedia.id)})">Kabul</button>
+                            <button type="button" class="pending-media-preview-cancel" onclick="cancelExistingMediaBackgroundPreview(${Number(activeMedia.id)})">İptal</button>
+                        </div>
+                    </div>
+                    <div class="pending-media-preview-stage-body">
+                        <img src="${activeMedia.backgroundPreviewUrl}" alt="Mevcut görsel arka plan kaldırma önizlemesi" class="pending-media-preview-image">
+                    </div>
+                `;
+                return;
+            }
+
+            stage.className = 'pending-media-preview-stage';
+            stage.innerHTML = '';
+        }
+
+        function renderExistingProductMedia() {
+            const group = document.getElementById('existing-media-group');
+            const container = document.getElementById('existing-media-container');
+            if (!group || !container) return;
+
+            if (!currentProductExistingMedia.length) {
+                group.style.display = 'none';
+                container.innerHTML = '';
+                renderExistingMediaPreviewStage();
+                return;
+            }
+
+            group.style.display = 'block';
+            container.innerHTML = currentProductExistingMedia.map((media) => {
+                const isVideo = isProductMediaVideo(media.media_url);
+                const isClickable = !isVideo;
+                const canPreviewBackgroundRemoval = isExistingMediaBackgroundRemovalEligible(media.media_url);
+                const isAlreadyBackgroundRemoved = hasBackgroundRemovalInUrl(media.media_url);
+                const mediaTag = isVideo
+                    ? `<video src="${media.media_url}" class="existing-media-preview is-video" muted playsinline></video>`
+                    : `<img src="${media.media_url}" class="existing-media-preview" alt="Mevcut ürün görseli">`;
+                const toolMarkup = canPreviewBackgroundRemoval
+                    ? `
+                        <div class="existing-media-tools">
+                            ${isAlreadyBackgroundRemoved ? '<span class="pending-media-flag">Arka plansız</span>' : ''}
+                            <button
+                                type="button"
+                                class="pending-media-icon-button ${isAlreadyBackgroundRemoved ? 'is-active' : ''}"
+                                onclick="openExistingMediaBackgroundPreview(${Number(media.id)})"
+                                ${media.backgroundPreviewState === 'loading' ? 'disabled' : ''}
+                                title="Arka plan kaldırma önizlemesini aç"
+                                aria-label="Arka plan kaldırma önizlemesini aç"
+                            >
+                                ✂
+                            </button>
+                        </div>
+                    `
+                    : '';
+
+                return `
+                    <div class="existing-media-item">
+                        <div class="existing-media-card ${isClickable ? 'is-clickable' : ''}" ${isClickable ? `onclick="openExistingMediaLightbox(${Number(media.id)})"` : ''}>
+                            ${mediaTag}
+                            <button type="button" onclick="deleteSpecificMedia(${Number(media.id)}, this); event.stopPropagation();" class="existing-media-delete">✕</button>
+                        </div>
+                        ${toolMarkup}
+                    </div>
+                `;
+            }).join('');
+
+            renderExistingMediaPreviewStage();
+        }
+
         function renderPendingProductMediaFiles() {
             const container = document.getElementById('pending-media-container');
             if (!container) return;
@@ -2576,19 +3204,39 @@
             if (!pendingProductMediaFiles.length) {
                 container.innerHTML = '';
                 updatePendingMediaStatus();
+                renderPendingMediaPreviewStage();
                 return;
             }
 
             container.innerHTML = pendingProductMediaFiles.map((entry, index) => {
                 const file = entry.file;
                 const isVideo = String(file.type || '').startsWith('video/');
+                const canPreviewBackgroundRemoval = isPendingBackgroundRemovalEligible(file);
+                const previewWrapClasses = `pending-media-preview-wrap${isVideo ? '' : ' is-clickable'}`;
                 const previewTag = isVideo
                     ? `<video src="${entry.previewUrl}" class="pending-media-preview is-video" muted playsinline></video>`
                     : `<img src="${entry.previewUrl}" alt="${escapeAdminHtml(file.name)}" class="pending-media-preview">`;
+                const backgroundToolMarkup = canPreviewBackgroundRemoval
+                    ? `
+                        <div class="pending-media-tools">
+                            ${entry.removeBackground ? '<span class="pending-media-flag">Arka plansız kaydedilecek</span>' : ''}
+                            <button
+                                type="button"
+                                class="pending-media-icon-button ${entry.removeBackground ? 'is-active' : ''}"
+                                onclick="handlePendingMediaBackgroundAction(${index})"
+                                ${entry.backgroundPreviewState === 'loading' ? 'disabled' : ''}
+                                title="${entry.removeBackground ? 'Arka plan kaldırmayı kapat' : 'Arka plan kaldırma önizlemesini aç'}"
+                                aria-label="${entry.removeBackground ? 'Arka plan kaldırmayı kapat' : 'Arka plan kaldırma önizlemesini aç'}"
+                            >
+                                ✂
+                            </button>
+                        </div>
+                    `
+                    : '';
 
                 return `
                     <div class="pending-media-card">
-                        <div class="pending-media-preview-wrap">
+                        <div class="${previewWrapClasses}" ${isVideo ? '' : `onclick="openPendingMediaLightbox(${index})"`}>
                             ${previewTag}
                             ${index === 0 ? '<span style="position:absolute; top:6px; left:6px; background:#F7941D; color:#fff; font-size:0.68rem; font-weight:700; padding:3px 6px; border-radius:999px;">Kapak</span>' : ''}
                         </div>
@@ -2597,17 +3245,20 @@
                             <button type="button" class="pending-media-action primary" onclick="movePendingProductMedia(${index}, -1)" ${index === 0 ? 'disabled' : ''}>Yukarı</button>
                             <button type="button" class="pending-media-action neutral" onclick="movePendingProductMedia(${index}, 1)" ${index === pendingProductMediaFiles.length - 1 ? 'disabled' : ''}>Aşağı</button>
                         </div>
+                        ${backgroundToolMarkup}
                         <button type="button" class="pending-media-action danger" onclick="removePendingProductMedia(${index})">Kaldır</button>
                     </div>
                 `;
             }).join('');
 
             updatePendingMediaStatus();
+            renderPendingMediaPreviewStage();
         }
 
         function resetPendingProductMediaSelection() {
             releasePendingProductMedia(pendingProductMediaFiles);
             pendingProductMediaFiles = [];
+            activePendingMediaPreviewKey = '';
 
             const mediaInput = document.getElementById('prod-media');
             if (mediaInput) {
@@ -2624,11 +3275,7 @@
             }
 
             const timestamp = Date.now();
-            const newEntries = selectedFiles.map((file, index) => ({
-                file,
-                previewUrl: URL.createObjectURL(file),
-                key: `${timestamp}-${index}-${file.name}-${file.size}`
-            }));
+            const newEntries = selectedFiles.map((file, index) => createPendingProductMediaEntry(file, index, timestamp));
 
             pendingProductMediaFiles = pendingProductMediaFiles.concat(newEntries);
             if (input) {
@@ -2695,14 +3342,213 @@
             renderPendingProductMediaFiles();
         }
 
+        async function openBackgroundRemovalPreview(index) {
+            const entry = pendingProductMediaFiles[index];
+            if (!entry || !entry.file) return;
+
+            if (!isPendingBackgroundRemovalEligible(entry.file)) {
+                alert('Arka plan kaldırma önizlemesi yalnızca standart görsellerde kullanılabilir.');
+                return;
+            }
+
+            if (entry.backgroundPreviewState === 'loading') return;
+
+            const pendingKey = entry.key;
+            const previousPreviewPublicId = entry.backgroundPreviewPublicId;
+            closeOtherPendingMediaPreviews(pendingKey);
+            clearPendingMediaBackgroundPreviewState(entry);
+            entry.backgroundPreviewState = 'loading';
+            activePendingMediaPreviewKey = pendingKey;
+            renderPendingProductMediaFiles();
+
+            if (previousPreviewPublicId) {
+                cleanupBackgroundPreviewAsset(previousPreviewPublicId);
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('media', entry.file);
+
+                const response = await adminApiFetch('/api/products/media-preview/remove-background', {
+                    method: 'POST',
+                    body: formData
+                });
+                const payload = await adminReadJson(response, 'Arka plan kaldırma önizlemesi hazırlanamadı.');
+                const currentEntry = pendingProductMediaFiles.find((item) => item.key === pendingKey);
+
+                if (!currentEntry) {
+                    cleanupBackgroundPreviewAsset(payload && payload.previewPublicId);
+                    return;
+                }
+
+                activePendingMediaPreviewKey = pendingKey;
+                currentEntry.backgroundPreviewState = 'ready';
+                currentEntry.backgroundPreviewUrl = String(payload && payload.previewUrl ? payload.previewUrl : '').trim();
+                currentEntry.backgroundPreviewPublicId = String(payload && payload.previewPublicId ? payload.previewPublicId : '').trim();
+                currentEntry.backgroundPreviewError = '';
+                renderPendingProductMediaFiles();
+            } catch (error) {
+                const currentEntry = pendingProductMediaFiles.find((item) => item.key === pendingKey);
+                if (currentEntry) {
+                    clearPendingMediaBackgroundPreviewState(currentEntry);
+                }
+                if (activePendingMediaPreviewKey === pendingKey) {
+                    activePendingMediaPreviewKey = '';
+                }
+                renderPendingProductMediaFiles();
+                alert(error.message || 'Arka plan kaldırma önizlemesi hazırlanamadı.');
+            }
+        }
+
+        function handlePendingMediaBackgroundAction(index) {
+            const entry = pendingProductMediaFiles[index];
+            if (!entry) return;
+
+            if (entry.removeBackground && entry.backgroundPreviewState === 'idle') {
+                entry.removeBackground = false;
+                renderPendingProductMediaFiles();
+                return;
+            }
+
+            openBackgroundRemovalPreview(index);
+        }
+
+        function acceptBackgroundRemovalPreview(index) {
+            const entry = pendingProductMediaFiles[index];
+            if (!entry) return;
+
+            const previewPublicId = entry.backgroundPreviewPublicId;
+            entry.removeBackground = true;
+            clearPendingMediaBackgroundPreviewState(entry);
+            activePendingMediaPreviewKey = '';
+            renderPendingProductMediaFiles();
+
+            if (previewPublicId) {
+                cleanupBackgroundPreviewAsset(previewPublicId);
+            }
+        }
+
+        function cancelBackgroundRemovalPreview(index) {
+            const entry = pendingProductMediaFiles[index];
+            if (!entry) return;
+
+            const previewPublicId = entry.backgroundPreviewPublicId;
+            clearPendingMediaBackgroundPreviewState(entry);
+            activePendingMediaPreviewKey = '';
+            renderPendingProductMediaFiles();
+
+            if (previewPublicId) {
+                cleanupBackgroundPreviewAsset(previewPublicId);
+            }
+        }
+
         function removePendingProductMedia(index) {
             if (index < 0 || index >= pendingProductMediaFiles.length) return;
 
             const updatedEntries = pendingProductMediaFiles.slice();
             const [removedEntry] = updatedEntries.splice(index, 1);
+            if (removedEntry && removedEntry.key === activePendingMediaPreviewKey) {
+                activePendingMediaPreviewKey = '';
+            }
             releasePendingProductMedia([removedEntry]);
             pendingProductMediaFiles = updatedEntries;
             renderPendingProductMediaFiles();
+        }
+
+        async function openExistingMediaBackgroundPreview(mediaId) {
+            const targetMedia = currentProductExistingMedia.find((item) => Number(item.id) === Number(mediaId));
+            if (!targetMedia) return;
+
+            if (!isExistingMediaBackgroundRemovalEligible(targetMedia.media_url)) {
+                alert('Arka plan kaldırma önizlemesi yalnızca standart görsellerde kullanılabilir.');
+                return;
+            }
+
+            currentProductExistingMedia.forEach((media) => {
+                if (Number(media.id) === Number(mediaId)) return;
+                media.backgroundPreviewState = 'idle';
+                media.backgroundPreviewUrl = '';
+            });
+
+            targetMedia.backgroundPreviewState = 'loading';
+            targetMedia.backgroundPreviewUrl = '';
+            activeExistingMediaPreviewId = Number(mediaId);
+            renderExistingProductMedia();
+
+            try {
+                const response = await adminApiFetch(`/api/products/media/${Number(mediaId)}/remove-background-preview`, {
+                    method: 'POST'
+                });
+                const payload = await adminReadJson(response, 'Arka plan kaldırma önizlemesi hazırlanamadı.');
+                const currentMedia = currentProductExistingMedia.find((item) => Number(item.id) === Number(mediaId));
+
+                if (!currentMedia) return;
+
+                currentMedia.backgroundPreviewState = 'ready';
+                currentMedia.backgroundPreviewUrl = String(payload && payload.previewUrl ? payload.previewUrl : '').trim();
+                activeExistingMediaPreviewId = Number(mediaId);
+                renderExistingProductMedia();
+            } catch (error) {
+                const currentMedia = currentProductExistingMedia.find((item) => Number(item.id) === Number(mediaId));
+                if (currentMedia) {
+                    currentMedia.backgroundPreviewState = 'idle';
+                    currentMedia.backgroundPreviewUrl = '';
+                }
+                activeExistingMediaPreviewId = null;
+                renderExistingProductMedia();
+                alert(error.message || 'Arka plan kaldırma önizlemesi hazırlanamadı.');
+            }
+        }
+
+        async function acceptExistingMediaBackgroundPreview(mediaId) {
+            const targetMedia = currentProductExistingMedia.find((item) => Number(item.id) === Number(mediaId));
+            if (!targetMedia || !targetMedia.backgroundPreviewUrl) return;
+
+            try {
+                const response = await adminApiFetch(`/api/products/media/${Number(mediaId)}/remove-background-apply`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ previewUrl: targetMedia.backgroundPreviewUrl })
+                });
+                const payload = await adminReadJson(response, 'Mevcut görsel arka plansız güncellenemedi.');
+                const updatedMediaUrl = String(payload && payload.media && payload.media.media_url ? payload.media.media_url : targetMedia.backgroundPreviewUrl).trim();
+
+                currentProductExistingMedia = currentProductExistingMedia.map((media) => {
+                    if (Number(media.id) !== Number(mediaId)) return media;
+                    return {
+                        ...media,
+                        media_url: updatedMediaUrl,
+                        backgroundPreviewState: 'idle',
+                        backgroundPreviewUrl: ''
+                    };
+                });
+
+                const productImage = globalProducts.find((item) => Number(item.id) === Number(editingProductId));
+                if (productImage && payload && payload.media && payload.media.is_main) {
+                    productImage.image_url = updatedMediaUrl;
+                }
+
+                activeExistingMediaPreviewId = null;
+                renderExistingProductMedia();
+                fetchProducts();
+            } catch (error) {
+                alert(error.message || 'Mevcut görsel arka plansız güncellenemedi.');
+            }
+        }
+
+        function cancelExistingMediaBackgroundPreview(mediaId) {
+            const targetMedia = currentProductExistingMedia.find((item) => Number(item.id) === Number(mediaId));
+            if (!targetMedia) return;
+
+            targetMedia.backgroundPreviewState = 'idle';
+            targetMedia.backgroundPreviewUrl = '';
+            activeExistingMediaPreviewId = null;
+            renderExistingProductMedia();
+        }
+
+        function formatProductSaveWarnings(warnings) {
+            if (!Array.isArray(warnings) || !warnings.length) return '';
+            return `\n\nNot:\n- ${warnings.join('\n- ')}`;
         }
 
         function cleanAiSummary(message) {
@@ -3305,6 +4151,7 @@
             try {
                 const res = await adminApiFetch('/api/categories');
                 globalCategories = await res.json();
+                populateCategoryDropdowns();
 
                 const tbody = document.getElementById('categories-table-body');
                 tbody.innerHTML = '';
@@ -3340,7 +4187,138 @@
             }
         }
 
-        function populateCategoryDropdowns() {
+        function escapeAdminHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizeProductCategories(product) {
+            const baseValues = Array.isArray(product?.categories) && product.categories.length > 0
+                ? product.categories
+                : [product?.category];
+            const seen = new Set();
+
+            return baseValues
+                .map((value) => String(value || '').trim())
+                .filter((value) => {
+                    if (!value) return false;
+                    const lookupKey = value.toLocaleLowerCase('tr-TR');
+                    if (seen.has(lookupKey)) return false;
+                    seen.add(lookupKey);
+                    return true;
+                });
+        }
+
+        function getOrderedCategoryOptions() {
+            const categoryById = new Map(globalCategories.map((category) => [Number(category.id), category]));
+            const sortedCategories = [...globalCategories].sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'tr'));
+            const topLevel = sortedCategories.filter((category) => category.parent_id === null);
+            const ordered = [];
+            const visitedIds = new Set();
+
+            topLevel.forEach((category) => {
+                const children = sortedCategories.filter((item) => Number(item.parent_id) === Number(category.id));
+                const hasChildren = children.length > 0;
+                visitedIds.add(Number(category.id));
+
+                if (!hasChildren) {
+                    ordered.push({ value: category.name, label: category.name });
+                }
+
+                children.forEach((child) => {
+                        visitedIds.add(Number(child.id));
+                        ordered.push({
+                            value: child.name,
+                            label: `${category.name} > ${child.name}`
+                        });
+                    });
+            });
+
+            sortedCategories.forEach((category) => {
+                if (visitedIds.has(Number(category.id))) return;
+                const parentName = categoryById.get(Number(category.parent_id))?.name;
+                ordered.push({
+                    value: category.name,
+                    label: parentName ? `${parentName} > ${category.name}` : category.name
+                });
+            });
+
+            return ordered;
+        }
+
+        function getSelectedCategoryValues() {
+            return [...selectedProductCategories];
+        }
+
+        function renderSelectedProductCategories() {
+            const container = document.getElementById('selected-product-categories');
+            if (!container) return;
+
+            if (selectedProductCategories.length === 0) {
+                container.innerHTML = '<span class="selected-category-empty">Henüz kategori eklenmedi.</span>';
+                return;
+            }
+
+            container.innerHTML = selectedProductCategories
+                .map((categoryName) => `
+                    <span class="selected-category-chip">
+                        <span>${escapeAdminHtml(categoryName)}</span>
+                        <button type="button" class="selected-category-remove" onclick="removeProductCategoryChip('${escapeAdminHtml(categoryName)}')" aria-label="${escapeAdminHtml(categoryName)} kategorisini kaldır">&times;</button>
+                    </span>
+                `)
+                .join('');
+        }
+
+        function refreshProductCategorySelectOptions() {
+            const prodCatSelect = document.getElementById('prod-category');
+            if (!prodCatSelect) return;
+
+            const selectedLookup = new Set(selectedProductCategories.map((value) => value.toLocaleLowerCase('tr-TR')));
+            const optionsHtml = getOrderedCategoryOptions()
+                .filter((categoryOption) => !selectedLookup.has(String(categoryOption.value || '').toLocaleLowerCase('tr-TR')))
+                .map((categoryOption) => `<option value="${escapeAdminHtml(categoryOption.value)}">${escapeAdminHtml(categoryOption.label)}</option>`)
+                .join('');
+
+            prodCatSelect.innerHTML = `<option value="">Kategori Seçin</option>${optionsHtml}`;
+            prodCatSelect.value = '';
+        }
+
+        function setSelectedProductCategories(values = []) {
+            selectedProductCategories = normalizeProductCategories({ categories: values });
+            refreshProductCategorySelectOptions();
+            renderSelectedProductCategories();
+        }
+
+        function handleProductCategorySelect(selectedValue) {
+            const normalizedValue = String(selectedValue || '').trim();
+            if (!normalizedValue) return;
+
+            setSelectedProductCategories([...selectedProductCategories, normalizedValue]);
+        }
+
+        function removeProductCategoryChip(categoryName) {
+            const normalizedTarget = String(categoryName || '').trim().toLocaleLowerCase('tr-TR');
+            selectedProductCategories = selectedProductCategories.filter((value) => value.toLocaleLowerCase('tr-TR') !== normalizedTarget);
+            refreshProductCategorySelectOptions();
+            renderSelectedProductCategories();
+        }
+
+        function renderProductCategoryBadges(product) {
+            const categories = normalizeProductCategories(product);
+            if (categories.length === 0) {
+                return '<span class="cat-badge">Kategorisiz</span>';
+            }
+
+            return categories
+                .map((categoryName) => `<span class="cat-badge">${escapeAdminHtml(categoryName)}</span>`)
+                .join(' ');
+        }
+
+        function populateCategoryDropdowns(selectedValues = []) {
             const parentSelect = document.getElementById('cat-parent');
             if (parentSelect) {
                 parentSelect.innerHTML = '<option value="">-- Ana Kategori (Yok) --</option>';
@@ -3351,12 +4329,8 @@
 
             const prodCatSelect = document.getElementById('prod-category');
             if (prodCatSelect) {
-                const currentValue = prodCatSelect.value;
-                prodCatSelect.innerHTML = '<option value="">Kategori Seçin</option>';
-                globalCategories.forEach(c => {
-                    prodCatSelect.innerHTML += `<option value="${c.name}">${c.name}</option>`;
-                });
-                if (currentValue) prodCatSelect.value = currentValue;
+                const preservedValues = selectedValues.length > 0 ? selectedValues : getSelectedCategoryValues();
+                setSelectedProductCategories(preservedValues);
             }
         }
 
@@ -4047,14 +5021,14 @@
                 globalProducts.forEach(p => {
                     const img = p.image_url || 'https://via.placeholder.com/50';
                     const oldPriceStr = p.old_price ? `<span style="color:#2E7D32; font-weight:bold;">${p.old_price} TL</span>` : '-';
-                    const catStr = p.category || 'Kategorisiz';
+                    const categoryBadges = renderProductCategoryBadges(p);
 
                     tbody.innerHTML += `
     <tr>
         <td><img src="${img}"
                 style="width:50px; height:50px; object-fit:contain; border-radius:8px; border:1px solid #eee;"></td>
         <td style="font-weight:600;">${p.name}</td>
-        <td><span class="cat-badge">${catStr}</span></td>
+        <td>${categoryBadges}</td>
         <td>${p.price} TL</td>
         <td>${oldPriceStr}</td>
         <td>${p.stock}</td>
@@ -4078,6 +5052,8 @@
             document.getElementById(id).style.display = 'none';
             if (id === 'product-modal') {
                 resetPendingProductMediaSelection();
+                resetExistingProductMediaState();
+                setSelectedProductCategories([]);
             }
         }
 
@@ -4085,10 +5061,12 @@
             editingProductId = null;
             document.getElementById('add-product-form').reset();
             resetPendingProductMediaSelection();
+            setSelectedProductCategories([]);
             setProductDescriptionEditorValue('');
             document.getElementById('modal-title-text').innerText = "Vitrine Yeni Ürün Ekle";
             document.getElementById('existing-media-group').style.display = 'none';
             document.getElementById('existing-media-container').innerHTML = '';
+            resetExistingProductMediaState();
             document.getElementById('upload-status').innerText = '';
             document.getElementById('btn-save-product').innerText = "Ürünü Kaydet";
             populateCategoryDropdowns();
@@ -4100,9 +5078,10 @@
             if (!p) return;
             editingProductId = p.id;
             resetPendingProductMediaSelection();
+            setSelectedProductCategories([]);
             document.getElementById('modal-title-text').innerText = "Ürünü Düzenle: " + p.name;
             document.getElementById('prod-name').value = p.name;
-            document.getElementById('prod-category').value = p.category || '';
+            populateCategoryDropdowns(normalizeProductCategories(p));
             document.getElementById('prod-price').value = p.price;
             document.getElementById('prod-old-price').value = p.old_price || '';
             document.getElementById('prod-stock').value = p.stock;
@@ -4110,32 +5089,21 @@
             document.getElementById('btn-save-product').innerText = "Değişiklikleri Kaydet";
             document.getElementById('upload-status').innerText = '';
 
-            document.getElementById('existing-media-group').style.display = 'none';
-            document.getElementById('existing-media-container').innerHTML = '';
+            resetExistingProductMediaState();
 
             try {
                 const res = await adminApiFetch('/api/products/' + id);
-                const pDetails = await res.json();
+                const pDetails = await adminReadJson(res, 'Ürün detayları getirilemedi.');
                 if (pDetails.media && pDetails.media.length > 0) {
-                    document.getElementById('existing-media-group').style.display = 'block';
-                    const container = document.getElementById('existing-media-container');
-                    pDetails.media.forEach(m => {
-                        let mediaTag = isProductMediaVideo(m.media_url)
-                            ? `<video src="${m.media_url}" class="existing-media-preview is-video"></video>`
-                            : `<img src="${m.media_url}" class="existing-media-preview">`;
-
-                        container.innerHTML += `
-    <div class="existing-media-card">
-        ${mediaTag}
-        <button type="button" onclick="deleteSpecificMedia(${m.id}, this)"
-            class="existing-media-delete">✕</button>
-    </div>
-    `;
-                    });
+                    currentProductExistingMedia = pDetails.media.map((media) => ({
+                        ...media,
+                        backgroundPreviewState: 'idle',
+                        backgroundPreviewUrl: ''
+                    }));
+                    renderExistingProductMedia();
                 }
             } catch (e) { }
 
-            populateCategoryDropdowns();
             document.getElementById('product-modal').style.display = 'flex';
         }
 
@@ -4145,7 +5113,12 @@
                 btnEl.innerText = "...";
                 const res = await adminApiFetch('/api/products/media/' + mediaId, { method: 'DELETE' });
                 await adminReadJson(res, 'Görsel silinemedi.');
-                btnEl.parentElement.remove();
+                currentProductExistingMedia = currentProductExistingMedia.filter((media) => Number(media.id) !== Number(mediaId));
+                if (Number(activeExistingMediaPreviewId) === Number(mediaId)) {
+                    activeExistingMediaPreviewId = null;
+                }
+                renderExistingProductMedia();
+                fetchProducts();
             } catch (e) {
                 alert(e.message || 'Görsel silinemedi.');
                 console.error(e);
@@ -4263,13 +5236,24 @@
                 formData.append('oldPrice', document.getElementById('prod-old-price').value);
                 formData.append('stock', document.getElementById('prod-stock').value);
                 formData.append('description', syncProductDescriptionField(true));
-                formData.append('category', document.getElementById('prod-category').value);
+                const selectedCategories = getSelectedCategoryValues();
+                if (selectedCategories.length === 0) {
+                    throw new Error('En az bir kategori seçin.');
+                }
+                formData.append('category', selectedCategories[0]);
+                formData.append('categories', JSON.stringify(selectedCategories));
 
                 if (pendingProductMediaFiles.length > 0) {
                     const mediaOrder = [];
                     for (let i = 0; i < pendingProductMediaFiles.length; i++) {
-                        const file = pendingProductMediaFiles[i].file;
-                        mediaOrder.push({ index: i, name: file.name, size: file.size });
+                        const entry = pendingProductMediaFiles[i];
+                        const file = entry.file;
+                        mediaOrder.push({
+                            index: i,
+                            name: file.name,
+                            size: file.size,
+                            removeBackground: !!entry.removeBackground
+                        });
                         formData.append('media', file);
                     }
                     formData.append('mediaOrder', JSON.stringify(mediaOrder));
@@ -4277,12 +5261,12 @@
 
                 if (editingProductId) {
                     const response = await adminApiFetch('/api/products/' + editingProductId, { method: 'PUT', body: formData });
-                    await adminReadJson(response, 'Ürün güncellenemedi.');
-                    alert('Ürün güncellendi.');
+                    const payload = await adminReadJson(response, 'Ürün güncellenemedi.');
+                    alert(`Ürün güncellendi.${formatProductSaveWarnings(payload && payload.warnings)}`);
                 } else {
                     const response = await adminApiFetch('/api/products', { method: 'POST', body: formData });
-                    await adminReadJson(response, 'Ürün eklenemedi.');
-                    alert('Ürün eklendi.');
+                    const payload = await adminReadJson(response, 'Ürün eklenemedi.');
+                    alert(`Ürün eklendi.${formatProductSaveWarnings(payload && payload.warnings)}`);
                 }
 
                 document.getElementById('add-product-form').reset();

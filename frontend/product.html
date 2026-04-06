@@ -1377,18 +1377,37 @@
 
         .category-item {
             position: relative;
+            border-bottom: 3px solid transparent;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .category-trigger {
+            border: none;
+            background: transparent;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
             padding: 15px 20px;
             cursor: pointer;
             font-weight: 600;
             color: #0F2A43;
             transition: all 0.3s;
-            border-bottom: 3px solid transparent;
-            border-radius: 6px 6px 0 0;
+            font: inherit;
         }
 
-        .category-item:hover {
+        .category-item:hover .category-trigger,
+        .category-item.is-open .category-trigger {
             color: #F7941D;
             background-color: #E8EEF2;
+        }
+
+        .category-caret {
+            font-size: 0.8rem;
+            transition: transform 0.24s ease;
+        }
+
+        .category-item.is-open .category-caret {
+            transform: rotate(180deg);
         }
 
         .subcategory-menu {
@@ -1406,11 +1425,17 @@
             border: 1px solid #eee;
         }
 
-        .category-item:hover .subcategory-menu {
+        .category-item:hover .subcategory-menu,
+        .category-item.is-open .subcategory-menu {
             display: block;
         }
 
         .subcategory-item {
+            display: block;
+            width: 100%;
+            border: none;
+            background: transparent;
+            text-align: left;
             padding: 10px 20px;
             font-size: 0.9rem;
             color: #F7941D;
@@ -1736,6 +1761,34 @@
         }
 
         // --- KATEGORİ SİSTEMİ ---
+        function setCategoryMenuOpenState(menuItem, isOpen) {
+            menuItem.classList.toggle('is-open', Boolean(isOpen));
+            const trigger = menuItem.querySelector('.category-trigger');
+            if (trigger) {
+                trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            }
+        }
+
+        function closeCategoryMenus(menu, exceptItem = null) {
+            menu.querySelectorAll('.category-item.is-open').forEach((item) => {
+                if (item !== exceptItem) {
+                    setCategoryMenuOpenState(item, false);
+                }
+            });
+        }
+
+        function bindCategoryMenuInteractions(menu) {
+            if (menu.dataset.interactionsBound === 'true') return;
+
+            document.addEventListener('click', (event) => {
+                if (!menu.contains(event.target)) {
+                    closeCategoryMenus(menu);
+                }
+            });
+
+            menu.dataset.interactionsBound = 'true';
+        }
+
         async function fetchNavigationCategories() {
             try {
                 const res = await fetch('/api/categories');
@@ -1747,27 +1800,79 @@
                 const mainCats = categories.filter(c => c.parent_id === null);
                 const themeColors = ['#F7941D', '#1976D2', '#388E3C', '#D32F2F', '#7B1FA2', '#00796B', '#FBC02D', '#C2185B', '#0F2A43'];
 
-                mainCats.forEach((main, index) => {
+                menu.innerHTML = mainCats.map((main, index) => {
                     const subCats = categories.filter(c => c.parent_id === main.id);
-
-                    let subHtml = '';
-                    if (subCats.length > 0) {
-                        subHtml = '<ul class="subcategory-menu">';
-                        subCats.forEach(sub => {
-                            subHtml += `<li class="subcategory-item" onclick="window.location.href='index.html?category=${encodeURIComponent(sub.name)}'">${sub.name}</li>`;
-                        });
-                        subHtml += '</ul>';
-                    }
+                    const hasChildren = subCats.length > 0;
+                    const subHtml = hasChildren
+                        ? `
+                            <ul class="subcategory-menu">
+                                ${subCats.map((sub) => `
+                                    <li>
+                                        <button type="button" class="subcategory-item" data-category-name="${escapeHtmlAttribute(sub.name)}">${escapeHtml(sub.name)}</button>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        `
+                        : '';
 
                     const bottomColor = themeColors[index % themeColors.length];
 
-                    menu.innerHTML += `
-                        <li class="category-item" style="border-bottom-color: ${bottomColor};" onclick="if(event.target === this) window.location.href='index.html?category=${encodeURIComponent(main.name)}'">
-                            ${main.name}
+                    return `
+                        <li class="category-item ${hasChildren ? 'has-children' : ''}" data-category-name="${escapeHtmlAttribute(main.name)}" style="border-bottom-color: ${bottomColor};">
+                            <button type="button" class="category-trigger" aria-expanded="false">
+                                <span>${escapeHtml(main.name)}</span>
+                                ${hasChildren ? '<span class="category-caret">&#9662;</span>' : ''}
+                            </button>
                             ${subHtml}
                         </li>
                     `;
+                }).join('');
+
+                menu.querySelectorAll('.category-item').forEach((menuItem) => {
+                    const trigger = menuItem.querySelector('.category-trigger');
+                    const categoryName = menuItem.dataset.categoryName || '';
+                    const hasChildren = menuItem.classList.contains('has-children');
+
+                    if (!trigger) return;
+
+                    if (!hasChildren) {
+                        trigger.addEventListener('click', () => {
+                            window.location.href = `index.html?category=${encodeURIComponent(categoryName)}`;
+                        });
+                        return;
+                    }
+
+                    menuItem.addEventListener('mouseenter', () => {
+                        if (!window.matchMedia('(hover: hover)').matches) return;
+                        closeCategoryMenus(menu, menuItem);
+                        setCategoryMenuOpenState(menuItem, true);
+                    });
+
+                    menuItem.addEventListener('mouseleave', () => {
+                        if (!window.matchMedia('(hover: hover)').matches) return;
+                        setCategoryMenuOpenState(menuItem, false);
+                    });
+
+                    trigger.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const shouldOpen = !menuItem.classList.contains('is-open');
+                        closeCategoryMenus(menu, shouldOpen ? menuItem : null);
+                        setCategoryMenuOpenState(menuItem, shouldOpen);
+                    });
                 });
+
+                menu.querySelectorAll('.subcategory-item').forEach((subTrigger) => {
+                    subTrigger.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const categoryName = subTrigger.dataset.categoryName || '';
+                        if (!categoryName) return;
+                        window.location.href = `index.html?category=${encodeURIComponent(categoryName)}`;
+                    });
+                });
+
+                bindCategoryMenuInteractions(menu);
             } catch (err) {
                 console.error("Kategoriler yüklenirken hata:", err);
             }

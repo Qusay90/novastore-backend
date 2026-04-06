@@ -34,6 +34,24 @@ const safeNumber = (value, fallback = 0) => {
 
 const buildProductUrl = (productId) => `${APP_BASE_URL}/product.html?id=${productId}`;
 
+const normalizeCategoryList = (value, fallbackCategory = 'Kategorisiz') => {
+    const rawList = Array.isArray(value) ? value : [fallbackCategory];
+    const unique = [];
+    const seen = new Set();
+
+    rawList.forEach((entry) => {
+        const categoryName = String(entry || '').trim();
+        if (!categoryName) return;
+
+        const lookupKey = categoryName.toLocaleLowerCase('tr-TR');
+        if (seen.has(lookupKey)) return;
+        seen.add(lookupKey);
+        unique.push(categoryName);
+    });
+
+    return unique.length > 0 ? unique : [fallbackCategory];
+};
+
 const runCatalogQuery = async () => {
     const primaryQuery = `
         SELECT
@@ -44,6 +62,7 @@ const runCatalogQuery = async () => {
             p.old_price,
             p.stock,
             p.image_url,
+            COALESCE(p.categories, ARRAY[COALESCE(NULLIF(p.category, ''), 'Kategorisiz')]::TEXT[]) AS categories,
             COALESCE(p.category, 'Kategorisiz') AS category,
             ROUND(COALESCE(AVG(r.rating), 0), 1) AS average_rating,
             CAST(COUNT(r.id) AS INTEGER) AS review_count
@@ -62,6 +81,7 @@ const runCatalogQuery = async () => {
             NULL::numeric AS old_price,
             p.stock,
             p.image_url,
+            ARRAY['Kategorisiz']::TEXT[] AS categories,
             'Kategorisiz' AS category,
             ROUND(COALESCE(AVG(r.rating), 0), 1) AS average_rating,
             CAST(COUNT(r.id) AS INTEGER) AS review_count
@@ -100,12 +120,13 @@ const parseSearchFilters = (message) => {
 };
 
 const scoreProduct = (product, queryTokens, filters) => {
-    const haystack = normalizeSearchText(`${product.name} ${product.category} ${product.description || ''}`);
+    const categoryHaystack = Array.isArray(product.categories) ? product.categories.join(' ') : product.category;
+    const haystack = normalizeSearchText(`${product.name} ${categoryHaystack} ${product.description || ''}`);
     let score = 0;
 
     queryTokens.forEach((token) => {
         if (normalizeSearchText(product.name).includes(token)) score += 8;
-        if (normalizeSearchText(product.category).includes(token)) score += 4;
+        if (normalizeSearchText(categoryHaystack).includes(token)) score += 4;
         if (haystack.includes(token)) score += 2;
     });
 
@@ -123,19 +144,23 @@ const scoreProduct = (product, queryTokens, filters) => {
     return score;
 };
 
-const formatProduct = (row) => ({
-    id: Number(row.id),
-    name: row.name,
-    description: row.description || '',
-    price: safeNumber(row.price),
-    oldPrice: row.old_price !== null && row.old_price !== undefined ? safeNumber(row.old_price) : null,
-    stock: safeNumber(row.stock),
-    imageUrl: row.image_url || '',
-    category: row.category || 'Kategorisiz',
-    averageRating: safeNumber(row.average_rating),
-    reviewCount: safeNumber(row.review_count),
-    productUrl: buildProductUrl(row.id)
-});
+const formatProduct = (row) => {
+    const categories = normalizeCategoryList(row.categories, row.category || 'Kategorisiz');
+    return {
+        categories,
+        id: Number(row.id),
+        name: row.name,
+        description: row.description || '',
+        price: safeNumber(row.price),
+        oldPrice: row.old_price !== null && row.old_price !== undefined ? safeNumber(row.old_price) : null,
+        stock: safeNumber(row.stock),
+        imageUrl: row.image_url || '',
+        category: categories[0] || row.category || 'Kategorisiz',
+        averageRating: safeNumber(row.average_rating),
+        reviewCount: safeNumber(row.review_count),
+        productUrl: buildProductUrl(row.id)
+    };
+};
 
 const applyStructuredFilters = (products, filters) => products.filter((product) => {
     if (filters.inStockOnly && product.stock <= 0) return false;
