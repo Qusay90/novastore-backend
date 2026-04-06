@@ -1257,20 +1257,7 @@
             if (slideCount <= 1) return;
 
             const currentX = Number(event.clientX || 0);
-            const currentY = Number(event.clientY || 0);
-            const previousX = state.lastPointerX;
-            const previousY = state.lastPointerY;
-
             state.lastPointerX = currentX;
-            state.lastPointerY = currentY;
-
-            if (previousX !== null && previousY !== null) {
-                const deltaX = Math.abs(currentX - previousX);
-                const deltaY = Math.abs(currentY - previousY);
-                if (deltaX < 4 || deltaX < deltaY) {
-                    return;
-                }
-            }
 
             const bounds = frame.getBoundingClientRect();
             if (!bounds.width) return;
@@ -1279,15 +1266,23 @@
             if (zoneCount <= 1) return;
 
             const relativeX = Math.min(Math.max(0, currentX - bounds.left), Math.max(0, bounds.width - 1));
-            const zoneIndex = Math.min(zoneCount - 1, Math.floor((relativeX / bounds.width) * zoneCount));
+            const normalizedPosition = bounds.width > 1
+                ? relativeX / (bounds.width - 1)
+                : 0;
+            const zoneIndex = Math.max(
+                0,
+                Math.min(zoneCount - 1, Math.floor(normalizedPosition * zoneCount))
+            );
             const targetIndex = getProductCardZoneSlideIndex(zoneIndex, slideCount);
 
             state.isPointerScrubbing = true;
-            state.manualZoneIndex = zoneIndex;
             clearProductCardStepTimeout(state);
             clearProductCardIdleResumeTimeout(state);
 
-            if (Number(frame.dataset.activeIndex || 0) !== targetIndex) {
+            const zoneChanged = state.manualZoneIndex !== zoneIndex;
+            state.manualZoneIndex = zoneIndex;
+
+            if (zoneChanged || Number(frame.dataset.activeIndex || 0) !== targetIndex) {
                 updateProductCardSlider(card, targetIndex);
             }
             syncProductCardHoverZones(card, targetIndex, zoneIndex);
@@ -1348,7 +1343,6 @@
                 zoomTimeoutId: null,
                 idleResumeTimeoutId: null,
                 lastPointerX: null,
-                lastPointerY: null,
                 isPointerScrubbing: false,
                 manualZoneIndex: null
             };
@@ -1371,7 +1365,7 @@
 
                 frame.onmouseenter = () => startProductCardSlider(card);
                 frame.onmouseleave = () => stopProductCardSlider(card);
-                frame.onmousemove = (event) => handleProductCardPointerScrub(event, card);
+                frame.onpointermove = (event) => handleProductCardPointerScrub(event, card);
             });
         }
 
