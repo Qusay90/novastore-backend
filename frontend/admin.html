@@ -167,13 +167,22 @@
 
         /* SOL MENÜ (SIDEBAR) */
         .sidebar {
-            width: 260px;
+            width: 300px;
+            min-width: 300px;
             background: var(--primary);
             color: white;
             display: flex;
             flex-direction: column;
             transition: 0.3s;
             z-index: 100;
+            overflow: hidden;
+        }
+
+        body.sidebar-hidden .sidebar {
+            width: 0;
+            min-width: 0;
+            border: 0;
+            transform: translateX(-12px);
         }
 
         .sidebar-header {
@@ -268,6 +277,35 @@
             position: sticky;
             top: 0;
             z-index: 90;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .sidebar-toggle {
+            width: 42px;
+            height: 42px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--table-hover);
+            color: var(--heading-color);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.25rem;
+            font-weight: 800;
+            transition: 0.2s ease;
+        }
+
+        .sidebar-toggle:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            transform: translateY(-1px);
         }
 
         .page-title {
@@ -1640,7 +1678,11 @@
 
     <main class="main-content">
         <header class="topbar">
-            <h1 class="page-title" id="page-title-text">Özet Paneli</h1>
+            <div class="topbar-left">
+                <button class="sidebar-toggle" id="sidebar-toggle" type="button" onclick="toggleAdminSidebar()"
+                    aria-label="Menüyü gizle" title="Menüyü gizle">☰</button>
+                <h1 class="page-title" id="page-title-text">Özet Paneli</h1>
+            </div>
             <div class="admin-profile">
                 <div class="theme-switch-wrapper">
                     <label class="theme-switch" for="theme-checkbox">
@@ -2317,6 +2359,26 @@
             }
 
             return payload;
+        }
+
+        function setAdminSidebarHidden(hidden) {
+            document.body.classList.toggle('sidebar-hidden', hidden);
+            localStorage.setItem('nova_admin_sidebar_hidden', hidden ? '1' : '0');
+
+            const toggle = document.getElementById('sidebar-toggle');
+            if (toggle) {
+                toggle.setAttribute('aria-label', hidden ? 'Menüyü göster' : 'Menüyü gizle');
+                toggle.setAttribute('title', hidden ? 'Menüyü göster' : 'Menüyü gizle');
+                toggle.innerText = hidden ? '☰' : '‹';
+            }
+        }
+
+        function toggleAdminSidebar() {
+            setAdminSidebarHidden(!document.body.classList.contains('sidebar-hidden'));
+        }
+
+        function initAdminSidebar() {
+            setAdminSidebarHidden(localStorage.getItem('nova_admin_sidebar_hidden') === '1');
         }
 
         function renderOrdersTableError(message) {
@@ -5334,6 +5396,7 @@
             const savedTheme = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', savedTheme);
             document.getElementById('theme-checkbox').checked = (savedTheme === 'dark');
+            initAdminSidebar();
             setupProductDescriptionEditor();
             setupProductMediaDropzone();
 
