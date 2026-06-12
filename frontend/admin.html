@@ -220,15 +220,9 @@
             font-weight: 600;
         }
 
-        .sidebar-footer {
-            padding: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
         .btn-logout {
             background: rgba(229, 57, 53, 0.1);
             color: #FF8A80;
-            width: 100%;
             padding: 12px;
             border: none;
             border-radius: 8px;
@@ -240,6 +234,18 @@
         .btn-logout:hover {
             background: #E53935;
             color: white;
+        }
+
+        .topbar-logout {
+            width: auto;
+            min-height: 40px;
+            padding: 0 14px;
+            border: 1px solid rgba(229, 57, 53, 0.28);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            white-space: nowrap;
         }
 
         /* ANA İÇERİK */
@@ -1630,9 +1636,6 @@
             <li class="nav-link" onclick="switchTab('chat', this)">💬 Müşteri Soruları</li>
             <li class="nav-link" onclick="window.open('index.html', '_blank')">🌐 Siteyi Görüntüle</li>
         </ul>
-        <div class="sidebar-footer">
-            <button class="btn-logout" onclick="adminLogout()">Güvenli Çıkış</button>
-        </div>
     </aside>
 
     <main class="main-content">
@@ -1667,6 +1670,7 @@
 
                 <span>Yönetici</span>
                 <div class="admin-avatar">A</div>
+                <button class="btn-logout topbar-logout" onclick="adminLogout()">Çıkış</button>
             </div>
         </header>
 
