@@ -12,7 +12,7 @@ exports.askQuestion = async (req, res) => {
         // Token'i header'dan alip manuel cozuyoruz (middleware olmadigi icin)
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Lutfen giris yapin.' });
+            return res.status(401).json({ error: 'Lütfen giriş yapın.' });
         }
         const token = authHeader.split(' ')[1];
         let user_id;
@@ -20,11 +20,11 @@ exports.askQuestion = async (req, res) => {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             user_id = decoded.id;
         } catch (err) {
-            return res.status(401).json({ error: 'Gecersiz veya suresi dolmus token.' });
+            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
         }
 
         if (!product_id || !question) {
-            return res.status(400).json({ error: 'Urun ID ve soru icerigi gereklidir.' });
+            return res.status(400).json({ error: 'Ürün ID ve soru içeriği gereklidir.' });
         }
 
         const newQuestion = await pool.query(
@@ -36,50 +36,55 @@ exports.askQuestion = async (req, res) => {
         try {
             const { io } = require('../server');
             const { createNotification } = require('./notificationController');
-            await createNotification(null, 'new_question', 'Yeni bir urun sorusu geldi!', io);
+            await createNotification(null, 'new_question', 'Yeni bir ürün sorusu geldi!', io);
         } catch (notifErr) {
             console.error('Bildirim gonderilirken hata:', notifErr);
         }
 
-        res.status(201).json({ mesaj: 'Sorunuz basariyla iletildi. Satici yanitladiginda burada gorunecektir.', question: newQuestion.rows[0] });
+        res.status(201).json({ mesaj: 'Sorunuz başarıyla iletildi. Satıcı yanıtladığında burada görünecektir.', question: newQuestion.rows[0] });
     } catch (error) {
-        console.error('Soru sorma hatasi:', error);
-        res.status(500).json({ error: 'Sunucu hatasi' });
+        console.error('Soru sorma hatası:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
     }
 };
 
-// Urune Ait Sorulari Getir
+// Ürüne Ait Soruları Getir
 exports.getProductQuestions = async (req, res) => {
     try {
         const { productId } = req.params;
 
         const questions = await pool.query(
-            `SELECT pq.id, pq.question, pq.answer, pq.created_at, pq.answered_at, COALESCE(u.full_name, u.name) as user_name
+            `SELECT pq.id, pq.product_id, pq.user_id, pq.question, pq.answer, pq.created_at, pq.answered_at,
+                    COALESCE(u.full_name, u.name) as user_name
              FROM product_questions pq
              JOIN users u ON pq.user_id = u.id
-             WHERE pq.product_id = $1 AND pq.answer IS NOT NULL
-             ORDER BY pq.answered_at DESC`,
+             WHERE pq.product_id = $1
+             ORDER BY
+                CASE WHEN pq.answer IS NULL THEN 0 ELSE 1 END ASC,
+                COALESCE(pq.answered_at, pq.created_at) DESC`,
             [productId]
         );
 
         res.status(200).json(
             questions.rows.map((questionRow) => ({
                 ...questionRow,
-                user_name: maskFullName(questionRow.user_name)
+                user_name: maskFullName(questionRow.user_name),
+                status: questionRow.answer ? 'answered' : 'pending',
+                is_answered: Boolean(questionRow.answer)
             }))
         );
     } catch (error) {
-        console.error('Sorulari getirme hatasi:', error);
-        res.status(500).json({ error: 'Sunucu hatasi' });
+        console.error('Soruları getirme hatası:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
     }
 };
 
-// 3. Kullanicinin Kendi Sordugu Sorulari Getir
+// 3. Kullanıcının Kendi Sorduğu Soruları Getir
 exports.getUserQuestions = async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Lutfen giris yapin.' });
+            return res.status(401).json({ error: 'Lütfen giriş yapın.' });
         }
         const token = authHeader.split(' ')[1];
         let user_id;
@@ -87,12 +92,12 @@ exports.getUserQuestions = async (req, res) => {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             user_id = decoded.id;
         } catch (err) {
-            return res.status(401).json({ error: 'Gecersiz veya suresi dolmus token.' });
+            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
         }
 
         const questions = await pool.query(
             `SELECT pq.id, pq.question, pq.answer, pq.created_at, pq.answered_at,
-                    p.name as product_name, p.image_url as product_image
+                    pq.product_id, p.name as product_name, p.image_url as product_image
              FROM product_questions pq
              JOIN products p ON pq.product_id = p.id
              WHERE pq.user_id = $1
@@ -100,23 +105,27 @@ exports.getUserQuestions = async (req, res) => {
             [user_id]
         );
 
-        res.status(200).json(questions.rows);
+        res.status(200).json(questions.rows.map((questionRow) => ({
+            ...questionRow,
+            status: questionRow.answer ? 'answered' : 'pending',
+            is_answered: Boolean(questionRow.answer)
+        })));
     } catch (error) {
-        console.error('Kullanici sorulari getirme hatasi:', error);
-        res.status(500).json({ error: 'Sunucu hatasi' });
+        console.error('Kullanıcı soruları getirme hatası:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
     }
 };
 
 // --- Admin Islemleri ---
 
-// Admin: Tum Sorulari Getir (Cevaplanmamislar ustte olsun)
+// Admin: Tüm Soruları Getir (Cevaplanmamışlar üstte olsun)
 exports.getAllQuestionsAdmin = async (req, res) => {
     try {
         console.log('[ADMIN YETKI KONTROLU] Baslatiliyor...');
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            console.log('[ADMIN YETKI KONTROLU] Token bulunamadi.');
-            return res.status(401).json({ error: 'Lutfen giris yapin.' });
+            console.log('[ADMIN YETKİ KONTROLÜ] Token bulunamadı.');
+            return res.status(401).json({ error: 'Lütfen giriş yapın.' });
         }
         const token = authHeader.split(' ')[1];
         try {
@@ -128,12 +137,12 @@ exports.getAllQuestionsAdmin = async (req, res) => {
             console.log('[ADMIN YETKI KONTROLU] Basarili.');
         } catch (err) {
             console.log('[ADMIN YETKI KONTROLU] Token dogrulanamadi:', err.message);
-            return res.status(401).json({ error: 'Gecersiz veya suresi dolmus token.' });
+            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
         }
 
         console.log('[VERITABANI] Sorular cekiliyor...');
         const questions = await pool.query(
-            `SELECT pq.id, pq.question, pq.answer, pq.created_at, pq.answered_at,
+            `SELECT pq.id, pq.product_id, pq.user_id, pq.question, pq.answer, pq.created_at, pq.answered_at,
                     p.name as product_name, p.image_url as product_image,
                     COALESCE(u.full_name, u.name) as user_name
              FROM product_questions pq
@@ -147,8 +156,49 @@ exports.getAllQuestionsAdmin = async (req, res) => {
 
         res.status(200).json(questions.rows);
     } catch (error) {
-        console.error('Tum sorulari getirme hatasi:', error);
-        res.status(500).json({ error: 'Sunucu hatasi: ' + error.message });
+        console.error('Tüm soruları getirme hatası:', error);
+        res.status(500).json({ error: 'Sunucu hatası: ' + error.message });
+    }
+};
+
+// Admin: Ürün bazlı soru özetleri
+exports.getProductQuestionSummaryAdmin = async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'Lütfen giriş yapın.' });
+        }
+        const token = authHeader.split(' ')[1];
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            if (decoded.role !== 'admin') {
+                return res.status(403).json({ error: 'Sadece yöneticiler bu işlemi yapabilir.' });
+            }
+        } catch (err) {
+            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
+        }
+
+        const result = await pool.query(
+            `SELECT
+                p.id AS product_id,
+                p.name AS product_name,
+                p.image_url AS product_image,
+                COUNT(pq.id)::INT AS question_count,
+                COUNT(pq.id) FILTER (WHERE pq.answer IS NULL)::INT AS pending_count,
+                COUNT(pq.id) FILTER (WHERE pq.answer IS NOT NULL)::INT AS answered_count,
+                MAX(pq.created_at) AS latest_question_at
+             FROM product_questions pq
+             JOIN products p ON pq.product_id = p.id
+             GROUP BY p.id, p.name, p.image_url
+             ORDER BY
+                COUNT(pq.id) FILTER (WHERE pq.answer IS NULL) DESC,
+                MAX(pq.created_at) DESC`
+        );
+
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error('Ürün soru özetleri getirme hatası:', error);
+        res.status(500).json({ error: 'Sunucu hatası: ' + error.message });
     }
 };
 
@@ -157,7 +207,7 @@ exports.answerQuestion = async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Lutfen giris yapin.' });
+            return res.status(401).json({ error: 'Lütfen giriş yapın.' });
         }
         const token = authHeader.split(' ')[1];
         try {
@@ -166,14 +216,14 @@ exports.answerQuestion = async (req, res) => {
                 return res.status(403).json({ error: 'Sadece yoneticiler bu islemi yapabilir.' });
             }
         } catch (err) {
-            return res.status(401).json({ error: 'Gecersiz veya suresi dolmus token.' });
+            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
         }
 
         const { id } = req.params;
         const { answer } = req.body;
 
         if (!answer) {
-            return res.status(400).json({ error: 'Lutfen bir cevap yazin.' });
+            return res.status(400).json({ error: 'Lütfen bir cevap yazın.' });
         }
 
         const updatedQuery = await pool.query(
@@ -182,7 +232,7 @@ exports.answerQuestion = async (req, res) => {
         );
 
         if (updatedQuery.rows.length === 0) {
-            return res.status(404).json({ error: 'Soru bulunamadi.' });
+            return res.status(404).json({ error: 'Soru bulunamadı.' });
         }
 
         const answeredQuestion = updatedQuery.rows[0];
@@ -198,7 +248,7 @@ exports.answerQuestion = async (req, res) => {
 
         res.status(200).json({ mesaj: 'Soru cevaplandi ve yayinlandi.', question: answeredQuestion });
     } catch (error) {
-        console.error('Cevaplama hatasi:', error);
-        res.status(500).json({ error: 'Sunucu hatasi' });
+        console.error('Cevaplama hatası:', error);
+        res.status(500).json({ error: 'Sunucu hatası' });
     }
 };

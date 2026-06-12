@@ -16,6 +16,8 @@ router.get('/product/:productId', questionController.getProductQuestions);
 // Tüm Soruları (Cevaplanmış/Cevaplanmamış) Getir
 router.get('/admin/all', questionController.getAllQuestionsAdmin);
 
+router.get('/admin/products', questionController.getProductQuestionSummaryAdmin);
+
 // Soruya Cevap Ver
 router.patch('/admin/answer/:id', questionController.answerQuestion);
 

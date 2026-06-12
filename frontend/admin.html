@@ -9,6 +9,7 @@
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
+    <script src="mobile-bridge.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -2265,6 +2266,8 @@
         let globalOrders = [];
         let globalReturns = [];
         let globalProducts = [];
+        let adminQuestionRows = [];
+        let adminQuestionProductRows = [];
         let globalCategories = []; // Kategorileri tutacak
         let editingProductId = null;
         let selectedProductCategories = [];
@@ -3833,7 +3836,7 @@
             } finally {
                 if (replyButton) {
                     replyButton.disabled = false;
-                    replyButton.innerText = 'Gonder';
+                    replyButton.innerText = 'Gönder';
                 }
             }
         }
@@ -5704,6 +5707,159 @@
             } catch (err) {
                 alert("Güncellenirken hata oluştu.");
             }
+        }
+
+        function questionStatusBadge(question) {
+            return question && question.answer
+                ? '<span class="status-badge status-delivered">Yanıtlandı</span>'
+                : '<span class="status-badge status-pending">Bekliyor</span>';
+        }
+
+        function productQuestionFallbackSummary(questions) {
+            const map = new Map();
+            questions.forEach((question) => {
+                const productId = Number(question.product_id || question.productId || 0);
+                if (!productId) return;
+                if (!map.has(productId)) {
+                    map.set(productId, {
+                        product_id: productId,
+                        product_name: question.product_name || 'Ürün',
+                        product_image: question.product_image || '',
+                        question_count: 0,
+                        pending_count: 0,
+                        answered_count: 0,
+                        latest_question_at: question.created_at
+                    });
+                }
+                const item = map.get(productId);
+                item.question_count += 1;
+                if (question.answer) item.answered_count += 1;
+                else item.pending_count += 1;
+                if (!item.latest_question_at || new Date(question.created_at) > new Date(item.latest_question_at)) {
+                    item.latest_question_at = question.created_at;
+                }
+            });
+            return Array.from(map.values()).sort((a, b) => (Number(b.pending_count || 0) - Number(a.pending_count || 0)) || (new Date(b.latest_question_at || 0) - new Date(a.latest_question_at || 0)));
+        }
+
+        function renderProductQuestionRows(products) {
+            const tbody = document.querySelector('#adminQuestionsTable tbody');
+            if (!tbody) return;
+            if (!products.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#98A2B3; padding:28px;">Henüz ürün sorusu yok.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = products.map((product) => {
+                const pendingCount = Number(product.pending_count || 0);
+                const answeredCount = Number(product.answered_count || 0);
+                const totalCount = Number(product.question_count || 0);
+                const latestQuestion = adminQuestionRows.find((q) => Number(q.product_id) === Number(product.product_id));
+                return `
+                    <tr style="${pendingCount > 0 ? 'background: rgba(247, 148, 29, 0.06);' : ''}">
+                        <td>
+                            <div style="display:flex; align-items:center; gap:12px; min-width:260px;">
+                                <img src="${escapeAdminHtml(product.product_image || 'https://via.placeholder.com/48?text=NS')}" alt="" style="width:48px; height:48px; object-fit:cover; border-radius:8px; background:#fff;">
+                                <div>
+                                    <div style="font-weight:800; color:var(--heading-color); max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeAdminHtml(product.product_name || 'Ürün')}</div>
+                                    <div style="font-size:0.78rem; color:#98A2B3;">Ürün #${Number(product.product_id)}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><strong>${totalCount}</strong> soru<br><span style="color:#98A2B3; font-size:0.8rem;">${answeredCount} yanıtlandı</span></td>
+                        <td>
+                            <div style="max-width:360px; color:#DDE6F3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeAdminHtml(latestQuestion ? latestQuestion.question : 'Soru geçmişini görüntüleyin.')}</div>
+                        </td>
+                        <td>${pendingCount > 0 ? `<span class="status-badge status-pending">${pendingCount} yeni</span>` : '<span class="status-badge status-delivered">Tamamlandı</span>'}</td>
+                        <td>${escapeAdminHtml(formatAdminDate(product.latest_question_at))}</td>
+                        <td>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                                <button class="btn-edit" ${pendingCount > 0 ? '' : 'disabled style="opacity:.45; cursor:not-allowed;"'} onclick="openProductQuestionAnswer(${Number(product.product_id)})">Yanıtla</button>
+                                <button class="btn-inspect" onclick="openProductQuestionViewer(${Number(product.product_id)})">Soruları Görüntüle</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function loadAdminQuestions() {
+            const tbody = document.querySelector('#adminQuestionsTable tbody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#98A2B3; padding:28px;">Ürün soruları yükleniyor...</td></tr>';
+            }
+
+            try {
+                const [questionsRes, productsRes] = await Promise.all([
+                    adminApiFetch('/api/questions/admin/all'),
+                    adminApiFetch('/api/questions/admin/products')
+                ]);
+                adminQuestionRows = await adminReadJson(questionsRes, 'Ürün soruları alınamadı.');
+                const productPayload = productsRes.ok
+                    ? await productsRes.json()
+                    : productQuestionFallbackSummary(Array.isArray(adminQuestionRows) ? adminQuestionRows : []);
+                adminQuestionProductRows = Array.isArray(productPayload) && productPayload.length
+                    ? productPayload
+                    : productQuestionFallbackSummary(Array.isArray(adminQuestionRows) ? adminQuestionRows : []);
+                renderProductQuestionRows(adminQuestionProductRows);
+            } catch (err) {
+                console.error('Ürün soruları yükleme hatası:', err);
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#FCA5A5; padding:28px;">${escapeAdminHtml(err.message || 'Ürün soruları alınamadı.')}</td></tr>`;
+                }
+            }
+        }
+
+        function openProductQuestionAnswer(productId) {
+            const pending = adminQuestionRows
+                .filter((question) => Number(question.product_id) === Number(productId) && !question.answer)
+                .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))[0];
+            if (!pending) return;
+            openAnswerModal(
+                Number(pending.id),
+                `${pending.product_name || 'Ürün'}\n\n${pending.question || ''}`,
+                pending.answer || ''
+            );
+        }
+
+        function openProductQuestionViewer(productId) {
+            const product = adminQuestionProductRows.find((item) => Number(item.product_id) === Number(productId));
+            const questions = adminQuestionRows
+                .filter((question) => Number(question.product_id) === Number(productId))
+                .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+            let modal = document.getElementById('product-question-view-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'product-question-view-modal';
+                modal.className = 'modal-overlay';
+                document.body.appendChild(modal);
+            }
+
+            modal.innerHTML = `
+                <div class="modal-box" style="max-width:860px; width:min(860px,94vw);">
+                    <div class="modal-header">
+                        <h2>${escapeAdminHtml(product ? product.product_name : 'Ürün Soruları')}</h2>
+                        <button class="close-modal" onclick="document.getElementById('product-question-view-modal').style.display='none'">×</button>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:14px; max-height:70vh; overflow:auto; padding-right:4px;">
+                        ${questions.length ? questions.map((question) => `
+                            <div style="background:var(--table-hover); border:1px solid var(--border); border-radius:14px; padding:16px;">
+                                <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+                                    <strong style="color:var(--heading-color);">${escapeAdminHtml(question.user_name || 'Müşteri')}</strong>
+                                    ${questionStatusBadge(question)}
+                                </div>
+                                <div style="margin-top:8px; color:var(--text); line-height:1.5;">${escapeAdminHtml(question.question || '')}</div>
+                                <div style="margin-top:10px; background:var(--card-bg); border-radius:12px; padding:12px; color:var(--text);">
+                                    <strong>Yanıt:</strong> ${question.answer ? escapeAdminHtml(question.answer) : '<span style="color:#98A2B3;">Henüz yanıtlanmadı.</span>'}
+                                </div>
+                                <div style="margin-top:8px; color:#98A2B3; font-size:0.78rem;">${escapeAdminHtml(formatAdminDate(question.created_at))}</div>
+                            </div>
+                        `).join('') : '<div style="padding:30px; text-align:center; color:#98A2B3;">Bu ürün için soru yok.</div>'}
+                    </div>
+                </div>
+            `;
+            modal.style.display = 'flex';
         }
 
         function showAdminToast(notif) {
