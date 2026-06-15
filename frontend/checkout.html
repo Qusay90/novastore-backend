@@ -628,6 +628,7 @@
         }
         function _cartKey() { return `novastore_cart_${_getUserId()}`; }
         function _addrKey() { return `novastore_addresses_${_getUserId()}`; }
+        function _addrMigrationKey() { return `novastore_addresses_migrated_${_getUserId()}`; }
         function _checkoutKey() { return `novastore_checkout_${_getUserId()}`; }
         const checkoutToken = localStorage.getItem('nova_user_token');
         const checkoutUser = JSON.parse(localStorage.getItem('nova_user_info') || 'null');
@@ -645,12 +646,23 @@
             };
         }
 
-        function getStoredCheckoutAddresses() {
+        function isCheckoutAddressMigrationComplete() {
+            return localStorage.getItem(_addrMigrationKey()) === '1';
+        }
+
+        function markCheckoutAddressMigrationComplete() {
+            localStorage.setItem(_addrMigrationKey(), '1');
+        }
+
+        function getStoredCheckoutAddresses(options = {}) {
+            const includeLegacy = options.includeLegacy !== false;
             const scopedKey = _addrKey();
             const scopedAddresses = JSON.parse(localStorage.getItem(scopedKey) || '[]').map(normalizeCheckoutAddress);
             if (scopedAddresses.length > 0) {
                 return scopedAddresses;
             }
+
+            if (!includeLegacy) return [];
 
             const legacyList = JSON.parse(localStorage.getItem('novastore_user_addresses') || '[]').map(normalizeCheckoutAddress);
             if (legacyList.length > 0) {
@@ -707,11 +719,12 @@
         }
 
         async function fetchCheckoutAddresses() {
-            const localAddresses = getStoredCheckoutAddresses();
+            const allowMigration = !isCheckoutAddressMigrationComplete();
+            const localAddresses = getStoredCheckoutAddresses({ includeLegacy: allowMigration });
             if (!checkoutToken) return localAddresses;
             try {
                 let remoteAddresses = (await apiCheckoutAddress()).map(normalizeCheckoutAddress);
-                if (remoteAddresses.length === 0 && localAddresses.length > 0) {
+                if (remoteAddresses.length === 0 && localAddresses.length > 0 && allowMigration) {
                     for (const addr of localAddresses) {
                         await apiCheckoutAddress('', {
                             method: 'POST',
@@ -719,9 +732,11 @@
                         });
                     }
                     localStorage.removeItem(_addrKey());
+                    markCheckoutAddressMigrationComplete();
                     remoteAddresses = (await apiCheckoutAddress()).map(normalizeCheckoutAddress);
                 }
                 persistCheckoutAddresses(remoteAddresses);
+                markCheckoutAddressMigrationComplete();
                 return remoteAddresses;
             } catch (_) {
                 return localAddresses;

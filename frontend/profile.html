@@ -913,6 +913,7 @@
         }
         function _cartKey() { return `novastore_cart_${_getUserId()}`; }
         function _addrKey() { return `novastore_addresses_${_getUserId()}`; }
+        function _addrMigrationKey() { return `novastore_addresses_migrated_${_getUserId()}`; }
         function _favsKey() { return `novastore_favs_${_getUserId()}`; }
         function _chkKey() { return `novastore_checkout_${_getUserId()}`; }
 
@@ -1620,10 +1621,21 @@
             };
         }
 
-        function readLocalAddresses() {
+        function isAddressMigrationComplete() {
+            return localStorage.getItem(_addrMigrationKey()) === '1';
+        }
+
+        function markAddressMigrationComplete() {
+            localStorage.setItem(_addrMigrationKey(), '1');
+        }
+
+        function readLocalAddresses(options = {}) {
+            const includeLegacy = options.includeLegacy !== false;
             const scopedKey = _addrKey();
             const scopedAddresses = JSON.parse(localStorage.getItem(scopedKey) || '[]').map(normalizeAddressForClient);
             if (scopedAddresses.length > 0) return scopedAddresses;
+
+            if (!includeLegacy) return [];
 
             const legacyList = JSON.parse(localStorage.getItem('novastore_user_addresses') || '[]').map(normalizeAddressForClient);
             if (legacyList.length > 0) {
@@ -1685,9 +1697,10 @@
                 });
             }
             localStorage.removeItem(_addrKey());
+            markAddressMigrationComplete();
         }
 
-        let addresses = readLocalAddresses();
+        let addresses = readLocalAddresses({ includeLegacy: !isAddressMigrationComplete() });
 
         function renderAddresses(message = '') {
             const container = document.getElementById('address-grid');
@@ -1806,7 +1819,10 @@
             if (confirm('Bu adresi silmek istediğinize emin misiniz?')) {
                 try {
                     await apiAddress(`/${id}`, { method: 'DELETE' });
-                    await loadAddress();
+                    addresses = addresses.filter(a => a.id !== String(id));
+                    persistAddresses();
+                    markAddressMigrationComplete();
+                    await loadAddress({ allowMigration: false });
                 } catch (error) {
                     alert(error.message || 'Adres silinemedi.');
                 }
@@ -1822,17 +1838,19 @@
             }
         }
 
-        async function loadAddress() {
-            const localAddresses = readLocalAddresses();
+        async function loadAddress(options = {}) {
+            const allowMigration = options.allowMigration !== false && !isAddressMigrationComplete();
+            const localAddresses = readLocalAddresses({ includeLegacy: allowMigration });
             renderAddresses('Adresler yükleniyor...');
             try {
                 let remoteAddresses = (await apiAddress()).map(normalizeAddressForClient);
-                if (remoteAddresses.length === 0 && localAddresses.length > 0) {
+                if (remoteAddresses.length === 0 && localAddresses.length > 0 && allowMigration) {
                     await migrateLocalAddressesToBackend(localAddresses);
                     remoteAddresses = (await apiAddress()).map(normalizeAddressForClient);
                 }
                 addresses = remoteAddresses;
                 persistAddresses();
+                markAddressMigrationComplete();
                 renderAddresses();
             } catch (error) {
                 addresses = localAddresses;

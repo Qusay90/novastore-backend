@@ -76,20 +76,23 @@ class CustomerLocalRepository @Inject constructor(
         _selectedAddressId.value = id
     }
 
-    suspend fun refreshAddresses(): Result<List<CustomerAddress>> = runCatching {
+    suspend fun refreshAddresses(allowMigration: Boolean = true): Result<List<CustomerAddress>> = runCatching {
         val localBeforeRefresh = _addresses.value
         var remote = api.getAddresses().normalizedDefaultOrder()
-        if (remote.isEmpty() && localBeforeRefresh.isNotEmpty()) {
+        val canMigrateLocal = allowMigration && !isAddressMigrationComplete()
+        if (remote.isEmpty() && localBeforeRefresh.isNotEmpty() && canMigrateLocal) {
             localBeforeRefresh.forEach { local ->
                 runCatching {
                     api.createAddress(local.copy(id = 0L, isDefault = local.id == _selectedAddressId.value))
                 }
             }
+            markAddressMigrationComplete()
             remote = api.getAddresses().normalizedDefaultOrder()
         }
         saveAddresses(remote)
         val defaultId = remote.firstOrNull { it.isDefault }?.id ?: remote.firstOrNull()?.id ?: NO_ADDRESS_ID
         selectAddress(defaultId)
+        markAddressMigrationComplete()
         remote
     }
 
@@ -100,6 +103,7 @@ class CustomerLocalRepository @Inject constructor(
             api.updateAddress(address.id, address)
         }
         refreshAddresses().getOrNull()
+        markAddressMigrationComplete()
         if (_selectedAddressId.value == NO_ADDRESS_ID || saved.isDefault) {
             selectAddress(saved.id)
         }
@@ -110,7 +114,9 @@ class CustomerLocalRepository @Inject constructor(
 
     suspend fun deleteAddressSynced(id: Long): Result<Unit> = runCatching {
         api.deleteAddress(id)
-        refreshAddresses().getOrNull()
+        deleteAddress(id)
+        markAddressMigrationComplete()
+        refreshAddresses(allowMigration = false).getOrNull()
         Unit
     }.onFailure {
         deleteAddress(id)
@@ -128,6 +134,13 @@ class CustomerLocalRepository @Inject constructor(
     private fun saveAddresses(addresses: List<CustomerAddress>) {
         prefs.edit().putString(KEY_ADDRESSES, gson.toJson(addresses)).apply()
         _addresses.value = addresses
+    }
+
+    private fun isAddressMigrationComplete(): Boolean =
+        prefs.getBoolean(KEY_ADDRESS_MIGRATION_COMPLETE, false)
+
+    private fun markAddressMigrationComplete() {
+        prefs.edit().putBoolean(KEY_ADDRESS_MIGRATION_COMPLETE, true).apply()
     }
 
     private fun readFavoriteIds(): Set<Int> {
@@ -149,6 +162,7 @@ class CustomerLocalRepository @Inject constructor(
         private const val KEY_FAVORITES = "favorite_product_ids"
         private const val KEY_ADDRESSES = "addresses"
         private const val KEY_SELECTED_ADDRESS_ID = "selected_address_id"
+        private const val KEY_ADDRESS_MIGRATION_COMPLETE = "addresses_migration_complete"
         private const val NO_ADDRESS_ID = -1L
     }
 }
