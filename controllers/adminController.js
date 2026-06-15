@@ -1,8 +1,8 @@
 const pool = require('../config/db');
 const { ORDER_STATUS } = require('../constants/orderStatus');
 
-const CONVERSION_EXCLUDED_STATUSES = [ORDER_STATUS.IPTAL_EDILDI];
-const SALES_EXCLUDED_STATUSES = [ORDER_STATUS.IPTAL_EDILDI, ORDER_STATUS.IADE_EDILDI];
+const CONVERSION_EXCLUDED_STATUSES = [ORDER_STATUS.IPTAL_EDILDI, ORDER_STATUS.ODEME_BEKLIYOR];
+const SALES_EXCLUDED_STATUSES = [ORDER_STATUS.IPTAL_EDILDI, ORDER_STATUS.IADE_EDILDI, ORDER_STATUS.ODEME_BEKLIYOR];
 
 const clampAnalyticsDays = (rawValue) => {
     const parsed = Number.parseInt(rawValue, 10);
@@ -144,11 +144,14 @@ const buildRecommendationPack = ({ overview, topViewedProducts, topSellingProduc
 const getDashboardStats = async (req, res) => {
     try {
         const revenueResult = await pool.query(
-            'SELECT COALESCE(SUM(total_amount), 0) AS total_revenue FROM orders WHERE status != $1',
-            [ORDER_STATUS.IPTAL_EDILDI]
+            'SELECT COALESCE(SUM(total_amount), 0) AS total_revenue FROM orders WHERE COALESCE(status, \'\') != ALL($1::text[])',
+            [SALES_EXCLUDED_STATUSES]
         );
 
-        const ordersCountResult = await pool.query('SELECT COUNT(*) AS total_orders FROM orders');
+        const ordersCountResult = await pool.query(
+            'SELECT COUNT(*) AS total_orders FROM orders WHERE COALESCE(status, \'\') != ALL($1::text[])',
+            [CONVERSION_EXCLUDED_STATUSES]
+        );
         const productsCountResult = await pool.query('SELECT COUNT(*) AS total_products FROM products');
         const usersCountResult = await pool.query("SELECT COUNT(*) AS total_users FROM users WHERE role = 'customer'");
 
@@ -159,7 +162,7 @@ const getDashboardStats = async (req, res) => {
             totalUsers: parseInt(usersCountResult.rows[0].total_users, 10)
         });
     } catch (err) {
-        console.error('Dashboard istatistik hatasi:', err.message);
+        console.error('Dashboard istatistik hatası:', err.message);
         res.status(500).json({ error: 'Istatistikler getirilemedi.' });
     }
 };
@@ -628,7 +631,7 @@ const getBehaviorAnalytics = async (req, res) => {
             recommendations: insightPack.recommendations
         });
     } catch (err) {
-        console.error('Davranis analitigi hatasi:', err.message);
+        console.error('Davranış analitiği hatası:', err.message);
         res.status(500).json({ error: 'Davranis analitigi getirilemedi.' });
     }
 };

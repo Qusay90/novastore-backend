@@ -608,6 +608,12 @@
             color: #E65100;
         }
 
+        .status-payment-pending {
+            background: #EAF3FF;
+            color: #0B5CAB;
+            border: 1px solid #B8D8FF;
+        }
+
         .status-preparing {
             background: #E3F2FD;
             color: #1565C0;
@@ -4206,6 +4212,7 @@
         // --- DİĞER FONKSİYONLAR (Aynı) ---
         // Sadece class isimlerini döndür - CSS ile yönetilecek
         function getStatusClass(status) {
+            if (status === 'Ödeme Bekliyor') return 'status-payment-pending';
             if (status === 'Onay Bekliyor') return 'status-pending';
             if (status === 'Hazırlanıyor') return 'status-preparing';
             if (status === 'Kargoya Verildi') return 'status-shipped';
@@ -4213,6 +4220,10 @@
             if (status === 'İptal Edildi') return 'status-cancelled';
             if (status === 'İade Edildi') return 'status-returned';
             return 'status-default';
+        }
+
+        function getOrderDisplayStatus(order) {
+            return order?.display_status || order?.status || '-';
         }
 
         // KATEGORİ YÖNETİMİ
@@ -5052,13 +5063,17 @@
 
                 globalOrders.forEach(order => {
                     const date = new Date(order.created_at).toLocaleDateString('tr-TR');
+                    const displayStatus = getOrderDisplayStatus(order);
+                    const statusNoteHtml = order.status_note
+                        ? `<div style="margin-top:6px; color:#64748B; font-size:0.78rem; line-height:1.35;">${escapeAdminHtml(order.status_note)}</div>`
+                        : '';
                     tbody.innerHTML += `
     <tr>
         <td style="font-weight:700;">#000${order.id}</td>
-        <td>${order.customer_name || 'Bilinmiyor'}</td>
+        <td>${escapeAdminHtml(order.customer_name || 'Bilinmiyor')}</td>
         <td>${date}</td>
         <td style="color:var(--accent); font-weight:700;">${order.total_amount} TL</td>
-        <td><span class="status-badge ${getStatusClass(order.status)}">${order.status}</span></td>
+        <td><span class="status-badge ${getStatusClass(displayStatus)}">${escapeAdminHtml(displayStatus)}</span>${statusNoteHtml}</td>
         <td>
             <button onclick="openOrderModal(${order.id})" class="btn-inspect">İncele</button>
             <button onclick="deleteOrder(${order.id})" class="btn-delete" style="margin-left:5px;">Sil</button>
@@ -5211,6 +5226,10 @@
         function openOrderModal(orderId) {
             const order = globalOrders.find(o => o.id === orderId);
             if (!order) return;
+            const displayStatus = getOrderDisplayStatus(order);
+            const statusNoteHtml = order.status_note
+                ? `<div style="margin:0 0 16px; padding:12px 14px; border-radius:8px; background:#EAF3FF; border:1px solid #B8D8FF; color:#0B5CAB; font-size:0.9rem;">${escapeAdminHtml(order.status_note)}</div>`
+                : '';
             let itemsHtml = '<div style=\"margin-top:20px; border:1px solid var(--border); border-radius:8px; padding:15px; background: var(--table-hover);\">';
 
             let items = [];
@@ -5239,8 +5258,10 @@
     </div>
     <h4>Sipariş İçeriği</h4>
     ${itemsHtml}
+    ${statusNoteHtml}
     <div style="margin-top: 25px; display: flex; justify-content: space-between; align-items: center;">
         <select id="status-select" class="form-control" style="width: 200px;">
+            <option value="Ödeme Bekliyor" ${displayStatus === 'Ödeme Bekliyor' ? 'selected' : ''}>Ödeme Bekliyor</option>
             <option value="Onay Bekliyor" ${order.status === 'Onay Bekliyor' ? 'selected' : ''}>Onay Bekliyor</option>
             <option value="Hazırlanıyor" ${order.status === 'Hazırlanıyor' ? 'selected' : ''}>Hazırlanıyor</option>
             <option value="Kargoya Verildi" ${order.status === 'Kargoya Verildi' ? 'selected' : ''}>Kargoya Verildi

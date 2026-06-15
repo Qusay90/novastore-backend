@@ -9,6 +9,7 @@
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
+    <script src="mobile-bridge.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -813,7 +814,7 @@
                 <div id="reviews-container">
                     <div style="text-align: center; padding: 40px 0; color: #666;">
                         <span style="font-size: 3rem; display: block; margin-bottom: 15px;">⭐</span>
-                        Sisteme yakında eklenecek. Mükemmel bir yorum arayüzü yolda!
+                        Değerlendirmeleriniz yükleniyor...
                     </div>
                 </div>
             </div>
@@ -903,12 +904,26 @@
         function _favsKey() { return `novastore_favs_${_getUserId()}`; }
         function _chkKey() { return `novastore_checkout_${_getUserId()}`; }
 
+        function appUrl(rawUrl) {
+            if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
+            if (!window.NOVASTORE_USE_NATIVE_THEME || window.NOVASTORE_IS_NATIVE_APP) return rawUrl;
+            try {
+                const url = new URL(rawUrl, window.location.href);
+                if (url.origin !== window.location.origin) return rawUrl;
+                url.searchParams.set('nativeTheme', '1');
+                return url.pathname.replace(/^\//, '') + url.search + url.hash;
+            } catch (_) {
+                return rawUrl;
+            }
+        }
+
         // --- 1. GÜVENLİK VE KULLANICI BİLGİLERİ ---
         const token = localStorage.getItem('nova_user_token');
         const userInfoStr = localStorage.getItem('nova_user_info');
 
         if (!token || !userInfoStr) {
-            window.location.href = "login.html";
+            window.location.href = appUrl("login.html");
+            throw new Error('Auth required');
         }
 
         const user = JSON.parse(userInfoStr);
@@ -940,13 +955,22 @@
             return headers;
         }
 
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
 
         function userLogout() {
             const uid = _getUserId();
             localStorage.removeItem(`novastore_checkout_${uid}`);
             localStorage.removeItem('nova_user_token');
             localStorage.removeItem('nova_user_info');
-            window.location.href = "index.html";
+            window.location.href = appUrl("index.html");
         }
 
         // --- 2. SEKMELER ARASI GEÇİŞ MANTIĞI (TAB SİSTEMİ) ---
@@ -1193,7 +1217,7 @@
             const selectedItems = cart.filter(item => item.selected !== false);
             if (selectedItems.length > 0) {
                 localStorage.setItem(_chkKey(), JSON.stringify(selectedItems));
-                window.location.href = 'checkout.html';
+                window.location.href = appUrl('checkout.html');
             }
         }
 
@@ -1298,7 +1322,37 @@
             `;
         }
 
-        function getProgressBarHtml(status) {
+        function getOrderDisplayStatus(order) {
+            return order?.display_status || order?.status || 'Durum yok';
+        }
+
+        function isPendingPaymentOrder(order) {
+            return !!order?.is_pending_payment || getOrderDisplayStatus(order) === 'Ödeme Bekliyor';
+        }
+
+        function isFailedPaymentOrder(order) {
+            return !!order?.is_payment_failed || getOrderDisplayStatus(order) === 'Ödeme Başarısız';
+        }
+
+        function getProgressBarHtml(status, order = {}) {
+            if (isPendingPaymentOrder(order)) {
+                return `
+                    <div style="margin:14px 0 4px; padding:14px 16px; border-radius:12px; background:#EAF3FF; border:1px solid #B8D8FF; color:#0B5CAB;">
+                        <div style="font-weight:800; margin-bottom:6px;">Ödeme Bekliyor</div>
+                        <div style="font-size:0.92rem; line-height:1.55;">${order.status_note || 'Ödeme tamamlanmadan sipariş kesinleşmez.'}</div>
+                    </div>
+                `;
+            }
+
+            if (isFailedPaymentOrder(order)) {
+                return `
+                    <div style="margin:14px 0 4px; padding:14px 16px; border-radius:12px; background:#FFF1F1; border:1px solid #F7C8C8; color:#8A1F1F;">
+                        <div style="font-weight:800; margin-bottom:6px;">Ödeme Başarısız</div>
+                        <div style="font-size:0.92rem; line-height:1.55;">${order.status_note || 'Ödeme tamamlanmadığı için sipariş kesinleşmedi.'}</div>
+                    </div>
+                `;
+            }
+
             let fillWidth = '0%';
             let steps = [
                 { label: 'Sipariş Alındı', active: false, icon: '✓' },
@@ -1386,38 +1440,53 @@
                         });
                     }
 
-                    const isCompactOrder = order.status === 'Teslim Edildi' || order.status === 'İptal Edildi' || order.status === 'İade Edildi';
+                    const displayStatus = getOrderDisplayStatus(order);
+                    const paymentFailed = isFailedPaymentOrder(order);
+                    const isCompactOrder = displayStatus === 'Teslim Edildi' || displayStatus === 'İptal Edildi' || displayStatus === 'İade Edildi' || paymentFailed;
                     if (isCompactOrder) {
-                        const isCancelled = order.status === 'İptal Edildi';
-                        const isReturned = order.status === 'İade Edildi';
+                        const isCancelled = displayStatus === 'İptal Edildi';
+                        const isReturned = displayStatus === 'İade Edildi';
                         const refundMeta = getRefundStatusMeta(order.refund_status);
                         const hasReturnFlow = !isCancelled && !isReturned && !!refundMeta;
                         const firstItem = products.length > 0 ? products[0] : null;
                         const firstItemQty = firstItem ? firstItem.quantity : 1;
                         const firstItemImage = firstItem ? ((firstItem.image && firstItem.image.trim() !== '') ? firstItem.image : (productImageMap[firstItem.id] || fallbackSvg)) : fallbackSvg;
-                        const compactCardClass = isCancelled
+                        const compactCardClass = paymentFailed || isCancelled
                             ? 'compact-order-card is-cancelled'
                             : isReturned
                                 ? 'compact-order-card is-returned'
                                 : hasReturnFlow
                                     ? 'compact-order-card has-return-flow'
                                     : 'compact-order-card';
-                        const statusIcon = isCancelled ? '✕' : (isReturned ? '↩' : (hasReturnFlow ? refundMeta.icon : '✓'));
-                        const statusTitle = isCancelled
+                        const statusIcon = paymentFailed || isCancelled ? '✕' : (isReturned ? '↩' : (hasReturnFlow ? refundMeta.icon : '✓'));
+                        const statusTitle = paymentFailed
+                            ? 'Ödeme başarısız'
+                            : isCancelled
                             ? 'Sipariş iptal edildi'
                             : isReturned
                                 ? 'İade edildi'
                                 : hasReturnFlow
                                     ? refundMeta.title
                                     : 'Sipariş tamamlandı';
-                        const statusSubtitle = isCancelled
+                        const statusSubtitle = paymentFailed
+                            ? (order.status_note || 'Ödeme tamamlanmadığı için sipariş kesinleşmedi.')
+                            : isCancelled
                             ? 'Detayları açıp iptal notunu ve ürünleri görebilirsiniz.'
                             : isReturned
                                 ? 'İade süreci tamamlandı, detayları açıp bilgileri görebilirsiniz.'
                                 : hasReturnFlow
                                     ? refundMeta.subtitle
                                     : 'Detayları açıp sipariş içeriğini görebilirsiniz.';
-                        const compactExtraHtml = isCancelled
+                        const compactExtraHtml = paymentFailed
+                            ? `
+                                <div style="margin-top:16px; display:grid; gap:12px;">
+                                    <div style="padding:14px 16px; border-radius:10px; background:#FFF1F1; border:1px solid #F7C8C8; color:#8A1F1F;">
+                                        <div style="font-weight:700; margin-bottom:6px;">Ödeme Notu</div>
+                                        <div style="font-size:0.92rem; line-height:1.55;">${order.status_note || 'Ödeme tamamlanmadığı için sipariş kesinleşmedi.'}</div>
+                                    </div>
+                                </div>
+                            `
+                            : isCancelled
                             ? `
                                 <div style="margin-top:16px; display:grid; gap:12px;">
                                     <div style="padding:14px 16px; border-radius:10px; background:#FFF1F1; border:1px solid #F7C8C8; color:#8A1F1F;">
@@ -1510,7 +1579,7 @@
                                 <div class="order-id-date"><span class="order-id">Sipariş No: #000${order.id}</span><span class="order-date">${standardDateStr}</span></div>
                                 <div class="order-total">${order.total_amount} TL</div>
                             </div>
-                            ${getProgressBarHtml(order.status)}
+                            ${getProgressBarHtml(displayStatus, order)}
                             ${trackingHtml}
                             <div class="order-items-box"><div style="font-size: 0.85rem; color: #888; margin-bottom: 8px; font-weight: 600; text-transform: uppercase;">Paket İçeriği</div>${itemsHtml}</div>
                         </div>`;
@@ -1716,7 +1785,7 @@
                 return;
             }
 
-            container.innerHTML = '<p style="text-align:center; color:#888;">Favorileriniz yükleniyor...</p>';
+            container.innerHTML = '<div class="native-loading"><span class="native-loading-spinner"></span><strong>Favorileriniz yükleniyor...</strong></div>';
 
             try {
                 // Tüm ürünleri çekip içinden favorileri filtreliyoruz.
@@ -1840,10 +1909,11 @@
             if (!Array.isArray(mediaItems) || mediaItems.length === 0) return '';
 
             const itemsHtml = mediaItems.map((media, index) => {
-                const mediaUrl = String(media?.media_url || '').trim();
-                if (!mediaUrl) return '';
+                const rawMediaUrl = String(media?.media_url || '').trim();
+                if (!rawMediaUrl) return '';
+                const mediaUrl = escapeHtml(rawMediaUrl);
 
-                if (isReviewVideoMedia(mediaUrl, media?.media_type)) {
+                if (isReviewVideoMedia(rawMediaUrl, media?.media_type)) {
                     return `
                         <a href="${mediaUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
                             <div style="width: 78px; height: 78px; border-radius: 12px; border: 1px solid #E5E7EB; background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; font-size: 0.76rem; font-weight: 700;">
@@ -1871,62 +1941,99 @@
         }
 
         // --- 6. DEĞERLENDİRMELERİMİ GETİRME ---
+        function renderReviewsLoading() {
+            return `
+                <div class="native-loading" style="padding: 42px 0;">
+                    <span class="native-loading-spinner"></span>
+                    <strong>Değerlendirmeleriniz yükleniyor...</strong>
+                </div>
+            `;
+        }
+
+        function renderReviewsEmpty() {
+            return `
+                <div style="text-align: center; padding: 44px 0; color: #666;">
+                    <span style="font-size: 3rem; display: block; margin-bottom: 15px;">⭐</span>
+                    <p style="font-size: 1.05rem; color: #333; margin: 0 0 8px; font-weight: 700;">Henüz değerlendirme yapmamışsınız.</p>
+                    <p style="margin: 0; color: #777;">Satın aldığınız ürünlere yorum yaptığınızda burada listelenecek.</p>
+                </div>
+            `;
+        }
+
+        function renderReviewsError(message) {
+            return `
+                <div style="text-align: center; padding: 44px 0; color: #666;">
+                    <span style="font-size: 3rem; display: block; margin-bottom: 15px;">⚠️</span>
+                    <p style="font-size: 1.05rem; color: #B91C1C; margin: 0 0 8px; font-weight: 700;">Değerlendirmeler yüklenemedi.</p>
+                    <p style="margin: 0 0 18px; color: #777;">${escapeHtml(message)}</p>
+                    <button onclick="fetchMyReviews()" style="border: none; background: #0F2A43; color: white; border-radius: 10px; padding: 10px 18px; font-weight: 700; cursor: pointer;">Tekrar dene</button>
+                </div>
+            `;
+        }
+
+        function renderReviewStars(ratingValue) {
+            const rating = Math.max(0, Math.min(5, parseInt(ratingValue, 10) || 0));
+            let starsHtml = '';
+            for (let i = 1; i <= 5; i++) {
+                if (i <= rating) {
+                    starsHtml += `<svg width="18" height="18" viewBox="0 0 24 24" fill="#F7941D" stroke="#F7941D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
+                } else {
+                    starsHtml += `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DDD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
+                }
+            }
+            return starsHtml;
+        }
+
         async function fetchMyReviews() {
             const container = document.getElementById('reviews-container');
-            container.innerHTML = '<p style="text-align:center; color:#888; padding: 40px 0;">Değerlendirmeleriniz yükleniyor...</p>';
+            container.innerHTML = renderReviewsLoading();
 
             try {
                 const effectiveUserId = getAuthenticatedUserId() || Number(user.id);
-                if (!Number.isInteger(effectiveUserId)) throw new Error('Oturum bilgisi dogrulanamadi.');
+                if (!Number.isInteger(effectiveUserId)) throw new Error('Oturum bilgisi doğrulanamadı.');
 
                 const response = await fetch('/api/reviews/user/' + effectiveUserId, {
                     headers: authHeaders()
                 });
-                const reviews = await response.json();
-                if (!response.ok) throw new Error(reviews.error || 'Degerlendirmeler getirilemedi.');
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload.error || 'Değerlendirmeler getirilemedi.');
 
+                const reviews = Array.isArray(payload) ? payload : (Array.isArray(payload.reviews) ? payload.reviews : []);
                 if (!reviews || reviews.length === 0) {
-                    container.innerHTML = `
-                        <div style="text-align: center; padding: 40px 0; color: #666;">
-                            <span style="font-size: 3rem; display: block; margin-bottom: 15px;">⭐</span>
-                            Henüz hiçbir ürüne yorum yapmamışsınız.
-                        </div>`;
+                    container.innerHTML = renderReviewsEmpty();
                     return;
                 }
 
                 let html = '<div style="display: flex; flex-direction: column; gap: 20px;">';
 
                 reviews.forEach(review => {
-                    const date = new Date(review.created_at).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
-                    const imageUrl = review.image_url || 'https://via.placeholder.com/100?text=Görsel+Yok';
+                    const createdAt = new Date(review.created_at);
+                    const date = Number.isNaN(createdAt.getTime())
+                        ? ''
+                        : createdAt.toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
+                    const productId = Number(review.product_id);
+                    const productUrl = Number.isInteger(productId) ? `product.html?id=${productId}` : 'index.html';
+                    const imageUrl = escapeHtml(review.image_url || 'https://via.placeholder.com/100?text=Görsel+Yok');
+                    const productName = escapeHtml(review.product_name || 'Ürün');
                     const reviewTextHtml = review.comment
                         ? `
                                 <p style="color: #444; font-size: 0.95rem; line-height: 1.5; margin: 0; background: white; padding: 15px; border-radius: 8px; border: 1px solid #F0F0F0;">
-                                    "${review.comment}"
+                                    "${escapeHtml(review.comment)}"
                                 </p>
                           `
                         : '';
 
-                    // Yıldızları oluştur
-                    let starsHtml = '';
-                    const rating = parseInt(review.rating);
-                    for (let i = 1; i <= 5; i++) {
-                        if (i <= rating) {
-                            starsHtml += `<svg width="18" height="18" viewBox="0 0 24 24" fill="#F7941D" stroke="#F7941D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
-                        } else {
-                            starsHtml += `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DDD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
-                        }
-                    }
+                    const starsHtml = renderReviewStars(review.rating);
 
                     html += `
                         <div style="background: #FAFAFA; border: 1px solid #EAEAEA; border-radius: 12px; padding: 20px; display: flex; gap: 20px; align-items: flex-start; transition: 0.3s;">
-                            <a href="product.html?id=${review.product_id}" style="flex-shrink: 0; display: block; border-radius: 8px; overflow: hidden; border: 1px solid #EEEEEE;">
-                                <img src="${imageUrl}" alt="${review.product_name}" style="width: 100px; height: 100px; object-fit: cover; display: block;">
+                            <a href="${productUrl}" style="flex-shrink: 0; display: block; border-radius: 8px; overflow: hidden; border: 1px solid #EEEEEE;">
+                                <img src="${imageUrl}" alt="${productName}" style="width: 100px; height: 100px; object-fit: cover; display: block;">
                             </a>
                             <div style="flex-grow: 1;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <a href="product.html?id=${review.product_id}" style="text-decoration: none; color: #0F2A43; font-weight: 700; font-size: 1.1rem; flex-grow: 1; margin-right: 15px;">${review.product_name}</a>
-                                    <div style="font-size: 0.85rem; color: #888; white-space: nowrap;">${date}</div>
+                                    <a href="${productUrl}" style="text-decoration: none; color: #0F2A43; font-weight: 700; font-size: 1.1rem; flex-grow: 1; margin-right: 15px;">${productName}</a>
+                                    <div style="font-size: 0.85rem; color: #888; white-space: nowrap;">${escapeHtml(date)}</div>
                                 </div>
                                 <div style="display: flex; gap: 3px; margin-bottom: 12px;">
                                     ${starsHtml}
@@ -1942,11 +2049,11 @@
                 container.innerHTML = html;
 
             } catch (error) {
-                const rawMsg = error && error.message ? error.message : 'Degerlendirmeler alinamadi.';
+                const rawMsg = error && error.message ? error.message : 'Değerlendirmeler alınamadı.';
                 const isAuthError = /Authentication required|Invalid or expired token|Access denied|403|401/i.test(rawMsg);
-                const msg = isAuthError ? 'Oturum suresi dolmus. Lutfen tekrar giris yapin.' : rawMsg;
+                const msg = isAuthError ? 'Oturum süresi dolmuş. Lütfen tekrar giriş yapın.' : rawMsg;
                 console.error(error);
-                container.innerHTML = '<p style="color:red; text-align:center; padding: 40px 0;">' + msg + '</p>';
+                container.innerHTML = renderReviewsError(msg);
 
             }
         }
