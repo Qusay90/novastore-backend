@@ -156,8 +156,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') sendAdminMessage();
     });
 
-    if (typeof io !== 'undefined' && !window.socket) {
-        window.socket = io();
+    if (typeof io !== 'undefined' && !window.socket && adminToken) {
+        window.socket = io(undefined, {
+            auth: { token: adminToken },
+            transports: ['websocket', 'polling']
+        });
         window.socket.emit('join_room', 'admin_room');
     }
 

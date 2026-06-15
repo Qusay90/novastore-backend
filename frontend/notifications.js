@@ -1,6 +1,6 @@
 /**
  * NovaStore - Musteri Bildirim Sistemi
- * Sadece musteri sayfalari icin calisir. Admin panelinin kendi sistemi vardir.
+ * Sadece müşteri sayfaları için çalışır. Admin panelinin kendi sistemi vardır.
  */
 
 let _notifSocket = null;
@@ -91,7 +91,13 @@ function _connectSocket(room) {
     if (typeof io === 'undefined') return;
 
     try {
-        _notifSocket = io(undefined, { transports: ['websocket', 'polling'] });
+        const token = localStorage.getItem('nova_user_token');
+        if (!token) return;
+
+        _notifSocket = io(undefined, {
+            auth: { token },
+            transports: ['websocket', 'polling']
+        });
         window.socket = _notifSocket;
 
         _notifSocket.on('connect', () => {

@@ -5453,7 +5453,13 @@
             fetchAdminNotifications();
 
             // 3) Socket.io ile admin_room'a bağlan
-            window.socket = io();
+            const socketToken = localStorage.getItem('nova_admin_token');
+            if (!socketToken) return;
+
+            window.socket = io(undefined, {
+                auth: { token: socketToken },
+                transports: ['websocket', 'polling']
+            });
             window.socket.on('connect', () => {
                 console.log('🔔 Socket bağlantısı kuruldu, admin_room odasına katılıyorum...');
                 window.socket.emit('join_room', 'admin_room');

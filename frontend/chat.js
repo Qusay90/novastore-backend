@@ -394,7 +394,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const existingSocket = window.socket && typeof window.socket.on === 'function'
             ? window.socket
             : null;
-        const socket = existingSocket || io(undefined, { transports: ['websocket', 'polling'] });
+        if (!token) return null;
+
+        const socket = existingSocket || io(undefined, {
+            auth: { token },
+            transports: ['websocket', 'polling']
+        });
         window.socket = socket;
 
         const roomName = `user_${userId}`;
@@ -750,7 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     role: 'assistant',
                     message: payload.error || 'AI asistan su an yanit veremiyor.',
                     createdAt: Date.now(),
-                    suggestions: ['Canli destege baglan'],
+                    suggestions: ['Canlı desteğe bağlan'],
                     products: [],
                     allowEscalation: true
                 });
@@ -770,9 +775,9 @@ document.addEventListener('DOMContentLoaded', () => {
             showTyping(false);
             appendAssistantEntry({
                 role: 'assistant',
-                message: 'Sunucuya su an baglanamadim. Isterseniz canli destek moduna gecelim.',
+                message: 'Sunucuya şu an bağlanamadım. İsterseniz canlı destek moduna geçelim.',
                 createdAt: Date.now(),
-                suggestions: ['Canli destege baglan'],
+                suggestions: ['Canlı desteğe bağlan'],
                 products: [],
                 allowEscalation: true
             });

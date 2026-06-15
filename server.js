@@ -7,6 +7,13 @@ const path = require('path');
 const { simpleRateLimit, sanitizeBody } = require('./middlewares/securityMiddleware');
 const pool = require('./config/db');
 const { getAllowedOrigins } = require('./config/appConfig');
+const {
+    authenticateSocket,
+    autoJoinAllowedRooms,
+    buildMessageTargetRoom,
+    buildSafeMessagePayload,
+    handleJoinRoom
+} = require('./services/socketAuthService');
 
 const app = express();
 const server = http.createServer(app);
@@ -25,22 +32,38 @@ const io = new Server(server, {
 // io export
 module.exports.io = io;
 
-io.on('connection', (socket) => {
-    console.log(`Socket baglantisi kuruldu: ${socket.id}`);
+io.use(authenticateSocket);
 
-    socket.on('join_room', (room) => {
-        socket.join(room);
-        console.log(`Socket ${socket.id} -> ${room} odasina katildi`);
+io.on('connection', (socket) => {
+    const joinedRooms = autoJoinAllowedRooms(socket);
+    console.log(`Socket baglantisi kuruldu: ${socket.id} user=${socket.user.id} role=${socket.user.role}`);
+
+    socket.on('join_room', (room, ack) => {
+        const result = handleJoinRoom(socket, room, ack);
+        if (result.ok) {
+            console.log(`Socket ${socket.id} -> ${result.room} odasina katildi`);
+        }
     });
 
-    socket.on('send_message', (data) => {
-        const isAdminTarget = data.receiver_role === 'admin' || data.receiver_id === 1 || data.receiver_id === 'admin';
-        const targetRoom = isAdminTarget ? 'admin_room' : `user_${data.receiver_id}`;
-        io.to(targetRoom).emit('receive_message', data);
+    socket.on('send_message', (data = {}, ack) => {
+        const targetRoom = buildMessageTargetRoom(socket.user, data);
+        if (!targetRoom) {
+            const payload = {
+                ok: false,
+                code: 'MESSAGE_FORBIDDEN',
+                message: 'Bu mesaj hedefi için yetkiniz yok.'
+            };
+            if (typeof ack === 'function') ack(payload);
+            socket.emit('socket_error', payload);
+            return;
+        }
+
+        io.to(targetRoom).emit('receive_message', buildSafeMessagePayload(socket.user, data));
+        if (typeof ack === 'function') ack({ ok: true, room: targetRoom });
     });
 
     socket.on('disconnect', () => {
-        console.log(`Socket baglantisi kesildi: ${socket.id}`);
+        console.log(`Socket baglantisi kesildi: ${socket.id} rooms=${joinedRooms.join(',')}`);
     });
 });
 

@@ -2079,7 +2079,13 @@
             fetchProfileNotifications();
 
             // Socket.io bağlantısı
-            const socket = io();
+            const socketToken = localStorage.getItem('nova_user_token');
+            if (!socketToken) return;
+
+            const socket = io(undefined, {
+                auth: { token: socketToken },
+                transports: ['websocket', 'polling']
+            });
             socket.on('connect', () => {
                 socket.emit('join_room', `user_${user.id}`);
             });
