@@ -5,6 +5,9 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,9 +17,12 @@ class SessionManager @Inject constructor(
 ) {
     private val legacyPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val securePrefs = createSecurePrefs()
+    private val _isLoggedInFlow = MutableStateFlow(false)
+    val isLoggedInFlow: StateFlow<Boolean> = _isLoggedInFlow.asStateFlow()
 
     init {
         migrateLegacySession()
+        _isLoggedInFlow.value = isLoggedIn
     }
 
     fun saveSession(token: String, userId: Int, fullName: String, email: String, phone: String? = null) {
@@ -30,6 +36,7 @@ class SessionManager @Inject constructor(
             apply()
         }
         clearLegacySessionKeys()
+        _isLoggedInFlow.value = true
     }
 
     fun updateProfile(fullName: String, phone: String?) {
@@ -44,6 +51,7 @@ class SessionManager @Inject constructor(
     fun clearSession() {
         securePrefs?.edit()?.clear()?.apply()
         clearLegacySessionKeys()
+        _isLoggedInFlow.value = false
     }
 
     val token: String?

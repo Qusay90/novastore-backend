@@ -5464,6 +5464,20 @@
                 console.log('🔔 Socket bağlantısı kuruldu, admin_room odasına katılıyorum...');
                 window.socket.emit('join_room', 'admin_room');
             });
+            window.socket.on('connect_error', () => {
+                console.warn('Admin socket bağlantısı yetkilendirilemedi.');
+                showAdminToast({
+                    type: 'warning',
+                    message: 'Canlı bildirim bağlantısı kurulamadı. Yönetici oturumunuzu kontrol edin.'
+                });
+            });
+            window.socket.on('socket_error', () => {
+                console.warn('Admin socket oda yetkisi reddedildi.');
+                showAdminToast({
+                    type: 'warning',
+                    message: 'Canlı bildirim bağlantısı yetkilendirilemedi. Yönetici oturumunuzu kontrol edin.'
+                });
+            });
 
             // 4) Gerçek zamanlı bildirim gelince
             window.socket.on('new_notification', (notif) => {

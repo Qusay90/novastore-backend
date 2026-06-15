@@ -404,9 +404,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const roomName = `user_${userId}`;
         const joinRoom = () => socket.emit('join_room', roomName);
+        const handleSocketAuthError = () => {
+            if (chatMode === 'support') {
+                renderBubble('Canlı destek bağlantısı yetkilendirilemedi. Lütfen oturumunuzu kontrol edip tekrar giriş yapın.', 'received', Date.now());
+            }
+        };
 
         if (!socket.__novaChatJoinRoom || socket.__novaChatJoinRoom !== roomName) {
             socket.on('connect', joinRoom);
+            socket.on('connect_error', handleSocketAuthError);
+            socket.on('socket_error', handleSocketAuthError);
             socket.__novaChatJoinRoom = roomName;
         }
 

@@ -104,6 +104,14 @@ function _connectSocket(room) {
             _notifSocket.emit('join_room', room);
         });
 
+        _notifSocket.on('connect_error', () => {
+            showToast('Bildirim bağlantısı kurulamadı. Oturumunuzu kontrol edip tekrar giriş yapın.', 'warning');
+        });
+
+        _notifSocket.on('socket_error', () => {
+            showToast('Bildirim bağlantısı yetkilendirilemedi. Lütfen tekrar giriş yapın.', 'warning');
+        });
+
         _notifSocket.on('new_notification', (notif) => {
             _prependNotifToDOM(notif);
             _updateBadge(1);

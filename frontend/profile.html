@@ -2089,6 +2089,18 @@
             socket.on('connect', () => {
                 socket.emit('join_room', `user_${user.id}`);
             });
+            socket.on('connect_error', () => {
+                showProfileToast({
+                    type: 'warning',
+                    message: 'Bildirim bağlantısı kurulamadı. Lütfen oturumunuzu kontrol edip tekrar giriş yapın.'
+                });
+            });
+            socket.on('socket_error', () => {
+                showProfileToast({
+                    type: 'warning',
+                    message: 'Bildirim bağlantısı yetkilendirilemedi. Lütfen tekrar giriş yapın.'
+                });
+            });
             socket.on('new_notification', (notif) => {
                 prependProfileNotif(notif);
                 _profileNotifUnread++;
