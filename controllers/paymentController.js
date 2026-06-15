@@ -3,7 +3,7 @@ const pool = require('../config/db');
 const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
 const { createNotification } = require('./notificationController');
 const { initializeIyzicoPayment, verifyWebhookSignature } = require('../services/paymentProviderService');
-const { createOrderWithReservation, restockItems, appendOrderEvent } = require('../services/orderService');
+const { createPendingPaymentOrder, reserveStock, restockItems, appendOrderEvent } = require('../services/orderService');
 const { PAYMENT_STATUS, ORDER_STATUS, REFUND_STATUS } = require('../constants/orderStatus');
 
 const readIdempotencyKey = (req) => {
@@ -35,6 +35,16 @@ const incrementCouponUsageIfNeeded = async (client, coupon) => {
         'UPDATE coupons SET used_count = used_count + 1, updated_at = NOW() WHERE id = $1',
         [coupon.couponId]
     );
+};
+
+const safeJsonParse = (value, fallback = {}) => {
+    if (!value) return fallback;
+    if (typeof value === 'object') return value;
+    try {
+        return JSON.parse(value);
+    } catch (_) {
+        return fallback;
+    }
 };
 
 const initializePayment = async (req, res) => {
@@ -88,7 +98,7 @@ const initializePayment = async (req, res) => {
 
         await client.query('BEGIN');
 
-        const { order, pricing } = await createOrderWithReservation({
+        const { order, pricing } = await createPendingPaymentOrder({
             client,
             userId,
             analyticsSessionKey,
@@ -100,8 +110,6 @@ const initializePayment = async (req, res) => {
             couponCode,
             paymentMethod
         });
-
-        await incrementCouponUsageIfNeeded(client, pricing.coupon);
 
         let paymentProvider = 'iyzico';
         let paymentRef = null;
@@ -141,7 +149,13 @@ const initializePayment = async (req, res) => {
                 pricing.totals.total,
                 pricing.totals.currency,
                 paymentStatus,
-                JSON.stringify({ paymentMethod, couponCode }),
+                JSON.stringify({
+                    paymentMethod,
+                    couponCode,
+                    coupon: pricing.coupon,
+                    stockReserved: false,
+                    finalizesOnWebhook: true
+                }),
                 JSON.stringify(providerResponse || {})
             ]
         );
@@ -163,23 +177,6 @@ const initializePayment = async (req, res) => {
         });
 
         await client.query('COMMIT');
-
-        const { io } = require('../server');
-        if (userId) {
-            await createNotification(
-                userId,
-                'order_update',
-                `Sipariş #${order.id} için ödeme adımı başlatıldı.`,
-                io
-            );
-        }
-
-        await createNotification(
-            null,
-            'new_order',
-            `Yeni sipariş oluşturuldu (#${order.id}). Ödeme adımı: ${paymentMethod}.`,
-            io
-        );
 
         res.status(201).json({
             orderId: order.id,
@@ -250,7 +247,7 @@ const webhookIyzico = async (req, res) => {
         }
 
         const paymentResult = await client.query(
-            `SELECT p.*, o.items, o.user_id, o.id AS order_id, o.status AS order_status
+            `SELECT p.*, o.items, o.user_id, o.customer_name, o.id AS order_id, o.status AS order_status
              FROM payments p
              JOIN orders o ON o.id = p.order_id
              WHERE p.payment_ref = $1`,
@@ -263,18 +260,35 @@ const webhookIyzico = async (req, res) => {
         }
 
         const payment = paymentResult.rows[0];
+        const rawRequest = safeJsonParse(payment.raw_request, {});
+        const parsedItemsRaw = safeJsonParse(payment.items, []);
+        const parsedItems = Array.isArray(parsedItemsRaw) ? parsedItemsRaw : [];
+        const stockWasReserved = rawRequest.stockReserved === true || rawRequest.finalizesOnWebhook !== true;
         const isSuccess = rawStatus === 'SUCCESS' || rawStatus === 'PAID';
 
         if (isSuccess) {
+            if (!stockWasReserved) {
+                await reserveStock(client, parsedItems);
+            }
+
             await client.query(
                 `UPDATE payments
                  SET status = $1,
                      external_ref = $2,
                      raw_response = COALESCE(raw_response, '{}'::jsonb) || $3::jsonb,
+                     raw_request = COALESCE(raw_request, '{}'::jsonb) || $4::jsonb,
                      updated_at = NOW()
-                 WHERE id = $4`,
-                [PAYMENT_STATUS.PAID, payload.providerTransactionId || null, JSON.stringify(payload), payment.id]
+                 WHERE id = $5`,
+                [
+                    PAYMENT_STATUS.PAID,
+                    payload.providerTransactionId || null,
+                    JSON.stringify(payload),
+                    JSON.stringify({ stockReserved: true, finalizedAt: new Date().toISOString() }),
+                    payment.id
+                ]
             );
+
+            await incrementCouponUsageIfNeeded(client, rawRequest.coupon);
 
             await client.query(
                 `UPDATE orders
@@ -288,7 +302,8 @@ const webhookIyzico = async (req, res) => {
             await appendOrderEvent(client, payment.order_id, 'PAYMENT_SUCCESS', 'Ödeme başarılı.', {
                 provider: 'iyzico',
                 eventId,
-                paymentRef
+                paymentRef,
+                stockReservedBeforeWebhook: stockWasReserved
             });
         } else {
             await client.query(
@@ -317,19 +332,16 @@ const webhookIyzico = async (req, res) => {
                 ]
             );
 
-            let parsedItems = [];
-            try {
-                parsedItems = Array.isArray(payment.items) ? payment.items : JSON.parse(payment.items || '[]');
-            } catch (_) {
-                parsedItems = [];
+            if (stockWasReserved) {
+                await restockItems(client, parsedItems);
             }
-            await restockItems(client, parsedItems);
 
             await appendOrderEvent(client, payment.order_id, 'PAYMENT_FAILED', 'Ödeme başarısız.', {
                 provider: 'iyzico',
                 eventId,
                 paymentRef,
-                reason: payload.reason || null
+                reason: payload.reason || null,
+                stockReservedBeforeWebhook: stockWasReserved
             });
         }
 
@@ -348,6 +360,15 @@ const webhookIyzico = async (req, res) => {
                 isSuccess
                     ? `Sipariş #${payment.order_id} ödemesi başarıyla alındı.`
                     : `Sipariş #${payment.order_id} ödemesi başarısız oldu.`,
+                io
+            );
+        }
+
+        if (isSuccess) {
+            await createNotification(
+                null,
+                'new_order',
+                `Yeni sipariş kesinleşti (#${payment.order_id}). Müşteri: ${payment.customer_name || 'Bilinmiyor'}`,
                 io
             );
         }
