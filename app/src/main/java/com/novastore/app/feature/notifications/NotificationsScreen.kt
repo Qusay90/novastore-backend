@@ -318,6 +318,8 @@ fun NotificationsScreen(
                 )
                 AccountPage.Addresses -> AddressesPage(
                     addresses = addresses,
+                    isLoading = uiState.addressLoading,
+                    error = uiState.addressError,
                     sessionPhone = viewModel.currentUserPhone.orEmpty(),
                     onSave = viewModel::saveAddress,
                     onDelete = viewModel::deleteAddress,
@@ -848,6 +850,8 @@ private fun OrderDetailPage(
 @Composable
 private fun AddressesPage(
     addresses: List<CustomerAddress>,
+    isLoading: Boolean,
+    error: String?,
     sessionPhone: String = "",
     onSave: (CustomerAddress) -> Unit,
     onDelete: (Long) -> Unit,
@@ -856,6 +860,17 @@ private fun AddressesPage(
     var editing by remember { mutableStateOf<CustomerAddress?>(null) }
     var showForm by remember { mutableStateOf(addresses.isEmpty()) }
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (isLoading) {
+            AccountCard {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = OrangeAccent)
+                    Text("Adresler yükleniyor...", color = MutedText)
+                }
+            }
+        }
+        error?.let {
+            InfoCard(it, "Adreslerde yaptığın değişiklikler bağlantı geldiğinde tekrar eşitlenebilir.", Icons.Default.Warning, success = false)
+        }
         if (addresses.isEmpty() && !showForm) {
             StateCard(Icons.Default.LocationOn, "Kayıtlı adres yok", "Teslimat adresini eklediğinde Home ve Checkout ekranlarında da kullanılacak.")
         }

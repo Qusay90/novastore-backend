@@ -103,6 +103,24 @@ const createCommerceSchema = async () => {
         );
         CREATE INDEX IF NOT EXISTS idx_order_events_order_id ON order_events(order_id);
 
+        CREATE TABLE IF NOT EXISTS customer_addresses (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            title VARCHAR(80) NOT NULL,
+            full_name VARCHAR(160) NOT NULL,
+            phone VARCHAR(40) NOT NULL,
+            city VARCHAR(120) NOT NULL,
+            district VARCHAR(120) NOT NULL,
+            address_line TEXT NOT NULL,
+            is_default BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_customer_addresses_user_id ON customer_addresses(user_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_customer_addresses_one_default
+            ON customer_addresses(user_id)
+            WHERE is_default = TRUE;
+
         CREATE TABLE IF NOT EXISTS notification_audit_logs (
             id SERIAL PRIMARY KEY,
             notification_id INTEGER REFERENCES notifications(id) ON DELETE SET NULL,

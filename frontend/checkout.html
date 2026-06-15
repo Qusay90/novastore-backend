@@ -9,6 +9,7 @@
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
+    <script src="mobile-bridge.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -628,15 +629,30 @@
         function _cartKey() { return `novastore_cart_${_getUserId()}`; }
         function _addrKey() { return `novastore_addresses_${_getUserId()}`; }
         function _checkoutKey() { return `novastore_checkout_${_getUserId()}`; }
+        const checkoutToken = localStorage.getItem('nova_user_token');
+        const checkoutUser = JSON.parse(localStorage.getItem('nova_user_info') || 'null');
+
+        function normalizeCheckoutAddress(addr) {
+            return {
+                id: String(addr.id || Date.now()),
+                title: addr.title || addr.label || 'Adres',
+                city: addr.city || addr.province || '',
+                district: addr.district || '',
+                detail: addr.detail || addr.addressLine || addr.address_line || addr.fullAddress || addr.address || '',
+                fullName: addr.fullName || addr.full_name || addr.recipientName || checkoutUser?.fullName || '',
+                phone: addr.phone || checkoutUser?.phone || '',
+                isDefault: addr.isDefault === true || addr.is_default === true
+            };
+        }
 
         function getStoredCheckoutAddresses() {
             const scopedKey = _addrKey();
-            const scopedAddresses = JSON.parse(localStorage.getItem(scopedKey) || '[]');
+            const scopedAddresses = JSON.parse(localStorage.getItem(scopedKey) || '[]').map(normalizeCheckoutAddress);
             if (scopedAddresses.length > 0) {
                 return scopedAddresses;
             }
 
-            const legacyList = JSON.parse(localStorage.getItem('novastore_user_addresses') || '[]');
+            const legacyList = JSON.parse(localStorage.getItem('novastore_user_addresses') || '[]').map(normalizeCheckoutAddress);
             if (legacyList.length > 0) {
                 localStorage.setItem(scopedKey, JSON.stringify(legacyList));
                 localStorage.removeItem('novastore_user_addresses');
@@ -650,12 +666,7 @@
 
             try {
                 const data = JSON.parse(oldAddress);
-                const migrated = [{
-                    ...data,
-                    id: data.id || Date.now().toString(),
-                    fullName: data.fullName || JSON.parse(localStorage.getItem('nova_user_info'))?.fullName || '',
-                    phone: data.phone || ''
-                }];
+                const migrated = [normalizeCheckoutAddress(data)];
                 localStorage.setItem(scopedKey, JSON.stringify(migrated));
                 localStorage.removeItem('nova_user_address');
                 return migrated;
@@ -666,6 +677,55 @@
 
         function persistCheckoutAddresses(addresses) {
             localStorage.setItem(_addrKey(), JSON.stringify(addresses));
+        }
+
+        async function apiCheckoutAddress(path = '', options = {}) {
+            if (!checkoutToken) throw new Error('Oturum bulunamadı.');
+            const response = await fetch(`/api/addresses${path}`, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + checkoutToken,
+                    ...(options.headers || {})
+                }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || data.message || 'Adres işlemi tamamlanamadı.');
+            return data;
+        }
+
+        function checkoutAddressPayload(addr) {
+            return {
+                title: addr.title,
+                fullName: addr.fullName || checkoutUser?.fullName || '',
+                phone: addr.phone || checkoutUser?.phone || '',
+                city: addr.city,
+                district: addr.district,
+                addressLine: addr.detail,
+                isDefault: addr.isDefault === true
+            };
+        }
+
+        async function fetchCheckoutAddresses() {
+            const localAddresses = getStoredCheckoutAddresses();
+            if (!checkoutToken) return localAddresses;
+            try {
+                let remoteAddresses = (await apiCheckoutAddress()).map(normalizeCheckoutAddress);
+                if (remoteAddresses.length === 0 && localAddresses.length > 0) {
+                    for (const addr of localAddresses) {
+                        await apiCheckoutAddress('', {
+                            method: 'POST',
+                            body: JSON.stringify(checkoutAddressPayload(addr))
+                        });
+                    }
+                    localStorage.removeItem(_addrKey());
+                    remoteAddresses = (await apiCheckoutAddress()).map(normalizeCheckoutAddress);
+                }
+                persistCheckoutAddresses(remoteAddresses);
+                return remoteAddresses;
+            } catch (_) {
+                return localAddresses;
+            }
         }
 
         const cart = JSON.parse(localStorage.getItem(_checkoutKey())) || [];
@@ -780,14 +840,17 @@
             document.getElementById('legalModalOverlay').style.display = 'none';
         }
         let selectedAddressId = null;
+        let checkoutAddresses = [];
 
-        function loadCheckoutAddresses() {
-            const addresses = getStoredCheckoutAddresses();
+        async function loadCheckoutAddresses() {
+            checkoutAddresses = await fetchCheckoutAddresses();
+            const addresses = checkoutAddresses;
 
             if (addresses.length > 0) {
                 // Varsayılan olarak ilk adresi seç
                 if (!selectedAddressId || !addresses.find(a => a.id === selectedAddressId)) {
-                    selectAddress(addresses[0].id);
+                    const defaultAddress = addresses.find(a => a.isDefault) || addresses[0];
+                    selectAddress(defaultAddress.id);
                 }
             } else {
                 document.getElementById('checkout-addr-title').innerText = "📍 Henüz Kayıtlı Adresiniz Yok";
@@ -797,7 +860,7 @@
         }
 
         function openCheckoutAddressModal() {
-            const addresses = getStoredCheckoutAddresses();
+            const addresses = checkoutAddresses;
             const listContainer = document.getElementById('checkout-address-list');
             listContainer.innerHTML = '';
 
@@ -833,7 +896,7 @@
         }
 
         function selectAddress(id) {
-            const addresses = getStoredCheckoutAddresses();
+            const addresses = checkoutAddresses.length > 0 ? checkoutAddresses : getStoredCheckoutAddresses();
             const addr = addresses.find(a => a.id === id);
 
             if (addr) {
@@ -857,7 +920,7 @@
             document.getElementById('new-address-modal').style.display = 'none';
         }
 
-        function saveNewAddressFromCheckout() {
+        async function saveNewAddressFromCheckout() {
             const title = document.getElementById('new-addr-title').value;
             const city = document.getElementById('new-addr-city').value;
             const district = document.getElementById('new-addr-district').value;
@@ -870,9 +933,8 @@
                 return;
             }
 
-            const newId = Date.now().toString();
             const newAddr = {
-                id: newId,
+                id: Date.now().toString(),
                 title: title,
                 city: city,
                 district: district,
@@ -881,12 +943,29 @@
                 phone: phone
             };
 
-            const addresses = getStoredCheckoutAddresses();
-            addresses.push(newAddr);
-            persistCheckoutAddresses(addresses);
+            try {
+                if (checkoutToken) {
+                    const saved = await apiCheckoutAddress('', {
+                        method: 'POST',
+                        body: JSON.stringify(checkoutAddressPayload(newAddr))
+                    });
+                    checkoutAddresses = (await apiCheckoutAddress()).map(normalizeCheckoutAddress);
+                    persistCheckoutAddresses(checkoutAddresses);
+                    closeNewAddressForm();
+                    selectAddress(String(saved.id));
+                    return;
+                }
+            } catch (error) {
+                alert(error.message || 'Adres kaydedilemedi.');
+                return;
+            }
+
+            checkoutAddresses = getStoredCheckoutAddresses();
+            checkoutAddresses.push(newAddr);
+            persistCheckoutAddresses(checkoutAddresses);
 
             closeNewAddressForm();
-            selectAddress(newId);
+            selectAddress(newAddr.id);
         }
 
         // Sayfa yüklendiğinde adresleri kontrol et
@@ -975,7 +1054,7 @@
             const user = userInfoStr ? JSON.parse(userInfoStr) : null;
             const token = localStorage.getItem('nova_user_token');
 
-            const addresses = getStoredCheckoutAddresses();
+            const addresses = checkoutAddresses.length > 0 ? checkoutAddresses : getStoredCheckoutAddresses();
             const selectedAddr = addresses.find(a => a.id === selectedAddressId) || {};
 
             const couponCode = appliedCouponCode || (document.getElementById('coupon-input').value.trim() || null);

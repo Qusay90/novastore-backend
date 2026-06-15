@@ -863,6 +863,18 @@
                             </div>
                             <div class="grid-2">
                                 <div class="form-group">
+                                    <label>Alıcı Ad Soyad</label>
+                                    <input type="text" id="addr-fullname" class="form-control"
+                                        placeholder="Ad Soyad" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Telefon</label>
+                                    <input type="tel" id="addr-phone" class="form-control"
+                                        placeholder="05XXXXXXXXX" required>
+                                </div>
+                            </div>
+                            <div class="grid-2">
+                                <div class="form-group">
                                     <label>İl</label>
                                     <input type="text" id="addr-city" class="form-control" placeholder="Örn: İstanbul"
                                         required>
@@ -1594,14 +1606,26 @@
         }
 
         // --- 4. ÇOKLU ADRES YÖNETİMİ ---
-        function getStoredAddresses() {
-            const scopedKey = _addrKey();
-            const scopedAddresses = JSON.parse(localStorage.getItem(scopedKey) || '[]');
-            if (scopedAddresses.length > 0) {
-                return scopedAddresses;
-            }
+        function normalizeAddressForClient(addr) {
+            return {
+                id: String(addr.id || Date.now()),
+                title: addr.title || addr.label || 'Adres',
+                fullName: addr.fullName || addr.full_name || addr.recipientName || user.fullName || '',
+                phone: addr.phone || user.phone || '',
+                city: addr.city || addr.province || '',
+                district: addr.district || '',
+                detail: addr.detail || addr.addressLine || addr.address_line || addr.fullAddress || addr.address || '',
+                zip: addr.zip || '',
+                isDefault: addr.isDefault === true || addr.is_default === true
+            };
+        }
 
-            const legacyList = JSON.parse(localStorage.getItem('novastore_user_addresses') || '[]');
+        function readLocalAddresses() {
+            const scopedKey = _addrKey();
+            const scopedAddresses = JSON.parse(localStorage.getItem(scopedKey) || '[]').map(normalizeAddressForClient);
+            if (scopedAddresses.length > 0) return scopedAddresses;
+
+            const legacyList = JSON.parse(localStorage.getItem('novastore_user_addresses') || '[]').map(normalizeAddressForClient);
             if (legacyList.length > 0) {
                 localStorage.setItem(scopedKey, JSON.stringify(legacyList));
                 localStorage.removeItem('novastore_user_addresses');
@@ -1609,16 +1633,10 @@
             }
 
             const oldAddress = localStorage.getItem('nova_user_address');
-            if (!oldAddress) {
-                return [];
-            }
+            if (!oldAddress) return [];
 
             try {
-                const data = JSON.parse(oldAddress);
-                const migrated = [{
-                    ...data,
-                    id: data.id || Date.now().toString()
-                }];
+                const migrated = [normalizeAddressForClient(JSON.parse(oldAddress))];
                 localStorage.setItem(scopedKey, JSON.stringify(migrated));
                 localStorage.removeItem('nova_user_address');
                 return migrated;
@@ -1631,24 +1649,68 @@
             localStorage.setItem(_addrKey(), JSON.stringify(addresses));
         }
 
-        let addresses = getStoredAddresses();
+        async function apiAddress(path = '', options = {}) {
+            const response = await fetch(`/api/addresses${path}`, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    ...(options.headers || {})
+                }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || data.message || 'Adres işlemi tamamlanamadı.');
+            }
+            return data;
+        }
 
-        function renderAddresses() {
+        function toAddressPayload(addr) {
+            return {
+                title: addr.title,
+                fullName: addr.fullName || user.fullName || '',
+                phone: addr.phone || user.phone || '',
+                city: addr.city,
+                district: addr.district,
+                addressLine: addr.detail,
+                isDefault: addr.isDefault === true
+            };
+        }
+
+        async function migrateLocalAddressesToBackend(localAddresses) {
+            for (const addr of localAddresses) {
+                await apiAddress('', {
+                    method: 'POST',
+                    body: JSON.stringify(toAddressPayload(addr))
+                });
+            }
+            localStorage.removeItem(_addrKey());
+        }
+
+        let addresses = readLocalAddresses();
+
+        function renderAddresses(message = '') {
             const container = document.getElementById('address-grid');
             container.innerHTML = '';
+
+            if (message) {
+                container.innerHTML += `<div style="grid-column: 1 / -1; color: #666; background:#F8FBFF; border:1px solid #DDE8F5; border-radius:12px; padding:14px;">${message}</div>`;
+            }
 
             addresses.forEach((addr, index) => {
                 container.innerHTML += `
                     <div style="background: white; border: 1px solid #EAEAEA; border-radius: 12px; padding: 20px; transition: 0.3s; position: relative;">
                         <h3 style="margin-top: 0; color: #0F2A43; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
-                            📍 ${addr.title}
+                            📍 ${addr.title} ${addr.isDefault ? '<span style="font-size:0.75rem; color:#F7941D;">Varsayılan</span>' : ''}
                         </h3>
                         <p style="color: #666; font-size: 0.95rem; line-height: 1.5; margin: 0 0 10px 0; min-height: 65px;">
+                            <strong>${addr.fullName || ''}</strong>${addr.phone ? ' - ' + addr.phone : ''}<br>
                             ${addr.detail}<br>
                             ${addr.district} / ${addr.city} ${addr.zip ? '- ' + addr.zip : ''}
                         </p>
                         <div style="display: flex; gap: 10px; margin-top: 20px; border-top: 1px dashed #EEE; padding-top: 15px;">
                             <button onclick="editAddress('${addr.id}')" style="flex: 1; background: #F8FBFF; color: #007BFF; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: 0.2s;">Düzenle</button>
+                            <button onclick="setDefaultAddress('${addr.id}')" style="flex: 1; background: #FFF7EC; color: #F7941D; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: 0.2s;">Varsayılan</button>
                             <button onclick="deleteAddress('${addr.id}')" style="flex: 1; background: #FFF0F0; color: #E53935; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: 0.2s;">Sil</button>
                         </div>
                     </div>
@@ -1667,6 +1729,8 @@
         function openAddressModal() {
             document.getElementById('address-form').reset();
             document.getElementById('addr-id').value = '';
+            document.getElementById('addr-fullname').value = user.fullName || '';
+            document.getElementById('addr-phone').value = user.phone || '';
             document.getElementById('btn-save-addr').innerText = 'Adresi Kaydet';
             document.getElementById('address-modal-overlay').style.display = 'flex';
         }
@@ -1680,38 +1744,46 @@
             if (e.target === this) closeAddressModal();
         });
 
-        function saveAddress(e) {
+        async function saveAddress(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-save-addr');
             btn.innerText = "Kaydediliyor...";
+            btn.disabled = true;
 
-            const newId = document.getElementById('addr-id').value || Date.now().toString();
+            const existingId = document.getElementById('addr-id').value;
 
             const addressData = {
-                id: newId,
+                id: existingId || Date.now().toString(),
                 title: document.getElementById('addr-title').value,
+                fullName: document.getElementById('addr-fullname').value,
+                phone: document.getElementById('addr-phone').value,
                 city: document.getElementById('addr-city').value,
                 district: document.getElementById('addr-district').value,
                 detail: document.getElementById('addr-detail').value,
                 zip: document.getElementById('addr-zip').value
             };
 
-            const existingIndex = addresses.findIndex(a => a.id === newId);
-            if (existingIndex > -1) {
-                addresses[existingIndex] = addressData; // Güncelle
-            } else {
-                addresses.push(addressData); // Yeni ekle
-            }
-
-            persistAddresses();
-
-            setTimeout(() => {
+            try {
+                if (existingId) {
+                    await apiAddress(`/${existingId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(toAddressPayload(addressData))
+                    });
+                } else {
+                    await apiAddress('', {
+                        method: 'POST',
+                        body: JSON.stringify(toAddressPayload(addressData))
+                    });
+                }
                 btn.innerText = "Kaydedildi!";
-                setTimeout(() => {
-                    closeAddressModal();
-                    renderAddresses();
-                }, 500);
-            }, 500);
+                closeAddressModal();
+                await loadAddress();
+            } catch (error) {
+                alert(error.message || 'Adres kaydedilemedi.');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = existingId ? 'Değişiklikleri Kaydet' : 'Adresi Kaydet';
+            }
         }
 
         function editAddress(id) {
@@ -1719,6 +1791,8 @@
             if (addr) {
                 document.getElementById('addr-id').value = addr.id;
                 document.getElementById('addr-title').value = addr.title || '';
+                document.getElementById('addr-fullname').value = addr.fullName || user.fullName || '';
+                document.getElementById('addr-phone').value = addr.phone || user.phone || '';
                 document.getElementById('addr-city').value = addr.city || '';
                 document.getElementById('addr-district').value = addr.district || '';
                 document.getElementById('addr-detail').value = addr.detail || '';
@@ -1728,17 +1802,42 @@
             }
         }
 
-        function deleteAddress(id) {
+        async function deleteAddress(id) {
             if (confirm('Bu adresi silmek istediğinize emin misiniz?')) {
-                addresses = addresses.filter(a => a.id !== id);
-                persistAddresses();
-                renderAddresses();
+                try {
+                    await apiAddress(`/${id}`, { method: 'DELETE' });
+                    await loadAddress();
+                } catch (error) {
+                    alert(error.message || 'Adres silinemedi.');
+                }
             }
         }
 
-        function loadAddress() {
-            addresses = getStoredAddresses();
-            renderAddresses();
+        async function setDefaultAddress(id) {
+            try {
+                await apiAddress(`/${id}/default`, { method: 'PATCH' });
+                await loadAddress();
+            } catch (error) {
+                alert(error.message || 'Varsayılan adres seçilemedi.');
+            }
+        }
+
+        async function loadAddress() {
+            const localAddresses = readLocalAddresses();
+            renderAddresses('Adresler yükleniyor...');
+            try {
+                let remoteAddresses = (await apiAddress()).map(normalizeAddressForClient);
+                if (remoteAddresses.length === 0 && localAddresses.length > 0) {
+                    await migrateLocalAddressesToBackend(localAddresses);
+                    remoteAddresses = (await apiAddress()).map(normalizeAddressForClient);
+                }
+                addresses = remoteAddresses;
+                persistAddresses();
+                renderAddresses();
+            } catch (error) {
+                addresses = localAddresses;
+                renderAddresses('Adresler sunucudan alınamadı. Cihazdaki kayıtlı adresler gösteriliyor.');
+            }
         }
 
         // Sayfa açıldığında siparişleri çek

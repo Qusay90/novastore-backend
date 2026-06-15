@@ -107,6 +107,9 @@ app.use('/api/orders', orderRoutes);
 const paymentRoutes = require('./routes/paymentRoutes');
 app.use('/api/payments', paymentRoutes);
 
+const addressRoutes = require('./routes/addressRoutes');
+app.use('/api/addresses', addressRoutes);
+
 const shipmentRoutes = require('./routes/shipmentRoutes');
 app.use('/api/shipments', shipmentRoutes);
 
