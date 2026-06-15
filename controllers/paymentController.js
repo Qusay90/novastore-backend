@@ -53,11 +53,11 @@ const initializePayment = async (req, res) => {
         } = req.body;
 
         if (!fullName || !email || !address) {
-            return res.status(400).json({ error: 'Musteri bilgileri eksik.' });
+            return res.status(400).json({ error: 'Müşteri bilgileri eksik.' });
         }
 
         if (!Array.isArray(cartItems) || cartItems.length === 0) {
-            return res.status(400).json({ error: 'Sepet bos olamaz.' });
+            return res.status(400).json({ error: 'Sepet boş olamaz.' });
         }
 
         const user = getUserFromRequestIfAny(req);
@@ -76,7 +76,7 @@ const initializePayment = async (req, res) => {
         if (existingPayment.rows.length > 0) {
             const row = existingPayment.rows[0];
             return res.status(200).json({
-                message: 'Idempotent tekrar istegi, mevcut odeme donuldu.',
+                message: 'Idempotent tekrar isteği, mevcut ödeme dönüldü.',
                 orderId: row.order_id,
                 paymentRef: row.payment_ref,
                 paymentStatus: row.status,
@@ -155,7 +155,7 @@ const initializePayment = async (req, res) => {
             [paymentRef, paymentStatus, order.id]
         );
 
-        await appendOrderEvent(client, order.id, 'PAYMENT_INITIALIZED', 'Odeme baslatildi.', {
+        await appendOrderEvent(client, order.id, 'PAYMENT_INITIALIZED', 'Ödeme başlatıldı.', {
             provider: paymentProvider,
             paymentRef,
             idempotencyKey,
@@ -169,7 +169,7 @@ const initializePayment = async (req, res) => {
             await createNotification(
                 userId,
                 'order_update',
-                `Siparis #${order.id} icin odeme adimi baslatildi.`,
+                `Sipariş #${order.id} için ödeme adımı başlatıldı.`,
                 io
             );
         }
@@ -177,7 +177,7 @@ const initializePayment = async (req, res) => {
         await createNotification(
             null,
             'new_order',
-            `Yeni siparis olusturuldu (#${order.id}). Odeme adimi: ${paymentMethod}.`,
+            `Yeni sipariş oluşturuldu (#${order.id}). Ödeme adımı: ${paymentMethod}.`,
             io
         );
 
@@ -192,13 +192,13 @@ const initializePayment = async (req, res) => {
             coupon: pricing.coupon,
             paymentAction: providerResponse,
             message: paymentMethod === 'havale'
-                ? 'Havale bilgileri olusturuldu. Odeme bekleniyor.'
-                : '3D odeme adimi baslatildi.'
+                ? 'Havale bilgileri oluşturuldu. Ödeme bekleniyor.'
+                : '3D ödeme adımı başlatıldı.'
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Odeme initialize hatasi:', err.message);
-        res.status(500).json({ error: err.message || 'Odeme baslatilamadi.' });
+        console.error('Ödeme initialize hatası:', err.message);
+        res.status(500).json({ error: err.message || 'Ödeme başlatılamadı.' });
     } finally {
         client.release();
     }
@@ -217,8 +217,18 @@ const webhookIyzico = async (req, res) => {
             return res.status(400).json({ error: 'eventId, paymentRef ve status zorunludur.' });
         }
 
-        const signature = req.headers['x-iyzico-signature'];
-        const signatureSecret = process.env.IYZICO_WEBHOOK_SECRET || '';
+        const signature = String(req.headers['x-iyzico-signature'] || '').trim();
+        const signatureSecret = String(process.env.IYZICO_WEBHOOK_SECRET || '').trim();
+        const isProductionWebhook = process.env.NODE_ENV === 'production';
+
+        if (isProductionWebhook && !signatureSecret) {
+            return res.status(503).json({ error: 'Webhook imza anahtarı production ortamında yapılandırılmalıdır.' });
+        }
+
+        if (isProductionWebhook && !signature) {
+            return res.status(401).json({ error: 'Production ortamında imzasız ödeme webhook isteği kabul edilmez.' });
+        }
+
         const signatureValid = signatureSecret ? verifyWebhookSignature(payload, signature, signatureSecret) : true;
 
         await client.query('BEGIN');
@@ -236,7 +246,7 @@ const webhookIyzico = async (req, res) => {
 
         if (!signatureValid) {
             await client.query('ROLLBACK');
-            return res.status(401).json({ error: 'Webhook imza dogrulamasi basarisiz.' });
+            return res.status(401).json({ error: 'Webhook imza doğrulaması başarısız.' });
         }
 
         const paymentResult = await client.query(
@@ -249,7 +259,7 @@ const webhookIyzico = async (req, res) => {
 
         if (paymentResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Odeme kaydi bulunamadi.' });
+            return res.status(404).json({ error: 'Ödeme kaydı bulunamadı.' });
         }
 
         const payment = paymentResult.rows[0];
@@ -275,7 +285,7 @@ const webhookIyzico = async (req, res) => {
                 [PAYMENT_STATUS.PAID, ORDER_STATUS.HAZIRLANIYOR, payment.order_id]
             );
 
-            await appendOrderEvent(client, payment.order_id, 'PAYMENT_SUCCESS', 'Odeme basarili.', {
+            await appendOrderEvent(client, payment.order_id, 'PAYMENT_SUCCESS', 'Ödeme başarılı.', {
                 provider: 'iyzico',
                 eventId,
                 paymentRef
@@ -301,7 +311,7 @@ const webhookIyzico = async (req, res) => {
                 [
                     PAYMENT_STATUS.FAILED,
                     ORDER_STATUS.IPTAL_EDILDI,
-                    payload.reason || 'Odeme basarisiz',
+                    payload.reason || 'Ödeme başarısız',
                     REFUND_STATUS.NONE,
                     payment.order_id
                 ]
@@ -315,7 +325,7 @@ const webhookIyzico = async (req, res) => {
             }
             await restockItems(client, parsedItems);
 
-            await appendOrderEvent(client, payment.order_id, 'PAYMENT_FAILED', 'Odeme basarisiz.', {
+            await appendOrderEvent(client, payment.order_id, 'PAYMENT_FAILED', 'Ödeme başarısız.', {
                 provider: 'iyzico',
                 eventId,
                 paymentRef,
@@ -336,8 +346,8 @@ const webhookIyzico = async (req, res) => {
                 payment.user_id,
                 'order_update',
                 isSuccess
-                    ? `Siparis #${payment.order_id} odemesi basariyla alindi.`
-                    : `Siparis #${payment.order_id} odemesi basarisiz oldu.`,
+                    ? `Sipariş #${payment.order_id} ödemesi başarıyla alındı.`
+                    : `Sipariş #${payment.order_id} ödemesi başarısız oldu.`,
                 io
             );
         }
@@ -345,8 +355,8 @@ const webhookIyzico = async (req, res) => {
         res.status(200).json({ ok: true, processed: true, status: isSuccess ? 'PAID' : 'FAILED' });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Iyzico webhook hatasi:', err.message);
-        res.status(500).json({ error: err.message || 'Webhook islenemedi.' });
+        console.error('Iyzico webhook hatası:', err.message);
+        res.status(500).json({ error: err.message || 'Webhook işlenemedi.' });
     } finally {
         client.release();
     }
