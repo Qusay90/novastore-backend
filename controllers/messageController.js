@@ -29,7 +29,7 @@ const emitRealtimeMessage = (messageRow, receiverRole) => {
             receiver_role: receiverRole
         });
     } catch (err) {
-        console.error('Gercek zamanli mesaj yayini hatasi:', err.message);
+        console.error('Gerçek zamanlı mesaj yayını hatası:', err.message);
     }
 };
 
@@ -49,8 +49,8 @@ const ensureSupportHandoffThread = async ({ client, customerId, adminId, firstMe
 
     const summaryLines = [
         AI_HANDOFF_PREFIX,
-        'Musteri dogrudan canli destek moduna gecti.',
-        `Ilk mesaj: ${String(firstMessage || '').trim().slice(0, 500)}`
+        'Müşteri doğrudan canlı destek moduna geçti.',
+        `İlk mesaj: ${String(firstMessage || '').trim().slice(0, 500)}`
     ];
 
     const handoffInsert = await client.query(
@@ -67,18 +67,18 @@ exports.getChatHistory = async (req, res) => {
     try {
         const requestedUserId = Number(req.params.userId);
         if (!Number.isInteger(requestedUserId)) {
-            return res.status(400).json({ error: 'Gecersiz kullanici kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz kullanıcı kimliği.' });
         }
 
         const adminId = await getPrimaryAdminId();
         if (!adminId) {
-            return res.status(500).json({ error: 'Admin hesabi bulunamadi.' });
+            return res.status(500).json({ error: 'Admin hesabı bulunamadı.' });
         }
 
         const targetUserId = req.user.role === 'admin' ? requestedUserId : req.user.id;
 
         if (req.user.role !== 'admin' && requestedUserId !== req.user.id) {
-            return res.status(403).json({ error: 'Bu sohbet gecmisine erisim yetkiniz yok.' });
+            return res.status(403).json({ error: 'Bu sohbet geçmişine erişim yetkiniz yok.' });
         }
 
         const query = `
@@ -91,8 +91,8 @@ exports.getChatHistory = async (req, res) => {
         const result = await pool.query(query, [targetUserId, adminId]);
         res.status(200).json(result.rows.map(normalizeMessageRow));
     } catch (err) {
-        console.error('Mesaj gecmisi cekilirken hata:', err);
-        res.status(500).json({ error: 'Mesaj gecmisi alinamadi' });
+        console.error('Mesaj geçmişi çekilirken hata:', err);
+        res.status(500).json({ error: 'Mesaj geçmişi alınamadı' });
     }
 };
 
@@ -104,12 +104,12 @@ exports.sendMessage = async (req, res) => {
         const trimmedMessage = String(message || '').trim();
 
         if (!trimmedMessage) {
-            return res.status(400).json({ error: 'Mesaj icerigi bos olamaz.' });
+            return res.status(400).json({ error: 'Mesaj içeriği boş olamaz.' });
         }
 
         const adminId = await getPrimaryAdminId();
         if (!adminId) {
-            return res.status(500).json({ error: 'Admin hesabi bulunamadi.' });
+            return res.status(500).json({ error: 'Admin hesabı bulunamadı.' });
         }
 
         const senderId = req.user.id;
@@ -118,7 +118,7 @@ exports.sendMessage = async (req, res) => {
         if (req.user.role === 'admin') {
             receiverId = Number(receiver_id);
             if (!Number.isInteger(receiverId)) {
-                return res.status(400).json({ error: 'Gecersiz alici kimligi.' });
+                return res.status(400).json({ error: 'Geçersiz alıcı kimliği.' });
             }
         } else {
             receiverId = adminId;
@@ -155,11 +155,11 @@ exports.sendMessage = async (req, res) => {
                 await createNotification(
                     null,
                     'ai_handoff',
-                    `Canli destek talebi olustu. Musteri #${senderId} size yazdi.`,
+                    `Canlı destek talebi oluştu. Müşteri #${senderId} size yazdı.`,
                     io
                 );
             } catch (err) {
-                console.error('Canli destek handoff bildirimi olusturulamadi:', err.message);
+                console.error('Canlı destek handoff bildirimi oluşturulamadı:', err.message);
             }
         }
 
@@ -170,8 +170,8 @@ exports.sendMessage = async (req, res) => {
         try {
             await client.query('ROLLBACK');
         } catch (_) { }
-        console.error('Mesaj gonderilirken hata:', err);
-        res.status(500).json({ error: 'Mesaj gonderilemedi' });
+        console.error('Mesaj gönderilirken hata:', err);
+        res.status(500).json({ error: 'Mesaj gönderilemedi' });
     } finally {
         client.release();
     }
@@ -181,7 +181,7 @@ exports.getChatUsers = async (req, res) => {
     try {
         const adminId = await getPrimaryAdminId();
         if (!adminId) {
-            return res.status(500).json({ error: 'Admin hesabi bulunamadi.' });
+            return res.status(500).json({ error: 'Admin hesabı bulunamadı.' });
         }
 
         const query = `
@@ -209,8 +209,8 @@ exports.getChatUsers = async (req, res) => {
         const result = await pool.query(query, [adminId, `${AI_HANDOFF_PREFIX}%`]);
         res.status(200).json(result.rows);
     } catch (err) {
-        console.error('Sohbet eden kullanicilar cekilirken hata:', err);
-        res.status(500).json({ error: 'Kullanicilar alinamadi' });
+        console.error('Sohbet eden kullanıcılar çekilirken hata:', err);
+        res.status(500).json({ error: 'Kullanıcılar alınamadı' });
     }
 };
 
@@ -218,7 +218,7 @@ exports.getAiHandoffs = async (req, res) => {
     try {
         const adminId = await getPrimaryAdminId();
         if (!adminId) {
-            return res.status(500).json({ error: 'Admin hesabi bulunamadi.' });
+            return res.status(500).json({ error: 'Admin hesabı bulunamadı.' });
         }
 
         const query = `
@@ -264,8 +264,8 @@ exports.getAiHandoffs = async (req, res) => {
         const result = await pool.query(query, [adminId, `${AI_HANDOFF_PREFIX}%`]);
         res.status(200).json(result.rows);
     } catch (err) {
-        console.error('AI handoff listesi cekilirken hata:', err);
-        res.status(500).json({ error: 'AI handoff listesi alinamadi.' });
+        console.error('AI handoff listesi çekilirken hata:', err);
+        res.status(500).json({ error: 'AI handoff listesi alınamadı.' });
     }
 };
 
@@ -275,7 +275,7 @@ exports.deleteAiHandoffThread = async (req, res) => {
     try {
         const requestedUserId = Number(req.params.userId);
         if (!Number.isInteger(requestedUserId)) {
-            return res.status(400).json({ error: 'Gecersiz kullanici kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz kullanıcı kimliği.' });
         }
 
         await client.query('BEGIN');
@@ -283,7 +283,7 @@ exports.deleteAiHandoffThread = async (req, res) => {
         const adminId = await getPrimaryAdminId(client);
         if (!adminId) {
             await client.query('ROLLBACK');
-            return res.status(500).json({ error: 'Admin hesabi bulunamadi.' });
+            return res.status(500).json({ error: 'Admin hesabı bulunamadı.' });
         }
 
         const customerResult = await client.query(
@@ -292,7 +292,7 @@ exports.deleteAiHandoffThread = async (req, res) => {
         );
         if (customerResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Musteri bulunamadi.' });
+            return res.status(404).json({ error: 'Müşteri bulunamadı.' });
         }
 
         const deleteMessagesResult = await client.query(
@@ -307,21 +307,21 @@ exports.deleteAiHandoffThread = async (req, res) => {
              WHERE user_id IS NULL
                AND type = 'ai_handoff'
                AND message LIKE $1`,
-            [`%Musteri #${requestedUserId}%`]
+            [`%Müşteri #${requestedUserId}%`]
         );
 
         await client.query('COMMIT');
 
         res.status(200).json({
             mesaj: deleteMessagesResult.rowCount > 0
-                ? 'AI devir kayitlari silindi.'
-                : 'Silinecek AI devir kaydi bulunamadi.',
+                ? 'AI devir kayıtları silindi.'
+                : 'Silinecek AI devir kaydı bulunamadı.',
             deletedCount: Number(deleteMessagesResult.rowCount || 0)
         });
     } catch (err) {
         await client.query('ROLLBACK');
         console.error('AI handoff silinirken hata:', err);
-        res.status(500).json({ error: 'AI devir kaydi silinemedi.' });
+        res.status(500).json({ error: 'AI devir kaydı silinemedi.' });
     } finally {
         client.release();
     }

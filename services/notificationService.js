@@ -33,7 +33,7 @@ const emitWithRetry = async ({ io, room, eventName, payload, notificationId = nu
             payload,
             delivered: false,
             attempts: 0,
-            lastError: 'Socket sunucusu veya oda bilgisi bulunamadi.'
+            lastError: 'Socket sunucusu veya oda bilgisi bulunamadı.'
         });
         return false;
     }
