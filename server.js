@@ -7,6 +7,7 @@ const path = require('path');
 const { simpleRateLimit, sanitizeBody } = require('./middlewares/securityMiddleware');
 const pool = require('./config/db');
 const { getAllowedOrigins } = require('./config/appConfig');
+const { resolveStartupSafety } = require('./config/startupSafety');
 const {
     authenticateSocket,
     autoJoinAllowedRooms,
@@ -174,22 +175,53 @@ const createNotificationsTable = require('./models/createNotificationDb');
 const createCommerceSchema = require('./models/createCommerceDb');
 const createAnalyticsSchema = require('./models/createAnalyticsDb');
 
-(async () => {
+const prepareDatabase = async (startupSafety) => {
+    if (!startupSafety.shouldVerifyDbConnection) {
+        console.log('Veritabani baglantisi ve schema init SKIP_SCHEMA_INIT=true ile atlandi.');
+        return;
+    }
+
+    await pool.query('SELECT 1');
+    console.log(`Veritabani baglantisi dogrulandi: ${pool.getTargetLabel()}`);
+
+    if (!startupSafety.shouldRunSchemaInit) {
+        console.log('Schema init guvenlik guard nedeniyle atlandi.');
+        return;
+    }
+
+    await createCoreSchema();
+    await createNotificationsTable();
+    await createCommerceSchema();
+    await createAnalyticsSchema();
+};
+
+const start = async () => {
+    const startupSafety = resolveStartupSafety(process.env);
+    startupSafety.warnings.forEach((warning) => console.warn(`Startup warning: ${warning}`));
+
+    if (!startupSafety.canStart) {
+        startupSafety.errors.forEach((error) => console.error(`Startup blocked: ${error}`));
+        process.exitCode = 1;
+        return;
+    }
+
     try {
-        await pool.query('SELECT 1');
-        console.log(`Veritabani baglantisi dogrulandi: ${pool.getTargetLabel()}`);
-        await createCoreSchema();
-        await createNotificationsTable();
-        await createCommerceSchema();
-        await createAnalyticsSchema();
+        console.log(`Veritabani hedefi: ${startupSafety.target.label}`);
+        await prepareDatabase(startupSafety);
     } catch (err) {
         console.error('Veritabani hazirlama hatasi:', pool.formatError(err));
+        if (startupSafety.safeLocalMode) {
+            process.exitCode = 1;
+            return;
+        }
     }
-})();
 
-// Sunucu
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-    console.log(`NovaStore sunucusu ${PORT} portunda baslatildi.`);
-    console.log('Socket.io hazir!');
-});
+    // Sunucu
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => {
+        console.log(`NovaStore sunucusu ${PORT} portunda baslatildi.`);
+        console.log('Socket.io hazir!');
+    });
+};
+
+start();
