@@ -47,3 +47,7 @@ temp_error.log
 *.keystore
 
 veri tabanı giriş şifresi.txt
+
+# Generated Cordova placeholders
+/frontend/cordova.js
+/frontend/cordova_plugins.js
