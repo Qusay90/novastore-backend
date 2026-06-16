@@ -99,11 +99,18 @@ class HomeViewModel @Inject constructor(
     init {
         loadData()
         refreshAddresses()
+        refreshFavorites()
     }
 
     fun refreshAddresses() {
         viewModelScope.launch {
             customerLocalRepository.refreshAddresses()
+        }
+    }
+
+    fun refreshFavorites() {
+        viewModelScope.launch {
+            customerLocalRepository.refreshFavorites()
         }
     }
 
@@ -183,7 +190,9 @@ class HomeViewModel @Inject constructor(
     }
 
     fun toggleFavorite(productId: Int) {
-        customerLocalRepository.toggleFavorite(productId)
+        viewModelScope.launch {
+            customerLocalRepository.toggleFavoriteSynced(productId)
+        }
     }
 
     fun saveAddress(address: CustomerAddress) {

@@ -105,6 +105,19 @@ interface NovaStoreApi {
     @PATCH("api/addresses/{id}/default")
     suspend fun setDefaultAddress(@Path("id") id: Long): CustomerAddress
 
+    // Favorites
+    @GET("api/favorites")
+    suspend fun getFavorites(): FavoritesResponse
+
+    @POST("api/favorites/{productId}")
+    suspend fun addFavorite(@Path("productId") productId: Int): FavoriteMutationResponse
+
+    @DELETE("api/favorites/{productId}")
+    suspend fun removeFavorite(@Path("productId") productId: Int): FavoriteMutationResponse
+
+    @POST("api/favorites/sync")
+    suspend fun syncFavorites(@Body body: FavoriteSyncRequest): FavoritesResponse
+
     // Payments
     @POST("api/payments/initialize")
     suspend fun initializePayment(@Body body: PaymentRequest): PaymentResponse

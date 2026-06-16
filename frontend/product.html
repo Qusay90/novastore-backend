@@ -9,6 +9,8 @@
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
+    <script src="mobile-bridge.js"></script>
+    <script src="favorites-sync.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -1574,17 +1576,21 @@
         }
 
         // --- FAVORİ SİSTEMİ ---
-        function toggleFavorite(btn, event, productId) {
+        function showFavoriteSyncError() {
+            console.warn('Favoriler senkronlanamadi.');
+        }
+
+        async function toggleFavorite(btn, event, productId) {
             event.preventDefault();
             event.stopPropagation();
-            btn.classList.toggle('active');
-            let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
-            if (btn.classList.contains('active')) {
-                if (!favs.includes(productId)) favs.push(productId);
-            } else {
-                favs = favs.filter(id => id !== productId);
+            const nextState = !btn.classList.contains('active');
+            btn.classList.toggle('active', nextState);
+            try {
+                await NovaStoreFavorites.setFavorite(productId, nextState);
+            } catch (error) {
+                btn.classList.toggle('active', !nextState);
+                alert('Favori işlemi tamamlanamadı. Lütfen tekrar deneyin.');
             }
-            localStorage.setItem(_favsKey(), JSON.stringify(favs));
         }
 
         // --- KULLANICIYA ÖZEL LOCALSTORAGE ANAHTARLARI ---
@@ -1954,7 +1960,7 @@
                         type: isVideoMedia(mediaUrl) ? 'video' : 'image',
                         altText: index === 0
                             ? String(product?.name || 'Urun medyasi')
-                            : `${String(product?.name || 'Urun')} gorsel ${index + 1}`
+                            : `${String(product?.name || 'Ürün')} görsel ${index + 1}`
                     };
                 }).filter(Boolean)
                 : [];
@@ -2202,11 +2208,11 @@
 
             if (selectedReviewFiles.length === 0) {
                 container.innerHTML = '';
-                hint.textContent = 'En fazla 4 gorsel veya video ekleyebilirsiniz. Ilk kare yorum kartinda kucuk onizleme olarak gorunur.';
+                hint.textContent = 'En fazla 4 görsel veya video ekleyebilirsiniz. İlk kare yorum kartında küçük önizleme olarak görünür.';
                 return;
             }
 
-            hint.textContent = `${selectedReviewFiles.length}/${MAX_REVIEW_MEDIA_FILES} dosya hazir. Yorum gonderildiginde gorseller ve videolar birlikte yollanacak.`;
+            hint.textContent = `${selectedReviewFiles.length}/${MAX_REVIEW_MEDIA_FILES} dosya hazır. Yorum gönderildiğinde görseller ve videolar birlikte yollanacak.`;
             container.innerHTML = selectedReviewFiles.map((file, index) => {
                 const previewUrl = URL.createObjectURL(file);
                 reviewPreviewUrls.push(previewUrl);
@@ -2245,7 +2251,7 @@
             });
 
             if (availableSlots <= 0) {
-                alert('En fazla 4 gorsel veya video ekleyebilirsiniz.');
+                alert('En fazla 4 görsel veya video ekleyebilirsiniz.');
                 syncReviewMediaInput();
                 renderReviewMediaPreviews();
                 return;
@@ -2522,7 +2528,7 @@
                                     multiple
                                     onchange="handleReviewMediaSelection(event)"
                                 >
-                                <div id="review-media-hint" class="review-upload-hint">En fazla 4 gorsel veya video ekleyebilirsiniz. Ilk kare yorum kartinda kucuk onizleme olarak gorunur.</div>
+                                <div id="review-media-hint" class="review-upload-hint">En fazla 4 görsel veya video ekleyebilirsiniz. İlk kare yorum kartında küçük önizleme olarak görünür.</div>
                                 <div id="review-media-preview" class="review-preview-grid"></div>
                             </div>
                             <button onclick="submitReview()" class="btn-submit-review">Yorumu Gönder</button>
@@ -2643,8 +2649,8 @@
                 }
 
                 // Favori kontrolü
-                let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
-                let isFav = favs.includes(product.id) ? 'active' : '';
+                const favoriteIds = await NovaStoreFavorites.loadFavoriteIds({ onError: showFavoriteSyncError });
+                let isFav = favoriteIds.has(Number(product.id)) ? 'active' : '';
                 const safeDescriptionHtml = getSafeProductDescriptionHtml(product.description);
                 const safeDescriptionText = stripProductDescriptionHtml(safeDescriptionHtml) || product.name;
 

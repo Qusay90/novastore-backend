@@ -4,7 +4,9 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.novastore.app.core.network.NovaStoreApi
+import com.novastore.app.core.session.SessionManager
 import com.novastore.app.data.model.CustomerAddress
+import com.novastore.app.data.model.FavoriteSyncRequest
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +17,8 @@ import javax.inject.Singleton
 @Singleton
 class CustomerLocalRepository @Inject constructor(
     @ApplicationContext context: Context,
-    private val api: NovaStoreApi
+    private val api: NovaStoreApi,
+    private val sessionManager: SessionManager
 ) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
@@ -34,19 +37,74 @@ class CustomerLocalRepository @Inject constructor(
             ?: _addresses.value.firstOrNull()
 
     fun toggleFavorite(productId: Int) {
-        val updated = _favoriteIds.value.toMutableSet().apply {
-            if (!add(productId)) remove(productId)
-        }
-        prefs.edit().putStringSet(KEY_FAVORITES, updated.map { it.toString() }.toSet()).apply()
-        _favoriteIds.value = updated
+        setFavoriteLocal(productId, !_favoriteIds.value.contains(productId))
     }
 
     fun setFavorite(productId: Int, isFavorite: Boolean) {
+        setFavoriteLocal(productId, isFavorite)
+    }
+
+    suspend fun refreshFavorites(allowMigration: Boolean = true): Result<Set<Int>> = runCatching {
+        val userId = activeUserId()
+        if (userId == null) {
+            val guestFavorites = readFavoriteIdsForUser(null)
+            _favoriteIds.value = guestFavorites
+            return@runCatching guestFavorites
+        }
+
+        val localUserFavorites = readFavoriteIdsForUser(userId)
+        val legacyFavorites = readFavoriteIdsForUser(null)
+        val migrationFavorites = (localUserFavorites + legacyFavorites).toSet()
+
+        if (allowMigration && !isFavoriteMigrationComplete(userId) && migrationFavorites.isNotEmpty()) {
+            api.syncFavorites(FavoriteSyncRequest(migrationFavorites.sorted()))
+            markFavoriteMigrationComplete(userId)
+            prefs.edit().remove(KEY_FAVORITES).apply()
+        } else if (allowMigration && !isFavoriteMigrationComplete(userId)) {
+            markFavoriteMigrationComplete(userId)
+        }
+
+        val remoteFavorites = api.getFavorites().normalizedProductIds
+        saveFavoriteIds(remoteFavorites, userId)
+        remoteFavorites
+    }.onFailure {
+        _favoriteIds.value = readFavoriteIdsForUser(activeUserId())
+    }
+
+    suspend fun toggleFavoriteSynced(productId: Int): Result<Boolean> {
+        val shouldFavorite = !_favoriteIds.value.contains(productId)
+        return setFavoriteSynced(productId, shouldFavorite).map { shouldFavorite }
+    }
+
+    suspend fun setFavoriteSynced(productId: Int, isFavorite: Boolean): Result<Unit> = runCatching {
+        val userId = activeUserId()
+        if (userId == null) {
+            setFavoriteLocal(productId, isFavorite)
+            return@runCatching
+        }
+
+        val previous = _favoriteIds.value
+        setFavoriteLocal(productId, isFavorite, userId)
+        try {
+            if (isFavorite) {
+                api.addFavorite(productId)
+            } else {
+                api.removeFavorite(productId)
+            }
+            refreshFavorites(allowMigration = false).getOrThrow()
+        } catch (error: Throwable) {
+            saveFavoriteIds(previous, userId)
+            throw error
+        }
+    }.onFailure {
+        _favoriteIds.value = readFavoriteIdsForUser(activeUserId())
+    }
+
+    private fun setFavoriteLocal(productId: Int, isFavorite: Boolean, userId: Int? = activeUserId()) {
         val updated = _favoriteIds.value.toMutableSet().apply {
             if (isFavorite) add(productId) else remove(productId)
         }
-        prefs.edit().putStringSet(KEY_FAVORITES, updated.map { it.toString() }.toSet()).apply()
-        _favoriteIds.value = updated
+        saveFavoriteIds(updated, userId)
     }
 
     fun saveAddress(address: CustomerAddress) {
@@ -144,9 +202,34 @@ class CustomerLocalRepository @Inject constructor(
     }
 
     private fun readFavoriteIds(): Set<Int> {
-        return prefs.getStringSet(KEY_FAVORITES, emptySet()).orEmpty()
+        return readFavoriteIdsForUser(activeUserId())
+    }
+
+    private fun readFavoriteIdsForUser(userId: Int?): Set<Int> {
+        return prefs.getStringSet(favoriteKey(userId), emptySet()).orEmpty()
             .mapNotNull { it.toIntOrNull() }
             .toSet()
+    }
+
+    private fun saveFavoriteIds(favorites: Set<Int>, userId: Int? = activeUserId()) {
+        prefs.edit().putStringSet(favoriteKey(userId), favorites.map { it.toString() }.toSet()).apply()
+        _favoriteIds.value = favorites
+    }
+
+    private fun activeUserId(): Int? =
+        sessionManager.userId.takeIf { sessionManager.isLoggedIn && it > 0 }
+
+    private fun favoriteKey(userId: Int?): String =
+        if (userId != null) "${KEY_FAVORITES}_$userId" else KEY_FAVORITES
+
+    private fun favoriteMigrationKey(userId: Int): String =
+        "${KEY_FAVORITES_MIGRATION_COMPLETE}_$userId"
+
+    private fun isFavoriteMigrationComplete(userId: Int): Boolean =
+        prefs.getBoolean(favoriteMigrationKey(userId), false)
+
+    private fun markFavoriteMigrationComplete(userId: Int) {
+        prefs.edit().putBoolean(favoriteMigrationKey(userId), true).apply()
     }
 
     private fun readAddresses(): List<CustomerAddress> {
@@ -160,6 +243,7 @@ class CustomerLocalRepository @Inject constructor(
     companion object {
         private const val PREFS_NAME = "novastore_customer_local_prefs"
         private const val KEY_FAVORITES = "favorite_product_ids"
+        private const val KEY_FAVORITES_MIGRATION_COMPLETE = "favorite_product_ids_migrated"
         private const val KEY_ADDRESSES = "addresses"
         private const val KEY_SELECTED_ADDRESS_ID = "selected_address_id"
         private const val KEY_ADDRESS_MIGRATION_COMPLETE = "addresses_migration_complete"

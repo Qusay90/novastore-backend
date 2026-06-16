@@ -10,6 +10,8 @@
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
+    <script src="mobile-bridge.js"></script>
+    <script src="favorites-sync.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -972,6 +974,7 @@
         function _cartKey() { return `novastore_cart_${_getUserId()}`; }
         function _favsKey() { return `novastore_favs_${_getUserId()}`; }
         function _checkoutKey() { return `novastore_checkout_${_getUserId()}`; }
+        let currentFavoriteIds = new Set();
         const productCardSliderState = new WeakMap();
         const PRODUCT_CARD_PREVIEW_DURATION_MS = 1500;
         const PRODUCT_CARD_ZOOM_DELAY_MS = 120;
@@ -1005,7 +1008,7 @@
                     return {
                         url: mediaUrl,
                         type: isVideoMedia(mediaUrl) ? 'video' : 'image',
-                        altText: index === 0 ? productName : `${productName} gorsel ${index + 1}`
+                        altText: index === 0 ? productName : `${productName} görsel ${index + 1}`
                     };
                 })
                 .filter(Boolean);
@@ -1048,7 +1051,7 @@
             }).join('');
 
             const hintHtml = mediaItems.length > 1
-                ? `<div class="product-hover-hint">${mediaItems.length} gorsel onizleme</div>`
+                ? `<div class="product-hover-hint">${mediaItems.length} görsel önizleme</div>`
                 : '';
             const hoverZonesHtml = mediaItems.length > 1
                 ? `
@@ -1399,17 +1402,22 @@
         }
 
         // --- FAVORİ SİSTEMİ ---
-        function toggleFavorite(btn, event, productId) {
+        function showFavoriteSyncError() {
+            console.warn('Favoriler senkronlanamadi.');
+        }
+
+        async function toggleFavorite(btn, event, productId) {
             event.preventDefault();
             event.stopPropagation();
-            btn.classList.toggle('active');
-            let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
-            if (btn.classList.contains('active')) {
-                if (!favs.includes(productId)) favs.push(productId);
-            } else {
-                favs = favs.filter(id => id !== productId);
+            const nextState = !btn.classList.contains('active');
+            btn.classList.toggle('active', nextState);
+            try {
+                await NovaStoreFavorites.setFavorite(productId, nextState);
+                currentFavoriteIds = await NovaStoreFavorites.loadFavoriteIds({ onError: showFavoriteSyncError });
+            } catch (error) {
+                btn.classList.toggle('active', !nextState);
+                alert('Favori işlemi tamamlanamadı. Lütfen tekrar deneyin.');
             }
-            localStorage.setItem(_favsKey(), JSON.stringify(favs));
         }
 
         // --- 2. KUSURSUZ SEPET SİSTEMİ ---
@@ -1732,6 +1740,7 @@
 
                 const container = document.getElementById('products-container');
                 container.innerHTML = '';
+                currentFavoriteIds = await NovaStoreFavorites.loadFavoriteIds({ onError: showFavoriteSyncError });
 
                 if (products.length === 0) {
                     container.innerHTML = '<p style="text-align: center; width: 100%; color: #666;">Bu kategoride henüz ürün bulunmuyor.</p>';
@@ -1759,24 +1768,24 @@
                         discountBadge = '';
 
                         priceHtml = `
-                            <div style="flex: 1; display: inline-flex; gap: 8px; align-items: center; background: #FAFAFA; padding: 4px 8px; border-radius: 8px; border: 1px solid #F0F0F0; margin-right: 10px;">
+                            <div class="native-price-box native-price-box-discount" style="flex: 1; display: inline-flex; gap: 8px; align-items: center; background: #FAFAFA; padding: 4px 8px; border-radius: 8px; border: 1px solid #F0F0F0; margin-right: 10px;">
                                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: #00897B; font-size: 0.65rem; font-weight: 800; line-height: 1.1; padding-right: 6px; border-right: 1px solid #E0E0E0;">
                                     <span>Sepete</span>
                                     <span>Özel</span>
                                 </div>
                                 <div style="display: flex; flex-direction: column; justify-content: center;">
                                     <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-                                        <span style="color: #777; text-decoration: line-through; font-size: 0.75rem;">${oldP.toFixed(2)} TL</span>
-                                        <span style="background: #00897B; color: white; padding: 1px 4px; border-radius: 4px; font-weight: bold; font-size: 0.65rem;">%${discountRate}</span>
+                                        <span class="native-old-price" style="color: #777; text-decoration: line-through; font-size: 0.75rem;">${oldP.toFixed(2)} TL</span>
+                                        <span class="native-discount-badge" style="background: #00897B; color: white; padding: 1px 4px; border-radius: 4px; font-weight: bold; font-size: 0.65rem;">%${discountRate}</span>
                                     </div>
-                                    <div style="color: #00897B; font-weight: 800; font-size: 1.15rem; line-height: 1;">${newP.toFixed(2)} <span style="font-size: 0.8rem; font-weight: 600;">TL</span></div>
+                                    <div class="native-card-price native-card-price-discount" style="color: #00897B; font-weight: 800; font-size: 1.15rem; line-height: 1;">${newP.toFixed(2)} <span style="font-size: 0.8rem; font-weight: 600;">TL</span></div>
                                 </div>
                             </div>
                         `;
                     } else {
                         priceHtml = `
-                            <div style="flex: 1; display: inline-flex; align-items: flex-end; background: #FAFAFA; padding: 6px 10px; border-radius: 8px; border: 1px solid #F0F0F0; height: 100%; margin-right: 10px;">
-                                <div style="color: #333; font-weight: 800; font-size: 1.15rem; line-height: 1;">${parseFloat(product.price).toFixed(2)} <span style="font-size: 0.8rem;">TL</span></div>
+                            <div class="native-price-box native-price-box-regular" style="flex: 1; display: inline-flex; align-items: flex-end; background: #FAFAFA; padding: 6px 10px; border-radius: 8px; border: 1px solid #F0F0F0; height: 100%; margin-right: 10px;">
+                                <div class="native-card-price native-card-price-regular" style="color: #333; font-weight: 800; font-size: 1.15rem; line-height: 1;">${parseFloat(product.price).toFixed(2)} <span style="font-size: 0.8rem;">TL</span></div>
                             </div>
                         `;
                     }
@@ -1806,8 +1815,7 @@
                     }
 
                     // Favori durumu kontrolü
-                    let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
-                    let isFav = favs.includes(product.id) ? 'active' : '';
+                    let isFav = currentFavoriteIds.has(Number(product.id)) ? 'active' : '';
 
                     cardsHtml += `
                         <div class="product-card" style="position: relative; display: flex; flex-direction: column;">

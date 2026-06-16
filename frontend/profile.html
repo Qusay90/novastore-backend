@@ -10,6 +10,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <script src="mobile-bridge.js"></script>
+    <script src="favorites-sync.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -1866,20 +1867,28 @@
         }
 
         // --- 5. FAVORİLERİ GETİRME ---
-        function toggleFavoriteProfile(btn, event, productId) {
+        function showFavoriteSyncError() {
+            console.warn('Favoriler senkronlanamadi.');
+        }
+
+        async function toggleFavoriteProfile(btn, event, productId) {
             event.preventDefault();
             event.stopPropagation();
 
-            let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
-            favs = favs.filter(id => id !== productId);
-            localStorage.setItem(_favsKey(), JSON.stringify(favs));
+            try {
+                await NovaStoreFavorites.setFavorite(productId, false);
+            } catch (error) {
+                alert('Favori kaldırılamadı. Lütfen tekrar deneyin.');
+                return;
+            }
 
             // Ekranda kartı gizle
             const card = btn.closest('.product-card');
             card.style.opacity = '0';
             setTimeout(() => {
                 card.remove();
-                if (favs.length === 0) {
+                const remainingCards = document.querySelectorAll('#favorites-container .product-card').length;
+                if (remainingCards === 0) {
                     document.getElementById('favorites-container').innerHTML = `
                         <div style="text-align: center; padding: 40px 0; color: #666;">
                             <span style="font-size: 3rem; display: block; margin-bottom: 15px;">❤️</span>
@@ -1890,8 +1899,9 @@
         }
 
         async function fetchMyFavorites() {
-            let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
             const container = document.getElementById('favorites-container');
+            const favoriteIds = await NovaStoreFavorites.loadFavoriteIds({ onError: showFavoriteSyncError });
+            const favs = Array.from(favoriteIds);
 
             if (favs.length === 0) {
                 container.innerHTML = `
