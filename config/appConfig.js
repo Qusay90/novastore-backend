@@ -2,6 +2,11 @@ const normalizeUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
 
 const DEFAULT_PRODUCTION_BASE_URL = 'https://novastore.tr';
 const DEFAULT_PRODUCTION_WWW_BASE_URL = 'https://www.novastore.tr';
+const DEFAULT_NATIVE_APP_ORIGINS = [
+    'https://localhost',
+    'capacitor://localhost',
+    'ionic://localhost'
+];
 
 const isProduction = () => process.env.NODE_ENV === 'production';
 
@@ -37,7 +42,11 @@ const getAllowedOrigins = () => {
     }
 
     if (isProduction()) {
-        return [DEFAULT_PRODUCTION_BASE_URL, DEFAULT_PRODUCTION_WWW_BASE_URL];
+        return [
+            DEFAULT_PRODUCTION_BASE_URL,
+            DEFAULT_PRODUCTION_WWW_BASE_URL,
+            ...DEFAULT_NATIVE_APP_ORIGINS
+        ];
     }
 
     return [getLocalBaseUrl()];
@@ -48,10 +57,41 @@ const getMailFrom = () => {
     return configuredSender || 'NovaStore Destek <onboarding@resend.dev>';
 };
 
+const parseBoolean = (value, fallback = false) => {
+    if (value === undefined || value === null || value === '') return fallback;
+    return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+};
+
+const splitList = (value) => String(value || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+
+const getAiProviderFallbacks = (primaryProvider) => {
+    const configuredFallbacks = splitList(process.env.AI_PROVIDER_FALLBACKS);
+    if (configuredFallbacks.length) {
+        return configuredFallbacks.filter((provider) => provider !== primaryProvider);
+    }
+
+    if (primaryProvider === 'mock') return [];
+    return ['mock'];
+};
+
+const getAiProviderConfig = () => {
+    const primaryProvider = String(process.env.AI_PROVIDER || 'mock').trim().toLowerCase() || 'mock';
+    return {
+        primaryProvider,
+        fallbackEnabled: parseBoolean(process.env.AI_PROVIDER_FALLBACK_ENABLED, true),
+        fallbackProviders: getAiProviderFallbacks(primaryProvider)
+    };
+};
+
 module.exports = {
     DEFAULT_PRODUCTION_BASE_URL,
     DEFAULT_PRODUCTION_WWW_BASE_URL,
+    DEFAULT_NATIVE_APP_ORIGINS,
     getAllowedOrigins,
     getAppBaseUrl,
+    getAiProviderConfig,
     getMailFrom
 };

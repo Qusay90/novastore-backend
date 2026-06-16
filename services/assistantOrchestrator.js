@@ -1,290 +1,281 @@
 const { ASSISTANT_INTENTS } = require('../constants/assistantIntents');
+const { normalizeSearchText } = require('./catalogSearchService');
+const { runAgentSession } = require('./llmRewriteService');
 const {
-    compareProductsByText,
-    getProductDetails,
-    normalizeSearchText,
-    searchProducts
-} = require('./catalogSearchService');
-const { summarizeProductReviews } = require('./reviewInsightService');
-const { getPolicyAnswer } = require('./policyService');
-const { getOrderSupportContext } = require('./orderSupportService');
-const { rewriteDraftReply } = require('./llmRewriteService');
+    getCheaperProductsTool,
+    searchProductsTool
+} = require('./assistantToolRegistry');
 
-const SOCIAL_PATTERNS = {
-    gratitude: /tesekkur|tesekkurler|sag ol|eyvallah|eline saglik|cok iyi oldu|yardimci oldun/,
-    compliment: /harikasin|super|mukemmel|adamsin|kralsin|efsanesin|site cok guzel|cok iyisin|begendim|iyi is cikarmissin/,
-    greeting: /merhaba|selam|gunaydin|iyi aksamlar|nasilsin|naber|orada misin|iyi gunler/
+const NOVABOT_MODES = Object.freeze({
+    professional: {
+        label: 'Profesyonel Mod',
+        aliases: ['profesyonel', 'resmi', 'musteri hizmetleri'],
+        intro: 'Net ve resmi şekilde yardımcı olayım.'
+    },
+    friendly: {
+        label: 'Samimi Mod',
+        aliases: ['samimi', 'sicak', 'normal'],
+        intro: 'Sıcak ve anlaşılır şekilde yardımcı olayım.'
+    },
+    buddy: {
+        label: 'Kanka Modu',
+        aliases: ['kanka', 'arkadas', 'rahat'],
+        intro: 'Kanka, mantıklı seçenekleri toparlayayım.'
+    },
+    funny: {
+        label: 'Komik Mod',
+        aliases: ['komik', 'eglenceli', 'esprili'],
+        intro: 'Hafif esprili ama bilgi tarafını boşlamadan yardımcı olayım.'
+    },
+    witty: {
+        label: 'Alayci Ama Saygili Mod',
+        aliases: ['alayci', 'sivri', 'takil'],
+        intro: 'Biraz takılırım ama saygıyı bozmadan net konuşurum.'
+    },
+    quick: {
+        label: 'Hızlı Mod',
+        aliases: ['hizli', 'kisa', 'net'],
+        intro: 'Kısa ve net cevap vereyim.'
+    },
+    detailed: {
+        label: 'Detaycı Mod',
+        aliases: ['detayci', 'detayli', 'uzun anlat'],
+        intro: 'Detaylarıyla karşılaştırıp anlatayım.'
+    },
+    technical: {
+        label: 'Teknik Uzman Modu',
+        aliases: ['teknik', 'uzman', 'performans'],
+        intro: 'Teknik kriterlere odaklanayım.'
+    },
+    sales: {
+        label: 'Satış Danışmanı Modu',
+        aliases: ['satis', 'danisman', 'ihtiyac'],
+        intro: 'İhtiyaç, bütçe ve kullanım amacına göre yönlendireyim.'
+    }
+});
+
+const listModeCards = () => Object.entries(NOVABOT_MODES).map(([id, mode]) => ({
+    id,
+    title: mode.label,
+    description: mode.intro
+}));
+
+const normalizeMode = (mode) => {
+    const requested = normalizeSearchText(mode);
+    if (NOVABOT_MODES[requested]) return requested;
+    return Object.entries(NOVABOT_MODES).find(([, item]) => item.aliases.some((alias) => requested.includes(normalizeSearchText(alias))))?.[0] || 'friendly';
 };
 
-const detectIntent = (message) => {
+const detectRequestedMode = (message) => {
     const text = normalizeSearchText(message);
-
-    if (SOCIAL_PATTERNS.gratitude.test(text) || SOCIAL_PATTERNS.compliment.test(text) || SOCIAL_PATTERNS.greeting.test(text)) {
-        return ASSISTANT_INTENTS.SOCIAL_CHAT;
-    }
-    if (/canli destek|gercek kisi|musteri temsilcisi|insan destegi/.test(text)) {
-        return ASSISTANT_INTENTS.ESCALATE_TO_HUMAN;
-    }
-    if (/karsilastir|farki ne|hangisi daha iyi|\bvs\b/.test(text)) {
-        return ASSISTANT_INTENTS.PRODUCT_COMPARE;
-    }
-    if (/yorum|degerlendirme|puan|memnun/.test(text)) {
-        return ASSISTANT_INTENTS.REVIEW_INSIGHT;
-    }
-    if (/siparis|kargom|takip no|teslimat durum|refund|geri odeme/.test(text)) {
-        return ASSISTANT_INTENTS.ORDER_SUPPORT;
-    }
-    if (/iade|kvkk|gizlilik|odeme|3d|havale|kampanya|kupon|kargo|teslim/.test(text)) {
-        return /kampanya|kupon|indirim/.test(text)
-            ? ASSISTANT_INTENTS.CAMPAIGN_SUPPORT
-            : ASSISTANT_INTENTS.POLICY_SUPPORT;
-    }
-    if (/oner|onerir misin|bul|ara|laptop|mouse|kulaklik|gozluk|kavak|makine|urun/.test(text)) {
-        return ASSISTANT_INTENTS.PRODUCT_SEARCH;
-    }
-    return ASSISTANT_INTENTS.GENERAL_HELP;
+    return Object.entries(NOVABOT_MODES).find(([, mode]) => mode.aliases.some((alias) => text.includes(normalizeSearchText(alias))))?.[0] || null;
 };
 
-const formatMoney = (value) => `${Number(value || 0).toFixed(2)} TL`;
-
-const productReason = (product) => {
-    const reasons = [];
-    if (Number(product.stock || 0) > 0) reasons.push('stokta');
-    if (Number(product.averageRating || 0) > 0) reasons.push(`${Number(product.averageRating).toFixed(1)}/5 puan`);
-    if (Number(product.reviewCount || 0) > 0) reasons.push(`${product.reviewCount} yorum`);
-    if (product.oldPrice && Number(product.oldPrice) > Number(product.price)) reasons.push('indirimli fiyat');
-    return reasons.length > 0 ? reasons.join(', ') : 'kategori eslesmesi';
+const resolveActiveMode = (message, context = {}) => {
+    const requestedMode = detectRequestedMode(message);
+    if (requestedMode) return requestedMode;
+    return normalizeMode(context.selectedMode || context.mode || 'friendly');
 };
 
-const shouldUseContextProduct = (message) => {
-    const text = normalizeSearchText(message);
-    return /bu urun|bu model|bunun|buna|buradaki|inceledigim/.test(text);
-};
+const LIVE_SUPPORT_PATTERN = /canli destek|canli destege|canli destegi|gercek kisi|musteri temsilcisi|insan destegi|temsilciye bagla|destek ekibine bagla/;
+const CART_PATTERN = /sepetimde ne var|sepetim|sepeti goster|sepetimi goster|sepetimi kontrol/;
+const PRODUCT_SEARCH_PATTERN = /urun|oner|bul|goster|ara|ucuz|uygun|butce|fiyat|kampanya|indirim|karsilastir|en cok satan/;
+const CHEAP_PRODUCT_PATTERN = /ucuz|uygun|butce|ekonomik|fiyat performans|indirim/;
+const SOCIAL_CHAT_PATTERN = /nasilsin|naber|ne haber|iyi misin|selam|merhaba|iyiyim|tesekkur/;
 
-const buildSocialReply = (message) => {
-    const text = normalizeSearchText(message);
+const toProductCard = (product) => ({
+    type: 'product',
+    productId: product.id,
+    title: product.name,
+    imageUrl: product.imageUrl || '',
+    price: product.price,
+    oldPrice: product.oldPrice,
+    currency: 'TRY',
+    inStock: Number(product.stock || 0) > 0,
+    stock: product.stock,
+    rating: product.averageRating,
+    reviewCount: product.reviewCount,
+    category: product.category,
+    actions: ['add_to_cart', 'view_details', 'favorite', 'compare']
+});
 
-    if (SOCIAL_PATTERNS.gratitude.test(text)) {
-        return {
-            reply: 'Rica ederim, memnun oldum. Isterseniz hemen size uygun bir urun bulayim ya da iki secenegi hizlica karsilastirayim.',
-            suggestions: ['Bana uygun urun oner', 'Iki urunu karsilastir', 'Yorumlari iyi olanlari goster'],
-            products: []
-        };
-    }
-
-    if (SOCIAL_PATTERNS.compliment.test(text)) {
-        return {
-            reply: 'Cok naziksiniz, tesekkur ederim. Guzel bir secim yapmaniz icin buradayim; isterseniz butceyi veya kullanim amacinizi yazin, en mantikli secenekleri cikarayim.',
-            suggestions: ['Fiyat performans urun oner', 'Hediye icin urun bul', 'Kargo ve iade kosullari'],
-            products: []
-        };
-    }
-
-    if (/nasilsin|naber/.test(text)) {
-        return {
-            reply: 'Iyiyim, tesekkur ederim. Size hizli ve net yardimci olayim; ne aradiginizi kisaca yazmaniz yeterli.',
-            suggestions: ['Bugun en cok tercih edilenler', '1000 TL alti urun oner', 'Canli destege baglan'],
-            products: []
-        };
-    }
-
-    return {
-        reply: 'Merhaba, hos geldiniz. Isterseniz ihtiyacinizi birlikte netlestirelim; ben size uygun urunleri, yorum ozetlerini ve fiyat avantajlarini hizlica cikarayim.',
-        suggestions: ['Bana uygun urun oner', 'Yorumlari iyi urunleri goster', 'Kargo ve iade kosullari'],
-        products: []
-    };
-};
-
-const buildProductSearchReply = (products, userMessage, fallback = false) => {
+const buildProductSearchReply = (products) => {
     if (!products.length) {
-        return {
-            reply: 'Kriterinize tam uyan bir urun bulamadim. Ama guzel bir baslangic yaptiniz; butceyi, kullanim amacini ya da kategoriyi biraz daha net yazarsaniz listeyi hizla daraltayim.',
-            suggestions: ['1000 TL alti urun oner', 'fiyat performans urun goster', 'yorumlari iyi olanlari listele'],
-            products: []
-        };
+        return 'Bu aramaya uygun ürün bulamadım. İstersen bütçe, kategori veya marka yazarak tekrar arayabiliriz.';
     }
-
-    const normalizedMessage = normalizeSearchText(userMessage);
-    const warmLead = /butce|fiyat|oyun|ofis|gunluk|profesyonel|hediye/.test(normalizedMessage)
-        ? 'Guzel bir kriter seti vermissiniz.'
-        : 'Istediginize yakin secenekleri toparladim.';
-    const intro = fallback
-        ? `${warmLead} Tam eslesme az oldugu icin en yakin alternatifleri cikardim:`
-        : `${warmLead} Size en alakali urunleri cikardim:`;
-
-    const lines = products.map((product, index) => `${index + 1}. ${product.name} - ${formatMoney(product.price)} (${productReason(product)})`);
-
-    return {
-        reply: `${intro}\n${lines.join('\n')}`,
-        suggestions: ['Bunlari karsilastir', 'Yorum ozetini goster', 'Daha uygun fiyatli alternatif ver'],
-        products
-    };
+    const lead = products.slice(0, 3).map((product, index) => (
+        `${index + 1}. ${product.name} - ${Number(product.price || 0).toLocaleString('tr-TR')} TL`
+    )).join('\n');
+    return `Aramana göre canlı katalogdan şu seçenekleri buldum:\n${lead}\nİstersen bunları karşılaştırabilir veya birini sepete eklemek için onay akışını başlatabilirim.`;
 };
 
-const buildComparisonReply = (products) => {
-    if (products.length < 2) {
-        return {
-            reply: 'Karari saglam vermek istemeniz cok iyi. Net bir karsilastirma yapmam icin en az iki urun belirtmeniz yeterli. Ornek: "mouse ile kulaklik karsilastir".',
-            suggestions: ['mouse ile kulaklik karsilastir', 'en iyi iki urunu karsilastir'],
-            products
-        };
+const resolveFallbackProducts = async (message) => {
+    const normalized = normalizeSearchText(message);
+    if (!PRODUCT_SEARCH_PATTERN.test(normalized)) return [];
+    if (CHEAP_PRODUCT_PATTERN.test(normalized)) {
+        return getCheaperProductsTool({ message, limit: 4 });
     }
-
-    const lines = products.slice(0, 3).map((product) => (
-        `${product.name}: ${formatMoney(product.price)}, stok ${product.stock}, puan ${Number(product.averageRating || 0).toFixed(1)}/5, yorum ${product.reviewCount}`
-    ));
-
-    const sortedByPrice = [...products].sort((left, right) => left.price - right.price);
-    const sortedByRating = [...products].sort((left, right) => right.averageRating - left.averageRating || right.reviewCount - left.reviewCount);
-    const recommendation = `Daha dusuk butce icin ${sortedByPrice[0].name}, yorum ve puan tarafinda daha guvenli tercih icin ${sortedByRating[0].name} one cikiyor.`;
-
-    return {
-        reply: `Karari netlestirelim.\n${lines.join('\n')}\n${recommendation}`,
-        suggestions: ['Ilk urunun yorumlarini ozetle', 'Bana tek bir secim oner'],
-        products
-    };
+    return searchProductsTool(message, {}, 4);
 };
 
-const buildReviewReply = async ({ product, contextProductId }) => {
-    const resolvedProduct = product || (contextProductId ? await getProductDetails(Number(contextProductId)) : null);
-    if (!resolvedProduct) {
-        return {
-            reply: 'Yorumlara bakmak cok dogru bir adim. Hangi urunun yorumlarini ozetlememi istediginizi yazarsaniz net bir ozet cikarabilirim.',
-            suggestions: ['Bu urunun yorumlari nasil?', 'En cok begenilen urun hangisi?'],
-            products: []
-        };
-    }
-
-    const summary = await summarizeProductReviews(resolvedProduct);
-    let reply = `Satin almadan once yorumlara bakmaniz cok iyi. ${summary.summary}`;
-    if (summary.recentComments.length > 0) {
-        reply += ` Son yorumlardan ornekler: ${summary.recentComments.join(' | ')}`;
-    }
-
-    return {
-        reply,
-        suggestions: ['Bu urunu onerir misin?', 'Benzer urunler goster'],
-        products: [resolvedProduct],
-        reviewSummary: summary
-    };
+const looksLikeProviderBusy = (text = '') => {
+    const normalized = normalizeSearchText(text);
+    return normalized.includes('isteklerinize cevap veremiyorum')
+        || normalized.includes('tam yanit uretemedi')
+        || normalized.includes('tekrar deneyebilir');
 };
 
-const buildGeneralReply = () => ({
-    reply: 'Memnuniyetle yardimci olurum. Size urun bulma, karsilastirma, yorum ozeti, kargo, iade, odeme ve kampanya konularinda destek verebilirim. Ne aradiginizi bir cumleyle yazmaniz yeterli.',
-    suggestions: ['1000 TL alti urun oner', 'Kargo ve iade kosullari neler?', 'Yorumlari iyi urunleri goster'],
-    products: []
-});
-
-const buildEscalationReply = () => ({
-    reply: 'Tabii, isterseniz sizi canli destek akisina alabilirim. Giris yaptiysaniz temsilciye bu konusmanin kisa ozetini de iletebilirim.',
-    suggestions: ['Canli destege baglan', 'Once burada devam edelim'],
-    products: [],
-    allowEscalation: true
-});
-
-const buildProductContext = async (message, context) => {
-    if (context && Number.isInteger(Number(context.productId))) {
-        return getProductDetails(Number(context.productId));
-    }
-
-    const candidates = await searchProducts({ query: message, limit: 1 });
-    return candidates[0] || null;
+const buildSocialFallbackReply = (message, mode) => {
+    if (!SOCIAL_CHAT_PATTERN.test(normalizeSearchText(message))) return null;
+    if (mode === 'quick') return 'İyiyim, teşekkür ederim. Sana nasıl yardımcı olayım?';
+    if (mode === 'buddy') return 'İyiyim kanka, teşekkür ederim. Sen nasılsın? Ürün, sepet, sipariş ya da canlı destek tarafında ne lazımsa buradayım.';
+    if (mode === 'funny') return 'İyiyim, enerjim yerinde. Alışveriş evreninde bugün hangi göreve ışınlanıyoruz?';
+    return 'İyiyim, teşekkür ederim. Sana ürün arama, sepet, sipariş, iade veya canlı destek konusunda yardımcı olabilirim.';
 };
 
 const handleAssistantChat = async ({ message, user, history = [], context = {} }) => {
     const trimmedMessage = String(message || '').trim();
+    const activeMode = resolveActiveMode(trimmedMessage, context);
+
+    // If changing mode explicitly
+    const requestedMode = detectRequestedMode(trimmedMessage);
+    if (/modu degistir|mod degistir|mod sec|modu/.test(normalizeSearchText(trimmedMessage)) && requestedMode) {
+        const title = NOVABOT_MODES[requestedMode].label;
+        return {
+            mode: requestedMode,
+            modeLabel: title,
+            availableModes: listModeCards(),
+            intent: ASSISTANT_INTENTS.MODE_CHANGE,
+            confidence: 1.0,
+            reply: `${title} aktif. Bundan sonra bu tonda konuşacağım.`,
+            message: `${title} aktif. Bundan sonra bu tonda konuşacağım.`,
+            suggestions: ['Ucuz ürün bul', 'Ürün karşılaştır', 'İade/değişim'],
+            products: [],
+            cards: [],
+            comparison: null,
+            requiresConfirmation: false,
+            pendingAction: null,
+            allowEscalation: false,
+            escalated: false,
+            citations: []
+        };
+    }
+
     if (!trimmedMessage) {
-        return buildGeneralReply();
+        return {
+            mode: activeMode,
+            modeLabel: NOVABOT_MODES[activeMode]?.label || NOVABOT_MODES.friendly.label,
+            availableModes: listModeCards(),
+            intent: ASSISTANT_INTENTS.GENERAL_CHAT,
+            confidence: 1.0,
+            reply: 'Merhaba, ben NovaBot. Ürün bulabilir, sepet/sipariş/iade/kargo konularında yardımcı olabilirim.',
+            message: 'Merhaba, ben NovaBot. Ürün bulabilir, sepet/sipariş/iade/kargo konularında yardımcı olabilirim.',
+            suggestions: ['Ucuz ürün bul', 'Ürün karşılaştır', 'Siparişimi sorgula', 'Bana hediye öner'],
+            products: [],
+            cards: [],
+            comparison: null,
+            requiresConfirmation: false,
+            pendingAction: null,
+            allowEscalation: false,
+            escalated: false,
+            citations: []
+        };
     }
 
-    const intent = detectIntent(trimmedMessage);
-    let response;
-    const llmContext = { historyCount: Array.isArray(history) ? history.length : 0 };
-
-    switch (intent) {
-        case ASSISTANT_INTENTS.SOCIAL_CHAT: {
-            response = buildSocialReply(trimmedMessage);
-            break;
-        }
-        case ASSISTANT_INTENTS.PRODUCT_SEARCH: {
-            const useContextProduct = shouldUseContextProduct(trimmedMessage) && context.productId;
-            const products = await searchProducts({
-                query: trimmedMessage,
-                limit: 4,
-                productId: useContextProduct ? Number(context.productId) : null
-            });
-            response = buildProductSearchReply(products, trimmedMessage);
-            llmContext.products = products;
-            break;
-        }
-        case ASSISTANT_INTENTS.PRODUCT_COMPARE: {
-            const products = await compareProductsByText(trimmedMessage, 3);
-            response = buildComparisonReply(products);
-            llmContext.products = products;
-            break;
-        }
-        case ASSISTANT_INTENTS.REVIEW_INSIGHT: {
-            const product = await buildProductContext(trimmedMessage, context);
-            response = await buildReviewReply({ product, contextProductId: context.productId });
-            llmContext.products = response.products;
-            llmContext.reviewSummary = response.reviewSummary || null;
-            break;
-        }
-        case ASSISTANT_INTENTS.ORDER_SUPPORT: {
-            const orderContext = await getOrderSupportContext({ user, message: trimmedMessage });
-            response = {
-                reply: orderContext.answer,
-                suggestions: orderContext.requiresAuth ? ['Giris yaptiktan sonra tekrar sor'] : ['Siparis detayini ac', 'Canli destege baglan'],
-                products: [],
-                allowEscalation: !orderContext.requiresAuth
-            };
-            llmContext.order = orderContext.order || null;
-            break;
-        }
-        case ASSISTANT_INTENTS.CAMPAIGN_SUPPORT:
-        case ASSISTANT_INTENTS.POLICY_SUPPORT: {
-            const policy = await getPolicyAnswer(trimmedMessage);
-            response = {
-                reply: policy.answer,
-                suggestions: ['Bana uygun urun oner', 'Canli destege baglan'],
-                products: []
-            };
-            llmContext.policy = policy;
-            break;
-        }
-        case ASSISTANT_INTENTS.ESCALATE_TO_HUMAN: {
-            response = buildEscalationReply();
-            break;
-        }
-        default: {
-            response = buildGeneralReply();
-            break;
-        }
+    if (LIVE_SUPPORT_PATTERN.test(normalizeSearchText(trimmedMessage))) {
+        return {
+            mode: 'professional',
+            modeLabel: NOVABOT_MODES.professional.label,
+            availableModes: listModeCards(),
+            intent: ASSISTANT_INTENTS.LIVE_SUPPORT,
+            confidence: 1.0,
+            reply: 'Seni canlı desteğe aktarabilirim. Temsilciye geçmeden önce onaylaman yeterli; konuşma özetini destek ekibine ileteceğim.',
+            message: 'Seni canlı desteğe aktarabilirim. Temsilciye geçmeden önce onaylaman yeterli; konuşma özetini destek ekibine ileteceğim.',
+            suggestions: ['Evet, canlı desteğe bağlan', 'Vazgeç'],
+            products: [],
+            cards: [],
+            comparison: null,
+            requiresConfirmation: true,
+            pendingAction: { type: 'live_support', reason: trimmedMessage },
+            allowEscalation: true,
+            escalated: false,
+            citations: []
+        };
     }
 
-    const rewrittenReply = await rewriteDraftReply({
+    if (CART_PATTERN.test(normalizeSearchText(trimmedMessage))) {
+        return {
+            mode: activeMode,
+            modeLabel: NOVABOT_MODES[activeMode]?.label || NOVABOT_MODES.friendly.label,
+            availableModes: listModeCards(),
+            intent: ASSISTANT_INTENTS.SHOW_CART,
+            confidence: 1.0,
+            reply: 'Sepetin Android uygulamasında yerel olarak tutuluyor. Sepet sekmesini açarak ürünlerini, adetleri ve toplam tutarı görebilirsin.',
+            message: 'Sepetin Android uygulamasında yerel olarak tutuluyor. Sepet sekmesini açarak ürünlerini, adetleri ve toplam tutarı görebilirsin.',
+            suggestions: ['Sepet sekmesine git', 'Ucuz ürün bul', 'Canlı desteğe bağlan'],
+            products: [],
+            cards: [],
+            comparison: null,
+            requiresConfirmation: false,
+            pendingAction: null,
+            allowEscalation: false,
+            escalated: false,
+            citations: []
+        };
+    }
+
+    // Call autonomous LLM agent session
+    const agentResult = await runAgentSession({
         userMessage: trimmedMessage,
-        draftReply: response.reply,
-        intent,
-        context: llmContext
+        history,
+        mode: activeMode,
+        user
     });
 
+    let products = agentResult.products || [];
+    if (!products.length) {
+        products = await resolveFallbackProducts(trimmedMessage);
+    }
+    const hasToolFallbackProducts = products.length > 0 && !(agentResult.products || []).length;
+    const socialFallbackReply = looksLikeProviderBusy(agentResult.text)
+        ? buildSocialFallbackReply(trimmedMessage, activeMode)
+        : null;
+    const reply = hasToolFallbackProducts
+        ? buildProductSearchReply(products)
+        : socialFallbackReply
+            ? socialFallbackReply
+        : looksLikeProviderBusy(agentResult.text)
+            ? 'Şu an NovaBot tarafında kısa bir yoğunluk var ama buradayım. Ürün arama, sepet, sipariş veya canlı destek için devam edebilirim.'
+            : agentResult.text;
+
+    const suggestions = ['Sohbet et', 'Bana telefon öner', 'Canlı desteğe bağlan'];
+    const cards = products.map(toProductCard);
+
     return {
-        mode: 'assistant',
-        intent,
-        confidence: 0.82,
-        reply: rewrittenReply,
-        suggestions: response.suggestions || [],
-        products: response.products || [],
-        allowEscalation: Boolean(response.allowEscalation),
-        citations: (response.products || []).map((product) => ({
+        mode: activeMode,
+        modeLabel: NOVABOT_MODES[activeMode]?.label || NOVABOT_MODES.friendly.label,
+        availableModes: listModeCards(),
+        intent: products.length ? ASSISTANT_INTENTS.PRODUCT_SEARCH : ASSISTANT_INTENTS.GENERAL_CHAT,
+        confidence: 1.0,
+        reply,
+        message: reply,
+        suggestions,
+        products,
+        cards,
+        comparison: agentResult.comparison || null,
+        requiresConfirmation: agentResult.requiresConfirmation || false,
+        pendingAction: agentResult.pendingAction || null,
+        allowEscalation: agentResult.allowEscalation || false,
+        escalated: false,
+        citations: products.map((product) => ({
             label: product.name,
-            url: product.productUrl
+            url: product.productUrl || ''
         }))
     };
 };
 
 module.exports = {
     ASSISTANT_INTENTS,
+    NOVABOT_MODES,
     handleAssistantChat
 };
