@@ -1,0 +1,3175 @@
+html.novastore-native-app-root {
+    --app-bg: #F7F9FC;
+    --app-surface: #FFFFFF;
+    --app-surface-soft: #F1F5F9;
+    --app-ink: #111827;
+    --app-muted: #64748B;
+    --app-line: #E2E8F0;
+    --app-brand: #0F2A43;
+    --app-brand-2: #0F766E;
+    --app-accent: #F7941D;
+    --app-danger: #DC2626;
+    --app-radius: 8px;
+    --app-shadow: 0 10px 24px rgba(15, 42, 67, 0.08);
+    --app-safe-top: env(safe-area-inset-top, 0px);
+    --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --app-header-height: calc(58px + var(--app-safe-top));
+}
+
+html.novastore-native-app-root,
+html.novastore-native-app-root body {
+    background: var(--app-bg) !important;
+    color: var(--app-ink) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 100%;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: none;
+}
+
+html.novastore-native-app-root body {
+    overflow-x: hidden !important;
+    padding-top: var(--app-header-height) !important;
+    padding-bottom: calc(82px + var(--app-safe-bottom)) !important;
+}
+
+html.novastore-native-app-root body.native-page-profile {
+    padding-top: calc(64px + var(--app-safe-top)) !important;
+}
+
+html.novastore-native-app-root body.native-page-admin,
+html.novastore-native-app-root body.native-page-admin-login {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+html.novastore-native-app-root * {
+    letter-spacing: 0 !important;
+}
+
+html.novastore-native-app-root a,
+html.novastore-native-app-root button,
+html.novastore-native-app-root input,
+html.novastore-native-app-root textarea,
+html.novastore-native-app-root select {
+    touch-action: manipulation;
+}
+
+html.novastore-native-app-root #mobile-tip-banner {
+    display: none !important;
+}
+
+html.novastore-native-app-root .nova-site-footer,
+html.novastore-native-app-root footer {
+    display: none !important;
+}
+
+html.novastore-native-app-root #nova-footer-page-shell {
+    min-height: auto !important;
+}
+
+html.novastore-native-app-root header {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
+    z-index: 1200 !important;
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    padding: calc(8px + var(--app-safe-top)) 12px 8px !important;
+    background: #FFFFFF !important;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.9) !important;
+    box-shadow: 0 2px 8px rgba(15, 42, 67, 0.05) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transform: translateZ(0) !important;
+    -webkit-transform: translateZ(0) !important;
+    transition: transform 0.22s ease !important;
+    contain: paint !important;
+}
+
+html.novastore-native-app-root header .logo {
+    grid-column: 1 !important;
+    order: 0 !important;
+    color: var(--app-brand) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    min-width: 78px !important;
+    max-width: 92px !important;
+    overflow: hidden !important;
+    font-size: 1.05rem !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    text-decoration: none !important;
+}
+
+html.novastore-native-app-root header .logo span {
+    color: var(--app-accent) !important;
+}
+
+html.novastore-native-app-root header form {
+    height: 42px !important;
+    max-width: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root header > div:nth-child(2) {
+    grid-column: 2 !important;
+    order: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+html.novastore-native-app-root header > div:nth-child(2) form {
+    max-width: none !important;
+}
+
+html.novastore-native-app-root header form input {
+    height: 42px !important;
+    min-width: 0 !important;
+    padding: 6px 10px !important;
+    background: var(--app-surface) !important;
+    border: 1px solid var(--app-line) !important;
+    border-radius: 12px !important;
+    color: var(--app-ink) !important;
+    font-size: 0.9rem !important;
+}
+
+html.novastore-native-app-root .nav-right {
+    grid-column: 3 !important;
+    justify-self: end !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+}
+
+html.novastore-native-app-root .welcome-text,
+html.novastore-native-app-root .btn-logout,
+html.novastore-native-app-root .back-link,
+html.novastore-native-app-root header .btn-login,
+html.novastore-native-app-root header .btn-profile,
+html.novastore-native-app-root header .user-menu,
+html.novastore-native-app-root header .notification-wrapper,
+html.novastore-native-app-root header #profile-notif-wrapper {
+    display: none !important;
+}
+
+html.novastore-native-app-root .btn-login,
+html.novastore-native-app-root .btn-profile {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 38px !important;
+    padding: 8px 10px !important;
+    border-radius: var(--app-radius) !important;
+    background: var(--app-brand) !important;
+    color: #FFFFFF !important;
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+}
+
+html.novastore-native-app-root .cart-btn,
+html.novastore-native-app-root #notificationBell,
+html.novastore-native-app-root #profile-notif-bell {
+    min-width: 40px !important;
+    min-height: 40px !important;
+    padding: 8px 10px !important;
+    border-radius: var(--app-radius) !important;
+    border: 1px solid var(--app-line) !important;
+    background: var(--app-surface) !important;
+    color: var(--app-brand) !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root .cart-badge,
+html.novastore-native-app-root .notif-badge,
+html.novastore-native-app-root #profile-notif-badge {
+    background: var(--app-accent) !important;
+    color: #FFFFFF !important;
+    border: 2px solid var(--app-surface) !important;
+}
+
+html.novastore-native-app-root header .nav-right > .cart-btn {
+    display: none !important;
+}
+
+html.novastore-native-app-root .native-location-pill {
+    width: 66px;
+    min-height: 42px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 6px;
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-radius);
+    background: var(--app-surface);
+    color: var(--app-brand);
+    box-shadow: none;
+    text-align: left;
+}
+
+html.novastore-native-app-root .native-location-pin {
+    color: var(--app-accent);
+    font-size: 1rem;
+    line-height: 1;
+}
+
+html.novastore-native-app-root .native-location-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.05;
+}
+
+html.novastore-native-app-root .native-location-text strong {
+    color: var(--app-accent);
+    font-size: 0.62rem;
+    font-weight: 900;
+}
+
+html.novastore-native-app-root .native-location-text em {
+    color: var(--app-brand);
+    font-size: 0.66rem;
+    font-style: normal;
+    font-weight: 750;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+html.novastore-native-app-root .native-page-appbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    z-index: 1200;
+    width: 100%;
+    align-self: stretch;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: calc(8px + var(--app-safe-top)) 12px 8px;
+    background: #FFFFFF;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+    box-shadow: 0 2px 8px rgba(15, 42, 67, 0.05);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    transition: transform 0.22s ease;
+    contain: paint;
+}
+
+html.novastore-native-app-root .native-pull-refresh {
+    position: fixed;
+    top: var(--app-header-height);
+    left: 50%;
+    z-index: 4990;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 14px;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.97);
+    color: var(--app-brand);
+    box-shadow: 0 12px 28px rgba(15, 42, 67, 0.14);
+    font-size: 0.78rem;
+    font-weight: 850;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate3d(-50%, -130%, 0);
+    transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease, color 0.18s ease;
+    will-change: transform, opacity;
+}
+
+html.novastore-native-app-root body.native-page-profile .native-pull-refresh {
+    top: calc(64px + var(--app-safe-top));
+}
+
+html.novastore-native-app-root .native-pull-refresh.is-visible {
+    opacity: 1;
+    transform: translate3d(-50%, var(--pull-offset, 0px), 0);
+}
+
+html.novastore-native-app-root .native-pull-refresh.is-ready,
+html.novastore-native-app-root .native-pull-refresh.is-refreshing {
+    background: var(--app-brand);
+    color: #FFFFFF;
+}
+
+html.novastore-native-app-root .native-pull-refresh.is-refreshing {
+    transform: translate3d(-50%, 12px, 0);
+}
+
+html.novastore-native-app-root body.native-is-pulling header,
+html.novastore-native-app-root body.native-is-pulling .native-page-appbar,
+html.novastore-native-app-root body.native-is-pulling .native-bottom-nav {
+    transform: translate3d(0, 0, 0) !important;
+    -webkit-transform: translate3d(0, 0, 0) !important;
+}
+
+html.novastore-native-app-root body.native-is-pulling header,
+html.novastore-native-app-root body.native-is-pulling .native-page-appbar {
+    top: 0 !important;
+}
+
+html.novastore-native-app-root body.native-is-pulling .native-bottom-nav {
+    bottom: 0 !important;
+}
+
+html.novastore-native-app-root .native-pull-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(15, 42, 67, 0.18);
+    border-top-color: var(--app-accent);
+    border-radius: 999px;
+}
+
+html.novastore-native-app-root .native-pull-refresh.is-ready .native-pull-spinner,
+html.novastore-native-app-root .native-pull-refresh.is-refreshing .native-pull-spinner {
+    border-color: rgba(255, 255, 255, 0.28);
+    border-top-color: var(--app-accent);
+}
+
+html.novastore-native-app-root .native-pull-refresh.is-visible .native-pull-spinner,
+html.novastore-native-app-root .native-pull-refresh.is-refreshing .native-pull-spinner {
+    animation: nativePullSpin 0.72s linear infinite;
+}
+
+@keyframes nativePullSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+html.novastore-native-app-root .native-appbar-logo {
+    color: var(--app-brand);
+    font-size: 1.05rem;
+    font-weight: 900;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+html.novastore-native-app-root .native-appbar-logo span {
+    color: var(--app-accent);
+}
+
+html.novastore-native-app-root .native-page-appbar strong {
+    min-width: 0;
+    color: var(--app-ink);
+    font-size: 0.95rem;
+    font-weight: 850;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+html.novastore-native-app-root .native-appbar-home {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-radius);
+    background: var(--app-surface);
+    color: var(--app-brand);
+}
+
+html.novastore-native-app-root .native-appbar-home svg {
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+}
+
+html.novastore-native-app-root body.native-page-profile header {
+    grid-template-columns: 48px minmax(0, 1fr) 48px !important;
+    min-height: 64px !important;
+    padding: calc(8px + var(--app-safe-top)) 14px 8px !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    box-shadow: 0 6px 16px rgba(15, 42, 67, 0.06) !important;
+}
+
+html.novastore-native-app-root body.native-page-profile header::before {
+    content: "Hesabım";
+    grid-column: 2;
+    justify-self: center;
+    color: var(--app-ink);
+    font-size: 1.08rem;
+    font-weight: 850;
+}
+
+html.novastore-native-app-root body.native-page-profile.native-profile-detail-screen header::before {
+    content: attr(data-native-title);
+}
+
+html.novastore-native-app-root body.native-page-profile header .native-profile-back {
+    grid-column: 1 !important;
+    width: 42px !important;
+    height: 42px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--app-brand) !important;
+    padding: 0 !important;
+}
+
+html.novastore-native-app-root body.native-page-profile header .native-profile-back svg {
+    width: 28px !important;
+    height: 28px !important;
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 2.2 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+}
+
+html.novastore-native-app-root body.native-page-profile header .logo,
+html.novastore-native-app-root body.native-page-profile header > div:nth-child(2),
+html.novastore-native-app-root body.native-page-profile header .back-link,
+html.novastore-native-app-root body.native-page-profile header .native-location-pill,
+html.novastore-native-app-root body.native-page-profile header .cart-btn {
+    display: none !important;
+}
+
+html.novastore-native-app-root body.native-page-profile header .nav-right {
+    grid-column: 3 !important;
+    width: 48px !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+}
+
+html.novastore-native-app-root body.native-page-profile header #profile-notif-wrapper {
+    display: block !important;
+}
+
+html.novastore-native-app-root body.native-page-profile header #profile-notif-bell {
+    width: 42px !important;
+    height: 42px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--app-brand) !important;
+    font-size: 1.35rem !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #profile-notif-dropdown {
+    position: fixed !important;
+    top: calc(74px + var(--app-safe-top)) !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-height: min(430px, 58vh) !important;
+    display: none;
+    overflow: hidden !important;
+    border: 1px solid rgba(226, 232, 240, 0.95) !important;
+    border-radius: 12px !important;
+    background: #FFFFFF !important;
+    box-shadow: 0 18px 38px rgba(15, 42, 67, 0.18) !important;
+    z-index: 6200 !important;
+    transform: none !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #profile-notif-dropdown > div:first-child {
+    min-height: 54px !important;
+    padding: 0 16px !important;
+    background: var(--app-brand) !important;
+    border-bottom: 0 !important;
+    color: #FFFFFF !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #profile-notif-dropdown > div:first-child span {
+    color: #FFFFFF !important;
+    font-size: 0.98rem !important;
+    font-weight: 900 !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #profile-notif-dropdown > div:first-child button {
+    color: var(--app-accent) !important;
+    font-size: 0.84rem !important;
+    font-weight: 850 !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #profile-notif-list {
+    max-height: calc(min(430px, 58vh) - 54px) !important;
+    overflow-y: auto !important;
+    background: #FFFFFF !important;
+}
+
+html.novastore-native-app-root .category-nav {
+    position: static !important;
+    top: auto !important;
+    z-index: 1000 !important;
+    padding: 8px 12px 10px !important;
+    background: var(--app-bg) !important;
+    border-bottom: 0 !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+html.novastore-native-app-root .category-nav::-webkit-scrollbar {
+    display: none !important;
+}
+
+html.novastore-native-app-root .category-menu {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 7px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-width: max-content !important;
+}
+
+html.novastore-native-app-root .category-item {
+    display: block !important;
+    flex: 0 0 auto !important;
+    padding: 0 !important;
+    border: 0 !important;
+}
+
+html.novastore-native-app-root .category-trigger,
+html.novastore-native-app-root .subcategory-item {
+    min-width: 88px !important;
+    min-height: 40px !important;
+    padding: 0 13px !important;
+    border: 1px solid var(--app-line) !important;
+    border-radius: 999px !important;
+    background: var(--app-surface) !important;
+    color: var(--app-brand) !important;
+    font-size: 0.78rem !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+    box-shadow: none !important;
+    text-align: center !important;
+}
+
+html.novastore-native-app-root .category-item:hover .category-trigger,
+html.novastore-native-app-root .category-item.is-open .category-trigger {
+    background: #FFF7ED !important;
+    border-color: rgba(247, 148, 29, 0.45) !important;
+    color: #9A4B08 !important;
+}
+
+html.novastore-native-app-root .subcategory-menu {
+    display: none !important;
+}
+
+html.novastore-native-app-root .category-item.is-open .subcategory-menu,
+html.novastore-native-app-root .category-item:hover .subcategory-menu {
+    display: none !important;
+}
+
+html.novastore-native-app-root .native-subcategory-tray {
+    display: flex !important;
+    gap: 10px !important;
+    margin: -2px 12px 10px !important;
+    padding: 8px !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    border: 1px solid var(--app-line) !important;
+    border-radius: var(--app-radius) !important;
+    background: var(--app-surface) !important;
+    box-shadow: 0 10px 22px rgba(15, 42, 67, 0.08) !important;
+    animation: nativeTrayIn 0.2s ease both !important;
+}
+
+html.novastore-native-app-root .native-subcategory-tray::-webkit-scrollbar {
+    display: none !important;
+}
+
+html.novastore-native-app-root .native-subcategory-link {
+    min-width: 112px !important;
+    min-height: 42px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 8px 12px !important;
+    border: 1px solid #FED7AA !important;
+    border-radius: var(--app-radius) !important;
+    background: #FFF7ED !important;
+    color: #9A4B08 !important;
+    text-align: center !important;
+    text-decoration: none !important;
+    font-size: 0.82rem !important;
+    line-height: 1.15 !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+}
+
+@keyframes nativeTrayIn {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+html.novastore-native-app-root .hero-section {
+    margin: 8px 12px 8px !important;
+    min-height: 126px !important;
+    padding: 16px !important;
+    border-radius: var(--app-radius) !important;
+    background:
+        radial-gradient(circle at 88% 18%, rgba(247, 148, 29, 0.24), transparent 34%),
+        linear-gradient(135deg, #0F2A43 0%, #123D48 64%, #0F766E 100%) !important;
+    box-shadow: 0 10px 24px rgba(15, 42, 67, 0.10) !important;
+}
+
+html.novastore-native-app-root .native-promo-strip {
+    display: none !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px 12px 0;
+}
+
+html.novastore-native-app-root .native-promo-card {
+    min-height: 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    padding: 12px;
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-radius);
+    background: var(--app-surface);
+    color: var(--app-ink);
+    text-decoration: none;
+    box-shadow: none;
+}
+
+html.novastore-native-app-root .native-promo-card.premium {
+    background: #FFF1F7;
+    border-color: #FBCFE8;
+}
+
+html.novastore-native-app-root .native-promo-card strong {
+    color: var(--app-accent);
+    font-size: 0.84rem;
+    font-weight: 900;
+}
+
+html.novastore-native-app-root .native-promo-card span {
+    color: var(--app-ink);
+    font-size: 0.86rem;
+    font-weight: 750;
+    line-height: 1.25;
+}
+
+html.novastore-native-app-root .hero-section .hero-content {
+    display: block !important;
+    width: 100% !important;
+    text-align: left !important;
+}
+
+html.novastore-native-app-root .hero-content h1 {
+    max-width: 260px !important;
+    margin: 0 0 7px !important;
+    color: #FFFFFF !important;
+    font-size: 1.34rem !important;
+    line-height: 1.12 !important;
+}
+
+html.novastore-native-app-root .hero-content p {
+    max-width: 286px !important;
+    margin: 0 0 12px !important;
+    color: rgba(255, 255, 255, 0.84) !important;
+    font-size: 0.78rem !important;
+    line-height: 1.35 !important;
+}
+
+html.novastore-native-app-root .btn-hero {
+    min-height: 38px !important;
+    padding: 0 16px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: var(--app-radius) !important;
+    font-size: 0.86rem !important;
+}
+
+html.novastore-native-app-root .btn-hero,
+html.novastore-native-app-root .btn-primary,
+html.novastore-native-app-root .btn-checkout,
+html.novastore-native-app-root .btn-add-large,
+html.novastore-native-app-root .btn-buy-now,
+html.novastore-native-app-root #submit-btn,
+html.novastore-native-app-root .btn-save {
+    min-height: 44px !important;
+    border-radius: var(--app-radius) !important;
+    background: var(--app-accent) !important;
+    color: #FFFFFF !important;
+    border: 0 !important;
+    box-shadow: 0 8px 18px rgba(247, 148, 29, 0.26) !important;
+    font-weight: 800 !important;
+}
+
+html.novastore-native-app-root .container {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 12px 22px !important;
+}
+
+html.novastore-native-app-root .section-title,
+html.novastore-native-app-root .reviews-title,
+html.novastore-native-app-root .qa-title {
+    margin: 18px 2px 12px !important;
+    color: var(--app-ink) !important;
+    font-size: 1.12rem !important;
+    line-height: 1.2 !important;
+    text-align: left !important;
+}
+
+html.novastore-native-app-root .products-grid,
+html.novastore-native-app-root .product-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    justify-content: stretch !important;
+    gap: 10px !important;
+}
+
+html.novastore-native-app-root body.native-page-index:not(.native-filtered-list) .products-grid {
+    display: flex !important;
+    grid-template-columns: none !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    padding-bottom: 8px !important;
+    scroll-snap-type: none !important;
+    scrollbar-width: none !important;
+}
+
+html.novastore-native-app-root body.native-page-index:not(.native-filtered-list) .products-grid::-webkit-scrollbar {
+    display: none !important;
+}
+
+html.novastore-native-app-root .product-card {
+    width: auto !important;
+    min-width: 0 !important;
+    padding: 10px !important;
+    border-radius: var(--app-radius) !important;
+    border: 1px solid var(--app-line) !important;
+    background: var(--app-surface) !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    scroll-snap-align: none !important;
+    box-shadow: 0 2px 10px rgba(15, 42, 67, 0.035) !important;
+}
+
+html.novastore-native-app-root body.native-page-index:not(.native-filtered-list) .product-card {
+    flex: 0 0 178px !important;
+}
+
+html.novastore-native-app-root .product-card:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root .product-media-frame,
+html.novastore-native-app-root .product-image,
+html.novastore-native-app-root .product-img {
+    height: auto !important;
+    aspect-ratio: 1 / 1 !important;
+    border-radius: var(--app-radius) !important;
+    background: #FFFFFF !important;
+    border: 1px solid #EEF2F7 !important;
+}
+
+html.novastore-native-app-root .product-img,
+html.novastore-native-app-root .product-media-frame img,
+html.novastore-native-app-root .product-image img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+}
+
+html.novastore-native-app-root .product-media-hover-zones,
+html.novastore-native-app-root .product-media-indicators,
+html.novastore-native-app-root .product-hover-hint {
+    display: none !important;
+}
+
+html.novastore-native-app-root .product-title,
+html.novastore-native-app-root .product-info h3 {
+    min-height: 38px !important;
+    margin: 8px 0 6px !important;
+    color: var(--app-ink) !important;
+    font-size: 0.88rem !important;
+    line-height: 1.25 !important;
+    font-weight: 750 !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+}
+
+html.novastore-native-app-root .price,
+html.novastore-native-app-root .product-price {
+    color: var(--app-accent) !important;
+    font-size: 1rem !important;
+    font-weight: 850 !important;
+}
+
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 36px !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+    margin-top: auto !important;
+    padding-top: 6px !important;
+    overflow: visible !important;
+}
+
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    margin-right: 0 !important;
+    padding: 7px 6px !important;
+    gap: 4px !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+}
+
+html.novastore-native-app-root .product-card .native-price-box {
+    min-height: 58px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    background: #FBFCFE !important;
+    border-color: #E9EEF5 !important;
+}
+
+html.novastore-native-app-root .product-card .native-price-box-discount {
+    display: grid !important;
+    grid-template-columns: 34px minmax(0, 1fr) !important;
+    column-gap: 5px !important;
+}
+
+html.novastore-native-app-root .product-card .native-price-box-regular {
+    padding: 7px 6px !important;
+}
+
+html.novastore-native-app-root .product-card .native-card-price {
+    max-width: 100% !important;
+    overflow: visible !important;
+    word-break: keep-all !important;
+}
+
+html.novastore-native-app-root .product-card .native-card-price-regular {
+    color: var(--app-ink) !important;
+    font-size: 1.06rem !important;
+    line-height: 1.05 !important;
+    font-weight: 900 !important;
+}
+
+html.novastore-native-app-root .product-card .native-card-price-regular span {
+    display: block !important;
+    margin-top: 2px !important;
+    font-size: 0.74rem !important;
+    line-height: 1 !important;
+    font-weight: 850 !important;
+}
+
+html.novastore-native-app-root .product-card .native-card-price-discount {
+    font-size: 0.94rem !important;
+    line-height: 1.04 !important;
+    font-weight: 900 !important;
+}
+
+html.novastore-native-app-root .product-card .native-card-price-discount span {
+    display: block !important;
+    margin-top: 2px !important;
+    font-size: 0.64rem !important;
+    line-height: 1 !important;
+    font-weight: 850 !important;
+}
+
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div[style*="color: #333"] {
+    color: var(--app-ink) !important;
+    font-size: 1.28rem !important;
+    line-height: 1.04 !important;
+    font-weight: 900 !important;
+}
+
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div[style*="color: #333"] span {
+    font-size: 0.82rem !important;
+    font-weight: 800 !important;
+}
+
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div:first-child:not(.native-card-price) {
+    flex: 0 0 34px !important;
+    padding-right: 4px !important;
+    font-size: 0.55rem !important;
+    line-height: 1.08 !important;
+}
+
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div:last-child {
+    min-width: 0 !important;
+    overflow: visible !important;
+}
+
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div:last-child > div:first-child {
+    gap: 2px !important;
+    min-width: 0 !important;
+}
+
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div:last-child > div:last-child {
+    color: #00897B !important;
+    font-size: 0.94rem !important;
+    line-height: 1.02 !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    word-break: keep-all !important;
+}
+
+html.novastore-native-app-root .product-card span[style*="line-through"] {
+    max-width: 76px !important;
+    display: inline-block !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+    font-size: 0.56rem !important;
+}
+
+html.novastore-native-app-root .product-card .native-old-price {
+    max-width: 76px !important;
+    font-size: 0.56rem !important;
+}
+
+html.novastore-native-app-root .product-card span[style*="background: #00897B"] {
+    font-size: 0.5rem !important;
+    padding: 1px 3px !important;
+}
+
+html.novastore-native-app-root .product-card .native-discount-badge {
+    font-size: 0.5rem !important;
+    padding: 1px 3px !important;
+}
+
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div:last-child > div:last-child span {
+    display: block !important;
+    margin-top: 2px !important;
+    font-size: 0.66rem !important;
+}
+
+html.novastore-native-app-root .product-card .btn-add {
+    position: static !important;
+    width: 36px !important;
+    min-width: 36px !important;
+    height: auto !important;
+    min-height: 58px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    align-self: stretch !important;
+    border-radius: var(--app-radius) !important;
+    transform: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+}
+
+html.novastore-native-app-root .product-card .btn-add svg {
+    width: 19px !important;
+    height: 19px !important;
+}
+
+html.novastore-native-app-root .btn-favorite {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 999px !important;
+    border: 1px solid var(--app-line) !important;
+    background: rgba(255, 255, 255, 0.94) !important;
+    box-shadow: 0 6px 14px rgba(15, 42, 67, 0.12) !important;
+}
+
+html.novastore-native-app-root .btn-favorite.active {
+    background: linear-gradient(135deg, #ff5b6b 0%, #d91f35 100%) !important;
+    border-color: transparent !important;
+    box-shadow:
+        0 8px 18px rgba(217, 31, 53, 0.32),
+        inset 0 3px 7px rgba(255, 255, 255, 0.28) !important;
+}
+
+html.novastore-native-app-root .btn-favorite .heart-icon {
+    stroke: #ff4757 !important;
+    fill: none !important;
+}
+
+html.novastore-native-app-root .btn-favorite.active .heart-icon {
+    stroke: #FFFFFF !important;
+    fill: #FFFFFF !important;
+}
+
+html.novastore-native-app-root .product-container,
+html.novastore-native-app-root .checkout-container,
+html.novastore-native-app-root .profile-container,
+html.novastore-native-app-root body > .container {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 12px !important;
+}
+
+html.novastore-native-app-root .product-container {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+}
+
+html.novastore-native-app-root .image-section,
+html.novastore-native-app-root .info-section,
+html.novastore-native-app-root .checkout-section,
+html.novastore-native-app-root .order-summary,
+html.novastore-native-app-root .profile-sidebar,
+html.novastore-native-app-root .content-card,
+html.novastore-native-app-root .review-form-box,
+html.novastore-native-app-root .reviews-section,
+html.novastore-native-app-root .qa-section,
+html.novastore-native-app-root .order-card,
+html.novastore-native-app-root .compact-order-card {
+    border-radius: var(--app-radius) !important;
+    border: 1px solid var(--app-line) !important;
+    background: var(--app-surface) !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root .image-section,
+html.novastore-native-app-root .info-section,
+html.novastore-native-app-root .checkout-section,
+html.novastore-native-app-root .order-summary,
+html.novastore-native-app-root .content-card {
+    padding: 14px !important;
+}
+
+html.novastore-native-app-root .main-media-container,
+html.novastore-native-app-root .gallery-container {
+    border-radius: var(--app-radius) !important;
+    background: var(--app-surface-soft) !important;
+}
+
+html.novastore-native-app-root .main-image,
+html.novastore-native-app-root .gallery-thumbnail-media {
+    border-radius: var(--app-radius) !important;
+}
+
+html.novastore-native-app-root .brand {
+    color: var(--app-brand-2) !important;
+    font-size: 0.72rem !important;
+    font-weight: 850 !important;
+}
+
+html.novastore-native-app-root .title {
+    color: var(--app-ink) !important;
+    font-size: 1.35rem !important;
+    line-height: 1.2 !important;
+}
+
+html.novastore-native-app-root .description-box,
+html.novastore-native-app-root .qa-card,
+html.novastore-native-app-root .review-card,
+html.novastore-native-app-root #selected-address-card {
+    border-radius: var(--app-radius) !important;
+    border: 1px solid var(--app-line) !important;
+    background: var(--app-surface-soft) !important;
+}
+
+html.novastore-native-app-root .bottom-sections-wrapper {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    margin-top: 12px !important;
+    padding-top: 0 !important;
+}
+
+html.novastore-native-app-root .cart-overlay {
+    background: rgba(15, 23, 42, 0.56) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+html.novastore-native-app-root .cart-sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    background: var(--app-surface) !important;
+    box-shadow: 0 -18px 44px rgba(15, 42, 67, 0.22) !important;
+}
+
+html.novastore-native-app-root .cart-sidebar.open {
+    right: 0 !important;
+}
+
+html.novastore-native-app-root .cart-header,
+html.novastore-native-app-root .cart-footer {
+    padding: 16px !important;
+    background: var(--app-surface) !important;
+    border-color: var(--app-line) !important;
+}
+
+html.novastore-native-app-root .cart-items {
+    padding: 12px !important;
+}
+
+html.novastore-native-app-root .cart-item {
+    border-radius: var(--app-radius) !important;
+    border: 1px solid var(--app-line) !important;
+    background: var(--app-surface) !important;
+    overflow: hidden !important;
+}
+
+html.novastore-native-app-root .cart-item-info {
+    padding-right: 0 !important;
+}
+
+html.novastore-native-app-root .cart-item-info > div[style*="background: #FAFAFA"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin-right: 0 !important;
+    overflow: hidden !important;
+}
+
+html.novastore-native-app-root .cart-item-info > div[style*="background: #FAFAFA"] > div:first-child {
+    flex-wrap: wrap !important;
+    row-gap: 3px !important;
+}
+
+html.novastore-native-app-root .cart-item-info > div[style*="background: #FAFAFA"] span[style*="line-through"] {
+    max-width: 74px !important;
+    display: inline-block !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+html.novastore-native-app-root .cart-item > div:last-child {
+    min-width: 84px !important;
+    align-self: stretch !important;
+}
+
+html.novastore-native-app-root .cart-item > div:last-child > div[style*="background: #F8F9FA"] {
+    min-width: 82px !important;
+    min-height: 34px !important;
+    justify-content: space-between !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+}
+
+html.novastore-native-app-root .cart-item > div:last-child > div[style*="background: #F8F9FA"] button {
+    width: 28px !important;
+    height: 32px !important;
+}
+
+html.novastore-native-app-root .cart-item > div:last-child > div[style*="background: #F8F9FA"] span {
+    width: 24px !important;
+    font-size: 0.95rem !important;
+}
+
+html.novastore-native-app-root .notification-dropdown,
+html.novastore-native-app-root #profile-notif-dropdown {
+    width: calc(100vw - 24px) !important;
+    right: 12px !important;
+    left: auto !important;
+    border-radius: var(--app-radius) !important;
+    border: 1px solid var(--app-line) !important;
+    background: #172033 !important;
+    box-shadow: var(--app-shadow) !important;
+}
+
+html.novastore-native-app-root .native-bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    max-width: 100vw;
+    overflow: hidden;
+    z-index: 5000;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    padding: 8px 8px calc(8px + var(--app-safe-bottom));
+    background: #FFFFFF;
+    border-top: 1px solid var(--app-line);
+    box-shadow: 0 -2px 10px rgba(15, 42, 67, 0.06);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    transition: transform 0.22s ease;
+    contain: paint;
+}
+
+html.novastore-native-app-root .native-tab-item {
+    position: relative;
+    min-width: 0;
+    min-height: 54px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: #8A94A6;
+    background: transparent;
+    border: 0;
+    text-decoration: none;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 750;
+    cursor: pointer;
+    isolation: isolate;
+}
+
+html.novastore-native-app-root .native-tab-item::before {
+    content: "";
+    position: absolute;
+    inset: 4px 5px;
+    z-index: -1;
+    border-radius: 999px;
+    background: transparent;
+    transform: scale(0.86);
+    opacity: 0;
+    transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+html.novastore-native-app-root .native-tab-item svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+    transition: transform 0.18s ease;
+}
+
+html.novastore-native-app-root .native-tab-item span {
+    max-width: 100%;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    font-size: 0.68rem;
+    line-height: 1.05;
+}
+
+html.novastore-native-app-root .native-tab-item.active {
+    color: #F05A24;
+}
+
+html.novastore-native-app-root .native-tab-item.active::before {
+    background: #FFF7ED;
+    opacity: 1;
+    transform: scale(1);
+}
+
+html.novastore-native-app-root .native-tab-item.is-pressing svg,
+html.novastore-native-app-root .native-tab-item:active svg {
+    transform: scale(0.92);
+}
+
+html.novastore-native-app-root .category-trigger.is-pressing,
+html.novastore-native-app-root .native-subcategory-link.is-pressing,
+html.novastore-native-app-root .btn-add.is-pressing,
+html.novastore-native-app-root .btn-primary.is-pressing,
+html.novastore-native-app-root .btn-hero.is-pressing {
+    transform: scale(0.97) !important;
+}
+
+html.novastore-native-app-root .native-tab-badge {
+    position: absolute;
+    top: 4px;
+    right: 20%;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--app-accent);
+    color: #FFFFFF;
+    font-size: 0.66rem;
+    font-style: normal;
+    font-weight: 900;
+    border: 2px solid #FFFFFF;
+}
+
+html.novastore-native-app-root .profile-sidebar {
+    padding: 14px !important;
+    margin-bottom: 12px !important;
+}
+
+html.novastore-native-app-root .profile-nav {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+}
+
+html.novastore-native-app-root .profile-nav li {
+    margin: 0 !important;
+    padding: 10px !important;
+    border: 1px solid var(--app-line) !important;
+    border-radius: var(--app-radius) !important;
+    background: var(--app-surface-soft) !important;
+    color: var(--app-brand) !important;
+    font-size: 0.84rem !important;
+    font-weight: 750 !important;
+}
+
+html.novastore-native-app-root .profile-nav li.active {
+    background: #FFF7ED !important;
+    border-color: rgba(247, 148, 29, 0.55) !important;
+    color: #9A4B08 !important;
+}
+
+html.novastore-native-app-root .avatar {
+    background: linear-gradient(135deg, var(--app-brand), var(--app-brand-2)) !important;
+    color: #FFFFFF !important;
+}
+
+html.novastore-native-app-root body.native-page-profile {
+    background: #FFFFFF !important;
+    padding-bottom: calc(84px + var(--app-safe-bottom)) !important;
+}
+
+html.novastore-native-app-root body.native-page-profile > .container,
+html.novastore-native-app-root body.native-page-profile #nova-footer-page-shell > .container {
+    width: 100% !important;
+    max-width: none !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 0 calc(96px + var(--app-safe-bottom)) !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .profile-sidebar {
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #FFFFFF !important;
+    overflow: visible !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .profile-header-box {
+    min-height: 270px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 42px 18px 30px !important;
+    background:
+        radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.18), transparent 28%),
+        linear-gradient(135deg, #FF6B4A 0%, #E01776 100%) !important;
+    color: #FFFFFF !important;
+    text-align: center !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .profile-header-box .avatar {
+    width: 106px !important;
+    height: 106px !important;
+    margin: 0 auto 22px !important;
+    border: 2px solid rgba(255, 255, 255, 0.62) !important;
+    background: #F8FAFC !important;
+    color: #3F3F46 !important;
+    font-size: 2rem !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .profile-name {
+    max-width: 100% !important;
+    margin: 0 !important;
+    color: #FFFFFF !important;
+    font-size: 1.85rem !important;
+    line-height: 1.08 !important;
+    font-weight: 900 !important;
+    word-break: break-word !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .profile-email {
+    margin-top: 8px !important;
+    color: rgba(255, 255, 255, 0.76) !important;
+    font-size: 0.86rem !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .profile-nav {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 16px 28px 0 !important;
+    background: #FFFFFF !important;
+    list-style: none !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .profile-nav li {
+    min-height: 74px !important;
+    display: grid !important;
+    grid-template-columns: 42px minmax(0, 1fr) 24px !important;
+    align-items: center !important;
+    gap: 18px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-bottom: 1px solid #EEF0F3 !important;
+    background: #FFFFFF !important;
+    color: #4B5563 !important;
+    font-size: 1.05rem !important;
+    font-weight: 500 !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .profile-nav li.active {
+    color: var(--app-accent) !important;
+    background: #FFFFFF !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .native-profile-row-icon {
+    width: 42px !important;
+    height: 42px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #555B63 !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .native-profile-row-icon svg {
+    width: 30px !important;
+    height: 30px !important;
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 1.8 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .profile-nav li.active .native-profile-row-icon,
+html.novastore-native-app-root body.native-page-profile .profile-nav li.active .native-profile-row-label {
+    color: var(--app-accent) !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .native-profile-row-label {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .native-profile-row-chevron {
+    color: #7A8088 !important;
+    font-size: 1.8rem !important;
+    font-weight: 300 !important;
+    line-height: 1 !important;
+    text-align: right !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .profile-sidebar .btn-logout {
+    width: calc(100% - 56px) !important;
+    min-height: 58px !important;
+    margin: 26px 28px 4px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 1px solid #DADDE3 !important;
+    border-radius: var(--app-radius) !important;
+    background: #FFFFFF !important;
+    color: #3F3F46 !important;
+    font-size: 1.05rem !important;
+    font-weight: 750 !important;
+    text-align: center !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .content-card {
+    width: auto !important;
+    min-height: 0 !important;
+    margin: 16px 12px 0 !important;
+    padding: 16px !important;
+    border-radius: var(--app-radius) !important;
+    border: 1px solid var(--app-line) !important;
+    box-shadow: none !important;
+    background: var(--app-surface) !important;
+}
+
+html.novastore-native-app-root body.native-page-profile .content-card .section-title {
+    margin-top: 0 !important;
+}
+
+html.novastore-native-app-root body.native-page-profile.native-profile-home-screen .content-card {
+    display: none !important;
+}
+
+html.novastore-native-app-root body.native-page-profile.native-profile-detail-screen .profile-sidebar {
+    display: none !important;
+}
+
+html.novastore-native-app-root body.native-page-profile.native-profile-detail-screen > .container,
+html.novastore-native-app-root body.native-page-profile.native-profile-detail-screen #nova-footer-page-shell > .container {
+    padding-top: 56px !important;
+}
+
+html.novastore-native-app-root body.native-page-profile.native-profile-detail-screen .content-card {
+    margin: 0 12px !important;
+    padding: 14px !important;
+}
+
+html.novastore-native-app-root body.native-page-profile.native-profile-detail-screen .content-card .section-title {
+    font-size: 1.12rem !important;
+    line-height: 1.25 !important;
+    margin-bottom: 14px !important;
+    padding-bottom: 10px !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 11px !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-card {
+    min-width: 0 !important;
+    min-height: auto !important;
+    padding: 8px !important;
+    border-radius: var(--app-radius) !important;
+    overflow: hidden !important;
+    min-height: 0 !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-card > a {
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+    display: block !important;
+    overflow: hidden !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-card .product-img {
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 1 / 1 !important;
+    margin: 0 0 8px !important;
+    object-fit: cover !important;
+    border-radius: var(--app-radius) !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-card .product-title {
+    min-height: 38px !important;
+    margin: 8px 0 5px !important;
+    font-size: 0.84rem !important;
+    line-height: 1.25 !important;
+    font-weight: 800 !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-card > a > div[style*="margin-bottom: 10px"] {
+    margin-bottom: 6px !important;
+    font-size: 0.72rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-card > div[style*="align-items: stretch"] {
+    margin-top: auto !important;
+    padding-top: 6px !important;
+    grid-template-columns: minmax(0, 1fr) 36px !important;
+    gap: 5px !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-card .native-price-box {
+    min-height: 58px !important;
+    padding: 6px 5px !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-card .native-price-box-discount {
+    grid-template-columns: 34px minmax(0, 1fr) !important;
+    column-gap: 4px !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-card .native-card-price-discount {
+    font-size: 0.9rem !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-card .native-card-price-regular {
+    font-size: 1rem !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .product-card .btn-add {
+    width: 36px !important;
+    min-width: 36px !important;
+    min-height: 58px !important;
+}
+
+html.novastore-native-app-root body.native-page-profile #favorites-container .btn-favorite {
+    top: 14px !important;
+    right: 14px !important;
+}
+
+html.novastore-native-app-root .native-loading {
+    min-height: 150px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    color: var(--app-muted) !important;
+    font-weight: 750 !important;
+    text-align: center !important;
+}
+
+html.novastore-native-app-root .native-loading-spinner {
+    position: relative !important;
+    width: 42px !important;
+    height: 42px !important;
+    border: 3px solid #E5E7EB !important;
+    border-right-color: var(--app-accent) !important;
+    border-bottom-color: var(--app-accent) !important;
+    border-radius: 999px !important;
+    animation: nativeLoadingSpin 0.72s linear infinite !important;
+}
+
+html.novastore-native-app-root .native-loading-spinner::after {
+    content: "" !important;
+    position: absolute !important;
+    width: 8px !important;
+    height: 8px !important;
+    right: 1px !important;
+    top: 4px !important;
+    border-radius: 999px !important;
+    background: var(--app-accent) !important;
+    box-shadow: 0 0 0 4px rgba(247, 148, 29, 0.12) !important;
+}
+
+@keyframes nativeLoadingSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+html.novastore-native-app-root .native-about-tab {
+    color: var(--app-ink) !important;
+}
+
+html.novastore-native-app-root .native-about-hero {
+    display: grid !important;
+    grid-template-columns: 76px minmax(0, 1fr) !important;
+    gap: 14px !important;
+    align-items: center !important;
+    padding: 16px !important;
+    border-radius: var(--app-radius) !important;
+    background: linear-gradient(135deg, rgba(15, 42, 67, 0.08), rgba(247, 148, 29, 0.11)) !important;
+    border: 1px solid rgba(226, 232, 240, 0.95) !important;
+}
+
+html.novastore-native-app-root .native-about-hero img {
+    width: 76px !important;
+    height: 76px !important;
+    object-fit: contain !important;
+    border-radius: 18px !important;
+    background: #FFFFFF !important;
+    padding: 8px !important;
+    box-sizing: border-box !important;
+}
+
+html.novastore-native-app-root .native-about-hero strong {
+    display: block !important;
+    color: var(--app-brand) !important;
+    font-size: 1.22rem !important;
+    font-weight: 900 !important;
+    line-height: 1.1 !important;
+}
+
+html.novastore-native-app-root .native-about-hero p {
+    margin: 6px 0 0 !important;
+    color: var(--app-muted) !important;
+    font-size: 0.88rem !important;
+    line-height: 1.45 !important;
+}
+
+html.novastore-native-app-root .native-about-list {
+    display: grid !important;
+    gap: 10px !important;
+    margin-top: 14px !important;
+}
+
+html.novastore-native-app-root .native-about-list a {
+    min-height: 62px !important;
+    display: grid !important;
+    grid-template-columns: 42px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 10px 12px !important;
+    border-radius: var(--app-radius) !important;
+    border: 1px solid var(--app-line) !important;
+    background: var(--app-surface) !important;
+    color: var(--app-ink) !important;
+    text-decoration: none !important;
+}
+
+html.novastore-native-app-root .native-about-list span {
+    width: 42px !important;
+    height: 42px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 999px !important;
+    background: #FFF7ED !important;
+    color: var(--app-accent) !important;
+    font-size: 0.78rem !important;
+    font-weight: 900 !important;
+}
+
+html.novastore-native-app-root .native-about-list strong,
+html.novastore-native-app-root .native-about-list em {
+    display: block !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+html.novastore-native-app-root .native-about-list strong {
+    font-size: 0.95rem !important;
+    font-weight: 850 !important;
+}
+
+html.novastore-native-app-root .native-about-list em {
+    margin-top: 2px !important;
+    color: var(--app-muted) !important;
+    font-size: 0.82rem !important;
+    font-style: normal !important;
+}
+
+html.novastore-native-app-root .checkout-container {
+    width: 100% !important;
+    max-width: 100vw !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    margin: 0 !important;
+    padding: 0 12px 196px !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout,
+html.novastore-native-app-root body.native-page-payment-result {
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+}
+
+html.novastore-native-app-root body.native-checkout-flow {
+    padding-bottom: calc(166px + var(--app-safe-bottom)) !important;
+}
+
+html.novastore-native-app-root .native-checkout-stepper {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    margin: 0 0 4px !important;
+}
+
+html.novastore-native-app-root .native-checkout-stepper button {
+    min-width: 0 !important;
+    min-height: 46px !important;
+    display: grid !important;
+    grid-template-columns: 22px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 7px !important;
+    padding: 6px 7px !important;
+    border: 1px solid var(--app-line) !important;
+    border-radius: var(--app-radius) !important;
+    background: var(--app-surface) !important;
+    color: var(--app-muted) !important;
+    text-align: left !important;
+    font: inherit !important;
+}
+
+html.novastore-native-app-root .native-checkout-stepper button span {
+    width: 22px !important;
+    height: 22px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 999px !important;
+    background: #EEF2F7 !important;
+    color: var(--app-muted) !important;
+    font-size: 0.72rem !important;
+    font-weight: 900 !important;
+}
+
+html.novastore-native-app-root .native-checkout-stepper button strong {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 0.72rem !important;
+    font-weight: 850 !important;
+}
+
+html.novastore-native-app-root .native-checkout-stepper button.is-active {
+    border-color: rgba(247, 148, 29, 0.56) !important;
+    background: #FFF7ED !important;
+    color: #9A4B08 !important;
+}
+
+html.novastore-native-app-root .native-checkout-stepper button.is-locked {
+    opacity: 0.58 !important;
+}
+
+html.novastore-native-app-root .native-checkout-stepper button.is-active span,
+html.novastore-native-app-root .native-checkout-stepper button.is-done span {
+    background: var(--app-accent) !important;
+    color: #FFFFFF !important;
+}
+
+html.novastore-native-app-root .native-step-hidden {
+    display: none !important;
+}
+
+html.novastore-native-app-root .native-step-active {
+    animation: nativeCheckoutPanelIn 0.22s ease both !important;
+}
+
+@keyframes nativeCheckoutPanelIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+html.novastore-native-app-root body.native-page-checkout .checkout-section,
+html.novastore-native-app-root body.native-page-checkout .order-summary {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 18px !important;
+    margin: 0 0 12px !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+    border: 1px solid var(--app-line) !important;
+    border-radius: var(--app-radius) !important;
+    background: var(--app-surface) !important;
+    box-shadow: 0 10px 26px rgba(15, 42, 67, 0.06) !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout .checkout-section .section-title,
+html.novastore-native-app-root body.native-page-checkout .order-summary .section-title {
+    margin: 0 0 14px !important;
+    padding-bottom: 12px !important;
+    border-bottom: 1px solid #EEF2F7 !important;
+    font-size: 1.22rem !important;
+    line-height: 1.18 !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout #selected-address-card {
+    padding: 16px !important;
+    border-color: var(--app-line) !important;
+    border-radius: var(--app-radius) !important;
+    background: #F8FAFC !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout #payment-method-toggle {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 9px !important;
+    margin-bottom: 16px !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout #payment-method-toggle label {
+    min-height: 54px !important;
+    padding: 0 14px !important;
+    border-width: 1px !important;
+    border-radius: var(--app-radius) !important;
+    background: #FFFFFF !important;
+    font-size: 0.92rem !important;
+    justify-content: center !important;
+    text-align: center !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout .grid-2 {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout .credit-card-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 188px !important;
+    overflow: hidden !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout .flip-card-front,
+html.novastore-native-app-root body.native-page-checkout .flip-card-back {
+    padding: 18px !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout .summary-item,
+html.novastore-native-app-root body.native-page-checkout .summary-total {
+    gap: 12px !important;
+    min-width: 0 !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout .native-checkout-trust-row {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    margin: 16px 0 0 !important;
+    padding: 14px 0 0 !important;
+    border-top: 1px solid #EEF2F7 !important;
+    border-bottom: 0 !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout .native-checkout-trust-row > div {
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    font-size: 0.78rem !important;
+    line-height: 1.25 !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout .native-checkout-legal {
+    margin: 14px 0 0 !important;
+    padding: 12px !important;
+    border-radius: var(--app-radius) !important;
+    background: #F8FAFC !important;
+    color: var(--app-muted) !important;
+    font-size: 0.78rem !important;
+    line-height: 1.45 !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout #submit-btn {
+    display: none !important;
+}
+
+html.novastore-native-app-root .native-checkout-bottom {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: calc(72px + var(--app-safe-bottom)) !important;
+    z-index: 4990 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(142px, 42%) !important;
+    gap: 12px !important;
+    align-items: center !important;
+    padding: 12px 14px !important;
+    border-top: 1px solid var(--app-line) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    box-shadow: 0 -8px 24px rgba(15, 42, 67, 0.08) !important;
+}
+
+html.novastore-native-app-root .native-checkout-bottom span {
+    display: block !important;
+    color: var(--app-muted) !important;
+    font-size: 0.74rem !important;
+    font-weight: 800 !important;
+}
+
+html.novastore-native-app-root .native-checkout-bottom strong {
+    display: block !important;
+    color: var(--app-ink) !important;
+    font-size: 1.18rem !important;
+    line-height: 1.12 !important;
+    font-weight: 900 !important;
+}
+
+html.novastore-native-app-root .native-checkout-bottom em {
+    font-style: normal !important;
+}
+
+html.novastore-native-app-root .native-checkout-bottom button {
+    min-height: 48px !important;
+    border: 0 !important;
+    border-radius: var(--app-radius) !important;
+    background: var(--app-accent) !important;
+    color: #FFFFFF !important;
+    font-size: 0.92rem !important;
+    font-weight: 900 !important;
+    box-shadow: 0 10px 22px rgba(247, 148, 29, 0.24) !important;
+}
+
+html.novastore-native-app-root body.native-page-checkout .summary-item span,
+html.novastore-native-app-root body.native-page-checkout .summary-total span,
+html.novastore-native-app-root body.native-page-checkout .summary-item strong,
+html.novastore-native-app-root body.native-page-checkout .summary-total strong {
+    min-width: 0 !important;
+    overflow-wrap: anywhere !important;
+}
+
+html.novastore-native-app-root .form-control,
+html.novastore-native-app-root input,
+html.novastore-native-app-root textarea,
+html.novastore-native-app-root select {
+    border-radius: var(--app-radius) !important;
+    border: 1px solid var(--app-line) !important;
+    background: var(--app-surface) !important;
+}
+
+html.novastore-native-app-root input:focus,
+html.novastore-native-app-root textarea:focus,
+html.novastore-native-app-root select:focus {
+    border-color: var(--app-brand-2) !important;
+    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14) !important;
+    outline: none !important;
+}
+
+html.novastore-native-app-root .credit-card-box {
+    border-radius: var(--app-radius) !important;
+    background: linear-gradient(135deg, #0F2A43 0%, #0F766E 100%) !important;
+}
+
+html.novastore-native-app-root .summary-item,
+html.novastore-native-app-root .summary-total {
+    color: var(--app-ink) !important;
+}
+
+html.novastore-native-app-root .toast-container {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: calc(14px + var(--app-safe-bottom)) !important;
+}
+
+html.novastore-native-app-root .toast {
+    min-width: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    border-radius: var(--app-radius) !important;
+}
+
+html.novastore-native-app-root body.native-page-login,
+html.novastore-native-app-root body.native-page-forgot-password,
+html.novastore-native-app-root body.native-page-reset-password {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 100vh !important;
+    padding: 18px 14px calc(92px + var(--app-safe-bottom)) !important;
+    background:
+        linear-gradient(180deg, rgba(15, 42, 67, 0.06) 0%, rgba(247, 249, 252, 0) 36%),
+        var(--app-bg) !important;
+}
+
+html.novastore-native-app-root body.native-page-login footer,
+html.novastore-native-app-root body.native-page-forgot-password footer,
+html.novastore-native-app-root body.native-page-reset-password footer {
+    display: none !important;
+}
+
+html.novastore-native-app-root .auth-container {
+    flex: 0 1 auto !important;
+    width: 100% !important;
+    max-width: 380px !important;
+    padding: 28px 22px !important;
+    border: 1px solid var(--app-line) !important;
+    border-radius: var(--app-radius) !important;
+    box-shadow: 0 12px 28px rgba(15, 42, 67, 0.08) !important;
+}
+
+html.novastore-native-app-root .auth-logo {
+    margin-bottom: 22px !important;
+    color: var(--app-brand) !important;
+    font-size: 1.85rem !important;
+    font-weight: 900 !important;
+}
+
+html.novastore-native-app-root .auth-logo span {
+    color: var(--app-accent) !important;
+}
+
+html.novastore-native-app-root .auth-tabs {
+    border-radius: var(--app-radius) !important;
+    background: var(--app-surface-soft) !important;
+}
+
+html.novastore-native-app-root .tab-btn {
+    border-radius: calc(var(--app-radius) - 2px) !important;
+}
+
+html.novastore-native-app-root .tab-btn.active {
+    color: var(--app-brand) !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root .native-alert-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    display: grid;
+    place-items: center;
+    padding: 22px;
+    background: rgba(15, 23, 42, 0.58);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+html.novastore-native-app-root .native-alert-overlay.is-visible {
+    opacity: 1;
+}
+
+html.novastore-native-app-root .native-alert-card {
+    width: min(340px, 100%);
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    gap: 12px;
+    padding: 18px;
+    border-radius: var(--app-radius);
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    background: var(--app-surface);
+    box-shadow: 0 22px 60px rgba(15, 42, 67, 0.24);
+}
+
+html.novastore-native-app-root .native-alert-icon {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--app-radius);
+    background: #ECFDF5;
+    color: #047857;
+    font-size: 1.35rem;
+    font-weight: 900;
+}
+
+html.novastore-native-app-root .native-alert-error .native-alert-icon {
+    background: #FEF2F2;
+    color: var(--app-danger);
+}
+
+html.novastore-native-app-root .native-alert-copy {
+    min-width: 0;
+}
+
+html.novastore-native-app-root .native-alert-copy strong {
+    display: block;
+    color: var(--app-ink);
+    font-size: 1rem;
+    font-weight: 900;
+    line-height: 1.25;
+    margin-bottom: 4px;
+}
+
+html.novastore-native-app-root .native-alert-copy p {
+    margin: 0;
+    color: var(--app-muted);
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+html.novastore-native-app-root .native-alert-ok {
+    grid-column: 1 / -1;
+    min-height: 42px;
+    border: 0;
+    border-radius: var(--app-radius);
+    background: var(--app-brand);
+    color: #FFFFFF;
+    font-weight: 850;
+}
+
+html.novastore-native-app-root #customer-chat-widget .chat-widget-container {
+    right: 14px !important;
+    bottom: calc(88px + var(--app-safe-bottom)) !important;
+    z-index: 4500 !important;
+}
+
+html.novastore-native-app-root #customer-chat-widget .chat-icon-collapsed {
+    width: 56px !important;
+    height: 56px !important;
+    transform: none !important;
+    box-shadow: 0 10px 24px rgba(15, 42, 67, 0.18) !important;
+}
+
+html.novastore-native-app-root #customer-chat-widget .chat-icon-collapsed:hover {
+    width: 56px !important;
+    transform: none !important;
+    box-shadow: 0 10px 24px rgba(15, 42, 67, 0.18) !important;
+}
+
+html.novastore-native-app-root #customer-chat-widget .chat-icon-collapsed::before,
+html.novastore-native-app-root #customer-chat-widget .chat-icon-collapsed::after {
+    opacity: 0 !important;
+}
+
+html.novastore-native-app-root #customer-chat-widget .chat-icon-mark,
+html.novastore-native-app-root #customer-chat-widget .chat-fab-robot {
+    width: 40px !important;
+    height: 40px !important;
+}
+
+html.novastore-native-app-root #customer-chat-widget .chat-icon-collapsed:hover .chat-icon-mark {
+    opacity: 1 !important;
+    transform: none !important;
+    transition-delay: 0s !important;
+}
+
+html.novastore-native-app-root #customer-chat-widget .chat-label,
+html.novastore-native-app-root #customer-chat-widget .chat-icon-collapsed:hover .chat-label {
+    display: none !important;
+    opacity: 0 !important;
+    transform: scale(0) !important;
+}
+
+html.novastore-native-app-root #chat-window {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: calc(92px + var(--app-safe-bottom)) !important;
+    width: auto !important;
+    max-width: none !important;
+    border-radius: var(--app-radius) !important;
+}
+
+html.novastore-native-app-root .btn-favorite.active .heart-icon,
+html.novastore-native-app-root .btn-favorite.active svg {
+    animation: nativeHeartPop 0.34s cubic-bezier(.2, .9, .2, 1) both;
+}
+
+@keyframes nativeHeartPop {
+    0% {
+        transform: scale(0.82);
+    }
+
+    58% {
+        transform: scale(1.18);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html.novastore-native-app-root * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+@media (max-width: 420px) {
+    html.novastore-native-app-root header {
+        grid-template-columns: auto minmax(0, 1fr) auto !important;
+    }
+
+    html.novastore-native-app-root header form {
+        grid-column: auto !important;
+        order: initial !important;
+    }
+
+    html.novastore-native-app-root .nav-right {
+        justify-self: end !important;
+    }
+
+    html.novastore-native-app-root .products-grid,
+    html.novastore-native-app-root .product-grid {
+        gap: 10px !important;
+    }
+
+    html.novastore-native-app-root .product-card {
+        padding: 8px !important;
+    }
+}
+
+/* app-shell-18: stronger mobile app form inspired by the demo, keeping NovaStore colors */
+html.novastore-native-app-root header {
+    min-height: var(--app-header-height) !important;
+    gap: 8px !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+}
+
+html.novastore-native-app-root header .logo {
+    max-width: 96px !important;
+    font-size: 0.98rem !important;
+    font-weight: 900 !important;
+}
+
+html.novastore-native-app-root header form input {
+    height: 38px !important;
+    border-radius: 999px !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    background: #FFFFFF !important;
+    box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.55) !important;
+}
+
+html.novastore-native-app-root .native-location-pill {
+    width: 62px !important;
+    min-height: 38px !important;
+    border-radius: 10px !important;
+}
+
+html.novastore-native-app-root .hero-section {
+    margin: 10px 12px 12px !important;
+    min-height: 138px !important;
+    padding: 18px !important;
+    border-radius: 12px !important;
+}
+
+html.novastore-native-app-root .hero-content h1 {
+    max-width: 250px !important;
+    font-size: 1.46rem !important;
+    line-height: 1.08 !important;
+    font-weight: 850 !important;
+}
+
+html.novastore-native-app-root .hero-content p {
+    max-width: 285px !important;
+    font-size: 0.82rem !important;
+    line-height: 1.36 !important;
+    font-weight: 500 !important;
+}
+
+html.novastore-native-app-root .btn-hero {
+    min-height: 40px !important;
+    padding: 0 18px !important;
+    border-radius: 8px !important;
+    font-size: 0.84rem !important;
+}
+
+html.novastore-native-app-root .category-nav {
+    padding: 2px 12px 10px !important;
+}
+
+html.novastore-native-app-root .category-menu {
+    gap: 8px !important;
+}
+
+html.novastore-native-app-root .category-trigger,
+html.novastore-native-app-root .subcategory-item {
+    min-width: auto !important;
+    min-height: 34px !important;
+    padding: 0 14px !important;
+    border-radius: 999px !important;
+    font-size: 0.72rem !important;
+    font-weight: 750 !important;
+}
+
+html.novastore-native-app-root .section-title,
+html.novastore-native-app-root .reviews-title,
+html.novastore-native-app-root .qa-title {
+    margin: 16px 2px 10px !important;
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+}
+
+html.novastore-native-app-root .products-grid,
+html.novastore-native-app-root .product-grid {
+    gap: 9px !important;
+}
+
+html.novastore-native-app-root body.native-page-index:not(.native-filtered-list) .products-grid {
+    gap: 9px !important;
+}
+
+html.novastore-native-app-root .product-card {
+    padding: 7px !important;
+    border-radius: 12px !important;
+    background: #FFFFFF !important;
+    border-color: #E7EDF5 !important;
+    box-shadow: 0 8px 18px rgba(15, 42, 67, 0.055) !important;
+}
+
+html.novastore-native-app-root body.native-page-index:not(.native-filtered-list) .product-card {
+    flex-basis: 154px !important;
+}
+
+html.novastore-native-app-root .product-media-frame,
+html.novastore-native-app-root .product-image,
+html.novastore-native-app-root .product-img {
+    border-radius: 10px !important;
+    border-color: #EEF2F7 !important;
+}
+
+html.novastore-native-app-root .product-title,
+html.novastore-native-app-root .product-info h3 {
+    min-height: 34px !important;
+    margin: 7px 0 4px !important;
+    font-size: 0.76rem !important;
+    line-height: 1.2 !important;
+    font-weight: 700 !important;
+    text-transform: none !important;
+}
+
+html.novastore-native-app-root .product-card > a + div,
+html.novastore-native-app-root .product-card > div[style*="margin-bottom: 8px"] {
+    margin-bottom: 6px !important;
+    gap: 4px !important;
+    font-size: 0.68rem !important;
+    font-weight: 500 !important;
+}
+
+html.novastore-native-app-root .product-card > a + div svg,
+html.novastore-native-app-root .product-card > div[style*="margin-bottom: 8px"] svg {
+    width: 13px !important;
+    height: 13px !important;
+}
+
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] {
+    grid-template-columns: minmax(0, 1fr) 34px !important;
+    gap: 6px !important;
+    padding-top: 4px !important;
+}
+
+html.novastore-native-app-root .product-card .native-price-box {
+    min-height: 44px !important;
+    justify-content: center !important;
+    align-items: flex-start !important;
+    text-align: left !important;
+    padding: 5px 4px !important;
+    border: 0 !important;
+    background: transparent !important;
+}
+
+html.novastore-native-app-root .product-card .native-price-box-discount {
+    grid-template-columns: 1fr !important;
+    row-gap: 2px !important;
+}
+
+html.novastore-native-app-root .product-card .native-price-box-discount > div:first-child {
+    display: none !important;
+}
+
+html.novastore-native-app-root .product-card .native-price-box-discount > div:last-child {
+    display: flex !important;
+    min-width: 0 !important;
+}
+
+html.novastore-native-app-root .product-card .native-card-price {
+    letter-spacing: 0 !important;
+}
+
+html.novastore-native-app-root .product-card .native-card-price-regular,
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div[style*="color: #333"] {
+    color: var(--app-ink) !important;
+    font-size: 0.95rem !important;
+    line-height: 1.02 !important;
+    font-weight: 800 !important;
+}
+
+html.novastore-native-app-root .product-card .native-card-price-discount,
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div:last-child > div:last-child {
+    color: #00897B !important;
+    font-size: 0.9rem !important;
+    line-height: 1.02 !important;
+    font-weight: 800 !important;
+}
+
+html.novastore-native-app-root .product-card .native-card-price-regular span,
+html.novastore-native-app-root .product-card .native-card-price-discount span,
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div:last-child > div:last-child span {
+    display: inline !important;
+    margin-top: 0 !important;
+    font-size: 0.66rem !important;
+    font-weight: 700 !important;
+}
+
+html.novastore-native-app-root .product-card span[style*="line-through"],
+html.novastore-native-app-root .product-card .native-old-price {
+    max-width: 68px !important;
+    font-size: 0.58rem !important;
+    color: #7C8797 !important;
+}
+
+html.novastore-native-app-root .product-card span[style*="background: #00897B"],
+html.novastore-native-app-root .product-card .native-discount-badge {
+    border-radius: 999px !important;
+    font-size: 0.52rem !important;
+    font-weight: 800 !important;
+    padding: 2px 5px !important;
+}
+
+html.novastore-native-app-root .product-card .btn-add {
+    width: 34px !important;
+    min-width: 34px !important;
+    min-height: 44px !important;
+    border: 0 !important;
+    border-radius: 10px !important;
+    background: var(--app-accent) !important;
+    box-shadow: 0 8px 16px rgba(247, 148, 29, 0.22) !important;
+}
+
+html.novastore-native-app-root .product-card .btn-add svg,
+html.novastore-native-app-root .product-card .btn-add svg * {
+    width: 18px !important;
+    height: 18px !important;
+    stroke: #FFFFFF !important;
+}
+
+html.novastore-native-app-root .btn-favorite {
+    width: 30px !important;
+    height: 30px !important;
+    top: 13px !important;
+    right: 13px !important;
+}
+
+html.novastore-native-app-root .btn-favorite .heart-icon {
+    width: 17px !important;
+    height: 17px !important;
+}
+
+html.novastore-native-app-root .native-bottom-nav {
+    padding-top: 6px !important;
+}
+
+html.novastore-native-app-root .native-tab-item {
+    min-height: 50px !important;
+    gap: 3px !important;
+    font-size: 0.66rem !important;
+    font-weight: 650 !important;
+}
+
+html.novastore-native-app-root .native-tab-item::before {
+    inset: 5px 8px !important;
+}
+
+html.novastore-native-app-root .native-tab-item svg {
+    width: 21px !important;
+    height: 21px !important;
+}
+
+html.novastore-native-app-root .native-tab-item span {
+    font-size: 0.62rem !important;
+    font-weight: 650 !important;
+}
+
+html.novastore-native-app-root .native-tab-badge {
+    top: 3px !important;
+    right: 22% !important;
+    min-width: 16px !important;
+    height: 16px !important;
+    font-size: 0.58rem !important;
+}
+
+html.novastore-native-app-root .cart-sidebar {
+    border-radius: 18px 18px 0 0 !important;
+}
+
+html.novastore-native-app-root .cart-header h2,
+html.novastore-native-app-root .cart-footer .total,
+html.novastore-native-app-root .cart-footer .btn-checkout {
+    font-weight: 800 !important;
+}
+
+html.novastore-native-app-root .cart-item {
+    padding: 8px !important;
+    border-radius: 12px !important;
+}
+
+html.novastore-native-app-root .cart-item img {
+    width: 58px !important;
+    height: 58px !important;
+    border-radius: 10px !important;
+}
+
+html.novastore-native-app-root {
+    --app-bg: #020918;
+    --app-surface: #081326;
+    --app-surface-2: #0B182C;
+    --app-ink: #F7FAFF;
+    --app-muted: #AAB6C8;
+    --app-border: #20314D;
+    --app-accent: #FF7417;
+    --app-teal: #0FA394;
+}
+
+html.novastore-native-app-root,
+html.novastore-native-app-root body,
+html.novastore-native-app-root main {
+    background: var(--app-bg) !important;
+    color: var(--app-ink) !important;
+}
+
+html.novastore-native-app-root body.novastore-native-app {
+    padding-bottom: 76px !important;
+}
+
+html.novastore-native-app-root header.native-app-header,
+html.novastore-native-app-root header {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 16px 14px !important;
+    align-items: center !important;
+    padding: calc(26px + env(safe-area-inset-top)) 32px 16px !important;
+    border: 0 !important;
+    background: var(--app-bg) !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root header .logo {
+    grid-column: 1 !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+    color: #FFFFFF !important;
+    font-size: 2.55rem !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+}
+
+html.novastore-native-app-root header .logo span {
+    color: var(--app-accent) !important;
+}
+
+html.novastore-native-app-root header .nav-right {
+    grid-column: 2 !important;
+    display: flex !important;
+    gap: 26px !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    width: auto !important;
+}
+
+html.novastore-native-app-root header .nav-right > *:not(.native-location-pill) {
+    display: none !important;
+}
+
+html.novastore-native-app-root .native-location-pill {
+    display: flex !important;
+    width: auto !important;
+    min-width: 116px !important;
+    height: 46px !important;
+    gap: 26px !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root .native-location-pill > * {
+    display: none !important;
+}
+
+html.novastore-native-app-root .native-location-pill::before,
+html.novastore-native-app-root .native-location-pill::after {
+    display: grid !important;
+    width: 38px !important;
+    height: 38px !important;
+    place-items: center !important;
+    color: #FFAA16 !important;
+    font-size: 2.08rem !important;
+    line-height: 1 !important;
+}
+
+html.novastore-native-app-root .native-location-pill::before {
+    content: "☀";
+}
+
+html.novastore-native-app-root .native-location-pill::after {
+    content: "🔔";
+    font-size: 1.88rem !important;
+}
+
+html.novastore-native-app-root header > div:nth-child(2) {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+}
+
+html.novastore-native-app-root header > div:nth-child(2) form {
+    position: relative !important;
+    height: 104px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0 !important;
+    padding: 0 28px 0 92px !important;
+    border: 2px solid var(--app-border) !important;
+    border-radius: 32px !important;
+    background: var(--app-surface-2) !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root header > div:nth-child(2) form::before {
+    content: "";
+    position: absolute;
+    left: 32px;
+    width: 34px;
+    height: 34px;
+    border: 5px solid var(--app-accent);
+    border-radius: 50%;
+}
+
+html.novastore-native-app-root header > div:nth-child(2) form::after {
+    content: "";
+    position: absolute;
+    left: 62px;
+    width: 21px;
+    height: 5px;
+    margin-top: 28px;
+    border-radius: 999px;
+    background: var(--app-accent);
+    transform: rotate(45deg);
+}
+
+html.novastore-native-app-root header form input {
+    height: 100% !important;
+    padding: 0 !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    background: transparent !important;
+    color: var(--app-ink) !important;
+    font-size: 1.76rem !important;
+    font-weight: 500 !important;
+}
+
+html.novastore-native-app-root header form input::placeholder {
+    color: #9CA8BB !important;
+}
+
+html.novastore-native-app-root header form button {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    margin-left: 18px !important;
+    border: 0 !important;
+    background:
+        linear-gradient(#9CA8BB, #9CA8BB) 50% 22% / 34px 4px no-repeat,
+        linear-gradient(#9CA8BB, #9CA8BB) 50% 50% / 34px 4px no-repeat,
+        linear-gradient(#9CA8BB, #9CA8BB) 50% 78% / 34px 4px no-repeat !important;
+    color: transparent !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root header form button img,
+html.novastore-native-app-root header form button svg {
+    display: none !important;
+}
+
+html.novastore-native-app-root .category-nav {
+    display: none !important;
+}
+
+html.novastore-native-app-root .hero-section {
+    display: none !important;
+}
+
+html.novastore-native-app-root .container {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 32px 22px !important;
+}
+
+html.novastore-native-app-root .section-title {
+    margin: 0 !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+}
+
+html.novastore-native-app-root .products-grid,
+html.novastore-native-app-root .product-grid,
+html.novastore-native-app-root body.native-page-index:not(.native-filtered-list) .products-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 28px 24px !important;
+    overflow: visible !important;
+    padding: 8px 0 22px !important;
+    scroll-snap-type: none !important;
+}
+
+html.novastore-native-app-root body.native-page-index:not(.native-filtered-list) .product-card,
+html.novastore-native-app-root .product-card {
+    display: flex !important;
+    min-width: 0 !important;
+    min-height: 374px !important;
+    flex: initial !important;
+    flex-basis: auto !important;
+    flex-direction: column !important;
+    padding: 14px !important;
+    border: 2px solid var(--app-border) !important;
+    border-radius: 22px !important;
+    background: var(--app-surface) !important;
+    box-shadow: none !important;
+    color: var(--app-ink) !important;
+}
+
+html.novastore-native-app-root .product-media-frame,
+html.novastore-native-app-root .product-image,
+html.novastore-native-app-root .product-img {
+    height: 190px !important;
+    border: 0 !important;
+    border-radius: 16px !important;
+    background: #FFFFFF !important;
+}
+
+html.novastore-native-app-root .product-media-frame img,
+html.novastore-native-app-root .product-image img,
+html.novastore-native-app-root .product-img img {
+    width: 92% !important;
+    height: 92% !important;
+    object-fit: contain !important;
+}
+
+html.novastore-native-app-root .product-title,
+html.novastore-native-app-root .product-info h3 {
+    min-height: 64px !important;
+    margin: 18px 0 12px !important;
+    color: var(--app-ink) !important;
+    font-size: 1.46rem !important;
+    line-height: 1.16 !important;
+    font-weight: 850 !important;
+}
+
+html.novastore-native-app-root .product-card > a + div,
+html.novastore-native-app-root .product-card > div[style*="margin-bottom: 8px"] {
+    min-height: 34px !important;
+    color: var(--app-muted) !important;
+    font-size: 1.18rem !important;
+    font-weight: 500 !important;
+}
+
+html.novastore-native-app-root .product-card > a + div svg,
+html.novastore-native-app-root .product-card > div[style*="margin-bottom: 8px"] svg {
+    width: 24px !important;
+    height: 24px !important;
+    color: #CDD6E4 !important;
+}
+
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] {
+    grid-template-columns: minmax(0, 1fr) 78px !important;
+    gap: 16px !important;
+    margin-top: auto !important;
+}
+
+html.novastore-native-app-root .product-card .native-price-box,
+html.novastore-native-app-root .product-card .native-price-box-discount {
+    min-height: 72px !important;
+    padding: 8px 10px !important;
+    border: 2px solid var(--app-border) !important;
+    border-radius: 16px !important;
+    background: transparent !important;
+}
+
+html.novastore-native-app-root .product-card .native-card-price-regular,
+html.novastore-native-app-root .product-card .native-card-price-discount,
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div[style*="color: #333"],
+html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] > div > div:last-child > div:last-child {
+    color: #11B3A6 !important;
+    font-size: 1.1rem !important;
+    font-weight: 900 !important;
+}
+
+html.novastore-native-app-root .product-card .btn-add {
+    width: 78px !important;
+    min-width: 78px !important;
+    min-height: 72px !important;
+    border-radius: 18px !important;
+    background: var(--app-accent) !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root .product-card .btn-add svg,
+html.novastore-native-app-root .product-card .btn-add svg * {
+    width: 34px !important;
+    height: 34px !important;
+    stroke: #FFFFFF !important;
+}
+
+html.novastore-native-app-root .btn-favorite {
+    top: 24px !important;
+    right: 24px !important;
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 50% !important;
+    background: #FFFFFF !important;
+}
+
+html.novastore-native-app-root .btn-favorite .heart-icon {
+    width: 28px !important;
+    height: 28px !important;
+}
+
+html.novastore-native-app-root .native-bottom-nav {
+    min-height: calc(86px + env(safe-area-inset-bottom)) !important;
+    padding: 10px 0 calc(10px + env(safe-area-inset-bottom)) !important;
+    border-color: #0F1B2E !important;
+    background: var(--app-surface) !important;
+    box-shadow: 0 -14px 34px rgba(0, 0, 0, 0.28) !important;
+}
+
+html.novastore-native-app-root .native-tab-item {
+    min-height: 64px !important;
+    color: var(--app-muted) !important;
+    font-size: 0.78rem !important;
+}
+
+html.novastore-native-app-root .native-tab-item.is-active {
+    color: var(--app-accent) !important;
+}
+
+html.novastore-native-app-root .native-tab-item.is-active::before {
+    inset: 0 2px !important;
+    border-radius: 999px !important;
+    background: var(--app-accent) !important;
+}
+
+html.novastore-native-app-root .native-tab-item.is-active svg,
+html.novastore-native-app-root .native-tab-item.is-active svg * {
+    stroke: #07101F !important;
+}
+
+html.novastore-native-app-root .native-tab-item.is-active span {
+    color: var(--app-accent) !important;
+}
+
+html.novastore-native-app-root body.native-page-login,
+html.novastore-native-app-root body.native-page-forgot-password,
+html.novastore-native-app-root body.native-page-reset-password {
+    display: flex !important;
+    min-height: 100vh !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    padding: calc(34px + env(safe-area-inset-top)) 18px calc(102px + env(safe-area-inset-bottom)) !important;
+    background:
+        radial-gradient(circle at 76% 7%, rgba(255, 116, 23, 0.16), transparent 26%),
+        linear-gradient(180deg, #020918 0%, #061122 100%) !important;
+}
+
+html.novastore-native-app-root body.native-page-login .auth-container,
+html.novastore-native-app-root body.native-page-forgot-password .auth-container,
+html.novastore-native-app-root body.native-page-reset-password .auth-container {
+    width: 100% !important;
+    max-width: 440px !important;
+    align-self: center !important;
+    padding: 28px 20px 22px !important;
+    border: 2px solid var(--app-border) !important;
+    border-radius: 24px !important;
+    background: var(--app-surface) !important;
+    box-shadow: none !important;
+    color: var(--app-ink) !important;
+}
+
+html.novastore-native-app-root body.native-page-login .auth-logo,
+html.novastore-native-app-root body.native-page-forgot-password .auth-logo,
+html.novastore-native-app-root body.native-page-reset-password .auth-logo {
+    margin-bottom: 24px !important;
+    color: #FFFFFF !important;
+    font-size: 2.08rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0 !important;
+}
+
+html.novastore-native-app-root body.native-page-login .auth-logo span,
+html.novastore-native-app-root body.native-page-forgot-password .auth-logo span,
+html.novastore-native-app-root body.native-page-reset-password .auth-logo span {
+    color: var(--app-accent) !important;
+}
+
+html.novastore-native-app-root body.native-page-login .auth-tabs {
+    gap: 6px !important;
+    margin-bottom: 22px !important;
+    padding: 5px !important;
+    border: 1px solid var(--app-border) !important;
+    border-radius: 16px !important;
+    background: #09182D !important;
+}
+
+html.novastore-native-app-root body.native-page-login .tab-btn {
+    min-height: 44px !important;
+    border-radius: 12px !important;
+    color: var(--app-muted) !important;
+    font-size: 0.96rem !important;
+    font-weight: 800 !important;
+}
+
+html.novastore-native-app-root body.native-page-login .tab-btn.active {
+    background: var(--app-accent) !important;
+    color: #07101F !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root .form-group label {
+    color: var(--app-muted) !important;
+    font-size: 0.86rem !important;
+    font-weight: 750 !important;
+}
+
+html.novastore-native-app-root .form-group input {
+    min-height: 52px !important;
+    border: 1px solid var(--app-border) !important;
+    border-radius: 15px !important;
+    background: #09182D !important;
+    color: var(--app-ink) !important;
+    box-shadow: none !important;
+}
+
+html.novastore-native-app-root .form-group input::placeholder {
+    color: #738197 !important;
+}
+
+html.novastore-native-app-root .form-group input:focus {
+    border-color: var(--app-accent) !important;
+    outline: none !important;
+}
+
+html.novastore-native-app-root .auth-container a {
+    color: var(--app-accent) !important;
+}
+
+html.novastore-native-app-root .auth-btn,
+html.novastore-native-app-root body.native-page-login #register-btn {
+    min-height: 54px !important;
+    border: 0 !important;
+    border-radius: 16px !important;
+    background: var(--app-accent) !important;
+    color: #07101F !important;
+    font-weight: 900 !important;
+    box-shadow: none !important;
+}
+
+@media (max-width: 520px) {
+    html.novastore-native-app-root header.native-app-header,
+    html.novastore-native-app-root header {
+        padding-right: 16px !important;
+        padding-left: 16px !important;
+    }
+
+    html.novastore-native-app-root header .logo {
+        font-size: 1.7rem !important;
+        max-width: 178px !important;
+    }
+
+    html.novastore-native-app-root header .nav-right {
+        gap: 14px !important;
+    }
+
+    html.novastore-native-app-root .native-location-pill {
+        min-width: 84px !important;
+        gap: 12px !important;
+    }
+
+    html.novastore-native-app-root .native-location-pill::before,
+    html.novastore-native-app-root .native-location-pill::after {
+        width: 30px !important;
+        height: 30px !important;
+        font-size: 1.55rem !important;
+    }
+
+    html.novastore-native-app-root .native-location-pill::after {
+        font-size: 1.45rem !important;
+    }
+
+    html.novastore-native-app-root header > div:nth-child(2) form {
+        height: 64px !important;
+        padding-left: 58px !important;
+        border-radius: 22px !important;
+    }
+
+    html.novastore-native-app-root header > div:nth-child(2) form::before {
+        left: 22px !important;
+        width: 20px !important;
+        height: 20px !important;
+        border-width: 3px !important;
+    }
+
+    html.novastore-native-app-root header > div:nth-child(2) form::after {
+        left: 40px !important;
+        width: 14px !important;
+        height: 3px !important;
+        margin-top: 18px !important;
+    }
+
+    html.novastore-native-app-root header form input {
+        font-size: 1rem !important;
+    }
+
+    html.novastore-native-app-root .container {
+        padding-right: 16px !important;
+        padding-left: 16px !important;
+    }
+
+    html.novastore-native-app-root .products-grid,
+    html.novastore-native-app-root .product-grid,
+    html.novastore-native-app-root body.native-page-index:not(.native-filtered-list) .products-grid {
+        gap: 14px 12px !important;
+    }
+
+    html.novastore-native-app-root body.native-page-index:not(.native-filtered-list) .product-card,
+    html.novastore-native-app-root .product-card {
+        min-height: 304px !important;
+        padding: 8px !important;
+        border-radius: 16px !important;
+    }
+
+    html.novastore-native-app-root .product-media-frame,
+    html.novastore-native-app-root .product-image,
+    html.novastore-native-app-root .product-img {
+        height: 136px !important;
+    }
+
+    html.novastore-native-app-root .product-title,
+    html.novastore-native-app-root .product-info h3 {
+        min-height: 46px !important;
+        margin: 12px 0 8px !important;
+        font-size: 0.98rem !important;
+    }
+
+    html.novastore-native-app-root .product-card > a + div,
+    html.novastore-native-app-root .product-card > div[style*="margin-bottom: 8px"] {
+        font-size: 0.84rem !important;
+    }
+
+    html.novastore-native-app-root .product-card > div[style*="justify-content: space-between"] {
+        grid-template-columns: minmax(0, 1fr) 50px !important;
+        gap: 8px !important;
+    }
+
+    html.novastore-native-app-root .product-card .native-price-box,
+    html.novastore-native-app-root .product-card .native-price-box-discount {
+        min-height: 50px !important;
+        padding: 5px 6px !important;
+    }
+
+    html.novastore-native-app-root .product-card .btn-add {
+        width: 50px !important;
+        min-width: 50px !important;
+        min-height: 50px !important;
+    }
+}
