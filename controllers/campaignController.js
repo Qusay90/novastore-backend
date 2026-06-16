@@ -26,6 +26,32 @@ const getCoupons = async (req, res) => {
     }
 };
 
+const getActiveCoupons = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT
+                id,
+                code,
+                discount_type,
+                discount_value,
+                min_order_amount,
+                max_discount_amount,
+                starts_at,
+                ends_at
+             FROM coupons
+             WHERE is_active = TRUE
+               AND (starts_at IS NULL OR starts_at <= NOW())
+               AND (ends_at IS NULL OR ends_at >= NOW())
+             ORDER BY ends_at ASC NULLS LAST, created_at DESC`
+        );
+
+        res.status(200).json(result.rows);
+    } catch (err) {
+        console.error('Aktif kuponlar getirilemedi:', err.message);
+        res.status(500).json({ error: 'Kuponlar getirilemedi.' });
+    }
+};
+
 const createCoupon = async (req, res) => {
     try {
         const {
@@ -64,14 +90,14 @@ const createCoupon = async (req, res) => {
     } catch (err) {
         if (err.code === '23505') return res.status(409).json({ error: 'Bu kupon kodu zaten mevcut.' });
         if (err.code === '23514') return res.status(400).json({ error: 'discount_type sadece PERCENT veya FIXED olabilir.' });
-        res.status(500).json({ error: err.message || 'Kupon olusturulamadi.' });
+        res.status(500).json({ error: err.message || 'Kupon oluşturulamadı.' });
     }
 };
 
 const updateCoupon = async (req, res) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id)) return res.status(400).json({ error: 'Gecersiz kupon kimligi.' });
+        if (!Number.isInteger(id)) return res.status(400).json({ error: 'Geçersiz kupon kimliği.' });
 
         const { discount_value, min_order_amount, max_discount_amount, usage_limit, starts_at, ends_at, is_active } = req.body;
 
@@ -90,7 +116,7 @@ const updateCoupon = async (req, res) => {
             [discount_value, min_order_amount, max_discount_amount, usage_limit, starts_at, ends_at, is_active, id]
         );
 
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Kupon bulunamadi.' });
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Kupon bulunamadı.' });
         res.status(200).json(result.rows[0]);
     } catch (err) {
         res.status(500).json({ error: err.message || 'Kupon guncellenemedi.' });
@@ -100,10 +126,10 @@ const updateCoupon = async (req, res) => {
 const deleteCoupon = async (req, res) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id)) return res.status(400).json({ error: 'Gecersiz kupon kimligi.' });
+        if (!Number.isInteger(id)) return res.status(400).json({ error: 'Geçersiz kupon kimliği.' });
 
         const result = await pool.query('DELETE FROM coupons WHERE id = $1 RETURNING id', [id]);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Kupon bulunamadi.' });
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Kupon bulunamadı.' });
         res.status(200).json({ mesaj: 'Kupon silindi.' });
     } catch (err) {
         res.status(500).json({ error: err.message || 'Kupon silinemedi.' });
@@ -117,7 +143,7 @@ const getCampaignConfig = async (req, res) => {
         result.rows.forEach((row) => { config[row.key] = row.value; });
         res.status(200).json(config);
     } catch (err) {
-        res.status(500).json({ error: 'Kampanya konfigurasyon alinamadi.' });
+        res.status(500).json({ error: 'Kampanya konfigürasyonu alınamadı.' });
     }
 };
 
@@ -145,6 +171,7 @@ const updateCampaignConfig = async (req, res) => {
 module.exports = {
     getQuote,
     getCoupons,
+    getActiveCoupons,
     createCoupon,
     updateCoupon,
     deleteCoupon,

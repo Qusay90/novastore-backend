@@ -9,6 +9,7 @@
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
+    <script src="mobile-bridge.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -128,14 +129,14 @@
             <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Kayıt Ol</button>
         </div>
 
-        <form id="login-form">
+        <form id="login-form" autocomplete="off">
             <div class="form-group">
                 <label>E-posta Adresiniz</label>
-                <input type="email" id="login-email" required placeholder="ornek@mail.com">
+                <input type="email" id="login-email" required placeholder="ornek@mail.com" autocomplete="username">
             </div>
             <div class="form-group">
                 <label>Şifreniz</label>
-                <input type="password" id="login-password" required placeholder="••••••••">
+                <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password">
                 <div style="text-align: right; margin-top: 15px; margin-bottom: 25px;">
                     <a href="forgot-password.html"
                         style="color: #F7941D; font-size: 0.85rem; text-decoration: none; font-weight: 600;">Şifremi
@@ -145,18 +146,18 @@
             <button type="submit" class="btn btn-primary auth-btn" id="login-btn">Giriş Yap</button>
         </form>
 
-        <form id="register-form">
+        <form id="register-form" autocomplete="off">
             <div class="form-group">
                 <label>Adınız Soyadınız</label>
-                <input type="text" id="reg-name" required placeholder="Ahmet Yılmaz">
+                <input type="text" id="reg-name" required placeholder="Ahmet Yılmaz" autocomplete="name">
             </div>
             <div class="form-group">
                 <label>E-posta Adresiniz</label>
-                <input type="email" id="reg-email" required placeholder="ornek@mail.com">
+                <input type="email" id="reg-email" required placeholder="ornek@mail.com" autocomplete="email">
             </div>
             <div class="form-group">
                 <label>Şifre Belirleyin</label>
-                <input type="password" id="reg-password" required placeholder="En az 6 karakter" minlength="6">
+                <input type="password" id="reg-password" required placeholder="En az 6 karakter" minlength="6" autocomplete="new-password">
             </div>
             <button type="submit" class="btn btn-secondary auth-btn" id="register-btn"
                 style="background-color: #0F2A43; color: white;">Hesap Oluştur</button>
@@ -164,6 +165,104 @@
     </div>
 
     <script>
+        function appUrl(rawUrl) {
+            if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
+            if (!window.NOVASTORE_USE_NATIVE_THEME || window.NOVASTORE_IS_NATIVE_APP) return rawUrl;
+            try {
+                const url = new URL(rawUrl, window.location.href);
+                if (url.origin !== window.location.origin) return rawUrl;
+                url.searchParams.set('nativeTheme', '1');
+                return url.pathname.replace(/^\//, '') + url.search + url.hash;
+            } catch (_) {
+                return rawUrl;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!window.NOVASTORE_USE_NATIVE_THEME) return;
+            if (localStorage.getItem('nova_user_token') && localStorage.getItem('nova_user_info')) {
+                window.location.replace(appUrl('profile.html'));
+                return;
+            }
+            document.querySelectorAll('a[href]').forEach((link) => {
+                const href = link.getAttribute('href');
+                const next = appUrl(href);
+                if (next !== href) link.setAttribute('href', next);
+            });
+        });
+
+        function showAuthMessage(message, type, options = {}) {
+            const isNativeTheme = window.NOVASTORE_USE_NATIVE_THEME || document.documentElement.classList.contains('novastore-native-app-root');
+
+            if (isNativeTheme && typeof window.NovaNativeAlert === 'function') {
+                return window.NovaNativeAlert(message, {
+                    type,
+                    title: options.title || (type === 'error' ? 'Giriş yapılamadı' : 'İşlem başarılı'),
+                    duration: options.duration
+                });
+            }
+
+            if (isNativeTheme) {
+                return new Promise((resolve) => {
+                    const previous = document.querySelector('.native-alert-overlay');
+                    if (previous) previous.remove();
+
+                    const overlay = document.createElement('div');
+                    overlay.className = `native-alert-overlay native-alert-${type || 'success'}`;
+
+                    const card = document.createElement('div');
+                    card.className = 'native-alert-card';
+                    card.setAttribute('role', 'dialog');
+                    card.setAttribute('aria-live', 'polite');
+
+                    const icon = document.createElement('div');
+                    icon.className = 'native-alert-icon';
+                    icon.textContent = type === 'error' ? '!' : '✓';
+
+                    const copy = document.createElement('div');
+                    copy.className = 'native-alert-copy';
+
+                    const title = document.createElement('strong');
+                    title.textContent = options.title || (type === 'error' ? 'Giriş yapılamadı' : 'İşlem başarılı');
+
+                    const text = document.createElement('p');
+                    text.textContent = String(message || '').replace(/^[✅❌🎉]\s*/u, '').replace(/^Hata:\s*/i, '').trim();
+
+                    const ok = document.createElement('button');
+                    ok.type = 'button';
+                    ok.className = 'native-alert-ok';
+                    ok.textContent = 'Tamam';
+
+                    copy.append(title, text);
+                    card.append(icon, copy, ok);
+                    overlay.appendChild(card);
+
+                    const close = () => {
+                        overlay.classList.remove('is-visible');
+                        window.setTimeout(() => {
+                            overlay.remove();
+                            resolve();
+                        }, 180);
+                    };
+
+                    ok.addEventListener('click', close);
+                    overlay.addEventListener('click', (event) => {
+                        if (event.target === overlay) close();
+                    });
+
+                    document.body.appendChild(overlay);
+                    window.setTimeout(() => overlay.classList.add('is-visible'), 20);
+
+                    if (options.duration) {
+                        window.setTimeout(close, options.duration);
+                    }
+                });
+            }
+
+            alert(message);
+            return Promise.resolve();
+        }
+
         // Sekmeler Arası Geçiş Animasyonu
         function switchTab(tab) {
             const loginForm = document.getElementById('login-form');
@@ -206,14 +305,17 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    alert("🎉 " + result.mesaj + "\nLütfen şimdi giriş yapın.");
+                    await showAuthMessage((result.mesaj || 'Hesabınız oluşturuldu.') + "\nLütfen şimdi giriş yapın.", 'success', {
+                        title: 'Kayıt tamamlandı',
+                        duration: window.NOVASTORE_USE_NATIVE_THEME ? 1400 : undefined
+                    });
                     document.getElementById('register-form').reset();
                     switchTab('login'); // Başarılı kayıttan sonra otomatik giriş sekmesine at
                 } else {
-                    alert("❌ Hata: " + result.error);
+                    await showAuthMessage(result.error || 'Kayıt tamamlanamadı.', 'error');
                 }
             } catch (error) {
-                alert("Sunucuya bağlanılamadı.");
+                await showAuthMessage("Sunucuya bağlanılamadı.", 'error');
             } finally {
                 btn.innerText = "Hesap Oluştur"; btn.disabled = false;
             }
@@ -244,13 +346,16 @@
                     localStorage.setItem('nova_user_token', result.token);
                     localStorage.setItem('nova_user_info', JSON.stringify(result.user));
 
-                    alert("✅ " + result.mesaj);
-                    window.location.href = "index.html"; // Ana sayfaya yönlendir
+                    await showAuthMessage((result.mesaj || 'Giriş başarılı!') + " Yönlendiriliyorsunuz...", 'success', {
+                        title: 'Hoş geldiniz',
+                        duration: window.NOVASTORE_USE_NATIVE_THEME ? 900 : undefined
+                    });
+                    window.location.href = appUrl("profile.html"); // Uygulama içindeki hesap ekranına yönlendir
                 } else {
-                    alert("❌ Hata: " + result.error);
+                    await showAuthMessage(result.error || 'E-posta veya şifre hatalı.', 'error');
                 }
             } catch (error) {
-                alert("Sunucuya bağlanılamadı.");
+                await showAuthMessage("Sunucuya bağlanılamadı.", 'error');
             } finally {
                 btn.innerText = "Giriş Yap"; btn.disabled = false;
             }
