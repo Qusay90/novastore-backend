@@ -63,7 +63,7 @@ const createReturnRequest = async (req, res) => {
         const orderResult = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
         if (orderResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Siparis bulunamadi.' });
+            return res.status(404).json({ error: 'Sipariş bulunamadı.' });
         }
 
         const order = orderResult.rows[0];
@@ -72,14 +72,14 @@ const createReturnRequest = async (req, res) => {
         const isOwner = Number(order.user_id) === req.user.id;
         if (!isAdmin && !isOwner) {
             await client.query('ROLLBACK');
-            return res.status(403).json({ error: 'Bu siparis icin iade talebi olusturamazsiniz.' });
+            return res.status(403).json({ error: 'Bu sipariş için iade talebi oluşturamazsınız.' });
         }
 
         const status = String(order.status || '').trim();
         const isDeliverableForReturn = status === ORDER_STATUS.TESLIM_EDILDI || status === ORDER_STATUS.IPTAL_EDILDI;
         if (!isDeliverableForReturn) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Iade talebi sadece teslim edilen veya iptal edilen siparislerde acilabilir.' });
+            return res.status(400).json({ error: 'İade talebi sadece teslim edilen veya iptal edilen siparişlerde açılabilir.' });
         }
 
         const existingReturn = await client.query(
@@ -92,7 +92,7 @@ const createReturnRequest = async (req, res) => {
 
         if (existingReturn.rows.length > 0) {
             await client.query('ROLLBACK');
-            return res.status(409).json({ error: 'Bu siparis icin acik bir iade talebi zaten var.' });
+            return res.status(409).json({ error: 'Bu sipariş için açık bir iade talebi zaten var.' });
         }
 
         const refundAmount = Number(order.total_amount || 0);
@@ -112,7 +112,7 @@ const createReturnRequest = async (req, res) => {
             [REFUND_STATUS.REQUESTED, orderId]
         );
 
-        await appendOrderEvent(client, orderId, 'RETURN_REQUESTED', 'Iade talebi olusturuldu.', {
+        await appendOrderEvent(client, orderId, 'RETURN_REQUESTED', 'İade talebi oluşturuldu.', {
             reasonCode,
             note,
             refundAmount
@@ -121,7 +121,7 @@ const createReturnRequest = async (req, res) => {
         try {
             await createInvoice({ client, orderId, type: 'RETURN', amount: refundAmount });
         } catch (invoiceErr) {
-            console.error('Iade fatura hatasi:', invoiceErr.message);
+            console.error('İade fatura hatası:', invoiceErr.message);
         }
 
         await client.query('COMMIT');
@@ -131,7 +131,7 @@ const createReturnRequest = async (req, res) => {
             await createNotification(
                 order.user_id,
                 'order_update',
-                `Siparis #${orderId} icin iade talebiniz alindi.`,
+                `Sipariş #${orderId} için iade talebiniz alındı.`,
                 io
             );
         }
@@ -139,18 +139,18 @@ const createReturnRequest = async (req, res) => {
         await createNotification(
             null,
             'new_order',
-            `Iade talebi olustu. Siparis #${orderId}, neden: ${reasonCode}.`,
+            `İade talebi oluştu. Sipariş #${orderId}, neden: ${reasonCode}.`,
             io
         );
 
         res.status(201).json({
-            message: 'Iade talebiniz alindi.',
+            message: 'İade talebiniz alındı.',
             returnRequest: insertResult.rows[0]
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Iade talebi hatasi:', err.message);
-        res.status(500).json({ error: err.message || 'Iade talebi olusturulamadi.' });
+        console.error('İade talebi hatası:', err.message);
+        res.status(500).json({ error: err.message || 'İade talebi oluşturulamadı.' });
     } finally {
         client.release();
     }
@@ -160,7 +160,7 @@ const getReturnById = async (req, res) => {
     try {
         const returnId = Number(req.params.id);
         if (!Number.isInteger(returnId)) {
-            return res.status(400).json({ error: 'Gecersiz iade kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz iade kimliği.' });
         }
 
         const result = await pool.query(
@@ -172,7 +172,7 @@ const getReturnById = async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Iade talebi bulunamadi.' });
+            return res.status(404).json({ error: 'İade talebi bulunamadı.' });
         }
 
         const row = result.rows[0];
@@ -180,13 +180,13 @@ const getReturnById = async (req, res) => {
         const isOwner = Number(row.user_id) === req.user.id;
 
         if (!isAdmin && !isOwner) {
-            return res.status(403).json({ error: 'Bu iade talebine erisim yetkiniz yok.' });
+            return res.status(403).json({ error: 'Bu iade talebine erişim yetkiniz yok.' });
         }
 
         res.status(200).json(row);
     } catch (err) {
-        console.error('Iade detayi hatasi:', err.message);
-        res.status(500).json({ error: 'Iade talebi bilgisi alinamadi.' });
+        console.error('İade detayı hatası:', err.message);
+        res.status(500).json({ error: 'İade talebi bilgisi alınamadı.' });
     }
 };
 
@@ -216,8 +216,8 @@ const getAllReturnRequests = async (_req, res) => {
 
         res.status(200).json(result.rows);
     } catch (err) {
-        console.error('Iade taleplerini listeleme hatasi:', err.message);
-        res.status(500).json({ error: 'Iade talepleri getirilemedi.' });
+        console.error('İade taleplerini listeleme hatası:', err.message);
+        res.status(500).json({ error: 'İade talepleri getirilemedi.' });
     }
 };
 

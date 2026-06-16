@@ -29,10 +29,10 @@ const parseOrderIdFromMessage = (message) => {
 };
 
 const buildOrderSupportAnswer = (order) => {
-    const pieces = [`Siparis #${order.id} durumu: ${order.status || 'bilinmiyor'}.`];
+    const pieces = [`Sipariş #${order.id} durumu: ${order.status || 'bilinmiyor'}.`];
 
     if (order.payment_status) {
-        pieces.push(`Odeme durumu: ${order.payment_status}.`);
+        pieces.push(`Ödeme durumu: ${order.payment_status}.`);
     }
     if (order.shipment_status || order.shipment_record_status) {
         pieces.push(`Kargo durumu: ${order.shipment_status || order.shipment_record_status}.`);
@@ -44,13 +44,13 @@ const buildOrderSupportAnswer = (order) => {
         pieces.push(`Tahmini teslim: ${(order.eta_date || order.estimated_delivery_date).toString().slice(0, 10)}.`);
     }
     if (order.cancel_reason) {
-        pieces.push(`Iptal nedeni kaydi: ${order.cancel_reason}.`);
+        pieces.push(`İptal nedeni kaydı: ${order.cancel_reason}.`);
     }
     if (order.refund_status && order.refund_status !== 'NONE') {
-        pieces.push(`Iade veya geri odeme durumu: ${order.refund_status}.`);
+        pieces.push(`İade veya geri ödeme durumu: ${order.refund_status}.`);
     }
     if (order.tracking_url) {
-        pieces.push('Takip linki sistemde hazir.');
+        pieces.push('Takip linki sistemde hazır.');
     }
 
     return pieces.join(' ');
@@ -60,7 +60,7 @@ const getOrderSupportContext = async ({ user, message }) => {
     if (!user || !Number.isInteger(Number(user.id))) {
         return {
             requiresAuth: true,
-            answer: 'Siparis bilgisi paylasabilmem icin hesabiniza giris yapmis olmaniz gerekiyor.'
+            answer: 'Sipariş bilgisi paylaşabilmem için hesabınıza giriş yapmış olmanız gerekiyor.'
         };
     }
 
@@ -77,8 +77,8 @@ const getOrderSupportContext = async ({ user, message }) => {
         return {
             requiresAuth: false,
             answer: requestedOrderId
-                ? `Hesabinizda #${requestedOrderId} numarali bir siparis bulamadim.`
-                : 'Hesabiniza bagli bir siparis kaydi goremiyorum.'
+                ? `Hesabınızda #${requestedOrderId} numaralı bir sipariş bulamadım.`
+                : 'Hesabınıza bağlı bir sipariş kaydı göremiyorum.'
         };
     }
 

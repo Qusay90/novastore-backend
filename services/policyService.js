@@ -2,33 +2,33 @@
 
 const POLICY_COPY = {
     returns: {
-        title: 'Iade politikasi',
+        title: 'İade politikası',
         body: [
-            'Teslim tarihinden itibaren 14 gun icinde iade talebi olusturulabilir.',
-            'Urunun kullanilmamis, tekrar satilabilir durumda ve orijinal ambalajinda olmasi gerekir.',
-            'Onaylanan iade odemeleri banka surecine gore genelde 1-3 is gunu icinde tamamlanir.'
+            'Teslim tarihinden itibaren 14 gün içinde iade talebi oluşturulabilir.',
+            'Ürünün kullanılmamış, tekrar satılabilir durumda ve orijinal ambalajında olması gerekir.',
+            'Onaylanan iade ödemeleri banka sürecine göre genelde 1-3 iş günü içinde tamamlanır.'
         ]
     },
     privacy: {
-        title: 'Gizlilik sozlesmesi',
+        title: 'Gizlilik sözleşmesi',
         body: [
-            'Uyelik ve siparis surecinde paylasilan veriler hizmet sunmak, teslimat ve destek surecini yonetmek icin kullanilir.',
-            'Veriler operasyon ve yasal yukumlulukler disinda paylasilmaz.'
+            'Üyelik ve sipariş sürecinde paylaşılan veriler hizmet sunmak, teslimat ve destek sürecini yönetmek için kullanılır.',
+            'Veriler operasyon ve yasal yükümlülükler dışında paylaşılmaz.'
         ]
     },
     kvkk: {
-        title: 'KVKK aydinlatma',
+        title: 'KVKK aydınlatma',
         body: [
-            'Kisisel veriler siparis yonetimi, faturalama, teslimat ve musteri destegi amaclariyla islenir.',
-            'Yasal saklama sureleri sonunda veriler guvenli sekilde silinir, yok edilir veya anonim hale getirilir.'
+            'Kişisel veriler sipariş yönetimi, faturalama, teslimat ve müşteri desteği amaçlarıyla işlenir.',
+            'Yasal saklama süreleri sonunda veriler güvenli şekilde silinir, yok edilir veya anonim hale getirilir.'
         ]
     },
     payment: {
-        title: 'Odeme',
+        title: 'Ödeme',
         body: [
-            'Sitede kart odemesi ve havale/EFT secenegi bulunur.',
-            'Kart odemeleri 3D dogrulama adimina yonlendirilir.',
-            'Havale secilirse siparis numarasini aciklama alanina eklemek gerekir ve odeme 24 saat icinde onaylanmazsa siparis iptal edilebilir.'
+            'Sitede kart ödemesi ve havale/EFT seçeneği bulunur.',
+            'Kart ödemeleri 3D doğrulama adımına yönlendirilir.',
+            'Havale seçilirse sipariş numarasını açıklama alanına eklemek gerekir ve ödeme 24 saat içinde onaylanmazsa sipariş iptal edilebilir.'
         ]
     }
 };
@@ -84,7 +84,7 @@ const getPolicyAnswer = async (message) => {
         return {
             topic,
             title: 'Kargo ve teslimat',
-            answer: `Varsayilan kargo partneri ${defaultProvider}. ${freeShippingThreshold.toFixed(0)} TL ve uzeri siparislerde kargo ucretsiz, bunun altinda varsayilan kargo ucreti ${defaultShippingFee.toFixed(2)} TL. Sistem tarafinda tahmini teslimat 2-3 is gunu olarak yonetiliyor.`
+            answer: `Varsayılan kargo partneri ${defaultProvider}. ${freeShippingThreshold.toFixed(0)} TL ve üzeri siparişlerde kargo ücretsiz, bunun altında varsayılan kargo ücreti ${defaultShippingFee.toFixed(2)} TL. Sistem tarafında tahmini teslimat 2-3 iş günü olarak yönetiliyor.`
         };
     }
 
@@ -94,7 +94,7 @@ const getPolicyAnswer = async (message) => {
             return {
                 topic,
                 title: 'Kampanyalar',
-                answer: 'Su anda dogrulanmis aktif kupon bilgisi goremiyorum. Sepette kupon kodu alanina kod girerek kontrol etmek en guvenli yontem olur.'
+                answer: 'Şu anda doğrulanmış aktif kupon bilgisi göremiyorum. Sepette kupon kodu alanına kod girerek kontrol etmek en güvenli yöntem olur.'
             };
         }
 
@@ -109,7 +109,7 @@ const getPolicyAnswer = async (message) => {
         return {
             topic,
             title: 'Kampanyalar',
-            answer: `Dogrulanmis aktif kuponlar: ${couponText}. Sepette uygulayip net toplam etkisini gorebilirsiniz.`
+            answer: `Doğrulanmış aktif kuponlar: ${couponText}. Sepette uygulayıp net toplam etkisini görebilirsiniz.`
         };
     }
 
@@ -124,7 +124,7 @@ const getPolicyAnswer = async (message) => {
     return {
         topic: null,
         title: 'Genel bilgi',
-        answer: 'Urun, kargo, iade, odeme, kampanya veya KVKK konularindan birini yazarsaniz dogrudan net bilgi verebilirim.'
+        answer: 'Ürün, kargo, iade, ödeme, kampanya veya KVKK konularından birini yazarsanız doğrudan net bilgi verebilirim.'
     };
 };
 

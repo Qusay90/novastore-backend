@@ -30,7 +30,7 @@ const createShipment = async (req, res) => {
     try {
         const orderId = Number(req.params.orderId);
         if (!Number.isInteger(orderId)) {
-            return res.status(400).json({ error: 'Gecersiz siparis kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz sipariş kimliği.' });
         }
 
         const {
@@ -46,14 +46,14 @@ const createShipment = async (req, res) => {
         const orderResult = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
         if (orderResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Siparis bulunamadi.' });
+            return res.status(404).json({ error: 'Sipariş bulunamadı.' });
         }
 
         const order = orderResult.rows[0];
 
         if (order.status === ORDER_STATUS.IPTAL_EDILDI) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Iptal edilen siparis icin gonderi olusturulamaz.' });
+            return res.status(400).json({ error: 'İptal edilen sipariş için gönderi oluşturulamaz.' });
         }
 
         const finalTrackingNo = trackingNo || buildTrackingNo(orderId);
@@ -100,7 +100,7 @@ const createShipment = async (req, res) => {
             [provider, finalTrackingNo, shipmentStatus, finalEta, ORDER_STATUS.KARGOYA_VERILDI, orderId]
         );
 
-        await appendOrderEvent(client, orderId, 'SHIPMENT_CREATED', 'Gonderi kaydi olusturuldu.', {
+        await appendOrderEvent(client, orderId, 'SHIPMENT_CREATED', 'Gönderi kaydı oluşturuldu.', {
             provider,
             trackingNo: finalTrackingNo,
             trackingUrl,
@@ -110,7 +110,7 @@ const createShipment = async (req, res) => {
         try {
             await createInvoice({ client, orderId, type: 'INVOICE', amount: Number(order.total_amount || 0) });
         } catch (invoiceErr) {
-            console.error('Fatura olusturma hatasi (kargo):', invoiceErr.message);
+            console.error('Fatura oluşturma hatası (kargo):', invoiceErr.message);
         }
 
         await client.query('COMMIT');
@@ -120,19 +120,19 @@ const createShipment = async (req, res) => {
             await createNotification(
                 order.user_id,
                 'order_update',
-                `Siparis #${orderId} kargoya verildi. Takip No: ${finalTrackingNo}`,
+                `Sipariş #${orderId} kargoya verildi. Takip No: ${finalTrackingNo}`,
                 io
             );
         }
 
         res.status(201).json({
-            message: 'Gonderi kaydi olusturuldu.',
+            message: 'Gönderi kaydı oluşturuldu.',
             shipment: shipmentResult.rows[0]
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Gonderi olusturma hatasi:', err.message);
-        res.status(500).json({ error: err.message || 'Gonderi olusturulamadi.' });
+        console.error('Gönderi oluşturma hatası:', err.message);
+        res.status(500).json({ error: err.message || 'Gönderi oluşturulamadı.' });
     } finally {
         client.release();
     }
@@ -142,7 +142,7 @@ const getShipment = async (req, res) => {
     try {
         const orderId = Number(req.params.orderId);
         if (!Number.isInteger(orderId)) {
-            return res.status(400).json({ error: 'Gecersiz siparis kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz sipariş kimliği.' });
         }
 
         const shipmentResult = await pool.query(
@@ -154,7 +154,7 @@ const getShipment = async (req, res) => {
         );
 
         if (shipmentResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Siparis bulunamadi.' });
+            return res.status(404).json({ error: 'Sipariş bulunamadı.' });
         }
 
         const row = shipmentResult.rows[0];
@@ -162,7 +162,7 @@ const getShipment = async (req, res) => {
         const isAdmin = req.user.role === 'admin';
         const isOwner = Number(row.user_id) === req.user.id;
         if (!isAdmin && !isOwner) {
-            return res.status(403).json({ error: 'Bu gonderi kaydina erisim yetkiniz yok.' });
+            return res.status(403).json({ error: 'Bu gönderi kaydına erişim yetkiniz yok.' });
         }
 
         res.status(200).json({
@@ -175,8 +175,8 @@ const getShipment = async (req, res) => {
             orderStatus: row.order_status
         });
     } catch (err) {
-        console.error('Gonderi sorgulama hatasi:', err.message);
-        res.status(500).json({ error: 'Gonderi bilgisi alinamadi.' });
+        console.error('Gönderi sorgulama hatası:', err.message);
+        res.status(500).json({ error: 'Gönderi bilgisi alınamadı.' });
     }
 };
 
