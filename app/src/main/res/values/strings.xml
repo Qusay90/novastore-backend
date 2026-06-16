@@ -1,0 +1,59 @@
+<resources>
+    <string name="app_name">NovaStore</string>
+    <string name="tab_home">Ana Sayfa</string>
+    <string name="tab_deals">Fırsatlar</string>
+    <string name="tab_favorites">Favorilerim</string>
+    <string name="tab_support">Destek</string>
+    <string name="tab_cart">Sepet</string>
+    <string name="tab_account">Hesap</string>
+    <string name="tab_account_full">Hesabım</string>
+
+    <string name="home_product_image_content_description">%1$s görseli %2$d</string>
+
+    <string name="support_title">NovaStore AI Asistan</string>
+    <string name="support_status_escalated">Talebiniz canlı destek ekibinde</string>
+    <string name="support_status_ready">Ürün, sipariş ve destek yardımı</string>
+    <string name="support_escalating">Canlı destek talebi oluşturuluyor...</string>
+    <string name="support_typing">NovaBot yazıyor...</string>
+    <string name="support_transfer_info">Aktarım bilgisi</string>
+    <string name="support_connect_live">Canlı desteğe bağlan</string>
+    <string name="support_default_product_name">NovaStore ürünü</string>
+    <string name="support_default_product_category">Ürün</string>
+    <string name="support_message_placeholder">Mesajınızı yazın...</string>
+    <string name="support_send">Gönder</string>
+
+    <string name="account_center">Hesabım</string>
+    <string name="account_orders">Siparişlerim</string>
+    <string name="account_order_detail">Sipariş Detayı</string>
+    <string name="account_addresses">Adreslerim</string>
+    <string name="account_payments">Ödeme Yöntemlerim</string>
+    <string name="account_coupons">Kuponlarım</string>
+    <string name="account_security">Şifre ve Güvenlik</string>
+    <string name="account_profile">Profil Bilgilerim</string>
+    <string name="account_tickets">Destek Taleplerim</string>
+    <string name="account_questions">Sorularım</string>
+    <string name="account_ticket_detail">Talep Detayı</string>
+    <string name="account_live_support">Canlı Destek</string>
+    <string name="account_help_center">Yardım Merkezi</string>
+    <string name="account_help_detail">Yardım Detayı</string>
+    <string name="account_notifications">Bildirimler</string>
+    <string name="account_returns">İadelerim</string>
+    <string name="account_reviews">Ürün Değerlendirmelerim</string>
+    <string name="account_invoices">Faturalarım</string>
+    <string name="account_notification_settings">Bildirim Ayarları</string>
+    <string name="account_language_region">Dil ve Bölge</string>
+    <string name="account_privacy">Gizlilik Politikası</string>
+    <string name="account_terms">Kullanım Şartları</string>
+    <string name="account_menu_shopping">Alışveriş İşlemleri</string>
+    <string name="account_menu_info">Hesap Bilgileri</string>
+    <string name="account_menu_support">Destek</string>
+    <string name="account_menu_settings">Ayarlar</string>
+    <string name="account_customer_service">Müşteri Hizmetleri</string>
+    <string name="account_faq">Sık Sorulan Sorular</string>
+    <string name="account_logout">Çıkış Yap</string>
+    <string name="account_edit_profile">Profili Düzenle</string>
+    <string name="account_need_help">Yardıma mı ihtiyacın var?</string>
+    <string name="account_help_shortcut_text">Sipariş, iade, ödeme ve ürünlerle ilgili destek alabilirsin.</string>
+    <string name="account_quick_order_status">Hızlı Sipariş Durumu</string>
+    <string name="account_view_orders">Siparişlerimi Gör</string>
+</resources>
