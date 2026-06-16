@@ -121,6 +121,16 @@ const createCommerceSchema = async () => {
             ON customer_addresses(user_id)
             WHERE is_default = TRUE;
 
+        CREATE TABLE IF NOT EXISTS favorites (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT favorites_user_product_unique UNIQUE (user_id, product_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
+        CREATE INDEX IF NOT EXISTS idx_favorites_product_id ON favorites(product_id);
+
         CREATE TABLE IF NOT EXISTS notification_audit_logs (
             id SERIAL PRIMARY KEY,
             notification_id INTEGER REFERENCES notifications(id) ON DELETE SET NULL,
