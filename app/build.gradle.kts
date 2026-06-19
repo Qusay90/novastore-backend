@@ -1,9 +1,54 @@
+import org.gradle.api.GradleException
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+}
+
+val releaseKeystoreProperties = Properties()
+val releaseKeystorePropertiesFile = rootProject.file("keystore.properties")
+if (releaseKeystorePropertiesFile.exists()) {
+    releaseKeystorePropertiesFile.inputStream().use(releaseKeystoreProperties::load)
+}
+
+fun releaseSigningValue(envName: String, propertyName: String): String? =
+    providers.environmentVariable(envName).orNull?.trim()?.takeIf { it.isNotEmpty() }
+        ?: releaseKeystoreProperties.getProperty(propertyName)?.trim()?.takeIf { it.isNotEmpty() }
+
+val releaseStoreFilePath = releaseSigningValue("NOVASTORE_RELEASE_STORE_FILE", "storeFile")
+val releaseStorePassword = releaseSigningValue("NOVASTORE_RELEASE_STORE_PASSWORD", "storePassword")
+val releaseKeyAlias = releaseSigningValue("NOVASTORE_RELEASE_KEY_ALIAS", "keyAlias")
+val releaseKeyPassword = releaseSigningValue("NOVASTORE_RELEASE_KEY_PASSWORD", "keyPassword")
+
+val missingReleaseSigningKeys = listOfNotNull(
+    "NOVASTORE_RELEASE_STORE_FILE or keystore.properties storeFile".takeIf { releaseStoreFilePath == null },
+    "NOVASTORE_RELEASE_STORE_PASSWORD or keystore.properties storePassword".takeIf { releaseStorePassword == null },
+    "NOVASTORE_RELEASE_KEY_ALIAS or keystore.properties keyAlias".takeIf { releaseKeyAlias == null },
+    "NOVASTORE_RELEASE_KEY_PASSWORD or keystore.properties keyPassword".takeIf { releaseKeyPassword == null },
+)
+
+gradle.taskGraph.whenReady {
+    val releaseSigningRequired = allTasks.any { task ->
+        task.path in setOf(":app:assembleRelease", ":app:bundleRelease", ":app:packageRelease")
+    }
+    if (releaseSigningRequired && missingReleaseSigningKeys.isNotEmpty()) {
+        throw GradleException(
+            "Release signing is not configured. Provide NOVASTORE_RELEASE_STORE_FILE, " +
+                "NOVASTORE_RELEASE_STORE_PASSWORD, NOVASTORE_RELEASE_KEY_ALIAS, " +
+                "NOVASTORE_RELEASE_KEY_PASSWORD or ignored keystore.properties. Missing: " +
+                missingReleaseSigningKeys.joinToString(", ")
+        )
+    }
+    if (releaseSigningRequired && releaseStoreFilePath != null && !rootProject.file(releaseStoreFilePath).exists()) {
+        throw GradleException(
+            "Release signing store file was configured but does not exist. Check " +
+                "NOVASTORE_RELEASE_STORE_FILE or keystore.properties storeFile."
+        )
+    }
 }
 
 android {
@@ -19,9 +64,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (missingReleaseSigningKeys.isEmpty()) {
+                storeFile = rootProject.file(releaseStoreFilePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

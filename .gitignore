@@ -21,6 +21,7 @@ artifacts/
 .env.*
 !.env.example
 local.properties
+keystore.properties
 
 # IDE files
 .vscode/
