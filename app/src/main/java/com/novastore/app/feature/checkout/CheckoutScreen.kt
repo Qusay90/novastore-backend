@@ -50,6 +50,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -129,7 +130,7 @@ fun CheckoutScreen(
     var email by remember { mutableStateOf(viewModel.currentUserEmail) }
     var phone by remember { mutableStateOf(viewModel.currentUserPhone) }
     var address by remember { mutableStateOf("") }
-    val paymentMethod = "card"
+    var paymentMethod by remember { mutableStateOf(PaymentMethod.Card) }
     var isCardSectionExpanded by remember { mutableStateOf(false) }
     var cardHolder by remember { mutableStateOf("") }
     var cardNumber by remember { mutableStateOf("") }
@@ -146,7 +147,17 @@ fun CheckoutScreen(
     val cardType by remember { derivedStateOf { detectCardType(cardNumber.digitsOnly()) } }
     val cvcMaxLength = if (cardType == CardType.AMEX) 4 else 3
     val cardValidation by remember { derivedStateOf { validateCardForm(cardHolder, cardNumber, expiry.text, cvc, cardType) } }
-    val canPressSubmit = !uiState.isLoading
+    val checkoutValidation = validateCheckout(
+        fullName = fullName,
+        email = email,
+        phone = phone,
+        address = address,
+        checkoutItems = checkoutItems,
+        checkoutTotal = checkoutTotal,
+        paymentMethod = paymentMethod,
+        cardErrors = cardValidation
+    )
+    val canPressSubmit = !uiState.isLoading && checkoutValidation == null
 
     val expiryFocusRequester = remember { FocusRequester() }
     val cvcFocusRequester = remember { FocusRequester() }
@@ -170,7 +181,7 @@ fun CheckoutScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (buyNowItem == null) "Ödeme" else "Hemen Al",
+                        if (buyNowItem == null) "\u00D6deme" else "Hemen Al",
                         fontWeight = FontWeight.Bold,
                         color = NavyDark
                     )
@@ -197,6 +208,10 @@ fun CheckoutScreen(
                 }
                 uiState.successResponse != null -> SuccessState(
                     response = uiState.successResponse!!,
+                    isCheckingStatus = uiState.isCheckingPaymentStatus,
+                    statusMessage = uiState.paymentStatusMessage,
+                    paymentFinalized = uiState.paymentFinalized,
+                    onRefreshStatus = viewModel::refreshPaymentStatus,
                     onNavigateToHome = onNavigateToHome
                 )
                 else -> Column(
@@ -206,7 +221,7 @@ fun CheckoutScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    CheckoutSection(title = "Teslimat ve İletişim") {
+                    CheckoutSection(title = "Teslimat ve \u0130leti\u015Fim") {
                         if (addresses.isNotEmpty()) {
                             AddressSelector(
                                 addresses = addresses,
@@ -235,53 +250,65 @@ fun CheckoutScreen(
                         NovaTextField(value = address, onValueChange = { address = it }, label = "Teslimat Adresi", minLines = 2)
                     }
 
-                    CheckoutSection(title = "Ödeme Yöntemi") {
-                        CardPaymentPanel(
-                            expanded = isCardSectionExpanded,
-                            cardHolder = cardHolder,
-                            cardNumber = cardNumber,
-                            expiry = expiry,
-                            cvc = cvc,
-                            cardType = cardType,
-                            cvcMaxLength = cvcMaxLength,
-                            isCardBackVisible = isCardBackVisible,
-                            errors = cardValidation,
-                            showErrors = attemptedSubmit,
-                            expiryFocusRequester = expiryFocusRequester,
-                            cvcFocusRequester = cvcFocusRequester,
-                            onExpand = { isCardSectionExpanded = true },
-                            onCardHolderChange = { cardHolder = it.take(40) },
-                            onCardNumberChange = {
-                                val digits = it.digitsOnly()
-                                val detectedType = detectCardType(digits)
-                                val sanitized = digits.take(expectedCardLength(detectedType))
-                                cardNumber = sanitized
-                                if (sanitized.length == expectedCardLength(detectedType)) {
-                                    expiryFocusRequester.requestFocus()
-                                }
-                            },
-                            onExpiryChange = {
-                                val formatted = formatExpiry(it.text)
-                                expiry = TextFieldValue(
-                                    text = formatted,
-                                    selection = TextRange(formatted.length)
-                                )
-                                if (formatted.length == 5) cvcFocusRequester.requestFocus()
-                            },
-                            onCvcChange = { cvc = it.filter(Char::isDigit).take(cvcMaxLength) },
-                            onSensitiveFocus = { isCardBackVisible = false },
-                            onCvcFocus = { focused -> if (focused) isCardBackVisible = true }
+                    CheckoutSection(title = "\u00D6deme Y\u00F6ntemi") {
+                        PaymentMethodSelector(
+                            selected = paymentMethod,
+                            onSelect = {
+                                paymentMethod = it
+                                if (it == PaymentMethod.Card) isCardSectionExpanded = true
+                            }
                         )
+
+                        if (paymentMethod == PaymentMethod.Card) {
+                            CardPaymentPanel(
+                                expanded = isCardSectionExpanded,
+                                cardHolder = cardHolder,
+                                cardNumber = cardNumber,
+                                expiry = expiry,
+                                cvc = cvc,
+                                cardType = cardType,
+                                cvcMaxLength = cvcMaxLength,
+                                isCardBackVisible = isCardBackVisible,
+                                errors = cardValidation,
+                                showErrors = attemptedSubmit,
+                                expiryFocusRequester = expiryFocusRequester,
+                                cvcFocusRequester = cvcFocusRequester,
+                                onExpand = { isCardSectionExpanded = true },
+                                onCardHolderChange = { cardHolder = it.take(40) },
+                                onCardNumberChange = {
+                                    val digits = it.digitsOnly()
+                                    val detectedType = detectCardType(digits)
+                                    val sanitized = digits.take(expectedCardLength(detectedType))
+                                    cardNumber = sanitized
+                                    if (sanitized.length == expectedCardLength(detectedType)) {
+                                        expiryFocusRequester.requestFocus()
+                                    }
+                                },
+                                onExpiryChange = {
+                                    val formatted = formatExpiry(it.text)
+                                    expiry = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(formatted.length)
+                                    )
+                                    if (formatted.length == 5) cvcFocusRequester.requestFocus()
+                                },
+                                onCvcChange = { cvc = it.filter(Char::isDigit).take(cvcMaxLength) },
+                                onSensitiveFocus = { isCardBackVisible = false },
+                                onCvcFocus = { focused -> if (focused) isCardBackVisible = true }
+                            )
+                        } else {
+                            BankTransferInfo()
+                        }
                     }
 
-                    CheckoutSection(title = "Sipariş Özeti") {
+                    CheckoutSection(title = "Sipari\u015F \u00D6zeti") {
                         buyNowItem?.let {
-                            SummaryRow("Ürün", "${it.quantity} adet")
+                            SummaryRow("\u00DCr\u00FCn", "${it.quantity} adet")
                         }
-                        SummaryRow("Ürün toplamı", formatMoney(checkoutTotal))
-                        SummaryRow("Kargo", "Ücretsiz")
+                        SummaryRow("\u00DCr\u00FCn toplam\u0131", formatMoney(checkoutTotal))
+                        SummaryRow("Kargo", "\u00DCcretsiz")
                         HorizontalDivider(color = BorderLight)
-                        SummaryRow("Ödenecek Tutar", formatMoney(checkoutTotal), highlighted = true)
+                        SummaryRow("\u00D6denecek Tutar", formatMoney(checkoutTotal), highlighted = true)
                     }
 
                     val errorText = localError ?: uiState.error
@@ -292,24 +319,16 @@ fun CheckoutScreen(
                     Button(
                         onClick = {
                             attemptedSubmit = true
-                            localError = validateCheckout(
-                                fullName = fullName,
-                                email = email,
-                                phone = phone,
-                                address = address,
-                                checkoutItems = checkoutItems,
-                                checkoutTotal = checkoutTotal,
-                                cardErrors = cardValidation
-                            )
+                            localError = checkoutValidation
                             if (localError == null) {
                                 viewModel.initializePayment(
                                     fullName = fullName,
                                     email = email,
                                     phone = phone,
                                     address = address,
-                                    paymentMethod = paymentMethod,
+                                    paymentMethod = paymentMethod.apiValue,
                                     checkoutItems = checkoutItems,
-                                    clearCartOnSuccess = buyNowItem == null,
+                                    clearCartWhenFinalized = buyNowItem == null,
                                     onRedirectionRequested = { url -> uriHandler.openUri(url) }
                                 )
                             }
@@ -325,7 +344,7 @@ fun CheckoutScreen(
                             .fillMaxWidth()
                             .height(52.dp)
                     ) {
-                        Text("Kart ile Ödemeyi Tamamla", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(paymentMethod.submitLabel, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }
@@ -374,7 +393,7 @@ private fun CardPaymentPanel(
                 Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Kart", color = NavyDark, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Text("Kredi/Banka kartı", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+                    Text("Kredi/Banka kart\u0131", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
                 }
                 Text(cardType.label, color = StoreBlue, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
             }
@@ -397,8 +416,8 @@ private fun CardPaymentPanel(
                     NovaTextField(
                         value = cardHolder,
                         onValueChange = onCardHolderChange,
-                        label = "Kart Üzerindeki İsim",
-                        placeholder = "Kart Üzerindeki İsim",
+                        label = "Kart \u00DCzerindeki \u0130sim",
+                        placeholder = "Kart \u00DCzerindeki \u0130sim",
                         isError = showErrors && errors.holderError != null,
                         supportingText = if (showErrors) errors.holderError else null,
                         modifier = Modifier.onFocusChanged { if (it.isFocused) onSensitiveFocus() }
@@ -406,7 +425,7 @@ private fun CardPaymentPanel(
                     NovaTextField(
                         value = cardNumber,
                         onValueChange = onCardNumberChange,
-                        label = "Kart Numarası",
+                        label = "Kart Numaras\u0131",
                         placeholder = "0000 0000 0000 0000",
                         keyboardType = KeyboardType.Number,
                         visualTransformation = CardNumberVisualTransformation(cardType),
@@ -444,6 +463,63 @@ private fun CardPaymentPanel(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PaymentMethodSelector(
+    selected: PaymentMethod,
+    onSelect: (PaymentMethod) -> Unit
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        PaymentMethodOption(
+            method = PaymentMethod.Card,
+            selected = selected == PaymentMethod.Card,
+            modifier = Modifier.weight(1f),
+            onSelect = onSelect
+        )
+        PaymentMethodOption(
+            method = PaymentMethod.BankTransfer,
+            selected = selected == PaymentMethod.BankTransfer,
+            modifier = Modifier.weight(1f),
+            onSelect = onSelect
+        )
+    }
+}
+
+@Composable
+private fun PaymentMethodOption(
+    method: PaymentMethod,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onSelect: (PaymentMethod) -> Unit
+) {
+    Surface(
+        modifier = modifier.clickable { onSelect(method) },
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) Orange.copy(alpha = 0.08f) else CardBackground,
+        border = BorderStroke(1.5.dp, if (selected) Orange else BorderLight)
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Icon(method.icon, contentDescription = null, tint = if (selected) Orange else TextSecondary)
+            Text(method.title, color = NavyDark, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+            Text(method.description, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun BankTransferInfo() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = StoreBlue.copy(alpha = 0.06f),
+        border = BorderStroke(1.dp, StoreBlue.copy(alpha = 0.24f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Havale/EFT", color = NavyDark, fontWeight = FontWeight.Bold)
+            Text("Sipari\u015F kayd\u0131 olu\u015Fturulur, banka bilgileri sonraki ekranda g\u00F6sterilir. \u00D6deme onaylanana kadar sepetiniz korunur.", color = TextSecondary)
         }
     }
 }
@@ -551,7 +627,7 @@ private fun PaymentCardFace(
                 verticalAlignment = Alignment.Bottom
             ) {
                 CardLabel(
-                    label = "KART SAHİBİ",
+                    label = "KART SAH\u0130B\u0130",
                     value = cardHolder.ifBlank { "AD SOYAD" }.uppercase(Locale("tr", "TR")),
                     modifier = Modifier.weight(1f)
                 )
@@ -616,7 +692,7 @@ private fun PaymentCardBack(modifier: Modifier, cvc: String) {
                 Spacer(Modifier.width(10.dp))
                 Surface(shape = RoundedCornerShape(8.dp), color = Color.White) {
                     Text(
-                        cvc.ifBlank { "•••" },
+                        cvc.ifBlank { "\u2022\u2022\u2022" },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
                         color = NavyDark,
                         fontWeight = FontWeight.Bold,
@@ -633,7 +709,7 @@ private fun PaymentCardBack(modifier: Modifier, cvc: String) {
             ) {
                 Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Güvenli ödeme", color = Color.White.copy(alpha = 0.82f), style = MaterialTheme.typography.labelMedium)
+                Text("G\u00FCvenli \u00F6deme", color = Color.White.copy(alpha = 0.82f), style = MaterialTheme.typography.labelMedium)
             }
             Text(
                 "NOVA CARD",
@@ -816,8 +892,26 @@ private fun SummaryRow(label: String, value: String, highlighted: Boolean = fals
 @Composable
 private fun SuccessState(
     response: com.novastore.app.data.model.PaymentResponse,
+    isCheckingStatus: Boolean,
+    statusMessage: String?,
+    paymentFinalized: Boolean,
+    onRefreshStatus: () -> Unit,
     onNavigateToHome: () -> Unit
 ) {
+    val isBankTransfer = response.provider == "bank_transfer" || response.paymentStatus == "WAITING_TRANSFER"
+    val statusTitle = when {
+        paymentFinalized -> "\u00D6deme Onayland\u0131"
+        isBankTransfer -> "Havale Bilgileri Olu\u015Fturuldu"
+        else -> "\u00D6deme Ba\u015Flat\u0131ld\u0131"
+    }
+    val statusMessage = if (isBankTransfer) {
+        "Banka transferiniz onayland\u0131\u011F\u0131nda sipari\u015Finiz i\u015Fleme al\u0131nacak. Sepetiniz \u00F6deme kesinle\u015Fene kadar korunur."
+    } else {
+        "3D Secure do\u011Frulamas\u0131 tamamland\u0131ktan ve \u00F6deme sa\u011Flay\u0131c\u0131 onay\u0131 geldikten sonra sipari\u015Finiz kesinle\u015Fecek."
+    }
+    val actionTitle = if (isBankTransfer) "Havale/EFT bekleniyor" else "Banka onay\u0131 bekleniyor"
+    val bankDetails = response.paymentAction
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -828,11 +922,11 @@ private fun SuccessState(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.verticalScroll(rememberScrollState())
         ) {
-            Icon(Icons.Default.CheckCircle, contentDescription = "Başarılı", tint = DiscountGreen, modifier = Modifier.size(80.dp))
+            Icon(Icons.Default.CheckCircle, contentDescription = statusTitle, tint = DiscountGreen, modifier = Modifier.size(80.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Siparişiniz Alındı!", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = NavyDark)
+            Text(statusTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = NavyDark, textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("Sipariş Numarası: #${response.orderId}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Orange)
+            Text("Sipari\u015F Numaras\u0131: #${response.orderId}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Orange)
             Spacer(modifier = Modifier.height(16.dp))
 
             Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardBackground)) {
@@ -840,23 +934,61 @@ private fun SuccessState(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = DiscountGreen)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Kart ödemeniz alındı.", fontWeight = FontWeight.Bold, color = NavyDark)
+                        Text(actionTitle, fontWeight = FontWeight.Bold, color = NavyDark)
                     }
-                    Text("3D Secure doğrulaması gerekiyorsa bankanızın yönlendirme sayfası açılır.", color = TextSecondary)
+                    Text(statusMessage, color = TextSecondary)
+                    if (isBankTransfer) {
+                        bankDetails?.accountName?.takeIf { it.isNotBlank() }?.let { SummaryRow("Al\u0131c\u0131", it) }
+                        bankDetails?.iban?.takeIf { it.isNotBlank() }?.let { SummaryRow("IBAN", it) }
+                        bankDetails?.dueHours?.let { SummaryRow("Son \u00F6deme", "$it saat i\u00E7inde") }
+                    }
+                    Text(statusMessage ?: response.message, color = TextSecondary)
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+            OutlinedButton(
+                onClick = onRefreshStatus,
+                enabled = !isCheckingStatus,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (isCheckingStatus) "Durum kontrol ediliyor" else "\u00D6deme Durumunu Kontrol Et", fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(10.dp))
             Button(
                 onClick = onNavigateToHome,
                 colors = ButtonDefaults.buttonColors(containerColor = Orange),
                 shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp)
+                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Alışverişe Devam Et", fontWeight = FontWeight.Bold)
+                Text("Al\u0131\u015Fveri\u015Fe Devam Et", fontWeight = FontWeight.Bold)
             }
         }
     }
+}
+private enum class PaymentMethod(
+    val apiValue: String,
+    val title: String,
+    val description: String,
+    val submitLabel: String,
+    val icon: ImageVector
+) {
+    Card(
+        apiValue = "card",
+        title = "Kart",
+        description = "3D Secure ile",
+        submitLabel = "Kart ile \u00D6demeyi Tamamla",
+        icon = Icons.Default.CreditCard
+    ),
+    BankTransfer(
+        apiValue = "havale",
+        title = "Havale/EFT",
+        description = "Banka onay\u0131 bekler",
+        submitLabel = "Sipari\u015Fi Olu\u015Ftur",
+        icon = Icons.Default.VerifiedUser
+    )
 }
 
 private enum class CardType(val label: String) {
@@ -939,7 +1071,7 @@ private fun formatCardNumber(input: String, type: CardType): String {
 private fun displayCardNumber(input: String, type: CardType): String {
     val digits = input.digitsOnly()
     val expected = expectedCardLength(type)
-    val padded = digits.padEnd(expected, '•')
+    val padded = digits.padEnd(expected, '\u2022')
     return if (type == CardType.AMEX) {
         listOf(padded.take(4), padded.drop(4).take(6), padded.drop(10).take(5))
             .filter { it.isNotEmpty() }
@@ -959,13 +1091,13 @@ private fun validateCardForm(holder: String, cardNumber: String, expiry: String,
     val expectedLength = expectedCardLength(cardType)
     val cvcLength = if (cardType == CardType.AMEX) 4 else 3
     return CardValidation(
-        holderError = if (holder.trim().length < 3) "Kart üzerindeki isim zorunlu." else null,
+        holderError = if (holder.trim().length < 3) "Kart \u00FCzerindeki isim zorunlu." else null,
         numberError = when {
-            digits.length != expectedLength -> "Kart numarası geçersiz."
-            !passesLuhn(digits) -> "Kart numarası geçersiz."
+            digits.length != expectedLength -> "Kart numaras\u0131 ge\u00E7ersiz."
+            !passesLuhn(digits) -> "Kart numaras\u0131 ge\u00E7ersiz."
             else -> null
         },
-        expiryError = if (!isValidExpiry(expiry)) "Son kullanma tarihi geçersiz." else null,
+        expiryError = if (!isValidExpiry(expiry)) "Son kullanma tarihi ge\u00E7ersiz." else null,
         cvcError = if (cvc.digitsOnly().length != cvcLength) "CVC eksik." else null
     )
 }
@@ -977,14 +1109,15 @@ private fun validateCheckout(
     address: String,
     checkoutItems: List<CartItem>,
     checkoutTotal: Double,
+    paymentMethod: PaymentMethod,
     cardErrors: CardValidation
 ): String? {
-    if (checkoutItems.isEmpty() || checkoutTotal <= 0.0) return "Ödeme başlatmak için sepetinde ürün olmalı."
-    if (fullName.trim().length < 2) return "Alıcı ad soyad bilgisini gir."
-    if (!email.trim().matches(Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))) return "Geçerli bir e-posta adresi gir."
+    if (checkoutItems.isEmpty() || checkoutTotal <= 0.0) return "\u00D6deme ba\u015Flatmak i\u00E7in sepetinde \u00FCr\u00FCn olmal\u0131."
+    if (fullName.trim().length < 2) return "Al\u0131c\u0131 ad soyad bilgisini gir."
+    if (!email.trim().matches(Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))) return "Ge\u00E7erli bir e-posta adresi gir."
     if (address.trim().length < 10) return "Teslimat adresini eksiksiz gir."
-    if (!phone.matches(Regex("^05\\d{9}$"))) return "Telefon numarası 05 ile başlamalı ve 11 hane olmalı."
-    if (!cardErrors.isValid) return "Kart bilgilerini kontrol et."
+    if (!phone.matches(Regex("^05\\d{9}$"))) return "Telefon numaras\u0131 05 ile ba\u015Flamal\u0131 ve 11 hane olmal\u0131."
+    if (paymentMethod == PaymentMethod.Card && !cardErrors.isValid) return "Kart bilgilerini kontrol et."
     return null
 }
 

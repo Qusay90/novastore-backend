@@ -16,7 +16,10 @@ import javax.inject.Inject
 data class CheckoutUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
-    val successResponse: PaymentResponse? = null
+    val successResponse: PaymentResponse? = null,
+    val isCheckingPaymentStatus: Boolean = false,
+    val paymentStatusMessage: String? = null,
+    val paymentFinalized: Boolean = false
 )
 
 @HiltViewModel
@@ -29,6 +32,7 @@ class CheckoutViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(CheckoutUiState())
     val uiState: StateFlow<CheckoutUiState> = _uiState.asStateFlow()
+    private var clearCartWhenPaymentFinalized: Boolean = false
 
     val cartItems: StateFlow<List<CartItem>> = cartRepository.cartItems
         .stateIn(
@@ -75,24 +79,25 @@ class CheckoutViewModel @Inject constructor(
         address: String,
         paymentMethod: String,
         checkoutItems: List<CartItem>? = null,
-        clearCartOnSuccess: Boolean = true,
+        clearCartWhenFinalized: Boolean = true,
         onRedirectionRequested: (String) -> Unit
     ) {
         if (fullName.isBlank() || email.isBlank() || phone.isBlank() || address.isBlank()) {
-            _uiState.update { it.copy(error = "Lütfen tüm teslimat bilgilerini eksiksiz doldurun.") }
+            _uiState.update { it.copy(error = "L\u00FCtfen t\u00FCm teslimat bilgilerini eksiksiz doldurun.") }
             return
         }
         if (!phone.matches(Regex("^05\\d{9}$"))) {
-            _uiState.update { it.copy(error = "Telefon numarası 05 ile başlamalı ve 11 hane olmalı.") }
+            _uiState.update { it.copy(error = "Telefon numaras\u0131 05 ile ba\u015Flamal\u0131 ve 11 hane olmal\u0131.") }
             return
         }
         val itemsToPay = checkoutItems ?: cartItems.value
         if (itemsToPay.isEmpty()) {
-            _uiState.update { it.copy(error = "Sepetiniz boş olduğu için ödeme başlatılamaz.") }
+            _uiState.update { it.copy(error = "Sepetiniz bo\u015F oldu\u011Fu i\u00E7in \u00F6deme ba\u015Flat\u0131lamaz.") }
             return
         }
 
         _uiState.update { it.copy(isLoading = true, error = null) }
+        clearCartWhenPaymentFinalized = clearCartWhenFinalized
         viewModelScope.launch {
             val itemsForPayment = itemsToPay.map { item ->
                 CartItemForPayment(
@@ -117,13 +122,15 @@ class CheckoutViewModel @Inject constructor(
             if (result.isSuccess) {
                 val response = result.getOrThrow()
                 Timber.d("Payment initialized successfully: orderId=${response.orderId}")
-                
-                // Clear the local cart on successful transaction start
-                if (clearCartOnSuccess) {
-                    cartRepository.clearCart()
+
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        successResponse = response,
+                        paymentStatusMessage = response.message,
+                        paymentFinalized = false
+                    )
                 }
-                
-                _uiState.update { it.copy(isLoading = false, successResponse = response) }
 
                 // Check for card 3D redirect
                 val redirectUrl = response.paymentAction?.action?.successUrl
@@ -132,9 +139,35 @@ class CheckoutViewModel @Inject constructor(
                     onRedirectionRequested(redirectUrl)
                 }
             } else {
-                val errorMsg = result.exceptionOrNull()?.message ?: "Ödeme başlatılamadı. Sunucu hatası oluştu."
+                val errorMsg = result.exceptionOrNull()?.message ?: "\u00D6deme ba\u015Flat\u0131lamad\u0131. Sunucu hatas\u0131 olu\u015Ftu."
                 Timber.e("Error initializing payment: $errorMsg")
                 _uiState.update { it.copy(isLoading = false, error = errorMsg) }
+            }
+        }
+    }
+
+    fun refreshPaymentStatus() {
+        val response = _uiState.value.successResponse ?: return
+        val paymentRef = response.paymentRef?.takeIf { it.isNotBlank() } ?: return
+
+        _uiState.update { it.copy(isCheckingPaymentStatus = true, error = null) }
+        viewModelScope.launch {
+            val result = paymentRepository.getPaymentStatus(paymentRef = paymentRef, orderId = response.orderId)
+            if (result.isSuccess) {
+                val status = result.getOrThrow()
+                if (status.finalized && status.paymentStatus == "PAID" && clearCartWhenPaymentFinalized) {
+                    cartRepository.clearCart()
+                }
+                _uiState.update {
+                    it.copy(
+                        isCheckingPaymentStatus = false,
+                        paymentStatusMessage = status.message,
+                        paymentFinalized = status.finalized && status.paymentStatus == "PAID"
+                    )
+                }
+            } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "\u00D6deme durumu kontrol edilemedi."
+                _uiState.update { it.copy(isCheckingPaymentStatus = false, error = errorMsg) }
             }
         }
     }

@@ -47,6 +47,48 @@ const safeJsonParse = (value, fallback = {}) => {
     }
 };
 
+const buildPaymentStatusResponse = (row) => {
+    const paymentStatus = row.payment_status || row.status;
+    const orderStatus = row.order_status;
+    const provider = row.provider || null;
+    const isPaid = paymentStatus === PAYMENT_STATUS.PAID;
+    const isFailed = paymentStatus === PAYMENT_STATUS.FAILED;
+    const isRefunded = paymentStatus === PAYMENT_STATUS.REFUNDED;
+    const isWaitingTransfer = paymentStatus === PAYMENT_STATUS.WAITING_TRANSFER || provider === 'bank_transfer';
+    const finalized = isPaid || isFailed || isRefunded;
+
+    let message = '\u00D6deme durumunuz kontrol ediliyor.';
+    let nextAction = 'CHECK_ORDERS';
+
+    if (isPaid) {
+        message = '\u00D6demeniz onayland\u0131. Sipari\u015Finiz haz\u0131rlan\u0131yor.';
+        nextAction = 'VIEW_ORDER';
+    } else if (isFailed) {
+        message = '\u00D6deme tamamlanamad\u0131. Sepetiniz korunur, dilerseniz tekrar deneyebilirsiniz.';
+        nextAction = 'RETRY_PAYMENT';
+    } else if (isRefunded) {
+        message = '\u00D6demeniz iade edildi.';
+        nextAction = 'VIEW_ORDER';
+    } else if (isWaitingTransfer) {
+        message = 'Havale/EFT bilgileri olu\u015Fturuldu. \u00D6demeniz onayland\u0131\u011F\u0131nda sipari\u015Finiz i\u015Fleme al\u0131nacak.';
+        nextAction = 'WAIT_TRANSFER';
+    } else if (paymentStatus === PAYMENT_STATUS.REQUIRES_ACTION) {
+        message = '\u00D6deme do\u011Frulamas\u0131 bekleniyor. Banka onay\u0131 tamamland\u0131\u011F\u0131nda sipari\u015Finiz kesinle\u015Fecek.';
+        nextAction = 'WAIT_PROVIDER_CONFIRMATION';
+    }
+
+    return {
+        orderId: row.order_id,
+        paymentRef: row.payment_ref,
+        paymentStatus,
+        orderStatus,
+        provider,
+        finalized,
+        message,
+        nextAction
+    };
+};
+
 const initializePayment = async (req, res) => {
     const client = await pool.connect();
 
@@ -63,11 +105,11 @@ const initializePayment = async (req, res) => {
         } = req.body;
 
         if (!fullName || !email || !address) {
-            return res.status(400).json({ error: 'Müşteri bilgileri eksik.' });
+            return res.status(400).json({ error: 'M\u00FC\u015Fteri bilgileri eksik.' });
         }
 
         if (!Array.isArray(cartItems) || cartItems.length === 0) {
-            return res.status(400).json({ error: 'Sepet boş olamaz.' });
+            return res.status(400).json({ error: 'Sepet bo\u015F olamaz.' });
         }
 
         const user = getUserFromRequestIfAny(req);
@@ -86,7 +128,7 @@ const initializePayment = async (req, res) => {
         if (existingPayment.rows.length > 0) {
             const row = existingPayment.rows[0];
             return res.status(200).json({
-                message: 'Idempotent tekrar isteği, mevcut ödeme dönüldü.',
+                message: 'Idempotent tekrar iste\u011Fi, mevcut \u00F6deme d\u00F6n\u00FCld\u00FC.',
                 orderId: row.order_id,
                 paymentRef: row.payment_ref,
                 paymentStatus: row.status,
@@ -118,7 +160,7 @@ const initializePayment = async (req, res) => {
 
         if (paymentMethod === 'havale') {
             paymentProvider = 'bank_transfer';
-            paymentRef = `HVL-${order.id}-${Date.now()}`;
+            paymentRef = `HVL-${order.id}-${crypto.randomBytes(6).toString('hex')}`;
             paymentStatus = PAYMENT_STATUS.WAITING_TRANSFER;
             providerResponse = {
                 accountName: process.env.HAVALE_ACCOUNT_NAME || 'NovaStore Elektronik',
@@ -169,7 +211,7 @@ const initializePayment = async (req, res) => {
             [paymentRef, paymentStatus, order.id]
         );
 
-        await appendOrderEvent(client, order.id, 'PAYMENT_INITIALIZED', 'Ödeme başlatıldı.', {
+        await appendOrderEvent(client, order.id, 'PAYMENT_INITIALIZED', '\u00D6deme ba\u015Flat\u0131ld\u0131.', {
             provider: paymentProvider,
             paymentRef,
             idempotencyKey,
@@ -189,15 +231,49 @@ const initializePayment = async (req, res) => {
             coupon: pricing.coupon,
             paymentAction: providerResponse,
             message: paymentMethod === 'havale'
-                ? 'Havale bilgileri oluşturuldu. Ödeme bekleniyor.'
-                : '3D ödeme adımı başlatıldı.'
+                ? 'Havale bilgileri olu\u015Fturuldu. \u00D6deme bekleniyor.'
+                : '3D \u00F6deme ad\u0131m\u0131 ba\u015Flat\u0131ld\u0131.'
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Ödeme initialize hatası:', err.message);
-        res.status(500).json({ error: err.message || 'Ödeme başlatılamadı.' });
+        console.error('\u00D6deme initialize hatas\u0131:', err.message);
+        res.status(500).json({ error: err.message || '\u00D6deme ba\u015Flat\u0131lamad\u0131.' });
     } finally {
         client.release();
+    }
+};
+
+const getPaymentStatus = async (req, res) => {
+    try {
+        const paymentRef = String(req.query.paymentRef || '').trim();
+        const orderId = Number(req.query.orderId || 0);
+
+        if (!paymentRef || !Number.isInteger(orderId) || orderId <= 0) {
+            return res.status(400).json({ error: 'paymentRef ve orderId zorunludur.' });
+        }
+
+        const paymentResult = await pool.query(
+            `SELECT p.payment_ref,
+                    p.status AS payment_status,
+                    p.provider,
+                    o.id AS order_id,
+                    o.status AS order_status
+             FROM payments p
+             JOIN orders o ON o.id = p.order_id
+             WHERE p.payment_ref = $1
+               AND o.id = $2
+             LIMIT 1`,
+            [paymentRef, orderId]
+        );
+
+        if (paymentResult.rows.length === 0) {
+            return res.status(404).json({ error: '\u00D6deme kayd\u0131 bulunamad\u0131.' });
+        }
+
+        res.status(200).json(buildPaymentStatusResponse(paymentResult.rows[0]));
+    } catch (err) {
+        console.error('\u00D6deme durum kontrol hatas\u0131:', err.message);
+        res.status(500).json({ error: err.message || '\u00D6deme durumu kontrol edilemedi.' });
     }
 };
 
@@ -219,11 +295,11 @@ const webhookIyzico = async (req, res) => {
         const isProductionWebhook = process.env.NODE_ENV === 'production';
 
         if (isProductionWebhook && !signatureSecret) {
-            return res.status(503).json({ error: 'Webhook imza anahtarı production ortamında yapılandırılmalıdır.' });
+            return res.status(503).json({ error: 'Webhook imza anahtar\u0131 production ortam\u0131nda yap\u0131land\u0131r\u0131lmal\u0131d\u0131r.' });
         }
 
         if (isProductionWebhook && !signature) {
-            return res.status(401).json({ error: 'Production ortamında imzasız ödeme webhook isteği kabul edilmez.' });
+            return res.status(401).json({ error: 'Production ortam\u0131nda imzas\u0131z \u00F6deme webhook iste\u011Fi kabul edilmez.' });
         }
 
         const signatureValid = signatureSecret ? verifyWebhookSignature(payload, signature, signatureSecret) : true;
@@ -243,7 +319,7 @@ const webhookIyzico = async (req, res) => {
 
         if (!signatureValid) {
             await client.query('ROLLBACK');
-            return res.status(401).json({ error: 'Webhook imza doğrulaması başarısız.' });
+            return res.status(401).json({ error: 'Webhook imza do\u011Frulamas\u0131 ba\u015Far\u0131s\u0131z.' });
         }
 
         const paymentResult = await client.query(
@@ -256,7 +332,7 @@ const webhookIyzico = async (req, res) => {
 
         if (paymentResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Ödeme kaydı bulunamadı.' });
+            return res.status(404).json({ error: '\u00D6deme kayd\u0131 bulunamad\u0131.' });
         }
 
         const payment = paymentResult.rows[0];
@@ -299,7 +375,7 @@ const webhookIyzico = async (req, res) => {
                 [PAYMENT_STATUS.PAID, ORDER_STATUS.HAZIRLANIYOR, payment.order_id]
             );
 
-            await appendOrderEvent(client, payment.order_id, 'PAYMENT_SUCCESS', 'Ödeme başarılı.', {
+            await appendOrderEvent(client, payment.order_id, 'PAYMENT_SUCCESS', '\u00D6deme ba\u015Far\u0131l\u0131.', {
                 provider: 'iyzico',
                 eventId,
                 paymentRef,
@@ -326,7 +402,7 @@ const webhookIyzico = async (req, res) => {
                 [
                     PAYMENT_STATUS.FAILED,
                     ORDER_STATUS.IPTAL_EDILDI,
-                    payload.reason || 'Ödeme başarısız',
+                    payload.reason || '\u00D6deme ba\u015Far\u0131s\u0131z',
                     REFUND_STATUS.NONE,
                     payment.order_id
                 ]
@@ -336,7 +412,7 @@ const webhookIyzico = async (req, res) => {
                 await restockItems(client, parsedItems);
             }
 
-            await appendOrderEvent(client, payment.order_id, 'PAYMENT_FAILED', 'Ödeme başarısız.', {
+            await appendOrderEvent(client, payment.order_id, 'PAYMENT_FAILED', '\u00D6deme ba\u015Far\u0131s\u0131z.', {
                 provider: 'iyzico',
                 eventId,
                 paymentRef,
@@ -358,8 +434,8 @@ const webhookIyzico = async (req, res) => {
                 payment.user_id,
                 'order_update',
                 isSuccess
-                    ? `Sipariş #${payment.order_id} ödemesi başarıyla alındı.`
-                    : `Sipariş #${payment.order_id} ödemesi başarısız oldu.`,
+                    ? `Sipari\u015F #${payment.order_id} \u00F6demesi ba\u015Far\u0131yla al\u0131nd\u0131.`
+                    : `Sipari\u015F #${payment.order_id} \u00F6demesi ba\u015Far\u0131s\u0131z oldu.`,
                 io
             );
         }
@@ -368,7 +444,7 @@ const webhookIyzico = async (req, res) => {
             await createNotification(
                 null,
                 'new_order',
-                `Yeni sipariş kesinleşti (#${payment.order_id}). Müşteri: ${payment.customer_name || 'Bilinmiyor'}`,
+                `Yeni sipari\u015F kesinle\u015Fti (#${payment.order_id}). M\u00FC\u015Fteri: ${payment.customer_name || 'Bilinmiyor'}`,
                 io
             );
         }
@@ -376,14 +452,16 @@ const webhookIyzico = async (req, res) => {
         res.status(200).json({ ok: true, processed: true, status: isSuccess ? 'PAID' : 'FAILED' });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Iyzico webhook hatası:', err.message);
-        res.status(500).json({ error: err.message || 'Webhook işlenemedi.' });
+        console.error('Iyzico webhook hatas\u0131:', err.message);
+        res.status(500).json({ error: err.message || 'Webhook i\u015Flenemedi.' });
     } finally {
         client.release();
     }
 };
 
 module.exports = {
+    buildPaymentStatusResponse,
+    getPaymentStatus,
     initializePayment,
     webhookIyzico
 };

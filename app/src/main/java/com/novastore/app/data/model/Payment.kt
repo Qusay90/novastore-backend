@@ -38,6 +38,18 @@ data class PaymentResponse(
 )
 
 @Serializable
+data class PaymentStatusResponse(
+    val orderId: Int,
+    val paymentRef: String?,
+    val paymentStatus: String,
+    val orderStatus: String?,
+    val provider: String?,
+    val finalized: Boolean = false,
+    val message: String,
+    val nextAction: String? = null
+)
+
+@Serializable
 data class PaymentTotals(
     val subtotal: Double,
     val total: Double,
@@ -48,7 +60,10 @@ data class PaymentTotals(
 data class PaymentAction(
     val provider: String?,
     val status: String?,
-    val action: PaymentActionRedirect?
+    val action: PaymentActionRedirect?,
+    val accountName: String? = null,
+    val iban: String? = null,
+    val dueHours: Int? = null
 )
 
 @Serializable

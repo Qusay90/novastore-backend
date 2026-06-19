@@ -630,6 +630,7 @@
         function _addrKey() { return `novastore_addresses_${_getUserId()}`; }
         function _addrMigrationKey() { return `novastore_addresses_migrated_${_getUserId()}`; }
         function _checkoutKey() { return `novastore_checkout_${_getUserId()}`; }
+        function _pendingCheckoutKey() { return `novastore_pending_checkout_${_getUserId()}`; }
         const checkoutToken = localStorage.getItem('nova_user_token');
         const checkoutUser = JSON.parse(localStorage.getItem('nova_user_info') || 'null');
 
@@ -1105,15 +1106,12 @@
                     return;
                 }
 
-                let mainCart = JSON.parse(localStorage.getItem(_cartKey())) || [];
-                cart.forEach(boughtItem => {
-                    if (!boughtItem.isBuyNow) {
-                        const idx = mainCart.findIndex(mc => mc.id === boughtItem.id);
-                        if (idx > -1) mainCart.splice(idx, 1);
-                    }
-                });
-                localStorage.setItem(_cartKey(), JSON.stringify(mainCart));
-                localStorage.removeItem(_checkoutKey());
+                localStorage.setItem(_pendingCheckoutKey(), JSON.stringify({
+                    orderId: result.orderId,
+                    paymentRef: result.paymentRef,
+                    items: cart,
+                    createdAt: Date.now()
+                }));
 
                 if (selectedPaymentMethod === 'havale') {
                     const iban = result.paymentAction && result.paymentAction.iban

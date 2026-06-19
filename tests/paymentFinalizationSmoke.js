@@ -1,5 +1,6 @@
 const assert = require('assert');
-const { ORDER_STATUS } = require('../constants/orderStatus');
+const { ORDER_STATUS, PAYMENT_STATUS } = require('../constants/orderStatus');
+const { buildPaymentStatusResponse } = require('../controllers/paymentController');
 const {
     createPendingPaymentOrder,
     reserveStock,
@@ -85,6 +86,46 @@ const createFakeClient = () => {
         true,
         'legacy reserved failure path can restock productId payloads'
     );
+
+    const waitingCardStatus = buildPaymentStatusResponse({
+        order_id: 7001,
+        payment_ref: 'PAY-7001',
+        payment_status: PAYMENT_STATUS.REQUIRES_ACTION,
+        order_status: ORDER_STATUS.ODEME_BEKLIYOR,
+        provider: 'iyzico'
+    });
+    assert.strictEqual(waitingCardStatus.finalized, false);
+    assert.strictEqual(waitingCardStatus.nextAction, 'WAIT_PROVIDER_CONFIRMATION');
+
+    const waitingTransferStatus = buildPaymentStatusResponse({
+        order_id: 7002,
+        payment_ref: 'HVL-7002',
+        payment_status: PAYMENT_STATUS.WAITING_TRANSFER,
+        order_status: ORDER_STATUS.ODEME_BEKLIYOR,
+        provider: 'bank_transfer'
+    });
+    assert.strictEqual(waitingTransferStatus.finalized, false);
+    assert.strictEqual(waitingTransferStatus.nextAction, 'WAIT_TRANSFER');
+
+    const paidStatus = buildPaymentStatusResponse({
+        order_id: 7001,
+        payment_ref: 'PAY-7001',
+        payment_status: PAYMENT_STATUS.PAID,
+        order_status: ORDER_STATUS.HAZIRLANIYOR,
+        provider: 'iyzico'
+    });
+    assert.strictEqual(paidStatus.finalized, true);
+    assert.strictEqual(paidStatus.nextAction, 'VIEW_ORDER');
+
+    const failedStatus = buildPaymentStatusResponse({
+        order_id: 7001,
+        payment_ref: 'PAY-7001',
+        payment_status: PAYMENT_STATUS.FAILED,
+        order_status: ORDER_STATUS.IPTAL_EDILDI,
+        provider: 'iyzico'
+    });
+    assert.strictEqual(failedStatus.finalized, true);
+    assert.strictEqual(failedStatus.nextAction, 'RETRY_PAYMENT');
 
     console.log('payment finalization smoke passed');
 })().catch((err) => {

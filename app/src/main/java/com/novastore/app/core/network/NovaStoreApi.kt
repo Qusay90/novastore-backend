@@ -122,6 +122,12 @@ interface NovaStoreApi {
     @POST("api/payments/initialize")
     suspend fun initializePayment(@Body body: PaymentRequest): PaymentResponse
 
+    @GET("api/payments/status")
+    suspend fun getPaymentStatus(
+        @Query("paymentRef") paymentRef: String,
+        @Query("orderId") orderId: Int
+    ): PaymentStatusResponse
+
     // AI Assistant
     @POST("api/assistant/chat")
     suspend fun sendAssistantMessage(@Body body: AssistantChatRequest): AssistantChatResponse
