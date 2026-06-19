@@ -2519,7 +2519,7 @@
                             </div>
                             <textarea id="review-comment" class="review-input" placeholder="Bu ürün hakkında ne düşünüyorsunuz? (Opsiyonel)"></textarea>
                             <div class="review-upload-box">
-                                <label for="review-media-input" class="review-upload-trigger">📷 Gorsel veya Video Ekle</label>
+                                <label for="review-media-input" class="review-upload-trigger">📷 Görsel veya Video Ekle</label>
                                 <input
                                     id="review-media-input"
                                     class="review-upload-input"
@@ -2566,10 +2566,10 @@
                             rStars += i <= r.rating ? '<span class="star" style="font-size:1rem;">★</span>' : '<span class="star-empty" style="font-size:1rem;">★</span>';
                         }
                         const rDate = new Date(r.created_at).toLocaleDateString('tr-TR');
-                        const safeReviewerName = escapeHtml(r.full_name || 'Musteri');
+                        const safeReviewerName = escapeHtml(r.full_name || 'Müşteri');
                         const safeComment = escapeHtml(r.comment || '');
                         const reviewTextHtml = safeComment ? `<div class="review-text">${safeComment}</div>` : '';
-                        const reviewMediaHtml = buildReviewMediaMarkup(r.media, `${r.full_name || 'Musteri'} yorumu`);
+                        const reviewMediaHtml = buildReviewMediaMarkup(r.media, `${r.full_name || 'Müşteri'} yorumu`);
 
                         reviewsListHtml += `
                             <div class="review-card">
@@ -2599,13 +2599,13 @@
 
                         if (mediaItem.type === 'video') {
                             galleryHtml += `
-                                <button type="button" class="gallery-thumbnail-button video-thumb ${activeClass}" data-media-index="${index}" aria-label="Gorsel ${index + 1}">
+                                <button type="button" class="gallery-thumbnail-button video-thumb ${activeClass}" data-media-index="${index}" aria-label="Görsel ${index + 1}">
                                     <video src="${safeUrl}" class="gallery-thumbnail-media" muted playsinline preload="metadata"></video>
                                 </button>
                             `;
                         } else {
                             galleryHtml += `
-                                <button type="button" class="gallery-thumbnail-button ${activeClass}" data-media-index="${index}" aria-label="Gorsel ${index + 1}">
+                                <button type="button" class="gallery-thumbnail-button ${activeClass}" data-media-index="${index}" aria-label="Görsel ${index + 1}">
                                     <img src="${safeUrl}" class="gallery-thumbnail-media" alt="${safeAlt}">
                                 </button>
                             `;
