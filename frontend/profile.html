@@ -940,10 +940,32 @@
             throw new Error('Auth required');
         }
 
-        const user = JSON.parse(userInfoStr);
-        document.getElementById('user-name').innerText = user.fullName;
-        document.getElementById('user-email').innerText = user.email;
-        document.getElementById('user-avatar').innerText = user.fullName.charAt(0).toUpperCase();
+        let user = JSON.parse(userInfoStr);
+
+        function renderProfileHeader() {
+            document.getElementById('user-name').innerText = user.fullName;
+            document.getElementById('user-email').innerText = user.email;
+            document.getElementById('user-avatar').innerText = user.fullName.charAt(0).toUpperCase();
+        }
+
+        async function refreshProfileFromBackend() {
+            try {
+                const response = await fetch('/api/users/me', { headers: authHeaders() });
+                if (!response.ok) return;
+                const data = await response.json();
+                if (!data.user) return;
+                user = {
+                    ...user,
+                    fullName: data.user.fullName || user.fullName,
+                    email: data.user.email || user.email,
+                    phone: data.user.phone ?? null
+                };
+                localStorage.setItem('nova_user_info', JSON.stringify(user));
+                renderProfileHeader();
+            } catch (_) {}
+        }
+
+        renderProfileHeader();
 
         function decodeBase64Url(value) {
             const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
@@ -968,6 +990,8 @@
             if (token) headers['Authorization'] = 'Bearer ' + token;
             return headers;
         }
+
+        refreshProfileFromBackend();
 
         function escapeHtml(value) {
             return String(value ?? '')

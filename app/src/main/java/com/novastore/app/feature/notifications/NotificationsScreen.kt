@@ -326,7 +326,7 @@ fun NotificationsScreen(
                     onSelect = viewModel::selectAddress
                 )
                 AccountPage.Payments -> PaymentMethodsPage()
-                AccountPage.Coupons -> CouponsComingSoonPage()
+                AccountPage.Coupons -> CouponsPage(state = uiState, onCouponClick = { selectedCoupon = it })
                 AccountPage.Security -> SecurityPage(
                     state = uiState,
                     email = email,
