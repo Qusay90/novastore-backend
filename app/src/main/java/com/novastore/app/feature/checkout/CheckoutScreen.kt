@@ -153,8 +153,8 @@ fun CheckoutScreen(
 
     LaunchedEffect(selectedAddress?.id) {
         selectedAddress?.let {
-            if (fullName.isBlank()) fullName = it.fullName
-            if (it.phone.isNotBlank()) phone = it.phone
+            fullName = it.fullName.ifBlank { viewModel.currentUserName }
+            phone = it.phone
             address = it.singleLine
         }
     }
@@ -214,7 +214,7 @@ fun CheckoutScreen(
                                 onSelect = { id ->
                                     viewModel.selectAddress(id)
                                     addresses.firstOrNull { it.id == id }?.let {
-                                        fullName = it.fullName
+                                        fullName = it.fullName.ifBlank { viewModel.currentUserName }
                                         phone = it.phone
                                         address = it.singleLine
                                     }
