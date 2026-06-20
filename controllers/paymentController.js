@@ -247,9 +247,14 @@ const getPaymentStatus = async (req, res) => {
     try {
         const paymentRef = String(req.query.paymentRef || '').trim();
         const orderId = Number(req.query.orderId || 0);
+        const userId = Number(req.user && req.user.id);
 
         if (!paymentRef || !Number.isInteger(orderId) || orderId <= 0) {
             return res.status(400).json({ error: 'paymentRef ve orderId zorunludur.' });
+        }
+
+        if (!Number.isInteger(userId) || userId <= 0) {
+            return res.status(401).json({ error: 'Authentication required.' });
         }
 
         const paymentResult = await pool.query(
@@ -257,7 +262,8 @@ const getPaymentStatus = async (req, res) => {
                     p.status AS payment_status,
                     p.provider,
                     o.id AS order_id,
-                    o.status AS order_status
+                    o.status AS order_status,
+                    o.user_id AS order_user_id
              FROM payments p
              JOIN orders o ON o.id = p.order_id
              WHERE p.payment_ref = $1
@@ -270,7 +276,16 @@ const getPaymentStatus = async (req, res) => {
             return res.status(404).json({ error: '\u00D6deme kayd\u0131 bulunamad\u0131.' });
         }
 
-        res.status(200).json(buildPaymentStatusResponse(paymentResult.rows[0]));
+        const paymentRow = paymentResult.rows[0];
+        const ownerUserId = paymentRow.order_user_id === null || paymentRow.order_user_id === undefined
+            ? null
+            : Number(paymentRow.order_user_id);
+
+        if (!Number.isInteger(ownerUserId) || ownerUserId <= 0 || ownerUserId !== userId) {
+            return res.status(404).json({ error: '\u00D6deme kayd\u0131 bulunamad\u0131.' });
+        }
+
+        res.status(200).json(buildPaymentStatusResponse(paymentRow));
     } catch (err) {
         console.error('\u00D6deme durum kontrol hatas\u0131:', err.message);
         res.status(500).json({ error: err.message || '\u00D6deme durumu kontrol edilemedi.' });
@@ -320,6 +335,11 @@ const webhookIyzico = async (req, res) => {
         if (!signatureValid) {
             await client.query('ROLLBACK');
             return res.status(401).json({ error: 'Webhook imza do\u011Frulamas\u0131 ba\u015Far\u0131s\u0131z.' });
+        }
+
+        if (webhookRow.processed === true) {
+            await client.query('COMMIT');
+            return res.status(200).json({ ok: true, processed: true, duplicate: true });
         }
 
         const paymentResult = await client.query(

@@ -46,6 +46,10 @@
         function cartKey() { return `novastore_cart_${getUserId()}`; }
         function checkoutKey() { return `novastore_checkout_${getUserId()}`; }
         function pendingCheckoutKey() { return `novastore_pending_checkout_${getUserId()}`; }
+        function paymentStatusHeaders() {
+            const token = localStorage.getItem('nova_user_token');
+            return token ? { Authorization: `Bearer ${token}` } : {};
+        }
 
         function clearFinalizedCheckoutItems(orderId, paymentRef) {
             let pending = null;
@@ -85,7 +89,9 @@
                 const params = new URLSearchParams({ paymentRef });
                 if (orderId) params.set('orderId', orderId);
 
-                const response = await fetch(`${API_BASE}/api/payments/status?${params.toString()}`);
+                const response = await fetch(`${API_BASE}/api/payments/status?${params.toString()}`, {
+                    headers: paymentStatusHeaders()
+                });
                 const result = await response.json();
 
                 if (!response.ok) {
