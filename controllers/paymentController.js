@@ -3,7 +3,7 @@ const pool = require('../config/db');
 const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
 const { createNotification } = require('./notificationController');
 const { initializeIyzicoPayment, verifyWebhookSignature } = require('../services/paymentProviderService');
-const { createOrderWithReservation, restockItems, appendOrderEvent } = require('../services/orderService');
+const { createPendingPaymentOrder, reserveStock, restockItems, appendOrderEvent } = require('../services/orderService');
 const { PAYMENT_STATUS, ORDER_STATUS, REFUND_STATUS } = require('../constants/orderStatus');
 
 const readIdempotencyKey = (req) => {
@@ -37,6 +37,58 @@ const incrementCouponUsageIfNeeded = async (client, coupon) => {
     );
 };
 
+const safeJsonParse = (value, fallback = {}) => {
+    if (!value) return fallback;
+    if (typeof value === 'object') return value;
+    try {
+        return JSON.parse(value);
+    } catch (_) {
+        return fallback;
+    }
+};
+
+const buildPaymentStatusResponse = (row) => {
+    const paymentStatus = row.payment_status || row.status;
+    const orderStatus = row.order_status;
+    const provider = row.provider || null;
+    const isPaid = paymentStatus === PAYMENT_STATUS.PAID;
+    const isFailed = paymentStatus === PAYMENT_STATUS.FAILED;
+    const isRefunded = paymentStatus === PAYMENT_STATUS.REFUNDED;
+    const isWaitingTransfer = paymentStatus === PAYMENT_STATUS.WAITING_TRANSFER || provider === 'bank_transfer';
+    const finalized = isPaid || isFailed || isRefunded;
+
+    let message = '\u00D6deme durumunuz kontrol ediliyor.';
+    let nextAction = 'CHECK_ORDERS';
+
+    if (isPaid) {
+        message = '\u00D6demeniz onayland\u0131. Sipari\u015Finiz haz\u0131rlan\u0131yor.';
+        nextAction = 'VIEW_ORDER';
+    } else if (isFailed) {
+        message = '\u00D6deme tamamlanamad\u0131. Sepetiniz korunur, dilerseniz tekrar deneyebilirsiniz.';
+        nextAction = 'RETRY_PAYMENT';
+    } else if (isRefunded) {
+        message = '\u00D6demeniz iade edildi.';
+        nextAction = 'VIEW_ORDER';
+    } else if (isWaitingTransfer) {
+        message = 'Havale/EFT bilgileri olu\u015Fturuldu. \u00D6demeniz onayland\u0131\u011F\u0131nda sipari\u015Finiz i\u015Fleme al\u0131nacak.';
+        nextAction = 'WAIT_TRANSFER';
+    } else if (paymentStatus === PAYMENT_STATUS.REQUIRES_ACTION) {
+        message = '\u00D6deme do\u011Frulamas\u0131 bekleniyor. Banka onay\u0131 tamamland\u0131\u011F\u0131nda sipari\u015Finiz kesinle\u015Fecek.';
+        nextAction = 'WAIT_PROVIDER_CONFIRMATION';
+    }
+
+    return {
+        orderId: row.order_id,
+        paymentRef: row.payment_ref,
+        paymentStatus,
+        orderStatus,
+        provider,
+        finalized,
+        message,
+        nextAction
+    };
+};
+
 const initializePayment = async (req, res) => {
     const client = await pool.connect();
 
@@ -53,11 +105,11 @@ const initializePayment = async (req, res) => {
         } = req.body;
 
         if (!fullName || !email || !address) {
-            return res.status(400).json({ error: 'Musteri bilgileri eksik.' });
+            return res.status(400).json({ error: 'M\u00FC\u015Fteri bilgileri eksik.' });
         }
 
         if (!Array.isArray(cartItems) || cartItems.length === 0) {
-            return res.status(400).json({ error: 'Sepet bos olamaz.' });
+            return res.status(400).json({ error: 'Sepet bo\u015F olamaz.' });
         }
 
         const user = getUserFromRequestIfAny(req);
@@ -76,7 +128,7 @@ const initializePayment = async (req, res) => {
         if (existingPayment.rows.length > 0) {
             const row = existingPayment.rows[0];
             return res.status(200).json({
-                message: 'Idempotent tekrar istegi, mevcut odeme donuldu.',
+                message: 'Idempotent tekrar iste\u011Fi, mevcut \u00F6deme d\u00F6n\u00FCld\u00FC.',
                 orderId: row.order_id,
                 paymentRef: row.payment_ref,
                 paymentStatus: row.status,
@@ -88,7 +140,7 @@ const initializePayment = async (req, res) => {
 
         await client.query('BEGIN');
 
-        const { order, pricing } = await createOrderWithReservation({
+        const { order, pricing } = await createPendingPaymentOrder({
             client,
             userId,
             analyticsSessionKey,
@@ -101,8 +153,6 @@ const initializePayment = async (req, res) => {
             paymentMethod
         });
 
-        await incrementCouponUsageIfNeeded(client, pricing.coupon);
-
         let paymentProvider = 'iyzico';
         let paymentRef = null;
         let paymentStatus = PAYMENT_STATUS.REQUIRES_ACTION;
@@ -110,7 +160,7 @@ const initializePayment = async (req, res) => {
 
         if (paymentMethod === 'havale') {
             paymentProvider = 'bank_transfer';
-            paymentRef = `HVL-${order.id}-${Date.now()}`;
+            paymentRef = `HVL-${order.id}-${crypto.randomBytes(6).toString('hex')}`;
             paymentStatus = PAYMENT_STATUS.WAITING_TRANSFER;
             providerResponse = {
                 accountName: process.env.HAVALE_ACCOUNT_NAME || 'NovaStore Elektronik',
@@ -141,7 +191,13 @@ const initializePayment = async (req, res) => {
                 pricing.totals.total,
                 pricing.totals.currency,
                 paymentStatus,
-                JSON.stringify({ paymentMethod, couponCode }),
+                JSON.stringify({
+                    paymentMethod,
+                    couponCode,
+                    coupon: pricing.coupon,
+                    stockReserved: false,
+                    finalizesOnWebhook: true
+                }),
                 JSON.stringify(providerResponse || {})
             ]
         );
@@ -155,7 +211,7 @@ const initializePayment = async (req, res) => {
             [paymentRef, paymentStatus, order.id]
         );
 
-        await appendOrderEvent(client, order.id, 'PAYMENT_INITIALIZED', 'Odeme baslatildi.', {
+        await appendOrderEvent(client, order.id, 'PAYMENT_INITIALIZED', '\u00D6deme ba\u015Flat\u0131ld\u0131.', {
             provider: paymentProvider,
             paymentRef,
             idempotencyKey,
@@ -163,23 +219,6 @@ const initializePayment = async (req, res) => {
         });
 
         await client.query('COMMIT');
-
-        const { io } = require('../server');
-        if (userId) {
-            await createNotification(
-                userId,
-                'order_update',
-                `Siparis #${order.id} icin odeme adimi baslatildi.`,
-                io
-            );
-        }
-
-        await createNotification(
-            null,
-            'new_order',
-            `Yeni siparis olusturuldu (#${order.id}). Odeme adimi: ${paymentMethod}.`,
-            io
-        );
 
         res.status(201).json({
             orderId: order.id,
@@ -192,15 +231,64 @@ const initializePayment = async (req, res) => {
             coupon: pricing.coupon,
             paymentAction: providerResponse,
             message: paymentMethod === 'havale'
-                ? 'Havale bilgileri olusturuldu. Odeme bekleniyor.'
-                : '3D odeme adimi baslatildi.'
+                ? 'Havale bilgileri olu\u015Fturuldu. \u00D6deme bekleniyor.'
+                : '3D \u00F6deme ad\u0131m\u0131 ba\u015Flat\u0131ld\u0131.'
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Odeme initialize hatasi:', err.message);
-        res.status(500).json({ error: err.message || 'Odeme baslatilamadi.' });
+        console.error('\u00D6deme initialize hatas\u0131:', err.message);
+        res.status(500).json({ error: err.message || '\u00D6deme ba\u015Flat\u0131lamad\u0131.' });
     } finally {
         client.release();
+    }
+};
+
+const getPaymentStatus = async (req, res) => {
+    try {
+        const paymentRef = String(req.query.paymentRef || '').trim();
+        const orderId = Number(req.query.orderId || 0);
+        const userId = Number(req.user && req.user.id);
+
+        if (!paymentRef || !Number.isInteger(orderId) || orderId <= 0) {
+            return res.status(400).json({ error: 'paymentRef ve orderId zorunludur.' });
+        }
+
+        if (!Number.isInteger(userId) || userId <= 0) {
+            return res.status(401).json({ error: 'Authentication required.' });
+        }
+
+        const paymentResult = await pool.query(
+            `SELECT p.payment_ref,
+                    p.status AS payment_status,
+                    p.provider,
+                    o.id AS order_id,
+                    o.status AS order_status,
+                    o.user_id AS order_user_id
+             FROM payments p
+             JOIN orders o ON o.id = p.order_id
+             WHERE p.payment_ref = $1
+               AND o.id = $2
+             LIMIT 1`,
+            [paymentRef, orderId]
+        );
+
+        if (paymentResult.rows.length === 0) {
+            return res.status(404).json({ error: '\u00D6deme kayd\u0131 bulunamad\u0131.' });
+        }
+
+        const paymentRow = paymentResult.rows[0];
+        const ownerUserId = paymentRow.order_user_id === null || paymentRow.order_user_id === undefined
+            ? null
+            : Number(paymentRow.order_user_id);
+
+        if (!Number.isInteger(ownerUserId) || ownerUserId <= 0 || ownerUserId !== userId) {
+            return res.status(404).json({ error: '\u00D6deme kayd\u0131 bulunamad\u0131.' });
+        }
+
+        res.status(200).json(buildPaymentStatusResponse(paymentRow));
+    } catch (err) {
+        console.error('\u00D6deme durum kontrol hatas\u0131:', err.message);
+        res.status(500).json({ error: err.message || '\u00D6deme durumu kontrol edilemedi.' });
     }
 };
 
@@ -217,8 +305,18 @@ const webhookIyzico = async (req, res) => {
             return res.status(400).json({ error: 'eventId, paymentRef ve status zorunludur.' });
         }
 
-        const signature = req.headers['x-iyzico-signature'];
-        const signatureSecret = process.env.IYZICO_WEBHOOK_SECRET || '';
+        const signature = String(req.headers['x-iyzico-signature'] || '').trim();
+        const signatureSecret = String(process.env.IYZICO_WEBHOOK_SECRET || '').trim();
+        const isProductionWebhook = process.env.NODE_ENV === 'production';
+
+        if (isProductionWebhook && !signatureSecret) {
+            return res.status(503).json({ error: 'Webhook imza anahtar\u0131 production ortam\u0131nda yap\u0131land\u0131r\u0131lmal\u0131d\u0131r.' });
+        }
+
+        if (isProductionWebhook && !signature) {
+            return res.status(401).json({ error: 'Production ortam\u0131nda imzas\u0131z \u00F6deme webhook iste\u011Fi kabul edilmez.' });
+        }
+
         const signatureValid = signatureSecret ? verifyWebhookSignature(payload, signature, signatureSecret) : true;
 
         await client.query('BEGIN');
@@ -236,11 +334,16 @@ const webhookIyzico = async (req, res) => {
 
         if (!signatureValid) {
             await client.query('ROLLBACK');
-            return res.status(401).json({ error: 'Webhook imza dogrulamasi basarisiz.' });
+            return res.status(401).json({ error: 'Webhook imza do\u011Frulamas\u0131 ba\u015Far\u0131s\u0131z.' });
+        }
+
+        if (webhookRow.processed === true) {
+            await client.query('COMMIT');
+            return res.status(200).json({ ok: true, processed: true, duplicate: true });
         }
 
         const paymentResult = await client.query(
-            `SELECT p.*, o.items, o.user_id, o.id AS order_id, o.status AS order_status
+            `SELECT p.*, o.items, o.user_id, o.customer_name, o.id AS order_id, o.status AS order_status
              FROM payments p
              JOIN orders o ON o.id = p.order_id
              WHERE p.payment_ref = $1`,
@@ -249,22 +352,39 @@ const webhookIyzico = async (req, res) => {
 
         if (paymentResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Odeme kaydi bulunamadi.' });
+            return res.status(404).json({ error: '\u00D6deme kayd\u0131 bulunamad\u0131.' });
         }
 
         const payment = paymentResult.rows[0];
+        const rawRequest = safeJsonParse(payment.raw_request, {});
+        const parsedItemsRaw = safeJsonParse(payment.items, []);
+        const parsedItems = Array.isArray(parsedItemsRaw) ? parsedItemsRaw : [];
+        const stockWasReserved = rawRequest.stockReserved === true || rawRequest.finalizesOnWebhook !== true;
         const isSuccess = rawStatus === 'SUCCESS' || rawStatus === 'PAID';
 
         if (isSuccess) {
+            if (!stockWasReserved) {
+                await reserveStock(client, parsedItems);
+            }
+
             await client.query(
                 `UPDATE payments
                  SET status = $1,
                      external_ref = $2,
                      raw_response = COALESCE(raw_response, '{}'::jsonb) || $3::jsonb,
+                     raw_request = COALESCE(raw_request, '{}'::jsonb) || $4::jsonb,
                      updated_at = NOW()
-                 WHERE id = $4`,
-                [PAYMENT_STATUS.PAID, payload.providerTransactionId || null, JSON.stringify(payload), payment.id]
+                 WHERE id = $5`,
+                [
+                    PAYMENT_STATUS.PAID,
+                    payload.providerTransactionId || null,
+                    JSON.stringify(payload),
+                    JSON.stringify({ stockReserved: true, finalizedAt: new Date().toISOString() }),
+                    payment.id
+                ]
             );
+
+            await incrementCouponUsageIfNeeded(client, rawRequest.coupon);
 
             await client.query(
                 `UPDATE orders
@@ -275,10 +395,11 @@ const webhookIyzico = async (req, res) => {
                 [PAYMENT_STATUS.PAID, ORDER_STATUS.HAZIRLANIYOR, payment.order_id]
             );
 
-            await appendOrderEvent(client, payment.order_id, 'PAYMENT_SUCCESS', 'Odeme basarili.', {
+            await appendOrderEvent(client, payment.order_id, 'PAYMENT_SUCCESS', '\u00D6deme ba\u015Far\u0131l\u0131.', {
                 provider: 'iyzico',
                 eventId,
-                paymentRef
+                paymentRef,
+                stockReservedBeforeWebhook: stockWasReserved
             });
         } else {
             await client.query(
@@ -301,25 +422,22 @@ const webhookIyzico = async (req, res) => {
                 [
                     PAYMENT_STATUS.FAILED,
                     ORDER_STATUS.IPTAL_EDILDI,
-                    payload.reason || 'Odeme basarisiz',
+                    payload.reason || '\u00D6deme ba\u015Far\u0131s\u0131z',
                     REFUND_STATUS.NONE,
                     payment.order_id
                 ]
             );
 
-            let parsedItems = [];
-            try {
-                parsedItems = Array.isArray(payment.items) ? payment.items : JSON.parse(payment.items || '[]');
-            } catch (_) {
-                parsedItems = [];
+            if (stockWasReserved) {
+                await restockItems(client, parsedItems);
             }
-            await restockItems(client, parsedItems);
 
-            await appendOrderEvent(client, payment.order_id, 'PAYMENT_FAILED', 'Odeme basarisiz.', {
+            await appendOrderEvent(client, payment.order_id, 'PAYMENT_FAILED', '\u00D6deme ba\u015Far\u0131s\u0131z.', {
                 provider: 'iyzico',
                 eventId,
                 paymentRef,
-                reason: payload.reason || null
+                reason: payload.reason || null,
+                stockReservedBeforeWebhook: stockWasReserved
             });
         }
 
@@ -336,8 +454,17 @@ const webhookIyzico = async (req, res) => {
                 payment.user_id,
                 'order_update',
                 isSuccess
-                    ? `Siparis #${payment.order_id} odemesi basariyla alindi.`
-                    : `Siparis #${payment.order_id} odemesi basarisiz oldu.`,
+                    ? `Sipari\u015F #${payment.order_id} \u00F6demesi ba\u015Far\u0131yla al\u0131nd\u0131.`
+                    : `Sipari\u015F #${payment.order_id} \u00F6demesi ba\u015Far\u0131s\u0131z oldu.`,
+                io
+            );
+        }
+
+        if (isSuccess) {
+            await createNotification(
+                null,
+                'new_order',
+                `Yeni sipari\u015F kesinle\u015Fti (#${payment.order_id}). M\u00FC\u015Fteri: ${payment.customer_name || 'Bilinmiyor'}`,
                 io
             );
         }
@@ -345,14 +472,16 @@ const webhookIyzico = async (req, res) => {
         res.status(200).json({ ok: true, processed: true, status: isSuccess ? 'PAID' : 'FAILED' });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Iyzico webhook hatasi:', err.message);
-        res.status(500).json({ error: err.message || 'Webhook islenemedi.' });
+        console.error('Iyzico webhook hatas\u0131:', err.message);
+        res.status(500).json({ error: err.message || 'Webhook i\u015Flenemedi.' });
     } finally {
         client.release();
     }
 };
 
 module.exports = {
+    buildPaymentStatusResponse,
+    getPaymentStatus,
     initializePayment,
     webhookIyzico
 };

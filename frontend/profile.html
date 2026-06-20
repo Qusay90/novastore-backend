@@ -9,6 +9,8 @@
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
+    <script src="mobile-bridge.js"></script>
+    <script src="favorites-sync.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -813,7 +815,7 @@
                 <div id="reviews-container">
                     <div style="text-align: center; padding: 40px 0; color: #666;">
                         <span style="font-size: 3rem; display: block; margin-bottom: 15px;">⭐</span>
-                        Sisteme yakında eklenecek. Mükemmel bir yorum arayüzü yolda!
+                        Değerlendirmeleriniz yükleniyor...
                     </div>
                 </div>
             </div>
@@ -862,6 +864,18 @@
                             </div>
                             <div class="grid-2">
                                 <div class="form-group">
+                                    <label>Alıcı Ad Soyad</label>
+                                    <input type="text" id="addr-fullname" class="form-control"
+                                        placeholder="Ad Soyad" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Telefon</label>
+                                    <input type="tel" id="addr-phone" class="form-control"
+                                        placeholder="05XXXXXXXXX" required>
+                                </div>
+                            </div>
+                            <div class="grid-2">
+                                <div class="form-group">
                                     <label>İl</label>
                                     <input type="text" id="addr-city" class="form-control" placeholder="Örn: İstanbul"
                                         required>
@@ -900,21 +914,58 @@
         }
         function _cartKey() { return `novastore_cart_${_getUserId()}`; }
         function _addrKey() { return `novastore_addresses_${_getUserId()}`; }
+        function _addrMigrationKey() { return `novastore_addresses_migrated_${_getUserId()}`; }
         function _favsKey() { return `novastore_favs_${_getUserId()}`; }
         function _chkKey() { return `novastore_checkout_${_getUserId()}`; }
+
+        function appUrl(rawUrl) {
+            if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
+            if (!window.NOVASTORE_USE_NATIVE_THEME || window.NOVASTORE_IS_NATIVE_APP) return rawUrl;
+            try {
+                const url = new URL(rawUrl, window.location.href);
+                if (url.origin !== window.location.origin) return rawUrl;
+                url.searchParams.set('nativeTheme', '1');
+                return url.pathname.replace(/^\//, '') + url.search + url.hash;
+            } catch (_) {
+                return rawUrl;
+            }
+        }
 
         // --- 1. GÜVENLİK VE KULLANICI BİLGİLERİ ---
         const token = localStorage.getItem('nova_user_token');
         const userInfoStr = localStorage.getItem('nova_user_info');
 
         if (!token || !userInfoStr) {
-            window.location.href = "login.html";
+            window.location.href = appUrl("login.html");
+            throw new Error('Auth required');
         }
 
-        const user = JSON.parse(userInfoStr);
-        document.getElementById('user-name').innerText = user.fullName;
-        document.getElementById('user-email').innerText = user.email;
-        document.getElementById('user-avatar').innerText = user.fullName.charAt(0).toUpperCase();
+        let user = JSON.parse(userInfoStr);
+
+        function renderProfileHeader() {
+            document.getElementById('user-name').innerText = user.fullName;
+            document.getElementById('user-email').innerText = user.email;
+            document.getElementById('user-avatar').innerText = user.fullName.charAt(0).toUpperCase();
+        }
+
+        async function refreshProfileFromBackend() {
+            try {
+                const response = await fetch('/api/users/me', { headers: authHeaders() });
+                if (!response.ok) return;
+                const data = await response.json();
+                if (!data.user) return;
+                user = {
+                    ...user,
+                    fullName: data.user.fullName || user.fullName,
+                    email: data.user.email || user.email,
+                    phone: data.user.phone ?? null
+                };
+                localStorage.setItem('nova_user_info', JSON.stringify(user));
+                renderProfileHeader();
+            } catch (_) {}
+        }
+
+        renderProfileHeader();
 
         function decodeBase64Url(value) {
             const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
@@ -940,13 +991,24 @@
             return headers;
         }
 
+        refreshProfileFromBackend();
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
 
         function userLogout() {
             const uid = _getUserId();
             localStorage.removeItem(`novastore_checkout_${uid}`);
             localStorage.removeItem('nova_user_token');
             localStorage.removeItem('nova_user_info');
-            window.location.href = "index.html";
+            window.location.href = appUrl("index.html");
         }
 
         // --- 2. SEKMELER ARASI GEÇİŞ MANTIĞI (TAB SİSTEMİ) ---
@@ -1193,7 +1255,7 @@
             const selectedItems = cart.filter(item => item.selected !== false);
             if (selectedItems.length > 0) {
                 localStorage.setItem(_chkKey(), JSON.stringify(selectedItems));
-                window.location.href = 'checkout.html';
+                window.location.href = appUrl('checkout.html');
             }
         }
 
@@ -1298,7 +1360,37 @@
             `;
         }
 
-        function getProgressBarHtml(status) {
+        function getOrderDisplayStatus(order) {
+            return order?.display_status || order?.status || 'Durum yok';
+        }
+
+        function isPendingPaymentOrder(order) {
+            return !!order?.is_pending_payment || getOrderDisplayStatus(order) === 'Ödeme Bekliyor';
+        }
+
+        function isFailedPaymentOrder(order) {
+            return !!order?.is_payment_failed || getOrderDisplayStatus(order) === 'Ödeme Başarısız';
+        }
+
+        function getProgressBarHtml(status, order = {}) {
+            if (isPendingPaymentOrder(order)) {
+                return `
+                    <div style="margin:14px 0 4px; padding:14px 16px; border-radius:12px; background:#EAF3FF; border:1px solid #B8D8FF; color:#0B5CAB;">
+                        <div style="font-weight:800; margin-bottom:6px;">Ödeme Bekliyor</div>
+                        <div style="font-size:0.92rem; line-height:1.55;">${order.status_note || 'Ödeme tamamlanmadan sipariş kesinleşmez.'}</div>
+                    </div>
+                `;
+            }
+
+            if (isFailedPaymentOrder(order)) {
+                return `
+                    <div style="margin:14px 0 4px; padding:14px 16px; border-radius:12px; background:#FFF1F1; border:1px solid #F7C8C8; color:#8A1F1F;">
+                        <div style="font-weight:800; margin-bottom:6px;">Ödeme Başarısız</div>
+                        <div style="font-size:0.92rem; line-height:1.55;">${order.status_note || 'Ödeme tamamlanmadığı için sipariş kesinleşmedi.'}</div>
+                    </div>
+                `;
+            }
+
             let fillWidth = '0%';
             let steps = [
                 { label: 'Sipariş Alındı', active: false, icon: '✓' },
@@ -1386,38 +1478,53 @@
                         });
                     }
 
-                    const isCompactOrder = order.status === 'Teslim Edildi' || order.status === 'İptal Edildi' || order.status === 'İade Edildi';
+                    const displayStatus = getOrderDisplayStatus(order);
+                    const paymentFailed = isFailedPaymentOrder(order);
+                    const isCompactOrder = displayStatus === 'Teslim Edildi' || displayStatus === 'İptal Edildi' || displayStatus === 'İade Edildi' || paymentFailed;
                     if (isCompactOrder) {
-                        const isCancelled = order.status === 'İptal Edildi';
-                        const isReturned = order.status === 'İade Edildi';
+                        const isCancelled = displayStatus === 'İptal Edildi';
+                        const isReturned = displayStatus === 'İade Edildi';
                         const refundMeta = getRefundStatusMeta(order.refund_status);
                         const hasReturnFlow = !isCancelled && !isReturned && !!refundMeta;
                         const firstItem = products.length > 0 ? products[0] : null;
                         const firstItemQty = firstItem ? firstItem.quantity : 1;
                         const firstItemImage = firstItem ? ((firstItem.image && firstItem.image.trim() !== '') ? firstItem.image : (productImageMap[firstItem.id] || fallbackSvg)) : fallbackSvg;
-                        const compactCardClass = isCancelled
+                        const compactCardClass = paymentFailed || isCancelled
                             ? 'compact-order-card is-cancelled'
                             : isReturned
                                 ? 'compact-order-card is-returned'
                                 : hasReturnFlow
                                     ? 'compact-order-card has-return-flow'
                                     : 'compact-order-card';
-                        const statusIcon = isCancelled ? '✕' : (isReturned ? '↩' : (hasReturnFlow ? refundMeta.icon : '✓'));
-                        const statusTitle = isCancelled
+                        const statusIcon = paymentFailed || isCancelled ? '✕' : (isReturned ? '↩' : (hasReturnFlow ? refundMeta.icon : '✓'));
+                        const statusTitle = paymentFailed
+                            ? 'Ödeme başarısız'
+                            : isCancelled
                             ? 'Sipariş iptal edildi'
                             : isReturned
                                 ? 'İade edildi'
                                 : hasReturnFlow
                                     ? refundMeta.title
                                     : 'Sipariş tamamlandı';
-                        const statusSubtitle = isCancelled
+                        const statusSubtitle = paymentFailed
+                            ? (order.status_note || 'Ödeme tamamlanmadığı için sipariş kesinleşmedi.')
+                            : isCancelled
                             ? 'Detayları açıp iptal notunu ve ürünleri görebilirsiniz.'
                             : isReturned
                                 ? 'İade süreci tamamlandı, detayları açıp bilgileri görebilirsiniz.'
                                 : hasReturnFlow
                                     ? refundMeta.subtitle
                                     : 'Detayları açıp sipariş içeriğini görebilirsiniz.';
-                        const compactExtraHtml = isCancelled
+                        const compactExtraHtml = paymentFailed
+                            ? `
+                                <div style="margin-top:16px; display:grid; gap:12px;">
+                                    <div style="padding:14px 16px; border-radius:10px; background:#FFF1F1; border:1px solid #F7C8C8; color:#8A1F1F;">
+                                        <div style="font-weight:700; margin-bottom:6px;">Ödeme Notu</div>
+                                        <div style="font-size:0.92rem; line-height:1.55;">${order.status_note || 'Ödeme tamamlanmadığı için sipariş kesinleşmedi.'}</div>
+                                    </div>
+                                </div>
+                            `
+                            : isCancelled
                             ? `
                                 <div style="margin-top:16px; display:grid; gap:12px;">
                                     <div style="padding:14px 16px; border-radius:10px; background:#FFF1F1; border:1px solid #F7C8C8; color:#8A1F1F;">
@@ -1510,7 +1617,7 @@
                                 <div class="order-id-date"><span class="order-id">Sipariş No: #000${order.id}</span><span class="order-date">${standardDateStr}</span></div>
                                 <div class="order-total">${order.total_amount} TL</div>
                             </div>
-                            ${getProgressBarHtml(order.status)}
+                            ${getProgressBarHtml(displayStatus, order)}
                             ${trackingHtml}
                             <div class="order-items-box"><div style="font-size: 0.85rem; color: #888; margin-bottom: 8px; font-weight: 600; text-transform: uppercase;">Paket İçeriği</div>${itemsHtml}</div>
                         </div>`;
@@ -1525,14 +1632,37 @@
         }
 
         // --- 4. ÇOKLU ADRES YÖNETİMİ ---
-        function getStoredAddresses() {
-            const scopedKey = _addrKey();
-            const scopedAddresses = JSON.parse(localStorage.getItem(scopedKey) || '[]');
-            if (scopedAddresses.length > 0) {
-                return scopedAddresses;
-            }
+        function normalizeAddressForClient(addr) {
+            return {
+                id: String(addr.id || Date.now()),
+                title: addr.title || addr.label || 'Adres',
+                fullName: addr.fullName || addr.full_name || addr.recipientName || user.fullName || '',
+                phone: addr.phone || user.phone || '',
+                city: addr.city || addr.province || '',
+                district: addr.district || '',
+                detail: addr.detail || addr.addressLine || addr.address_line || addr.fullAddress || addr.address || '',
+                zip: addr.zip || '',
+                isDefault: addr.isDefault === true || addr.is_default === true
+            };
+        }
 
-            const legacyList = JSON.parse(localStorage.getItem('novastore_user_addresses') || '[]');
+        function isAddressMigrationComplete() {
+            return localStorage.getItem(_addrMigrationKey()) === '1';
+        }
+
+        function markAddressMigrationComplete() {
+            localStorage.setItem(_addrMigrationKey(), '1');
+        }
+
+        function readLocalAddresses(options = {}) {
+            const includeLegacy = options.includeLegacy !== false;
+            const scopedKey = _addrKey();
+            const scopedAddresses = JSON.parse(localStorage.getItem(scopedKey) || '[]').map(normalizeAddressForClient);
+            if (scopedAddresses.length > 0) return scopedAddresses;
+
+            if (!includeLegacy) return [];
+
+            const legacyList = JSON.parse(localStorage.getItem('novastore_user_addresses') || '[]').map(normalizeAddressForClient);
             if (legacyList.length > 0) {
                 localStorage.setItem(scopedKey, JSON.stringify(legacyList));
                 localStorage.removeItem('novastore_user_addresses');
@@ -1540,16 +1670,10 @@
             }
 
             const oldAddress = localStorage.getItem('nova_user_address');
-            if (!oldAddress) {
-                return [];
-            }
+            if (!oldAddress) return [];
 
             try {
-                const data = JSON.parse(oldAddress);
-                const migrated = [{
-                    ...data,
-                    id: data.id || Date.now().toString()
-                }];
+                const migrated = [normalizeAddressForClient(JSON.parse(oldAddress))];
                 localStorage.setItem(scopedKey, JSON.stringify(migrated));
                 localStorage.removeItem('nova_user_address');
                 return migrated;
@@ -1562,24 +1686,69 @@
             localStorage.setItem(_addrKey(), JSON.stringify(addresses));
         }
 
-        let addresses = getStoredAddresses();
+        async function apiAddress(path = '', options = {}) {
+            const response = await fetch(`/api/addresses${path}`, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    ...(options.headers || {})
+                }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || data.message || 'Adres işlemi tamamlanamadı.');
+            }
+            return data;
+        }
 
-        function renderAddresses() {
+        function toAddressPayload(addr) {
+            return {
+                title: addr.title,
+                fullName: addr.fullName || user.fullName || '',
+                phone: addr.phone || user.phone || '',
+                city: addr.city,
+                district: addr.district,
+                addressLine: addr.detail,
+                isDefault: addr.isDefault === true
+            };
+        }
+
+        async function migrateLocalAddressesToBackend(localAddresses) {
+            for (const addr of localAddresses) {
+                await apiAddress('', {
+                    method: 'POST',
+                    body: JSON.stringify(toAddressPayload(addr))
+                });
+            }
+            localStorage.removeItem(_addrKey());
+            markAddressMigrationComplete();
+        }
+
+        let addresses = readLocalAddresses({ includeLegacy: !isAddressMigrationComplete() });
+
+        function renderAddresses(message = '') {
             const container = document.getElementById('address-grid');
             container.innerHTML = '';
+
+            if (message) {
+                container.innerHTML += `<div style="grid-column: 1 / -1; color: #666; background:#F8FBFF; border:1px solid #DDE8F5; border-radius:12px; padding:14px;">${message}</div>`;
+            }
 
             addresses.forEach((addr, index) => {
                 container.innerHTML += `
                     <div style="background: white; border: 1px solid #EAEAEA; border-radius: 12px; padding: 20px; transition: 0.3s; position: relative;">
                         <h3 style="margin-top: 0; color: #0F2A43; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
-                            📍 ${addr.title}
+                            📍 ${addr.title} ${addr.isDefault ? '<span style="font-size:0.75rem; color:#F7941D;">Varsayılan</span>' : ''}
                         </h3>
                         <p style="color: #666; font-size: 0.95rem; line-height: 1.5; margin: 0 0 10px 0; min-height: 65px;">
+                            <strong>${addr.fullName || ''}</strong>${addr.phone ? ' - ' + addr.phone : ''}<br>
                             ${addr.detail}<br>
                             ${addr.district} / ${addr.city} ${addr.zip ? '- ' + addr.zip : ''}
                         </p>
                         <div style="display: flex; gap: 10px; margin-top: 20px; border-top: 1px dashed #EEE; padding-top: 15px;">
                             <button onclick="editAddress('${addr.id}')" style="flex: 1; background: #F8FBFF; color: #007BFF; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: 0.2s;">Düzenle</button>
+                            <button onclick="setDefaultAddress('${addr.id}')" style="flex: 1; background: #FFF7EC; color: #F7941D; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: 0.2s;">Varsayılan</button>
                             <button onclick="deleteAddress('${addr.id}')" style="flex: 1; background: #FFF0F0; color: #E53935; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: 0.2s;">Sil</button>
                         </div>
                     </div>
@@ -1598,6 +1767,8 @@
         function openAddressModal() {
             document.getElementById('address-form').reset();
             document.getElementById('addr-id').value = '';
+            document.getElementById('addr-fullname').value = user.fullName || '';
+            document.getElementById('addr-phone').value = user.phone || '';
             document.getElementById('btn-save-addr').innerText = 'Adresi Kaydet';
             document.getElementById('address-modal-overlay').style.display = 'flex';
         }
@@ -1611,38 +1782,46 @@
             if (e.target === this) closeAddressModal();
         });
 
-        function saveAddress(e) {
+        async function saveAddress(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-save-addr');
             btn.innerText = "Kaydediliyor...";
+            btn.disabled = true;
 
-            const newId = document.getElementById('addr-id').value || Date.now().toString();
+            const existingId = document.getElementById('addr-id').value;
 
             const addressData = {
-                id: newId,
+                id: existingId || Date.now().toString(),
                 title: document.getElementById('addr-title').value,
+                fullName: document.getElementById('addr-fullname').value,
+                phone: document.getElementById('addr-phone').value,
                 city: document.getElementById('addr-city').value,
                 district: document.getElementById('addr-district').value,
                 detail: document.getElementById('addr-detail').value,
                 zip: document.getElementById('addr-zip').value
             };
 
-            const existingIndex = addresses.findIndex(a => a.id === newId);
-            if (existingIndex > -1) {
-                addresses[existingIndex] = addressData; // Güncelle
-            } else {
-                addresses.push(addressData); // Yeni ekle
-            }
-
-            persistAddresses();
-
-            setTimeout(() => {
+            try {
+                if (existingId) {
+                    await apiAddress(`/${existingId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(toAddressPayload(addressData))
+                    });
+                } else {
+                    await apiAddress('', {
+                        method: 'POST',
+                        body: JSON.stringify(toAddressPayload(addressData))
+                    });
+                }
                 btn.innerText = "Kaydedildi!";
-                setTimeout(() => {
-                    closeAddressModal();
-                    renderAddresses();
-                }, 500);
-            }, 500);
+                closeAddressModal();
+                await loadAddress();
+            } catch (error) {
+                alert(error.message || 'Adres kaydedilemedi.');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = existingId ? 'Değişiklikleri Kaydet' : 'Adresi Kaydet';
+            }
         }
 
         function editAddress(id) {
@@ -1650,6 +1829,8 @@
             if (addr) {
                 document.getElementById('addr-id').value = addr.id;
                 document.getElementById('addr-title').value = addr.title || '';
+                document.getElementById('addr-fullname').value = addr.fullName || user.fullName || '';
+                document.getElementById('addr-phone').value = addr.phone || user.phone || '';
                 document.getElementById('addr-city').value = addr.city || '';
                 document.getElementById('addr-district').value = addr.district || '';
                 document.getElementById('addr-detail').value = addr.detail || '';
@@ -1659,17 +1840,47 @@
             }
         }
 
-        function deleteAddress(id) {
+        async function deleteAddress(id) {
             if (confirm('Bu adresi silmek istediğinize emin misiniz?')) {
-                addresses = addresses.filter(a => a.id !== id);
-                persistAddresses();
-                renderAddresses();
+                try {
+                    await apiAddress(`/${id}`, { method: 'DELETE' });
+                    addresses = addresses.filter(a => a.id !== String(id));
+                    persistAddresses();
+                    markAddressMigrationComplete();
+                    await loadAddress({ allowMigration: false });
+                } catch (error) {
+                    alert(error.message || 'Adres silinemedi.');
+                }
             }
         }
 
-        function loadAddress() {
-            addresses = getStoredAddresses();
-            renderAddresses();
+        async function setDefaultAddress(id) {
+            try {
+                await apiAddress(`/${id}/default`, { method: 'PATCH' });
+                await loadAddress();
+            } catch (error) {
+                alert(error.message || 'Varsayılan adres seçilemedi.');
+            }
+        }
+
+        async function loadAddress(options = {}) {
+            const allowMigration = options.allowMigration !== false && !isAddressMigrationComplete();
+            const localAddresses = readLocalAddresses({ includeLegacy: allowMigration });
+            renderAddresses('Adresler yükleniyor...');
+            try {
+                let remoteAddresses = (await apiAddress()).map(normalizeAddressForClient);
+                if (remoteAddresses.length === 0 && localAddresses.length > 0 && allowMigration) {
+                    await migrateLocalAddressesToBackend(localAddresses);
+                    remoteAddresses = (await apiAddress()).map(normalizeAddressForClient);
+                }
+                addresses = remoteAddresses;
+                persistAddresses();
+                markAddressMigrationComplete();
+                renderAddresses();
+            } catch (error) {
+                addresses = localAddresses;
+                renderAddresses('Adresler sunucudan alınamadı. Cihazdaki kayıtlı adresler gösteriliyor.');
+            }
         }
 
         // Sayfa açıldığında siparişleri çek
@@ -1680,20 +1891,28 @@
         }
 
         // --- 5. FAVORİLERİ GETİRME ---
-        function toggleFavoriteProfile(btn, event, productId) {
+        function showFavoriteSyncError() {
+            console.warn('Favoriler senkronlanamadi.');
+        }
+
+        async function toggleFavoriteProfile(btn, event, productId) {
             event.preventDefault();
             event.stopPropagation();
 
-            let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
-            favs = favs.filter(id => id !== productId);
-            localStorage.setItem(_favsKey(), JSON.stringify(favs));
+            try {
+                await NovaStoreFavorites.setFavorite(productId, false);
+            } catch (error) {
+                alert('Favori kaldırılamadı. Lütfen tekrar deneyin.');
+                return;
+            }
 
             // Ekranda kartı gizle
             const card = btn.closest('.product-card');
             card.style.opacity = '0';
             setTimeout(() => {
                 card.remove();
-                if (favs.length === 0) {
+                const remainingCards = document.querySelectorAll('#favorites-container .product-card').length;
+                if (remainingCards === 0) {
                     document.getElementById('favorites-container').innerHTML = `
                         <div style="text-align: center; padding: 40px 0; color: #666;">
                             <span style="font-size: 3rem; display: block; margin-bottom: 15px;">❤️</span>
@@ -1704,8 +1923,9 @@
         }
 
         async function fetchMyFavorites() {
-            let favs = JSON.parse(localStorage.getItem(_favsKey())) || [];
             const container = document.getElementById('favorites-container');
+            const favoriteIds = await NovaStoreFavorites.loadFavoriteIds({ onError: showFavoriteSyncError });
+            const favs = Array.from(favoriteIds);
 
             if (favs.length === 0) {
                 container.innerHTML = `
@@ -1716,7 +1936,7 @@
                 return;
             }
 
-            container.innerHTML = '<p style="text-align:center; color:#888;">Favorileriniz yükleniyor...</p>';
+            container.innerHTML = '<div class="native-loading"><span class="native-loading-spinner"></span><strong>Favorileriniz yükleniyor...</strong></div>';
 
             try {
                 // Tüm ürünleri çekip içinden favorileri filtreliyoruz.
@@ -1840,10 +2060,11 @@
             if (!Array.isArray(mediaItems) || mediaItems.length === 0) return '';
 
             const itemsHtml = mediaItems.map((media, index) => {
-                const mediaUrl = String(media?.media_url || '').trim();
-                if (!mediaUrl) return '';
+                const rawMediaUrl = String(media?.media_url || '').trim();
+                if (!rawMediaUrl) return '';
+                const mediaUrl = escapeHtml(rawMediaUrl);
 
-                if (isReviewVideoMedia(mediaUrl, media?.media_type)) {
+                if (isReviewVideoMedia(rawMediaUrl, media?.media_type)) {
                     return `
                         <a href="${mediaUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
                             <div style="width: 78px; height: 78px; border-radius: 12px; border: 1px solid #E5E7EB; background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; font-size: 0.76rem; font-weight: 700;">
@@ -1871,62 +2092,99 @@
         }
 
         // --- 6. DEĞERLENDİRMELERİMİ GETİRME ---
+        function renderReviewsLoading() {
+            return `
+                <div class="native-loading" style="padding: 42px 0;">
+                    <span class="native-loading-spinner"></span>
+                    <strong>Değerlendirmeleriniz yükleniyor...</strong>
+                </div>
+            `;
+        }
+
+        function renderReviewsEmpty() {
+            return `
+                <div style="text-align: center; padding: 44px 0; color: #666;">
+                    <span style="font-size: 3rem; display: block; margin-bottom: 15px;">⭐</span>
+                    <p style="font-size: 1.05rem; color: #333; margin: 0 0 8px; font-weight: 700;">Henüz değerlendirme yapmamışsınız.</p>
+                    <p style="margin: 0; color: #777;">Satın aldığınız ürünlere yorum yaptığınızda burada listelenecek.</p>
+                </div>
+            `;
+        }
+
+        function renderReviewsError(message) {
+            return `
+                <div style="text-align: center; padding: 44px 0; color: #666;">
+                    <span style="font-size: 3rem; display: block; margin-bottom: 15px;">⚠️</span>
+                    <p style="font-size: 1.05rem; color: #B91C1C; margin: 0 0 8px; font-weight: 700;">Değerlendirmeler yüklenemedi.</p>
+                    <p style="margin: 0 0 18px; color: #777;">${escapeHtml(message)}</p>
+                    <button onclick="fetchMyReviews()" style="border: none; background: #0F2A43; color: white; border-radius: 10px; padding: 10px 18px; font-weight: 700; cursor: pointer;">Tekrar dene</button>
+                </div>
+            `;
+        }
+
+        function renderReviewStars(ratingValue) {
+            const rating = Math.max(0, Math.min(5, parseInt(ratingValue, 10) || 0));
+            let starsHtml = '';
+            for (let i = 1; i <= 5; i++) {
+                if (i <= rating) {
+                    starsHtml += `<svg width="18" height="18" viewBox="0 0 24 24" fill="#F7941D" stroke="#F7941D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
+                } else {
+                    starsHtml += `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DDD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
+                }
+            }
+            return starsHtml;
+        }
+
         async function fetchMyReviews() {
             const container = document.getElementById('reviews-container');
-            container.innerHTML = '<p style="text-align:center; color:#888; padding: 40px 0;">Değerlendirmeleriniz yükleniyor...</p>';
+            container.innerHTML = renderReviewsLoading();
 
             try {
                 const effectiveUserId = getAuthenticatedUserId() || Number(user.id);
-                if (!Number.isInteger(effectiveUserId)) throw new Error('Oturum bilgisi dogrulanamadi.');
+                if (!Number.isInteger(effectiveUserId)) throw new Error('Oturum bilgisi doğrulanamadı.');
 
                 const response = await fetch('/api/reviews/user/' + effectiveUserId, {
                     headers: authHeaders()
                 });
-                const reviews = await response.json();
-                if (!response.ok) throw new Error(reviews.error || 'Degerlendirmeler getirilemedi.');
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload.error || 'Değerlendirmeler getirilemedi.');
 
+                const reviews = Array.isArray(payload) ? payload : (Array.isArray(payload.reviews) ? payload.reviews : []);
                 if (!reviews || reviews.length === 0) {
-                    container.innerHTML = `
-                        <div style="text-align: center; padding: 40px 0; color: #666;">
-                            <span style="font-size: 3rem; display: block; margin-bottom: 15px;">⭐</span>
-                            Henüz hiçbir ürüne yorum yapmamışsınız.
-                        </div>`;
+                    container.innerHTML = renderReviewsEmpty();
                     return;
                 }
 
                 let html = '<div style="display: flex; flex-direction: column; gap: 20px;">';
 
                 reviews.forEach(review => {
-                    const date = new Date(review.created_at).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
-                    const imageUrl = review.image_url || 'https://via.placeholder.com/100?text=Görsel+Yok';
+                    const createdAt = new Date(review.created_at);
+                    const date = Number.isNaN(createdAt.getTime())
+                        ? ''
+                        : createdAt.toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
+                    const productId = Number(review.product_id);
+                    const productUrl = Number.isInteger(productId) ? `product.html?id=${productId}` : 'index.html';
+                    const imageUrl = escapeHtml(review.image_url || 'https://via.placeholder.com/100?text=Görsel+Yok');
+                    const productName = escapeHtml(review.product_name || 'Ürün');
                     const reviewTextHtml = review.comment
                         ? `
                                 <p style="color: #444; font-size: 0.95rem; line-height: 1.5; margin: 0; background: white; padding: 15px; border-radius: 8px; border: 1px solid #F0F0F0;">
-                                    "${review.comment}"
+                                    "${escapeHtml(review.comment)}"
                                 </p>
                           `
                         : '';
 
-                    // Yıldızları oluştur
-                    let starsHtml = '';
-                    const rating = parseInt(review.rating);
-                    for (let i = 1; i <= 5; i++) {
-                        if (i <= rating) {
-                            starsHtml += `<svg width="18" height="18" viewBox="0 0 24 24" fill="#F7941D" stroke="#F7941D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
-                        } else {
-                            starsHtml += `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DDD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
-                        }
-                    }
+                    const starsHtml = renderReviewStars(review.rating);
 
                     html += `
                         <div style="background: #FAFAFA; border: 1px solid #EAEAEA; border-radius: 12px; padding: 20px; display: flex; gap: 20px; align-items: flex-start; transition: 0.3s;">
-                            <a href="product.html?id=${review.product_id}" style="flex-shrink: 0; display: block; border-radius: 8px; overflow: hidden; border: 1px solid #EEEEEE;">
-                                <img src="${imageUrl}" alt="${review.product_name}" style="width: 100px; height: 100px; object-fit: cover; display: block;">
+                            <a href="${productUrl}" style="flex-shrink: 0; display: block; border-radius: 8px; overflow: hidden; border: 1px solid #EEEEEE;">
+                                <img src="${imageUrl}" alt="${productName}" style="width: 100px; height: 100px; object-fit: cover; display: block;">
                             </a>
                             <div style="flex-grow: 1;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <a href="product.html?id=${review.product_id}" style="text-decoration: none; color: #0F2A43; font-weight: 700; font-size: 1.1rem; flex-grow: 1; margin-right: 15px;">${review.product_name}</a>
-                                    <div style="font-size: 0.85rem; color: #888; white-space: nowrap;">${date}</div>
+                                    <a href="${productUrl}" style="text-decoration: none; color: #0F2A43; font-weight: 700; font-size: 1.1rem; flex-grow: 1; margin-right: 15px;">${productName}</a>
+                                    <div style="font-size: 0.85rem; color: #888; white-space: nowrap;">${escapeHtml(date)}</div>
                                 </div>
                                 <div style="display: flex; gap: 3px; margin-bottom: 12px;">
                                     ${starsHtml}
@@ -1942,11 +2200,11 @@
                 container.innerHTML = html;
 
             } catch (error) {
-                const rawMsg = error && error.message ? error.message : 'Degerlendirmeler alinamadi.';
+                const rawMsg = error && error.message ? error.message : 'Değerlendirmeler alınamadı.';
                 const isAuthError = /Authentication required|Invalid or expired token|Access denied|403|401/i.test(rawMsg);
-                const msg = isAuthError ? 'Oturum suresi dolmus. Lutfen tekrar giris yapin.' : rawMsg;
+                const msg = isAuthError ? 'Oturum süresi dolmuş. Lütfen tekrar giriş yapın.' : rawMsg;
                 console.error(error);
-                container.innerHTML = '<p style="color:red; text-align:center; padding: 40px 0;">' + msg + '</p>';
+                container.innerHTML = renderReviewsError(msg);
 
             }
         }
@@ -1972,9 +2230,27 @@
             fetchProfileNotifications();
 
             // Socket.io bağlantısı
-            const socket = io();
+            const socketToken = localStorage.getItem('nova_user_token');
+            if (!socketToken) return;
+
+            const socket = io(undefined, {
+                auth: { token: socketToken },
+                transports: ['websocket', 'polling']
+            });
             socket.on('connect', () => {
                 socket.emit('join_room', `user_${user.id}`);
+            });
+            socket.on('connect_error', () => {
+                showProfileToast({
+                    type: 'warning',
+                    message: 'Bildirim bağlantısı kurulamadı. Lütfen oturumunuzu kontrol edip tekrar giriş yapın.'
+                });
+            });
+            socket.on('socket_error', () => {
+                showProfileToast({
+                    type: 'warning',
+                    message: 'Bildirim bağlantısı yetkilendirilemedi. Lütfen tekrar giriş yapın.'
+                });
             });
             socket.on('new_notification', (notif) => {
                 prependProfileNotif(notif);

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaStore | Kategoriler</title>
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <script src="mobile-bridge.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: #F7F9FC;
+            color: #111827;
+        }
+
+        .native-categories-page {
+            width: 100%;
+            padding: 14px 12px 112px;
+            box-sizing: border-box;
+        }
+
+        .native-categories-title {
+            margin: 4px 2px 8px;
+            color: #0F2A43;
+            font-size: 1.34rem;
+            line-height: 1.15;
+            font-weight: 900;
+        }
+
+        .native-categories-lead {
+            margin: 0 2px 14px;
+            color: #64748B;
+            font-size: 0.84rem;
+            line-height: 1.45;
+            font-weight: 650;
+        }
+
+        .native-categories-list {
+            display: grid;
+            gap: 11px;
+        }
+
+        .native-category-card {
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            background: #FFFFFF;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(15, 42, 67, 0.055);
+        }
+
+        .native-category-main {
+            width: 100%;
+            min-height: 76px;
+            display: grid;
+            grid-template-columns: 44px minmax(0, 1fr) 30px;
+            align-items: center;
+            gap: 12px;
+            padding: 0 14px;
+            border: 0;
+            background:
+                radial-gradient(circle at 92% 16%, rgba(247, 148, 29, 0.14), transparent 30%),
+                linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+            color: #0F2A43;
+            text-align: left;
+            text-decoration: none;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .native-category-mark {
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            background: #FFF7ED;
+            color: #F7941D;
+            font-size: 1rem;
+            font-weight: 900;
+        }
+
+        .native-category-copy {
+            min-width: 0;
+        }
+
+        .native-category-copy strong,
+        .native-category-copy em {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .native-category-copy strong {
+            color: #0F2A43;
+            font-size: 1rem;
+            line-height: 1.15;
+            font-weight: 900;
+        }
+
+        .native-category-copy em {
+            margin-top: 4px;
+            color: #64748B;
+            font-size: 0.74rem;
+            font-style: normal;
+            font-weight: 750;
+        }
+
+        .native-category-arrow {
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #FFF7ED;
+            color: #F7941D;
+            font-style: normal;
+            font-weight: 900;
+        }
+
+        .native-subcategory-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 0 14px 14px 70px;
+        }
+
+        .native-subcategory-link {
+            min-height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 12px;
+            border: 1px solid #FED7AA;
+            border-radius: 999px;
+            background: #FFFBF7;
+            color: #9A4B08;
+            text-decoration: none;
+            font-size: 0.76rem;
+            font-weight: 800;
+            line-height: 1;
+            text-align: center;
+            box-shadow: none;
+        }
+
+        .native-category-empty,
+        .native-category-error {
+            padding: 18px;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            background: #FFFFFF;
+            color: #64748B;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .native-loading {
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: #64748B;
+            font-weight: 750;
+        }
+
+        .native-loading-spinner {
+            position: relative;
+            width: 42px;
+            height: 42px;
+            border: 3px solid #E5E7EB;
+            border-right-color: #F7941D;
+            border-bottom-color: #F7941D;
+            border-radius: 999px;
+            animation: nativeLoadingSpin 0.72s linear infinite;
+        }
+
+        .native-loading-spinner::after {
+            content: "";
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            right: 1px;
+            top: 4px;
+            border-radius: 999px;
+            background: #F7941D;
+            box-shadow: 0 0 0 4px rgba(247, 148, 29, 0.12);
+        }
+
+        @keyframes nativeLoadingSpin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="native-categories-page">
+        <h1 class="native-categories-title">Kategoriler</h1>
+        <p class="native-categories-lead">Alışverişini hızlandıran ana bölümler ve alt kategoriler.</p>
+        <section class="native-categories-list" id="native-categories-list">
+            <div class="native-loading"><span class="native-loading-spinner"></span><strong>Kategoriler yükleniyor...</strong></div>
+        </section>
+    </main>
+
+    <script>
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function categoryUrl(name) {
+            return 'index.html?category=' + encodeURIComponent(name || '');
+        }
+
+        async function loadNativeCategories() {
+            const list = document.getElementById('native-categories-list');
+
+            try {
+                const response = await fetch('/api/categories');
+                const categories = await response.json();
+                const mainCategories = Array.isArray(categories)
+                    ? categories.filter((category) => category.parent_id === null)
+                    : [];
+
+                if (!mainCategories.length) {
+                    list.innerHTML = '<div class="native-category-empty">Kategori bulunamadı.</div>';
+                    return;
+                }
+
+                list.innerHTML = mainCategories.map((main) => {
+                    const children = categories.filter((category) => category.parent_id === main.id);
+                    const firstLetter = String(main.name || 'N').trim().charAt(0).toLocaleUpperCase('tr-TR');
+                    const childText = children.length
+                        ? children.length + ' alt kategori'
+                        : 'Tüm ürünleri görüntüle';
+                    const childrenHtml = children.length
+                        ? '<div class="native-subcategory-list">' + children.map((child) => (
+                            '<a class="native-subcategory-link" href="' + categoryUrl(child.name) + '">' + escapeHtml(child.name) + '</a>'
+                        )).join('') + '</div>'
+                        : '';
+
+                    return [
+                        '<article class="native-category-card">',
+                        '<a class="native-category-main" href="' + categoryUrl(main.name) + '">',
+                        '<span class="native-category-mark">' + escapeHtml(firstLetter) + '</span>',
+                        '<span class="native-category-copy"><strong>' + escapeHtml(main.name) + '</strong><em>' + childText + '</em></span>',
+                        '<span class="native-category-arrow">&rsaquo;</span>',
+                        '</a>',
+                        childrenHtml,
+                        '</article>'
+                    ].join('');
+                }).join('');
+            } catch (error) {
+                list.innerHTML = '<div class="native-category-error">Kategoriler yüklenemedi.</div>';
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadNativeCategories);
+        } else {
+            loadNativeCategories();
+        }
+    </script>
+</body>
+
+</html>

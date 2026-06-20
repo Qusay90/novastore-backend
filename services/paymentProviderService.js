@@ -11,7 +11,10 @@ const buildWebhookSignature = (payload, secret) => {
 const verifyWebhookSignature = (payload, signature, secret) => {
     if (!signature || !secret) return false;
     const expected = buildWebhookSignature(payload, secret);
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    const signatureBuffer = Buffer.from(String(signature));
+    const expectedBuffer = Buffer.from(expected);
+    if (signatureBuffer.length !== expectedBuffer.length) return false;
+    return crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
 };
 
 const initializeIyzicoPayment = async ({ orderId, amount, currency }) => {

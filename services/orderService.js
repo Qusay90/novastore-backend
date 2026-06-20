@@ -39,7 +39,7 @@ const restockItems = async (client, items) => {
     if (!Array.isArray(items)) return;
 
     for (const item of items) {
-        const productId = Number(item.id || item.product_id);
+        const productId = Number(item.id || item.product_id || item.productId);
         const quantity = Number(item.quantity || 0);
 
         if (!Number.isInteger(productId) || quantity <= 0) continue;
@@ -109,12 +109,72 @@ const createOrderWithReservation = async ({
 
     const order = orderInsert.rows[0];
 
-    await appendOrderEvent(client, order.id, 'ORDER_CREATED', 'Siparis olusturuldu.', {
+    await appendOrderEvent(client, order.id, 'ORDER_CREATED', 'Sipariş oluşturuldu.', {
         analyticsSessionKey,
         paymentMethod,
         totals: pricing.totals,
         campaigns: pricing.campaigns,
         coupon: pricing.coupon
+    });
+
+    return {
+        order,
+        pricing
+    };
+};
+
+const createPendingPaymentOrder = async ({
+    client = pool,
+    userId = null,
+    analyticsSessionKey = null,
+    fullName,
+    email,
+    phone,
+    address,
+    cartItems,
+    couponCode = null,
+    paymentMethod = 'card'
+}) => {
+    const pricing = await calculatePricing({ cartItems, couponCode, client });
+
+    const paymentStatus = paymentMethod === 'havale'
+        ? PAYMENT_STATUS.WAITING_TRANSFER
+        : PAYMENT_STATUS.REQUIRES_ACTION;
+
+    const orderInsert = await client.query(
+        `INSERT INTO orders
+            (user_id, total_amount, status, customer_name, email, phone, address, items, payment_status,
+             payment_method, refund_status, shipment_status, currency, analytics_session_key)
+         VALUES
+            ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14)
+         RETURNING *`,
+        [
+            userId,
+            round2(pricing.totals.total),
+            ORDER_STATUS.ODEME_BEKLIYOR,
+            fullName,
+            email,
+            phone,
+            extractAddressText(address),
+            JSON.stringify(pricing.items),
+            paymentStatus,
+            paymentMethod,
+            REFUND_STATUS.NONE,
+            SHIPMENT_STATUS.NONE,
+            pricing.totals.currency,
+            analyticsSessionKey
+        ]
+    );
+
+    const order = orderInsert.rows[0];
+
+    await appendOrderEvent(client, order.id, 'PAYMENT_INTENT_CREATED', 'Ödeme bekleyen ara kayıt oluşturuldu.', {
+        analyticsSessionKey,
+        paymentMethod,
+        totals: pricing.totals,
+        campaigns: pricing.campaigns,
+        coupon: pricing.coupon,
+        stockReserved: false
     });
 
     return {
@@ -145,7 +205,7 @@ const markOrderCancelled = async ({
 
     await restockItems(client, parsedItems);
 
-    await appendOrderEvent(client, order.id, 'ORDER_CANCELLED', 'Siparis iptal edildi.', {
+    await appendOrderEvent(client, order.id, 'ORDER_CANCELLED', 'Sipariş iptal edildi.', {
         reasonCode,
         note,
         refundStatus
@@ -157,7 +217,7 @@ const markOrderCancelled = async ({
 const updateOrderStatus = async ({ client = pool, orderId, status, shipmentStatus = null }) => {
     const resolvedStatus = resolveOrderStatus(status);
     if (!resolvedStatus) {
-        throw new Error('Gecersiz siparis durumu.');
+        throw new Error('Geçersiz sipariş durumu.');
     }
 
     const updateResult = await client.query(
@@ -171,10 +231,10 @@ const updateOrderStatus = async ({ client = pool, orderId, status, shipmentStatu
     );
 
     if (updateResult.rows.length === 0) {
-        throw new Error('Siparis bulunamadi.');
+        throw new Error('Sipariş bulunamadı.');
     }
 
-    await appendOrderEvent(client, orderId, 'ORDER_STATUS_UPDATED', `Siparis durumu guncellendi: ${resolvedStatus}`, {
+    await appendOrderEvent(client, orderId, 'ORDER_STATUS_UPDATED', `Sipariş durumu güncellendi: ${resolvedStatus}`, {
         status: resolvedStatus,
         shipmentStatus
     });
@@ -185,7 +245,9 @@ const updateOrderStatus = async ({ client = pool, orderId, status, shipmentStatu
 module.exports = {
     appendOrderEvent,
     parseItems,
+    reserveStock,
     restockItems,
+    createPendingPaymentOrder,
     createOrderWithReservation,
     markOrderCancelled,
     updateOrderStatus

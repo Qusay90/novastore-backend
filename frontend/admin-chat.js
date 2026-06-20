@@ -156,12 +156,26 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') sendAdminMessage();
     });
 
-    if (typeof io !== 'undefined' && !window.socket) {
-        window.socket = io();
+    function showAdminChatSocketNotice() {
+        if (!chatMessages) return;
+        chatMessages.insertAdjacentHTML(
+            'beforeend',
+            '<div style="text-align:center; color:#C62828; padding:10px; font-size:0.85rem;">Canlı destek bağlantısı yetkilendirilemedi. Yönetici oturumunuzu kontrol edin.</div>'
+        );
+    }
+
+    if (typeof io !== 'undefined' && !window.socket && adminToken) {
+        window.socket = io(undefined, {
+            auth: { token: adminToken },
+            transports: ['websocket', 'polling']
+        });
         window.socket.emit('join_room', 'admin_room');
     }
 
     if (window.socket) {
+        window.socket.on('connect_error', showAdminChatSocketNotice);
+        window.socket.on('socket_error', showAdminChatSocketNotice);
+
         window.socket.on('receive_message', (data) => {
             if (data.receiver_id == adminUserId) {
                 if (currentChatUserId == data.sender_id) {

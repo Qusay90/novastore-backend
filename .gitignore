@@ -7,16 +7,26 @@ yarn-error.log*
 # Build outputs
 dist/
 build/
+**/build/
 *.log
+*.apk
+*.aab
+*.ap_
+.gradle/
+**/.gradle/
+artifacts/
 
 # Environment files
 .env
 .env.*
 !.env.example
+local.properties
+keystore.properties
 
 # IDE files
 .vscode/
 .idea/
+app/.run/
 *.swp
 *.swo
 
@@ -28,10 +38,17 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+.playwright-mcp/
 
 # Sensitive files (auto-detected)
 .env
 error.log
 temp_error.log
+*.jks
+*.keystore
 
 veri tabanı giriş şifresi.txt
+
+# Generated Cordova placeholders
+/frontend/cordova.js
+/frontend/cordova_plugins.js

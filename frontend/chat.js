@@ -353,6 +353,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 .chat-card-btn:hover { opacity: 0.92; }
                 .chat-system-card { background: linear-gradient(180deg, #FFF9F3 0%, #FFFFFF 100%); border: 1px solid #F6D5B2; border-radius: 12px; padding: 10px 12px; color: #7A4A12; font-size: 0.84rem; }
                 .chat-system-card strong { display: block; color: #B45309; margin-bottom: 4px; font-size: 0.82rem; }
+                .chat-mode-meta { display: inline-flex; align-items: center; gap: 6px; background: #EEF4FB; color: #0F2A43; border: 1px solid #D7E3F0; border-radius: 999px; padding: 5px 9px; font-size: 0.74rem; font-weight: 800; margin-bottom: 8px; }
+                .chat-comparison-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.76rem; overflow: hidden; border-radius: 10px; }
+                .chat-comparison-table th, .chat-comparison-table td { border: 1px solid #E6EDF5; padding: 7px; vertical-align: top; text-align: left; }
+                .chat-comparison-table th { background: #F4F7FB; color: #0F2A43; font-weight: 800; }
+                .chat-confirm-card { margin-top: 10px; padding: 10px; border: 1px solid #F6D5B2; background: #FFF9F3; color: #7A4A12; border-radius: 12px; font-size: 0.84rem; }
+                .chat-confirm-card strong { display: block; color: #B45309; margin-bottom: 4px; }
             </style>
         </div>
     `;
@@ -394,14 +400,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const existingSocket = window.socket && typeof window.socket.on === 'function'
             ? window.socket
             : null;
-        const socket = existingSocket || io(undefined, { transports: ['websocket', 'polling'] });
+        if (!token) return null;
+
+        const socket = existingSocket || io(undefined, {
+            auth: { token },
+            transports: ['websocket', 'polling']
+        });
         window.socket = socket;
 
         const roomName = `user_${userId}`;
         const joinRoom = () => socket.emit('join_room', roomName);
+        const handleSocketAuthError = () => {
+            if (chatMode === 'support') {
+                renderBubble('Canlı destek bağlantısı yetkilendirilemedi. Lütfen oturumunuzu kontrol edip tekrar giriş yapın.', 'received', Date.now());
+            }
+        };
 
         if (!socket.__novaChatJoinRoom || socket.__novaChatJoinRoom !== roomName) {
             socket.on('connect', joinRoom);
+            socket.on('connect_error', handleSocketAuthError);
+            socket.on('socket_error', handleSocketAuthError);
             socket.__novaChatJoinRoom = roomName;
         }
 
@@ -418,6 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let unreadCount = 0;
     let chatMode = 'assistant';
     let assistantHistory = loadAssistantHistory();
+    let assistantSelectedMode = localStorage.getItem('nova_assistant_mode') || 'friendly';
 
     function getCurrentUserId() {
         try {
@@ -502,6 +521,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function persistAssistantHistory() {
         localStorage.setItem(assistantHistoryKey(), JSON.stringify(assistantHistory.slice(-24)));
+    }
+
+    function persistAssistantMode() {
+        localStorage.setItem('nova_assistant_mode', assistantSelectedMode);
     }
 
     function escapeHtml(value) {
@@ -599,19 +622,116 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<div class="chat-product-grid">${cards}</div>`;
     }
 
+    function normalizeAssistantProducts(payload) {
+        if (Array.isArray(payload.products) && payload.products.length > 0) return payload.products;
+        if (!Array.isArray(payload.cards)) return [];
+        return payload.cards.map((card) => ({
+            id: card.productId,
+            name: card.title,
+            price: card.price,
+            oldPrice: card.oldPrice,
+            imageUrl: card.imageUrl,
+            productUrl: card.productUrl || (card.productId ? `product.html?id=${card.productId}` : '#'),
+            stock: card.stock,
+            category: card.category,
+            averageRating: card.rating,
+            reviewCount: card.reviewCount
+        }));
+    }
+
+    function buildModeMetaHtml(entry) {
+        const mode = entry.modeLabel || entry.mode;
+        const modes = Array.isArray(entry.availableModes) ? entry.availableModes : [];
+        const modeBadge = mode ? `<div class="chat-mode-meta">${escapeHtml(mode)}</div>` : '';
+        const modeButtons = modes.length > 0
+            ? `<div class="chat-chip-wrap">${modes.map((item) => {
+                const id = escapeHtml(item.id || item.key || item.mode || '');
+                const title = escapeHtml(item.title || item.label || item.id || 'Mod');
+                return `<button type="button" class="chat-chip" data-mode="${id}">${title}</button>`;
+            }).join('')}</div>`
+            : '';
+        return `${modeBadge}${modeButtons}`;
+    }
+
+    function buildComparisonHtml(comparison) {
+        const rows = comparison && Array.isArray(comparison.rows) ? comparison.rows : [];
+        if (!rows.length) return '';
+
+        return `
+            <table class="chat-comparison-table">
+                <thead><tr><th>Ürün</th><th>Fiyat</th><th>Öne çıkan</th></tr></thead>
+                <tbody>
+                    ${rows.map((row) => `
+                        <tr>
+                            <td>${escapeHtml(row.title || row.name || 'Ürün')}</td>
+                            <td>${escapeHtml(formatMoney(row.price))}</td>
+                            <td>${escapeHtml(row.bestFor || (Array.isArray(row.pros) ? row.pros.slice(0, 2).join(', ') : '') || 'Karşılaştırma bilgisi')}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    function describePendingAction(action) {
+        if (!action || !action.type) return 'Bu işlemi onaylıyor musunuz?';
+        if (action.type === 'add_to_cart') return 'Bu ürünü sepete ekleyeyim mi?';
+        if (action.type === 'live_support') return 'Canlı desteğe bağlanmak ister misiniz?';
+        return 'Bu işlemi onaylıyor musunuz?';
+    }
+
+    function buildPendingActionHtml(entry) {
+        if (!entry.requiresConfirmation || !entry.pendingAction) return '';
+        return `
+            <div class="chat-confirm-card">
+                <strong>Onay bekleniyor</strong>
+                ${escapeHtml(describePendingAction(entry.pendingAction))}
+                <div class="chat-chip-wrap">
+                    <button type="button" class="chat-chip" data-action="confirm-pending">Evet</button>
+                    <button type="button" class="chat-chip" data-action="cancel-pending">Vazgeç</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function findAssistantProduct(productId) {
+        const id = Number(productId);
+        if (!Number.isInteger(id)) return null;
+        for (const entry of assistantHistory.slice().reverse()) {
+            const product = (entry.products || []).find((item) => Number(item.id) === id);
+            if (product) return product;
+        }
+        return null;
+    }
+
+    function getLatestPendingEntry() {
+        return assistantHistory.slice().reverse().find((entry) => entry.pendingAction);
+    }
+
+    function clearLatestPendingEntry() {
+        const entry = getLatestPendingEntry();
+        if (entry) {
+            entry.pendingAction = null;
+            entry.requiresConfirmation = false;
+            persistAssistantHistory();
+            if (chatMode === 'assistant') renderAssistantHistory();
+        }
+    }
     function renderAssistantEntry(entry) {
         const safeText = escapeHtml(entry.message || '').replace(/\n/g, '<br>');
+        const modeMeta = buildModeMetaHtml(entry);
         const productsHtml = buildProductCardsHtml(entry.products || []);
+        const comparisonHtml = buildComparisonHtml(entry.comparison);
+        const pendingHtml = buildPendingActionHtml(entry);
         const suggestions = Array.isArray(entry.suggestions) && entry.suggestions.length > 0
             ? `<div class="chat-chip-wrap">${entry.suggestions.map((item) => `<button type="button" class="chat-chip" data-prompt="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join('')}</div>`
             : '';
-        const escalateButton = entry.allowEscalation
+        const escalateButton = entry.allowEscalation && !entry.requiresConfirmation
             ? '<div class="chat-chip-wrap"><button type="button" class="chat-chip" data-action="escalate">Canlı desteğe bağlan</button></div>'
             : '';
 
-        renderBubble(`${safeText}${productsHtml}${suggestions}${escalateButton}`, entry.role === 'user' ? 'sent' : 'received', entry.createdAt);
+        renderBubble(`${modeMeta}${safeText}${productsHtml}${comparisonHtml}${pendingHtml}${suggestions}${escalateButton}`, entry.role === 'user' ? 'sent' : 'received', entry.createdAt);
     }
-
     function renderAssistantWelcome() {
         chatMessages.innerHTML = `
             <div class="chat-helper-note">NovaStore AI Asistan ürün bulma, yorum özeti ve karar vermeyi kolaylaştırma konularında yardımcı olur.</div>
@@ -688,7 +808,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return {
             page: window.location.pathname.split('/').pop() || 'index.html',
             title: document.title,
-            productId: Number.isInteger(productId) ? productId : null
+            productId: Number.isInteger(productId) ? productId : null,
+            selectedMode: assistantSelectedMode,
+            lastProductIds: assistantHistory
+                .flatMap((entry) => entry.products || [])
+                .map((product) => Number(product.id))
+                .filter(Number.isInteger)
+                .slice(-6),
+            pendingAction: (getLatestPendingEntry() || {}).pendingAction || null
         };
     }
 
@@ -748,9 +875,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) {
                 appendAssistantEntry({
                     role: 'assistant',
-                    message: payload.error || 'AI asistan su an yanit veremiyor.',
+                    message: payload.error || 'AI asistan şu an yanıt veremiyor.',
                     createdAt: Date.now(),
-                    suggestions: ['Canli destege baglan'],
+                    suggestions: ['Canlı desteğe bağlan'],
                     products: [],
                     allowEscalation: true
                 });
@@ -761,24 +888,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 role: 'assistant',
                 message: payload.reply,
                 createdAt: Date.now(),
+                mode: payload.mode,
+                modeLabel: payload.modeLabel,
+                availableModes: payload.availableModes || [],
                 suggestions: payload.suggestions || [],
-                products: payload.products || [],
-                allowEscalation: Boolean(payload.allowEscalation)
+                products: normalizeAssistantProducts(payload),
+                comparison: payload.comparison || null,
+                allowEscalation: Boolean(payload.allowEscalation),
+                requiresConfirmation: Boolean(payload.requiresConfirmation),
+                pendingAction: payload.pendingAction || null
             });
         } catch (err) {
-            console.error('AI mesaj hatasi:', err);
+            console.error('AI mesaj hatası:', err);
             showTyping(false);
             appendAssistantEntry({
                 role: 'assistant',
-                message: 'Sunucuya su an baglanamadim. Isterseniz canli destek moduna gecelim.',
+                message: 'Sunucuya şu an bağlanamadım. İsterseniz canlı destek moduna geçelim.',
                 createdAt: Date.now(),
-                suggestions: ['Canli destege baglan'],
+                suggestions: ['Canlı desteğe bağlan'],
                 products: [],
                 allowEscalation: true
             });
         }
     }
-
     async function sendSupportMessage() {
         if (!token || !userId) {
             if (confirm('Canlı desteği kullanabilmek için giriş yapmalısınız. Giriş sayfasına gitmek ister misiniz?')) {
@@ -912,11 +1044,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     chatMessages.addEventListener('click', (event) => {
-        const actionTarget = event.target.closest('[data-action], [data-prompt]');
+        const actionTarget = event.target.closest('[data-action], [data-prompt], [data-mode]');
         if (!actionTarget) return;
 
         const prompt = actionTarget.getAttribute('data-prompt');
         const action = actionTarget.getAttribute('data-action');
+        const mode = actionTarget.getAttribute('data-mode');
 
         if (prompt) {
             chatInput.value = prompt;
@@ -929,6 +1062,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (action === 'escalate') {
             handleEscalationRequest();
+            return;
+        }
+
+        if (action === 'confirm-pending') {
+            const pendingEntry = getLatestPendingEntry();
+            const pendingAction = pendingEntry && pendingEntry.pendingAction;
+            if (!pendingAction) return;
+
+            if (pendingAction.type === 'add_to_cart') {
+                const productId = pendingAction.productId || pendingAction.product_id || pendingAction.id;
+                const product = pendingAction.product || findAssistantProduct(productId);
+                if (product) {
+                    addProductToCart(product);
+                    appendAssistantEntry({ role: 'assistant', message: 'Ürün sepete eklendi.', createdAt: Date.now(), suggestions: ['Sepetimi kontrol et'], products: [] });
+                } else {
+                    appendAssistantEntry({ role: 'assistant', message: 'Ürün bilgisini bulamadım. Ürün kartından tekrar deneyebilirsiniz.', createdAt: Date.now(), suggestions: [], products: [] });
+                }
+                clearLatestPendingEntry();
+                return;
+            }
+
+            if (pendingAction.type === 'live_support') {
+                clearLatestPendingEntry();
+                handleEscalationRequest();
+                return;
+            }
+
+            clearLatestPendingEntry();
+            return;
+        }
+
+        if (action === 'cancel-pending') {
+            clearLatestPendingEntry();
+            appendAssistantEntry({ role: 'assistant', message: 'Tamam, işlemi iptal ettim.', createdAt: Date.now(), suggestions: [], products: [] });
             return;
         }
 
@@ -948,6 +1115,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 actionTarget.textContent = originalText;
                 actionTarget.disabled = false;
             }, 1200);
+        }
+
+        if (mode) {
+            assistantSelectedMode = mode;
+            persistAssistantMode();
+            chatInput.value = `${actionTarget.textContent.trim()} modunda devam et`;
+            chatInput.focus();
         }
     });
 

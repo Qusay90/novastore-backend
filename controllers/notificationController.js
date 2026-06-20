@@ -28,7 +28,7 @@ const createNotification = async (userId, type, message, io = null) => {
 
         return notif;
     } catch (err) {
-        console.error('Bildirim olusturma hatasi:', err.message);
+        console.error('Bildirim oluşturma hatası:', err.message);
         return null;
     }
 };
@@ -38,7 +38,7 @@ const getUserNotifications = async (req, res) => {
     try {
         const userId = Number(req.params.userId);
         if (!Number.isInteger(userId)) {
-            return res.status(400).json({ error: 'Gecersiz kullanici kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz kullanıcı kimliği.' });
         }
 
         const result = await pool.query(
@@ -47,7 +47,7 @@ const getUserNotifications = async (req, res) => {
         );
         res.status(200).json(result.rows);
     } catch (err) {
-        console.error('Bildirim getirme hatasi:', err.message);
+        console.error('Bildirim getirme hatası:', err.message);
         res.status(500).json({ error: 'Bildirimler getirilemedi.' });
     }
 };
@@ -60,7 +60,7 @@ const getAdminNotifications = async (req, res) => {
         );
         res.status(200).json(result.rows);
     } catch (err) {
-        console.error('Admin bildirim hatasi:', err.message);
+        console.error('Admin bildirim hatası:', err.message);
         res.status(500).json({ error: 'Admin bildirimleri getirilemedi.' });
     }
 };
@@ -70,24 +70,24 @@ const markAsRead = async (req, res) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id)) {
-            return res.status(400).json({ error: 'Gecersiz bildirim kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz bildirim kimliği.' });
         }
 
         const notifResult = await pool.query('SELECT id, user_id FROM notifications WHERE id = $1', [id]);
         if (notifResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Bildirim bulunamadi.' });
+            return res.status(404).json({ error: 'Bildirim bulunamadı.' });
         }
 
         const notif = notifResult.rows[0];
 
         if (req.user.role !== 'admin') {
             if (notif.user_id === null || Number(notif.user_id) !== req.user.id) {
-                return res.status(403).json({ error: 'Bu bildirime erisim yetkiniz yok.' });
+                return res.status(403).json({ error: 'Bu bildirime erişim yetkiniz yok.' });
             }
         }
 
         await pool.query('UPDATE notifications SET is_read = TRUE WHERE id = $1', [id]);
-        res.status(200).json({ mesaj: 'Bildirim okundu olarak isaretlendi.' });
+        res.status(200).json({ mesaj: 'Bildirim okundu olarak işaretlendi.' });
     } catch (err) {
         res.status(500).json({ error: 'Bildirim guncellenemedi.' });
     }
@@ -104,20 +104,20 @@ const markAllAsRead = async (req, res) => {
             } else {
                 const numericUserId = Number(userId);
                 if (!Number.isInteger(numericUserId)) {
-                    return res.status(400).json({ error: 'Gecersiz kullanici kimligi.' });
+                    return res.status(400).json({ error: 'Geçersiz kullanıcı kimliği.' });
                 }
                 await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [numericUserId]);
             }
-            return res.status(200).json({ mesaj: 'Tum bildirimler okundu olarak isaretlendi.' });
+            return res.status(200).json({ mesaj: 'Tüm bildirimler okundu olarak işaretlendi.' });
         }
 
         const requestedUserId = Number(userId);
         if (!Number.isInteger(requestedUserId) || requestedUserId !== req.user.id) {
-            return res.status(403).json({ error: 'Bu islem icin yetkiniz yok.' });
+            return res.status(403).json({ error: 'Bu işlem için yetkiniz yok.' });
         }
 
         await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [req.user.id]);
-        res.status(200).json({ mesaj: 'Tum bildirimler okundu olarak isaretlendi.' });
+        res.status(200).json({ mesaj: 'Tüm bildirimler okundu olarak işaretlendi.' });
     } catch (err) {
         res.status(500).json({ error: 'Bildirimler guncellenemedi.' });
     }

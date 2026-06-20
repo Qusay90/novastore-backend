@@ -1,4 +1,5 @@
 ﻿const ORDER_STATUS = Object.freeze({
+    ODEME_BEKLIYOR: '\u00d6deme Bekliyor',
     ONAY_BEKLIYOR: 'Onay Bekliyor',
     HAZIRLANIYOR: 'Haz\u0131rlan\u0131yor',
     KARGOYA_VERILDI: 'Kargoya Verildi',
@@ -48,6 +49,7 @@ Object.values(ORDER_STATUS).forEach((status) => {
     STATUS_LOOKUP.set(normalizeStatus(status), status);
 });
 
+STATUS_LOOKUP.set('odeme_bekliyor', ORDER_STATUS.ODEME_BEKLIYOR);
 STATUS_LOOKUP.set('onay_bekliyor', ORDER_STATUS.ONAY_BEKLIYOR);
 STATUS_LOOKUP.set('hazirlaniyor', ORDER_STATUS.HAZIRLANIYOR);
 STATUS_LOOKUP.set('kargoya_verildi', ORDER_STATUS.KARGOYA_VERILDI);

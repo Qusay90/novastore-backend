@@ -35,7 +35,7 @@ const getReviewPermission = async (userId, productId) => {
             canReview: false,
             requiresAuth: true,
             code: 'AUTH_REQUIRED',
-            message: 'Degerlendirme yapabilmek icin giris yapmalisiniz.'
+            message: 'Değerlendirme yapabilmek için giriş yapmalısınız.'
         };
     }
 
@@ -49,7 +49,7 @@ const getReviewPermission = async (userId, productId) => {
             canReview: false,
             requiresAuth: false,
             code: 'ALREADY_REVIEWED',
-            message: 'Bu urunu zaten degerlendirdiniz.'
+            message: 'Bu ürünü zaten değerlendirdiniz.'
         };
     }
 
@@ -59,7 +59,7 @@ const getReviewPermission = async (userId, productId) => {
             canReview: false,
             requiresAuth: false,
             code: 'DELIVERY_REQUIRED',
-            message: 'Bu urune sadece satin alip siparisi teslim edilen musteriler degerlendirme yapabilir.'
+            message: 'Bu ürüne sadece satın alıp siparişi teslim edilen müşteriler değerlendirme yapabilir.'
         };
     }
 
@@ -129,7 +129,7 @@ const loadReviewMediaMap = async (reviewIds) => {
     return mediaMap;
 };
 
-// 1. Urune yorum ekleme
+// 1. Ürüne yorum ekleme
 const addReview = async (req, res) => {
     let client;
 
@@ -138,12 +138,12 @@ const addReview = async (req, res) => {
         const userId = req.user.id;
 
         if (!productId || !rating) {
-            return res.status(400).json({ error: 'Urun ve puan bilgisi zorunludur.' });
+            return res.status(400).json({ error: 'Ürün ve puan bilgisi zorunludur.' });
         }
 
         const numericProductId = Number(productId);
         if (!Number.isInteger(numericProductId) || numericProductId <= 0) {
-            return res.status(400).json({ error: 'Gecerli bir urun secmelisiniz.' });
+            return res.status(400).json({ error: 'Geçerli bir ürün seçmelisiniz.' });
         }
 
         const numericRating = Number(rating);
@@ -153,12 +153,12 @@ const addReview = async (req, res) => {
 
         const normalizedComment = normalizeReviewComment(comment);
         if (normalizedComment && normalizedComment.length > MAX_REVIEW_COMMENT_LENGTH) {
-            return res.status(400).json({ error: 'Yorum metni cok uzun. Lutfen daha kisa bir yorum yazin.' });
+            return res.status(400).json({ error: 'Yorum metni çok uzun. Lütfen daha kısa bir yorum yazın.' });
         }
 
         const reviewMedia = buildReviewMediaPayload(req.files);
         if (reviewMedia.length > MAX_REVIEW_MEDIA_COUNT) {
-            return res.status(400).json({ error: 'En fazla 4 gorsel veya video ekleyebilirsiniz.' });
+            return res.status(400).json({ error: 'En fazla 4 görsel veya video ekleyebilirsiniz.' });
         }
 
         const permission = await getReviewPermission(userId, numericProductId);
@@ -190,7 +190,7 @@ const addReview = async (req, res) => {
         await client.query('COMMIT');
 
         res.status(201).json({
-            mesaj: 'Degerlendirmeniz basariyla eklendi!',
+            mesaj: 'Değerlendirmeniz başarıyla eklendi!',
             reviewId
         });
 
@@ -200,7 +200,7 @@ const addReview = async (req, res) => {
             await createNotification(
                 null,
                 'new_review',
-                `Yeni bir urun yorumu eklendi! Urun ID: #${numericProductId} - Puan: ${numericRating}/5`,
+                `Yeni bir ürün yorumu eklendi! Ürün ID: #${numericProductId} - Puan: ${numericRating}/5`,
                 io
             );
         } catch (_) { }
@@ -211,19 +211,19 @@ const addReview = async (req, res) => {
             } catch (_) { }
         }
 
-        console.error('Yorum ekleme hatasi:', err.message);
-        res.status(500).json({ error: 'Yorum eklenirken hata olustu.' });
+        console.error('Yorum ekleme hatası:', err.message);
+        res.status(500).json({ error: 'Yorum eklenirken hata oluştu.' });
     } finally {
         if (client) client.release();
     }
 };
 
-// 2. Bir urunun tum yorumlarini ve puan ortalamasini getirme
+// 2. Bir ürünün tüm yorumlarını ve puan ortalamasını getirme
 const getProductReviews = async (req, res) => {
     try {
         const productId = Number(req.params.productId);
         if (!Number.isInteger(productId) || productId <= 0) {
-            return res.status(400).json({ error: 'Gecersiz urun kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz ürün kimliği.' });
         }
 
         const authUser = getUserFromRequestIfAny(req);
@@ -257,7 +257,7 @@ const getProductReviews = async (req, res) => {
             reviewPermission
         });
     } catch (err) {
-        console.error('Yorumlari getirme hatasi:', err.message);
+        console.error('Yorumları getirme hatası:', err.message);
         res.status(500).json({ error: 'Yorumlar getirilemedi.' });
     }
 };
@@ -285,7 +285,7 @@ const getUserReviews = async (req, res) => {
             }))
         );
     } catch (err) {
-        console.error('Kullanici yorumlari getirme hatasi:', err);
+        console.error('Kullanıcı yorumları getirme hatası:', err);
         res.status(500).json({ error: 'Yorumlariniz getirilemedi.' });
     }
 };

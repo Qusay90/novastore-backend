@@ -150,18 +150,18 @@ const getBackgroundRemovalRequestedForFile = (mediaEntry, fallbackValue = false)
 const formatBackgroundRemovalFailureReason = (reason) => {
     const normalizedReason = String(reason || '').trim();
     if (!normalizedReason) {
-        return 'Arka plan kaldirma onizlemesi Cloudinary tarafinda hazirlanamadi.';
+        return 'Arka plan kaldırma önizlemesi Cloudinary tarafında hazırlanamadı.';
     }
 
     if (/less than 64x64/i.test(normalizedReason) || /too small/i.test(normalizedReason)) {
-        return 'Gorsel cok kucuk. Arka plan kaldirma onizlemesi icin en az 64x64 px gorsel gerekiyor.';
+        return 'Görsel çok küçük. Arka plan kaldırma önizlemesi için en az 64x64 px görsel gerekiyor.';
     }
 
     if (/unsupported/i.test(normalizedReason)) {
-        return 'Bu gorsel formati arka plan kaldirma onizlemesinde desteklenmiyor.';
+        return 'Bu görsel formatı arka plan kaldırma önizlemesinde desteklenmiyor.';
     }
 
-    return `Arka plan kaldirma onizlemesi hazirlanamadi: ${normalizedReason}`;
+    return `Arka plan kaldırma önizlemesi hazırlanamadı: ${normalizedReason}`;
 };
 
 const extractCloudinaryAssetFromUrl = (mediaUrl) => {
@@ -239,7 +239,7 @@ const buildBackgroundRemovalPreviewForAsset = async (asset) => {
     if (!asset || !asset.publicId || !isBackgroundRemovalEligibleForAsset(asset)) {
         return {
             url: null,
-            warning: 'Bu medya icin arka plan kaldirma onizlemesi kullanilamaz.'
+            warning: 'Bu medya için arka plan kaldırma önizlemesi kullanılamaz.'
         };
     }
 
@@ -269,7 +269,7 @@ const buildBackgroundRemovalPreviewForAsset = async (asset) => {
 
         return { url: transformedUrl, warning: null };
     } catch (error) {
-        console.error(`Arka plan kaldirma hatasi (${asset.publicId}):`, error.message);
+        console.error(`Arka plan kaldırma hatası (${asset.publicId}):`, error.message);
         return {
             url: null,
             warning: formatBackgroundRemovalFailureReason(error.message)
@@ -287,7 +287,7 @@ const destroyCloudinaryAsset = async (publicId, resourceType = 'image') => {
             resource_type: resourceType
         });
     } catch (error) {
-        console.error(`Cloudinary varlik silme hatasi (${publicId}):`, error.message);
+        console.error(`Cloudinary varlık silme hatası (${publicId}):`, error.message);
     }
 };
 
@@ -310,7 +310,7 @@ const applyBackgroundRemovalToFile = async (file) => {
     if (!previewResult.url || previewResult.warning) {
         return {
             url: originalUrl,
-            warning: `${getUploadedFileName(file) || 'Bir gorsel'} icin ${previewResult.warning || 'Arka plan kaldirma uygulanamadi; orijinal dosya korundu.'}`
+            warning: `${getUploadedFileName(file) || 'Bir görsel'} için ${previewResult.warning || 'Arka plan kaldırma uygulanamadı; orijinal dosya korundu.'}`
         };
     }
 
@@ -460,16 +460,16 @@ const buildProductPayload = async (body, files, existingProduct = null) => {
     const removeBackground = parseBooleanFlag(body.removeBackground);
 
     if (!name) {
-        return { error: 'Urun adi zorunludur.' };
+        return { error: 'Ürün adı zorunludur.' };
     }
     if (!Number.isFinite(price) || price < 0) {
-        return { error: 'Urun fiyati gecersiz.' };
+        return { error: 'Ürün fiyatı geçersiz.' };
     }
     if (oldPrice !== null && (!Number.isFinite(oldPrice) || oldPrice < 0)) {
-        return { error: 'Eski fiyat gecersiz.' };
+        return { error: 'Eski fiyat geçersiz.' };
     }
     if (!Number.isInteger(stock)) {
-        return { error: 'Stok bilgisi gecersiz.' };
+        return { error: 'Stok bilgisi geçersiz.' };
     }
 
     const { mediaUrls, warnings } = await buildProductMediaUrls(orderedFiles, removeBackground);
@@ -529,8 +529,8 @@ const getAllProducts = async (req, res) => {
 
         res.status(200).json(products);
     } catch (err) {
-        console.error('Urun listeleme hatasi:', err.message);
-        res.status(500).json({ error: 'Urunler getirilirken sunucu hatasi olustu.' });
+        console.error('Ürün listeleme hatası:', err.message);
+        res.status(500).json({ error: 'Ürünler getirilirken sunucu hatası oluştu.' });
     }
 };
 
@@ -577,18 +577,18 @@ const createProduct = async (req, res) => {
         await client.query('COMMIT');
 
         res.status(201).json({
-            mesaj: 'Urun basariyla vitrine eklendi.',
+            mesaj: 'Ürün başarıyla vitrine eklendi.',
             warnings: payload.warnings,
             product: normalizeProductRow(product)
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Urun ekleme hatasi:', err.message);
+        console.error('Ürün ekleme hatası:', err.message);
 
         const isValueTooLong = err.code === '22001';
         const message = isValueTooLong
-            ? 'Urun gorsel adresi veritabani alanina sigmadi. URL alanlari buyutuldu; sunucuyu yeniden baslatip tekrar deneyin.'
-            : (err.message || 'Urun eklenirken bir hata meydana geldi.');
+            ? 'Ürün görsel adresi veritabanı alanına sığmadı. URL alanları büyütüldü; sunucuyu yeniden başlatıp tekrar deneyin.'
+            : (err.message || 'Ürün eklenirken bir hata meydana geldi.');
 
         res.status(500).json({ error: message });
     } finally {
@@ -600,12 +600,12 @@ const getProductById = async (req, res) => {
     try {
         const id = parseProductId(req.params.id);
         if (!id) {
-            return res.status(400).json({ error: 'Gecersiz urun kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz ürün kimliği.' });
         }
 
         const result = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Urun bulunamadi.' });
+            return res.status(404).json({ error: 'Ürün bulunamadı.' });
         }
 
         const mediaResult = await pool.query(
@@ -618,8 +618,8 @@ const getProductById = async (req, res) => {
 
         res.status(200).json(product);
     } catch (err) {
-        console.error('Urun detay hatasi:', err.message);
-        res.status(500).json({ error: 'Urun detaylari getirilemedi.' });
+        console.error('Ürün detay hatası:', err.message);
+        res.status(500).json({ error: 'Ürün detayları getirilemedi.' });
     }
 };
 
@@ -629,7 +629,7 @@ const deleteProduct = async (req, res) => {
     try {
         const id = parseProductId(req.params.id);
         if (!id) {
-            return res.status(400).json({ error: 'Gecersiz urun kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz ürün kimliği.' });
         }
 
         await client.query('BEGIN');
@@ -645,15 +645,15 @@ const deleteProduct = async (req, res) => {
 
         if (deleteResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Urun bulunamadi.' });
+            return res.status(404).json({ error: 'Ürün bulunamadı.' });
         }
 
         await client.query('COMMIT');
-        res.status(200).json({ mesaj: 'Urun basariyla silindi.' });
+        res.status(200).json({ mesaj: 'Ürün başarıyla silindi.' });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Urun silme hatasi:', err.message);
-        res.status(500).json({ error: err.message || 'Urun silinirken hata olustu.' });
+        console.error('Ürün silme hatası:', err.message);
+        res.status(500).json({ error: err.message || 'Ürün silinirken hata oluştu.' });
     } finally {
         client.release();
     }
@@ -662,32 +662,32 @@ const deleteProduct = async (req, res) => {
 const previewProductMediaBackgroundRemoval = async (req, res) => {
     const uploadedFile = req.file;
     if (!uploadedFile) {
-        return res.status(400).json({ error: 'Onizleme icin bir gorsel secin.' });
+        return res.status(400).json({ error: 'Önizleme için bir görsel seçin.' });
     }
 
     const publicId = getUploadedPublicId(uploadedFile);
     if (!isBackgroundRemovalEligible(uploadedFile)) {
         await destroyCloudinaryAsset(publicId);
-        return res.status(400).json({ error: 'Arka plan kaldirma onizlemesi yalnizca standart gorsellerde kullanilabilir. Video ve GIF dosyalari desteklenmiyor.' });
+        return res.status(400).json({ error: 'Arka plan kaldırma önizlemesi yalnızca standart görsellerde kullanılabilir. Video ve GIF dosyaları desteklenmiyor.' });
     }
 
     try {
         const previewResult = await applyBackgroundRemovalToFile(uploadedFile);
         if (!previewResult.url || previewResult.warning) {
             await destroyCloudinaryAsset(publicId);
-            return res.status(422).json({ error: previewResult.warning || 'Onizleme olusturulamadi.' });
+            return res.status(422).json({ error: previewResult.warning || 'Önizleme oluşturulamadı.' });
         }
 
         return res.status(200).json({
-            mesaj: 'Arka plan kaldirma onizlemesi hazir.',
+            mesaj: 'Arka plan kaldırma önizlemesi hazır.',
             originalUrl: normalizeMediaUrl(uploadedFile),
             previewPublicId: publicId,
             previewUrl: previewResult.url
         });
     } catch (error) {
         await destroyCloudinaryAsset(publicId);
-        console.error('Arka plan kaldirma onizleme hatasi:', error.message);
-        return res.status(500).json({ error: 'Arka plan kaldirma onizlemesi hazirlanamadi.' });
+        console.error('Arka plan kaldırma önizleme hatası:', error.message);
+        return res.status(500).json({ error: 'Arka plan kaldırma önizlemesi hazırlanamadı.' });
     }
 };
 
@@ -695,7 +695,7 @@ const previewExistingProductMediaBackgroundRemoval = async (req, res) => {
     try {
         const mediaId = parseProductId(req.params.mediaId);
         if (!mediaId) {
-            return res.status(400).json({ error: 'Gecersiz medya kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz medya kimliği.' });
         }
 
         const mediaResult = await pool.query(
@@ -704,28 +704,28 @@ const previewExistingProductMediaBackgroundRemoval = async (req, res) => {
         );
 
         if (mediaResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Medya bulunamadi.' });
+            return res.status(404).json({ error: 'Medya bulunamadı.' });
         }
 
         const mediaRow = mediaResult.rows[0];
         const asset = extractCloudinaryAssetFromUrl(mediaRow.media_url);
         if (!isBackgroundRemovalEligibleForAsset(asset)) {
-            return res.status(400).json({ error: 'Arka plan kaldirma onizlemesi yalnizca standart gorsellerde kullanilabilir. Video ve GIF dosyalari desteklenmiyor.' });
+            return res.status(400).json({ error: 'Arka plan kaldırma önizlemesi yalnızca standart görsellerde kullanılabilir. Video ve GIF dosyaları desteklenmiyor.' });
         }
 
         const previewResult = await buildBackgroundRemovalPreviewForAsset(asset);
         if (!previewResult.url || previewResult.warning) {
-            return res.status(422).json({ error: previewResult.warning || 'Arka plan kaldirma onizlemesi hazirlanamadi.' });
+            return res.status(422).json({ error: previewResult.warning || 'Arka plan kaldırma önizlemesi hazırlanamadı.' });
         }
 
         return res.status(200).json({
-            mesaj: 'Arka plan kaldirma onizlemesi hazir.',
+            mesaj: 'Arka plan kaldırma önizlemesi hazır.',
             mediaId,
             previewUrl: previewResult.url
         });
     } catch (error) {
-        console.error('Mevcut medya arka plan onizleme hatasi:', error.message);
-        return res.status(500).json({ error: 'Arka plan kaldirma onizlemesi hazirlanamadi.' });
+        console.error('Mevcut medya arka plan önizleme hatası:', error.message);
+        return res.status(500).json({ error: 'Arka plan kaldırma önizlemesi hazırlanamadı.' });
     }
 };
 
@@ -735,12 +735,12 @@ const applyExistingProductMediaBackgroundRemoval = async (req, res) => {
     try {
         const mediaId = parseProductId(req.params.mediaId);
         if (!mediaId) {
-            return res.status(400).json({ error: 'Gecersiz medya kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz medya kimliği.' });
         }
 
         const previewUrl = String(req.body?.previewUrl || '').trim();
         if (!previewUrl) {
-            return res.status(400).json({ error: 'Onizleme gorseli bulunamadi.' });
+            return res.status(400).json({ error: 'Önizleme görseli bulunamadı.' });
         }
 
         await client.query('BEGIN');
@@ -756,7 +756,7 @@ const applyExistingProductMediaBackgroundRemoval = async (req, res) => {
 
         if (mediaResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Medya bulunamadi.' });
+            return res.status(404).json({ error: 'Medya bulunamadı.' });
         }
 
         const mediaRow = mediaResult.rows[0];
@@ -765,7 +765,7 @@ const applyExistingProductMediaBackgroundRemoval = async (req, res) => {
 
         if (!isBackgroundRemovalEligibleForAsset(sourceAsset)) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Arka plan kaldirma yalnizca standart gorsellerde kullanilabilir.' });
+            return res.status(400).json({ error: 'Arka plan kaldırma yalnızca standart görsellerde kullanılabilir.' });
         }
 
         const previewBelongsToSameAsset = previewAsset
@@ -792,7 +792,7 @@ const applyExistingProductMediaBackgroundRemoval = async (req, res) => {
         await client.query('COMMIT');
 
         return res.status(200).json({
-            mesaj: 'Mevcut gorsel arka plansiz guncellendi.',
+            mesaj: 'Mevcut görsel arka plansız güncellendi.',
             media: {
                 id: mediaRow.id,
                 product_id: mediaRow.product_id,
@@ -802,8 +802,8 @@ const applyExistingProductMediaBackgroundRemoval = async (req, res) => {
         });
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error('Mevcut medya arka plan uygulama hatasi:', error.message);
-        return res.status(500).json({ error: 'Mevcut gorsel arka plansiz guncellenemedi.' });
+        console.error('Mevcut medya arka plan uygulama hatası:', error.message);
+        return res.status(500).json({ error: 'Mevcut görsel arka plansız güncellenemedi.' });
     } finally {
         client.release();
     }
@@ -812,7 +812,7 @@ const applyExistingProductMediaBackgroundRemoval = async (req, res) => {
 const cleanupProductMediaPreview = async (req, res) => {
     const publicId = String(req.body?.publicId || '').trim();
     if (!publicId || !publicId.startsWith(PRODUCT_MEDIA_PREVIEW_FOLDER)) {
-        return res.status(400).json({ error: 'Gecersiz onizleme kimligi.' });
+        return res.status(400).json({ error: 'Geçersiz önizleme kimliği.' });
     }
 
     await destroyCloudinaryAsset(publicId);
@@ -825,7 +825,7 @@ const updateProduct = async (req, res) => {
     try {
         const id = parseProductId(req.params.id);
         if (!id) {
-            return res.status(400).json({ error: 'Gecersiz urun kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz ürün kimliği.' });
         }
 
         await client.query('BEGIN');
@@ -837,7 +837,7 @@ const updateProduct = async (req, res) => {
 
         if (existingResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Urun bulunamadi.' });
+            return res.status(404).json({ error: 'Ürün bulunamadı.' });
         }
 
         const existingProduct = existingResult.rows[0];
@@ -893,14 +893,14 @@ const updateProduct = async (req, res) => {
 
         await client.query('COMMIT');
         res.status(200).json({
-            mesaj: 'Urun bilgileri guncellendi.',
+            mesaj: 'Ürün bilgileri güncellendi.',
             warnings: payload.warnings,
             product: normalizeProductRow(updateResult.rows[0])
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Urun guncelleme hatasi:', err.message);
-        res.status(500).json({ error: err.message || 'Urun guncellenemedi.' });
+        console.error('Ürün güncelleme hatası:', err.message);
+        res.status(500).json({ error: err.message || 'Ürün güncellenemedi.' });
     } finally {
         client.release();
     }
@@ -912,7 +912,7 @@ const deleteProductMedia = async (req, res) => {
     try {
         const mediaId = parseProductId(req.params.mediaId);
         if (!mediaId) {
-            return res.status(400).json({ error: 'Gecersiz medya kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz medya kimliği.' });
         }
 
         await client.query('BEGIN');
@@ -931,7 +931,7 @@ const deleteProductMedia = async (req, res) => {
 
         if (mediaResult.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Medya bulunamadi.' });
+            return res.status(404).json({ error: 'Medya bulunamadı.' });
         }
 
         const removedMedia = mediaResult.rows[0];
@@ -940,10 +940,10 @@ const deleteProductMedia = async (req, res) => {
         }
 
         await client.query('COMMIT');
-        res.status(200).json({ mesaj: 'Medya basariyla silindi.' });
+        res.status(200).json({ mesaj: 'Medya başarıyla silindi.' });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Medya silme hatasi:', err.message);
+        console.error('Medya silme hatası:', err.message);
         res.status(500).json({ error: err.message || 'Medya silinemedi.' });
     } finally {
         client.release();

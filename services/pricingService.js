@@ -8,26 +8,51 @@ const toNumericMap = (rows) => {
     return map;
 };
 
+const readCartProductId = (item, index) => {
+    const suppliedIds = ['id', 'product_id', 'productId']
+        .filter((field) => Object.prototype.hasOwnProperty.call(item, field))
+        .map((field) => ({ field, value: item[field] }))
+        .filter(({ value }) => value !== undefined && value !== null && value !== '');
+
+    if (suppliedIds.length === 0) {
+        throw new Error(`Geçersiz ürün kimliği (index ${index}).`);
+    }
+
+    const numericIds = suppliedIds.map(({ field, value }) => {
+        const numeric = Number(value);
+        if (!Number.isInteger(numeric) || numeric <= 0) {
+            throw new Error(`Geçersiz ürün kimliği (${field}, index ${index}).`);
+        }
+        return numeric;
+    });
+
+    if (new Set(numericIds).size > 1) {
+        throw new Error(`Çelişkili ürün kimliği alanları (index ${index}).`);
+    }
+
+    return numericIds[0];
+};
+
 const normalizeCartItems = (cartItems) => {
     if (!Array.isArray(cartItems) || cartItems.length === 0) {
-        throw new Error('Sepet bos olamaz.');
+        throw new Error('Sepet boş olamaz.');
     }
 
     return cartItems.map((item, index) => {
-        const productId = Number(item.id || item.product_id);
+        const productId = readCartProductId(item, index);
         const quantity = Number(item.quantity || 1);
 
         if (!Number.isInteger(productId) || productId <= 0) {
-            throw new Error(`Gecersiz urun kimligi (index ${index}).`);
+            throw new Error(`Geçersiz ürün kimliği (index ${index}).`);
         }
         if (!Number.isInteger(quantity) || quantity <= 0) {
-            throw new Error(`Gecersiz urun adedi (urun ${productId}).`);
+            throw new Error(`Geçersiz ürün adedi (ürün ${productId}).`);
         }
 
         return {
             id: productId,
             quantity,
-            image: item.image || null,
+            image: item.image || item.image_url || item.imageUrl || null,
             nameHint: item.name || null
         };
     });
@@ -47,7 +72,7 @@ const loadProductsForCart = async (cartItems, client = pool) => {
     const productMap = toNumericMap(result.rows);
 
     if (productMap.size !== ids.length) {
-        throw new Error('Sepetteki bazi urunler bulunamadi.');
+        throw new Error('Sepetteki bazı ürünler bulunamadı.');
     }
 
     return { normalized, productMap };
@@ -70,13 +95,13 @@ const resolveCoupon = async (couponCode, subtotal, client = pool) => {
     );
 
     if (result.rows.length === 0) {
-        return { applied: false, code, discountAmount: 0, reason: 'Kupon bulunamadi veya aktif degil.', couponId: null };
+        return { applied: false, code, discountAmount: 0, reason: 'Kupon bulunamadı veya aktif değil.', couponId: null };
     }
 
     const coupon = result.rows[0];
 
     if (coupon.usage_limit !== null && Number(coupon.used_count) >= Number(coupon.usage_limit)) {
-        return { applied: false, code, discountAmount: 0, reason: 'Kupon kullanim limiti dolmus.', couponId: coupon.id };
+        return { applied: false, code, discountAmount: 0, reason: 'Kupon kullanım limiti dolmuş.', couponId: coupon.id };
     }
 
     const minAmount = Number(coupon.min_order_amount || 0);
@@ -85,7 +110,7 @@ const resolveCoupon = async (couponCode, subtotal, client = pool) => {
             applied: false,
             code,
             discountAmount: 0,
-            reason: `Bu kupon icin minimum sepet tutari ${minAmount.toFixed(2)} TL.`,
+            reason: `Bu kupon için minimum sepet tutarı ${minAmount.toFixed(2)} TL.`,
             couponId: coupon.id
         };
     }
@@ -110,7 +135,7 @@ const resolveCoupon = async (couponCode, subtotal, client = pool) => {
         applied: discountAmount > 0,
         code,
         discountAmount,
-        reason: discountAmount > 0 ? null : 'Kupon indirimi uygulanamadi.',
+        reason: discountAmount > 0 ? null : 'Kupon indirimi uygulanamadı.',
         couponId: coupon.id
     };
 };
@@ -126,11 +151,11 @@ const calculatePricing = async ({ cartItems, couponCode = null, client = pool })
         const unitPrice = Number(product.price);
 
         if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-            throw new Error(`Urun fiyat verisi gecersiz (${product.id}).`);
+            throw new Error(`Ürün fiyat verisi geçersiz (${product.id}).`);
         }
 
         if (Number(product.stock) < cartItem.quantity) {
-            throw new Error(`${product.name} icin yeterli stok yok.`);
+            throw new Error(`${product.name} için yeterli stok yok.`);
         }
 
         const lineTotal = round2(unitPrice * cartItem.quantity);

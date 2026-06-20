@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "dev:safe": "set NODE_ENV=test&& set NOVASTORE_SAFE_LOCAL_BACKEND=true&& set SKIP_SCHEMA_INIT=true&& set DB_SSL=false&& node server.js",
+    "dev:safe:schema": "set NODE_ENV=test&& set NOVASTORE_SAFE_LOCAL_BACKEND=true&& set NOVASTORE_ALLOW_SCHEMA_INIT=true&& set DB_SSL=false&& node server.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

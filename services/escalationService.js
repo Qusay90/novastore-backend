@@ -9,7 +9,7 @@ const getPrimaryAdminId = async () => {
 const createEscalationMessage = async ({ userId, summary }) => {
     const adminId = await getPrimaryAdminId();
     if (!adminId) {
-        const err = new Error('Admin hesabi bulunamadi.');
+        const err = new Error('Admin hesabı bulunamadı.');
         err.statusCode = 500;
         throw err;
     }

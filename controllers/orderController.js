@@ -56,7 +56,7 @@ const notifyOrderCreated = async (orderId, userId, customerName) => {
         await createNotification(
             userId,
             'order_update',
-            `#${orderId} numarali siparisiniz alindi ve odeme sureci baslatildi.`,
+            `#${orderId} numaralı siparişiniz alındı ve ödeme süreci başlatıldı.`,
             io
         );
     }
@@ -64,7 +64,7 @@ const notifyOrderCreated = async (orderId, userId, customerName) => {
     await createNotification(
         null,
         'new_order',
-        `Yeni siparis alindi! Siparis No: #${orderId} - Musteri: ${customerName}`,
+        `Yeni sipariş alındı! Sipariş No: #${orderId} - Müşteri: ${customerName}`,
         io
     );
 };
@@ -74,19 +74,19 @@ const statusMessageForUser = (status, orderId) => {
 
     switch (normalized) {
         case ORDER_STATUS.ONAY_BEKLIYOR:
-            return `Siparis #${orderId} onay bekliyor.`;
+            return `Sipariş #${orderId} onay bekliyor.`;
         case ORDER_STATUS.HAZIRLANIYOR:
-            return `Siparis #${orderId} hazirlaniyor.`;
+            return `Sipariş #${orderId} hazırlanıyor.`;
         case ORDER_STATUS.KARGOYA_VERILDI:
-            return `Siparis #${orderId} kargoya verildi!`;
+            return `Sipariş #${orderId} kargoya verildi!`;
         case ORDER_STATUS.TESLIM_EDILDI:
-            return `Siparis #${orderId} teslim edildi, keyifli kullanimlar!`;
+            return `Sipariş #${orderId} teslim edildi, keyifli kullanımlar!`;
         case ORDER_STATUS.IPTAL_EDILDI:
-            return `Siparis #${orderId} iptal edildi.`;
+            return `Sipariş #${orderId} iptal edildi.`;
         case ORDER_STATUS.IADE_EDILDI:
-            return `Siparis #${orderId} iade edildi.`;
+            return `Sipariş #${orderId} iade edildi.`;
         default:
-            return `Siparis #${orderId} durumu guncellendi: ${status}`;
+            return `Sipariş #${orderId} durumu güncellendi: ${status}`;
     }
 };
 
@@ -98,6 +98,36 @@ const fetchOrderById = async (client, orderId) => {
         `${orderSelectFallbackSql} WHERE o.id = $1`
     );
     return result.rows[0] || null;
+};
+
+const isPendingPaymentRow = (row = {}) => (
+    row.status === ORDER_STATUS.ODEME_BEKLIYOR ||
+    row.payment_status === PAYMENT_STATUS.REQUIRES_ACTION
+);
+
+const isFailedPaymentRow = (row = {}) => (
+    row.payment_status === PAYMENT_STATUS.FAILED
+);
+
+const normalizeOrderVisibility = (row = {}) => {
+    const isPendingPayment = isPendingPaymentRow(row);
+    const isPaymentFailed = isFailedPaymentRow(row);
+
+    return {
+        ...row,
+        is_pending_payment: isPendingPayment,
+        is_payment_failed: isPaymentFailed,
+        display_status: isPendingPayment
+            ? ORDER_STATUS.ODEME_BEKLIYOR
+            : isPaymentFailed
+                ? 'Ödeme Başarısız'
+                : row.status,
+        status_note: isPendingPayment
+            ? 'Ödeme tamamlanmadan kesin siparişe dönüşmez.'
+            : isPaymentFailed
+                ? 'Ödeme tamamlanmadığı için sipariş kesinleşmedi.'
+                : null
+    };
 };
 
 // 1. Yeni Siparis Olusturma (legacy/fallback)
@@ -116,7 +146,7 @@ const createOrder = async (req, res) => {
         } = req.body;
 
         if (!fullName || !email || !address) {
-            return res.status(400).json({ error: 'Musteri bilgileri eksik.' });
+            return res.status(400).json({ error: 'Müşteri bilgileri eksik.' });
         }
 
         const authUser = getUserFromRequestIfAny(req);
@@ -161,7 +191,7 @@ const createOrder = async (req, res) => {
         await notifyOrderCreated(order.id, userId, fullName);
 
         res.status(201).json({
-            mesaj: 'Siparisiniz basariyla alindi!',
+            mesaj: 'Siparişiniz başarıyla alındı!',
             siparisNo: order.id,
             totals: pricing.totals,
             campaigns: pricing.campaigns,
@@ -169,14 +199,14 @@ const createOrder = async (req, res) => {
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Siparis hatasi:', err.message);
-        res.status(500).json({ error: err.message || 'Siparis olusturulurken bir hata meydana geldi.' });
+        console.error('Sipariş hatası:', err.message);
+        res.status(500).json({ error: err.message || 'Sipariş oluşturulurken bir hata meydana geldi.' });
     } finally {
         client.release();
     }
 };
 
-// 2. Tum Siparisleri Getir (Admin)
+// 2. Tüm Siparişleri Getir (Admin)
 const getAllOrders = async (req, res) => {
     try {
         const result = await runOrderQueryWithFallback(
@@ -185,18 +215,18 @@ const getAllOrders = async (req, res) => {
             [],
             `${orderSelectFallbackSql} ORDER BY o.created_at DESC`
         );
-        res.status(200).json(result.rows);
+        res.status(200).json(result.rows.map(normalizeOrderVisibility));
     } catch (err) {
-        res.status(500).json({ error: 'Siparisler getirilemedi.' });
+        res.status(500).json({ error: 'Siparişler getirilemedi.' });
     }
 };
 
-// 3. Belirli Kullanicinin Siparisleri
+// 3. Belirli Kullanıcının Siparişleri
 const getUserOrders = async (req, res) => {
     try {
         const userId = Number(req.params.userId);
         if (!Number.isInteger(userId)) {
-            return res.status(400).json({ error: 'Gecersiz kullanici kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz kullanıcı kimliği.' });
         }
 
         const result = await runOrderQueryWithFallback(
@@ -205,9 +235,9 @@ const getUserOrders = async (req, res) => {
             [userId],
             `${orderSelectFallbackSql} WHERE o.user_id = $1 ORDER BY o.created_at DESC`
         );
-        res.status(200).json(result.rows);
+        res.status(200).json(result.rows.map(normalizeOrderVisibility));
     } catch (err) {
-        res.status(500).json({ error: 'Gecmis siparisler getirilemedi.' });
+        res.status(500).json({ error: 'Geçmiş siparişler getirilemedi.' });
     }
 };
 
@@ -221,10 +251,10 @@ const updateOrderStatus = async (req, res) => {
         const resolvedStatus = resolveOrderStatus(status);
 
         if (!Number.isInteger(orderId)) {
-            return res.status(400).json({ error: 'Gecersiz siparis kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz sipariş kimliği.' });
         }
         if (!resolvedStatus) {
-            return res.status(400).json({ error: 'Gecersiz siparis durumu.' });
+            return res.status(400).json({ error: 'Geçersiz sipariş durumu.' });
         }
 
         await client.query('BEGIN');
@@ -232,12 +262,12 @@ const updateOrderStatus = async (req, res) => {
         const currentOrder = await fetchOrderById(client, orderId);
         if (!currentOrder) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Siparis bulunamadi.' });
+            return res.status(404).json({ error: 'Sipariş bulunamadı.' });
         }
 
         if (resolvedStatus === ORDER_STATUS.IPTAL_EDILDI && resolveOrderStatus(currentOrder.status) === ORDER_STATUS.TESLIM_EDILDI) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Teslim edilen siparis durumdan iptal edilemez. Iade akisini kullanin.' });
+            return res.status(400).json({ error: 'Teslim edilen sipariş durumdan iptal edilemez. İade akışını kullanın.' });
         }
 
         let updatedOrder;
@@ -246,7 +276,7 @@ const updateOrderStatus = async (req, res) => {
                 client,
                 order: currentOrder,
                 reasonCode: 'ADMIN_STATUS_UPDATE',
-                note: 'Yonetici panelinden iptal edildi.',
+                note: 'Yönetici panelinden iptal edildi.',
                 refundStatus: currentOrder.payment_status === PAYMENT_STATUS.PAID ? REFUND_STATUS.PENDING : REFUND_STATUS.NONE
             });
             updatedOrder = await fetchOrderById(client, orderId);
@@ -267,11 +297,11 @@ const updateOrderStatus = async (req, res) => {
             await createNotification(updatedOrder.user_id, 'order_update', msg, io);
         }
 
-        res.status(200).json({ mesaj: 'Siparis durumu basariyla guncellendi!', order: updatedOrder });
+        res.status(200).json({ mesaj: 'Sipariş durumu başarıyla güncellendi!', order: updatedOrder });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Durum guncelleme hatasi:', err.message);
-        res.status(500).json({ error: err.message || 'Siparis durumu guncellenirken hata olustu.' });
+        console.error('Durum güncelleme hatası:', err.message);
+        res.status(500).json({ error: err.message || 'Sipariş durumu güncellenirken hata oluştu.' });
     } finally {
         client.release();
     }
@@ -287,7 +317,7 @@ const cancelOrder = async (req, res) => {
         const note = String(req.body.note || '').trim();
 
         if (!Number.isInteger(orderId)) {
-            return res.status(400).json({ error: 'Gecersiz siparis kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz sipariş kimliği.' });
         }
 
         if (!reasonCode) {
@@ -299,7 +329,7 @@ const cancelOrder = async (req, res) => {
         const order = await fetchOrderById(client, orderId);
         if (!order) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Siparis bulunamadi.' });
+            return res.status(404).json({ error: 'Sipariş bulunamadı.' });
         }
 
         const isOwner = req.user && Number(order.user_id) === req.user.id;
@@ -307,17 +337,17 @@ const cancelOrder = async (req, res) => {
 
         if (!isOwner && !isAdmin) {
             await client.query('ROLLBACK');
-            return res.status(403).json({ error: 'Bu siparisi iptal etme yetkiniz yok.' });
+            return res.status(403).json({ error: 'Bu siparişi iptal etme yetkiniz yok.' });
         }
 
         if (resolveOrderStatus(order.status) === ORDER_STATUS.IPTAL_EDILDI) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Siparis zaten iptal edilmis.' });
+            return res.status(400).json({ error: 'Sipariş zaten iptal edilmiş.' });
         }
 
         if (resolveOrderStatus(order.status) === ORDER_STATUS.TESLIM_EDILDI) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Teslim edilen siparis dogrudan iptal edilemez. Iade talebi olusturun.' });
+            return res.status(400).json({ error: 'Teslim edilen sipariş doğrudan iptal edilemez. İade talebi oluşturun.' });
         }
 
         const refundStatus = order.payment_status === PAYMENT_STATUS.PAID ? REFUND_STATUS.PENDING : REFUND_STATUS.NONE;
@@ -326,7 +356,7 @@ const cancelOrder = async (req, res) => {
         try {
             await createInvoice({ client, orderId, type: 'CANCELLATION', amount: Number(order.total_amount || 0) });
         } catch (invoiceErr) {
-            console.error('Iptal fatura hatasi:', invoiceErr.message);
+            console.error('İptal fatura hatası:', invoiceErr.message);
         }
 
         const updatedOrder = await fetchOrderById(client, orderId);
@@ -337,20 +367,20 @@ const cancelOrder = async (req, res) => {
             await createNotification(
                 order.user_id,
                 'order_update',
-                `Siparis #${orderId} iptal edildi.`,
+                `Sipariş #${orderId} iptal edildi.`,
                 io
             );
         }
 
         res.status(200).json({
-            mesaj: 'Siparis iptal edildi.',
+            mesaj: 'Sipariş iptal edildi.',
             order: updatedOrder,
-            refund_eta: refundStatus === REFUND_STATUS.PENDING ? '1-3 is gunu' : null
+            refund_eta: refundStatus === REFUND_STATUS.PENDING ? '1-3 iş günü' : null
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Siparis iptal hatasi:', err.message);
-        res.status(500).json({ error: err.message || 'Siparis iptal edilirken hata olustu.' });
+        console.error('Sipariş iptal hatası:', err.message);
+        res.status(500).json({ error: err.message || 'Sipariş iptal edilirken hata oluştu.' });
     } finally {
         client.release();
     }
@@ -361,18 +391,18 @@ const deleteOrder = async (req, res) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id)) {
-            return res.status(400).json({ error: 'Gecersiz siparis kimligi.' });
+            return res.status(400).json({ error: 'Geçersiz sipariş kimliği.' });
         }
 
         const result = await pool.query('DELETE FROM orders WHERE id = $1 RETURNING *', [id]);
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Siparis bulunamadi.' });
+            return res.status(404).json({ error: 'Sipariş bulunamadı.' });
         }
 
-        res.status(200).json({ mesaj: 'Siparis basariyla silindi.' });
+        res.status(200).json({ mesaj: 'Sipariş başarıyla silindi.' });
     } catch (err) {
-        console.error('Siparis silme hatasi:', err.message);
-        res.status(500).json({ error: 'Siparis silinirken hata olustu.' });
+        console.error('Sipariş silme hatası:', err.message);
+        res.status(500).json({ error: 'Sipariş silinirken hata oluştu.' });
     }
 };
 
@@ -388,7 +418,7 @@ const getOrderByIdInternal = async (orderId) => {
 
     const row = result.rows[0];
     row.items = parseItems(row);
-    return row;
+    return normalizeOrderVisibility(row);
 };
 
 module.exports = {
@@ -398,5 +428,6 @@ module.exports = {
     updateOrderStatus,
     cancelOrder,
     deleteOrder,
-    getOrderByIdInternal
+    getOrderByIdInternal,
+    normalizeOrderVisibility
 };

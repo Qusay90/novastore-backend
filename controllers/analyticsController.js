@@ -53,7 +53,7 @@ const normalizeQuantity = (value) => {
 const normalizeActionType = (value) => {
     const normalized = String(value || '').trim().toLowerCase();
     if (!PRODUCT_ACTION_TYPES.has(normalized)) {
-        const err = new Error('Gecersiz urun aksiyonu.');
+        const err = new Error('Geçersiz ürün aksiyonu.');
         err.statusCode = 400;
         throw err;
     }
@@ -169,8 +169,8 @@ const trackPageEnter = async (req, res) => {
         res.status(202).json({ ok: true });
     } catch (err) {
         const statusCode = Number(err && err.statusCode) || 500;
-        const message = statusCode === 500 ? 'Analytics kaydi olusturulamadi.' : err.message;
-        console.error('Analytics enter hatasi:', err.message);
+        const message = statusCode === 500 ? 'Analytics kaydı oluşturulamadı.' : err.message;
+        console.error('Analytics enter hatası:', err.message);
         res.status(statusCode).json({ error: message });
     }
 };
@@ -208,7 +208,7 @@ const trackPageHeartbeat = async (req, res) => {
     } catch (err) {
         const statusCode = Number(err && err.statusCode) || 500;
         const message = statusCode === 500 ? 'Analytics heartbeat kaydedilemedi.' : err.message;
-        console.error('Analytics heartbeat hatasi:', err.message);
+        console.error('Analytics heartbeat hatası:', err.message);
         res.status(statusCode).json({ error: message });
     }
 };
@@ -262,7 +262,7 @@ const trackPageLeave = async (req, res) => {
     } catch (err) {
         const statusCode = Number(err && err.statusCode) || 500;
         const message = statusCode === 500 ? 'Analytics cikis kaydedilemedi.' : err.message;
-        console.error('Analytics leave hatasi:', err.message);
+        console.error('Analytics leave hatası:', err.message);
         res.status(statusCode).json({ error: message });
     }
 };
@@ -303,8 +303,8 @@ const trackProductAction = async (req, res) => {
         res.status(202).json({ ok: true });
     } catch (err) {
         const statusCode = Number(err && err.statusCode) || 500;
-        const message = statusCode === 500 ? 'Urun aksiyonu kaydedilemedi.' : err.message;
-        console.error('Analytics urun aksiyonu hatasi:', err.message);
+        const message = statusCode === 500 ? 'Ürün aksiyonu kaydedilemedi.' : err.message;
+        console.error('Analytics ürün aksiyonu hatası:', err.message);
         res.status(statusCode).json({ error: message });
     }
 };

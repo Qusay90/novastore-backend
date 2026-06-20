@@ -140,7 +140,7 @@ const formatDbError = (error) => {
     }
 
     if (error?.code === '28P01') {
-        hints.push('Kullanici adi veya sifre hatali gorunuyor.');
+        hints.push('Kullanıcı adı veya şifre hatalı görünüyor.');
     }
 
     if (isSupabasePoolerHost(poolConfig.host || '') && !String(poolConfig.user || '').includes('.')) {
@@ -153,7 +153,7 @@ const formatDbError = (error) => {
 const pool = new Pool(poolConfig);
 
 pool.on('connect', () => {
-    console.log('PostgreSQL baglantisi hazir.');
+    console.log('PostgreSQL bağlantısı hazır.');
 });
 
 pool.formatError = formatDbError;

@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NovaStore | Odeme Sonucu</title>
+    <title>NovaStore | Ödeme Sonucu</title>
     <link rel="shortcut icon" href="/favicon.ico">
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
+    <script src="mobile-bridge.js"></script>
     <style>
         body { margin: 0; font-family: Inter, Arial, sans-serif; background: #f4f7fb; color: #1f2937; display: grid; place-items: center; min-height: 100vh; }
         .box { width: min(560px, 92vw); background: #fff; border: 1px solid #e5eaf2; border-radius: 16px; padding: 28px; box-shadow: 0 10px 28px rgba(15, 42, 67, 0.08); text-align: center; }
@@ -20,9 +21,9 @@
 </head>
 <body>
     <div class="box">
-        <h1 id="title">Odeme Sonucu</h1>
-        <p id="desc">Sonuc kontrol ediliyor...</p>
-        <button class="btn" onclick="window.location.href='profile.html?tab=orders'">Siparislerime Don</button>
+        <h1 id="title">Ödeme Sonucu</h1>
+        <p id="desc">Sonuç kontrol ediliyor...</p>
+        <button class="btn" onclick="window.location.href='profile.html?tab=orders'">Siparişlerime Dön</button>
     </div>
 
     <script>
@@ -33,8 +34,45 @@
             return url.searchParams.get(name);
         }
 
+        function getUserId() {
+            try {
+                const info = JSON.parse(localStorage.getItem('nova_user_info') || 'null');
+                return info && info.id ? info.id : 'guest';
+            } catch (_) {
+                return 'guest';
+            }
+        }
+
+        function cartKey() { return `novastore_cart_${getUserId()}`; }
+        function checkoutKey() { return `novastore_checkout_${getUserId()}`; }
+        function pendingCheckoutKey() { return `novastore_pending_checkout_${getUserId()}`; }
+        function paymentStatusHeaders() {
+            const token = localStorage.getItem('nova_user_token');
+            return token ? { Authorization: `Bearer ${token}` } : {};
+        }
+
+        function clearFinalizedCheckoutItems(orderId, paymentRef) {
+            let pending = null;
+            try {
+                pending = JSON.parse(localStorage.getItem(pendingCheckoutKey()) || 'null');
+            } catch (_) {}
+
+            if (!pending || String(pending.orderId) !== String(orderId) || String(pending.paymentRef) !== String(paymentRef)) {
+                return;
+            }
+
+            const boughtItems = Array.isArray(pending.items) ? pending.items : [];
+            const mainCart = JSON.parse(localStorage.getItem(cartKey()) || '[]');
+            const nextCart = mainCart.filter((cartItem) => {
+                return !boughtItems.some((boughtItem) => !boughtItem.isBuyNow && Number(boughtItem.id) === Number(cartItem.id));
+            });
+
+            localStorage.setItem(cartKey(), JSON.stringify(nextCart));
+            localStorage.removeItem(checkoutKey());
+            localStorage.removeItem(pendingCheckoutKey());
+        }
+
         async function handleResult() {
-            const status = (qs('status') || 'failed').toUpperCase();
             const paymentRef = qs('paymentRef');
             const orderId = qs('orderId');
 
@@ -42,44 +80,49 @@
             const desc = document.getElementById('desc');
 
             if (!paymentRef) {
-                title.innerText = 'Odeme Bilgisi Eksik';
-                desc.innerText = 'Odeme referansi bulunamadi.';
+                title.innerText = 'Ödeme Bilgisi Eksik';
+                desc.innerText = 'Ödeme referansı bulunamadı.';
                 return;
             }
 
             try {
-                const payload = {
-                    eventId: `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                    paymentRef,
-                    status: status === 'SUCCESS' ? 'SUCCESS' : 'FAILED',
-                    providerTransactionId: `mock-${paymentRef}`,
-                    orderId
-                };
+                const params = new URLSearchParams({ paymentRef });
+                if (orderId) params.set('orderId', orderId);
 
-                const response = await fetch(`${API_BASE}/api/payments/webhook/iyzico`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                const response = await fetch(`${API_BASE}/api/payments/status?${params.toString()}`, {
+                    headers: paymentStatusHeaders()
                 });
                 const result = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(result.error || 'Webhook islenemedi.');
+                    throw new Error(result.error || 'Ödeme durumu kontrol edilemedi.');
                 }
 
-                if (status === 'SUCCESS') {
-                    title.innerText = 'Odeme Basarili';
+                if (result.paymentStatus === 'PAID') {
+                    title.innerText = 'Ödeme Başarılı';
                     title.className = 'ok';
-                    desc.innerText = `Odemeniz alindi. Siparisiniz hazirlaniyor. (Ref: ${paymentRef})`;
-                } else {
-                    title.innerText = 'Odeme Basarisiz';
+                    desc.innerText = `${result.message} (Ref: ${paymentRef})`;
+                    if (result.finalized) clearFinalizedCheckoutItems(result.orderId || orderId, paymentRef);
+                } else if (result.paymentStatus === 'FAILED') {
+                    title.innerText = 'Ödeme Başarısız';
                     title.className = 'bad';
-                    desc.innerText = 'Odeme tamamlanamadi. Dilerseniz tekrar deneyebilirsiniz.';
+                    desc.innerText = result.message || 'Ödeme tamamlanamadı. Dilerseniz tekrar deneyebilirsiniz.';
+                } else {
+                    title.innerText = 'Ödeme Onayı Bekleniyor';
+                    title.className = '';
+                    desc.innerText = `${result.message || 'Ödeme sağlayıcısından onay bekleniyor.'} (Ref: ${paymentRef})`;
+                }
+
+                if (window.NovaMobileBridge && typeof window.NovaMobileBridge.postMessage === 'function') {
+                    window.NovaMobileBridge.postMessage({
+                        type: 'payment_status_checked',
+                        payload: result
+                    });
                 }
             } catch (err) {
-                title.innerText = 'Odeme Sonucu Islenemedi';
+                title.innerText = 'Ödeme Sonucu İşlenemedi';
                 title.className = 'bad';
-                desc.innerText = err.message || 'Beklenmeyen bir hata olustu.';
+                desc.innerText = err.message || 'Beklenmeyen bir hata oluştu.';
             }
         }
 
@@ -88,5 +131,3 @@
     <script src="footer.js"></script>
 </body>
 </html>
-
-

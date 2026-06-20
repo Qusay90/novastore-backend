@@ -50,7 +50,7 @@ const getMerchantFeed = async (req, res) => {
   <channel>
     <title>NovaStore Product Feed</title>
     <link>${xmlEscape(getAppBaseUrl())}</link>
-    <description>NovaStore Google Merchant urun feed'i</description>
+    <description>NovaStore Google Merchant ürün feed'i</description>
 ${itemsXml}
   </channel>
 </rss>`;
@@ -58,8 +58,8 @@ ${itemsXml}
         res.set('Content-Type', 'application/xml; charset=utf-8');
         res.status(200).send(xml);
     } catch (err) {
-        console.error('Merchant feed hatasi:', err.message);
-        res.status(500).json({ error: 'Merchant feed olusturulamadi.' });
+        console.error('Merchant feed hatası:', err.message);
+        res.status(500).json({ error: 'Merchant feed oluşturulamadı.' });
     }
 };
 

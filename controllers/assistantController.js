@@ -3,6 +3,26 @@ const { handleAssistantChat } = require('../services/assistantOrchestrator');
 const { createEscalationMessage } = require('../services/escalationService');
 const { createNotification } = require('./notificationController');
 
+const { getAiProviderConfig } = require('../config/appConfig');
+
+const normalizeAssistantResponse = (response = {}) => {
+    const reply = String(response.reply || response.message || response.text || '').trim();
+    return {
+        ...response,
+        reply,
+        message: String(response.message || reply).trim(),
+        suggestions: Array.isArray(response.suggestions) ? response.suggestions : [],
+        products: Array.isArray(response.products) ? response.products : [],
+        cards: Array.isArray(response.cards) ? response.cards : [],
+        comparison: response.comparison || null,
+        requiresConfirmation: Boolean(response.requiresConfirmation),
+        pendingAction: response.pendingAction || null,
+        allowEscalation: Boolean(response.allowEscalation),
+        escalated: Boolean(response.escalated),
+        citations: Array.isArray(response.citations) ? response.citations : []
+    };
+};
+
 const chat = async (req, res) => {
     try {
         const user = getUserFromRequestIfAny(req);
@@ -13,10 +33,15 @@ const chat = async (req, res) => {
         }
 
         const response = await handleAssistantChat({ message, user, history, context });
-        res.status(200).json(response);
+        res.status(200).json(normalizeAssistantResponse(response));
     } catch (err) {
-        console.error('Assistant chat hatasi:', err.message);
-        res.status(500).json({ error: 'Yapay zeka asistani su an yanit veremiyor.' });
+        const aiProviderConfig = getAiProviderConfig();
+        console.error('Assistant chat hatası:', {
+            message: err.message,
+            provider: aiProviderConfig.primaryProvider,
+            fallbacks: aiProviderConfig.fallbackProviders
+        });
+        res.status(500).json({ error: 'Yapay zeka asistanı şu an yanıt veremiyor.' });
     }
 };
 
@@ -24,7 +49,7 @@ const escalate = async (req, res) => {
     try {
         const user = getUserFromRequestIfAny(req);
         if (!user) {
-            return res.status(401).json({ error: 'Canli destek devri icin giris yapmalisiniz.' });
+            return res.status(401).json({ error: 'Canlı destek devri için giriş yapmalısınız.' });
         }
 
         const summary = String(req.body.summary || '').trim();
@@ -45,23 +70,24 @@ const escalate = async (req, res) => {
                 await createNotification(
                     null,
                     'ai_handoff',
-                    `AI devri olustu. Musteri #${user.id} temsilciye aktarildi.`,
+                    `AI devri oluştu. Müşteri #${user.id} temsilciye aktarıldı.`,
                     io
                 );
             }
         } catch (_) {}
 
         res.status(201).json({
-            message: 'Konusma ozeti canli destek ekibine iletildi.',
+            message: 'Konuşma özeti canlı destek ekibine iletildi.',
             escalation: escalation.message
         });
     } catch (err) {
         const statusCode = err.statusCode || 500;
-        res.status(statusCode).json({ error: err.message || 'Canli destek devri yapilamadi.' });
+        res.status(statusCode).json({ error: err.message || 'Canlı destek devri yapılamadı.' });
     }
 };
 
 module.exports = {
     chat,
-    escalate
+    escalate,
+    normalizeAssistantResponse
 };
