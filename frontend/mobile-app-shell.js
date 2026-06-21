@@ -1020,8 +1020,6 @@
         }
 
         function hasPaymentDetails() {
-            if (getPaymentMethod() === 'havale') return true;
-
             var name = document.getElementById('cardName');
             var number = document.getElementById('cardNumber');
             var expiry = document.getElementById('cardExpiry');

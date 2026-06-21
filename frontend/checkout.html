@@ -481,10 +481,6 @@
                             <input type="radio" name="paymentMethod" value="card" checked style="width:16px;height:16px;accent-color:#0F2A43;pointer-events:none;">
                             <span style="font-weight: 600; color: #0F2A43; font-size: 0.95rem;">Kredi / Banka Kartı</span>
                         </label>
-                        <label id="method-havale-label" onclick="selectPaymentMethod('havale')" style="flex: 1; display: flex; align-items: center; gap: 10px; padding: 14px 18px; border: 2px solid #EAEAEA; border-radius: 10px; cursor: pointer; background: white; transition: 0.2s;">
-                            <input type="radio" name="paymentMethod" value="havale" style="width:16px;height:16px;accent-color:#0F2A43;pointer-events:none;">
-                            <span style="font-weight: 600; color: #555; font-size: 0.95rem;">Havale / EFT</span>
-                        </label>
                     </div>
 
                     <div id="card-payment-section">
@@ -547,15 +543,6 @@
                     </div>
                     </div><!-- /#card-payment-section -->
 
-                    <div id="havale-payment-section" style="display:none; background:#F0F7FF; border:1px solid #BBDEFB; border-radius:12px; padding:24px;">
-                        <h4 style="margin:0 0 12px; color:#1565C0; font-size:1rem;">Havale / EFT Bilgileri</h4>
-                        <p style="margin:0 0 14px; color:#555; font-size:0.9rem; line-height:1.5;">Aşağıdaki IBAN'a siparişinizin toplam tutarını aktarın. Ödemeniz doğrulandıktan sonra siparişiniz işleme alınır.</p>
-                        <div style="background:white; border:1px solid #E3F2FD; border-radius:8px; padding:16px; display:flex; flex-direction:column; gap:10px;">
-                            <div style="display:flex; justify-content:space-between;"><span style="color:#888; font-size:0.85rem;">Hesap Sahibi</span><span style="font-weight:700; color:#0F2A43;">NovaStore Elektronik</span></div>
-                            <div style="display:flex; justify-content:space-between;"><span style="color:#888; font-size:0.85rem;">IBAN</span><span style="font-weight:700; color:#0F2A43; font-family:monospace; font-size:0.9rem;" id="display-iban">TR00 0000 0000 0000 0000 0000 00</span></div>
-                        </div>
-                        <p style="margin:12px 0 0; color:#E65100; font-size:0.82rem;">Havale sonrasında sipariş numaranızı açıklama kısmına ekleyin. 24 saat içinde ödeme onaylanmazsa sipariş iptal edilir.</p>
-                    </div>
                 </div>
 
                 <button type="submit" class="btn btn-primary" id="submit-btn"
@@ -993,35 +980,17 @@
         let appliedCouponCode = null;
 
         function selectPaymentMethod(method) {
-            selectedPaymentMethod = method;
+            selectedPaymentMethod = 'card';
             const cardLabel = document.getElementById('method-card-label');
-            const havaleLabel = document.getElementById('method-havale-label');
             const cardSection = document.getElementById('card-payment-section');
-            const havaleSection = document.getElementById('havale-payment-section');
 
-            if (method === 'card') {
-                cardLabel.style.borderColor = '#0F2A43';
-                cardLabel.style.background = '#F8FBFF';
-                cardLabel.querySelector('span').style.color = '#0F2A43';
-                havaleLabel.style.borderColor = '#EAEAEA';
-                havaleLabel.style.background = 'white';
-                havaleLabel.querySelector('span').style.color = '#555';
-                cardSection.style.display = 'block';
-                havaleSection.style.display = 'none';
-                document.getElementById('submit-btn').innerText = 'Siparişi Tamamla ve Öde';
-            } else {
-                havaleLabel.style.borderColor = '#0F2A43';
-                havaleLabel.style.background = '#F8FBFF';
-                havaleLabel.querySelector('span').style.color = '#0F2A43';
-                cardLabel.style.borderColor = '#EAEAEA';
-                cardLabel.style.background = 'white';
-                cardLabel.querySelector('span').style.color = '#555';
-                cardSection.style.display = 'none';
-                havaleSection.style.display = 'block';
-                document.getElementById('submit-btn').innerText = 'Sipariş Ver (Havale ile Öde)';
-            }
+            cardLabel.style.borderColor = '#0F2A43';
+            cardLabel.style.background = '#F8FBFF';
+            cardLabel.querySelector('span').style.color = '#0F2A43';
+            cardSection.style.display = 'block';
+            document.getElementById('submit-btn').innerText = 'Siparişi Tamamla ve Öde';
             document.querySelectorAll('input[name="paymentMethod"]').forEach(r => {
-                r.checked = r.value === method;
+                r.checked = r.value === 'card';
             });
         }
 
@@ -1101,7 +1070,7 @@
 
                 if (!response.ok) {
                     alert("Hata: " + (result.error || 'Sipariş oluşturulamadı.'));
-                    btn.innerText = selectedPaymentMethod === 'havale' ? 'Sipariş Ver (Havale ile Öde)' : 'Siparişi Tamamla ve Öde';
+                    btn.innerText = 'Siparişi Tamamla ve Öde';
                     btn.disabled = false;
                     return;
                 }
@@ -1113,23 +1082,13 @@
                     createdAt: Date.now()
                 }));
 
-                if (selectedPaymentMethod === 'havale') {
-                    const iban = result.paymentAction && result.paymentAction.iban
-                        ? result.paymentAction.iban
-                        : 'TR00 0000 0000 0000 0000 0000 00';
-                    document.getElementById('display-iban').innerText = iban;
-                    btn.innerText = 'Sipariş Alındı';
-                    document.getElementById('havale-payment-section').scrollIntoView({ behavior: 'smooth' });
-                    alert(`Sipariş No: #${result.orderId}\n\nHavale bilgileri ekranda gösterilmektedir. 24 saat içinde ödeme yapmanız gerekmektedir.`);
-                } else {
-                    const successUrl = result.paymentAction && result.paymentAction.action && result.paymentAction.action.successUrl
-                        ? result.paymentAction.action.successUrl
-                        : `payment-result.html?status=success&paymentRef=${result.paymentRef}&orderId=${result.orderId}`;
-                    window.location.href = successUrl;
-                }
+                const successUrl = result.paymentAction && result.paymentAction.action && result.paymentAction.action.successUrl
+                    ? result.paymentAction.action.successUrl
+                    : `payment-result.html?status=success&paymentRef=${result.paymentRef}&orderId=${result.orderId}`;
+                window.location.href = successUrl;
             } catch (error) {
                 alert("Sunucuya bağlanılamadı.");
-                btn.innerText = selectedPaymentMethod === 'havale' ? 'Sipariş Ver (Havale ile Öde)' : 'Siparişi Tamamla ve Öde';
+                btn.innerText = 'Siparişi Tamamla ve Öde';
                 btn.disabled = false;
             }
         });

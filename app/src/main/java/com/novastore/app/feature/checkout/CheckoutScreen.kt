@@ -255,50 +255,46 @@ fun CheckoutScreen(
                             selected = paymentMethod,
                             onSelect = {
                                 paymentMethod = it
-                                if (it == PaymentMethod.Card) isCardSectionExpanded = true
+                                isCardSectionExpanded = true
                             }
                         )
 
-                        if (paymentMethod == PaymentMethod.Card) {
-                            CardPaymentPanel(
-                                expanded = isCardSectionExpanded,
-                                cardHolder = cardHolder,
-                                cardNumber = cardNumber,
-                                expiry = expiry,
-                                cvc = cvc,
-                                cardType = cardType,
-                                cvcMaxLength = cvcMaxLength,
-                                isCardBackVisible = isCardBackVisible,
-                                errors = cardValidation,
-                                showErrors = attemptedSubmit,
-                                expiryFocusRequester = expiryFocusRequester,
-                                cvcFocusRequester = cvcFocusRequester,
-                                onExpand = { isCardSectionExpanded = true },
-                                onCardHolderChange = { cardHolder = it.take(40) },
-                                onCardNumberChange = {
-                                    val digits = it.digitsOnly()
-                                    val detectedType = detectCardType(digits)
-                                    val sanitized = digits.take(expectedCardLength(detectedType))
-                                    cardNumber = sanitized
-                                    if (sanitized.length == expectedCardLength(detectedType)) {
-                                        expiryFocusRequester.requestFocus()
-                                    }
-                                },
-                                onExpiryChange = {
-                                    val formatted = formatExpiry(it.text)
-                                    expiry = TextFieldValue(
-                                        text = formatted,
-                                        selection = TextRange(formatted.length)
-                                    )
-                                    if (formatted.length == 5) cvcFocusRequester.requestFocus()
-                                },
-                                onCvcChange = { cvc = it.filter(Char::isDigit).take(cvcMaxLength) },
-                                onSensitiveFocus = { isCardBackVisible = false },
-                                onCvcFocus = { focused -> if (focused) isCardBackVisible = true }
-                            )
-                        } else {
-                            BankTransferInfo()
-                        }
+                        CardPaymentPanel(
+                            expanded = isCardSectionExpanded,
+                            cardHolder = cardHolder,
+                            cardNumber = cardNumber,
+                            expiry = expiry,
+                            cvc = cvc,
+                            cardType = cardType,
+                            cvcMaxLength = cvcMaxLength,
+                            isCardBackVisible = isCardBackVisible,
+                            errors = cardValidation,
+                            showErrors = attemptedSubmit,
+                            expiryFocusRequester = expiryFocusRequester,
+                            cvcFocusRequester = cvcFocusRequester,
+                            onExpand = { isCardSectionExpanded = true },
+                            onCardHolderChange = { cardHolder = it.take(40) },
+                            onCardNumberChange = {
+                                val digits = it.digitsOnly()
+                                val detectedType = detectCardType(digits)
+                                val sanitized = digits.take(expectedCardLength(detectedType))
+                                cardNumber = sanitized
+                                if (sanitized.length == expectedCardLength(detectedType)) {
+                                    expiryFocusRequester.requestFocus()
+                                }
+                            },
+                            onExpiryChange = {
+                                val formatted = formatExpiry(it.text)
+                                expiry = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                                if (formatted.length == 5) cvcFocusRequester.requestFocus()
+                            },
+                            onCvcChange = { cvc = it.filter(Char::isDigit).take(cvcMaxLength) },
+                            onSensitiveFocus = { isCardBackVisible = false },
+                            onCvcFocus = { focused -> if (focused) isCardBackVisible = true }
+                        )
                     }
 
                     CheckoutSection(title = "Sipari\u015F \u00D6zeti") {
@@ -476,13 +472,7 @@ private fun PaymentMethodSelector(
         PaymentMethodOption(
             method = PaymentMethod.Card,
             selected = selected == PaymentMethod.Card,
-            modifier = Modifier.weight(1f),
-            onSelect = onSelect
-        )
-        PaymentMethodOption(
-            method = PaymentMethod.BankTransfer,
-            selected = selected == PaymentMethod.BankTransfer,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             onSelect = onSelect
         )
     }
@@ -505,21 +495,6 @@ private fun PaymentMethodOption(
             Icon(method.icon, contentDescription = null, tint = if (selected) Orange else TextSecondary)
             Text(method.title, color = NavyDark, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
             Text(method.description, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
-
-@Composable
-private fun BankTransferInfo() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = StoreBlue.copy(alpha = 0.06f),
-        border = BorderStroke(1.dp, StoreBlue.copy(alpha = 0.24f))
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Havale/EFT", color = NavyDark, fontWeight = FontWeight.Bold)
-            Text("Sipari\u015F kayd\u0131 olu\u015Fturulur, banka bilgileri sonraki ekranda g\u00F6sterilir. \u00D6deme onaylanana kadar sepetiniz korunur.", color = TextSecondary)
         }
     }
 }
@@ -901,16 +876,15 @@ private fun SuccessState(
     val isBankTransfer = response.provider == "bank_transfer" || response.paymentStatus == "WAITING_TRANSFER"
     val statusTitle = when {
         paymentFinalized -> "\u00D6deme Onayland\u0131"
-        isBankTransfer -> "Havale Bilgileri Olu\u015Fturuldu"
+        isBankTransfer -> "\u00D6deme Bekleniyor"
         else -> "\u00D6deme Ba\u015Flat\u0131ld\u0131"
     }
     val statusMessage = if (isBankTransfer) {
-        "Banka transferiniz onayland\u0131\u011F\u0131nda sipari\u015Finiz i\u015Fleme al\u0131nacak. Sepetiniz \u00F6deme kesinle\u015Fene kadar korunur."
+        "\u00D6deme onayland\u0131\u011F\u0131nda sipari\u015Finiz i\u015Fleme al\u0131nacak. Sepetiniz \u00F6deme kesinle\u015Fene kadar korunur."
     } else {
         "3D Secure do\u011Frulamas\u0131 tamamland\u0131ktan ve \u00F6deme sa\u011Flay\u0131c\u0131 onay\u0131 geldikten sonra sipari\u015Finiz kesinle\u015Fecek."
     }
-    val actionTitle = if (isBankTransfer) "Havale/EFT bekleniyor" else "Banka onay\u0131 bekleniyor"
-    val bankDetails = response.paymentAction
+    val actionTitle = "\u00D6deme onay\u0131 bekleniyor"
 
     Box(
         modifier = Modifier
@@ -937,11 +911,6 @@ private fun SuccessState(
                         Text(actionTitle, fontWeight = FontWeight.Bold, color = NavyDark)
                     }
                     Text(statusMessage, color = TextSecondary)
-                    if (isBankTransfer) {
-                        bankDetails?.accountName?.takeIf { it.isNotBlank() }?.let { SummaryRow("Al\u0131c\u0131", it) }
-                        bankDetails?.iban?.takeIf { it.isNotBlank() }?.let { SummaryRow("IBAN", it) }
-                        bankDetails?.dueHours?.let { SummaryRow("Son \u00F6deme", "$it saat i\u00E7inde") }
-                    }
                     Text(statusMessage ?: response.message, color = TextSecondary)
                 }
             }
@@ -981,13 +950,6 @@ private enum class PaymentMethod(
         description = "3D Secure ile",
         submitLabel = "Kart ile \u00D6demeyi Tamamla",
         icon = Icons.Default.CreditCard
-    ),
-    BankTransfer(
-        apiValue = "havale",
-        title = "Havale/EFT",
-        description = "Banka onay\u0131 bekler",
-        submitLabel = "Sipari\u015Fi Olu\u015Ftur",
-        icon = Icons.Default.VerifiedUser
     )
 }
 
