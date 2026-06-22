@@ -1,6 +1,17 @@
 const pool = require('../config/db');
 const { emitWithRetry } = require('../services/notificationService');
 
+const redactKnownSecretText = (value = '') => {
+    let text = String(value || '');
+    for (const secret of [process.env.PAYTR_MERCHANT_KEY, process.env.PAYTR_MERCHANT_SALT]) {
+        const secretText = String(secret || '').trim();
+        if (secretText) {
+            text = text.split(secretText).join('[REDACTED]');
+        }
+    }
+    return text;
+};
+
 /**
  * Yeni bildirim olusturur ve Socket.io ile gercek zamanli gonderir.
  * @param {number|null} userId
@@ -28,7 +39,7 @@ const createNotification = async (userId, type, message, io = null) => {
 
         return notif;
     } catch (err) {
-        console.error('Bildirim oluşturma hatası:', err.message);
+        console.error('Bildirim oluşturma hatası:', redactKnownSecretText(err.message));
         return null;
     }
 };

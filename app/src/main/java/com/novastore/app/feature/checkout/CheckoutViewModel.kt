@@ -20,6 +20,7 @@ import javax.inject.Inject
 private const val PAYTR_IFRAME_TYPE = "iframe"
 private const val PAYTR_SECURE_PAYMENT_HOST = "www.paytr.com"
 private const val PAYTR_SECURE_PAYMENT_PATH_PREFIX = "/odeme/guvenli/"
+private const val PAYMENT_STATUS_PAID = "PAID"
 
 data class CheckoutUiState(
     val isLoading: Boolean = false,
@@ -27,6 +28,8 @@ data class CheckoutUiState(
     val successResponse: PaymentResponse? = null,
     val isCheckingPaymentStatus: Boolean = false,
     val paymentStatusMessage: String? = null,
+    val paymentStatus: String? = null,
+    val paymentStatusFinalized: Boolean = false,
     val paymentFinalized: Boolean = false
 )
 
@@ -169,6 +172,8 @@ class CheckoutViewModel @Inject constructor(
                         isLoading = false,
                         successResponse = response,
                         paymentStatusMessage = response.message,
+                        paymentStatus = response.paymentStatus,
+                        paymentStatusFinalized = false,
                         paymentFinalized = false
                     )
                 }
@@ -208,14 +213,17 @@ class CheckoutViewModel @Inject constructor(
             val result = paymentRepository.getPaymentStatus(paymentRef = paymentRef, orderId = response.orderId)
             if (result.isSuccess) {
                 val status = result.getOrThrow()
-                if (status.finalized && status.paymentStatus == "PAID" && clearCartWhenPaymentFinalized) {
+                val paidAndFinalized = status.shouldClearCartAfterStatusRefresh()
+                if (paidAndFinalized && clearCartWhenPaymentFinalized) {
                     cartRepository.clearCart()
                 }
                 _uiState.update {
                     it.copy(
                         isCheckingPaymentStatus = false,
                         paymentStatusMessage = status.message,
-                        paymentFinalized = status.finalized && status.paymentStatus == "PAID"
+                        paymentStatus = status.paymentStatus,
+                        paymentStatusFinalized = status.finalized,
+                        paymentFinalized = paidAndFinalized
                     )
                 }
             } else {
@@ -228,6 +236,9 @@ class CheckoutViewModel @Inject constructor(
 
 internal fun PaymentAction?.isPaytrIframeAction(): Boolean =
     this?.type.equals(PAYTR_IFRAME_TYPE, ignoreCase = true)
+
+internal fun PaymentStatusResponse?.shouldClearCartAfterStatusRefresh(): Boolean =
+    this != null && finalized && paymentStatus.equals(PAYMENT_STATUS_PAID, ignoreCase = true)
 
 internal fun PaymentAction?.resolveSafePaytrIframeUrl(): String? {
     if (!isPaytrIframeAction()) return null

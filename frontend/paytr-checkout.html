@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaStore | Güvenli Ödeme</title>
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <script src="mobile-bridge.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Inter, Arial, sans-serif;
+            background: #f4f7fb;
+            color: #1f2937;
+        }
+        .paytr-shell {
+            width: min(1120px, calc(100vw - 32px));
+            margin: 0 auto;
+            padding: 24px 0 32px;
+        }
+        .paytr-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .brand {
+            color: #0f2a43;
+            font-weight: 800;
+            font-size: 1.35rem;
+        }
+        .status {
+            color: #566273;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .frame-wrap {
+            background: #fff;
+            border: 1px solid #e5eaf2;
+            border-radius: 8px;
+            min-height: 680px;
+            overflow: hidden;
+            box-shadow: 0 12px 28px rgba(15, 42, 67, 0.08);
+        }
+        iframe {
+            display: block;
+            width: 100%;
+            min-height: 680px;
+            border: 0;
+            background: #fff;
+        }
+        .error {
+            display: none;
+            padding: 28px;
+            background: #fff;
+            border: 1px solid #f1c7c7;
+            border-radius: 8px;
+            color: #9f1d1d;
+            line-height: 1.55;
+        }
+        .meta {
+            margin-top: 12px;
+            color: #6b7280;
+            font-size: 0.85rem;
+        }
+        .btn {
+            appearance: none;
+            border: 0;
+            border-radius: 8px;
+            background: #0f2a43;
+            color: #fff;
+            padding: 10px 14px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        @media (max-width: 720px) {
+            .paytr-shell { width: 100%; padding: 14px 10px 20px; }
+            .paytr-header { align-items: flex-start; flex-direction: column; }
+            .frame-wrap, iframe { min-height: 620px; }
+            .btn { width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <main class="paytr-shell">
+        <header class="paytr-header">
+            <div>
+                <div class="brand">NovaStore</div>
+                <div class="status" id="paytr-status">Güvenli ödeme ekranı yükleniyor.</div>
+                <div class="meta" id="paytr-meta"></div>
+            </div>
+            <a class="btn" href="checkout.html">Checkout'a Dön</a>
+        </header>
+
+        <section class="error" id="paytr-error"></section>
+        <section class="frame-wrap" id="paytr-frame-wrap">
+            <iframe id="paytr-frame" title="PayTR güvenli ödeme ekranı" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        </section>
+    </main>
+
+    <script>
+        function readParam(name) {
+            return new URL(window.location.href).searchParams.get(name) || '';
+        }
+
+        function readPaytrCheckoutSession(paymentRef) {
+            if (!paymentRef) return null;
+            try {
+                const raw = sessionStorage.getItem(`novastore.paytrCheckout.${paymentRef}`);
+                return raw ? JSON.parse(raw) : null;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function isSafeIframeUrl(value) {
+            try {
+                const url = new URL(value);
+                return url.protocol === 'https:'
+                    && url.hostname === 'www.paytr.com'
+                    && url.pathname.startsWith('/odeme/guvenli/');
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('paytr-frame-wrap').style.display = 'none';
+            const error = document.getElementById('paytr-error');
+            error.style.display = 'block';
+            error.innerText = message;
+            document.getElementById('paytr-status').innerText = 'Ödeme ekranı açılamadı.';
+        }
+
+        function renderPaytrIframe() {
+            const paymentRef = readParam('paymentRef');
+            const orderId = readParam('orderId');
+
+            if (!paymentRef || !orderId) {
+                showError('Ödeme referansı veya sipariş bilgisi eksik. Lütfen checkout ekranından tekrar deneyin.');
+                return;
+            }
+
+            const checkoutSession = readPaytrCheckoutSession(paymentRef);
+            if (!checkoutSession || String(checkoutSession.orderId) !== String(orderId)) {
+                showError('Ödeme oturumu bulunamadı veya süresi doldu. Lütfen ödeme adımına geri dönün.');
+                return;
+            }
+
+            const iframeUrl = checkoutSession.iframeUrl || '';
+            if (!iframeUrl || !isSafeIframeUrl(iframeUrl)) {
+                showError('Güvenli ödeme ekranı için geçerli bağlantı alınamadı.');
+                return;
+            }
+
+            document.getElementById('paytr-meta').innerText = `Sipariş #${orderId} · Ref: ${paymentRef}`;
+            const frame = document.getElementById('paytr-frame');
+            frame.addEventListener('load', () => {
+                document.getElementById('paytr-status').innerText = 'Güvenli ödeme ekranı hazır.';
+            }, { once: true });
+            frame.src = iframeUrl;
+        }
+
+        renderPaytrIframe();
+    </script>
+    <script src="footer.js"></script>
+</body>
+</html>

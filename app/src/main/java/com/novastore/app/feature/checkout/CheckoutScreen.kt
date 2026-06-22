@@ -210,6 +210,8 @@ fun CheckoutScreen(
                     response = uiState.successResponse!!,
                     isCheckingStatus = uiState.isCheckingPaymentStatus,
                     statusMessage = uiState.paymentStatusMessage,
+                    paymentStatus = uiState.paymentStatus,
+                    paymentStatusFinalized = uiState.paymentStatusFinalized,
                     paymentFinalized = uiState.paymentFinalized,
                     onRefreshStatus = viewModel::refreshPaymentStatus,
                     onNavigateToHome = onNavigateToHome
@@ -869,22 +871,36 @@ private fun SuccessState(
     response: com.novastore.app.data.model.PaymentResponse,
     isCheckingStatus: Boolean,
     statusMessage: String?,
+    paymentStatus: String?,
+    paymentStatusFinalized: Boolean,
     paymentFinalized: Boolean,
     onRefreshStatus: () -> Unit,
     onNavigateToHome: () -> Unit
 ) {
     val isBankTransfer = response.provider == "bank_transfer" || response.paymentStatus == "WAITING_TRANSFER"
+    val normalizedPaymentStatus = paymentStatus?.uppercase(Locale.ROOT)
+    val paymentFailed = paymentStatusFinalized && normalizedPaymentStatus == "FAILED"
     val statusTitle = when {
         paymentFinalized -> "\u00D6deme Onayland\u0131"
+        paymentFailed -> "\u00D6deme Ba\u015Far\u0131s\u0131z"
+        !paymentStatusFinalized -> "\u00D6deme Bekleniyor"
         isBankTransfer -> "\u00D6deme Bekleniyor"
         else -> "\u00D6deme Ba\u015Flat\u0131ld\u0131"
     }
-    val statusMessage = if (isBankTransfer) {
-        "\u00D6deme onayland\u0131\u011F\u0131nda sipari\u015Finiz i\u015Fleme al\u0131nacak. Sepetiniz \u00F6deme kesinle\u015Fene kadar korunur."
-    } else {
-        "3D Secure do\u011Frulamas\u0131 tamamland\u0131ktan ve \u00F6deme sa\u011Flay\u0131c\u0131 onay\u0131 geldikten sonra sipari\u015Finiz kesinle\u015Fecek."
+    val defaultStatusMessage = when {
+        paymentFinalized -> "\u00D6deme onayland\u0131. Sepetiniz g\u00FCncellendi."
+        paymentFailed -> "\u00D6deme ba\u015Far\u0131s\u0131z veya iptal edildi. Sepetiniz korunur; tekrar deneyebilirsiniz."
+        isBankTransfer -> "\u00D6deme onayland\u0131\u011F\u0131nda sipari\u015Finiz i\u015Fleme al\u0131nacak. Sepetiniz \u00F6deme kesinle\u015Fene kadar korunur."
+        !paymentStatusFinalized -> "\u00D6deme sa\u011Flay\u0131c\u0131 onay\u0131 bekleniyor. Sepetiniz \u00F6deme kesinle\u015Fene kadar korunur."
+        else -> "3D Secure do\u011Frulamas\u0131 tamamland\u0131ktan ve \u00F6deme sa\u011Flay\u0131c\u0131 onay\u0131 geldikten sonra sipari\u015Finiz kesinle\u015Fecek."
     }
-    val actionTitle = "\u00D6deme onay\u0131 bekleniyor"
+    val visibleStatusMessage = statusMessage ?: defaultStatusMessage
+    val actionTitle = when {
+        paymentFinalized -> "\u00D6deme tamamland\u0131"
+        paymentFailed -> "\u00D6deme tamamlanamad\u0131"
+        else -> "\u00D6deme onay\u0131 bekleniyor"
+    }
+    val statusAccentColor = if (paymentFailed) Error else DiscountGreen
 
     Box(
         modifier = Modifier
@@ -896,7 +912,7 @@ private fun SuccessState(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.verticalScroll(rememberScrollState())
         ) {
-            Icon(Icons.Default.CheckCircle, contentDescription = statusTitle, tint = DiscountGreen, modifier = Modifier.size(80.dp))
+            Icon(Icons.Default.CheckCircle, contentDescription = statusTitle, tint = statusAccentColor, modifier = Modifier.size(80.dp))
             Spacer(modifier = Modifier.height(16.dp))
             Text(statusTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = NavyDark, textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(4.dp))
@@ -906,12 +922,14 @@ private fun SuccessState(
             Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardBackground)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = DiscountGreen)
+                        Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = statusAccentColor)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(actionTitle, fontWeight = FontWeight.Bold, color = NavyDark)
                     }
-                    Text(statusMessage, color = TextSecondary)
-                    Text(statusMessage ?: response.message, color = TextSecondary)
+                    if (visibleStatusMessage != defaultStatusMessage) {
+                        Text(defaultStatusMessage, color = TextSecondary)
+                    }
+                    Text(visibleStatusMessage, color = TextSecondary)
                 }
             }
 

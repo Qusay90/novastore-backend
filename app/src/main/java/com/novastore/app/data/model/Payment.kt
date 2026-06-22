@@ -58,9 +58,14 @@ data class PaymentTotals(
 
 @Serializable
 data class PaymentAction(
-    val provider: String?,
-    val status: String?,
-    val action: PaymentActionRedirect?,
+    val provider: String? = null,
+    val status: String? = null,
+    val action: PaymentActionRedirect? = null,
+    val type: String? = null,
+    val token: String? = null,
+    val iframeUrl: String? = null,
+    val successUrl: String? = null,
+    val failUrl: String? = null,
     val accountName: String? = null,
     val iban: String? = null,
     val dueHours: Int? = null

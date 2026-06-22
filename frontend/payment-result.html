@@ -17,12 +17,14 @@
         .ok { color: #127a44; }
         .bad { color: #b42323; }
         .btn { margin-top: 14px; background: #0f2a43; color: white; border: none; border-radius: 10px; padding: 11px 16px; font-weight: 700; cursor: pointer; }
+        .btn.secondary { background: #eef3f8; color: #0f2a43; margin-left: 8px; }
     </style>
 </head>
 <body>
     <div class="box">
         <h1 id="title">Ödeme Sonucu</h1>
         <p id="desc">Sonuç kontrol ediliyor...</p>
+        <button class="btn secondary" id="retry-btn" style="display:none;" onclick="window.location.href='checkout.html'">Ödeme Adımına Dön</button>
         <button class="btn" onclick="window.location.href='profile.html?tab=orders'">Siparişlerime Dön</button>
     </div>
 
@@ -49,6 +51,13 @@
         function paymentStatusHeaders() {
             const token = localStorage.getItem('nova_user_token');
             return token ? { Authorization: `Bearer ${token}` } : {};
+        }
+
+        function clearPaytrCheckoutSession(paymentRef) {
+            if (!paymentRef) return;
+            try {
+                sessionStorage.removeItem(`novastore.paytrCheckout.${paymentRef}`);
+            } catch (_) {}
         }
 
         function clearFinalizedCheckoutItems(orderId, paymentRef) {
@@ -78,6 +87,8 @@
 
             const title = document.getElementById('title');
             const desc = document.getElementById('desc');
+            const retryBtn = document.getElementById('retry-btn');
+            retryBtn.style.display = 'none';
 
             if (!paymentRef) {
                 title.innerText = 'Ödeme Bilgisi Eksik';
@@ -98,15 +109,18 @@
                     throw new Error(result.error || 'Ödeme durumu kontrol edilemedi.');
                 }
 
-                if (result.paymentStatus === 'PAID') {
+                if (result.finalized === true && result.paymentStatus === 'PAID') {
                     title.innerText = 'Ödeme Başarılı';
                     title.className = 'ok';
                     desc.innerText = `${result.message} (Ref: ${paymentRef})`;
-                    if (result.finalized) clearFinalizedCheckoutItems(result.orderId || orderId, paymentRef);
-                } else if (result.paymentStatus === 'FAILED') {
+                    clearFinalizedCheckoutItems(result.orderId || orderId, paymentRef);
+                    clearPaytrCheckoutSession(paymentRef);
+                } else if (result.finalized === true && result.paymentStatus === 'FAILED') {
                     title.innerText = 'Ödeme Başarısız';
                     title.className = 'bad';
                     desc.innerText = result.message || 'Ödeme tamamlanamadı. Dilerseniz tekrar deneyebilirsiniz.';
+                    retryBtn.style.display = 'inline-block';
+                    clearPaytrCheckoutSession(paymentRef);
                 } else {
                     title.innerText = 'Ödeme Onayı Bekleniyor';
                     title.className = '';
