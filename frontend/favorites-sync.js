@@ -25,6 +25,11 @@
         return storage().getItem('nova_user_token') || '';
     }
 
+    function clearAuthSession() {
+        storage().removeItem('nova_user_token');
+        storage().removeItem('nova_user_info');
+    }
+
     function isAuthenticated() {
         return Boolean(getToken()) && getUserId() !== 'guest';
     }
@@ -147,6 +152,7 @@
     return {
         getUserId,
         isAuthenticated,
+        clearAuthSession,
         favoritesKey,
         migrationKey,
         readLocalIds,

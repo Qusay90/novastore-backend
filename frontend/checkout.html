@@ -10,6 +10,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <script src="mobile-bridge.js"></script>
+    <script src="shared-state-sync.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -731,15 +732,42 @@
             }
         }
 
-        const cart = JSON.parse(localStorage.getItem(_checkoutKey())) || [];
-        let totalAmount = 0;
-        if (cart.length === 0) { alert("Ödenecek ürün bulanamadı. Lütfen seçim yapın."); window.location.href = "index.html"; }
         const itemsContainer = document.getElementById('checkout-items');
-        cart.forEach(item => {
-            totalAmount += parseFloat(item.price) * item.quantity;
-            itemsContainer.innerHTML += `<div class="summary-item"><span>${item.quantity}x ${item.name}</span><span style="font-weight:600;">${(item.price * item.quantity).toFixed(2)} TL</span></div>`;
-        });
-        document.getElementById('checkout-total').innerText = totalAmount.toFixed(2);
+        let cart = JSON.parse(localStorage.getItem(_checkoutKey())) || [];
+        let totalAmount = 0;
+
+        function renderCheckoutItems() {
+            totalAmount = 0;
+            itemsContainer.innerHTML = '';
+            if (cart.length === 0) {
+                alert("Ödenecek ürün bulanamadı. Lütfen seçim yapın.");
+                window.location.href = "index.html";
+                return;
+            }
+            cart.forEach(item => {
+                totalAmount += parseFloat(item.price) * item.quantity;
+                itemsContainer.innerHTML += `<div class="summary-item"><span>${item.quantity}x ${item.name}</span><span style="font-weight:600;">${(item.price * item.quantity).toFixed(2)} TL</span></div>`;
+            });
+            document.getElementById('checkout-total').innerText = totalAmount.toFixed(2);
+        }
+
+        async function loadSharedCheckoutDraft() {
+            if (!window.NovaStoreSharedState || !window.NovaStoreSharedState.isAuthenticated()) {
+                renderCheckoutItems();
+                return;
+            }
+            try {
+                const draft = await window.NovaStoreSharedState.loadCheckout();
+                if (draft && Array.isArray(draft.items) && draft.items.length > 0) {
+                    cart = draft.items;
+                    localStorage.setItem(_checkoutKey(), JSON.stringify(cart));
+                    if (draft.paymentMethod) selectPaymentMethod(draft.paymentMethod);
+                }
+            } catch (error) {
+                alert('Odeme taslagi alinamadi. Lutfen tekrar deneyin.');
+            }
+            renderCheckoutItems();
+        }
 
         function flipCard(isFlipped) {
             const cardBox = document.getElementById('card-box');
@@ -974,6 +1002,7 @@
         // Sayfa yüklendiğinde adresleri kontrol et
         document.addEventListener('DOMContentLoaded', () => {
             loadCheckoutAddresses();
+            loadSharedCheckoutDraft();
         });
 
         let selectedPaymentMethod = 'card';
@@ -1020,6 +1049,39 @@
             } catch (_) {
                 resultEl.innerHTML = '<span style="color:red;">Kupon doğrulanamadı.</span>';
             }
+        }
+
+        function resolvePaytrIframeUrl(paymentAction) {
+            if (!paymentAction || paymentAction.type !== 'iframe') return null;
+            if (paymentAction.iframeUrl) return paymentAction.iframeUrl;
+            if (paymentAction.token) {
+                return `https://www.paytr.com/odeme/guvenli/${encodeURIComponent(paymentAction.token)}`;
+            }
+            return null;
+        }
+
+        function buildPaytrCheckoutUrl(result) {
+            const paymentAction = result && result.paymentAction ? result.paymentAction : null;
+            const iframeUrl = resolvePaytrIframeUrl(paymentAction);
+            const paymentRef = result && result.paymentRef ? String(result.paymentRef) : '';
+            const orderId = result && result.orderId ? String(result.orderId) : '';
+            if (!iframeUrl || !paymentRef || !orderId) return null;
+
+            sessionStorage.setItem(`novastore.paytrCheckout.${paymentRef}`, JSON.stringify({
+                paymentRef,
+                orderId,
+                iframeUrl,
+                token: paymentAction.token || '',
+                successUrl: paymentAction.successUrl || '',
+                failUrl: paymentAction.failUrl || '',
+                createdAt: Date.now()
+            }));
+
+            const params = new URLSearchParams({
+                paymentRef,
+                orderId
+            });
+            return `paytr-checkout.html?${params.toString()}`;
         }
 
         document.getElementById('checkout-form').addEventListener('submit', async (e) => {
@@ -1081,6 +1143,12 @@
                     items: cart,
                     createdAt: Date.now()
                 }));
+
+                const paytrCheckoutUrl = buildPaytrCheckoutUrl(result);
+                if (paytrCheckoutUrl) {
+                    window.location.href = paytrCheckoutUrl;
+                    return;
+                }
 
                 const successUrl = result.paymentAction && result.paymentAction.action && result.paymentAction.action.successUrl
                     ? result.paymentAction.action.successUrl

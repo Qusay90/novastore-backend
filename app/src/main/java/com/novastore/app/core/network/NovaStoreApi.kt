@@ -118,6 +118,19 @@ interface NovaStoreApi {
     @POST("api/favorites/sync")
     suspend fun syncFavorites(@Body body: FavoriteSyncRequest): FavoritesResponse
 
+    // Shared state
+    @GET("api/shared-state/cart")
+    suspend fun getSharedCart(): SharedCartStateResponse
+
+    @PUT("api/shared-state/cart")
+    suspend fun putSharedCart(@Body body: SharedCartStateRequest): SharedCartStateResponse
+
+    @GET("api/shared-state/checkout")
+    suspend fun getSharedCheckout(): SharedCheckoutStateResponse
+
+    @PUT("api/shared-state/checkout")
+    suspend fun putSharedCheckout(@Body body: SharedCheckoutStateRequest): SharedCheckoutStateResponse
+
     // Payments
     @POST("api/payments/initialize")
     suspend fun initializePayment(@Body body: PaymentRequest): PaymentResponse

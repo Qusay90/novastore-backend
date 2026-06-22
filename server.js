@@ -105,6 +105,9 @@ app.use('/api/products', productRoutes);
 const favoriteRoutes = require('./routes/favoriteRoutes');
 app.use('/api/favorites', favoriteRoutes);
 
+const sharedStateRoutes = require('./routes/sharedStateRoutes');
+app.use('/api/shared-state', sharedStateRoutes);
+
 const orderRoutes = require('./routes/orderRoutes');
 app.use('/api/orders', orderRoutes);
 

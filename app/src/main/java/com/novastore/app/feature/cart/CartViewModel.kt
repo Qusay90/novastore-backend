@@ -3,6 +3,7 @@ package com.novastore.app.feature.cart
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.novastore.app.data.model.CartItem
+import com.novastore.app.data.repository.AuthRepository
 import com.novastore.app.data.repository.CartRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -15,7 +16,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CartViewModel @Inject constructor(
-    private val cartRepository: CartRepository
+    private val cartRepository: CartRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     val cartItems: StateFlow<List<CartItem>> = cartRepository.cartItems
@@ -40,6 +42,19 @@ class CartViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = 0.0
         )
+
+    init {
+        viewModelScope.launch {
+            cartRepository.refreshCartFromServer()
+        }
+        viewModelScope.launch {
+            authRepository.isLoggedInFlow.collect { isLoggedIn ->
+                if (isLoggedIn) {
+                    cartRepository.refreshCartFromServer()
+                }
+            }
+        }
+    }
 
     fun addToCart(item: CartItem, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {

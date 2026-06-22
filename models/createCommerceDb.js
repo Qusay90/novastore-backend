@@ -131,6 +131,15 @@ const createCommerceSchema = async () => {
         CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
         CREATE INDEX IF NOT EXISTS idx_favorites_product_id ON favorites(product_id);
 
+        CREATE TABLE IF NOT EXISTS user_shared_state (
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            state_key VARCHAR(40) NOT NULL,
+            payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, state_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_user_shared_state_user_id ON user_shared_state(user_id);
+
         CREATE TABLE IF NOT EXISTS notification_audit_logs (
             id SERIAL PRIMARY KEY,
             notification_id INTEGER REFERENCES notifications(id) ON DELETE SET NULL,

@@ -15,6 +15,9 @@ interface CartDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertItem(item: CartItem)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertItems(items: List<CartItem>)
+
     @Update
     suspend fun updateItem(item: CartItem)
 
@@ -26,4 +29,12 @@ interface CartDao {
 
     @Query("DELETE FROM cart_items")
     suspend fun clearCart()
+
+    @Transaction
+    suspend fun replaceAll(items: List<CartItem>) {
+        clearCart()
+        if (items.isNotEmpty()) {
+            insertItems(items)
+        }
+    }
 }

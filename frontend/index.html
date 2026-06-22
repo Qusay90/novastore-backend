@@ -11,6 +11,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <script src="mobile-bridge.js"></script>
+    <script src="shared-state-sync.js"></script>
     <script src="favorites-sync.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -1422,6 +1423,35 @@
 
         // --- 2. KUSURSUZ SEPET SİSTEMİ ---
         let cart = JSON.parse(localStorage.getItem(_cartKey())) || [];
+        window.addEventListener('novastore:shared-cart-updated', () => {
+            cart = JSON.parse(localStorage.getItem(_cartKey())) || [];
+            renderCartUI();
+        });
+
+        async function persistCart(nextCart, previousCart = cart) {
+            const sharedState = window.NovaStoreSharedState;
+            try {
+                if (sharedState && sharedState.isAuthenticated()) {
+                    await sharedState.saveCart(nextCart);
+                    cart = sharedState.writeCartLocal(nextCart);
+                } else {
+                    cart = nextCart;
+                    localStorage.setItem(_cartKey(), JSON.stringify(cart));
+                }
+                renderCartUI();
+                return true;
+            } catch (error) {
+                cart = previousCart;
+                if (sharedState && sharedState.writeCartLocal) {
+                    sharedState.writeCartLocal(previousCart);
+                } else {
+                    localStorage.setItem(_cartKey(), JSON.stringify(previousCart));
+                }
+                renderCartUI();
+                alert('Sepet senkronlanamadi. Lutfen tekrar deneyin.');
+                return false;
+            }
+        }
 
         function openCart() {
             document.getElementById('cart-sidebar').classList.add('open');
@@ -1525,54 +1555,68 @@
             checkoutBtn.disabled = selectedItemsCount === 0;
         }
 
-        function updateCartQuantity(index, change) {
+        async function updateCartQuantity(index, change) {
             if (cart[index]) {
-                cart[index].quantity += change;
-                if (cart[index].quantity <= 0) {
-                    cart[index].quantity = 1; // Opsiyonel: ya da removeFromCart(index)
+                const previousCart = cart.map(item => ({ ...item }));
+                const nextCart = cart.map(item => ({ ...item }));
+                nextCart[index].quantity += change;
+                if (nextCart[index].quantity <= 0) {
+                    nextCart[index].quantity = 1; // Opsiyonel: ya da removeFromCart(index)
                 }
-                localStorage.setItem(_cartKey(), JSON.stringify(cart));
-                renderCartUI();
+                await persistCart(nextCart, previousCart);
             }
         }
 
-        function toggleCartItemSelection(index) {
-            if (cart[index].selected === undefined) {
-                cart[index].selected = false;
-            } else {
-                cart[index].selected = !cart[index].selected;
+        async function toggleCartItemSelection(index) {
+            if (cart[index]) {
+                const previousCart = cart.map(item => ({ ...item }));
+                const nextCart = cart.map(item => ({ ...item }));
+                if (nextCart[index].selected === undefined) {
+                    nextCart[index].selected = false;
+                } else {
+                    nextCart[index].selected = !nextCart[index].selected;
+                }
+                await persistCart(nextCart, previousCart);
             }
-            localStorage.setItem(_cartKey(), JSON.stringify(cart));
-            renderCartUI();
         }
 
-        function proceedToCheckout() {
+        async function proceedToCheckout() {
             const selectedItems = cart.filter(item => item.selected !== false);
             if (selectedItems.length > 0) {
-                localStorage.setItem(_checkoutKey(), JSON.stringify(selectedItems));
-                window.location.href = 'checkout.html';
+                try {
+                    if (window.NovaStoreSharedState && window.NovaStoreSharedState.isAuthenticated()) {
+                        await window.NovaStoreSharedState.saveCheckout({ items: selectedItems });
+                    }
+                    localStorage.setItem(_checkoutKey(), JSON.stringify(selectedItems));
+                    window.location.href = 'checkout.html';
+                } catch (error) {
+                    alert('Odeme taslagi senkronlanamadi. Lutfen tekrar deneyin.');
+                }
             }
         }
 
-        function addToCart(id, name, price, image, old_price = null) {
-            const existingItem = cart.find(item => item.id === id);
+        async function addToCart(id, name, price, image, old_price = null) {
+            const previousCart = cart.map(item => ({ ...item }));
+            const nextCart = cart.map(item => ({ ...item }));
+            const existingItem = nextCart.find(item => item.id === id);
             if (existingItem) {
                 existingItem.quantity += 1;
             } else {
-                cart.push({ id, name, price, image: image || '', old_price: old_price, quantity: 1 });
+                nextCart.push({ id, name, price, image: image || '', old_price: old_price, quantity: 1 });
             }
+            const saved = await persistCart(nextCart, previousCart);
+            if (!saved) return;
             if (window.NovaAnalytics && typeof window.NovaAnalytics.trackAddToCart === 'function') {
                 window.NovaAnalytics.trackAddToCart({ id, name }, 1);
             }
-            localStorage.setItem(_cartKey(), JSON.stringify(cart));
-            renderCartUI();
             openCart();
         }
 
-        function removeFromCart(index) {
-            cart.splice(index, 1);
-            localStorage.setItem(_cartKey(), JSON.stringify(cart));
-            renderCartUI();
+        async function removeFromCart(index) {
+            const previousCart = cart.map(item => ({ ...item }));
+            const nextCart = cart.map(item => ({ ...item }));
+            nextCart.splice(index, 1);
+            await persistCart(nextCart, previousCart);
         }
 
         // --- KATEGORİ SİSTEMİ ---

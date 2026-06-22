@@ -35,6 +35,16 @@ global.fetch = async (path, options = {}) => {
         return ok({ productId: 101, favorited: false, removed: true });
     }
 
+    if (path === '/api/favorites/104' && options.method === 'POST') {
+        return {
+            ok: false,
+            status: 401,
+            async json() {
+                return { error: 'Invalid or expired token.' };
+            }
+        };
+    }
+
     throw new Error(`Unexpected fetch: ${path}`);
 };
 
@@ -71,10 +81,17 @@ const favorites = require('../frontend/favorites-sync');
     assert.strictEqual(calls.some((call) => call.path === '/api/favorites/101' && call.options.method === 'DELETE'), true);
     assert.deepStrictEqual(favorites.readLocalIds(10).sort((a, b) => a - b), [102, 103]);
 
+    await assert.rejects(
+        () => favorites.setFavorite(104, true),
+        /Invalid or expired token/
+    );
+    assert.strictEqual(localStorage.getItem('nova_user_token'), 'token-10');
+    assert.deepStrictEqual(favorites.readLocalIds(10).sort((a, b) => a - b), [102, 103]);
+
     localStorage.removeItem('nova_user_token');
     localStorage.setItem('nova_user_info', JSON.stringify({ id: 'guest' }));
     await favorites.setFavorite(201, true);
-    assert.deepStrictEqual(favorites.readLocalIds('guest'), [201]);
+    assert.deepStrictEqual(favorites.readLocalIds('guest').sort((a, b) => a - b), [201]);
 
     console.log('web favorites sync smoke passed');
 })().catch((err) => {
