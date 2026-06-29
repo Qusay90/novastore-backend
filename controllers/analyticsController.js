@@ -83,7 +83,7 @@ const upsertSession = async ({
         `INSERT INTO visitor_sessions
             (session_key, visitor_key, user_id, landing_path, entry_page_type, referrer, user_agent, started_at, last_seen_at, ended_at)
          VALUES
-            ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), NULL)
+            ($1, $2, (SELECT id FROM users WHERE id = $3), $4, $5, $6, $7, NOW(), NOW(), NULL)
          ON CONFLICT (session_key)
          DO UPDATE SET
             user_id = COALESCE(visitor_sessions.user_id, EXCLUDED.user_id),
@@ -253,7 +253,7 @@ const trackPageLeave = async (req, res) => {
             `UPDATE visitor_sessions
              SET last_seen_at = NOW(),
                  ended_at = NOW(),
-                 user_id = COALESCE(user_id, $2)
+                 user_id = COALESCE(user_id, (SELECT id FROM users WHERE id = $2))
              WHERE session_key = $1`,
             [payload.sessionKey, payload.userId]
         );
@@ -286,7 +286,7 @@ const trackProductAction = async (req, res) => {
             `INSERT INTO product_actions
                 (action_key, session_key, visitor_key, user_id, product_id, action_type, quantity, page_path, created_at)
              VALUES
-                ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                ($1, $2, $3, (SELECT id FROM users WHERE id = $4), $5, $6, $7, $8, NOW())
              ON CONFLICT (action_key) DO NOTHING`,
             [
                 payload.actionKey,
