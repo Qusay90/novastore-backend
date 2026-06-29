@@ -1058,13 +1058,8 @@
                 return true;
             } catch (error) {
                 cart = previousCart;
-                if (sharedState && sharedState.writeCartLocal) {
-                    sharedState.writeCartLocal(previousCart);
-                } else {
-                    localStorage.setItem(_cartKey(), JSON.stringify(previousCart));
-                }
                 renderCartUI();
-                alert('Sepet senkronlanamadi. Lutfen tekrar deneyin.');
+                sharedState?.reportError('cart', error, 'Sepet şu anda senkronlanamadı. Değişikliğiniz uygulanmadı.');
                 return false;
             }
         }
@@ -1295,7 +1290,11 @@
                     localStorage.setItem(_chkKey(), JSON.stringify(selectedItems));
                     window.location.href = appUrl('checkout.html');
                 } catch (error) {
-                    alert('Odeme taslagi senkronlanamadi. Lutfen tekrar deneyin.');
+                    window.NovaStoreSharedState?.reportError(
+                        'checkout',
+                        error,
+                        'Ödeme taslağı şu anda senkronlanamadı. Sepetiniz korunuyor.'
+                    );
                 }
             }
         }
@@ -1933,8 +1932,8 @@
         }
 
         // --- 5. FAVORİLERİ GETİRME ---
-        function showFavoriteSyncError() {
-            console.warn('Favoriler senkronlanamadi.');
+        function showFavoriteSyncError(error) {
+            NovaStoreFavorites.reportError(error, 'Favoriler şu anda yenilenemedi. Son kayıtlı listeniz gösteriliyor.');
         }
 
         async function toggleFavoriteProfile(btn, event, productId) {
@@ -1944,7 +1943,7 @@
             try {
                 await NovaStoreFavorites.setFavorite(productId, false);
             } catch (error) {
-                alert('Favori kaldırılamadı. Lütfen tekrar deneyin.');
+                NovaStoreFavorites.reportError(error, 'Favori şu anda kaldırılamadı. Listeniz değiştirilmedi.');
                 return;
             }
 

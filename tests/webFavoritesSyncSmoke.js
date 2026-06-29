@@ -12,6 +12,13 @@ global.localStorage = {
         storage.delete(key);
     }
 };
+global.CustomEvent = class CustomEvent {
+    constructor(type, init = {}) {
+        this.type = type;
+        this.detail = init.detail;
+    }
+};
+global.dispatchEvent = () => {};
 
 const calls = [];
 global.fetch = async (path, options = {}) => {
@@ -85,10 +92,10 @@ const favorites = require('../frontend/favorites-sync');
         () => favorites.setFavorite(104, true),
         /Invalid or expired token/
     );
-    assert.strictEqual(localStorage.getItem('nova_user_token'), 'token-10');
+    assert.strictEqual(localStorage.getItem('nova_user_token'), null);
+    assert.strictEqual(localStorage.getItem('nova_user_info'), null);
     assert.deepStrictEqual(favorites.readLocalIds(10).sort((a, b) => a - b), [102, 103]);
 
-    localStorage.removeItem('nova_user_token');
     localStorage.setItem('nova_user_info', JSON.stringify({ id: 'guest' }));
     await favorites.setFavorite(201, true);
     assert.deepStrictEqual(favorites.readLocalIds('guest').sort((a, b) => a - b), [201]);

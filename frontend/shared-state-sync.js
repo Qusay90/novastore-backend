@@ -1,9 +1,8 @@
 (function (root) {
     const CART_PREFIX = 'novastore_cart_';
     const CART_MIGRATION_PREFIX = 'novastore_cart_migrated_';
-    const CHECKOUT_PREFIX = 'novastore_checkout_';
-    const PENDING_CHECKOUT_PREFIX = 'novastore_pending_checkout_';
-    const syncingKeys = new Set();
+    const writeQueues = new Map();
+    const recentNotices = new Map();
 
     function storage() {
         return root.localStorage;
@@ -33,6 +32,12 @@
 
     function isAuthenticated() {
         return Boolean(getToken()) && getUserId() !== 'guest';
+    }
+
+    function clearExpiredSession() {
+        storage().removeItem('nova_user_token');
+        storage().removeItem('nova_user_info');
+        root.dispatchEvent(new CustomEvent('novastore:auth-required'));
     }
 
     function scopedKey(prefix) {
@@ -90,23 +95,109 @@
         return [...byId.values()];
     }
 
-    async function apiFetch(path, options = {}) {
-        const response = await root.fetch(path, {
-            ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...(options.headers || {}),
-                Authorization: `Bearer ${getToken()}`
+    function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function readResponsePayload(response) {
+        if (typeof response.text === 'function') {
+            const text = await response.text();
+            if (!text) return {};
+            try {
+                return JSON.parse(text);
+            } catch (_) {
+                return { message: text };
             }
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            const error = new Error(payload.error || 'Ortak durum senkronlanamadi.');
-            error.status = response.status;
-            error.payload = payload;
+        }
+        if (typeof response.json === 'function') {
+            return response.json().catch(() => ({}));
+        }
+        return {};
+    }
+
+    function shouldRetry(error) {
+        return !error.status || error.status === 408 || error.status === 429 || error.status >= 500;
+    }
+
+    async function apiFetch(path, options = {}, attempt = 0) {
+        try {
+            const response = await root.fetch(path, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(options.headers || {}),
+                    Authorization: `Bearer ${getToken()}`
+                }
+            });
+            const payload = await readResponsePayload(response);
+            if (!response.ok) {
+                const error = new Error(payload.error || payload.message || 'Ortak durum senkronlanamadı.');
+                error.status = response.status;
+                error.code = payload.code;
+                error.payload = payload;
+                if (response.status === 401) clearExpiredSession();
+                throw error;
+            }
+            return payload;
+        } catch (error) {
+            if (attempt === 0 && shouldRetry(error)) {
+                await wait(250);
+                return apiFetch(path, options, attempt + 1);
+            }
             throw error;
         }
-        return payload;
+    }
+
+    function enqueueWrite(key, operation) {
+        const previous = writeQueues.get(key) || Promise.resolve();
+        const current = previous.catch(() => undefined).then(operation);
+        writeQueues.set(key, current);
+        return current.finally(() => {
+            if (writeQueues.get(key) === current) writeQueues.delete(key);
+        });
+    }
+
+    function showNotice(message) {
+        const now = Date.now();
+        if (now - (recentNotices.get(message) || 0) < 2500) return;
+        recentNotices.set(message, now);
+
+        if (typeof root.showToast === 'function') {
+            root.showToast(message, 'warning');
+            return;
+        }
+
+        if (!root.document || !root.document.body) return;
+        const notice = root.document.createElement('div');
+        notice.setAttribute('role', 'status');
+        notice.textContent = message;
+        Object.assign(notice.style, {
+            position: 'fixed',
+            right: '16px',
+            bottom: '16px',
+            zIndex: '100000',
+            maxWidth: '360px',
+            padding: '12px 16px',
+            background: '#1f2937',
+            color: '#ffffff',
+            borderLeft: '4px solid #f59e0b',
+            borderRadius: '6px',
+            boxShadow: '0 8px 24px rgba(0,0,0,.2)',
+            font: '600 14px/1.4 Arial, sans-serif'
+        });
+        root.document.body.appendChild(notice);
+        setTimeout(() => notice.remove(), 4500);
+    }
+
+    function reportError(scope, error, message) {
+        console.error(`[NovaStore ${scope} sync]`, {
+            status: error?.status || null,
+            code: error?.code || null,
+            message: error?.message || String(error)
+        });
+        showNotice(error?.status === 401
+            ? 'Oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.'
+            : message);
     }
 
     async function loadCart() {
@@ -129,10 +220,10 @@
     async function saveCart(items) {
         if (!isAuthenticated()) return null;
         const normalized = normalizeCartItems(items);
-        return apiFetch('/api/shared-state/cart', {
+        return enqueueWrite('cart', () => apiFetch('/api/shared-state/cart', {
             method: 'PUT',
             body: JSON.stringify({ payload: { version: 1, items: normalized } })
-        });
+        }));
     }
 
     async function saveCheckout(payload) {
@@ -141,10 +232,10 @@
             ...(payload || {}),
             items: normalizeCartItems((payload && payload.items) || [])
         };
-        return apiFetch('/api/shared-state/checkout', {
+        return enqueueWrite('checkout', () => apiFetch('/api/shared-state/checkout', {
             method: 'PUT',
             body: JSON.stringify({ payload: normalizedPayload })
-        });
+        }));
     }
 
     async function loadCheckout() {
@@ -156,18 +247,9 @@
         };
     }
 
-    function writeWithoutSync(key, value) {
-        syncingKeys.add(key);
-        try {
-            storage().setItem(key, value);
-        } finally {
-            syncingKeys.delete(key);
-        }
-    }
-
     function writeCartLocal(items) {
         const normalized = normalizeCartItems(items);
-        writeWithoutSync(scopedKey(CART_PREFIX), JSON.stringify(normalized));
+        storage().setItem(scopedKey(CART_PREFIX), JSON.stringify(normalized));
         return normalized;
     }
 
@@ -177,7 +259,7 @@
         try {
             const remoteState = await loadCartState();
             if (remoteState.exists) {
-                writeWithoutSync(key, JSON.stringify(remoteState.items));
+                storage().setItem(key, JSON.stringify(remoteState.items));
                 markCartMigrationComplete();
                 root.dispatchEvent(new CustomEvent('novastore:shared-cart-updated', { detail: { items: remoteState.items } }));
                 return;
@@ -187,33 +269,18 @@
             if (localItems.length > 0 && !isCartMigrationComplete()) {
                 await saveCart(localItems);
                 markCartMigrationComplete();
-                writeWithoutSync(key, JSON.stringify(localItems));
+                storage().setItem(key, JSON.stringify(localItems));
                 root.dispatchEvent(new CustomEvent('novastore:shared-cart-updated', { detail: { items: localItems } }));
             } else {
                 markCartMigrationComplete();
-                writeWithoutSync(key, JSON.stringify([]));
+                storage().setItem(key, JSON.stringify([]));
                 root.dispatchEvent(new CustomEvent('novastore:shared-cart-updated', { detail: { items: [] } }));
             }
         } catch (error) {
+            reportError('cart', error, 'Sepet şu anda senkronlanamadı. Değişiklikleriniz korunuyor.');
             root.dispatchEvent(new CustomEvent('novastore:shared-state-error', { detail: { error } }));
         }
     }
-
-    const originalSetItem = Storage.prototype.setItem;
-    Storage.prototype.setItem = function patchedSetItem(key, value) {
-        originalSetItem.call(this, key, value);
-        if (this !== storage() || syncingKeys.has(key) || !isAuthenticated()) return;
-
-        if (key === scopedKey(CART_PREFIX)) {
-            saveCart(readJson(key, [])).catch((error) => {
-                root.dispatchEvent(new CustomEvent('novastore:shared-state-error', { detail: { error, key: 'cart' } }));
-            });
-        } else if (key === scopedKey(CHECKOUT_PREFIX) || key === scopedKey(PENDING_CHECKOUT_PREFIX)) {
-            saveCheckout(readJson(key, {})).catch((error) => {
-                root.dispatchEvent(new CustomEvent('novastore:shared-state-error', { detail: { error, key: 'checkout' } }));
-            });
-        }
-    };
 
     root.NovaStoreSharedState = {
         isAuthenticated,
@@ -225,7 +292,8 @@
         loadCheckout,
         writeCartLocal,
         normalizeCartItems,
-        isCartMigrationComplete
+        isCartMigrationComplete,
+        reportError
     };
 
     root.addEventListener('DOMContentLoaded', () => {

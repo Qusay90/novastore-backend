@@ -1,4 +1,15 @@
 const pool = require('../config/db');
+const FAVORITES_SCHEMA_ERROR = '42P01';
+
+const sendFavoritesError = (res, error, fallbackMessage) => {
+    if (error?.code === FAVORITES_SCHEMA_ERROR) {
+        return res.status(503).json({
+            error: 'Favoriler geçici olarak kullanılamıyor.',
+            code: 'FAVORITES_SCHEMA_MISSING'
+        });
+    }
+    return res.status(500).json({ error: fallbackMessage });
+};
 
 const normalizeProductId = (value) => {
     const parsed = Number(value);
@@ -67,7 +78,7 @@ const listFavorites = async (req, res) => {
         res.json(buildFavoritesResponse(rows));
     } catch (error) {
         console.error('Favoriler alinamadi:', error);
-        res.status(500).json({ error: 'Favoriler alinamadi.' });
+        sendFavoritesError(res, error, 'Favoriler alinamadi.');
     }
 };
 
@@ -95,7 +106,7 @@ const addFavorite = async (req, res) => {
         });
     } catch (error) {
         console.error('Favori eklenemedi:', error);
-        res.status(500).json({ error: 'Favori eklenemedi.' });
+        sendFavoritesError(res, error, 'Favori eklenemedi.');
     }
 };
 
@@ -116,7 +127,7 @@ const removeFavorite = async (req, res) => {
         });
     } catch (error) {
         console.error('Favori kaldirilamadi:', error);
-        res.status(500).json({ error: 'Favori kaldirilamadi.' });
+        sendFavoritesError(res, error, 'Favori kaldirilamadi.');
     }
 };
 
@@ -142,13 +153,8 @@ const syncFavorites = async (req, res) => {
                 [productIds]
             );
             const existingIds = new Set(existingResult.rows.map((row) => Number(row.id)));
-            const missingProductIds = productIds.filter((productId) => !existingIds.has(productId));
-            if (missingProductIds.length > 0) {
-                await client.query('ROLLBACK');
-                return res.status(404).json({ error: 'Bazi urunler bulunamadi.', missingProductIds });
-            }
-
-            for (const productId of productIds) {
+            const validProductIds = productIds.filter((productId) => existingIds.has(productId));
+            for (const productId of validProductIds) {
                 await client.query(
                     `INSERT INTO favorites (user_id, product_id)
                      VALUES ($1, $2)
@@ -160,11 +166,15 @@ const syncFavorites = async (req, res) => {
 
         const rows = await fetchFavoriteRows(req.user.id, client);
         await client.query('COMMIT');
-        res.json(buildFavoritesResponse(rows));
+        const response = buildFavoritesResponse(rows);
+        response.ignoredProductIds = productIds.filter(
+            (productId) => !rows.some((row) => Number(row.product_id) === productId)
+        );
+        res.json(response);
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Favoriler senkronlanamadi:', error);
-        res.status(500).json({ error: 'Favoriler senkronlanamadi.' });
+        sendFavoritesError(res, error, 'Favoriler senkronlanamadi.');
     } finally {
         client.release();
     }
@@ -178,6 +188,7 @@ module.exports = {
     __test: {
         normalizeProductId,
         mapFavoriteRow,
-        buildFavoritesResponse
+        buildFavoritesResponse,
+        sendFavoritesError
     }
 };

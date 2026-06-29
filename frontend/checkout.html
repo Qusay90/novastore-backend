@@ -764,7 +764,11 @@
                     if (draft.paymentMethod) selectPaymentMethod(draft.paymentMethod);
                 }
             } catch (error) {
-                alert('Odeme taslagi alinamadi. Lutfen tekrar deneyin.');
+                window.NovaStoreSharedState?.reportError(
+                    'checkout',
+                    error,
+                    'Ödeme taslağı şu anda alınamadı. Kayıtlı sepetiniz gösteriliyor.'
+                );
             }
             renderCheckoutItems();
         }

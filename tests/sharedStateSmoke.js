@@ -1,4 +1,6 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const pool = require('../config/db');
 const {
     getSharedState,
@@ -94,6 +96,20 @@ const invoke = async (handler, req) => {
     assert.strictEqual(deleted.statusCode, 200);
     assert.strictEqual(deleted.body.exists, false);
     assert.strictEqual(rows.has(keyFor(10, 'cart')), false);
+
+    const schemaError = new Error('relation does not exist');
+    schemaError.code = '42P01';
+    const schemaErrorResponse = createRes();
+    __test.sendSharedStateError(schemaErrorResponse, schemaError, 'fallback');
+    assert.strictEqual(schemaErrorResponse.statusCode, 503);
+    assert.strictEqual(schemaErrorResponse.body.code, 'SHARED_STATE_SCHEMA_MISSING');
+
+    const migrationSql = fs.readFileSync(
+        path.join(__dirname, '..', 'migrations', '20260629_shared_customer_state.sql'),
+        'utf8'
+    );
+    assert.match(migrationSql, /CREATE TABLE IF NOT EXISTS favorites/i);
+    assert.match(migrationSql, /CREATE TABLE IF NOT EXISTS user_shared_state/i);
 
     console.log('shared state smoke passed');
 })().catch((err) => {

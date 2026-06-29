@@ -7,6 +7,7 @@
 })(typeof window !== 'undefined' ? window : globalThis, function (root) {
     const FAVORITES_PREFIX = 'novastore_favs_';
     const MIGRATION_PREFIX = 'novastore_favs_migrated_';
+    const mutationQueues = new Map();
 
     function storage() {
         return root.localStorage;
@@ -28,6 +29,7 @@
     function clearAuthSession() {
         storage().removeItem('nova_user_token');
         storage().removeItem('nova_user_info');
+        root.dispatchEvent(new CustomEvent('novastore:auth-required'));
     }
 
     function isAuthenticated() {
@@ -71,33 +73,93 @@
         return [];
     }
 
-    async function apiFetch(path, options = {}) {
-        const response = await root.fetch(path, {
-            ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...(options.headers || {}),
-                Authorization: `Bearer ${getToken()}`
-            }
-        });
+    function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
 
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            const error = new Error(payload.error || 'Favori islemi tamamlanamadi.');
-            error.status = response.status;
-            error.payload = payload;
+    async function readResponsePayload(response) {
+        if (typeof response.text === 'function') {
+            const text = await response.text();
+            if (!text) return {};
+            try {
+                return JSON.parse(text);
+            } catch (_) {
+                return { message: text };
+            }
+        }
+        if (typeof response.json === 'function') {
+            return response.json().catch(() => ({}));
+        }
+        return {};
+    }
+
+    function shouldRetry(error) {
+        return !error.status || error.status === 408 || error.status === 429 || error.status >= 500;
+    }
+
+    async function apiFetch(path, options = {}, attempt = 0) {
+        try {
+            const response = await root.fetch(path, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(options.headers || {}),
+                    Authorization: `Bearer ${getToken()}`
+                }
+            });
+
+            const payload = await readResponsePayload(response);
+            if (!response.ok) {
+                const error = new Error(payload.error || payload.message || 'Favori işlemi tamamlanamadı.');
+                error.status = response.status;
+                error.code = payload.code;
+                error.payload = payload;
+                if (response.status === 401) clearAuthSession();
+                throw error;
+            }
+            return payload;
+        } catch (error) {
+            if (attempt === 0 && shouldRetry(error)) {
+                await wait(250);
+                return apiFetch(path, options, attempt + 1);
+            }
             throw error;
         }
-        return payload;
+    }
+
+    function enqueueMutation(productId, operation) {
+        const previous = mutationQueues.get(productId) || Promise.resolve();
+        const current = previous.catch(() => undefined).then(operation);
+        mutationQueues.set(productId, current);
+        return current.finally(() => {
+            if (mutationQueues.get(productId) === current) mutationQueues.delete(productId);
+        });
+    }
+
+    function reportError(error, message = 'Favori işlemi şu anda tamamlanamadı. Seçiminiz değiştirilmedi.') {
+        if (root.NovaStoreSharedState?.reportError) {
+            root.NovaStoreSharedState.reportError('favorites', error, message);
+            return;
+        }
+        console.error('[NovaStore favorites sync]', {
+            status: error?.status || null,
+            code: error?.code || null,
+            message: error?.message || String(error)
+        });
     }
 
     async function syncLocalFavoritesOnce() {
         if (!isAuthenticated()) return null;
 
         const userId = getUserId();
-        if (storage().getItem(migrationKey(userId)) === '1') return null;
+        const guestIds = readLocalIds('guest');
+        const migrationComplete = storage().getItem(migrationKey(userId)) === '1';
+        if (migrationComplete && guestIds.length === 0) return null;
 
-        const localIds = readLocalIds(userId);
+        const localIds = normalizeIds([
+            ...(migrationComplete ? [] : readLocalIds(userId)),
+            ...guestIds
+        ]);
         let payload = null;
         if (localIds.length > 0) {
             payload = await apiFetch('/api/favorites/sync', {
@@ -106,6 +168,7 @@
             });
             writeLocalIds(extractIds(payload), userId);
         }
+        if (guestIds.length > 0) storage().removeItem(favoritesKey('guest'));
         storage().setItem(migrationKey(userId), '1');
         return payload;
     }
@@ -134,19 +197,21 @@
             throw new Error('Gecersiz urun id.');
         }
 
+        const authenticatedAtCall = isAuthenticated();
         const userId = getUserId();
-        const localIds = readLocalIds(userId);
+        return enqueueMutation(id, async () => {
+            const localIds = readLocalIds(userId);
+            if (!authenticatedAtCall) {
+                writeLocalIds(shouldFavorite ? [...localIds, id] : localIds.filter((item) => item !== id), userId);
+                return { productId: id, favorited: shouldFavorite, localOnly: true };
+            }
 
-        if (!isAuthenticated()) {
+            const payload = await apiFetch(`/api/favorites/${id}`, {
+                method: shouldFavorite ? 'POST' : 'DELETE'
+            });
             writeLocalIds(shouldFavorite ? [...localIds, id] : localIds.filter((item) => item !== id), userId);
-            return { productId: id, favorited: shouldFavorite, localOnly: true };
-        }
-
-        const payload = await apiFetch(`/api/favorites/${id}`, {
-            method: shouldFavorite ? 'POST' : 'DELETE'
+            return payload;
         });
-        writeLocalIds(shouldFavorite ? [...localIds, id] : localIds.filter((item) => item !== id), userId);
-        return payload;
     }
 
     return {
@@ -160,6 +225,7 @@
         extractIds,
         syncLocalFavoritesOnce,
         loadFavoriteIds,
-        setFavorite
+        setFavorite,
+        reportError
     };
 });

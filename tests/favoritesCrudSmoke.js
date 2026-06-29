@@ -157,7 +157,15 @@ const invoke = async (handler, req) => {
     assert.strictEqual(favorites.filter((favorite) => favorite.user_id === 10 && favorite.product_id === 102).length, 1);
 
     const syncMissing = await invoke(syncFavorites, createReq(10, {}, { productIds: [999] }));
-    assert.strictEqual(syncMissing.statusCode, 404);
+    assert.strictEqual(syncMissing.statusCode, 200);
+    assert.deepStrictEqual(syncMissing.body.ignoredProductIds, [999]);
+
+    const schemaError = new Error('relation does not exist');
+    schemaError.code = '42P01';
+    const schemaErrorResponse = createRes();
+    __test.sendFavoritesError(schemaErrorResponse, schemaError, 'fallback');
+    assert.strictEqual(schemaErrorResponse.statusCode, 503);
+    assert.strictEqual(schemaErrorResponse.body.code, 'FAVORITES_SCHEMA_MISSING');
 
     console.log('favorites CRUD smoke passed');
 })().catch((err) => {

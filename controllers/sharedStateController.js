@@ -2,6 +2,17 @@ const pool = require('../config/db');
 
 const ALLOWED_STATE_KEYS = new Set(['cart', 'checkout']);
 const MAX_ITEMS = 200;
+const SHARED_STATE_SCHEMA_ERROR = '42P01';
+
+const sendSharedStateError = (res, error, fallbackMessage) => {
+    if (error?.code === SHARED_STATE_SCHEMA_ERROR) {
+        return res.status(503).json({
+            error: 'Ortak müşteri durumu geçici olarak kullanılamıyor.',
+            code: 'SHARED_STATE_SCHEMA_MISSING'
+        });
+    }
+    return res.status(500).json({ error: fallbackMessage });
+};
 
 const normalizeStateKey = (value) => {
     const key = String(value || '').trim().toLowerCase();
@@ -104,7 +115,7 @@ const getSharedState = async (req, res) => {
         });
     } catch (error) {
         console.error('Ortak durum alinamadi:', error);
-        res.status(500).json({ error: 'Ortak durum alinamadi.' });
+        sendSharedStateError(res, error, 'Ortak durum alinamadi.');
     }
 };
 
@@ -133,7 +144,7 @@ const putSharedState = async (req, res) => {
         });
     } catch (error) {
         console.error('Ortak durum kaydedilemedi:', error);
-        res.status(500).json({ error: 'Ortak durum kaydedilemedi.' });
+        sendSharedStateError(res, error, 'Ortak durum kaydedilemedi.');
     }
 };
 
@@ -149,7 +160,7 @@ const deleteSharedState = async (req, res) => {
         res.json({ key, exists: false, deleted: true });
     } catch (error) {
         console.error('Ortak durum silinemedi:', error);
-        res.status(500).json({ error: 'Ortak durum silinemedi.' });
+        sendSharedStateError(res, error, 'Ortak durum silinemedi.');
     }
 };
 
@@ -160,6 +171,7 @@ module.exports = {
     __test: {
         normalizeStateKey,
         normalizeCartPayload,
-        normalizeCheckoutPayload
+        normalizeCheckoutPayload,
+        sendSharedStateError
     }
 };

@@ -1403,21 +1403,28 @@
         }
 
         // --- FAVORİ SİSTEMİ ---
-        function showFavoriteSyncError() {
-            console.warn('Favoriler senkronlanamadi.');
+        function showFavoriteSyncError(error) {
+            NovaStoreFavorites.reportError(error, 'Favoriler şu anda yenilenemedi. Son kayıtlı listeniz gösteriliyor.');
         }
 
         async function toggleFavorite(btn, event, productId) {
             event.preventDefault();
             event.stopPropagation();
+            const operationId = String((Number(btn.dataset.favoriteOperation || 0) + 1));
+            btn.dataset.favoriteOperation = operationId;
             const nextState = !btn.classList.contains('active');
             btn.classList.toggle('active', nextState);
             try {
                 await NovaStoreFavorites.setFavorite(productId, nextState);
-                currentFavoriteIds = await NovaStoreFavorites.loadFavoriteIds({ onError: showFavoriteSyncError });
+                if (btn.dataset.favoriteOperation === operationId) {
+                    currentFavoriteIds = await NovaStoreFavorites.loadFavoriteIds({ onError: showFavoriteSyncError });
+                    btn.classList.toggle('active', currentFavoriteIds.has(Number(productId)));
+                }
             } catch (error) {
-                btn.classList.toggle('active', !nextState);
-                alert('Favori işlemi tamamlanamadı. Lütfen tekrar deneyin.');
+                if (btn.dataset.favoriteOperation === operationId) {
+                    btn.classList.toggle('active', !nextState);
+                    NovaStoreFavorites.reportError(error);
+                }
             }
         }
 
@@ -1442,13 +1449,8 @@
                 return true;
             } catch (error) {
                 cart = previousCart;
-                if (sharedState && sharedState.writeCartLocal) {
-                    sharedState.writeCartLocal(previousCart);
-                } else {
-                    localStorage.setItem(_cartKey(), JSON.stringify(previousCart));
-                }
                 renderCartUI();
-                alert('Sepet senkronlanamadi. Lutfen tekrar deneyin.');
+                sharedState?.reportError('cart', error, 'Sepet şu anda senkronlanamadı. Değişikliğiniz uygulanmadı.');
                 return false;
             }
         }
@@ -1590,7 +1592,11 @@
                     localStorage.setItem(_checkoutKey(), JSON.stringify(selectedItems));
                     window.location.href = 'checkout.html';
                 } catch (error) {
-                    alert('Odeme taslagi senkronlanamadi. Lutfen tekrar deneyin.');
+                    window.NovaStoreSharedState?.reportError(
+                        'checkout',
+                        error,
+                        'Ödeme taslağı şu anda senkronlanamadı. Sepetiniz korunuyor.'
+                    );
                 }
             }
         }
