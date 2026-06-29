@@ -6,6 +6,8 @@ import com.novastore.app.data.model.CartItem
 import com.novastore.app.data.model.CustomerAddress
 import com.novastore.app.data.model.Product
 import com.novastore.app.data.model.ProductQuestion
+import com.novastore.app.data.model.AccountCoupon
+import com.novastore.app.data.repository.AccountRepository
 import com.novastore.app.data.repository.CartRepository
 import com.novastore.app.data.repository.CustomerLocalRepository
 import com.novastore.app.data.repository.ProductRepository
@@ -30,7 +32,10 @@ data class ProductDetailUiState(
     val favoriteLoading: Boolean = false,
     val addToCartLoading: Boolean = false,
     val selectedQuantity: Int = 1,
-    val selectedCouponId: String? = null,
+    val selectedCouponCode: String? = null,
+    val couponsLoading: Boolean = false,
+    val coupons: List<AccountCoupon> = emptyList(),
+    val couponsError: String? = null,
     val addresses: List<CustomerAddress> = emptyList(),
     val selectedAddressId: Long = -1L,
     val questionSending: Boolean = false,
@@ -42,6 +47,7 @@ data class ProductDetailUiState(
 @HiltViewModel
 class ProductDetailViewModel @Inject constructor(
     private val productRepository: ProductRepository,
+    private val accountRepository: AccountRepository,
     private val cartRepository: CartRepository,
     private val customerLocalRepository: CustomerLocalRepository
 ) : ViewModel() {
@@ -80,11 +86,14 @@ class ProductDetailViewModel @Inject constructor(
                 relatedProducts = emptyList(),
                 error = null,
                 selectedQuantity = 1,
-                selectedCouponId = null,
+                selectedCouponCode = null,
+                coupons = emptyList(),
+                couponsError = null,
                 questions = emptyList(),
                 questionsError = null
             )
         }
+        loadCoupons()
         viewModelScope.launch {
             val result = productRepository.getProduct(productId)
             if (result.isSuccess) {
@@ -138,8 +147,44 @@ class ProductDetailViewModel @Inject constructor(
         }
     }
 
-    fun applyCoupon(couponId: String) {
-        _uiState.update { it.copy(selectedCouponId = couponId) }
+    fun applyCoupon(couponCode: String) {
+        _uiState.update { state ->
+            state.copy(
+                selectedCouponCode = nextSelectedCouponCode(
+                    currentCouponCode = state.selectedCouponCode,
+                    requestedCouponCode = couponCode
+                )
+            )
+        }
+    }
+
+    fun loadCoupons() {
+        if (_uiState.value.couponsLoading) return
+        _uiState.update { it.copy(couponsLoading = true, couponsError = null) }
+        viewModelScope.launch {
+            val result = accountRepository.getCoupons()
+            _uiState.update { state ->
+                if (result.isSuccess) {
+                    val coupons = result.getOrDefault(emptyList())
+                        .filter { it.code.isNotBlank() }
+                        .distinctBy { it.code }
+                    state.copy(
+                        couponsLoading = false,
+                        coupons = coupons,
+                        selectedCouponCode = state.selectedCouponCode?.takeIf { selected ->
+                            coupons.any { it.code == selected }
+                        }
+                    )
+                } else {
+                    state.copy(
+                        couponsLoading = false,
+                        coupons = emptyList(),
+                        selectedCouponCode = null,
+                        couponsError = result.exceptionOrNull()?.message ?: "Kuponlar yüklenemedi."
+                    )
+                }
+            }
+        }
     }
 
     fun loadQuestions(productId: Int? = _uiState.value.product?.id) {
@@ -225,4 +270,14 @@ class ProductDetailViewModel @Inject constructor(
             else -> "Soru gönderilemedi. Lütfen tekrar dene."
         }
     }
+}
+
+internal fun nextSelectedCouponCode(
+    currentCouponCode: String?,
+    requestedCouponCode: String?
+): String? {
+    val normalizedRequestedCode = requestedCouponCode?.trim()?.takeIf { it.isNotEmpty() }
+        ?: return null
+    val normalizedCurrentCode = currentCouponCode?.trim()?.takeIf { it.isNotEmpty() }
+    return normalizedRequestedCode.takeUnless { it == normalizedCurrentCode }
 }

@@ -68,7 +68,11 @@ sealed interface Screen : NavKey {
     @Serializable data object Favorites : Screen
     @Serializable data object Account : Screen
     @Serializable data class ProductDetail(val productId: Int) : Screen
-    @Serializable data class Checkout(val buyNowItem: CartItem? = null) : Screen
+    @Serializable
+    data class Checkout(
+        val buyNowItem: CartItem? = null,
+        val couponCode: String? = null
+    ) : Screen
     @Serializable data object Notifications : Screen
 }
 
@@ -308,8 +312,8 @@ fun NovaStoreNavGraph(
                                 backStack.clear()
                                 backStack.add(Screen.Cart)
                             },
-                            onBuyNow = { item ->
-                                backStack.add(Screen.Checkout(item))
+                            onBuyNow = { item, couponCode ->
+                                backStack.add(Screen.Checkout(item, couponCode))
                             },
                             onProductClick = { productId ->
                                 backStack.add(Screen.ProductDetail(productId))
@@ -327,6 +331,7 @@ fun NovaStoreNavGraph(
                                 backStack.add(Screen.Home)
                             },
                             buyNowItem = key.buyNowItem,
+                            couponCode = key.couponCode,
                             modifier = Modifier.padding(padding)
                         )
                     }

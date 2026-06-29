@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -121,6 +122,7 @@ import com.novastore.app.core.theme.PrimaryOrange as Orange
 import com.novastore.app.core.theme.StoreBlue
 import com.novastore.app.core.theme.TextSecondary as SecondaryText
 import com.novastore.app.core.ui.optimizedImageUrl
+import com.novastore.app.data.model.AccountCoupon
 import com.novastore.app.data.model.CartItem
 import com.novastore.app.data.model.CustomerAddress
 import com.novastore.app.data.model.Product
@@ -135,7 +137,7 @@ fun ProductDetailScreen(
     productId: Int,
     onBackClick: () -> Unit,
     onNavigateCart: () -> Unit = {},
-    onBuyNow: (CartItem) -> Unit = {},
+    onBuyNow: (CartItem, String?) -> Unit = { _, _ -> },
     onProductClick: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ProductDetailViewModel = hiltViewModel()
@@ -230,7 +232,10 @@ fun ProductDetailScreen(
                         }
                     },
                     onBuyNow = {
-                        onBuyNow(product.toCartItem(uiState.selectedQuantity))
+                        onBuyNow(
+                            product.toCartItem(uiState.selectedQuantity),
+                            uiState.selectedCouponCode
+                        )
                     }
                 )
             }
@@ -319,10 +324,20 @@ private fun ProductDetailContent(
         item {
             PriceAndCampaignCard(
                 product = product,
-                selectedCouponId = uiState.selectedCouponId,
-                onApplyCoupon = {
-                    onApplyCoupon(it)
-                    onMessage("Kupon uygulandı.")
+                selectedCouponCode = uiState.selectedCouponCode,
+                couponsLoading = uiState.couponsLoading,
+                coupons = uiState.coupons,
+                couponsError = uiState.couponsError,
+                onApplyCoupon = { couponCode ->
+                    val removingSelection = uiState.selectedCouponCode == couponCode
+                    onApplyCoupon(couponCode)
+                    onMessage(
+                        if (removingSelection) {
+                            "Kupon seçimi kaldırıldı."
+                        } else {
+                            "Kupon seçildi: $couponCode"
+                        }
+                    )
                 },
                 onInstallments = { showInstallments = true }
             )
@@ -552,7 +567,10 @@ private fun StockBadge(stock: Int) {
 @Composable
 private fun PriceAndCampaignCard(
     product: Product,
-    selectedCouponId: String?,
+    selectedCouponCode: String?,
+    couponsLoading: Boolean,
+    coupons: List<AccountCoupon>,
+    couponsError: String?,
     onApplyCoupon: (String) -> Unit,
     onInstallments: () -> Unit
 ) {
@@ -588,34 +606,54 @@ private fun PriceAndCampaignCard(
         Spacer(Modifier.height(5.dp))
         Text("Sepette avantajlı NovaStore fiyatı", color = Success, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(14.dp))
-        Text("Kampanyalar", color = NavyDark, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+        Text("Aktif kuponlar", color = NavyDark, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(9.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                CampaignChip(
-                    icon = Icons.Default.LocalOffer,
-                    title = if (selectedCouponId == "coupon50") "Uygulandı" else "50 TL kupon",
-                    selected = selectedCouponId == "coupon50",
-                    onClick = { onApplyCoupon("coupon50") }
-                )
+        when {
+            couponsLoading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Orange, strokeWidth = 2.dp)
+                Text("Kuponlar yükleniyor", color = SecondaryText, style = MaterialTheme.typography.bodySmall)
             }
-            item {
-                CampaignChip(
-                    icon = Icons.Default.LocalShipping,
-                    title = "Kargo bedava",
-                    selected = false,
-                    onClick = {}
-                )
+            coupons.isNotEmpty() -> LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(coupons, key = { it.code }) { coupon ->
+                    CampaignChip(
+                        icon = Icons.Default.LocalOffer,
+                        title = coupon.detailChipTitle(selected = selectedCouponCode == coupon.code),
+                        selected = selectedCouponCode == coupon.code,
+                        onClick = { onApplyCoupon(coupon.code) }
+                    )
+                }
             }
-            item {
-                CampaignChip(
-                    icon = Icons.Default.CreditCard,
-                    title = "3 taksit",
-                    selected = false,
-                    onClick = onInstallments
-                )
-            }
+            couponsError != null -> Text("Aktif kuponlar şu an alınamadı.", color = SecondaryText, style = MaterialTheme.typography.bodySmall)
+            else -> Text("Aktif kupon yok.", color = SecondaryText, style = MaterialTheme.typography.bodySmall)
         }
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = onInstallments,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, BorderLight)
+        ) {
+            Icon(Icons.Default.CreditCard, contentDescription = null, tint = NavyDark, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(7.dp))
+            Text("Taksit seçenekleri", color = NavyDark, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+private fun AccountCoupon.detailChipTitle(selected: Boolean): String {
+    return if (selected) {
+        "Uygulandı: $code"
+    } else {
+        "$code - ${discountLabel()}"
+    }
+}
+
+private fun AccountCoupon.discountLabel(): String {
+    val value = discountValue ?: 0.0
+    return if (discountType.equals("PERCENT", ignoreCase = true)) {
+        "%${value.toInt()} indirim"
+    } else {
+        "${formatPrice(value)} indirim"
     }
 }
 
@@ -633,7 +671,15 @@ private fun CampaignChip(icon: ImageVector, title: String, selected: Boolean, on
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Icon(if (selected) Icons.Default.Check else icon, contentDescription = null, tint = Orange, modifier = Modifier.size(18.dp))
-            Text(title, color = NavyDark, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+            Text(
+                title,
+                color = NavyDark,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 220.dp)
+            )
         }
     }
 }

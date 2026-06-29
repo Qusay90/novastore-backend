@@ -115,6 +115,7 @@ fun CheckoutScreen(
     onBackClick: () -> Unit,
     onNavigateToHome: () -> Unit,
     buyNowItem: CartItem? = null,
+    couponCode: String? = null,
     modifier: Modifier = Modifier,
     viewModel: CheckoutViewModel = hiltViewModel()
 ) {
@@ -326,6 +327,7 @@ fun CheckoutScreen(
                                     address = address,
                                     paymentMethod = paymentMethod.apiValue,
                                     checkoutItems = checkoutItems,
+                                    couponCode = couponCode,
                                     clearCartWhenFinalized = buyNowItem == null,
                                     onRedirectionRequested = { url -> uriHandler.openUri(url) }
                                 )

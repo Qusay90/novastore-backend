@@ -101,6 +101,7 @@ class CheckoutViewModel @Inject constructor(
         address: String,
         paymentMethod: String,
         checkoutItems: List<CartItem>? = null,
+        couponCode: String? = null,
         clearCartWhenFinalized: Boolean = true,
         onRedirectionRequested: (String) -> Unit
     ) {
@@ -121,22 +122,14 @@ class CheckoutViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, error = null) }
         clearCartWhenPaymentFinalized = clearCartWhenFinalized
         viewModelScope.launch {
-            val itemsForPayment = itemsToPay.map { item ->
-                CartItemForPayment(
-                    productId = item.productId,
-                    name = item.name,
-                    price = item.price,
-                    imageUrl = item.imageUrl,
-                    quantity = item.quantity
-                )
-            }
-
-            val request = PaymentRequest(
+            val normalizedCouponCode = couponCode.normalizedCouponCode()
+            val request = buildPaymentRequest(
                 fullName = fullName,
                 email = email,
                 phone = phone,
                 address = address,
-                cartItems = itemsForPayment,
+                cartItems = itemsToPay,
+                couponCode = normalizedCouponCode,
                 paymentMethod = paymentMethod
             )
 
@@ -148,6 +141,7 @@ class CheckoutViewModel @Inject constructor(
                             SharedCheckoutPayload(
                                 items = itemsToPay,
                                 selectedAddressId = selectedId,
+                                couponCode = normalizedCouponCode,
                                 paymentMethod = paymentMethod
                             )
                         )
@@ -233,6 +227,35 @@ class CheckoutViewModel @Inject constructor(
         }
     }
 }
+
+internal fun String?.normalizedCouponCode(): String? =
+    this?.trim()?.takeIf { it.isNotEmpty() }
+
+internal fun buildPaymentRequest(
+    fullName: String,
+    email: String,
+    phone: String,
+    address: String,
+    cartItems: List<CartItem>,
+    couponCode: String?,
+    paymentMethod: String
+): PaymentRequest = PaymentRequest(
+    fullName = fullName,
+    email = email,
+    phone = phone,
+    address = address,
+    cartItems = cartItems.map { item ->
+        CartItemForPayment(
+            productId = item.productId,
+            name = item.name,
+            price = item.price,
+            imageUrl = item.imageUrl,
+            quantity = item.quantity
+        )
+    },
+    couponCode = couponCode.normalizedCouponCode(),
+    paymentMethod = paymentMethod
+)
 
 internal fun PaymentAction?.isPaytrIframeAction(): Boolean =
     this?.type.equals(PAYTR_IFRAME_TYPE, ignoreCase = true)
