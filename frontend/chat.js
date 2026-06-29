@@ -771,9 +771,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadSupportHistory() {
         if (!token || !userId) {
             chatMessages.innerHTML = `
-                <div class="chat-helper-note">Canli destek modunu kullanmak icin giris yapmaniz gerekiyor.</div>
+                <div class="chat-helper-note">Canlı destek modunu kullanmak için giriş yapmanız gerekiyor.</div>
                 <div class="chat-bubble received">
-                    <div>Giris yaptiysaniz bu alanda temsilciyle mesajlasabilirsiniz. Giris yoksa AI Asistan ile devam edebiliriz.</div>
+                    <div>Giriş yaptıysanız bu alanda temsilciyle mesajlaşabilirsiniz. Giriş yoksa AI Asistan ile devam edebiliriz.</div>
                     <div class="chat-time">${formatTime(Date.now())}</div>
                 </div>
             `;
@@ -787,14 +787,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error('support history failed');
 
             const history = await res.json();
-            chatMessages.innerHTML = '<div class="chat-helper-note">NovaStore destek ekibiyle mesajlasiyorsunuz.</div>';
+            chatMessages.innerHTML = '<div class="chat-helper-note">NovaStore destek ekibiyle mesajlaşıyorsunuz.</div>';
             history.forEach((msg) => {
                 const type = Number(msg.sender_id) === Number(userId) ? 'sent' : 'received';
                 renderBubble(formatSupportMessageHtml(msg.message), type, msg.created_at || Date.now());
             });
         } catch (err) {
             console.error('Canli destek gecmisi yuklenemedi:', err);
-            chatMessages.innerHTML = '<div class="chat-helper-note" style="color:#C62828;">Canli destek gecmisi yuklenemedi.</div>';
+            chatMessages.innerHTML = '<div class="chat-helper-note" style="color:#C62828;">Canlı destek geçmişi yüklenemedi.</div>';
         }
     }
 
@@ -957,7 +957,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleEscalationRequest() {
         if (!token || !userId) {
-            alert('Canli destek devri icin once giris yapmaniz gerekiyor.');
+            alert('Canlı destek devri için önce giriş yapmanız gerekiyor.');
             return;
         }
 
