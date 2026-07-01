@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { applyCategoryV2Schema } = require('./categoryV2Schema');
 
 const createCoreSchema = async () => {
     const query = `
@@ -155,6 +156,7 @@ const createCoreSchema = async () => {
     `;
 
     await pool.query(query);
+    await applyCategoryV2Schema(pool);
     console.log('Temel veritabani schema hazir.');
 };
 
