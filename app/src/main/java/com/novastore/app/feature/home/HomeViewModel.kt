@@ -3,6 +3,7 @@ package com.novastore.app.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.novastore.app.data.model.Category
+import com.novastore.app.data.model.findCategoryTrail
 import com.novastore.app.data.model.CustomerAddress
 import com.novastore.app.data.model.Product
 import com.novastore.app.data.repository.CustomerLocalRepository
@@ -39,20 +40,21 @@ data class HomeUiState(
     val isRefreshing: Boolean = false,
     val products: List<Product> = emptyList(),
     val categories: List<Category> = emptyList(),
-    val selectedCategory: String? = null,
+    val selectedCategorySlug: String? = null,
+    val selectedCategoryId: Int? = null,
+    val categoryBreadcrumb: List<Category> = emptyList(),
     val searchQuery: String = "",
     val selectedFilter: HomeProductFilter = HomeProductFilter.ALL,
     val selectedSort: HomeProductSort = HomeProductSort.FEATURED,
     val error: String? = null
 ) {
+    val selectedCategory: String?
+        get() = categoryBreadcrumb.lastOrNull()?.name
+
     val filteredProducts: List<Product>
         get() {
             val normalizedQuery = searchQuery.trim().lowercase(Locale("tr", "TR"))
             val filtered = products.filter { product ->
-                val matchesCategory = selectedCategory == null || 
-                        product.categories.contains(selectedCategory) || 
-                        product.category.equals(selectedCategory, ignoreCase = true)
-                
                 val matchesSearch = normalizedQuery.isBlank() ||
                         product.name.lowercase(Locale("tr", "TR")).contains(normalizedQuery) ||
                         product.category.lowercase(Locale("tr", "TR")).contains(normalizedQuery) ||
@@ -66,10 +68,10 @@ data class HomeUiState(
                     HomeProductFilter.OUT_OF_STOCK -> product.stock <= 0
                 }
                 
-                matchesCategory && matchesSearch && matchesFilter
+                matchesSearch && matchesFilter
             }
 
-            return when (selectedSort) {
+            val sorted = when (selectedSort) {
                 HomeProductSort.FEATURED -> filtered
                 HomeProductSort.NEWEST -> filtered.sortedByDescending { it.id }
                 HomeProductSort.PRICE_ASC -> filtered.sortedBy { it.price }
@@ -77,6 +79,7 @@ data class HomeUiState(
                 HomeProductSort.DISCOUNT_DESC -> filtered.sortedByDescending { it.discountPercentage }
                 HomeProductSort.RATING_DESC -> filtered.sortedByDescending { it.averageRating.toDoubleOrNull() ?: 0.0 }
             }
+            return sorted.sortedByDescending { it.stock > 0 }
         }
 }
 
@@ -126,12 +129,16 @@ class HomeViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            val productsResult = productRepository.getProducts(forceRefresh)
+            val productsResult = productRepository.getProducts(
+                forceRefresh = forceRefresh,
+                categorySlug = current.selectedCategorySlug
+            )
             val categoriesResult = productRepository.getCategories(forceRefresh)
 
             if (productsResult.isSuccess && categoriesResult.isSuccess) {
                 val products = productsResult.getOrDefault(emptyList())
                 val categories = categoriesResult.getOrDefault(emptyList())
+                val trail = categories.findCategoryTrail(current.selectedCategorySlug)
                 
                 Timber.d("Fetched ${products.size} products and ${categories.size} categories successfully.")
                 _uiState.update { 
@@ -139,7 +146,10 @@ class HomeViewModel @Inject constructor(
                         isLoading = false,
                         isRefreshing = false,
                         products = products,
-                        categories = categories
+                        categories = categories,
+                        selectedCategoryId = trail.lastOrNull()?.id,
+                        selectedCategorySlug = trail.lastOrNull()?.slug,
+                        categoryBreadcrumb = trail
                     )
                 }
             } else {
@@ -159,9 +169,48 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun selectCategory(categoryName: String?) {
-        Timber.d("Selected category changed to: $categoryName")
-        _uiState.update { it.copy(selectedCategory = categoryName) }
+    fun selectCategory(category: Category?) {
+        val current = _uiState.value
+        val trail = current.categories.findCategoryTrail(category?.slug)
+        Timber.d("Selected category changed to slug: ${category?.slug}")
+        _uiState.update {
+            it.copy(
+                selectedCategorySlug = category?.slug,
+                selectedCategoryId = category?.id,
+                categoryBreadcrumb = trail,
+                isRefreshing = true,
+                error = null
+            )
+        }
+        viewModelScope.launch {
+            productRepository.getProducts(categorySlug = category?.slug)
+                .onSuccess { products ->
+                    _uiState.update { state ->
+                        if (state.selectedCategorySlug == category?.slug) {
+                            state.copy(products = products, isRefreshing = false)
+                        } else {
+                            state
+                        }
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update { state ->
+                        if (state.selectedCategorySlug == category?.slug) {
+                            state.copy(
+                                isRefreshing = false,
+                                error = error.message ?: "Kategori ürünleri yüklenemedi."
+                            )
+                        } else {
+                            state
+                        }
+                    }
+                }
+        }
+    }
+
+    fun navigateToParentCategory() {
+        val parent = _uiState.value.categoryBreadcrumb.dropLast(1).lastOrNull()
+        selectCategory(parent)
     }
 
     fun updateSearchQuery(query: String) {
@@ -182,11 +231,11 @@ class HomeViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 searchQuery = "",
-                selectedCategory = null,
                 selectedFilter = HomeProductFilter.ALL,
                 selectedSort = HomeProductSort.FEATURED
             )
         }
+        selectCategory(null)
     }
 
     fun toggleFavorite(productId: Int) {

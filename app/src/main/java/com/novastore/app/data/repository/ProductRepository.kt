@@ -14,21 +14,26 @@ class ProductRepository @Inject constructor(
     private val api: NovaStoreApi
 ) {
     private val mutex = Mutex()
-    private var cachedProducts: List<Product>? = null
+    private val cachedProducts = mutableMapOf<String?, List<Product>>()
     private var cachedCategories: List<Category>? = null
 
-    suspend fun getProducts(forceRefresh: Boolean = false): Result<List<Product>> = runCatching {
+    suspend fun getProducts(
+        forceRefresh: Boolean = false,
+        categorySlug: String? = null
+    ): Result<List<Product>> = runCatching {
         mutex.withLock {
             if (!forceRefresh) {
-                cachedProducts?.let { return@runCatching it }
+                cachedProducts[categorySlug]?.let { return@runCatching it }
             }
 
-            api.getProducts().also { cachedProducts = it }
+            api.getProducts(categorySlug = categorySlug)
+                .also { cachedProducts[categorySlug] = it }
         }
     }
 
     suspend fun getProduct(id: Int): Result<Product> = runCatching {
-        cachedProducts?.firstOrNull { it.id == id }?.let { return@runCatching it }
+        cachedProducts.values.asSequence().flatten().firstOrNull { it.id == id }
+            ?.let { return@runCatching it }
         api.getProduct(id)
     }
 
