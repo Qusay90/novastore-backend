@@ -322,6 +322,10 @@ const createCallbackClient = (state) => ({
             return { rows: [] };
         }
 
+        if (/category_stats|WITH RECURSIVE category_tree/i.test(sql)) {
+            return { rows: [], rowCount: 0 };
+        }
+
         throw new Error(`Unexpected PayTR backend security query: ${sql}`);
     },
     release() {}

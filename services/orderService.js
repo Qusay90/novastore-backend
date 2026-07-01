@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { calculatePricing, round2 } = require('./pricingService');
+const { syncCategoryStatsForProducts } = require('./categoryStatsService');
 const { ORDER_STATUS, PAYMENT_STATUS, REFUND_STATUS, SHIPMENT_STATUS, resolveOrderStatus } = require('../constants/orderStatus');
 
 const extractAddressText = (address) => {
@@ -20,6 +21,7 @@ const appendOrderEvent = async (client, orderId, eventType, message, payload = n
 };
 
 const reserveStock = async (client, pricedItems) => {
+    const changedProductIds = [];
     for (const item of pricedItems) {
         const updateResult = await client.query(
             `UPDATE products
@@ -32,12 +34,15 @@ const reserveStock = async (client, pricedItems) => {
         if (updateResult.rows.length === 0) {
             throw new Error(`Stok yetersiz: ${item.name}`);
         }
+        changedProductIds.push(item.id);
     }
+    await syncCategoryStatsForProducts(client, changedProductIds);
 };
 
 const restockItems = async (client, items) => {
     if (!Array.isArray(items)) return;
 
+    const changedProductIds = [];
     for (const item of items) {
         const productId = Number(item.id || item.product_id || item.productId);
         const quantity = Number(item.quantity || 0);
@@ -48,7 +53,9 @@ const restockItems = async (client, items) => {
             'UPDATE products SET stock = stock + $1 WHERE id = $2',
             [quantity, productId]
         );
+        changedProductIds.push(productId);
     }
+    await syncCategoryStatsForProducts(client, changedProductIds);
 };
 
 const parseItems = (orderRow) => {

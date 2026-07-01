@@ -206,6 +206,10 @@ const createFakeClient = (state) => ({
             return { rows: [] };
         }
 
+        if (/category_stats|WITH RECURSIVE category_tree/i.test(sql)) {
+            return { rows: [], rowCount: 0 };
+        }
+
         throw new Error(`Unexpected PayTR idempotency query: ${sql}`);
     },
     release() {}

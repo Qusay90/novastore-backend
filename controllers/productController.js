@@ -1,5 +1,12 @@
 const pool = require('../config/db');
 const { cloudinary } = require('../config/cloudinary');
+const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
+const {
+    resolveProductCategoryAssignment,
+    getProductCategoryLinks,
+    syncProductCategoryAssignments
+} = require('../services/productCategoryService');
+const { syncCategoryStatsForProducts } = require('../services/categoryStatsService');
 const DEFAULT_PRODUCT_CATEGORY = 'Kategorisiz';
 const BACKGROUND_REMOVAL_TRANSFORMATION = [
     { effect: 'background_removal' },
@@ -37,6 +44,36 @@ const parseBooleanFlag = (value) => {
 
     const normalizedValue = String(value || '').trim().toLocaleLowerCase('tr-TR');
     return ['1', 'true', 'on', 'yes', 'evet'].includes(normalizedValue);
+};
+
+const PRODUCT_STATUSES = new Set(['draft', 'pending_approval', 'active', 'inactive', 'rejected', 'archived']);
+
+const parseProductStatus = (body, existingProduct = null) => {
+    const rawValue = body.publicationStatus ?? body.publication_status;
+    const status = rawValue === undefined
+        ? String(existingProduct?.publication_status || 'active')
+        : String(rawValue).trim().toLowerCase();
+    return PRODUCT_STATUSES.has(status) ? status : null;
+};
+
+const parseCustomerVisibility = (body, existingProduct = null) => {
+    const rawValue = body.isCustomerVisible ?? body.is_customer_visible;
+    return rawValue === undefined
+        ? existingProduct?.is_customer_visible !== false
+        : parseBooleanFlag(rawValue);
+};
+
+const parseDeletedAt = (body, existingProduct = null) => {
+    const hasValue =
+        Object.prototype.hasOwnProperty.call(body, 'deletedAt') ||
+        Object.prototype.hasOwnProperty.call(body, 'deleted_at');
+    if (!hasValue) return existingProduct?.deleted_at || null;
+    const rawValue = Object.prototype.hasOwnProperty.call(body, 'deletedAt')
+        ? body.deletedAt
+        : body.deleted_at;
+    if (rawValue === null || rawValue === '' || String(rawValue).toLowerCase() === 'null') return null;
+    const parsed = new Date(rawValue);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 };
 
 const dedupeCategories = (values) => {
@@ -103,7 +140,12 @@ const normalizeProductRow = (product = {}) => {
     return {
         ...product,
         category: primaryCategory,
-        categories: categories.length > 0 ? categories : [primaryCategory]
+        categories: categories.length > 0 ? categories : [primaryCategory],
+        is_purchasable:
+            product.publication_status === 'active' &&
+            product.is_customer_visible !== false &&
+            !product.deleted_at &&
+            Number(product.stock || 0) > 0
     };
 };
 
@@ -458,6 +500,9 @@ const buildProductPayload = async (body, files, existingProduct = null) => {
     const oldPrice = parsePrice(body.oldPrice, null);
     const stock = parseStock(body.stock);
     const removeBackground = parseBooleanFlag(body.removeBackground);
+    const publicationStatus = parseProductStatus(body, existingProduct);
+    const isCustomerVisible = parseCustomerVisibility(body, existingProduct);
+    const deletedAt = parseDeletedAt(body, existingProduct);
 
     if (!name) {
         return { error: 'Ürün adı zorunludur.' };
@@ -472,6 +517,13 @@ const buildProductPayload = async (body, files, existingProduct = null) => {
         return { error: 'Stok bilgisi geçersiz.' };
     }
 
+    if (!publicationStatus) {
+        return { error: 'Ürün yayın durumu geçersiz.' };
+    }
+    if (deletedAt === undefined) {
+        return { error: 'Ürün silinme tarihi geçersiz.' };
+    }
+
     const { mediaUrls, warnings } = await buildProductMediaUrls(orderedFiles, removeBackground);
 
     return {
@@ -482,6 +534,9 @@ const buildProductPayload = async (body, files, existingProduct = null) => {
         price,
         oldPrice,
         stock,
+        publicationStatus,
+        isCustomerVisible,
+        deletedAt,
         mediaUrls,
         warnings,
         mainImageUrl: mediaUrls[0] || existingProduct?.image_url || null
@@ -504,6 +559,12 @@ const buildProductMediaMap = (mediaRows) => {
 
 const getAllProducts = async (req, res) => {
     try {
+        const isAdmin = getUserFromRequestIfAny(req)?.role === 'admin';
+        const visibilityWhere = isAdmin
+            ? ''
+            : `WHERE p.publication_status = 'active'
+                 AND p.is_customer_visible = TRUE
+                 AND p.deleted_at IS NULL`;
         const [productsResult, mediaResult] = await Promise.all([
             pool.query(`
                 SELECT p.*,
@@ -511,8 +572,9 @@ const getAllProducts = async (req, res) => {
                        CAST(COUNT(r.id) AS INTEGER) AS review_count
                 FROM products p
                 LEFT JOIN reviews r ON p.id = r.product_id
+                ${visibilityWhere}
                 GROUP BY p.id
-                ORDER BY p.created_at DESC
+                ORDER BY ${isAdmin ? '' : 'CASE WHEN p.stock > 0 THEN 0 ELSE 1 END,'} p.created_at DESC
             `),
             pool.query(`
                 SELECT *
@@ -544,10 +606,22 @@ const createProduct = async (req, res) => {
         }
 
         await client.query('BEGIN');
+        const categoryResolution = await resolveProductCategoryAssignment(
+            client,
+            req.body,
+            payload.categories
+        );
+        if (categoryResolution.replace) {
+            payload.categories = categoryResolution.categoryNames;
+            payload.category = categoryResolution.categoryNames[0];
+        }
 
         const insertResult = await client.query(
-            `INSERT INTO products (name, price, old_price, stock, description, image_url, category, categories)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            `INSERT INTO products (
+                name, price, old_price, stock, description, image_url, category, categories,
+                publication_status, is_customer_visible, deleted_at
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              RETURNING *`,
             [
                 payload.name,
@@ -557,11 +631,19 @@ const createProduct = async (req, res) => {
                 payload.description,
                 payload.mainImageUrl,
                 payload.category,
-                payload.categories
+                payload.categories,
+                payload.publicationStatus,
+                payload.isCustomerVisible,
+                payload.deletedAt
             ]
         );
 
         const product = insertResult.rows[0];
+        const categorySync = await syncProductCategoryAssignments(
+            client,
+            product.id,
+            categoryResolution
+        );
 
         for (let i = 0; i < payload.mediaUrls.length; i += 1) {
             await client.query(
@@ -573,24 +655,39 @@ const createProduct = async (req, res) => {
         if (payload.mediaUrls.length > 0) {
             await setMainMediaForProduct(client, product.id, payload.mediaUrls[0]);
         }
+        await syncCategoryStatsForProducts(
+            client,
+            [product.id],
+            categorySync.previous.map((item) => item.categoryId)
+        );
 
         await client.query('COMMIT');
 
         res.status(201).json({
             mesaj: 'Ürün başarıyla vitrine eklendi.',
-            warnings: payload.warnings,
-            product: normalizeProductRow(product)
+            warnings: [...payload.warnings, ...categoryResolution.warnings],
+            product: {
+                ...normalizeProductRow(product),
+                categoryIds: categorySync.current.map((item) => item.categoryId),
+                primaryCategoryId: categorySync.current.find((item) => item.isPrimary)?.categoryId || null
+            }
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Ürün ekleme hatası:', err.message);
+        if (!err.statusCode || err.statusCode >= 500) {
+            console.error('Ürün ekleme hatası:', err.message);
+        }
 
         const isValueTooLong = err.code === '22001';
         const message = isValueTooLong
             ? 'Ürün görsel adresi veritabanı alanına sığmadı. URL alanları büyütüldü; sunucuyu yeniden başlatıp tekrar deneyin.'
             : (err.message || 'Ürün eklenirken bir hata meydana geldi.');
 
-        res.status(500).json({ error: message });
+        res.status(err.statusCode || 500).json({
+            error: message,
+            code: err.code,
+            details: err.details
+        });
     } finally {
         client.release();
     }
@@ -603,7 +700,15 @@ const getProductById = async (req, res) => {
             return res.status(400).json({ error: 'Geçersiz ürün kimliği.' });
         }
 
-        const result = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+        const isAdmin = getUserFromRequestIfAny(req)?.role === 'admin';
+        const result = await pool.query(
+            `SELECT * FROM products
+             WHERE id = $1
+             ${isAdmin ? '' : `AND publication_status = 'active'
+                 AND is_customer_visible = TRUE
+                 AND deleted_at IS NULL`}`,
+            [id]
+        );
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Ürün bulunamadı.' });
         }
@@ -615,6 +720,9 @@ const getProductById = async (req, res) => {
 
         const product = normalizeProductRow(result.rows[0]);
         product.media = mediaResult.rows;
+        const categoryLinks = await getProductCategoryLinks(pool, id);
+        product.categoryIds = categoryLinks.map((item) => item.categoryId);
+        product.primaryCategoryId = categoryLinks.find((item) => item.isPrimary)?.categoryId || null;
 
         res.status(200).json(product);
     } catch (err) {
@@ -633,6 +741,7 @@ const deleteProduct = async (req, res) => {
         }
 
         await client.query('BEGIN');
+        const previousLinks = await getProductCategoryLinks(client, id);
 
         await client.query('DELETE FROM product_media WHERE product_id = $1', [id]);
         await client.query('DELETE FROM reviews WHERE product_id = $1', [id]);
@@ -648,6 +757,11 @@ const deleteProduct = async (req, res) => {
             return res.status(404).json({ error: 'Ürün bulunamadı.' });
         }
 
+        await syncCategoryStatsForProducts(
+            client,
+            [id],
+            previousLinks.map((item) => item.categoryId)
+        );
         await client.query('COMMIT');
         res.status(200).json({ mesaj: 'Ürün başarıyla silindi.' });
     } catch (err) {
@@ -846,6 +960,16 @@ const updateProduct = async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(400).json({ error: payload.error });
         }
+        const categoryResolution = await resolveProductCategoryAssignment(
+            client,
+            req.body,
+            payload.categories,
+            { isUpdate: true }
+        );
+        if (categoryResolution.replace) {
+            payload.categories = categoryResolution.categoryNames;
+            payload.category = categoryResolution.categoryNames[0];
+        }
 
         const nextMainImageUrl = payload.mediaUrls[0] || existingProduct.image_url || null;
 
@@ -858,8 +982,12 @@ const updateProduct = async (req, res) => {
                  description = $5,
                  category = $6,
                  categories = $7,
-                 image_url = $8
-             WHERE id = $9
+                 image_url = $8,
+                 publication_status = $9,
+                 is_customer_visible = $10,
+                 deleted_at = $11,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $12
              RETURNING *`,
             [
                 payload.name,
@@ -870,6 +998,9 @@ const updateProduct = async (req, res) => {
                 payload.category,
                 payload.categories,
                 nextMainImageUrl,
+                payload.publicationStatus,
+                payload.isCustomerVisible,
+                payload.deletedAt,
                 id
             ]
         );
@@ -890,17 +1021,37 @@ const updateProduct = async (req, res) => {
             }
             await setMainMediaForProduct(client, id, payload.mediaUrls[0]);
         }
+        const categorySync = await syncProductCategoryAssignments(
+            client,
+            id,
+            categoryResolution
+        );
+        await syncCategoryStatsForProducts(
+            client,
+            [id],
+            categorySync.previous.map((item) => item.categoryId)
+        );
 
         await client.query('COMMIT');
         res.status(200).json({
             mesaj: 'Ürün bilgileri güncellendi.',
-            warnings: payload.warnings,
-            product: normalizeProductRow(updateResult.rows[0])
+            warnings: [...payload.warnings, ...categoryResolution.warnings],
+            product: {
+                ...normalizeProductRow(updateResult.rows[0]),
+                categoryIds: categorySync.current.map((item) => item.categoryId),
+                primaryCategoryId: categorySync.current.find((item) => item.isPrimary)?.categoryId || null
+            }
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Ürün güncelleme hatası:', err.message);
-        res.status(500).json({ error: err.message || 'Ürün güncellenemedi.' });
+        if (!err.statusCode || err.statusCode >= 500) {
+            console.error('Ürün güncelleme hatası:', err.message);
+        }
+        res.status(err.statusCode || 500).json({
+            error: err.message || 'Ürün güncellenemedi.',
+            code: err.code,
+            details: err.details
+        });
     } finally {
         client.release();
     }
