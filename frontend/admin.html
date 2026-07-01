@@ -767,6 +767,111 @@
             background: #C62828;
         }
 
+        .category-tree-name {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            min-width: 250px;
+        }
+
+        .category-tree-name small {
+            color: #8A94A6;
+            font-weight: 500;
+        }
+
+        .category-tree-branch {
+            color: var(--accent);
+            width: 15px;
+        }
+
+        .category-tree-row.is-archived {
+            opacity: 0.68;
+            background: rgba(148, 163, 184, 0.08);
+        }
+
+        .category-status {
+            display: inline-flex;
+            padding: 5px 9px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .category-status.active { background: #E8F5E9; color: #237A35; }
+        .category-status.inactive,
+        .category-status.hidden { background: #FFF3E0; color: #B45309; }
+        .category-status.empty { background: #E8F1FF; color: #2457A7; }
+        .category-status.archived { background: #ECEFF1; color: #546E7A; }
+
+        .category-actions {
+            display: flex;
+            gap: 7px;
+            min-width: 170px;
+        }
+
+        .btn-restore {
+            padding: 7px 10px;
+            border: 0;
+            border-radius: 7px;
+            background: #2E7D32;
+            color: white;
+            cursor: pointer;
+        }
+
+        .category-empty-state {
+            padding: 28px !important;
+            text-align: center;
+            color: #8A94A6;
+        }
+
+        .category-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0 16px;
+        }
+
+        .category-form-grid .form-span-2 {
+            grid-column: 1 / -1;
+        }
+
+        .category-toggle-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin: 4px 0 18px;
+        }
+
+        .category-toggle {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.82rem;
+        }
+
+        .category-form-error {
+            margin-bottom: 14px;
+            padding: 10px 12px;
+            border-radius: 9px;
+            background: #FFEBEE;
+            color: #B71C1C;
+            font-weight: 700;
+        }
+
+        @media (max-width: 720px) {
+            .category-form-grid,
+            .category-toggle-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .category-form-grid .form-span-2 {
+                grid-column: auto;
+            }
+        }
+
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -2062,6 +2167,9 @@
                 <h2>📂 Kategori Yönetimi</h2>
                 <button class="btn-add" onclick="openCategoryModal()">+ Yeni Kategori</button>
             </div>
+            <p style="margin:0 0 14px; color:#778195;">
+                Arşivlenmiş, pasif ve ürünsüz kategoriler yönetim ekranında korunur. Public görünürlük stoktan bağımsız görünür ürün sayısıyla belirlenir.
+            </p>
             <div class="table-container" style="overflow-x: auto;">
                 <table id="categoriesTable">
                     <thead>
@@ -2069,11 +2177,20 @@
                             <th>ID</th>
                             <th>Kategori Adı</th>
                             <th>Üst Kategori</th>
-                            <th>Oluşturulma Tarihi</th>
+                            <th>Durum</th>
+                            <th>Doğrudan Ürün</th>
+                            <th>Görünür Ürün</th>
+                            <th>Satılabilir Ürün</th>
+                            <th>Alt Görünür</th>
+                            <th>Alt Satılabilir</th>
+                            <th>Ağaç Görünür</th>
+                            <th>Ağaç Satılabilir</th>
                             <th>İşlemler</th>
                         </tr>
                     </thead>
-                    <tbody id="categories-table-body"></tbody>
+                    <tbody id="categories-table-body">
+                        <tr><td colspan="12" class="category-empty-state">Kategoriler yükleniyor...</td></tr>
+                    </tbody>
                 </table>
             </div>
         </div>
@@ -2148,24 +2265,74 @@
 
     <!-- KATEGORİ MODAL -->
     <div class="modal-overlay" id="category-modal">
-        <div class="modal-box" style="max-width: 400px;">
+        <div class="modal-box" style="max-width: 880px; width:min(880px, 96vw);">
             <div class="modal-header">
-                <h2>Yeni Kategori Ekle</h2>
+                <h2 id="category-modal-title">Yeni Kategori</h2>
                 <button class="close-modal" onclick="closeModal('category-modal')">✕</button>
             </div>
             <div class="modal-body">
                 <form id="add-category-form">
-                    <div class="form-group">
-                        <label>Kategori Adı</label>
-                        <input type="text" id="cat-name" class="form-control" required placeholder="Örn: Telefonlar">
+                    <div id="category-form-error" class="category-form-error" role="alert" hidden></div>
+                    <div class="category-form-grid">
+                        <div class="form-group">
+                            <label for="cat-name">Kategori Adı</label>
+                            <input type="text" id="cat-name" class="form-control" required placeholder="Örn: Telefonlar">
+                        </div>
+                        <div class="form-group">
+                            <label for="cat-slug">Slug</label>
+                            <input type="text" id="cat-slug" class="form-control" placeholder="Otomatik oluşturulabilir">
+                        </div>
+                        <div class="form-group">
+                            <label for="cat-parent">Üst Kategori</label>
+                            <select id="cat-parent" class="form-control">
+                                <option value="">Ana kategori (kök)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="cat-sort-order">Sıralama</label>
+                            <input type="number" id="cat-sort-order" class="form-control" value="0" step="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="cat-image-url">Kategori Görseli URL</label>
+                            <input type="url" id="cat-image-url" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="cat-banner-url">Banner URL</label>
+                            <input type="url" id="cat-banner-url" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="cat-icon">İkon</label>
+                            <input type="text" id="cat-icon" class="form-control" placeholder="İkon adı veya emoji">
+                        </div>
+                        <div class="form-group">
+                            <label for="cat-accent-color">Vurgu Rengi</label>
+                            <input type="text" id="cat-accent-color" class="form-control" placeholder="#F7941D">
+                        </div>
+                        <div class="form-group form-span-2">
+                            <label for="cat-description">Açıklama</label>
+                            <textarea id="cat-description" class="form-control" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="cat-seo-title">SEO Başlığı</label>
+                            <input type="text" id="cat-seo-title" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="cat-google-taxonomy-id">Google Taxonomy ID</label>
+                            <input type="text" id="cat-google-taxonomy-id" class="form-control">
+                        </div>
+                        <div class="form-group form-span-2">
+                            <label for="cat-seo-description">SEO Açıklaması</label>
+                            <textarea id="cat-seo-description" class="form-control" rows="2"></textarea>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Üst Kategori (Opsiyonel)</label>
-                        <select id="cat-parent" class="form-control">
-                            <option value="">-- Ana Kategori (Yok) --</option>
-                        </select>
+                    <div class="category-toggle-grid">
+                        <label class="category-toggle"><input type="checkbox" id="cat-is-active" checked> Aktif</label>
+                        <label class="category-toggle"><input type="checkbox" id="cat-is-customer-visible" checked> Müşteriye görünür</label>
+                        <label class="category-toggle"><input type="checkbox" id="cat-show-in-menu" checked> Menüde göster</label>
+                        <label class="category-toggle"><input type="checkbox" id="cat-show-on-home"> Ana sayfada göster</label>
+                        <label class="category-toggle"><input type="checkbox" id="cat-hide-when-empty" checked> Public boşken gizle</label>
                     </div>
-                    <button type="submit" id="btn-save-category" class="btn-submit">Kaydet</button>
+                    <button type="submit" id="category-save-button" class="btn-submit">Kaydet</button>
                 </form>
             </div>
         </div>
@@ -4277,41 +4444,23 @@
         // KATEGORİ YÖNETİMİ
         async function fetchCategories() {
             try {
-                const res = await adminApiFetch('/api/categories');
-                globalCategories = await res.json();
-                populateCategoryDropdowns();
-
-                const tbody = document.getElementById('categories-table-body');
-                tbody.innerHTML = '';
-
-                if (globalCategories.length === 0) {
-                    tbody.innerHTML = '<tr> <td colspan = "4" style = "text-align: center;"> Henüz kategori eklenmemiş.</td> </tr> ';
-                } else {
-                    globalCategories.forEach(cat => {
-                        const parentName = cat.parent_id
-                            ? (globalCategories.find(c => c.id === cat.parent_id)?.name || '-')
-                            : '-';
-
-                        const dateStr = cat.created_at ? new Date(cat.created_at).toLocaleDateString('tr-TR') : '-';
-                        tbody.innerHTML += `
-    <tr>
-        <td style="font-weight: bold; color: var(--accent);">#${cat.id}</td>
-        <td>${cat.name}</td>
-        <td><span class="cat-badge">${parentName}</span></td>
-        <td>${dateStr}</td>
-        <td>
-            <button class="btn-action btn-delete" style="background:#C62828;"
-                onclick="deleteCategory(${cat.id})">Sil</button>
-        </td>
-    </tr>
-    `;
-                    });
+                if (!window.NovaStoreAdminCategories) {
+                    throw new Error('Kategori yönetim modülü yüklenemedi.');
                 }
-
-                populateCategoryDropdowns();
+                window.NovaStoreAdminCategories.configure({
+                    apiFetch: adminApiFetch,
+                    onCategoriesChanged(categories) {
+                        globalCategories = categories;
+                        populateCategoryDropdowns();
+                    }
+                });
+                await window.NovaStoreAdminCategories.load();
             } catch (error) {
                 console.error("Kategoriler çekilirken hata:", error);
-                tbody.innerHTML = '<tr> <td colspan = "4" style = "text-align: center; color: red;"> Veri yüklenemedi.</td> </tr> ';
+                const tbody = document.getElementById('categories-table-body');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="12" class="category-empty-state" style="color:#C62828;">Kategoriler yüklenemedi.</td></tr>';
+                }
             }
         }
 
@@ -4463,48 +4612,12 @@
         }
 
         function openCategoryModal() {
-            document.getElementById('add-category-form').reset();
-            populateCategoryDropdowns();
-            document.getElementById('category-modal').style.display = 'flex';
+            window.NovaStoreAdminCategories?.openCreate();
         }
 
-        async function deleteCategory(id) {
-            if (!confirm("Kategoriyi silerseniz alt kategoriler de silinir. Emin misiniz?")) return;
-            try {
-                const res = await adminApiFetch('/api/categories/' + id, { method: 'DELETE' });
-                if (res.ok) fetchCategories();
-                else alert('Hata oluştu');
-            } catch (e) { }
+        function closeCategoryModal() {
+            closeModal('category-modal');
         }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const catForm = document.getElementById('add-category-form');
-            if (catForm) {
-                catForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const btn = document.getElementById('btn-save-category');
-                    btn.innerText = "Kaydediliyor..."; btn.disabled = true;
-                    try {
-                        const parent_id = document.getElementById('cat-parent').value;
-                        const bodyData = {
-                            name: document.getElementById('cat-name').value,
-                            parent_id: parent_id ? parseInt(parent_id) : null
-                        };
-
-                        await adminApiFetch('/api/categories', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(bodyData)
-                        });
-                        closeModal('category-modal');
-                        fetchCategories();
-                    } catch (e) {
-                    } finally {
-                        btn.innerText = "Kaydet"; btn.disabled = false;
-                    }
-                });
-            }
-        });
 
         async function fetchStats() {
             try {
@@ -6051,6 +6164,7 @@
 
     </script>
     <div class="toast-container" id="toastContainer"></div>
+    <script src="admin-categories.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <!-- Artık admin-chat'e gerek kalmadı ama ileride gerekecekse durabilir. Devre dışı kalması için silebiliriz -->
     <!-- <script src="admin-chat.js"></script> -->
