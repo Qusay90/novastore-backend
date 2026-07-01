@@ -10,6 +10,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <script src="mobile-bridge.js"></script>
+    <script src="catalog-navigation.js"></script>
     <script src="shared-state-sync.js"></script>
     <script src="favorites-sync.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1543,6 +1544,7 @@
         </ul>
     </nav>
 
+    <div id="product-category-breadcrumb" style="max-width:1200px; margin:18px auto 0; padding:0 20px;"></div>
     <div class="product-container" id="product-detail-area">
         <h2 style="text-align: center; width: 100%; grid-column: 1 / -1;">Ürün aranıyor...</h2>
     </div>
@@ -1854,8 +1856,11 @@
         }
 
         async function fetchNavigationCategories() {
+            if (window.NovaStoreCatalogNavigation) {
+                return window.NovaStoreCatalogNavigation.mountMenu({ menuId: 'category-menu' });
+            }
             try {
-                const res = await fetch('/api/categories');
+                const res = await fetch('/api/public/categories');
                 const categories = await res.json();
 
                 const menu = document.getElementById('category-menu');
@@ -2543,6 +2548,7 @@
 
                 const product = await productRes.json();
                 const reviewData = await reviewsRes.json();
+                window.NovaStoreCatalogNavigation?.renderProductBreadcrumb(product);
 
                 const imageUrl = product.image_url || 'https://via.placeholder.com/500?text=Görsel+Yok';
 
@@ -2711,6 +2717,7 @@
                 let isFav = favoriteIds.has(Number(product.id)) ? 'active' : '';
                 const safeDescriptionHtml = getSafeProductDescriptionHtml(product.description);
                 const safeDescriptionText = stripProductDescriptionHtml(safeDescriptionHtml) || product.name;
+                const soldOut = Number(product.stock || 0) <= 0;
 
                 // EKRANI ÇİZİYORUZ
                 document.getElementById('product-detail-area').innerHTML = `
@@ -2737,6 +2744,7 @@
                         </div>
 
                         ${priceHtml}
+                        ${soldOut ? '<div class="catalog-sold-out-badge" style="position:static; display:inline-flex; margin-bottom:14px;">Tükendi · satın alınamaz</div>' : ''}
 
                         <div class="description-box">
                             <div class="description-title">Ürün Açıklaması</div>
@@ -2746,12 +2754,12 @@
                         </div>
 
                         <div style="display: flex; gap: 15px; margin-top: 10px;">
-                            <button class="btn-add-large" style="flex: 1;" onclick="addToCart(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price}, '${imageUrl}', ${product.old_price ? `'${product.old_price}'` : 'null'})">
-                                🛒 Sepete Ekle
+                            <button class="btn-add-large" style="flex: 1;" ${soldOut ? 'disabled aria-disabled="true"' : `onclick="addToCart(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price}, '${imageUrl}', ${product.old_price ? `'${product.old_price}'` : 'null'})"`}>
+                                ${soldOut ? 'Tükendi' : '🛒 Sepete Ekle'}
                             </button>
                             
-                            <button class="btn-buy-now" style="flex: 1;" onclick="buyNow(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price})">
-                                ⚡ Şimdi Al
+                            <button class="btn-buy-now" style="flex: 1;" ${soldOut ? 'disabled aria-disabled="true"' : `onclick="buyNow(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price})"`}>
+                                ${soldOut ? 'Satın alınamaz' : '⚡ Şimdi Al'}
                             </button>
                         </div>
                     </div>

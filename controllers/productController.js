@@ -8,6 +8,10 @@ const {
     assertProductCategoryPublicationReady
 } = require('../services/productCategoryService');
 const { syncCategoryStatsForProducts } = require('../services/categoryStatsService');
+const {
+    getPublicCategoryBySlug,
+    listPublicCategories
+} = require('../services/categoryService');
 const DEFAULT_PRODUCT_CATEGORY = 'Kategorisiz';
 const BACKGROUND_REMOVAL_TRANSFORMATION = [
     { effect: 'background_removal' },
@@ -558,14 +562,67 @@ const buildProductMediaMap = (mediaRows) => {
     return mediaByProductId;
 };
 
+const resolvePublicProductCategoryId = async (query = {}) => {
+    const slug = String(query.categorySlug || query.category_slug || '').trim();
+    if (slug) {
+        let detail = await getPublicCategoryBySlug(slug);
+        if (detail.redirect) {
+            detail = await getPublicCategoryBySlug(detail.redirect.canonical_slug);
+        }
+        return Number(detail.category.id);
+    }
+
+    const rawId = query.categoryId ?? query.category_id;
+    if (rawId === undefined || rawId === null || rawId === '') return null;
+    const requestedId = Number(rawId);
+    if (!Number.isInteger(requestedId)) return null;
+    const categories = await listPublicCategories({ format: 'flat' });
+    const selected = categories.find((category) => Number(category.id) === requestedId);
+    if (!selected) {
+        const error = new Error('Kategori bulunamadı veya yayında değil.');
+        error.statusCode = 404;
+        error.code = 'CATEGORY_NOT_PUBLIC';
+        throw error;
+    }
+    return requestedId;
+};
+
 const getAllProducts = async (req, res) => {
     try {
         const isAdmin = getUserFromRequestIfAny(req)?.role === 'admin';
-        const visibilityWhere = isAdmin
+        const selectedCategoryId = isAdmin ? null : await resolvePublicProductCategoryId(req.query || {});
+        let visibilityWhere = isAdmin
             ? ''
             : `WHERE p.publication_status = 'active'
                  AND p.is_customer_visible = TRUE
                  AND p.deleted_at IS NULL`;
+        const productQueryParams = [];
+        if (selectedCategoryId !== null) {
+            productQueryParams.push(selectedCategoryId);
+            visibilityWhere += `
+                AND EXISTS (
+                    WITH RECURSIVE selected_categories AS (
+                        SELECT id
+                        FROM categories
+                        WHERE id = $1
+                          AND is_active = TRUE
+                          AND is_customer_visible = TRUE
+                          AND deleted_at IS NULL
+                        UNION ALL
+                        SELECT child.id
+                        FROM categories child
+                        JOIN selected_categories parent ON child.parent_id = parent.id
+                        WHERE child.is_active = TRUE
+                          AND child.is_customer_visible = TRUE
+                          AND child.deleted_at IS NULL
+                    )
+                    SELECT 1
+                    FROM product_categories product_category
+                    JOIN selected_categories selected
+                      ON selected.id = product_category.category_id
+                    WHERE product_category.product_id = p.id
+                )`;
+        }
         const [productsResult, mediaResult, categoryLinksResult] = await Promise.all([
             pool.query(`
                 SELECT p.*,
@@ -576,7 +633,7 @@ const getAllProducts = async (req, res) => {
                 ${visibilityWhere}
                 GROUP BY p.id
                 ORDER BY ${isAdmin ? '' : 'CASE WHEN p.stock > 0 THEN 0 ELSE 1 END,'} p.created_at DESC
-            `),
+            `, productQueryParams),
             pool.query(`
                 SELECT *
                 FROM product_media
@@ -615,8 +672,13 @@ const getAllProducts = async (req, res) => {
 
         res.status(200).json(products);
     } catch (err) {
-        console.error('Ürün listeleme hatası:', err.message);
-        res.status(500).json({ error: 'Ürünler getirilirken sunucu hatası oluştu.' });
+        if (!err.statusCode || err.statusCode >= 500) {
+            console.error('Ürün listeleme hatası:', err.message);
+        }
+        res.status(err.statusCode || 500).json({
+            error: err.statusCode ? err.message : 'Ürünler getirilirken sunucu hatası oluştu.',
+            code: err.code
+        });
     }
 };
 

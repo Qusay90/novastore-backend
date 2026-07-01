@@ -267,6 +267,31 @@ const statsFor = async (categoryId) => {
     assert(!Object.hasOwn(publicList.body[0], 'categoryIds'));
     assert(!Object.hasOwn(publicList.body[0], 'primaryCategoryId'));
 
+    const rootCategoryProducts = await invoke(getAllProducts, {
+        query: { categorySlug: 'lifecycle-root' }
+    });
+    assert.strictEqual(rootCategoryProducts.statusCode, 200);
+    assert.deepStrictEqual(
+        rootCategoryProducts.body.map((product) => Number(product.id)),
+        [productId, secondProductId]
+    );
+    assert.strictEqual(rootCategoryProducts.body[0].is_purchasable, true);
+    assert.strictEqual(rootCategoryProducts.body[1].is_purchasable, false);
+
+    const categoryIdProducts = await invoke(getAllProducts, {
+        query: { categoryId: rootId }
+    });
+    assert.strictEqual(categoryIdProducts.statusCode, 200);
+    assert.deepStrictEqual(
+        categoryIdProducts.body.map((product) => Number(product.id)),
+        [productId, secondProductId]
+    );
+
+    const missingCategoryProducts = await invoke(getAllProducts, {
+        query: { categorySlug: 'missing-category' }
+    });
+    assert.strictEqual(missingCategoryProducts.statusCode, 404);
+
     await pool.query(
         `UPDATE products
          SET publication_status = 'pending_approval'
