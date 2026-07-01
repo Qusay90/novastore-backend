@@ -135,8 +135,14 @@ app.use('/api/reviews', reviewRoutes);
 const userRoutes = require('./routes/userRoutes');
 app.use('/api/users', userRoutes);
 
+const adminCategoryRoutes = require('./routes/adminCategoryRoutes');
+app.use('/api/admin/categories', adminCategoryRoutes);
+
 const adminRoutes = require('./routes/adminRoutes');
 app.use('/api/admin', adminRoutes);
+
+const publicCategoryRoutes = require('./routes/publicCategoryRoutes');
+app.use('/api/public/categories', publicCategoryRoutes);
 
 const categoryRoutes = require('./routes/categoryRoutes');
 app.use('/api/categories', categoryRoutes);
