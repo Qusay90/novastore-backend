@@ -1,46 +1,56 @@
 const pool = require('../config/db');
+const {
+    createCategory: createCategoryV2,
+    setCategoryArchived
+} = require('../services/categoryService');
 
-// Tüm Kategori ve Alt Kategorileri Getir (Hiyerarşik Değil, Düz Liste Olarak. Frontend yönetecek)
+// Legacy flat response contract; existing clients build the tree themselves.
 const getCategories = async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM categories ORDER BY parent_id NULLS FIRST, name ASC');
-        res.status(200).json(result.rows);
-    } catch (err) {
-        console.error("Kategoriler getirilirken hata:", err);
-        res.status(500).json({ error: "Kategoriler yüklenemedi." });
+        const result = await pool.query(
+            'SELECT * FROM categories ORDER BY parent_id NULLS FIRST, name ASC'
+        );
+        return res.status(200).json(result.rows);
+    } catch (error) {
+        console.error('Kategoriler getirilirken hata:', error);
+        return res.status(500).json({ error: 'Kategoriler yüklenemedi.' });
     }
 };
 
-// Yeni Kategori Ekle
 const createCategory = async (req, res) => {
     try {
-        const { name, parent_id } = req.body;
-
-        // Eğer kategori adı zaten varsa kaydetmeye çalışınca hata verir (UNIQUE constraint var)
-        const newCategory = await pool.query(
-            'INSERT INTO categories (name, parent_id) VALUES ($1, $2) RETURNING *',
-            [name, parent_id || null]
-        );
-
-        res.status(201).json({ mesaj: "Kategori başarıyla eklendi!", category: newCategory.rows[0] });
-    } catch (err) {
-        console.error("Kategori eklenirken hata:", err);
-        res.status(500).json({ error: "Kategori eklenemedi." });
+        const category = await createCategoryV2({
+            ...req.body,
+            parentId: req.body.parent_id || null
+        });
+        return res.status(201).json({
+            mesaj: 'Kategori başarıyla eklendi!',
+            category
+        });
+    } catch (error) {
+        if (!error.statusCode || error.statusCode >= 500) {
+            console.error('Kategori eklenirken hata:', error);
+        }
+        return res.status(error.statusCode || 500).json({
+            error: error.statusCode ? error.message : 'Kategori eklenemedi.',
+            code: error.code
+        });
     }
 };
 
-// Kategori Sil
+// Legacy DELETE is retained as a route contract but now archives instead of hard-deleting.
 const deleteCategory = async (req, res) => {
     try {
-        const { id } = req.params;
-
-        // Tabloda ON DELETE CASCADE olduğu için, alt kategoriler de silinecektir.
-        await pool.query('DELETE FROM categories WHERE id = $1', [id]);
-
-        res.status(200).json({ mesaj: "Kategori başarıyla silindi." });
-    } catch (err) {
-        console.error("Kategori silinirken hata:", err);
-        res.status(500).json({ error: "Kategori silinemedi." });
+        await setCategoryArchived(req.params.id, true);
+        return res.status(200).json({ mesaj: 'Kategori başarıyla silindi.' });
+    } catch (error) {
+        if (!error.statusCode || error.statusCode >= 500) {
+            console.error('Kategori silinirken hata:', error);
+        }
+        return res.status(error.statusCode || 500).json({
+            error: error.statusCode ? error.message : 'Kategori silinemedi.',
+            code: error.code
+        });
     }
 };
 

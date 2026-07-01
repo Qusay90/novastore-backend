@@ -1,4 +1,10 @@
-const { listAdminCategories } = require('../services/categoryService');
+const {
+    listAdminCategories,
+    createCategory,
+    updateCategory,
+    moveCategory,
+    setCategoryArchived
+} = require('../services/categoryService');
 
 const resolveFormat = (req) => {
     const format = String(req.query?.format || 'tree').trim().toLowerCase();
@@ -25,6 +31,33 @@ const getAdminCategories = async (req, res) => {
     }
 };
 
+const mutationHandler = (operation, successStatus = 200) => async (req, res) => {
+    try {
+        const category = await operation(req);
+        return res.status(successStatus).json({ category });
+    } catch (error) {
+        if (!error.statusCode || error.statusCode >= 500) {
+            console.error('Admin kategori mutation hatası:', error.message);
+        }
+        return res.status(error.statusCode || 500).json({
+            error: error.statusCode ? error.message : 'Kategori işlemi tamamlanamadı.',
+            code: error.code,
+            details: error.details
+        });
+    }
+};
+
+const createAdminCategory = mutationHandler((req) => createCategory(req.body), 201);
+const updateAdminCategory = mutationHandler((req) => updateCategory(req.params.id, req.body));
+const moveAdminCategory = mutationHandler((req) => moveCategory(req.params.id, req.body));
+const archiveAdminCategory = mutationHandler((req) =>
+    setCategoryArchived(req.params.id, req.body.archived !== false)
+);
+
 module.exports = {
-    getAdminCategories
+    getAdminCategories,
+    createAdminCategory,
+    updateAdminCategory,
+    moveAdminCategory,
+    archiveAdminCategory
 };

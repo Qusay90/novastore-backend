@@ -31,6 +31,12 @@ const getPublicCategories = async (req, res) => {
 const getPublicCategory = async (req, res) => {
     try {
         const category = await getPublicCategoryBySlug(req.params.slug);
+        if (category.redirect) {
+            return res.redirect(
+                category.redirect.status,
+                `/api/public/categories/${encodeURIComponent(category.redirect.canonical_slug)}`
+            );
+        }
         return res.status(200).json(category);
     } catch (error) {
         if (!error.statusCode || error.statusCode >= 500) {
