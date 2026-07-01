@@ -2333,20 +2333,68 @@
         let behaviorAnalyticsSnapshot = null;
         const analyticsLookbackDays = 30;
         const _nativeFetch = window.fetch.bind(window);
-        function adminApiFetch(input, init = {}) {
+        let adminAuthRedirectStarted = false;
+
+        function decodeAdminTokenPayload(token) {
+            try {
+                const parts = String(token || '').split('.');
+                if (parts.length !== 3) return null;
+                const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+                const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+                return JSON.parse(atob(padded));
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function isValidAdminToken(token, nowMs = Date.now()) {
+            const payload = decodeAdminTokenPayload(token);
+            const expiresAt = Number(payload && payload.exp);
+            return Boolean(
+                payload
+                && Number.isInteger(Number(payload.id))
+                && payload.role === 'admin'
+                && Number.isFinite(expiresAt)
+                && (expiresAt * 1000) > nowMs
+            );
+        }
+
+        function beginAdminReauthentication() {
+            localStorage.removeItem('nova_admin_token');
+            if (adminAuthRedirectStarted) return;
+            adminAuthRedirectStarted = true;
+            window.location.href = 'admin-login.html?reason=session-expired';
+        }
+
+        function createAdminAuthError() {
+            const error = new Error('Yönetici oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.');
+            error.status = 401;
+            error.isAdminAuthError = true;
+            return error;
+        }
+
+        async function adminApiFetch(input, init = {}) {
             const url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
             const isApiCall = typeof url === 'string' && url.includes('/api/');
             if (!isApiCall) return _nativeFetch(input, init);
 
             const token = localStorage.getItem('nova_admin_token');
-            if (!token) return _nativeFetch(input, init);
+            if (!isValidAdminToken(token)) {
+                beginAdminReauthentication();
+                throw createAdminAuthError();
+            }
 
             const mergedHeaders = new Headers(init.headers || {});
             if (!mergedHeaders.has('Authorization')) {
                 mergedHeaders.set('Authorization', `Bearer ${token}`);
             }
 
-            return _nativeFetch(input, { ...init, headers: mergedHeaders });
+            const response = await _nativeFetch(input, { ...init, headers: mergedHeaders });
+            if (response.status === 401) {
+                beginAdminReauthentication();
+                throw createAdminAuthError();
+            }
+            return response;
         }
 
         async function adminReadJson(response, fallbackMessage = 'İşlem başarısız.') {
@@ -5402,15 +5450,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             // 🔐 Admin token kontrolü — geçersizse login'e yönlendir
             const token = localStorage.getItem('nova_admin_token');
-            if (!token) {
-                window.location.href = 'admin-login.html';
-                return;
-            }
-            // Token formatı doğru mu basit kontrol
-            const parts = token.split('.');
-            if (parts.length !== 3) {
-                localStorage.removeItem('nova_admin_token');
-                window.location.href = 'admin-login.html';
+            if (!isValidAdminToken(token)) {
+                beginAdminReauthentication();
                 return;
             }
 
