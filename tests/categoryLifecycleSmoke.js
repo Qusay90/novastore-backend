@@ -78,6 +78,24 @@ const statsFor = async (categoryId) => {
     const leafA = Number(leafResult.rows.find((row) => row.name.endsWith('A')).id);
     const leafB = Number(leafResult.rows.find((row) => row.name.endsWith('B')).id);
 
+    const activeWithoutCategory = await invoke(createProduct, {
+        body: productBody({ publicationStatus: 'active' })
+    });
+    assert.strictEqual(activeWithoutCategory.statusCode, 400);
+    assert.match(activeWithoutCategory.body.error, /primaryCategoryId/);
+
+    const draftWithoutCategory = await invoke(createProduct, {
+        body: productBody({ name: 'Draft without category', publicationStatus: 'draft' })
+    });
+    assert.strictEqual(draftWithoutCategory.statusCode, 201);
+    assert.deepStrictEqual(draftWithoutCategory.body.product.categoryIds, []);
+    const activateUnassignedDraft = await invoke(updateProduct, {
+        params: { id: draftWithoutCategory.body.product.id },
+        body: productBody({ name: 'Draft without category', publicationStatus: 'active' })
+    });
+    assert.strictEqual(activateUnassignedDraft.statusCode, 400);
+    assert.match(activateUnassignedDraft.body.error, /primaryCategoryId/);
+
     const parentRejected = await invoke(createProduct, {
         body: productBody({ categoryIds: [rootId], primaryCategoryId: rootId })
     });
@@ -246,6 +264,8 @@ const statsFor = async (categoryId) => {
     assert.strictEqual(publicList.statusCode, 200);
     assert.strictEqual(publicList.body[0].id, productId);
     assert.strictEqual(publicList.body.at(-1).is_purchasable, false);
+    assert(!Object.hasOwn(publicList.body[0], 'categoryIds'));
+    assert(!Object.hasOwn(publicList.body[0], 'primaryCategoryId'));
 
     await pool.query(
         `UPDATE products
@@ -266,6 +286,16 @@ const statsFor = async (categoryId) => {
         }
     });
     assert(adminList.body.some((product) => Number(product.id) === secondProductId));
+    const adminLinkedProduct = adminList.body.find((product) => Number(product.id) === productId);
+    assert.deepStrictEqual(adminLinkedProduct.categoryIds, [leafB]);
+    assert.strictEqual(adminLinkedProduct.primaryCategoryId, leafB);
+
+    const preservedLegacyFields = await pool.query(
+        'SELECT category, categories FROM products WHERE id = $1',
+        [productId]
+    );
+    assert.strictEqual(preservedLegacyFields.rows[0].category, 'Lifecycle Leaf B');
+    assert.deepStrictEqual(preservedLegacyFields.rows[0].categories, ['Lifecycle Leaf B']);
 
     await pool.query(
         'UPDATE category_stats SET subtree_visible_product_count = 999 WHERE category_id = $1',

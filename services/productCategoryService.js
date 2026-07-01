@@ -138,10 +138,22 @@ const syncProductCategoryAssignments = async (queryable, productId, resolution) 
     return { previous, current: resolution.assignments };
 };
 
+const assertProductCategoryPublicationReady = (publicationStatus, assignments = []) => {
+    if (String(publicationStatus || '').toLowerCase() !== 'active') return true;
+    const hasPrimaryLeaf = assignments.length > 0 && assignments.some((item) => item.isPrimary === true);
+    if (!hasPrimaryLeaf) {
+        throw new ProductCategoryValidationError(
+            'Aktif ürün için en az bir leaf categoryIds ve seçili primaryCategoryId zorunludur.'
+        );
+    }
+    return true;
+};
+
 module.exports = {
     ProductCategoryValidationError,
     parseIdList,
     resolveProductCategoryAssignment,
     getProductCategoryLinks,
-    syncProductCategoryAssignments
+    syncProductCategoryAssignments,
+    assertProductCategoryPublicationReady
 };

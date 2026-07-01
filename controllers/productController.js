@@ -4,7 +4,8 @@ const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
 const {
     resolveProductCategoryAssignment,
     getProductCategoryLinks,
-    syncProductCategoryAssignments
+    syncProductCategoryAssignments,
+    assertProductCategoryPublicationReady
 } = require('../services/productCategoryService');
 const { syncCategoryStatsForProducts } = require('../services/categoryStatsService');
 const DEFAULT_PRODUCT_CATEGORY = 'Kategorisiz';
@@ -565,7 +566,7 @@ const getAllProducts = async (req, res) => {
             : `WHERE p.publication_status = 'active'
                  AND p.is_customer_visible = TRUE
                  AND p.deleted_at IS NULL`;
-        const [productsResult, mediaResult] = await Promise.all([
+        const [productsResult, mediaResult, categoryLinksResult] = await Promise.all([
             pool.query(`
                 SELECT p.*,
                        ROUND(COALESCE(AVG(r.rating), 0), 1) AS average_rating,
@@ -580,14 +581,37 @@ const getAllProducts = async (req, res) => {
                 SELECT *
                 FROM product_media
                 ORDER BY product_id ASC, is_main DESC, sort_order ASC, id ASC
-            `)
+            `),
+            isAdmin
+                ? pool.query(`
+                    SELECT product_id, category_id, is_primary
+                    FROM product_categories
+                    ORDER BY product_id, is_primary DESC, category_id
+                `)
+                : Promise.resolve({ rows: [] })
         ]);
 
         const mediaByProductId = buildProductMediaMap(mediaResult.rows);
-        const products = productsResult.rows.map((product) => ({
-            ...normalizeProductRow(product),
-            media: mediaByProductId.get(Number(product.id)) || []
-        }));
+        const categoriesByProductId = new Map();
+        categoryLinksResult.rows.forEach((link) => {
+            const productId = Number(link.product_id);
+            if (!categoriesByProductId.has(productId)) categoriesByProductId.set(productId, []);
+            categoriesByProductId.get(productId).push({
+                categoryId: Number(link.category_id),
+                isPrimary: link.is_primary === true
+            });
+        });
+        const products = productsResult.rows.map((product) => {
+            const links = categoriesByProductId.get(Number(product.id)) || [];
+            return {
+                ...normalizeProductRow(product),
+                media: mediaByProductId.get(Number(product.id)) || [],
+                ...(isAdmin ? {
+                    categoryIds: links.map((item) => item.categoryId),
+                    primaryCategoryId: links.find((item) => item.isPrimary)?.categoryId || null
+                } : {})
+            };
+        });
 
         res.status(200).json(products);
     } catch (err) {
@@ -611,6 +635,7 @@ const createProduct = async (req, res) => {
             req.body,
             payload.categories
         );
+        assertProductCategoryPublicationReady(payload.publicationStatus, categoryResolution.assignments);
         if (categoryResolution.replace) {
             payload.categories = categoryResolution.categoryNames;
             payload.category = categoryResolution.categoryNames[0];
@@ -966,6 +991,10 @@ const updateProduct = async (req, res) => {
             payload.categories,
             { isUpdate: true }
         );
+        const effectiveCategoryAssignments = categoryResolution.replace
+            ? categoryResolution.assignments
+            : await getProductCategoryLinks(client, id);
+        assertProductCategoryPublicationReady(payload.publicationStatus, effectiveCategoryAssignments);
         if (categoryResolution.replace) {
             payload.categories = categoryResolution.categoryNames;
             payload.category = categoryResolution.categoryNames[0];
