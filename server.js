@@ -201,6 +201,9 @@ app.use('/api/admin', adminMenuRoutes);
 const adminCollectionRoutes = require('./routes/adminCollectionRoutes');
 app.use('/api/admin', adminCollectionRoutes);
 
+const adminAttributeRoutes = require('./routes/adminAttributeRoutes');
+app.use('/api/admin', adminAttributeRoutes);
+
 const categoryRoutes = require('./routes/categoryRoutes');
 app.use('/api/categories', categoryRoutes);
 

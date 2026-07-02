@@ -9,6 +9,13 @@ const {
 } = require('../services/productCategoryService');
 const { syncCategoryStatsForProducts } = require('../services/categoryStatsService');
 const {
+    hasAttributePayload,
+    validateProductAttributes,
+    syncProductAttributeValues,
+    getProductAttributeValues,
+    buildPublicAttributeFilterSql
+} = require('../services/productAttributeService');
+const {
     getPublicCategoryBySlug,
     listPublicCategories
 } = require('../services/categoryService');
@@ -623,6 +630,10 @@ const getAllProducts = async (req, res) => {
                     WHERE product_category.product_id = p.id
                 )`;
         }
+        if (!isAdmin) {
+            const filtered = buildPublicAttributeFilterSql(req.query || {}, productQueryParams);
+            visibilityWhere += filtered.sql;
+        }
         const [productsResult, mediaResult, categoryLinksResult] = await Promise.all([
             pool.query(`
                 SELECT p.*,
@@ -698,6 +709,11 @@ const createProduct = async (req, res) => {
             payload.categories
         );
         assertProductCategoryPublicationReady(payload.publicationStatus, categoryResolution.assignments);
+        const attributeValidation = await validateProductAttributes(client, {
+            categoryIds: categoryResolution.assignments.map((item) => item.categoryId),
+            body: req.body,
+            publicationStatus: payload.publicationStatus
+        });
         if (categoryResolution.replace) {
             payload.categories = categoryResolution.categoryNames;
             payload.category = categoryResolution.categoryNames[0];
@@ -731,6 +747,7 @@ const createProduct = async (req, res) => {
             product.id,
             categoryResolution
         );
+        await syncProductAttributeValues(client, product.id, attributeValidation);
 
         for (let i = 0; i < payload.mediaUrls.length; i += 1) {
             await client.query(
@@ -749,6 +766,7 @@ const createProduct = async (req, res) => {
         );
 
         await client.query('COMMIT');
+        const productAttributes = await getProductAttributeValues(pool, product.id);
 
         res.status(201).json({
             mesaj: 'Ürün başarıyla vitrine eklendi.',
@@ -756,7 +774,8 @@ const createProduct = async (req, res) => {
             product: {
                 ...normalizeProductRow(product),
                 categoryIds: categorySync.current.map((item) => item.categoryId),
-                primaryCategoryId: categorySync.current.find((item) => item.isPrimary)?.categoryId || null
+                primaryCategoryId: categorySync.current.find((item) => item.isPrimary)?.categoryId || null,
+                attributes: productAttributes
             }
         });
     } catch (err) {
@@ -810,6 +829,7 @@ const getProductById = async (req, res) => {
         const categoryLinks = await getProductCategoryLinks(pool, id);
         product.categoryIds = categoryLinks.map((item) => item.categoryId);
         product.primaryCategoryId = categoryLinks.find((item) => item.isPrimary)?.categoryId || null;
+        product.attributes = await getProductAttributeValues(pool, id, { publicOnly: !isAdmin });
 
         res.status(200).json(product);
     } catch (err) {
@@ -1057,6 +1077,20 @@ const updateProduct = async (req, res) => {
             ? categoryResolution.assignments
             : await getProductCategoryLinks(client, id);
         assertProductCategoryPublicationReady(payload.publicationStatus, effectiveCategoryAssignments);
+        const shouldValidateAttributes =
+            hasAttributePayload(req.body) ||
+            categoryResolution.replace;
+        const existingAttributeValues = shouldValidateAttributes
+            ? await getProductAttributeValues(client, id)
+            : [];
+        const attributeValidation = shouldValidateAttributes
+            ? await validateProductAttributes(client, {
+                categoryIds: effectiveCategoryAssignments.map((item) => item.categoryId),
+                body: req.body,
+                publicationStatus: payload.publicationStatus,
+                existingValues: existingAttributeValues
+            })
+            : null;
         if (categoryResolution.replace) {
             payload.categories = categoryResolution.categoryNames;
             payload.category = categoryResolution.categoryNames[0];
@@ -1117,6 +1151,9 @@ const updateProduct = async (req, res) => {
             id,
             categoryResolution
         );
+        if (attributeValidation) {
+            await syncProductAttributeValues(client, id, attributeValidation);
+        }
         await syncCategoryStatsForProducts(
             client,
             [id],
@@ -1124,13 +1161,15 @@ const updateProduct = async (req, res) => {
         );
 
         await client.query('COMMIT');
+        const productAttributes = await getProductAttributeValues(pool, id);
         res.status(200).json({
             mesaj: 'Ürün bilgileri güncellendi.',
             warnings: [...payload.warnings, ...categoryResolution.warnings],
             product: {
                 ...normalizeProductRow(updateResult.rows[0]),
                 categoryIds: categorySync.current.map((item) => item.categoryId),
-                primaryCategoryId: categorySync.current.find((item) => item.isPrimary)?.categoryId || null
+                primaryCategoryId: categorySync.current.find((item) => item.isPrimary)?.categoryId || null,
+                attributes: productAttributes
             }
         });
     } catch (err) {

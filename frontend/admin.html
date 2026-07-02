@@ -1939,6 +1939,7 @@
             <li class="nav-link" onclick="switchTab('returns', this)">↩️ Müşteri İade Talepleri</li>
             <li class="nav-link" onclick="switchTab('products', this)">🛍️ Ürün Yönetimi</li>
             <li class="nav-link" onclick="switchTab('categories', this)">📂 Kategoriler</li>
+            <li class="nav-link" onclick="switchTab('attributes', this)">🧩 Özellik / Filtre Şablonları</li>
             <li class="nav-link" onclick="switchTab('menus', this)">🧭 Menü Yönetimi</li>
             <li class="nav-link" onclick="switchTab('collections', this)">🗂️ Koleksiyonlar</li>
             <li class="nav-link" onclick="switchTab('chat', this)">💬 Müşteri Soruları</li>
@@ -2364,6 +2365,17 @@
             <div id="admin-menu-manager" class="catalog-admin-panel">Menüler yükleniyor...</div>
         </div>
 
+        <div id="tab-attributes" class="tab-pane">
+            <div class="table-header">
+                <h2>🧩 Özellik / Filtre Şablonları</h2>
+            </div>
+            <p style="margin:0 0 14px; color:#778195;">
+                Kategoriye bağlı ürün özelliklerini, seçeneklerini ve müşteri filtrelerini yönetin.
+                Template bağlantıları doğrudan seçilen kategoriye uygulanır.
+            </p>
+            <div id="admin-attribute-manager" class="catalog-admin-panel">Özellikler yükleniyor...</div>
+        </div>
+
         <div id="tab-collections" class="tab-pane">
             <div class="table-header">
                 <h2>🗂️ Koleksiyon Yönetimi</h2>
@@ -2573,6 +2585,13 @@
                             <input type="checkbox" id="prod-is-customer-visible" checked>
                             Müşteri tarafında görünür
                         </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Ürün Özellikleri</label>
+                        <div id="product-attributes-fields" class="catalog-admin-card">
+                            <p class="catalog-admin-empty">Özellik alanları seçilen leaf kategorilere göre yüklenir.</p>
+                        </div>
+                        <div id="product-attributes-error" class="product-category-message error" role="alert" hidden></div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div class="form-group"><label>Güncel Fiyat</label><input type="number" step="0.01"
@@ -2828,6 +2847,7 @@
             if (tabId === 'returns') fetchReturnRequests();
             if (tabId === 'products') fetchProducts();
             if (tabId === 'categories') fetchCategories();
+            if (tabId === 'attributes') window.NovaStoreAdminAttributes?.load();
             if (tabId === 'menus') window.NovaStoreAdminMenus?.load();
             if (tabId === 'collections') window.NovaStoreAdminCollections?.load();
             if (tabId === 'chat') { loadAdminQuestions(); loadAiHandoffs(); }
@@ -5611,6 +5631,7 @@
                 formData.append('description', syncProductDescriptionField(true));
                 const publicationStatus = document.getElementById('prod-publication-status').value;
                 const categorySubmission = window.NovaStoreAdminProducts.getSubmission(publicationStatus);
+                const attributeSubmission = window.NovaStoreAdminProducts.getAttributeSubmission(publicationStatus);
                 formData.append('publicationStatus', publicationStatus);
                 formData.append(
                     'isCustomerVisible',
@@ -5622,6 +5643,7 @@
                     formData.append('category', categorySubmission.categoryNames[0]);
                     formData.append('categories', JSON.stringify(categorySubmission.categoryNames));
                 }
+                formData.append('attributes', JSON.stringify(attributeSubmission));
 
                 if (pendingProductMediaFiles.length > 0) {
                     const mediaOrder = [];
@@ -6295,6 +6317,7 @@
     <div class="toast-container" id="toastContainer"></div>
     <script src="admin-products.js"></script>
     <script src="admin-categories.js"></script>
+    <script src="admin-attributes.js"></script>
     <script src="admin-menus.js"></script>
     <script src="admin-collections.js"></script>
     <script src="/socket.io/socket.io.js"></script>

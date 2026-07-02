@@ -2,6 +2,8 @@ const {
     listPublicCategories,
     getPublicCategoryBySlug
 } = require('../services/categoryService');
+const pool = require('../config/db');
+const { getPublicCategoryFacets } = require('../services/productAttributeService');
 
 const resolveFormat = (req) => {
     const format = String(req.query?.format || 'tree').trim().toLowerCase();
@@ -49,7 +51,34 @@ const getPublicCategory = async (req, res) => {
     }
 };
 
+const getPublicCategoryFilters = async (req, res) => {
+    try {
+        let detail = await getPublicCategoryBySlug(req.params.slug);
+        if (detail.redirect) {
+            detail = await getPublicCategoryBySlug(detail.redirect.canonical_slug);
+        }
+        const filters = await getPublicCategoryFacets(pool, Number(detail.category.id));
+        return res.status(200).json({
+            category: {
+                id: Number(detail.category.id),
+                slug: detail.category.slug,
+                name: detail.category.name
+            },
+            filters
+        });
+    } catch (error) {
+        if (!error.statusCode || error.statusCode >= 500) {
+            console.error('Public kategori filtre hatası:', error.message);
+        }
+        return res.status(error.statusCode || 500).json({
+            error: error.statusCode ? error.message : 'Kategori filtreleri yüklenemedi.',
+            code: error.code
+        });
+    }
+};
+
 module.exports = {
     getPublicCategories,
-    getPublicCategory
+    getPublicCategory,
+    getPublicCategoryFilters
 };

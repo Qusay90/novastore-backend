@@ -2008,6 +2008,34 @@
                 .replace(/'/g, '&#39;');
         }
 
+        function renderProductSpecifications(attributes) {
+            const visible = (Array.isArray(attributes) ? attributes : [])
+                .filter((attribute) => attribute && attribute.value !== null && attribute.value !== undefined);
+            if (!visible.length) return '';
+            const displayValue = (attribute) => {
+                const value = attribute.value;
+                let text = '';
+                if (Array.isArray(value)) {
+                    text = value.map((item) => item?.label ?? item?.value ?? item).join(', ');
+                } else if (value && typeof value === 'object' && 'min' in value && 'max' in value) {
+                    text = `${value.min} – ${value.max}`;
+                } else if (value && typeof value === 'object') {
+                    text = value.label ?? value.value ?? '';
+                } else if (typeof value === 'boolean') {
+                    text = value ? 'Evet' : 'Hayır';
+                } else {
+                    text = String(value);
+                }
+                return `${escapeHtml(text)}${attribute.unit ? ` ${escapeHtml(attribute.unit)}` : ''}`;
+            };
+            return `<section class="product-specifications" aria-labelledby="product-specifications-title">
+                <h2 id="product-specifications-title">Ürün Özellikleri</h2>
+                <dl>${visible.map((attribute) =>
+                    `<dt>${escapeHtml(attribute.name)}</dt><dd>${displayValue(attribute)}</dd>`
+                ).join('')}</dl>
+            </section>`;
+        }
+
         function isVideoMedia(url) {
             return /\.(mp4|webm|ogg|mov)(?:$|[?#])/i.test(String(url || ''));
         }
@@ -2752,6 +2780,7 @@
                                 ${safeDescriptionHtml}
                             </div>
                         </div>
+                        ${renderProductSpecifications(product.attributes)}
 
                         <div style="display: flex; gap: 15px; margin-top: 10px;">
                             <button class="btn-add-large" style="flex: 1;" ${soldOut ? 'disabled aria-disabled="true"' : `onclick="addToCart(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price}, '${imageUrl}', ${product.old_price ? `'${product.old_price}'` : 'null'})"`}>

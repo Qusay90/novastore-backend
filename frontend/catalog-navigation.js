@@ -335,6 +335,90 @@
         </section>`;
     }
 
+    function renderCategoryFilters(filters) {
+        if (!Array.isArray(filters) || filters.length === 0) return '';
+        return `<aside class="catalog-filter-panel" aria-label="Ürün filtreleri">
+            <div class="catalog-filter-head"><h2>Filtreler</h2><button type="button" data-filter-reset>Temizle</button></div>
+            <form id="catalog-attribute-filters">
+                ${filters.map((filter) => {
+                    if (['number', 'range'].includes(filter.type)) {
+                        return `<fieldset class="catalog-filter-group" data-filter-code="${escapeHtml(filter.code)}" data-filter-type="${escapeHtml(filter.type)}">
+                            <legend>${escapeHtml(filter.name)}${filter.unit ? ` (${escapeHtml(filter.unit)})` : ''}</legend>
+                            <div class="catalog-filter-range">
+                                <input type="number" step="any" data-filter-min placeholder="Min ${escapeHtml(filter.min ?? '')}">
+                                <input type="number" step="any" data-filter-max placeholder="Max ${escapeHtml(filter.max ?? '')}">
+                            </div>
+                        </fieldset>`;
+                    }
+                    if (filter.type === 'boolean') {
+                        return `<fieldset class="catalog-filter-group" data-filter-code="${escapeHtml(filter.code)}" data-filter-type="boolean">
+                            <legend>${escapeHtml(filter.name)}</legend>
+                            <select data-filter-boolean><option value="">Tümü</option>
+                                ${(filter.options || []).map((option) => `<option value="${option.value ? 'true' : 'false'}">${escapeHtml(option.label)}</option>`).join('')}
+                            </select>
+                        </fieldset>`;
+                    }
+                    return `<fieldset class="catalog-filter-group" data-filter-code="${escapeHtml(filter.code)}" data-filter-type="${escapeHtml(filter.type)}">
+                        <legend>${escapeHtml(filter.name)}</legend>
+                        ${(filter.options || []).map((option) => `<label>
+                            <input type="checkbox" value="${escapeHtml(option.value ?? option.id)}">
+                            <span>${escapeHtml(option.label)}</span>
+                        </label>`).join('')}
+                    </fieldset>`;
+                }).join('')}
+            </form>
+        </aside>`;
+    }
+
+    function collectCategoryFilters(form) {
+        const values = {};
+        if (!form) return values;
+        form.querySelectorAll('[data-filter-code]').forEach((group) => {
+            const code = group.dataset.filterCode;
+            const type = group.dataset.filterType;
+            if (['number', 'range'].includes(type)) {
+                const min = group.querySelector('[data-filter-min]').value;
+                const max = group.querySelector('[data-filter-max]').value;
+                if (min !== '' || max !== '') values[code] = { min, max };
+            } else if (type === 'boolean') {
+                const selected = group.querySelector('[data-filter-boolean]').value;
+                if (selected !== '') values[code] = selected === 'true';
+            } else {
+                const selected = [...group.querySelectorAll('input:checked')].map((input) => input.value);
+                if (selected.length) values[code] = selected;
+            }
+        });
+        return values;
+    }
+
+    function bindCategoryFilters(container, category) {
+        const form = container.querySelector('#catalog-attribute-filters');
+        if (!form) return;
+        const refresh = async () => {
+            const filters = collectCategoryFilters(form);
+            const current = container.querySelector('.catalog-page-products, .catalog-empty-state');
+            if (current) current.classList.add('is-loading');
+            try {
+                const url = `/api/products?categorySlug=${encodeURIComponent(category.slug)}&attributes=${encodeURIComponent(JSON.stringify(filters))}`;
+                const response = await fetch(url);
+                const products = await readJson(response, 'Filtrelenmiş ürünler yüklenemedi.');
+                const replacement = document.createElement('div');
+                replacement.innerHTML = renderCategoryProducts(products);
+                const next = replacement.firstElementChild;
+                const target = container.querySelector('.catalog-page-products, .catalog-empty-state');
+                if (target && next) target.replaceWith(next);
+            } catch (error) {
+                const target = container.querySelector('.catalog-page-products, .catalog-empty-state');
+                if (target) target.outerHTML = `<div class="catalog-error-state">${escapeHtml(error.message || 'Filtre uygulanamadı.')}</div>`;
+            }
+        };
+        form.addEventListener('change', refresh);
+        container.querySelector('[data-filter-reset]')?.addEventListener('click', () => {
+            form.reset();
+            refresh();
+        });
+    }
+
     async function loadCategoryPage({ containerId = 'native-categories-list' } = {}) {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -357,7 +441,9 @@
             const detail = await fetchCategoryDetail(resolution.category.slug);
             const category = detail.category;
             const productsResponse = await fetch(`/api/products?categorySlug=${encodeURIComponent(category.slug)}`);
+            const filtersResponse = await fetch(`/api/public/categories/${encodeURIComponent(category.slug)}/filters`);
             const products = await readJson(productsResponse, 'Kategori ürünleri yüklenemedi.');
+            const filterPayload = await readJson(filtersResponse, 'Kategori filtreleri yüklenemedi.');
             const banner = safeUrl(category.banner_url || category.image_url);
             const accentColor = safeAccentColor(category.accent_color);
             updateCategoryMetadata(category);
@@ -368,7 +454,11 @@
                     <div><h1>${escapeHtml(category.name)}</h1><p>${escapeHtml(category.description || '')}</p></div>
                 </header>
                 ${renderCategoryCards(detail.children)}
-                ${renderCategoryProducts(products)}`;
+                <div class="catalog-category-content">
+                    ${renderCategoryFilters(filterPayload.filters)}
+                    <div class="catalog-category-results">${renderCategoryProducts(products)}</div>
+                </div>`;
+            bindCategoryFilters(container, category);
         } catch (error) {
             const message = error.status === 404
                 ? 'Kategori bulunamadı veya artık yayında değil.'
@@ -420,7 +510,9 @@
             renderNavigationItems,
             renderBreadcrumb,
             renderCategoryCards,
-            renderCategoryProducts
+            renderCategoryProducts,
+            renderCategoryFilters,
+            collectCategoryFilters
         }
     };
 })(window, document);

@@ -7,7 +7,10 @@
         leafIds: new Set(),
         selectedIds: [],
         primaryId: null,
-        legacyWarning: ''
+        legacyWarning: '',
+        attributeDefinitions: [],
+        productAttributeValues: new Map(),
+        attributeLoadToken: 0
     };
 
     function escapeHtml(value) {
@@ -134,8 +137,13 @@
         state.selectedIds = resolution.selectedIds;
         state.primaryId = resolution.primaryId;
         state.legacyWarning = resolution.warnings.join(' ');
+        state.productAttributeValues = new Map(
+            (Array.isArray(product.attributes) ? product.attributes : [])
+                .map((attribute) => [String(attribute.code), attribute.value])
+        );
         setError('');
         render();
+        refreshAttributeFields();
         return resolution;
     }
 
@@ -143,8 +151,12 @@
         state.selectedIds = [];
         state.primaryId = null;
         state.legacyWarning = '';
+        state.attributeDefinitions = [];
+        state.productAttributeValues = new Map();
         setError('');
+        setText('product-attributes-error', '');
         render();
+        renderAttributeFields();
     }
 
     function selectCategory(rawId) {
@@ -163,6 +175,7 @@
         if (!state.selectedIds.includes(id)) state.selectedIds.push(id);
         if (!state.primaryId) state.primaryId = id;
         render();
+        refreshAttributeFields();
         return true;
     }
 
@@ -171,6 +184,7 @@
         state.selectedIds = state.selectedIds.filter((item) => item !== id);
         if (state.primaryId === id) state.primaryId = state.selectedIds[0] || null;
         render();
+        refreshAttributeFields();
     }
 
     function setPrimary(rawId) {
@@ -251,6 +265,122 @@
         setText('product-category-warning', state.legacyWarning);
     }
 
+    function attributeValue(code) {
+        return state.productAttributeValues.get(String(code));
+    }
+
+    function renderAttributeInput(definition) {
+        const code = definition.code;
+        const value = attributeValue(code);
+        const required = definition.effective_required ? ' <strong aria-label="zorunlu">*</strong>' : '';
+        const unit = definition.unit ? ` <small>${escapeHtml(definition.unit)}</small>` : '';
+        let input = '';
+        if (definition.type === 'text') {
+            input = `<input class="form-control" data-attribute-code="${code}" data-attribute-type="text" value="${escapeHtml(value ?? '')}">`;
+        } else if (definition.type === 'number') {
+            input = `<input type="number" step="any" class="form-control" data-attribute-code="${code}" data-attribute-type="number" value="${escapeHtml(value ?? '')}">`;
+        } else if (definition.type === 'boolean') {
+            input = `<select class="form-control" data-attribute-code="${code}" data-attribute-type="boolean">
+                <option value="">Seçin</option><option value="true"${value === true ? ' selected' : ''}>Evet</option>
+                <option value="false"${value === false ? ' selected' : ''}>Hayır</option></select>`;
+        } else if (definition.type === 'option') {
+            const selectedId = Number(value?.id ?? value);
+            input = `<select class="form-control" data-attribute-code="${code}" data-attribute-type="option">
+                <option value="">Seçin</option>${(definition.options || []).map((option) =>
+                    `<option value="${Number(option.id)}"${selectedId === Number(option.id) ? ' selected' : ''}>${escapeHtml(option.label)}</option>`
+                ).join('')}</select>`;
+        } else if (definition.type === 'multi_option') {
+            const selectedIds = new Set((Array.isArray(value) ? value : []).map((item) => Number(item?.id ?? item)));
+            input = `<div class="category-toggle-grid" data-attribute-code="${code}" data-attribute-type="multi_option">
+                ${(definition.options || []).map((option) => `<label class="category-toggle">
+                    <input type="checkbox" value="${Number(option.id)}"${selectedIds.has(Number(option.id)) ? ' checked' : ''}>
+                    ${escapeHtml(option.label)}
+                </label>`).join('') || '<small>Aktif option bulunmuyor.</small>'}
+            </div>`;
+        } else if (definition.type === 'range') {
+            input = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" data-attribute-code="${code}" data-attribute-type="range">
+                <input type="number" step="any" class="form-control" data-range-part="min" placeholder="Min" value="${escapeHtml(value?.min ?? '')}">
+                <input type="number" step="any" class="form-control" data-range-part="max" placeholder="Max" value="${escapeHtml(value?.max ?? '')}">
+            </div>`;
+        }
+        return `<div class="form-group"><label>${escapeHtml(definition.name)}${required}${unit}</label>${input}</div>`;
+    }
+
+    function renderAttributeFields() {
+        const container = document.getElementById('product-attributes-fields');
+        if (!container) return;
+        if (!state.selectedIds.length) {
+            container.innerHTML = '<p class="catalog-admin-empty">Özellik alanları seçilen leaf kategorilere göre yüklenir.</p>';
+            return;
+        }
+        if (!state.attributeDefinitions.length) {
+            container.innerHTML = '<p class="catalog-admin-empty">Seçilen kategoriler için aktif attribute template bulunmuyor.</p>';
+            return;
+        }
+        container.innerHTML = `<div class="catalog-admin-form">${state.attributeDefinitions.map(renderAttributeInput).join('')}</div>`;
+    }
+
+    async function refreshAttributeFields() {
+        const container = document.getElementById('product-attributes-fields');
+        if (!container) return;
+        const token = ++state.attributeLoadToken;
+        setText('product-attributes-error', '');
+        if (!state.selectedIds.length) {
+            state.attributeDefinitions = [];
+            renderAttributeFields();
+            return;
+        }
+        container.innerHTML = '<p class="catalog-admin-empty">Kategori özellikleri yükleniyor…</p>';
+        try {
+            const response = await adminApiFetch(
+                `/api/admin/attribute-templates/resolve?categoryIds=${encodeURIComponent(JSON.stringify(state.selectedIds))}`
+            );
+            const payload = await adminReadJson(response, 'Kategori özellikleri yüklenemedi.');
+            if (token !== state.attributeLoadToken) return;
+            state.attributeDefinitions = Array.isArray(payload.attributes) ? payload.attributes : [];
+            renderAttributeFields();
+        } catch (error) {
+            if (token !== state.attributeLoadToken) return;
+            state.attributeDefinitions = [];
+            renderAttributeFields();
+            setText('product-attributes-error', error.message || 'Kategori özellikleri yüklenemedi.');
+        }
+    }
+
+    function getAttributeSubmission(publicationStatus) {
+        const values = {};
+        for (const definition of state.attributeDefinitions) {
+            const code = definition.code;
+            const element = document.querySelector(`[data-attribute-code="${code}"]`);
+            let value = null;
+            if (!element) continue;
+            if (definition.type === 'multi_option') {
+                value = [...element.querySelectorAll('input:checked')].map((input) => Number(input.value));
+            } else if (definition.type === 'range') {
+                const min = element.querySelector('[data-range-part="min"]').value;
+                const max = element.querySelector('[data-range-part="max"]').value;
+                value = min === '' && max === '' ? null : { min, max };
+            } else if (definition.type === 'boolean') {
+                value = element.value === '' ? null : element.value === 'true';
+            } else if (definition.type === 'number') {
+                value = element.value === '' ? null : Number(element.value);
+            } else if (definition.type === 'option') {
+                value = element.value === '' ? null : Number(element.value);
+            } else {
+                value = element.value.trim() || null;
+            }
+            const empty = value === null || value === '' || (Array.isArray(value) && value.length === 0);
+            if (String(publicationStatus).toLowerCase() === 'active' && definition.effective_required && empty) {
+                const message = `Aktif ürün için ${definition.name} zorunludur.`;
+                setText('product-attributes-error', message);
+                throw new Error(message);
+            }
+            values[code] = value;
+        }
+        setText('product-attributes-error', '');
+        return values;
+    }
+
     function getSubmission(publicationStatus) {
         const status = String(publicationStatus || 'active').trim().toLowerCase();
         if (state.selectedIds.length === 0) {
@@ -308,6 +438,8 @@
         removeCategory,
         setPrimary,
         getSubmission,
+        getAttributeSubmission,
+        refreshAttributeFields,
         renderProductBadges,
         _test: {
             escapeHtml,
