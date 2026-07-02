@@ -91,6 +91,7 @@ const createPaymentState = (overrides = {}) => ({
     couponDecrements: 0,
     orderEvents: 0,
     paymentSuccessEvents: 0,
+    orderItemWrites: 0,
     paymentFailedEvents: 0,
     paymentPaidUpdates: 0,
     paymentFailedUpdates: 0,
@@ -193,6 +194,11 @@ const createFakeClient = (state) => ({
             if (params[1] === 'PAYMENT_SUCCESS') state.paymentSuccessEvents += 1;
             if (params[1] === 'PAYMENT_FAILED') state.paymentFailedEvents += 1;
             return { rows: [] };
+        }
+
+        if (/INSERT INTO order_items/i.test(sql)) {
+            state.orderItemWrites += 1;
+            return { rows: [{ id: 1 }], rowCount: 1 };
         }
 
         if (/UPDATE webhook_events SET processed = TRUE/i.test(sql)) {
@@ -305,6 +311,7 @@ const assertNoAnyFinalizationSideEffects = (state) => {
     assert.strictEqual(state.orderPaidUpdates, 0);
     assert.strictEqual(state.orderFailedUpdates, 0);
     assert.strictEqual(state.notificationInserts, 0);
+    assert.strictEqual(state.orderItemWrites, 0);
 };
 
 const assertNoSecrets = (response, state) => {
@@ -368,6 +375,7 @@ const assertNoSecrets = (response, state) => {
             assert.strictEqual(successState.notificationInserts, 2);
             assert.strictEqual(successState.successNotificationInserts, 2);
             assert.strictEqual(successState.paymentSuccessEvents, 1);
+            assert.strictEqual(successState.orderItemWrites, 1);
         });
 
         const duplicateSuccessState = createPaymentState({ webhookProcessed: true });

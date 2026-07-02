@@ -14,7 +14,13 @@ const {
     buildPaytrTokenPayload,
     verifyPaytrCallbackHash
 } = require('../services/paytrPaymentService');
-const { createPendingPaymentOrder, reserveStock, restockItems, appendOrderEvent } = require('../services/orderService');
+const {
+    createPendingPaymentOrder,
+    reserveStock,
+    restockItems,
+    appendOrderEvent,
+    syncOrderItemsForOrder
+} = require('../services/orderService');
 const { PAYMENT_STATUS, ORDER_STATUS, REFUND_STATUS } = require('../constants/orderStatus');
 
 const readIdempotencyKey = (req) => {
@@ -278,6 +284,8 @@ const finalizePaytrSuccess = async (payload) => {
              WHERE id = $3`,
             [PAYMENT_STATUS.PAID, ORDER_STATUS.HAZIRLANIYOR, payment.order_id]
         );
+
+        await syncOrderItemsForOrder(client, payment.order_id, parsedItems);
 
         await appendOrderEvent(client, payment.order_id, 'PAYMENT_SUCCESS', 'Ödeme başarılı.', {
             provider: 'paytr',
@@ -874,6 +882,8 @@ const webhookIyzico = async (req, res) => {
                  WHERE id = $3`,
                 [PAYMENT_STATUS.PAID, ORDER_STATUS.HAZIRLANIYOR, payment.order_id]
             );
+
+            await syncOrderItemsForOrder(client, payment.order_id, parsedItems);
 
             await appendOrderEvent(client, payment.order_id, 'PAYMENT_SUCCESS', '\u00D6deme ba\u015Far\u0131l\u0131.', {
                 provider: 'iyzico',

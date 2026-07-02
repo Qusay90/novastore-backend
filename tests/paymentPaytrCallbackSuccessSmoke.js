@@ -87,6 +87,7 @@ const createPaymentState = (overrides = {}) => ({
     stockUpdates: 0,
     couponUpdates: 0,
     orderEvents: 0,
+    orderItemWrites: 0,
     paymentPaidUpdates: 0,
     orderPaidUpdates: 0,
     webhookProcessedUpdates: 0,
@@ -162,6 +163,11 @@ const createFakeClient = (state) => ({
         if (/INSERT INTO order_events/i.test(sql)) {
             state.orderEvents += 1;
             return { rows: [] };
+        }
+
+        if (/INSERT INTO order_items/i.test(sql)) {
+            state.orderItemWrites += 1;
+            return { rows: [{ id: 1 }], rowCount: 1 };
         }
 
         if (/UPDATE webhook_events SET processed = TRUE/i.test(sql)) {
@@ -251,6 +257,7 @@ const assertNoSideEffects = (state) => {
     assert.strictEqual(state.stockUpdates, 0);
     assert.strictEqual(state.couponUpdates, 0);
     assert.strictEqual(state.orderEvents, 0);
+    assert.strictEqual(state.orderItemWrites, 0);
     assert.strictEqual(state.paymentPaidUpdates, 0);
     assert.strictEqual(state.orderPaidUpdates, 0);
     assert.strictEqual(state.notificationInserts, 0);
@@ -277,6 +284,7 @@ const assertNoSideEffects = (state) => {
             assert.strictEqual(successState.stockUpdates, 1);
             assert.strictEqual(successState.couponUpdates, 1);
             assert.strictEqual(successState.orderEvents, 1);
+            assert.strictEqual(successState.orderItemWrites, 1);
             assert.strictEqual(successState.notificationInserts, 2);
             assert.strictEqual(successState.webhookProcessed, true);
             assert.strictEqual(response.text.includes('merchant-key-secret'), false);

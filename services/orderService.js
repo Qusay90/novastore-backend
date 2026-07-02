@@ -69,6 +69,140 @@ const parseItems = (orderRow) => {
     }
 };
 
+const normalizeOrderItemSnapshots = (items) => {
+    if (!Array.isArray(items)) {
+        return { snapshots: [], invalidCount: 1 };
+    }
+
+    const snapshots = [];
+    let invalidCount = 0;
+    items.forEach((item, index) => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            invalidCount += 1;
+            return;
+        }
+        const productId = Number(item.id ?? item.product_id ?? item.productId);
+        const quantity = Number(item.quantity);
+        const unitPrice = Number(item.price ?? item.unit_price ?? item.unitPrice ?? 0);
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+            invalidCount += 1;
+            return;
+        }
+        snapshots.push({
+            source_item_index: index,
+            product_id: Number.isInteger(productId) && productId > 0 ? productId : null,
+            product_name: String(item.name || item.product_name || 'Legacy product').trim().slice(0, 255) ||
+                'Legacy product',
+            quantity,
+            unit_price: Number.isFinite(unitPrice) && unitPrice >= 0 ? round2(unitPrice) : 0
+        });
+    });
+    return { snapshots, invalidCount };
+};
+
+const syncOrderItemsForOrder = async (client, orderId, items, { issueReason = 'live_sync_unreadable' } = {}) => {
+    const parsedOrderId = Number(orderId);
+    if (!Number.isInteger(parsedOrderId) || parsedOrderId <= 0) {
+        throw new Error('Order item sync için geçerli order id zorunludur.');
+    }
+    const { snapshots, invalidCount } = normalizeOrderItemSnapshots(items);
+    let syncedCount = 0;
+
+    if (snapshots.length > 0) {
+        const result = await client.query(`
+            INSERT INTO order_items (
+                order_id,
+                product_id,
+                product_name,
+                quantity,
+                unit_price,
+                total_price,
+                source_item_index,
+                created_at
+            )
+            SELECT
+                customer_order.id,
+                product.id,
+                snapshot.product_name,
+                snapshot.quantity,
+                snapshot.unit_price,
+                snapshot.quantity * snapshot.unit_price,
+                snapshot.source_item_index,
+                COALESCE(customer_order.created_at, CURRENT_TIMESTAMP)
+            FROM jsonb_to_recordset($2::jsonb) AS snapshot(
+                source_item_index INTEGER,
+                product_id INTEGER,
+                product_name TEXT,
+                quantity INTEGER,
+                unit_price NUMERIC
+            )
+            JOIN orders customer_order ON customer_order.id = $1
+            LEFT JOIN products product ON product.id = snapshot.product_id
+            ON CONFLICT (order_id, source_item_index) DO UPDATE
+            SET product_id = EXCLUDED.product_id,
+                product_name = EXCLUDED.product_name,
+                quantity = EXCLUDED.quantity,
+                unit_price = EXCLUDED.unit_price,
+                total_price = EXCLUDED.total_price
+            RETURNING id
+        `, [parsedOrderId, JSON.stringify(snapshots)]);
+        syncedCount = result.rowCount ?? result.rows.length;
+    }
+
+    if (invalidCount > 0) {
+        await client.query(`
+            INSERT INTO order_item_backfill_issues (order_id, reason, source_items)
+            VALUES ($1, $2, $3::jsonb)
+            ON CONFLICT (order_id) DO UPDATE
+            SET reason = EXCLUDED.reason,
+                source_items = EXCLUDED.source_items,
+                recorded_at = CURRENT_TIMESTAMP
+        `, [parsedOrderId, issueReason, JSON.stringify(items ?? null)]);
+    }
+
+    return {
+        order_id: parsedOrderId,
+        source_count: Array.isArray(items) ? items.length : 0,
+        synced_count: syncedCount,
+        invalid_count: invalidCount
+    };
+};
+
+const reconcileOrderItemsForOrder = async (client, orderId) => {
+    const parsedOrderId = Number(orderId);
+    if (!Number.isInteger(parsedOrderId) || parsedOrderId <= 0) {
+        throw new Error('Reconciliation için geçerli order id zorunludur.');
+    }
+    const orderResult = await client.query(`
+        SELECT id, items, payment_status, status
+        FROM orders
+        WHERE id = $1
+        FOR UPDATE
+    `, [parsedOrderId]);
+    if (orderResult.rows.length === 0) {
+        const error = new Error('Reconciliation siparişi bulunamadı.');
+        error.statusCode = 404;
+        throw error;
+    }
+    const order = orderResult.rows[0];
+    if (order.payment_status !== PAYMENT_STATUS.PAID) {
+        return {
+            order_id: parsedOrderId,
+            reconciled: false,
+            reason: 'order_not_paid',
+            synced_count: 0,
+            invalid_count: 0
+        };
+    }
+    const result = await syncOrderItemsForOrder(client, parsedOrderId, parseItems(order), {
+        issueReason: 'reconciliation_unreadable'
+    });
+    return {
+        ...result,
+        reconciled: true
+    };
+};
+
 const createOrderWithReservation = async ({
     client = pool,
     userId = null,
@@ -252,6 +386,9 @@ const updateOrderStatus = async ({ client = pool, orderId, status, shipmentStatu
 module.exports = {
     appendOrderEvent,
     parseItems,
+    normalizeOrderItemSnapshots,
+    syncOrderItemsForOrder,
+    reconcileOrderItemsForOrder,
     reserveStock,
     restockItems,
     createPendingPaymentOrder,

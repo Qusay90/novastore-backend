@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 const { slugifyCategoryName } = require('./categoryV2BackfillService');
-const { ORDER_STATUS } = require('../constants/orderStatus');
+const { ORDER_STATUS, PAYMENT_STATUS } = require('../constants/orderStatus');
 
 const COLLECTION_TYPES = new Set(['manual', 'dynamic']);
 const RULE_ALIASES = new Map([
@@ -370,6 +370,7 @@ const getCollectionProductSource = (collection) => {
                 FROM order_items order_item
                 JOIN orders customer_order ON customer_order.id = order_item.order_id
                 WHERE customer_order.status = $4
+                  AND customer_order.payment_status = $5
                   AND customer_order.created_at >= CURRENT_TIMESTAMP - INTERVAL '30 days'
                   AND order_item.product_id IS NOT NULL
                 GROUP BY order_item.product_id
@@ -393,7 +394,13 @@ const queryPublicCollectionProducts = async (
     const parsedLimit = Math.min(asInteger(limit, 'limit', { min: 1 }), 100);
     const offset = (parsedPage - 1) * parsedLimit;
     const source = getCollectionProductSource(collection);
-    const params = [collection.id, parsedLimit, offset, ORDER_STATUS.TESLIM_EDILDI];
+    const params = [
+        collection.id,
+        parsedLimit,
+        offset,
+        ORDER_STATUS.TESLIM_EDILDI,
+        PAYMENT_STATUS.PAID
+    ];
     const commonWhere = `
         p.publication_status = 'active'
         AND p.is_customer_visible = TRUE
@@ -407,7 +414,8 @@ const queryPublicCollectionProducts = async (
                 $1::BIGINT AS collection_id,
                 $2::INTEGER AS page_limit,
                 $3::INTEGER AS page_offset,
-                $4::TEXT AS completed_status
+                $4::TEXT AS completed_status,
+                $5::TEXT AS paid_status
         ) query_input
         ${source.joins}
         WHERE ${commonWhere}
@@ -431,7 +439,8 @@ const queryPublicCollectionProducts = async (
                 $1::BIGINT AS collection_id,
                 $2::INTEGER AS page_limit,
                 $3::INTEGER AS page_offset,
-                $4::TEXT AS completed_status
+                $4::TEXT AS completed_status,
+                $5::TEXT AS paid_status
         ) query_input
         ${source.joins}
         WHERE ${commonWhere}
@@ -516,6 +525,7 @@ const listPublicCollections = async ({ queryable = pool } = {}) => {
                       AND product.is_customer_visible = TRUE
                       AND product.deleted_at IS NULL
                       AND customer_order.status = $1
+                      AND customer_order.payment_status = $2
                       AND customer_order.created_at >= CURRENT_TIMESTAMP - INTERVAL '30 days'
                 )
                 ELSE 0
@@ -524,7 +534,7 @@ const listPublicCollections = async ({ queryable = pool } = {}) => {
         WHERE collection.is_active = TRUE
           AND collection.deleted_at IS NULL
         ORDER BY collection.sort_order ASC, collection.name ASC, collection.id ASC
-    `, [ORDER_STATUS.TESLIM_EDILDI]);
+    `, [ORDER_STATUS.TESLIM_EDILDI, PAYMENT_STATUS.PAID]);
     return result.rows
         .map(normalizeCollection)
         .filter((collection) => collection.visible_product_count > 0)

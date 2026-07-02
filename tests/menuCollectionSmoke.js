@@ -4,10 +4,12 @@ const { spawn } = require('child_process');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const createCoreSchema = require('../models/createCoreDb');
+const createCommerceSchema = require('../models/createCommerceDb');
+const createNotificationsTable = require('../models/createNotificationDb');
 const { applyMenuCollectionSchema } = require('../models/menuCollectionSchema');
 const { recalculateAllCategoryStats } = require('../services/categoryStatsService');
 const { resolveStartupSafety } = require('../config/startupSafety');
-const { ORDER_STATUS } = require('../constants/orderStatus');
+const { ORDER_STATUS, PAYMENT_STATUS } = require('../constants/orderStatus');
 
 const root = path.join(__dirname, '..');
 const port = 5199;
@@ -54,6 +56,8 @@ const request = async (pathname, {
 
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await createCoreSchema();
+    await createNotificationsTable();
+    await createCommerceSchema();
 
     const categoryResult = await pool.query(`
         INSERT INTO categories (
@@ -97,10 +101,10 @@ const request = async (pathname, {
     await recalculateAllCategoryStats(pool);
 
     const orderResult = await pool.query(`
-        INSERT INTO orders (total_amount, status, items, created_at)
+        INSERT INTO orders (total_amount, status, items, payment_status, created_at)
         VALUES
-            (300, $1, $2::jsonb, CURRENT_TIMESTAMP),
-            (0, $1, $3::jsonb, CURRENT_TIMESTAMP)
+            (300, $1, $2::jsonb, $4, CURRENT_TIMESTAMP),
+            (0, $1, $3::jsonb, $4, CURRENT_TIMESTAMP)
         RETURNING id
     `, [
         ORDER_STATUS.TESLIM_EDILDI,
@@ -113,7 +117,8 @@ const request = async (pathname, {
             },
             'okunamayan'
         ]),
-        JSON.stringify({ invalid: true })
+        JSON.stringify({ invalid: true }),
+        PAYMENT_STATUS.PAID
     ]);
 
     await applyMenuCollectionSchema(pool);

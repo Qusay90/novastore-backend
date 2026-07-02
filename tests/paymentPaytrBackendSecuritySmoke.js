@@ -213,6 +213,7 @@ const createCallbackState = (overrides = {}) => ({
     orderEvents: 0,
     paymentSuccessEvents: 0,
     paymentFailedEvents: 0,
+    orderItemWrites: 0,
     paymentPaidUpdates: 0,
     paymentFailedUpdates: 0,
     orderPaidUpdates: 0,
@@ -310,6 +311,11 @@ const createCallbackClient = (state) => ({
             if (params[1] === 'PAYMENT_SUCCESS') state.paymentSuccessEvents += 1;
             if (params[1] === 'PAYMENT_FAILED') state.paymentFailedEvents += 1;
             return { rows: [] };
+        }
+
+        if (/INSERT INTO order_items/i.test(sql)) {
+            state.orderItemWrites += 1;
+            return { rows: [{ id: 1 }], rowCount: 1 };
         }
 
         if (/UPDATE webhook_events SET processed = TRUE/i.test(sql)) {
@@ -414,6 +420,7 @@ const assertNoFinalization = (state) => {
     assert.strictEqual(state.orderPaidUpdates, 0);
     assert.strictEqual(state.orderFailedUpdates, 0);
     assert.strictEqual(state.cartMutations, 0);
+    assert.strictEqual(state.orderItemWrites, 0);
 };
 
 const callStatus = async ({ row, user = { id: 10 } }) => {
@@ -489,6 +496,7 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
             assert.strictEqual(successState.stockDecrements, 1);
             assert.strictEqual(successState.couponIncrements, 1);
             assert.strictEqual(successState.paymentSuccessEvents, 1);
+            assert.strictEqual(successState.orderItemWrites, 1);
             assert.strictEqual(successState.successNotifications, 2);
             assertNoSecrets(response);
         });
