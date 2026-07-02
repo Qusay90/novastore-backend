@@ -5,6 +5,7 @@ const {
     postCollection,
     patchCollection,
     patchCollectionArchive,
+    getCollectionProducts,
     postCollectionProduct,
     deleteCollectionProduct
 } = require('../controllers/adminCollectionController');
@@ -15,6 +16,7 @@ router.get('/collections', getCollections);
 router.post('/collections', postCollection);
 router.patch('/collections/:id', patchCollection);
 router.patch('/collections/:id/archive', patchCollectionArchive);
+router.get('/collections/:id/products', getCollectionProducts);
 router.post('/collections/:id/products', postCollectionProduct);
 router.delete('/collections/:id/products/:productId', deleteCollectionProduct);
 

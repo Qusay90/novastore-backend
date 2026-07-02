@@ -69,6 +69,17 @@ const waitForServer = () => new Promise((resolve, reject) => {
          VALUES ($1, 'eski-rota', 'eski-rota', 'legacy_slug', 301)`,
         [categoryId]
     );
+    const collectionResult = await pool.query(`
+        INSERT INTO collections (
+            name, slug, collection_type, is_active, show_on_home
+        )
+        VALUES ('Temiz Vitrin', 'temiz-vitrin', 'manual', TRUE, TRUE)
+        RETURNING id
+    `);
+    await pool.query(`
+        INSERT INTO collection_products (collection_id, product_id, sort_order)
+        VALUES ($1, $2, 0)
+    `, [collectionResult.rows[0].id, productResult.rows[0].id]);
     await recalculateAllCategoryStats(pool);
 
     child = spawn(process.execPath, ['server.js'], {
@@ -110,6 +121,14 @@ const waitForServer = () => new Promise((resolve, reject) => {
     const missing = await fetch(`${base}/kategori/bulunamayan`, { redirect: 'manual' });
     assert.strictEqual(missing.status, 404);
     assert.match(await missing.text(), /native-categories-list/);
+
+    const collection = await fetch(`${base}/koleksiyon/temiz-vitrin`, { redirect: 'manual' });
+    assert.strictEqual(collection.status, 200);
+    assert.match(await collection.text(), /collection-page-content/);
+
+    const missingCollection = await fetch(`${base}/koleksiyon/bulunamayan`, { redirect: 'manual' });
+    assert.strictEqual(missingCollection.status, 404);
+    assert.match(await missingCollection.text(), /collection-page-content/);
 
     console.log('web category routing smoke passed');
 })().catch((error) => {

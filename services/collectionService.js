@@ -82,6 +82,7 @@ const normalizeCollectionInput = (body = {}, existing = null) => {
         seo_title: cleanText(body.seo_title ?? body.seoTitle ?? existing?.seo_title, 180),
         seo_description: cleanText(body.seo_description ?? body.seoDescription ?? existing?.seo_description, 5000),
         sort_order: asInteger(body.sort_order ?? body.sortOrder ?? existing?.sort_order ?? 0, 'sort_order'),
+        show_on_home: body.show_on_home ?? body.showOnHome ?? existing?.show_on_home ?? false,
         is_active: body.is_active ?? body.isActive ?? existing?.is_active ?? true
     };
 };
@@ -137,9 +138,9 @@ const createCollection = async (body, { queryable = pool } = {}) => {
             INSERT INTO collections (
                 name, slug, collection_type, rule_code, description,
                 image_url, banner_url, accent_color, seo_title, seo_description,
-                sort_order, is_active
+                sort_order, show_on_home, is_active
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
         `, [
             input.name,
@@ -153,6 +154,7 @@ const createCollection = async (body, { queryable = pool } = {}) => {
             input.seo_title,
             input.seo_description,
             input.sort_order,
+            Boolean(input.show_on_home),
             Boolean(input.is_active)
         ]);
         const collection = normalizeCollection(result.rows[0]);
@@ -200,9 +202,10 @@ const updateCollection = async (id, body, { queryable = pool } = {}) => {
                 seo_title = $9,
                 seo_description = $10,
                 sort_order = $11,
-                is_active = $12,
+                show_on_home = $12,
+                is_active = $13,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = $13
+            WHERE id = $14
             RETURNING *
         `, [
             input.name,
@@ -216,6 +219,7 @@ const updateCollection = async (id, body, { queryable = pool } = {}) => {
             input.seo_title,
             input.seo_description,
             input.sort_order,
+            Boolean(input.show_on_home),
             Boolean(input.is_active),
             existing.id
         ]);
@@ -317,6 +321,35 @@ const removeManualCollectionProduct = async (
         });
     }
     return { removed: true, product_id: parsedProductId };
+};
+
+const listAdminCollectionProducts = async (collectionId, { queryable = pool } = {}) => {
+    const collection = await assertManualCollection(collectionId, queryable);
+    const result = await queryable.query(`
+        SELECT
+            product.id,
+            product.name,
+            product.price,
+            product.old_price,
+            product.stock,
+            product.image_url,
+            product.publication_status,
+            product.is_customer_visible,
+            product.deleted_at,
+            collection_product.sort_order
+        FROM collection_products collection_product
+        JOIN products product ON product.id = collection_product.product_id
+        WHERE collection_product.collection_id = $1
+        ORDER BY collection_product.sort_order ASC, product.name ASC, product.id ASC
+    `, [collection.id]);
+    return result.rows.map((row) => ({
+        ...row,
+        id: Number(row.id),
+        price: Number(row.price),
+        old_price: row.old_price === null ? null : Number(row.old_price),
+        stock: Number(row.stock || 0),
+        sort_order: Number(row.sort_order || 0)
+    }));
 };
 
 const getPublicCollectionRow = async (slug, queryable = pool) => {
@@ -482,6 +515,7 @@ const toPublicCollection = (collection, visibleProductCount) => ({
     seo_title: collection.seo_title,
     seo_description: collection.seo_description,
     sort_order: collection.sort_order,
+    show_on_home: collection.show_on_home === true,
     visible_product_count: Number(visibleProductCount || 0)
 });
 
@@ -573,6 +607,7 @@ module.exports = {
     archiveCollection,
     addManualCollectionProduct,
     removeManualCollectionProduct,
+    listAdminCollectionProducts,
     listPublicCollections,
     getPublicCollection,
     queryPublicCollectionProducts

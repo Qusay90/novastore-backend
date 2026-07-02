@@ -187,7 +187,8 @@ const request = async (pathname, {
     const showcase = await createCollection({
         name: 'Vitrin',
         slug: 'vitrin',
-        collection_type: 'manual'
+        collection_type: 'manual',
+        show_on_home: true
     });
     const emptyCollection = await createCollection({
         name: 'Boş Koleksiyon',
@@ -255,6 +256,11 @@ const request = async (pathname, {
     const adminCollections = await request('/api/admin/collections', { token: adminToken });
     assert.strictEqual(adminCollections.response.status, 200);
     assert(adminCollections.payload.some((collection) => collection.slug === 'vitrin'));
+    const adminCollectionProducts = await request(`/api/admin/collections/${showcase.id}/products`, {
+        token: adminToken
+    });
+    assert.strictEqual(adminCollectionProducts.response.status, 200);
+    assert.strictEqual(adminCollectionProducts.payload.length, 2);
 
     const createItem = async (body) => {
         const result = await request('/api/admin/menu-items', {
@@ -359,6 +365,10 @@ const request = async (pathname, {
     assert(publicSlugs.includes('cok-satanlar'));
     assert(!publicSlugs.includes('bos-koleksiyon'));
     assert(!publicSlugs.includes('pasif-koleksiyon'));
+    assert.strictEqual(
+        publicCollections.payload.find((collection) => collection.slug === 'vitrin').show_on_home,
+        true
+    );
 
     const showcasePageOne = await request('/api/public/collections/vitrin?page=1&limit=1');
     assert.strictEqual(showcasePageOne.response.status, 200);

@@ -4,7 +4,8 @@ const {
     updateCollection,
     archiveCollection,
     addManualCollectionProduct,
-    removeManualCollectionProduct
+    removeManualCollectionProduct,
+    listAdminCollectionProducts
 } = require('../services/collectionService');
 
 const sendError = (res, error, fallback) => {
@@ -67,6 +68,14 @@ const postCollectionProduct = async (req, res) => {
     }
 };
 
+const getCollectionProducts = async (req, res) => {
+    try {
+        return res.status(200).json(await listAdminCollectionProducts(req.params.id));
+    } catch (error) {
+        return sendError(res, error, 'Koleksiyon ürünleri yüklenemedi.');
+    }
+};
+
 const deleteCollectionProduct = async (req, res) => {
     try {
         return res.status(200).json(await removeManualCollectionProduct(
@@ -83,6 +92,7 @@ module.exports = {
     postCollection,
     patchCollection,
     patchCollectionArchive,
+    getCollectionProducts,
     postCollectionProduct,
     deleteCollectionProduct
 };

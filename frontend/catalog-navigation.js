@@ -2,6 +2,7 @@
     'use strict';
 
     let categoryTreePromise = null;
+    let publicNavigationPromise = null;
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -103,6 +104,18 @@
         return categoryTreePromise;
     }
 
+    async function fetchPublicNavigation(code = 'main', { force = false } = {}) {
+        if (force || !publicNavigationPromise) {
+            publicNavigationPromise = fetch(`/api/public/navigation/${encodeURIComponent(code)}`)
+                .then((response) => readJson(response, 'Navigasyon yüklenemedi.'))
+                .catch((error) => {
+                    publicNavigationPromise = null;
+                    throw error;
+                });
+        }
+        return publicNavigationPromise;
+    }
+
     function renderTreeItems(categories, level = 0) {
         return (Array.isArray(categories) ? categories : []).map((category) => {
             const children = Array.isArray(category.children) ? category.children : [];
@@ -122,6 +135,35 @@
                             </button>` : ''}
                     </div>
                     ${hasChildren ? `<ul class="catalog-nav-children">${renderTreeItems(children, level + 1)}</ul>` : ''}
+                </li>`;
+        }).join('');
+    }
+
+    function navigationItemUrl(item) {
+        const targetUrl = safeUrl(item?.target?.url);
+        return targetUrl && targetUrl.startsWith('/') && !targetUrl.startsWith('//') ? targetUrl : '';
+    }
+
+    function renderNavigationItems(items, level = 0) {
+        return (Array.isArray(items) ? items : []).map((item) => {
+            const children = Array.isArray(item.children) ? item.children : [];
+            const hasChildren = children.length > 0;
+            const url = navigationItemUrl(item);
+            const label = `${escapeHtml(item.icon || '')}<span>${escapeHtml(item.title || '')}</span>`;
+            return `
+                <li class="catalog-nav-item level-${level}${hasChildren ? ' has-children' : ''}">
+                    <div class="catalog-nav-row">
+                        ${url
+                            ? `<a class="catalog-nav-link" href="${escapeHtml(url)}">${label}</a>`
+                            : `<span class="catalog-nav-link catalog-nav-group">${label}</span>`}
+                        ${hasChildren ? `
+                            <button type="button" class="catalog-nav-toggle"
+                                aria-expanded="false"
+                                aria-label="${escapeHtml(item.title || '')} alt menüsünü aç">
+                                <span aria-hidden="true">⌄</span>
+                            </button>` : ''}
+                    </div>
+                    ${hasChildren ? `<ul class="catalog-nav-children">${renderNavigationItems(children, level + 1)}</ul>` : ''}
                 </li>`;
         }).join('');
     }
@@ -161,6 +203,17 @@
         menu.classList.add('catalog-nav-menu');
         menu.innerHTML = '<li class="catalog-nav-loading">Kategoriler yükleniyor…</li>';
         try {
+            let navigation = null;
+            try {
+                navigation = await fetchPublicNavigation('main');
+            } catch (_) {
+                navigation = null;
+            }
+            if (Array.isArray(navigation?.items) && navigation.items.length > 0) {
+                menu.innerHTML = renderNavigationItems(navigation.items);
+                bindMenu(menu);
+                return navigation.items;
+            }
             const tree = await fetchCategoryTree();
             if (!Array.isArray(tree) || tree.length === 0) {
                 menu.innerHTML = '<li class="catalog-nav-fallback"><a href="/categories.html">Kategoriler</a></li>';
@@ -348,6 +401,7 @@
 
     window.NovaStoreCatalogNavigation = {
         mountMenu,
+        fetchPublicNavigation,
         fetchCategoryTree,
         resolveCategoryFromLocation,
         fetchCategoryDetail,
@@ -362,6 +416,8 @@
             updateCategoryMetadata,
             flattenTree,
             renderTreeItems,
+            navigationItemUrl,
+            renderNavigationItems,
             renderBreadcrumb,
             renderCategoryCards,
             renderCategoryProducts

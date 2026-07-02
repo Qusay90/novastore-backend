@@ -9,6 +9,7 @@ const pool = require('./config/db');
 const { getAllowedOrigins } = require('./config/appConfig');
 const { resolveStartupSafety } = require('./config/startupSafety');
 const { getPublicCategoryBySlug } = require('./services/categoryService');
+const { getPublicCollection } = require('./services/collectionService');
 const {
     authenticateSocket,
     autoJoinAllowedRooms,
@@ -121,6 +122,19 @@ app.get(['/kategori/:slug', '/category/:slug'], async (req, res) => {
         if (error.statusCode === 404) return sendCategoryPage(res, 404);
         console.error('Kategori sayfa rotasi hatasi:', error.message);
         return sendCategoryPage(res, 500);
+    }
+});
+
+app.get('/koleksiyon/:slug', async (req, res) => {
+    try {
+        await getPublicCollection(req.params.slug, { page: 1, limit: 1 });
+        return res.sendFile(path.join(__dirname, 'frontend', 'collections.html'));
+    } catch (error) {
+        if (error.statusCode === 404) {
+            return res.status(404).sendFile(path.join(__dirname, 'frontend', 'collections.html'));
+        }
+        console.error('Koleksiyon sayfa rotasi hatasi:', error.message);
+        return res.status(500).sendFile(path.join(__dirname, 'frontend', 'collections.html'));
     }
 });
 
