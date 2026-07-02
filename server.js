@@ -8,6 +8,7 @@ const { simpleRateLimit, sanitizeBody } = require('./middlewares/securityMiddlew
 const pool = require('./config/db');
 const { getAllowedOrigins } = require('./config/appConfig');
 const { resolveStartupSafety } = require('./config/startupSafety');
+const { getPublicCategoryBySlug } = require('./services/categoryService');
 const {
     authenticateSocket,
     autoJoinAllowedRooms,
@@ -92,6 +93,36 @@ app.use(express.static(path.join(__dirname, 'frontend'), {
         }
     }
 }));
+
+const sendCategoryPage = (res, statusCode = 200) => {
+    res.status(statusCode);
+    return res.sendFile(path.join(__dirname, 'frontend', 'categories.html'));
+};
+
+app.get(['/kategori/:slug', '/category/:slug'], async (req, res) => {
+    try {
+        const detail = await getPublicCategoryBySlug(req.params.slug);
+        if (detail.redirect) {
+            return res.redirect(
+                detail.redirect.status,
+                `/kategori/${encodeURIComponent(detail.redirect.canonical_slug)}`
+            );
+        }
+        const canonicalSlug = String(detail.category?.slug || '');
+        const usesAlternatePrefix = req.path.toLocaleLowerCase('tr-TR').startsWith('/category/');
+        if (canonicalSlug && (
+            usesAlternatePrefix ||
+            canonicalSlug !== String(req.params.slug || '').toLocaleLowerCase('tr-TR')
+        )) {
+            return res.redirect(301, `/kategori/${encodeURIComponent(canonicalSlug)}`);
+        }
+        return sendCategoryPage(res);
+    } catch (error) {
+        if (error.statusCode === 404) return sendCategoryPage(res, 404);
+        console.error('Kategori sayfa rotasi hatasi:', error.message);
+        return sendCategoryPage(res, 500);
+    }
+});
 
 // Temel rota
 app.get('/', (req, res) => {

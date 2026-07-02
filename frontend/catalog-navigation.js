@@ -34,7 +34,45 @@
     }
 
     function categoryUrl(category) {
-        return `categories.html?slug=${encodeURIComponent(String(category?.slug || ''))}`;
+        return `/kategori/${encodeURIComponent(String(category?.slug || ''))}`;
+    }
+
+    function categorySlugFromPath(pathname) {
+        const match = String(pathname || '').match(/^\/(?:kategori|category)\/([^/?#]+)\/?$/i);
+        if (!match) return null;
+        try {
+            return decodeURIComponent(match[1]);
+        } catch (_) {
+            return match[1];
+        }
+    }
+
+    function replaceWithCanonicalPath(category, locationLike = window.location) {
+        if (!category?.slug || !window.history?.replaceState) return;
+        const path = categoryUrl(category);
+        if (String(locationLike.pathname || '').toLocaleLowerCase('tr-TR') === path.toLocaleLowerCase('tr-TR') &&
+            !locationLike.search) return;
+        window.history.replaceState({}, '', `${path}${locationLike.hash || ''}`);
+    }
+
+    function updateCategoryMetadata(category) {
+        if (!category?.slug) return;
+        let canonical = document.querySelector('link[rel="canonical"]');
+        if (!canonical) {
+            canonical = document.createElement('link');
+            canonical.rel = 'canonical';
+            document.head.appendChild(canonical);
+        }
+        canonical.href = new URL(categoryUrl(category), window.location.origin).href;
+
+        let description = document.querySelector('meta[name="description"]');
+        if (!description) {
+            description = document.createElement('meta');
+            description.name = 'description';
+            document.head.appendChild(description);
+        }
+        description.content = String(category.seo_description || category.description || '').trim();
+        document.title = `${category.seo_title || category.name} | NovaStore`;
     }
 
     async function readJson(response, fallbackMessage) {
@@ -125,7 +163,7 @@
         try {
             const tree = await fetchCategoryTree();
             if (!Array.isArray(tree) || tree.length === 0) {
-                menu.innerHTML = '<li class="catalog-nav-fallback"><a href="categories.html">Kategoriler</a></li>';
+                menu.innerHTML = '<li class="catalog-nav-fallback"><a href="/categories.html">Kategoriler</a></li>';
                 return [];
             }
             menu.innerHTML = renderTreeItems(tree);
@@ -133,14 +171,15 @@
             return tree;
         } catch (error) {
             console.error('Public kategori navigasyonu yüklenemedi:', error);
-            menu.innerHTML = '<li class="catalog-nav-fallback"><a href="categories.html">Kategorilere göz at</a></li>';
+            menu.innerHTML = '<li class="catalog-nav-fallback"><a href="/categories.html">Kategorilere göz at</a></li>';
             return [];
         }
     }
 
     async function resolveCategoryFromLocation(locationLike = window.location, { replaceHistory = true } = {}) {
         const params = new URLSearchParams(locationLike.search || '');
-        const canonicalSlug = params.get('categorySlug') || params.get('slug');
+        const pathSlug = categorySlugFromPath(locationLike.pathname);
+        const canonicalSlug = pathSlug || params.get('categorySlug') || params.get('slug');
         const legacyName = params.get('category');
         const tree = await fetchCategoryTree();
         const flat = flattenTree(tree);
@@ -150,15 +189,15 @@
                 String(item.slug || '').toLocaleLowerCase('tr-TR') ===
                 String(canonicalSlug).toLocaleLowerCase('tr-TR')
             );
-            if (category) return { category, legacy: false, error: null };
+            if (category) {
+                if (replaceHistory && (!pathSlug || locationLike.pathname?.startsWith('/category/'))) {
+                    replaceWithCanonicalPath(category, locationLike);
+                }
+                return { category, legacy: false, error: null };
+            }
             try {
                 const detail = await fetchCategoryDetail(canonicalSlug);
-                if (replaceHistory && detail.category?.slug && window.history?.replaceState) {
-                    const next = new URL(locationLike.href || window.location.href);
-                    const key = locationLike.pathname?.endsWith('categories.html') ? 'slug' : 'categorySlug';
-                    next.searchParams.set(key, detail.category.slug);
-                    window.history.replaceState({}, '', `${next.pathname}${next.search}${next.hash}`);
-                }
+                if (replaceHistory) replaceWithCanonicalPath(detail.category, locationLike);
                 return { category: detail.category, legacy: true, error: null };
             } catch (_) {
                 return { category: null, legacy: false, error: 'Kategori bulunamadı veya yayında değil.' };
@@ -180,15 +219,7 @@
             };
         }
 
-        if (replaceHistory && window.history?.replaceState) {
-            const next = new URL(locationLike.href || window.location.href);
-            next.searchParams.delete('category');
-            next.searchParams.set(
-                locationLike.pathname?.endsWith('categories.html') ? 'slug' : 'categorySlug',
-                matches[0].slug
-            );
-            window.history.replaceState({}, '', `${next.pathname}${next.search}${next.hash}`);
-        }
+        if (replaceHistory) replaceWithCanonicalPath(matches[0], locationLike);
         return { category: matches[0], legacy: true, error: null };
     }
 
@@ -199,7 +230,7 @@
 
     function renderBreadcrumb(items) {
         return `<nav class="catalog-breadcrumb" aria-label="Kategori yolu">
-            <a href="index.html">Ana Sayfa</a>
+            <a href="/index.html">Ana Sayfa</a>
             ${(Array.isArray(items) ? items : []).map((item, index, all) =>
                 `${index < all.length ? '<span aria-hidden="true">›</span>' : ''}` +
                 `<a href="${escapeHtml(categoryUrl(item))}"${index === all.length - 1 ? ' aria-current="page"' : ''}>` +
@@ -234,7 +265,7 @@
                     const soldOut = Number(product.stock || 0) <= 0;
                     const image = safeUrl(product.image_url, 'https://via.placeholder.com/320?text=NovaStore');
                     return `<article class="catalog-product-card${soldOut ? ' is-sold-out' : ''}">
-                        <a href="product.html?id=${Number(product.id)}">
+                        <a href="/product.html?id=${Number(product.id)}">
                             <div class="catalog-product-image">
                                 <img src="${escapeHtml(image)}" alt="${escapeHtml(product.name)}">
                                 ${soldOut ? '<span class="catalog-sold-out-badge">Tükendi</span>' : ''}
@@ -244,7 +275,7 @@
                         <span class="catalog-product-price">${escapeHtml(product.price)} TL</span>
                         ${soldOut
                             ? '<button type="button" disabled>Satın alınamaz</button>'
-                            : `<a class="catalog-product-action" href="product.html?id=${Number(product.id)}">Ürünü incele</a>`}
+                            : `<a class="catalog-product-action" href="/product.html?id=${Number(product.id)}">Ürünü incele</a>`}
                     </article>`;
                 }).join('')}
             </div>
@@ -259,7 +290,7 @@
         try {
             const resolution = await resolveCategoryFromLocation(window.location);
             if (resolution.error) {
-                container.innerHTML = `<div class="catalog-error-state">${escapeHtml(resolution.error)} <a href="categories.html">Tüm kategoriler</a></div>`;
+                container.innerHTML = `<div class="catalog-error-state">${escapeHtml(resolution.error)} <a href="/categories.html">Tüm kategoriler</a></div>`;
                 return;
             }
             if (!resolution.category) {
@@ -276,6 +307,7 @@
             const products = await readJson(productsResponse, 'Kategori ürünleri yüklenemedi.');
             const banner = safeUrl(category.banner_url || category.image_url);
             const accentColor = safeAccentColor(category.accent_color);
+            updateCategoryMetadata(category);
             container.innerHTML = `
                 ${renderBreadcrumb(detail.breadcrumb)}
                 <header class="catalog-category-hero"${accentColor ? ` style="--catalog-accent:${accentColor}"` : ''}>
@@ -284,12 +316,11 @@
                 </header>
                 ${renderCategoryCards(detail.children)}
                 ${renderCategoryProducts(products)}`;
-            document.title = `${category.seo_title || category.name} | NovaStore`;
         } catch (error) {
             const message = error.status === 404
                 ? 'Kategori bulunamadı veya artık yayında değil.'
                 : 'Kategori içeriği şu anda yüklenemiyor.';
-            container.innerHTML = `<div class="catalog-error-state">${escapeHtml(message)} <a href="categories.html">Tüm kategoriler</a></div>`;
+            container.innerHTML = `<div class="catalog-error-state">${escapeHtml(message)} <a href="/categories.html">Tüm kategoriler</a></div>`;
         }
     }
 
@@ -327,6 +358,8 @@
             escapeHtml,
             safeUrl,
             safeAccentColor,
+            categorySlugFromPath,
+            updateCategoryMetadata,
             flattenTree,
             renderTreeItems,
             renderBreadcrumb,

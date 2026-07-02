@@ -29,10 +29,12 @@ const tree = [{
     }]
 }];
 
+const headNodes = [];
 const sandbox = {
     window: {
         location: {
             href: 'https://store.test/index.html?category=Bilgisayar',
+            origin: 'https://store.test',
             pathname: '/index.html',
             search: '?category=Bilgisayar',
             hash: ''
@@ -46,7 +48,19 @@ const sandbox = {
     },
     document: {
         getElementById: () => null,
-        addEventListener: () => {}
+        addEventListener: () => {},
+        title: '',
+        head: {
+            appendChild(node) {
+                headNodes.push(node);
+            }
+        },
+        createElement: (tagName) => ({ tagName }),
+        querySelector: (selector) => {
+            if (selector === 'link[rel="canonical"]') return headNodes.find((node) => node.rel === 'canonical') || null;
+            if (selector === 'meta[name="description"]') return headNodes.find((node) => node.name === 'description') || null;
+            return null;
+        }
     },
     fetch: async (url) => {
         assert.strictEqual(url, '/api/public/categories');
@@ -76,7 +90,7 @@ assert(!threeLevelMenu.includes('<img src=x'));
 
 const breadcrumb = catalog._test.renderBreadcrumb([tree[0], tree[0].children[0]]);
 assert(breadcrumb.includes('catalog-breadcrumb'));
-assert(breadcrumb.includes('categories.html?slug=elektronik'));
+assert(breadcrumb.includes('/kategori/elektronik'));
 assert(breadcrumb.includes('aria-current="page"'));
 
 const productsMarkup = catalog._test.renderCategoryProducts([
@@ -90,12 +104,27 @@ assert(productsMarkup.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
 assert(!productsMarkup.includes('javascript:alert(1)'));
 assert.strictEqual(catalog._test.safeAccentColor('#F7941D'), '#F7941D');
 assert.strictEqual(catalog._test.safeAccentColor('red; background:url(x)'), '');
+assert.strictEqual(catalog.categoryUrl(tree[0]), '/kategori/elektronik');
+catalog._test.updateCategoryMetadata({
+    slug: 'elektronik',
+    name: 'Elektronik',
+    seo_title: 'Elektronik SEO',
+    seo_description: '<script>safe text only</script>'
+});
+assert.strictEqual(headNodes.find((node) => node.rel === 'canonical').href, 'https://store.test/kategori/elektronik');
+assert.strictEqual(
+    headNodes.find((node) => node.name === 'description').content,
+    '<script>safe text only</script>'
+);
+assert.strictEqual(sandbox.document.title, 'Elektronik SEO | NovaStore');
 
 (async () => {
     const legacyResolution = await catalog.resolveCategoryFromLocation(sandbox.window.location);
     assert.strictEqual(legacyResolution.category.slug, 'bilgisayar');
     assert.strictEqual(legacyResolution.legacy, true);
-    assert.match(sandbox.window.history.replaced, /categorySlug=bilgisayar/);
+    assert.strictEqual(sandbox.window.history.replaced, '/kategori/bilgisayar');
+    assert.strictEqual(catalog._test.categorySlugFromPath('/kategori/dizustu'), 'dizustu');
+    assert.strictEqual(catalog._test.categorySlugFromPath('/category/dizustu'), 'dizustu');
 
     for (const [name, source] of [
         ['index.html', indexSource],
