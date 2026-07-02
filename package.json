@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "dev:safe": "set NODE_ENV=test&& set NOVASTORE_SAFE_LOCAL_BACKEND=true&& set SKIP_SCHEMA_INIT=true&& set DB_SSL=false&& node server.js",
-    "dev:safe:schema": "set NODE_ENV=test&& set NOVASTORE_SAFE_LOCAL_BACKEND=true&& set NOVASTORE_ALLOW_SCHEMA_INIT=true&& set DB_SSL=false&& node server.js"
+    "dev:safe": "set NODE_ENV=test&& set NOVASTORE_SAFE_LOCAL_BACKEND=true&& set NOVASTORE_ALLOW_REMOTE_DB=false&& set SKIP_SCHEMA_INIT=true&& set NOVASTORE_ALLOW_SCHEMA_INIT=false&& set DATABASE_URL=postgresql://novastore_test:novastore_test_only@127.0.0.1:55432/novastore_category_v2_test&& set DB_HOST=127.0.0.1&& set DB_PORT=55432&& set DB_NAME=novastore_category_v2_test&& set DB_USER=novastore_test&& set DB_PASSWORD=novastore_test_only&& set DB_SSL=false&& set SUPABASE_USE_POOLER=false&& set SUPABASE_POOLER_HOST=&& set SUPABASE_REGION=&& set SUPABASE_PROJECT_REF=&& node server.js",
+    "dev:safe:schema": "set NODE_ENV=test&& set NOVASTORE_SAFE_LOCAL_BACKEND=true&& set NOVASTORE_ALLOW_REMOTE_DB=false&& set SKIP_SCHEMA_INIT=false&& set NOVASTORE_ALLOW_SCHEMA_INIT=true&& set DATABASE_URL=postgresql://novastore_test:novastore_test_only@127.0.0.1:55432/novastore_category_v2_test&& set DB_HOST=127.0.0.1&& set DB_PORT=55432&& set DB_NAME=novastore_category_v2_test&& set DB_USER=novastore_test&& set DB_PASSWORD=novastore_test_only&& set DB_SSL=false&& set SUPABASE_USE_POOLER=false&& set SUPABASE_POOLER_HOST=&& set SUPABASE_REGION=&& set SUPABASE_PROJECT_REF=&& node server.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

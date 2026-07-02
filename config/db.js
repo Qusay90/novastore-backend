@@ -1,5 +1,12 @@
-const { Pool } = require('pg');
 require('dotenv').config({ quiet: true });
+const { resolveStartupSafety } = require('./startupSafety');
+
+const startupSafety = resolveStartupSafety(process.env);
+if (!startupSafety.canStart) {
+    throw new Error(`Database startup blocked: ${startupSafety.errors.join(' ')}`);
+}
+
+const { Pool } = require('pg');
 
 const useSsl = String(process.env.DB_SSL || 'true').toLowerCase() !== 'false';
 const truthyValues = new Set(['1', 'true', 'yes', 'on']);

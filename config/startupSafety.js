@@ -19,15 +19,35 @@ const normalizeDatabaseName = (value) => {
 
 const getDatabaseTarget = (env = process.env) => {
     const parsed = parseDatabaseUrl(env.DATABASE_URL);
-    const host = env.DB_HOST || parsed?.hostname || '';
-    const database = env.DB_NAME || normalizeDatabaseName(parsed?.pathname);
-    const port = env.DB_PORT || parsed?.port || '5432';
+    const useSupabasePooler =
+        isTruthy(env.SUPABASE_USE_POOLER) ||
+        Boolean(env.SUPABASE_POOLER_HOST || env.SUPABASE_REGION);
+    const poolerHost =
+        env.SUPABASE_POOLER_HOST ||
+        (env.SUPABASE_REGION ? `aws-0-${env.SUPABASE_REGION}.pooler.supabase.com` : '');
+    const host =
+        env.DB_HOST ||
+        (useSupabasePooler && poolerHost ? poolerHost : '') ||
+        parsed?.hostname ||
+        env.PGHOST ||
+        '';
+    const database =
+        env.DB_NAME ||
+        normalizeDatabaseName(parsed?.pathname) ||
+        env.PGDATABASE ||
+        '';
+    const port = env.DB_PORT || (host === parsed?.hostname ? parsed?.port : '') || env.PGPORT || '5432';
 
     return {
         host,
         database,
         port,
-        hasDatabaseConfig: Boolean(env.DATABASE_URL || env.DB_HOST),
+        hasDatabaseConfig: Boolean(
+            env.DATABASE_URL ||
+            env.DB_HOST ||
+            env.PGHOST ||
+            (useSupabasePooler && poolerHost)
+        ),
         isLocalHost: LOCAL_HOSTS.has(String(host).toLowerCase()),
         isSupabaseHost: /(^db\.[a-z0-9]+\.supabase\.co$|\.pooler\.supabase\.com$)/i.test(host),
         label: host ? `${host}:${port}/${database || 'postgres'}` : 'DATABASE_URL veya DB_HOST tanimli degil'
@@ -45,12 +65,22 @@ const resolveStartupSafety = (env = process.env) => {
     const nodeEnv = String(env.NODE_ENV || 'development').toLowerCase();
     const target = getDatabaseTarget(env);
     const safeLocalMode = isTruthy(env.NOVASTORE_SAFE_LOCAL_BACKEND);
+    const allowRemoteDatabase = isTruthy(env.NOVASTORE_ALLOW_REMOTE_DB);
     const skipSchemaInit = isTruthy(env.SKIP_SCHEMA_INIT);
     const allowSchemaInit = isTruthy(env.NOVASTORE_ALLOW_SCHEMA_INIT);
     const isProduction = nodeEnv === 'production';
     const safeLocalDatabase = isSafeLocalDatabase(target);
     const errors = [];
     const warnings = [];
+
+    if (!target.hasDatabaseConfig) {
+        errors.push('Acik bir DATABASE_URL veya DB_HOST tanimi gerekli.');
+    } else if (!target.isLocalHost && !allowRemoteDatabase) {
+        errors.push(
+            `Remote veritabani varsayilan olarak reddedildi. ` +
+            `Yalnizca bilincli kullanim icin NOVASTORE_ALLOW_REMOTE_DB=true ayarlanabilir. Hedef: ${target.label}`
+        );
+    }
 
     if (safeLocalMode) {
         if (isProduction) {
@@ -84,6 +114,7 @@ const resolveStartupSafety = (env = process.env) => {
         warnings,
         nodeEnv,
         safeLocalMode,
+        allowRemoteDatabase,
         skipSchemaInit,
         allowSchemaInit,
         shouldRunSchemaInit,

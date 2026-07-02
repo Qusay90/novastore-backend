@@ -1,6 +1,6 @@
 const assert = require('assert');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawnLocalServer, stopServerProcess } = require('./helpers/localServerProcess');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const createCoreSchema = require('../models/createCoreDb');
@@ -137,19 +137,12 @@ const request = async (pathname, {
     const preservedAfter = await pool.query('SELECT COUNT(*)::INTEGER AS count FROM products');
     assert.strictEqual(preservedAfter.rows[0].count, preservedBefore.rows[0].count);
 
-    child = spawn(process.execPath, ['server.js'], {
-        cwd: root,
+    child = spawnLocalServer({
+        root,
+        port,
         env: {
-            ...process.env,
-            PORT: String(port),
-            NODE_ENV: 'test',
-            JWT_SECRET: jwtSecret,
-            NOVASTORE_SAFE_LOCAL_BACKEND: 'true',
-            SKIP_SCHEMA_INIT: 'true',
-            NOVASTORE_ALLOW_SCHEMA_INIT: 'false',
-            DB_SSL: 'false'
-        },
-        stdio: ['ignore', 'pipe', 'pipe']
+            JWT_SECRET: jwtSecret
+        }
     });
     await waitForServer();
 
@@ -409,6 +402,6 @@ const request = async (pathname, {
     console.error(error);
     process.exitCode = 1;
 }).finally(async () => {
-    if (child && !child.killed) child.kill();
+    await stopServerProcess(child);
     await pool.end();
 });

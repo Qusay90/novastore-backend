@@ -1,6 +1,6 @@
 const assert = require('assert');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawnLocalServer, stopServerProcess } = require('./helpers/localServerProcess');
 const pool = require('../config/db');
 const createCoreSchema = require('../models/createCoreDb');
 const createCommerceSchema = require('../models/createCommerceDb');
@@ -138,19 +138,10 @@ const expectCollection404 = async (slug) => {
     const failedPaymentRef = 'NST-PAYTR-LIVE-FAILED';
     const failed = await insertPendingPayment({ productId, paymentRef: failedPaymentRef });
 
-    child = spawn(process.execPath, ['server.js'], {
-        cwd: root,
-        env: {
-            ...process.env,
-            ...paytrEnv,
-            PORT: String(port),
-            NODE_ENV: 'test',
-            NOVASTORE_SAFE_LOCAL_BACKEND: 'true',
-            SKIP_SCHEMA_INIT: 'true',
-            NOVASTORE_ALLOW_SCHEMA_INIT: 'false',
-            DB_SSL: 'false'
-        },
-        stdio: ['ignore', 'pipe', 'pipe']
+    child = spawnLocalServer({
+        root,
+        port,
+        env: paytrEnv
     });
     await waitForServer();
 
@@ -270,6 +261,6 @@ const expectCollection404 = async (slug) => {
     console.error(error);
     process.exitCode = 1;
 }).finally(async () => {
-    if (child && !child.killed) child.kill();
+    await stopServerProcess(child);
     await pool.end();
 });

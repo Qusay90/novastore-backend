@@ -1,4 +1,14 @@
 require('dotenv').config({ quiet: true });
+const { resolveStartupSafety } = require('./config/startupSafety');
+
+const startupSafety = resolveStartupSafety(process.env);
+startupSafety.warnings.forEach((warning) => console.warn(`Startup warning: ${warning}`));
+
+if (!startupSafety.canStart) {
+    startupSafety.errors.forEach((error) => console.error(`Startup blocked: ${error}`));
+    process.exit(1);
+}
+
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
@@ -7,7 +17,6 @@ const path = require('path');
 const { simpleRateLimit, sanitizeBody } = require('./middlewares/securityMiddleware');
 const pool = require('./config/db');
 const { getAllowedOrigins } = require('./config/appConfig');
-const { resolveStartupSafety } = require('./config/startupSafety');
 const { getPublicCategoryBySlug } = require('./services/categoryService');
 const { getPublicCollection } = require('./services/collectionService');
 const {
@@ -265,24 +274,13 @@ const prepareDatabase = async (startupSafety) => {
 };
 
 const start = async () => {
-    const startupSafety = resolveStartupSafety(process.env);
-    startupSafety.warnings.forEach((warning) => console.warn(`Startup warning: ${warning}`));
-
-    if (!startupSafety.canStart) {
-        startupSafety.errors.forEach((error) => console.error(`Startup blocked: ${error}`));
-        process.exitCode = 1;
-        return;
-    }
-
     try {
         console.log(`Veritabani hedefi: ${startupSafety.target.label}`);
         await prepareDatabase(startupSafety);
     } catch (err) {
         console.error('Veritabani hazirlama hatasi:', pool.formatError(err));
-        if (startupSafety.safeLocalMode) {
-            process.exitCode = 1;
-            return;
-        }
+        process.exitCode = 1;
+        return;
     }
 
     // Sunucu
