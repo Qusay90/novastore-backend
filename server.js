@@ -175,6 +175,18 @@ app.use('/api/admin', adminRoutes);
 const publicCategoryRoutes = require('./routes/publicCategoryRoutes');
 app.use('/api/public/categories', publicCategoryRoutes);
 
+const publicNavigationRoutes = require('./routes/publicNavigationRoutes');
+app.use('/api/public/navigation', publicNavigationRoutes);
+
+const publicCollectionRoutes = require('./routes/publicCollectionRoutes');
+app.use('/api/public/collections', publicCollectionRoutes);
+
+const adminMenuRoutes = require('./routes/adminMenuRoutes');
+app.use('/api/admin', adminMenuRoutes);
+
+const adminCollectionRoutes = require('./routes/adminCollectionRoutes');
+app.use('/api/admin', adminCollectionRoutes);
+
 const categoryRoutes = require('./routes/categoryRoutes');
 app.use('/api/categories', categoryRoutes);
 

@@ -3,6 +3,7 @@ const {
     applyCategoryV2Schema,
     applyCategoryV2BackfillConstraints
 } = require('./categoryV2Schema');
+const { applyMenuCollectionSchema } = require('./menuCollectionSchema');
 
 const createCoreSchema = async () => {
     const query = `
@@ -161,6 +162,7 @@ const createCoreSchema = async () => {
     await pool.query(query);
     await applyCategoryV2Schema(pool);
     await applyCategoryV2BackfillConstraints(pool);
+    await applyMenuCollectionSchema(pool);
     console.log('Temel veritabani schema hazir.');
 };
 
