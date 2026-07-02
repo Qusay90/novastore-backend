@@ -1,0 +1,40 @@
+﻿# Graphify code-only mode için
+# Amaç: docs/images/secret/build dosyalarını graphify dışında bırakmak
+
+# Secrets / signing
+.env
+.env.*
+keystore.properties
+*.jks
+*.keystore
+release-keys/
+
+# Heavy/generated
+node_modules/
+build/
+.gradle/
+dist/
+coverage/
+artifacts/
+graphify-out/
+
+# Docs / markdown / text
+docs/
+*.md
+*.txt
+*.pdf
+*.doc
+*.docx
+
+# Images / media
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.ico
+*.mp4
+*.mov
+*.mp3
+*.wav
