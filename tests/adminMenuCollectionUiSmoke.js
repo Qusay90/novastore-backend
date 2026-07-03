@@ -24,7 +24,7 @@ assert(menuModule._test.escapeHtml('<img src=x>') === '&lt;img src=x&gt;');
 assert(collectionModule._test.escapeHtml('<script>x</script>').includes('&lt;script&gt;'));
 assert.strictEqual(
     collectionModule._test.ruleLabels.best_sellers,
-    'Çok Satanlar · son 30 gün PAID + Teslim Edildi'
+    'Çok Satanlar · son 30 gün · ödemesi alınmış ve teslim edilmiş'
 );
 
 for (const marker of [
@@ -50,7 +50,13 @@ for (const endpoint of [
 }
 assert(menuSource.includes('<option value="category">Kategori</option>'));
 assert(menuSource.includes('<option value="collection">Koleksiyon</option>'));
-assert(menuSource.includes('<option value="internal_url">Site içi link</option>'));
+assert(menuSource.includes('<option value="internal_url">Site İçi Bağlantı</option>'));
+assert(menuSource.includes('<option value="main">Ana Menü</option>'));
+assert(menuSource.includes('<option value="footer">Alt Bilgi Menüsü</option>'));
+assert(menuSource.includes('<option value="mobile">Mobil Menü</option>'));
+assert(menuSource.includes('<option value="home">Ana Sayfa Menüsü</option>'));
+assert(menuSource.includes('Hedef Türü'));
+assert(menuSource.includes('(Sistem Kodu:'));
 assert(!menuSource.includes('external_url'));
 assert(menuSource.includes('Seviye ${depth + 1}'));
 assert(menuSource.includes("method: 'PATCH'"));
@@ -80,7 +86,12 @@ for (const field of [
 ]) {
     assert(collectionSource.includes(`id="${field}"`), `Missing collection field: ${field}`);
 }
-assert(collectionSource.includes('Boş: storefront’ta görünmez.'));
+assert(collectionSource.includes('Boş: mağazada görünmez.'));
+assert(collectionSource.includes('<option value="manual">Manuel</option>'));
+assert(collectionSource.includes('<option value="dynamic">Dinamik</option>'));
+assert(collectionSource.includes("collection.is_active ? 'Arşivle' : 'Arşivden Çıkar'"));
+assert(collectionSource.includes('Koleksiyon Türü'));
+assert(collectionSource.includes('URL Adı: /'));
 assert(collectionSource.includes("method: 'DELETE'"));
 assert(collectionSource.includes("method: id ? 'PATCH' : 'POST'"));
 

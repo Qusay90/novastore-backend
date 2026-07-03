@@ -43,12 +43,12 @@ const categories = [
 ];
 
 productAdmin.setCategories(categories);
-assert(elements['prod-category'].innerHTML.includes('Level 3 · parent'));
+assert(elements['prod-category'].innerHTML.includes('Level 3 · üst kategori'));
 assert(elements['prod-category'].innerHTML.includes('&lt;img src=x'));
 assert(!elements['prod-category'].innerHTML.includes('<img src=x'));
 
 assert.strictEqual(productAdmin.selectCategory(3), false, 'Parent category must be rejected');
-assert.match(elements['product-category-error'].textContent, /parent kategori seçilemez/i);
+assert.match(elements['product-category-error'].textContent, /üst kategori seçilemez/i);
 assert.strictEqual(productAdmin.selectCategory(4), true);
 assert.strictEqual(productAdmin.selectCategory(5), true);
 assert.strictEqual(productAdmin.setPrimary(5), true);
@@ -70,7 +70,7 @@ assert.deepStrictEqual(
 );
 assert.throws(
     () => productAdmin.getSubmission('active'),
-    /Aktif ürün için en az bir leaf kategori/
+    /Aktif ürün için en az bir ürün atanabilir son kategori/
 );
 
 const linkedResolution = productAdmin.loadProduct({
@@ -114,6 +114,8 @@ assert.strictEqual(
 ].forEach((id) => assert(adminHtml.includes(`id="${id}"`), `Missing product category field: ${id}`));
 
 assert(adminHtml.includes('<script src="admin-products.js"></script>'));
+assert(adminHtml.includes('Ürün Atanabilir Son Kategori Ekle'));
+assert(adminHtml.includes('Ana Ürün Kategorisi'));
 assert(adminHtml.includes("formData.append('categoryIds'"));
 assert(adminHtml.includes("formData.append('primaryCategoryId'"));
 assert(adminHtml.includes("formData.append('publicationStatus'"));

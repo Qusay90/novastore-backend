@@ -2,6 +2,14 @@
     'use strict';
 
     const state = { attributes: [], templates: [], categories: [], initialized: false };
+    const ATTRIBUTE_TYPE_LABELS = {
+        text: 'Metin',
+        number: 'Sayı',
+        boolean: 'Evet/Hayır',
+        option: 'Tek Seçenek',
+        multi_option: 'Çoklu Seçenek',
+        range: 'Aralık'
+    };
     const root = () => document.getElementById('admin-attribute-manager');
     const escapeHtml = (value) => String(value ?? '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -10,6 +18,7 @@
         adminReadJson(await adminApiFetch(url, options), fallback);
     const findAttribute = (id) => state.attributes.find((item) => Number(item.id) === Number(id));
     const findTemplate = (id) => state.templates.find((item) => Number(item.id) === Number(id));
+    const attributeTypeLabel = (type) => ATTRIBUTE_TYPE_LABELS[type] || type;
 
     function showError(error) {
         const element = document.getElementById('admin-attribute-error');
@@ -28,7 +37,7 @@
     function attributeOptions(selected = '') {
         return state.attributes
             .filter((attribute) => attribute.is_active)
-            .map((attribute) => `<option value="${Number(attribute.id)}"${Number(selected) === Number(attribute.id) ? ' selected' : ''}>${escapeHtml(attribute.name)} · ${escapeHtml(attribute.type)}</option>`)
+            .map((attribute) => `<option value="${Number(attribute.id)}"${Number(selected) === Number(attribute.id) ? ' selected' : ''}>${escapeHtml(attribute.name)} · ${escapeHtml(attributeTypeLabel(attribute.type))}</option>`)
             .join('');
     }
 
@@ -36,47 +45,47 @@
         return `
             <div id="admin-attribute-error" class="catalog-admin-error" hidden></div>
             <div class="catalog-admin-toolbar">
-                <div><strong>Attribute tanımları</strong><div class="catalog-admin-meta">Fiziksel silme yerine pasifleştirme kullanılır.</div></div>
+                <div><strong>Özellik tanımları</strong><div class="catalog-admin-meta">Fiziksel silme yerine pasifleştirme kullanılır.</div></div>
                 <div class="catalog-admin-actions">
-                    <button type="button" class="btn-add" data-attribute-action="new-attribute">+ Attribute</button>
-                    <button type="button" class="btn-add" data-attribute-action="new-template">+ Template</button>
+                    <button type="button" class="btn-add" data-attribute-action="new-attribute">+ Özellik</button>
+                    <button type="button" class="btn-add" data-attribute-action="new-template">+ Şablon</button>
                 </div>
             </div>
             <form id="admin-attribute-form" class="catalog-admin-form" hidden>
                 <input type="hidden" id="admin-attribute-id">
-                <div class="form-group"><label>Kod</label><input id="admin-attribute-code" class="form-control" maxlength="80" pattern="[a-z][a-z0-9_]+" required></div>
+                <div class="form-group"><label>Sistem Kodu</label><input id="admin-attribute-code" class="form-control" maxlength="80" pattern="[a-z][a-z0-9_]+" required></div>
                 <div class="form-group"><label>Ad</label><input id="admin-attribute-name" class="form-control" maxlength="160" required></div>
-                <div class="form-group"><label>Tip</label><select id="admin-attribute-type" class="form-control">
+                <div class="form-group"><label>Özellik Türü</label><select id="admin-attribute-type" class="form-control">
                     <option value="text">Metin</option><option value="number">Sayı</option>
                     <option value="boolean">Evet/Hayır</option><option value="option">Tek seçenek</option>
                     <option value="multi_option">Çoklu seçenek</option><option value="range">Aralık</option>
                 </select></div>
                 <div class="form-group"><label>Birim</label><input id="admin-attribute-unit" class="form-control" maxlength="40"></div>
                 <div class="form-group"><label>Sıra</label><input id="admin-attribute-sort" type="number" class="form-control" value="0"></div>
-                <div class="form-group"><label>Validation JSON</label><input id="admin-attribute-validation" class="form-control" value="{}" placeholder='{"min":0,"max":100}'></div>
-                <label class="category-toggle"><input type="checkbox" id="admin-attribute-filterable"> Filtrelenebilir</label>
-                <label class="category-toggle"><input type="checkbox" id="admin-attribute-required"> Varsayılan zorunlu</label>
-                <label class="category-toggle"><input type="checkbox" id="admin-attribute-variant"> Varyantla ilgili</label>
+                <div class="form-group"><label>Doğrulama Kuralları (JSON)</label><input id="admin-attribute-validation" class="form-control" value="{}" placeholder='{"min":0,"max":100}'></div>
+                <label class="category-toggle"><input type="checkbox" id="admin-attribute-filterable"> Filtrede Göster</label>
+                <label class="category-toggle"><input type="checkbox" id="admin-attribute-required"> Varsayılan Olarak Zorunlu</label>
+                <label class="category-toggle"><input type="checkbox" id="admin-attribute-variant"> Varyantta Kullan</label>
                 <label class="category-toggle"><input type="checkbox" id="admin-attribute-active" checked> Aktif</label>
                 <div class="catalog-admin-actions span-2">
-                    <button type="submit" class="btn-submit">Attribute Kaydet</button>
+                    <button type="submit" class="btn-submit">Özelliği Kaydet</button>
                     <button type="button" class="btn-edit" data-attribute-action="cancel-attribute">Vazgeç</button>
                 </div>
             </form>
             <form id="admin-template-form" class="catalog-admin-form" hidden>
                 <input type="hidden" id="admin-template-id">
-                <div class="form-group"><label>Template adı</label><input id="admin-template-name" class="form-control" required></div>
+                <div class="form-group"><label>Şablon Adı</label><input id="admin-template-name" class="form-control" required></div>
                 <div class="form-group"><label>Kategori</label><select id="admin-template-category" class="form-control" required></select></div>
                 <div class="form-group"><label>Sıra</label><input id="admin-template-sort" type="number" class="form-control" value="0"></div>
                 <label class="category-toggle"><input type="checkbox" id="admin-template-active" checked> Aktif</label>
                 <div class="catalog-admin-actions span-2">
-                    <button type="submit" class="btn-submit">Template Kaydet</button>
+                    <button type="submit" class="btn-submit">Şablonu Kaydet</button>
                     <button type="button" class="btn-edit" data-attribute-action="cancel-template">Vazgeç</button>
                 </div>
             </form>
             <div class="catalog-admin-grid" style="margin-top:16px">
-                <section><h3>Attribute’lar</h3><div id="admin-attribute-list" class="catalog-admin-list"></div></section>
-                <section><h3>Template’ler</h3><div id="admin-template-list" class="catalog-admin-list"></div></section>
+                <section><h3>Özellikler</h3><div id="admin-attribute-list" class="catalog-admin-list"></div></section>
+                <section><h3>Şablonlar</h3><div id="admin-template-list" class="catalog-admin-list"></div></section>
             </div>`;
     }
 
@@ -85,24 +94,24 @@
         target.innerHTML = state.attributes.map((attribute) => `
             <article class="catalog-admin-card${attribute.is_active ? '' : ' is-inactive'}">
                 <div class="catalog-admin-card-head">
-                    <div><strong>${escapeHtml(attribute.name)}</strong><div class="catalog-admin-meta">${escapeHtml(attribute.code)} · ${escapeHtml(attribute.type)}${attribute.unit ? ` · ${escapeHtml(attribute.unit)}` : ''}</div></div>
-                    <span class="catalog-admin-badge">${attribute.is_filterable ? 'Filtre' : 'Spec'}</span>
+                    <div><strong>${escapeHtml(attribute.name)}</strong><div class="catalog-admin-meta">Sistem Kodu: ${escapeHtml(attribute.code)} · ${escapeHtml(attributeTypeLabel(attribute.type))}${attribute.unit ? ` · ${escapeHtml(attribute.unit)}` : ''}</div></div>
+                    <span class="catalog-admin-badge">${attribute.is_filterable ? 'Filtre' : 'Ürün Bilgisi'}</span>
                 </div>
-                <div class="catalog-admin-meta">${attribute.is_required ? 'Zorunlu · ' : ''}${attribute.is_variant_relevant ? 'Varyant · ' : ''}sıra ${Number(attribute.sort_order || 0)}</div>
+                <div class="catalog-admin-meta">${attribute.is_required ? 'Zorunlu · ' : ''}${attribute.is_variant_relevant ? 'Varyantta Kullan · ' : ''}sıra ${Number(attribute.sort_order || 0)}</div>
                 ${['option', 'multi_option'].includes(attribute.type) ? `
                     <form class="catalog-admin-actions" data-option-form="${Number(attribute.id)}" style="margin-top:9px">
-                        <input class="form-control" name="value" placeholder="value" required>
-                        <input class="form-control" name="label" placeholder="Etiket" required>
-                        <button class="btn-edit" type="submit">Option ekle</button>
+                        <input class="form-control" name="value" placeholder="Sistem değeri" required>
+                        <input class="form-control" name="label" placeholder="Görünen ad" required>
+                        <button class="btn-edit" type="submit">Seçenek Ekle</button>
                     </form>
                     <div class="catalog-admin-meta">${(attribute.options || []).map((option) =>
                         `<button type="button" class="catalog-admin-badge" data-attribute-action="toggle-option" data-id="${Number(option.id)}" data-active="${option.is_active}">${escapeHtml(option.label)}${option.is_active ? '' : ' (pasif)'}</button>`
-                    ).join(' ') || 'Henüz option yok'}</div>` : ''}
+                    ).join(' ') || 'Henüz seçenek yok'}</div>` : ''}
                 <div class="catalog-admin-actions" style="margin-top:9px">
                     <button class="btn-edit" data-attribute-action="edit-attribute" data-id="${Number(attribute.id)}">Düzenle</button>
                     <button class="btn-edit" data-attribute-action="archive-attribute" data-id="${Number(attribute.id)}">${attribute.is_active ? 'Pasifleştir' : 'Aktifleştir'}</button>
                 </div>
-            </article>`).join('') || '<div class="catalog-admin-warning">Henüz attribute yok.</div>';
+            </article>`).join('') || '<div class="catalog-admin-warning">Henüz özellik yok.</div>';
     }
 
     function renderTemplates() {
@@ -114,19 +123,19 @@
                     <button class="btn-edit" data-attribute-action="edit-template" data-id="${Number(template.id)}">Düzenle</button>
                 </div>
                 <form class="catalog-admin-form" data-template-link-form="${Number(template.id)}" style="margin-top:9px">
-                    <select name="attribute_id" class="form-control" required><option value="">Attribute seçin</option>${attributeOptions()}</select>
+                    <select name="attribute_id" class="form-control" required><option value="">Özellik seçin</option>${attributeOptions()}</select>
                     <input name="sort_order" type="number" class="form-control" value="0" aria-label="Sıra">
                     <label class="category-toggle"><input name="is_required" type="checkbox"> Zorunlu</label>
-                    <label class="category-toggle"><input name="is_filterable" type="checkbox"> Filtre</label>
+                    <label class="category-toggle"><input name="is_filterable" type="checkbox"> Filtrede Göster</label>
                     <button class="btn-edit" type="submit">Bağla / Güncelle</button>
                 </form>
                 <div class="catalog-admin-list" style="margin-top:9px">
                     ${(template.attributes || []).map((attribute) => `<div class="catalog-admin-node">
-                        <div><strong>${escapeHtml(attribute.name)}</strong><div class="catalog-admin-meta">${escapeHtml(attribute.code)} · ${escapeHtml(attribute.type)}${attribute.is_required ? ' · zorunlu' : ''}${attribute.is_filterable ? ' · filtre' : ''}</div></div>
+                        <div><strong>${escapeHtml(attribute.name)}</strong><div class="catalog-admin-meta">Sistem Kodu: ${escapeHtml(attribute.code)} · ${escapeHtml(attributeTypeLabel(attribute.type))}${attribute.is_required ? ' · zorunlu' : ''}${attribute.is_filterable ? ' · filtrede göster' : ''}</div></div>
                         <button class="btn-edit" data-attribute-action="unlink-attribute" data-template-id="${Number(template.id)}" data-attribute-id="${Number(attribute.attribute_id)}">Kaldır</button>
-                    </div>`).join('') || '<div class="catalog-admin-warning">Template henüz boş.</div>'}
+                    </div>`).join('') || '<div class="catalog-admin-warning">Şablon henüz boş.</div>'}
                 </div>
-            </article>`).join('') || '<div class="catalog-admin-warning">Henüz template yok.</div>';
+            </article>`).join('') || '<div class="catalog-admin-warning">Henüz şablon yok.</div>';
     }
 
     async function load() {
@@ -139,8 +148,8 @@
         showError('');
         try {
             [state.attributes, state.templates, state.categories] = await Promise.all([
-                api('/api/admin/attributes', {}, 'Attribute listesi yüklenemedi.'),
-                api('/api/admin/attribute-templates', {}, 'Template listesi yüklenemedi.'),
+                api('/api/admin/attributes', {}, 'Özellik listesi yüklenemedi.'),
+                api('/api/admin/attribute-templates', {}, 'Şablon listesi yüklenemedi.'),
                 api('/api/admin/categories?format=flat', {}, 'Kategoriler yüklenemedi.')
             ]);
             renderAttributes();
@@ -242,7 +251,7 @@
                 }
                 await load();
             } catch (error) {
-                showError(error instanceof SyntaxError ? new Error('Validation alanı geçerli JSON olmalıdır.') : error);
+                showError(error instanceof SyntaxError ? new Error('Doğrulama kuralları alanı geçerli JSON olmalıdır.') : error);
             }
         });
 
@@ -288,6 +297,6 @@
 
     window.NovaStoreAdminAttributes = {
         load,
-        _test: { escapeHtml }
+        _test: { escapeHtml, attributeTypeLabel }
     };
 })(window, document);

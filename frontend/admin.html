@@ -2328,23 +2328,23 @@
                 <button class="btn-add" onclick="openCategoryModal()">+ Yeni Kategori</button>
             </div>
             <p style="margin:0 0 14px; color:#778195;">
-                Arşivlenmiş, pasif ve ürünsüz kategoriler yönetim ekranında korunur. Public görünürlük stoktan bağımsız görünür ürün sayısıyla belirlenir.
+                Arşivlenmiş, pasif ve ürünsüz kategoriler yönetim ekranında korunur. Müşteri görünürlüğü stoktan bağımsız görünür ürün sayısıyla belirlenir.
             </p>
             <div class="table-container" style="overflow-x: auto;">
                 <table id="categoriesTable">
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th>Kayıt No.</th>
                             <th>Kategori Adı</th>
                             <th>Üst Kategori</th>
                             <th>Durum</th>
-                            <th>Doğrudan Ürün</th>
-                            <th>Görünür Ürün</th>
-                            <th>Satılabilir Ürün</th>
-                            <th>Alt Görünür</th>
-                            <th>Alt Satılabilir</th>
-                            <th>Ağaç Görünür</th>
-                            <th>Ağaç Satılabilir</th>
+                            <th>Doğrudan Ürün Sayısı</th>
+                            <th>Görünür Ürün Sayısı</th>
+                            <th>Satılabilir Ürün Sayısı</th>
+                            <th>Alt Dallardaki Görünür Ürünler</th>
+                            <th>Alt Dallardaki Satılabilir Ürünler</th>
+                            <th>Bu Kategori ve Altlarındaki Görünür Ürünler</th>
+                            <th>Bu Kategori ve Altlarındaki Satılabilir Ürünler</th>
                             <th>İşlemler</th>
                         </tr>
                     </thead>
@@ -2360,7 +2360,7 @@
                 <h2>🧭 Menü Yönetimi</h2>
             </div>
             <p style="margin:0 0 14px; color:#778195;">
-                Main, footer, mobile ve home menülerini; kategori, koleksiyon veya güvenli site içi link hedefleriyle yönetin.
+                Ana menü, alt bilgi menüsü, mobil menü ve ana sayfa menüsünü; kategori, koleksiyon veya güvenli site içi bağlantı hedefleriyle yönetin.
             </p>
             <div id="admin-menu-manager" class="catalog-admin-panel">Menüler yükleniyor...</div>
         </div>
@@ -2371,7 +2371,7 @@
             </div>
             <p style="margin:0 0 14px; color:#778195;">
                 Kategoriye bağlı ürün özelliklerini, seçeneklerini ve müşteri filtrelerini yönetin.
-                Template bağlantıları doğrudan seçilen kategoriye uygulanır.
+                Şablon bağlantıları doğrudan seçilen kategoriye uygulanır.
             </p>
             <div id="admin-attribute-manager" class="catalog-admin-panel">Özellikler yükleniyor...</div>
         </div>
@@ -2381,7 +2381,7 @@
                 <h2>🗂️ Koleksiyon Yönetimi</h2>
             </div>
             <p style="margin:0 0 14px; color:#778195;">
-                Dinamik koleksiyon kurallarını ve manuel vitrin ürünlerini yönetin. Boş koleksiyonlar storefront'ta gösterilmez.
+                Dinamik koleksiyon kurallarını ve manuel vitrin ürünlerini yönetin. Boş koleksiyonlar mağazada gösterilmez.
             </p>
             <div id="admin-collection-manager" class="catalog-admin-panel">Koleksiyonlar yükleniyor...</div>
         </div>
@@ -2393,7 +2393,7 @@
                 <h2>M&uuml;&#351;teri Sorular&#305;</h2>
                 <button class="btn-add" type="button" onclick="openAiHandoffModal()"
                     style="display:inline-flex; align-items:center; gap:10px;">
-                    AI Devralmalar&#305;
+                    Yapay Zek&acirc; Devralmalar&#305;
                     <span id="ai-handoff-count-badge"
                         style="display:inline-flex; min-width:26px; height:26px; padding:0 8px; border-radius:999px; background:#FFF3E0; color:#E65100; font-size:0.8rem; font-weight:800; align-items:center; justify-content:center;">0</span>
                 </button>
@@ -2423,7 +2423,7 @@
     <div class="modal-overlay" id="ai-handoff-modal">
         <div class="modal-box" style="max-width: 1120px; width: min(1120px, 96vw); padding: 0;">
             <div class="modal-header" style="padding: 22px 24px; border-bottom: 1px solid var(--border);">
-                <h2>AI Destek Devralmalar&#305;</h2>
+                <h2>Yapay Zek&acirc; Destek Devirleri</h2>
                 <div style="display:flex; align-items:center; gap:10px;">
                     <button class="btn-add" type="button" onclick="loadAiHandoffs(false)">Yenile</button>
                     <button class="close-modal" onclick="closeAiHandoffModal()">&#10005;</button>
@@ -2470,7 +2470,7 @@
                             <input type="text" id="cat-name" class="form-control" required placeholder="Örn: Telefonlar">
                         </div>
                         <div class="form-group">
-                            <label for="cat-slug">Slug</label>
+                            <label for="cat-slug">URL Adı</label>
                             <input type="text" id="cat-slug" class="form-control" placeholder="Otomatik oluşturulabilir">
                         </div>
                         <div class="form-group">
@@ -2480,15 +2480,15 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="cat-sort-order">Sıralama</label>
+                            <label for="cat-sort-order">Sıra</label>
                             <input type="number" id="cat-sort-order" class="form-control" value="0" step="1">
                         </div>
                         <div class="form-group">
-                            <label for="cat-image-url">Kategori Görseli URL</label>
+                            <label for="cat-image-url">Kategori Görseli Adresi</label>
                             <input type="url" id="cat-image-url" class="form-control">
                         </div>
                         <div class="form-group">
-                            <label for="cat-banner-url">Banner URL</label>
+                            <label for="cat-banner-url">Büyük Görsel Adresi</label>
                             <input type="url" id="cat-banner-url" class="form-control">
                         </div>
                         <div class="form-group">
@@ -2504,15 +2504,15 @@
                             <textarea id="cat-description" class="form-control" rows="3"></textarea>
                         </div>
                         <div class="form-group">
-                            <label for="cat-seo-title">SEO Başlığı</label>
+                            <label for="cat-seo-title">Arama Motoru Başlığı</label>
                             <input type="text" id="cat-seo-title" class="form-control">
                         </div>
                         <div class="form-group">
-                            <label for="cat-google-taxonomy-id">Google Taxonomy ID</label>
+                            <label for="cat-google-taxonomy-id">Google Ürün Kategori Kodu</label>
                             <input type="text" id="cat-google-taxonomy-id" class="form-control">
                         </div>
                         <div class="form-group form-span-2">
-                            <label for="cat-seo-description">SEO Açıklaması</label>
+                            <label for="cat-seo-description">Arama Motoru Açıklaması</label>
                             <textarea id="cat-seo-description" class="form-control" rows="2"></textarea>
                         </div>
                     </div>
@@ -2521,7 +2521,7 @@
                         <label class="category-toggle"><input type="checkbox" id="cat-is-customer-visible" checked> Müşteriye görünür</label>
                         <label class="category-toggle"><input type="checkbox" id="cat-show-in-menu" checked> Menüde göster</label>
                         <label class="category-toggle"><input type="checkbox" id="cat-show-on-home"> Ana sayfada göster</label>
-                        <label class="category-toggle"><input type="checkbox" id="cat-hide-when-empty" checked> Public boşken gizle</label>
+                        <label class="category-toggle"><input type="checkbox" id="cat-hide-when-empty" checked> Boşken gizle</label>
                     </div>
                     <button type="submit" id="category-save-button" class="btn-submit">Kaydet</button>
                 </form>
@@ -2550,12 +2550,12 @@
                     <div class="form-group"><label>Ürün Adı</label><input type="text" id="prod-name"
                             class="form-control" required></div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div class="form-group"><label>Leaf Kategori Ekle</label><select id="prod-category" class="form-control"
+                        <div class="form-group"><label>Ürün Atanabilir Son Kategori Ekle</label><select id="prod-category" class="form-control"
                                 onchange="handleProductCategorySelect(this.value)">
-                                <option value="">Leaf kategori ekleyin</option>
+                                <option value="">Ürün atanabilir son kategori ekleyin</option>
                             </select>
                             <div id="selected-product-categories" class="selected-category-list"></div>
-                            <small style="display:block; margin-top:6px; color:#6B7280;">Birden fazla leaf kategori ekleyebilirsiniz.</small>
+                            <small style="display:block; margin-top:6px; color:#6B7280;">Birden fazla ürün atanabilir son kategori ekleyebilirsiniz.</small>
                             <div id="product-category-warning" class="product-category-message warning" role="status" hidden></div>
                             <div id="product-category-error" class="product-category-message error" role="alert" hidden></div>
                         </div>
@@ -2564,10 +2564,10 @@
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div class="form-group">
-                            <label for="prod-primary-category">Primary Kategori</label>
+                            <label for="prod-primary-category">Ana Ürün Kategorisi</label>
                             <select id="prod-primary-category" class="form-control"
                                 onchange="NovaStoreAdminProducts.setPrimary(this.value)">
-                                <option value="">Primary kategori seçin</option>
+                                <option value="">Ana ürün kategorisi seçin</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -2583,13 +2583,13 @@
                     <div class="form-group">
                         <label class="category-toggle" style="display:inline-flex;">
                             <input type="checkbox" id="prod-is-customer-visible" checked>
-                            Müşteri tarafında görünür
+                            Müşteriye görünür
                         </label>
                     </div>
                     <div class="form-group">
                         <label>Ürün Özellikleri</label>
                         <div id="product-attributes-fields" class="catalog-admin-card">
-                            <p class="catalog-admin-empty">Özellik alanları seçilen leaf kategorilere göre yüklenir.</p>
+                            <p class="catalog-admin-empty">Özellik alanları seçilen ürün atanabilir son kategorilere göre yüklenir.</p>
                         </div>
                         <div id="product-attributes-error" class="product-category-message error" role="alert" hidden></div>
                     </div>
@@ -4083,7 +4083,7 @@
             const replyInput = document.getElementById('ai-handoff-reply');
             const replyButton = document.getElementById('ai-handoff-send');
             if (preview) preview.innerHTML = escapeAdminHtml(message || 'Listeden bir müşteri seçin.');
-            if (thread) thread.innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#888;">Aktif AI devir kaydı yok.</div>';
+            if (thread) thread.innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:#888;">Aktif yapay zekâ devir kaydı yok.</div>';
             if (replyInput) { replyInput.value = ''; replyInput.disabled = true; }
             if (replyButton) replyButton.disabled = true;
         }
@@ -4093,8 +4093,8 @@
             if (!list) return;
 
             if (!items.length) {
-                list.innerHTML = '<div style="padding:22px; color:#888; text-align:center;">Henüz AI devri oluşmadı.</div>';
-                setAiHandoffEmptyState('AI devri bekleniyor.');
+                list.innerHTML = '<div style="padding:22px; color:#888; text-align:center;">Henüz yapay zekâ devri oluşmadı.</div>';
+                setAiHandoffEmptyState('Yapay zekâ devri bekleniyor.');
                 return;
             }
 
@@ -4105,9 +4105,9 @@
                     <button type="button" onclick="openAiHandoffThread(${Number(item.id)})" style="width:100%; text-align:left; border:none; border-bottom:1px solid var(--border); background:${isActive ? 'rgba(247, 148, 29, 0.10)' : 'transparent'}; padding:16px 18px; cursor:pointer; display:flex; flex-direction:column; gap:8px;">
                         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
                             <div style="font-weight:700; color:var(--heading-color);">${escapeAdminHtml(item.name)}</div>
-                            <span style="background:#FFF3E0; color:#E65100; border-radius:999px; padding:4px 8px; font-size:0.72rem; font-weight:700;">AI x${Number(item.handoff_count || 1)}</span>
+                            <span style="background:#FFF3E0; color:#E65100; border-radius:999px; padding:4px 8px; font-size:0.72rem; font-weight:700;">Yapay Zekâ ×${Number(item.handoff_count || 1)}</span>
                         </div>
-                        <div style="font-size:0.82rem; color:#667085; line-height:1.45;">${escapeAdminHtml(summary || 'AI devir özeti hazır.')}</div>
+                        <div style="font-size:0.82rem; color:#667085; line-height:1.45;">${escapeAdminHtml(summary || 'Yapay zekâ devir özeti hazır.')}</div>
                         <div style="font-size:0.74rem; color:#98A2B3;">Son devir: ${escapeAdminHtml(formatAdminDate(item.latest_handoff_at))}</div>
                     </button>
                 `;
@@ -4121,7 +4121,7 @@
 
             try {
                 const res = await adminApiFetch('/api/messages/handoffs');
-                const items = await adminReadJson(res, 'AI devir listesi alınamadı.');
+                const items = await adminReadJson(res, 'Yapay zekâ devir listesi alınamadı.');
                 aiHandoffItems = Array.isArray(items) ? items : [];
                 updateAiHandoffBadge(aiHandoffItems.length);
                 renderAiHandoffList(aiHandoffItems);
@@ -4140,8 +4140,8 @@
                 }
             } catch (err) {
                 console.error('AI handoff yükleme hatası:', err);
-                list.innerHTML = `<div style="padding:22px; color:#C62828; text-align:center;">${escapeAdminHtml(err.message || 'AI devir listesi alınamadı.')}</div>`;
-                setAiHandoffEmptyState('AI devir bilgisi alınamadı.');
+                list.innerHTML = `<div style="padding:22px; color:#C62828; text-align:center;">${escapeAdminHtml(err.message || 'Yapay zekâ devir listesi alınamadı.')}</div>`;
+                setAiHandoffEmptyState('Yapay zekâ devir bilgisi alınamadı.');
             }
         }
 
@@ -4207,19 +4207,19 @@
 
             const item = aiHandoffItems.find((entry) => Number(entry.id) === numericUserId);
             const displayName = item && item.name ? item.name : `Musteri #${numericUserId}`;
-            const confirmed = confirm(`${displayName} icin kayitli tum AI devir ozetleri silinsin mi?`);
+            const confirmed = confirm(`${displayName} için kayıtlı tüm yapay zekâ devir özetleri silinsin mi?`);
             if (!confirmed) return;
 
             try {
                 const response = await adminApiFetch(`/api/messages/handoffs/${numericUserId}`, { method: 'DELETE' });
-                const payload = await adminReadJson(response, 'AI devir kaydi silinemedi.');
+                const payload = await adminReadJson(response, 'Yapay zekâ devir kaydı silinemedi.');
                 if (Number(currentAiHandoffUserId) === numericUserId) {
                     currentAiHandoffUserId = null;
                 }
                 await loadAiHandoffs(false);
-                alert(payload && payload.mesaj ? payload.mesaj : 'AI devir kaydi silindi.');
+                alert(payload && payload.mesaj ? payload.mesaj : 'Yapay zekâ devir kaydı silindi.');
             } catch (err) {
-                alert(err.message || 'AI devir kaydi silinemedi.');
+                alert(err.message || 'Yapay zekâ devir kaydı silinemedi.');
             }
         }
 
@@ -4237,7 +4237,7 @@
                 if (msg.is_ai_handoff || messageText.startsWith('[AI DESTEK DEVRI]')) {
                     return `
                         <div style="background:linear-gradient(180deg,#FFF7ED 0%,#FFFFFF 100%); border:1px solid #FED7AA; border-radius:14px; padding:14px 16px; margin-bottom:14px; box-shadow:0 6px 18px rgba(15,42,67,0.05);">
-                            <div style="font-size:0.76rem; font-weight:800; color:#C2410C; margin-bottom:8px; letter-spacing:0.02em;">AI DEVİR ÖZETİ</div>
+                            <div style="font-size:0.76rem; font-weight:800; color:#C2410C; margin-bottom:8px; letter-spacing:0.02em;">YAPAY ZEKÂ DEVİR ÖZETİ</div>
                             <div style="font-size:0.88rem; color:#7C2D12; line-height:1.55;">${escapeAdminHtml(cleanAiSummary(messageText)).replace(/\n/g, '<br>')}</div>
                             <div style="font-size:0.72rem; color:#9A3412; margin-top:8px;">${escapeAdminHtml(createdAt)}</div>
                         </div>
@@ -4267,7 +4267,7 @@
             const meta = aiHandoffItems.find((item) => Number(item.id) === Number(userId));
 
             if (!meta) {
-                setAiHandoffEmptyState('AI devir kaydi bulunamadi.');
+                setAiHandoffEmptyState('Yapay zekâ devir kaydı bulunamadı.');
                 return;
             }
 
@@ -4279,14 +4279,14 @@
                             <div style="font-size:0.84rem; color:#667085; margin-top:4px;">${escapeAdminHtml(meta.email || '')}</div>
                         </div>
                         <div style="text-align:right; font-size:0.78rem; color:#667085;">
-                            <div><strong>${Number(meta.handoff_count || 1)}</strong> AI devri</div>
+                            <div><strong>${Number(meta.handoff_count || 1)}</strong> yapay zekâ devri</div>
                             <div style="margin-top:4px;">Son devir: ${escapeAdminHtml(formatAdminDate(meta.latest_handoff_at))}</div>
                         </div>
                     </div>
                 `;
                 const deleteButton = document.createElement('button');
                 deleteButton.type = 'button';
-                deleteButton.innerText = 'AI devrini sil';
+                deleteButton.innerText = 'Yapay zekâ devrini sil';
                 deleteButton.style.marginTop = '14px';
                 deleteButton.style.border = 'none';
                 deleteButton.style.borderRadius = '10px';
@@ -4829,7 +4829,7 @@
                     datasets: [
                         {
                             type: 'bar',
-                            label: 'Sayfa Goruntuleme',
+                            label: 'Sayfa Görüntüleme',
                             data: trends.map((item) => item.totalPageViews),
                             yAxisID: 'y1',
                             backgroundColor: palette.isDark ? 'rgba(247, 148, 29, 0.24)' : 'rgba(247, 148, 29, 0.18)',
@@ -4852,7 +4852,7 @@
                         },
                         {
                             type: 'line',
-                            label: 'Donusen Oturum',
+                            label: 'Dönüşen Oturum',
                             data: trends.map((item) => item.convertedSessions),
                             yAxisID: 'y',
                             borderColor: palette.green,
@@ -4956,7 +4956,7 @@
                         },
                         {
                             type: 'bar',
-                            label: 'Goruntuleme',
+                            label: 'Görüntüleme',
                             data: rows.map((row) => row.views),
                             yAxisID: 'y',
                             backgroundColor: palette.isDark ? 'rgba(21, 101, 192, 0.64)' : 'rgba(21, 101, 192, 0.74)',
@@ -4976,7 +4976,7 @@
                         },
                         {
                             type: 'line',
-                            label: 'Ort. Inceleme (dk)',
+                            label: 'Ort. İnceleme (dk)',
                             data: rows.map((row) => Number((row.avgDurationSeconds / 60).toFixed(2))),
                             yAxisID: 'y1',
                             borderColor: palette.purple,
@@ -5378,6 +5378,17 @@
             }
         }
 
+        function getPublicationStatusLabel(status) {
+            const labels = {
+                active: 'Aktif',
+                inactive: 'Pasif',
+                draft: 'Taslak',
+                pending_approval: 'Onay Bekliyor'
+            };
+            const normalized = String(status || 'active').trim().toLowerCase();
+            return labels[normalized] || status || 'Aktif';
+        }
+
         async function fetchProducts() {
             try {
                 const res = await adminApiFetch('/api/products');
@@ -5397,7 +5408,7 @@
                     const stockState = stockCount > 0
                         ? '<span class="stock-state in">Satılabilir</span>'
                         : '<span class="stock-state out">Tükendi · satın alınamaz</span>';
-                    const publicationState = escapeAdminHtml(p.publication_status || 'active');
+                    const publicationState = escapeAdminHtml(getPublicationStatusLabel(p.publication_status));
                     const customerVisibility = p.is_customer_visible === false ? ' · müşteriye gizli' : '';
 
                     tbody.innerHTML += `

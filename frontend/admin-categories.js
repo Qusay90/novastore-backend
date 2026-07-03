@@ -133,7 +133,7 @@
         if (category.is_active === false) return { label: 'Pasif', className: 'inactive' };
         if (category.is_customer_visible === false) return { label: 'Gizli', className: 'hidden' };
         if (Number(category.subtree_visible_product_count || 0) === 0) {
-            return { label: 'Public boş', className: 'empty' };
+            return { label: 'Müşteriye gösterilecek ürün yok', className: 'empty' };
         }
         return { label: 'Yayında', className: 'active' };
     }
@@ -152,7 +152,7 @@
             const depth = Number(category.depth || 0);
             const indent = Math.min(depth, 12) * 22;
             const archiveAction = category.deleted_at ? 'restore' : 'archive';
-            const archiveLabel = category.deleted_at ? 'Geri Yükle' : 'Arşivle';
+            const archiveLabel = category.deleted_at ? 'Arşivden Çıkar' : 'Arşivle';
             const parentName = category.parent_id
                 ? state.flat.find((item) => Number(item.id) === Number(category.parent_id))?.name || '—'
                 : 'Kök';
@@ -164,7 +164,7 @@
                         <div class="category-tree-name" style="padding-left:${indent}px">
                             <span class="category-tree-branch" aria-hidden="true">${depth ? '↳' : '●'}</span>
                             <strong>${escapeHtml(category.name)}</strong>
-                            <small>/${escapeHtml(category.path || category.slug || '')}</small>
+                            <small>Site İçi Yol: /${escapeHtml(category.path || category.slug || '')}</small>
                         </div>
                     </td>
                     <td>${escapeHtml(parentName)}</td>

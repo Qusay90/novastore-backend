@@ -168,7 +168,7 @@
             return false;
         }
         if (!state.leafIds.has(id)) {
-            setError('Ürünler yalnızca leaf kategorilere atanabilir; parent kategori seçilemez.');
+            setError('Ürünler yalnızca ürün atanabilir son kategorilere atanabilir; üst kategori seçilemez.');
             return false;
         }
         setError('');
@@ -190,7 +190,7 @@
     function setPrimary(rawId) {
         const id = Number(rawId);
         if (!state.selectedIds.includes(id)) {
-            setError('Primary kategori, seçili kategoriler içinde olmalıdır.');
+            setError('Ana ürün kategorisi, seçili kategoriler içinde olmalıdır.');
             return false;
         }
         state.primaryId = id;
@@ -210,13 +210,13 @@
     function renderCategorySelect() {
         const select = document.getElementById('prod-category');
         if (!select) return;
-        const options = ['<option value="">Leaf kategori ekleyin</option>'];
+        const options = ['<option value="">Ürün atanabilir son kategori ekleyin</option>'];
         state.categories.forEach((category) => {
             if (category.deleted_at || state.selectedIds.includes(Number(category.id))) return;
             const isLeaf = state.leafIds.has(Number(category.id));
             options.push(
                 `<option value="${Number(category.id)}"${isLeaf ? '' : ' disabled'}>` +
-                `${escapeHtml(categoryLabel(category))}${isLeaf ? '' : ' · parent'}</option>`
+                `${escapeHtml(categoryLabel(category))}${isLeaf ? '' : ' · üst kategori'}</option>`
             );
         });
         select.innerHTML = options.join('');
@@ -227,12 +227,12 @@
         const container = document.getElementById('selected-product-categories');
         if (!container) return;
         if (!state.selectedIds.length) {
-            container.innerHTML = '<span class="selected-category-empty">Henüz leaf kategori eklenmedi.</span>';
+            container.innerHTML = '<span class="selected-category-empty">Henüz ürün atanabilir son kategori eklenmedi.</span>';
             return;
         }
         container.innerHTML = state.selectedIds.map((id) => {
             const category = state.byId.get(id);
-            const primary = id === state.primaryId ? '<strong class="primary-category-mark">Primary</strong>' : '';
+            const primary = id === state.primaryId ? '<strong class="primary-category-mark">Ana Ürün Kategorisi</strong>' : '';
             return `<span class="selected-category-chip">
                 <span>${escapeHtml(category?.name || `Kategori #${id}`)}</span>
                 ${primary}
@@ -246,7 +246,7 @@
     function renderPrimarySelect() {
         const select = document.getElementById('prod-primary-category');
         if (!select) return;
-        const options = ['<option value="">Primary kategori seçin</option>'];
+        const options = ['<option value="">Ana ürün kategorisi seçin</option>'];
         state.selectedIds.forEach((id) => {
             const category = state.byId.get(id);
             options.push(
@@ -295,12 +295,12 @@
                 ${(definition.options || []).map((option) => `<label class="category-toggle">
                     <input type="checkbox" value="${Number(option.id)}"${selectedIds.has(Number(option.id)) ? ' checked' : ''}>
                     ${escapeHtml(option.label)}
-                </label>`).join('') || '<small>Aktif option bulunmuyor.</small>'}
+                </label>`).join('') || '<small>Aktif seçenek bulunmuyor.</small>'}
             </div>`;
         } else if (definition.type === 'range') {
             input = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" data-attribute-code="${code}" data-attribute-type="range">
-                <input type="number" step="any" class="form-control" data-range-part="min" placeholder="Min" value="${escapeHtml(value?.min ?? '')}">
-                <input type="number" step="any" class="form-control" data-range-part="max" placeholder="Max" value="${escapeHtml(value?.max ?? '')}">
+                <input type="number" step="any" class="form-control" data-range-part="min" placeholder="En az" value="${escapeHtml(value?.min ?? '')}">
+                <input type="number" step="any" class="form-control" data-range-part="max" placeholder="En fazla" value="${escapeHtml(value?.max ?? '')}">
             </div>`;
         }
         return `<div class="form-group"><label>${escapeHtml(definition.name)}${required}${unit}</label>${input}</div>`;
@@ -310,11 +310,11 @@
         const container = document.getElementById('product-attributes-fields');
         if (!container) return;
         if (!state.selectedIds.length) {
-            container.innerHTML = '<p class="catalog-admin-empty">Özellik alanları seçilen leaf kategorilere göre yüklenir.</p>';
+            container.innerHTML = '<p class="catalog-admin-empty">Özellik alanları seçilen ürün atanabilir son kategorilere göre yüklenir.</p>';
             return;
         }
         if (!state.attributeDefinitions.length) {
-            container.innerHTML = '<p class="catalog-admin-empty">Seçilen kategoriler için aktif attribute template bulunmuyor.</p>';
+            container.innerHTML = '<p class="catalog-admin-empty">Seçilen kategoriler için aktif özellik / filtre şablonu bulunmuyor.</p>';
             return;
         }
         container.innerHTML = `<div class="catalog-admin-form">${state.attributeDefinitions.map(renderAttributeInput).join('')}</div>`;
@@ -385,14 +385,14 @@
         const status = String(publicationStatus || 'active').trim().toLowerCase();
         if (state.selectedIds.length === 0) {
             if (status === 'active') {
-                const message = 'Aktif ürün için en az bir leaf kategori ve primary kategori zorunludur.';
+                const message = 'Aktif ürün için en az bir ürün atanabilir son kategori ve ana ürün kategorisi zorunludur.';
                 setError(message);
                 throw new Error(message);
             }
             return { hasAssignment: false, categoryIds: [], primaryCategoryId: null, categoryNames: [] };
         }
         if (!state.primaryId || !state.selectedIds.includes(state.primaryId)) {
-            const message = 'Primary kategori, seçili categoryIds içinde olmalıdır.';
+            const message = 'Ana ürün kategorisi, seçili kategoriler içinde olmalıdır.';
             setError(message);
             throw new Error(message);
         }
@@ -426,7 +426,7 @@
         if (!categories.length) return '<span class="cat-badge">Manuel seçim gerekli</span>';
         return categories.map((category) =>
             `<span class="cat-badge${category.primary ? ' is-primary' : ''}">` +
-            `${escapeHtml(category.name)}${category.primary ? ' · Primary' : ''}</span>`
+            `${escapeHtml(category.name)}${category.primary ? ' · Ana Ürün Kategorisi' : ''}</span>`
         ).join(' ');
     }
 

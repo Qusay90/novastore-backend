@@ -36,10 +36,10 @@
                     <form id="admin-menu-form" class="catalog-admin-form" hidden>
                         <input type="hidden" id="admin-menu-id">
                         <div class="form-group">
-                            <label for="admin-menu-code">Kod</label>
+                            <label for="admin-menu-code">Sistem Kodu</label>
                             <select id="admin-menu-code" class="form-control" required>
-                                <option value="main">main</option><option value="footer">footer</option>
-                                <option value="mobile">mobile</option><option value="home">home</option>
+                                <option value="main">Ana Menü</option><option value="footer">Alt Bilgi Menüsü</option>
+                                <option value="mobile">Mobil Menü</option><option value="home">Ana Sayfa Menüsü</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -63,24 +63,24 @@
                         <input type="hidden" id="admin-menu-item-id">
                         <div class="form-group"><label>Başlık</label><input id="admin-menu-item-title" class="form-control" maxlength="160" required></div>
                         <div class="form-group"><label>Alt başlık</label><input id="admin-menu-item-subtitle" class="form-control" maxlength="240"></div>
-                        <div class="form-group"><label>Hedef tipi</label>
+                        <div class="form-group"><label>Hedef Türü</label>
                             <select id="admin-menu-target-type" class="form-control">
                                 <option value="">Sadece grup</option>
                                 <option value="category">Kategori</option>
                                 <option value="collection">Koleksiyon</option>
-                                <option value="internal_url">Site içi link</option>
+                                <option value="internal_url">Site İçi Bağlantı</option>
                             </select>
                         </div>
                         <div class="form-group" id="admin-menu-target-select-wrap"><label>Hedef</label>
                             <select id="admin-menu-target-id" class="form-control"></select>
                         </div>
-                        <div class="form-group" id="admin-menu-url-wrap" hidden><label>Site içi path</label>
+                        <div class="form-group" id="admin-menu-url-wrap" hidden><label>Site İçi Yol</label>
                             <input id="admin-menu-internal-url" class="form-control" placeholder="/kampanyalar">
                         </div>
-                        <div class="form-group"><label>Parent</label><select id="admin-menu-parent" class="form-control"></select></div>
+                        <div class="form-group"><label>Üst Menü Öğesi</label><select id="admin-menu-parent" class="form-control"></select></div>
                         <div class="form-group"><label>Sıra</label><input id="admin-menu-sort" type="number" min="0" class="form-control" value="0"></div>
                         <div class="form-group"><label>İkon</label><input id="admin-menu-icon" class="form-control" maxlength="120"></div>
-                        <div class="form-group"><label>Görsel URL</label><input id="admin-menu-image" class="form-control"></div>
+                        <div class="form-group"><label>Görsel Adresi</label><input id="admin-menu-image" class="form-control"></div>
                         <div class="form-group"><label>Vurgu rengi</label><input id="admin-menu-accent" class="form-control" placeholder="#F7941D"></div>
                         <label class="category-toggle"><input type="checkbox" id="admin-menu-item-active" checked> Aktif</label>
                         <div class="catalog-admin-actions span-2">
@@ -103,7 +103,7 @@
     function populateMenuSelect() {
         const select = document.getElementById('admin-menu-select');
         select.innerHTML = state.menus.length
-            ? state.menus.map((menu) => `<option value="${Number(menu.id)}">${escapeHtml(menu.name)} (${escapeHtml(menu.code)})</option>`).join('')
+            ? state.menus.map((menu) => `<option value="${Number(menu.id)}">${escapeHtml(menu.name)} (Sistem Kodu: ${escapeHtml(menu.code)})</option>`).join('')
             : '<option value="">Henüz menü yok</option>';
         if (!state.selectedMenuId && state.menus[0]) state.selectedMenuId = Number(state.menus[0].id);
         select.value = state.selectedMenuId ? String(state.selectedMenuId) : '';
@@ -111,7 +111,7 @@
         document.getElementById('admin-menu-summary').innerHTML = menu
             ? `<div class="catalog-admin-card${menu.is_active ? '' : ' is-inactive'}">
                 <strong>${escapeHtml(menu.name)}</strong>
-                <div class="catalog-admin-meta">Kod: ${escapeHtml(menu.code)} · ${Number(menu.item_count || 0)} öğe · ${menu.is_active ? 'Aktif' : 'Pasif'}</div>
+                <div class="catalog-admin-meta">Sistem Kodu: ${escapeHtml(menu.code)} · ${Number(menu.item_count || 0)} öğe · ${menu.is_active ? 'Aktif' : 'Pasif'}</div>
                 <div class="catalog-admin-actions" style="margin-top:9px">
                     <button class="btn-edit" data-menu-action="edit-menu" data-id="${Number(menu.id)}">Düzenle</button>
                     <button class="btn-edit" data-menu-action="toggle-menu" data-id="${Number(menu.id)}">${menu.is_active ? 'Pasifleştir' : 'Aktifleştir'}</button>
@@ -148,7 +148,7 @@
         if (item.target_type === 'collection') {
             return `Koleksiyon: ${state.collections.find((entry) => Number(entry.id) === Number(item.collection_id))?.name || item.collection_id}`;
         }
-        if (item.target_type === 'internal_url') return `Path: ${item.internal_url}`;
+        if (item.target_type === 'internal_url') return `Site İçi Yol: ${item.internal_url}`;
         return 'Hedefsiz grup';
     }
 

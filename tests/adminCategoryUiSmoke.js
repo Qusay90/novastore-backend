@@ -174,6 +174,8 @@ assert(moduleSource.includes('`/api/admin/categories/${state.editingId}/move`'))
 assert(moduleSource.includes('`/api/admin/categories/${Number(categoryId)}/archive`'));
 assert(!moduleSource.includes("method: 'DELETE'"), 'Admin category UI must archive instead of deleting');
 assert(moduleSource.includes('error.textContent = message'), 'Backend errors must be rendered as text');
+assert(adminHtml.includes('<th>Kayıt No.</th>'));
+assert(moduleSource.includes('Site İçi Yol: /'));
 
 (async () => {
     const calls = [];
@@ -197,7 +199,7 @@ assert(moduleSource.includes('error.textContent = message'), 'Backend errors mus
     assert.strictEqual(callbackCategories.length, 4);
     assert(fakeElements['categories-table-body'].innerHTML.includes('Arşiv'));
     assert(fakeElements['categories-table-body'].innerHTML.includes('Pasif'));
-    assert(fakeElements['categories-table-body'].innerHTML.includes('Public boş'));
+    assert(fakeElements['categories-table-body'].innerHTML.includes('Müşteriye gösterilecek ürün yok'));
     assert(!fakeElements['categories-table-body'].innerHTML.includes('<img src=x'));
     assert(fakeElements['categories-table-body'].innerHTML.includes('&lt;img src=x'));
     assert.strictEqual(typeof submitHandler, 'function');

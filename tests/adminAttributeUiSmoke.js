@@ -19,6 +19,7 @@ assert.strictEqual(
     sandbox.window.NovaStoreAdminAttributes._test.escapeHtml('<script>x</script>'),
     '&lt;script&gt;x&lt;/script&gt;'
 );
+assert.strictEqual(sandbox.window.NovaStoreAdminAttributes._test.attributeTypeLabel('multi_option'), 'Çoklu Seçenek');
 
 for (const marker of [
     "switchTab('attributes'",
@@ -47,5 +48,11 @@ assert(attributeSource.includes('is_filterable'));
 assert(productSource.includes('/api/admin/attribute-templates/resolve?categoryIds='));
 assert(productSource.includes('getAttributeSubmission'));
 assert(productSource.includes('Aktif ürün için'));
+assert(attributeSource.includes('Doğrulama Kuralları (JSON)'));
+assert(attributeSource.includes('Filtrede Göster'));
+assert(attributeSource.includes('Varyantta Kullan'));
+assert(attributeSource.includes('Ürün Bilgisi'));
+assert(attributeSource.includes('Özellik Türü'));
+assert(attributeSource.includes('Sistem Kodu:'));
 
 console.log('admin attribute UI smoke passed');

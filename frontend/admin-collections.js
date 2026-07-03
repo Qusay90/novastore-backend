@@ -4,7 +4,7 @@
     const RULE_LABELS = {
         new_arrivals: 'Yeni Gelenler · son 30 gün',
         discount: 'İndirim · eski fiyat yeni fiyattan yüksek',
-        best_sellers: 'Çok Satanlar · son 30 gün PAID + Teslim Edildi'
+        best_sellers: 'Çok Satanlar · son 30 gün · ödemesi alınmış ve teslim edilmiş'
     };
     const state = {
         collections: [],
@@ -31,17 +31,17 @@
             <div class="catalog-admin-toolbar">
                 <div>
                     <strong>Koleksiyonlar</strong>
-                    <div class="catalog-admin-meta">Boş ve pasif koleksiyonlar public API tarafından otomatik gizlenir.</div>
+                    <div class="catalog-admin-meta">Boş ve pasif koleksiyonlar müşteri tarafında otomatik gizlenir.</div>
                 </div>
                 <button type="button" class="btn-add" data-collection-action="new">+ Koleksiyon</button>
             </div>
             <form id="admin-collection-form" class="catalog-admin-form" hidden>
                 <input type="hidden" id="admin-collection-id">
                 <div class="form-group"><label>Ad</label><input id="admin-collection-name" class="form-control" maxlength="160" required></div>
-                <div class="form-group"><label>Slug</label><input id="admin-collection-slug" class="form-control" maxlength="180"></div>
-                <div class="form-group"><label>Tip</label>
+                <div class="form-group"><label>URL Adı</label><input id="admin-collection-slug" class="form-control" maxlength="180"></div>
+                <div class="form-group"><label>Koleksiyon Türü</label>
                     <select id="admin-collection-type" class="form-control">
-                        <option value="manual">Manual</option><option value="dynamic">Dynamic</option>
+                        <option value="manual">Manuel</option><option value="dynamic">Dinamik</option>
                     </select>
                 </div>
                 <div class="form-group" id="admin-collection-rule-wrap" hidden><label>Dinamik kural</label>
@@ -52,11 +52,11 @@
                     </select>
                 </div>
                 <div class="form-group span-2"><label>Açıklama</label><textarea id="admin-collection-description" class="form-control" rows="3"></textarea></div>
-                <div class="form-group"><label>Görsel URL</label><input id="admin-collection-image" class="form-control"></div>
-                <div class="form-group"><label>Banner URL</label><input id="admin-collection-banner" class="form-control"></div>
+                <div class="form-group"><label>Görsel Adresi</label><input id="admin-collection-image" class="form-control"></div>
+                <div class="form-group"><label>Büyük Görsel Adresi</label><input id="admin-collection-banner" class="form-control"></div>
                 <div class="form-group"><label>Sıra</label><input id="admin-collection-sort" type="number" min="0" class="form-control" value="0"></div>
-                <div class="form-group"><label>SEO başlık</label><input id="admin-collection-seo-title" class="form-control"></div>
-                <div class="form-group span-2"><label>SEO açıklama</label><textarea id="admin-collection-seo-description" class="form-control" rows="2"></textarea></div>
+                <div class="form-group"><label>Arama Motoru Başlığı</label><input id="admin-collection-seo-title" class="form-control"></div>
+                <div class="form-group span-2"><label>Arama Motoru Açıklaması</label><textarea id="admin-collection-seo-description" class="form-control" rows="2"></textarea></div>
                 <label class="category-toggle"><input type="checkbox" id="admin-collection-home"> Ana sayfada göster</label>
                 <label class="category-toggle"><input type="checkbox" id="admin-collection-active" checked> Aktif</label>
                 <div class="catalog-admin-actions span-2">
@@ -67,7 +67,7 @@
             <div class="catalog-admin-grid" style="margin-top:16px">
                 <div id="admin-collection-list" class="catalog-admin-list"></div>
                 <section id="admin-manual-products" class="catalog-admin-panel">
-                    <div class="catalog-admin-warning">Manual ürünlerini yönetmek için bir manual koleksiyon seçin.</div>
+                    <div class="catalog-admin-warning">Manuel ürünleri yönetmek için manuel bir koleksiyon seçin.</div>
                 </section>
             </div>`;
     }
@@ -83,12 +83,12 @@
         const container = document.getElementById('admin-collection-list');
         container.innerHTML = state.collections.map((collection) => {
             const isManual = collection.collection_type === 'manual';
-            const rule = isManual ? 'Manual' : RULE_LABELS[collection.rule_code] || collection.rule_code;
+            const rule = isManual ? 'Manuel' : RULE_LABELS[collection.rule_code] || collection.rule_code;
             return `<article class="catalog-admin-card${collection.is_active ? '' : ' is-inactive'}">
                 <div class="catalog-admin-card-head">
                     <div>
                         <strong>${escapeHtml(collection.name)}</strong>
-                        <div class="catalog-admin-meta">/${escapeHtml(collection.slug)} · sıra ${Number(collection.sort_order || 0)}</div>
+                        <div class="catalog-admin-meta">URL Adı: /${escapeHtml(collection.slug)} · Sıra ${Number(collection.sort_order || 0)}</div>
                     </div>
                     <div>
                         <span class="catalog-admin-badge">${escapeHtml(rule)}</span>
@@ -97,11 +97,11 @@
                 </div>
                 <p class="catalog-admin-meta">${escapeHtml(collection.description || 'Açıklama yok')}</p>
                 ${isManual && Number(collection.manual_product_count || 0) === 0
-                    ? '<div class="catalog-admin-warning">Boş: storefront’ta görünmez.</div>' : ''}
+                    ? '<div class="catalog-admin-warning">Boş: mağazada görünmez.</div>' : ''}
                 <div class="catalog-admin-actions" style="margin-top:9px">
                     <button class="btn-edit" data-collection-action="edit" data-id="${Number(collection.id)}">Düzenle</button>
                     ${isManual ? `<button class="btn-edit" data-collection-action="products" data-id="${Number(collection.id)}">Ürünler (${Number(collection.manual_product_count || 0)})</button>` : ''}
-                    <button class="btn-edit" data-collection-action="archive" data-id="${Number(collection.id)}">${collection.is_active ? 'Arşivle' : 'Aktifleştir'}</button>
+                    <button class="btn-edit" data-collection-action="archive" data-id="${Number(collection.id)}">${collection.is_active ? 'Arşivle' : 'Arşivden Çıkar'}</button>
                 </div>
             </article>`;
         }).join('') || '<div class="catalog-admin-warning">Henüz koleksiyon yok.</div>';
@@ -122,7 +122,7 @@
         const panel = document.getElementById('admin-manual-products');
         const collection = findCollection(state.selectedManualId);
         if (!collection) {
-            panel.innerHTML = '<div class="catalog-admin-warning">Manual ürünlerini yönetmek için bir manual koleksiyon seçin.</div>';
+            panel.innerHTML = '<div class="catalog-admin-warning">Manuel ürünleri yönetmek için manuel bir koleksiyon seçin.</div>';
             return;
         }
         panel.innerHTML = `
@@ -144,13 +144,13 @@
                         </div>
                         <button class="btn-edit" data-collection-action="remove-product" data-product-id="${Number(product.id)}">Çıkar</button>
                     </div>
-                </div>`).join('') || '<div class="catalog-admin-warning">Bu manual koleksiyon boş; storefront’ta gösterilmez.</div>'}
+                </div>`).join('') || '<div class="catalog-admin-warning">Bu manuel koleksiyon boş; mağazada gösterilmez.</div>'}
             </div>`;
     }
 
     async function loadManualProducts(id) {
         state.selectedManualId = Number(id);
-        state.manualProducts = await api(`/api/admin/collections/${id}/products`, {}, 'Manual ürünler yüklenemedi.');
+        state.manualProducts = await api(`/api/admin/collections/${id}/products`, {}, 'Manuel ürünler yüklenemedi.');
         renderManualProducts();
     }
 
