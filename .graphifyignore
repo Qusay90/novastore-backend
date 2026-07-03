@@ -1,16 +1,19 @@
-﻿# Graphify code-only mode için
-# Amaç: docs/images/secret/build dosyalarını graphify dışında bırakmak
+﻿# NovaStore Graphify code-only mode
+# Amaç: LLM API key gerekmeden sadece kod grafiği üretmek.
 
-# Secrets / signing
+# Secrets / env / signing
 .env
 .env.*
+*.env
 keystore.properties
 *.jks
 *.keystore
 release-keys/
 
-# Heavy/generated
+# Generated / heavy folders
+.git/
 node_modules/
+app/build/
 build/
 .gradle/
 dist/
@@ -18,10 +21,25 @@ coverage/
 artifacts/
 graphify-out/
 
-# Docs / markdown / text
+# Graphify/Codex docs themselves
+.codex/
+AGENTS.md
+EXTERNAL_SERVICES.md
+PROJECT_MAP.md
+
+# Logs / temporary text files
+*.log
+*.txt
+error.txt
+puppeteer_logs.txt
+test_out_encoded.txt
+Görsel bilgileri.txt
+
+# Docs
 docs/
 *.md
-*.txt
+*.rst
+*.adoc
 *.pdf
 *.doc
 *.docx
