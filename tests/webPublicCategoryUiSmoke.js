@@ -97,8 +97,7 @@ const productsMarkup = catalog._test.renderCategoryProducts([
     { id: 10, name: 'Stoklu', price: 100, stock: 2, image_url: 'https://cdn.test/in.jpg' },
     { id: 11, name: '<script>alert(1)</script>', price: 90, stock: 0, image_url: 'javascript:alert(1)' }
 ]);
-assert(productsMarkup.includes('Tükendi'));
-assert(productsMarkup.includes('Satın alınamaz'));
+assert(productsMarkup.includes('Stokta Yok'));
 assert(productsMarkup.includes('disabled'));
 assert(productsMarkup.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
 assert(!productsMarkup.includes('javascript:alert(1)'));
@@ -139,7 +138,7 @@ assert.strictEqual(sandbox.document.title, 'Elektronik SEO | NovaStore');
     assert(indexSource.includes('NovaStoreCatalogNavigation.mountMenu'));
     assert(!indexSource.includes('productMatchesCategory'));
     assert(indexSource.includes('catalog-sold-out-badge'));
-    assert(productSource.includes('Tükendi · satın alınamaz'));
+    assert(productSource.includes('Stokta Yok'));
     assert(productSource.includes('renderProductBreadcrumb(product)'));
     assert(productSource.includes('NovaStoreCatalogNavigation.mountMenu'));
     assert(categoriesSource.includes('loadCategoryPage'));

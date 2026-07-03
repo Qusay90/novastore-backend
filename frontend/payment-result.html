@@ -112,7 +112,7 @@
                 if (result.finalized === true && result.paymentStatus === 'PAID') {
                     title.innerText = 'Ödeme Başarılı';
                     title.className = 'ok';
-                    desc.innerText = `${result.message} (Ref: ${paymentRef})`;
+                    desc.innerText = `${result.message} (Ödeme Referansı: ${paymentRef})`;
                     clearFinalizedCheckoutItems(result.orderId || orderId, paymentRef);
                     clearPaytrCheckoutSession(paymentRef);
                 } else if (result.finalized === true && result.paymentStatus === 'FAILED') {
@@ -124,7 +124,7 @@
                 } else {
                     title.innerText = 'Ödeme Onayı Bekleniyor';
                     title.className = '';
-                    desc.innerText = `${result.message || 'Ödeme sağlayıcısından onay bekleniyor.'} (Ref: ${paymentRef})`;
+                    desc.innerText = `${result.message || 'Ödeme sağlayıcısından onay bekleniyor.'} (Ödeme Referansı: ${paymentRef})`;
                 }
 
                 if (window.NovaMobileBridge && typeof window.NovaMobileBridge.postMessage === 'function') {

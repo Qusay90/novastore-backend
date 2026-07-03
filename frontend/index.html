@@ -1003,7 +1003,7 @@
         }
 
         function normalizeProductCardMedia(product) {
-            const productName = String(product?.name || 'Urun');
+            const productName = String(product?.name || 'Ürün');
             const rawMediaItems = Array.isArray(product?.media) ? product.media : [];
             const normalizedItems = rawMediaItems
                 .map((mediaItem, index) => {
@@ -1034,7 +1034,7 @@
         }
 
         function buildProductCardMediaMarkup(mediaItems, productName) {
-            const safeProductName = escapeHtmlAttribute(productName || 'Urun');
+            const safeProductName = escapeHtmlAttribute(productName || 'Ürün');
             const hoverZoneCount = getProductCardHoverZoneCount(mediaItems.length);
             const slidesHtml = mediaItems.map((mediaItem) => {
                 const safeUrl = escapeHtmlAttribute(mediaItem.url);
@@ -1485,7 +1485,7 @@
                 container.innerHTML = `
                     <div class="cart-empty-msg">
                         <span style="font-size: 3rem; display:block; margin-bottom:15px;">🛒</span>
-                        Sepetiniz şu an bomboş.<br>Hemen ürün eklemeye başlayın!
+                        Sepetiniz boş.<br>Alışverişe devam ederek ürün ekleyebilirsiniz.
                     </div>`;
                 totalEl.innerText = "0.00";
                 badge.innerText = "0";
@@ -1781,8 +1781,8 @@
                 products.forEach(product => {
                     const productMediaItems = normalizeProductCardMedia(product);
                     const previewImageUrl = productMediaItems[0]?.url || product.image_url || 'https://via.placeholder.com/250?text=Görsel+Yok';
-                    const safeProductName = escapeHtml(product.name || 'Urun');
-                    const safeProductNameAttr = escapeHtmlAttribute(product.name || 'Urun');
+                    const safeProductName = escapeHtml(product.name || 'Ürün');
+                    const safeProductNameAttr = escapeHtmlAttribute(product.name || 'Ürün');
                     const productMediaMarkup = buildProductCardMediaMarkup(productMediaItems, product.name);
                     const soldOut = Number(product.stock || 0) <= 0;
 
@@ -1854,7 +1854,7 @@
                                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                                 </svg>
                             </button>
-                            ${soldOut ? '<span class="catalog-sold-out-badge">Tükendi</span>' : ''}
+                            ${soldOut ? '<span class="catalog-sold-out-badge">Stokta Yok</span>' : ''}
                             ${discountBadge} <a href="product.html?id=${product.id}" style="text-decoration: none; color: inherit;">
                                 ${productMediaMarkup}
                                 <div class="product-title" style="transition: 0.2s; cursor: pointer;" onmouseover="this.style.color='#F7941D'" onmouseout="this.style.color='#222'">${safeProductName}</div>
@@ -1863,7 +1863,7 @@
                             
                             <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; padding-top: 2px;">
                                 ${priceHtml} 
-                                <button class="btn-add" ${soldOut ? 'disabled aria-disabled="true" title="Tükendi"' : `onclick="addToCart(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price}, '${previewImageUrl}', ${product.old_price ? `'${product.old_price}'` : 'null'})" title="Sepete Ekle"`} aria-label="${safeProductNameAttr} ürününü sepete ekle">
+                                <button class="btn-add" ${soldOut ? 'disabled aria-disabled="true" title="Stokta Yok"' : `onclick="addToCart(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price}, '${previewImageUrl}', ${product.old_price ? `'${product.old_price}'` : 'null'})" title="Sepete Ekle"`} aria-label="${safeProductNameAttr} ürününü sepete ekle">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                        <circle cx="8" cy="21" r="2"></circle>
                                        <circle cx="20" cy="21" r="2"></circle>

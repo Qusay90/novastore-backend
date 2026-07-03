@@ -53,8 +53,7 @@ const soldOutMarkup = collections._test.renderProductCard({
     is_purchasable: false,
     image_url: 'javascript:alert(1)'
 });
-assert(soldOutMarkup.includes('Tükendi'));
-assert(soldOutMarkup.includes('Satın alınamaz'));
+assert(soldOutMarkup.includes('Stokta Yok'));
 assert(soldOutMarkup.includes('disabled'));
 assert(soldOutMarkup.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
 assert(!soldOutMarkup.includes('javascript:alert(1)'));

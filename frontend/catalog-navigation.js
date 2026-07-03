@@ -321,14 +321,14 @@
                         <a href="/product.html?id=${Number(product.id)}">
                             <div class="catalog-product-image">
                                 <img src="${escapeHtml(image)}" alt="${escapeHtml(product.name)}">
-                                ${soldOut ? '<span class="catalog-sold-out-badge">Tükendi</span>' : ''}
+                                ${soldOut ? '<span class="catalog-sold-out-badge">Stokta Yok</span>' : ''}
                             </div>
                             <strong>${escapeHtml(product.name)}</strong>
                         </a>
                         <span class="catalog-product-price">${escapeHtml(product.price)} TL</span>
                         ${soldOut
-                            ? '<button type="button" disabled>Satın alınamaz</button>'
-                            : `<a class="catalog-product-action" href="/product.html?id=${Number(product.id)}">Ürünü incele</a>`}
+                            ? '<button type="button" disabled>Stokta Yok</button>'
+                            : `<a class="catalog-product-action" href="/product.html?id=${Number(product.id)}">Detayları Gör</a>`}
                     </article>`;
                 }).join('')}
             </div>
@@ -345,8 +345,8 @@
                         return `<fieldset class="catalog-filter-group" data-filter-code="${escapeHtml(filter.code)}" data-filter-type="${escapeHtml(filter.type)}">
                             <legend>${escapeHtml(filter.name)}${filter.unit ? ` (${escapeHtml(filter.unit)})` : ''}</legend>
                             <div class="catalog-filter-range">
-                                <input type="number" step="any" data-filter-min placeholder="Min ${escapeHtml(filter.min ?? '')}">
-                                <input type="number" step="any" data-filter-max placeholder="Max ${escapeHtml(filter.max ?? '')}">
+                                <input type="number" step="any" data-filter-min placeholder="En az ${escapeHtml(filter.min ?? '')}">
+                                <input type="number" step="any" data-filter-max placeholder="En fazla ${escapeHtml(filter.max ?? '')}">
                             </div>
                         </fieldset>`;
                     }

@@ -98,7 +98,7 @@
                 <div class="status" id="paytr-status">Güvenli ödeme ekranı yükleniyor.</div>
                 <div class="meta" id="paytr-meta"></div>
             </div>
-            <a class="btn" href="checkout.html">Checkout'a Dön</a>
+            <a class="btn" href="checkout.html">Ödeme Adımına Dön</a>
         </header>
 
         <section class="error" id="paytr-error"></section>
@@ -146,7 +146,7 @@
             const orderId = readParam('orderId');
 
             if (!paymentRef || !orderId) {
-                showError('Ödeme referansı veya sipariş bilgisi eksik. Lütfen checkout ekranından tekrar deneyin.');
+                showError('Ödeme referansı veya sipariş bilgisi eksik. Lütfen ödeme adımından tekrar deneyin.');
                 return;
             }
 
@@ -162,7 +162,7 @@
                 return;
             }
 
-            document.getElementById('paytr-meta').innerText = `Sipariş #${orderId} · Ref: ${paymentRef}`;
+            document.getElementById('paytr-meta').innerText = `Sipariş No: ${orderId} · Ödeme Referansı: ${paymentRef}`;
             const frame = document.getElementById('paytr-frame');
             frame.addEventListener('load', () => {
                 document.getElementById('paytr-status').innerText = 'Güvenli ödeme ekranı hazır.';

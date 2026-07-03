@@ -194,7 +194,7 @@
     async function setFavorite(productId, shouldFavorite) {
         const id = Number.parseInt(productId, 10);
         if (!Number.isInteger(id) || id <= 0) {
-            throw new Error('Gecersiz urun id.');
+            throw new Error('Geçersiz ürün bilgisi.');
         }
 
         const authenticatedAtCall = isAuthenticated();

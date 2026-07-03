@@ -533,7 +533,7 @@
                     <div class="grid-2">
                         <div class="form-group">
                             <label>Son Kullanma (AA/YY)</label>
-                            <input type="text" id="cardExpiry" required placeholder="MM/YY" maxlength="5"
+                            <input type="text" id="cardExpiry" required placeholder="AA/YY" maxlength="5"
                                 oninput="formatExpiry(this)">
                         </div>
                         <div class="form-group">
@@ -746,7 +746,7 @@
             }
             cart.forEach(item => {
                 totalAmount += parseFloat(item.price) * item.quantity;
-                itemsContainer.innerHTML += `<div class="summary-item"><span>${item.quantity}x ${item.name}</span><span style="font-weight:600;">${(item.price * item.quantity).toFixed(2)} TL</span></div>`;
+                itemsContainer.innerHTML += `<div class="summary-item"><span>${item.quantity} adet ${item.name}</span><span style="font-weight:600;">${(item.price * item.quantity).toFixed(2)} TL</span></div>`;
             });
             document.getElementById('checkout-total').innerText = totalAmount.toFixed(2);
         }

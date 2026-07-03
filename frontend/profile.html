@@ -826,7 +826,7 @@
                 <div id="favorites-container">
                     <div style="text-align: center; padding: 40px 0; color: #666;">
                         <span style="font-size: 3rem; display: block; margin-bottom: 15px;">❤️</span>
-                        Favori listeniz şu an boş görünüyor. Vitrinden ürün eklemeye başlayın.
+                        Henüz favori ürününüz yok. Ürünleri keşfetmeye başlayın.
                     </div>
                 </div>
             </div>
@@ -1158,7 +1158,7 @@
                 container.innerHTML = `
                     <div class="cart-empty-msg" style="text-align: center; color: #888; margin-top: 60px; font-size: 1.1rem; line-height: 1.6;">
                         <span style="font-size: 3rem; display:block; margin-bottom:15px;">🛒</span>
-                        Sepetiniz şu an bomboş.<br>Hemen ürün eklemeye başlayın!
+                        Sepetiniz boş.<br>Alışverişe devam ederek ürün ekleyebilirsiniz.
                     </div>`;
                 totalEl.innerText = "0.00";
                 badge.innerText = "0";
@@ -1475,7 +1475,7 @@
                 } catch (e) { /* ürünler yüklenemezse harita boş kalır */ }
 
                 const effectiveUserId = getAuthenticatedUserId() || Number(user.id);
-                if (!Number.isInteger(effectiveUserId)) throw new Error('Oturum bilgisi dogrulanamadi.');
+                if (!Number.isInteger(effectiveUserId)) throw new Error('Oturum bilgisi doğrulanamadı.');
 
                 const response = await fetch('/api/orders/user/' + effectiveUserId, { headers: authHeaders() });
                 const orders = await response.json();
@@ -1484,7 +1484,7 @@
                 container.innerHTML = '';
 
                 if (orders.length === 0) {
-                    container.innerHTML = `<div style="text-align: center; padding: 40px 0;"><div style="font-size: 4rem; margin-bottom: 15px;">🛍️</div><p style="font-size: 1.1rem; color: #555; margin-bottom: 20px;">Henüz hiç sipariş vermemişsiniz.</p><a href="index.html" class="btn-action" style="text-decoration: none; display: inline-block;">Alışverişe Başla</a></div>`;
+                    container.innerHTML = `<div style="text-align: center; padding: 40px 0;"><div style="font-size: 4rem; margin-bottom: 15px;">🛍️</div><p style="font-size: 1.1rem; color: #555; margin-bottom: 20px;">Henüz siparişiniz yok.</p><a href="index.html" class="btn-action" style="text-decoration: none; display: inline-block;">Alışverişe Başla</a></div>`;
                     return;
                 }
 
@@ -1512,7 +1512,7 @@
                                     <div style="width: 50px; height: 50px; flex-shrink: 0; border-radius: 6px; border: 1px solid #EEE; display: flex; align-items: center; justify-content: center; overflow: hidden; background: white;">
                                         <img src="${itemImage}" alt="Ürün" style="max-width: 90%; max-height: 90%; object-fit: contain;" onerror="this.onerror=null; this.src='${fallbackSvg}'">
                                     </div>
-                                    <div class="item-name" style="flex: 1; display:flex; align-items: center;"><span class="item-qty" style="font-weight: bold; color: #F7941D; margin-right: 8px;">${item.quantity}x</span> ${item.name}</div>
+                                    <div class="item-name" style="flex: 1; display:flex; align-items: center;"><span class="item-qty" style="font-weight: bold; color: #F7941D; margin-right: 8px;">${item.quantity} adet</span> ${item.name}</div>
                                     <div style="color: #666; font-weight: 600;">${(parseFloat(item.price) * parseInt(item.quantity)).toFixed(2)} TL</div>
                                 </div>
                             `;
@@ -1602,7 +1602,7 @@
                                 <div class="compact-order-header" onclick="toggleOrderDetails(${order.id})">
                                     <div class="compact-header-top">
                                         <div class="compact-image-box">
-                                            <span class="compact-badge">x${firstItemQty}</span>
+                                            <span class="compact-badge">×${firstItemQty}</span>
                                             <img src="${firstItemImage}" alt="Ürün" onerror="this.onerror=null; this.src='${fallbackSvg}'">
                                         </div>
                                         <div class="compact-right">
@@ -1665,9 +1665,9 @@
                     }
                 });
             } catch (error) {
-                const rawMsg = error && error.message ? error.message : 'Sunucuya baglanilamadi!';
+                const rawMsg = error && error.message ? error.message : 'Sunucuya bağlanılamadı.';
                 const isAuthError = /Authentication required|Invalid or expired token|Access denied|403|401/i.test(rawMsg);
-                const msg = isAuthError ? 'Oturum suresi dolmus. Lutfen tekrar giris yapin.' : rawMsg;
+                const msg = isAuthError ? 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.' : rawMsg;
                 document.getElementById('orders-container').innerHTML = '<p style="color:red; text-align:center;">' + msg + '</p>';
             }
         }
@@ -1957,7 +1957,7 @@
                     document.getElementById('favorites-container').innerHTML = `
                         <div style="text-align: center; padding: 40px 0; color: #666;">
                             <span style="font-size: 3rem; display: block; margin-bottom: 15px;">❤️</span>
-                            Favori listeniz şu an boş görünüyor. Vitrinden ürün eklemeye başlayın.
+                            Henüz favori ürününüz yok. Ürünleri keşfetmeye başlayın.
                         </div>`;
                 }
             }, 300);
@@ -1972,7 +1972,7 @@
                 container.innerHTML = `
                     <div style="text-align: center; padding: 40px 0; color: #666;">
                         <span style="font-size: 3rem; display: block; margin-bottom: 15px;">❤️</span>
-                        Favori listeniz şu an boş görünüyor. Vitrinden ürün eklemeye başlayın.
+                        Henüz favori ürününüz yok. Ürünleri keşfetmeye başlayın.
                     </div>`;
                 return;
             }

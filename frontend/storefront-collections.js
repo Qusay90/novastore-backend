@@ -57,14 +57,14 @@
             <a href="/product.html?id=${Number(product.id)}">
                 <div class="catalog-product-image">
                     <img src="${escapeHtml(image)}" alt="${escapeHtml(product.name)}">
-                    ${soldOut ? '<span class="catalog-sold-out-badge">Tükendi</span>' : ''}
+                    ${soldOut ? '<span class="catalog-sold-out-badge">Stokta Yok</span>' : ''}
                 </div>
                 <strong>${escapeHtml(product.name)}</strong>
             </a>
             <span class="catalog-product-price">${escapeHtml(product.price)} TL</span>
             ${soldOut
-                ? '<button type="button" disabled>Satın alınamaz</button>'
-                : `<a class="catalog-product-action" href="/product.html?id=${Number(product.id)}">Ürünü incele</a>`}
+                ? '<button type="button" disabled>Stokta Yok</button>'
+                : `<a class="catalog-product-action" href="/product.html?id=${Number(product.id)}">Detayları Gör</a>`}
         </article>`;
     }
 
@@ -75,7 +75,7 @@
         return `<section class="storefront-collection-block">
             <div class="storefront-collection-heading">
                 <div>
-                    <span class="storefront-collection-kicker">${escapeHtml(collection.collection_type === 'dynamic' ? 'Dinamik koleksiyon' : 'Seçili ürünler')}</span>
+                    <span class="storefront-collection-kicker">${escapeHtml(collection.collection_type === 'dynamic' ? 'Güncel Seçki' : 'Seçili ürünler')}</span>
                     <h2>${escapeHtml(collection.name)}</h2>
                     <p>${escapeHtml(collection.description || '')}</p>
                 </div>

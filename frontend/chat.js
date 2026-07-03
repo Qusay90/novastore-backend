@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="chat-header-copy">
                             <div id="chat-title" class="chat-header-title">
                                 <span class="chat-header-icon" style="display:inline-flex; align-items:center;">${assistantIconMarkup}</span>
-                                <span>NovaStore AI Asistan</span>
+                                <span>NovaBot</span>
                             </div>
                             <div id="chat-subtitle" class="chat-header-subtitle">Ürün bulma, seçim kolaylaştırma ve destek yardımı</div>
                         </div>
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
 
                     <div class="chat-mode-strip">
-                        <button id="chat-mode-assistant" class="chat-mode-btn active" type="button">AI Asistan</button>
+                        <button id="chat-mode-assistant" class="chat-mode-btn active" type="button">NovaBot</button>
                         <button id="chat-mode-support" class="chat-mode-btn" type="button">Canlı Destek</button>
                     </div>
 
@@ -568,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
         supportModeBtn.classList.toggle('active', !assistantActive);
 
         if (assistantActive) {
-            chatTitle.innerHTML = `<span class="chat-header-icon" style="display:inline-flex; align-items:center;">${assistantIconMarkup}</span><span>NovaStore AI Asistan</span>`;
+            chatTitle.innerHTML = `<span class="chat-header-icon" style="display:inline-flex; align-items:center;">${assistantIconMarkup}</span><span>NovaBot</span>`;
             chatSubtitle.innerText = 'Ürün bulma, seçim kolaylaştırma ve destek yardımı';
             chatInput.placeholder = 'Ne aradığınızı yazın...';
             renderAssistantHistory();
@@ -598,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const imageUrl = escapeHtml(product.imageUrl || 'https://via.placeholder.com/64?text=Nova');
             const oldPriceHtml = product.oldPrice ? `<s>${escapeHtml(formatMoney(product.oldPrice))}</s>` : '';
             const categoryText = product.category ? `${escapeHtml(product.category)} · ` : '';
-            const stockText = Number(product.stock) > 0 ? 'stokta' : 'stok bilgisi sinirli';
+            const stockText = Number(product.stock) > 0 ? 'Stokta var' : 'Stokta yok';
 
             return `
                 <div class="chat-product-card">
@@ -612,7 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div class="chat-product-actions">
                             <button type="button" class="chat-card-btn primary" data-action="add-to-cart" data-product-id="${Number(product.id)}" data-product-name="${encodeURIComponent(product.name)}" data-product-price="${Number(product.price)}" data-product-image="${encodeURIComponent(product.imageUrl || '')}" data-product-old-price="${product.oldPrice !== null && product.oldPrice !== undefined ? Number(product.oldPrice) : ''}">Sepete ekle</button>
-                            <a class="chat-card-btn secondary" href="${encodeURI(product.productUrl)}" style="text-decoration:none; display:inline-flex; align-items:center;">Ürüne git</a>
+                            <a class="chat-card-btn secondary" href="${encodeURI(product.productUrl)}" style="text-decoration:none; display:inline-flex; align-items:center;">Detayları Gör</a>
                         </div>
                     </div>
                 </div>
@@ -734,7 +734,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function renderAssistantWelcome() {
         chatMessages.innerHTML = `
-            <div class="chat-helper-note">NovaStore AI Asistan ürün bulma, yorum özeti ve karar vermeyi kolaylaştırma konularında yardımcı olur.</div>
+            <div class="chat-helper-note">NovaBot ürün bulma, yorum özeti ve karar vermeyi kolaylaştırma konularında yardımcı olur.</div>
             <div class="chat-bubble received">
                 <div>
                     Merhaba, hoş geldiniz. Memnuniyetle yardımcı olurum; ihtiyacınıza göre ürün bulabilir, ürünleri karşılaştırabilir, yorumları özetleyebilir ve kargo, iade, ödeme gibi konularda net cevap verebilirim.
@@ -763,7 +763,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const text = String(message || '');
         if (text.startsWith(AI_HANDOFF_PREFIX)) {
             const summary = escapeHtml(text.replace(AI_HANDOFF_PREFIX, '').trim()).replace(/\n/g, '<br>');
-            return `<div class="chat-system-card"><strong>AI devir özeti</strong>${summary}</div>`;
+            return `<div class="chat-system-card"><strong>NovaBot görüşme özeti</strong>${summary}</div>`;
         }
         return escapeHtml(text).replace(/\n/g, '<br>');
     }
@@ -773,7 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
             chatMessages.innerHTML = `
                 <div class="chat-helper-note">Canlı destek modunu kullanmak için giriş yapmanız gerekiyor.</div>
                 <div class="chat-bubble received">
-                    <div>Giriş yaptıysanız bu alanda temsilciyle mesajlaşabilirsiniz. Giriş yoksa AI Asistan ile devam edebiliriz.</div>
+                    <div>Giriş yaptıysanız bu alanda temsilciyle mesajlaşabilirsiniz. Giriş yoksa NovaBot ile devam edebiliriz.</div>
                     <div class="chat-time">${formatTime(Date.now())}</div>
                 </div>
             `;
@@ -820,7 +820,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildAssistantSummary() {
-        return assistantHistory.slice(-6).map((item) => `${item.role === 'user' ? 'Kullanici' : 'Asistan'}: ${item.message}`).join('\n');
+        return assistantHistory.slice(-6).map((item) => `${item.role === 'user' ? 'Kullanıcı' : 'Asistan'}: ${item.message}`).join('\n');
     }
 
     function appendAssistantEntry(entry) {
@@ -875,7 +875,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) {
                 appendAssistantEntry({
                     role: 'assistant',
-                    message: payload.error || 'AI asistan şu an yanıt veremiyor.',
+                    message: payload.error || 'NovaBot şu anda yanıt veremiyor.',
                     createdAt: Date.now(),
                     suggestions: ['Canlı desteğe bağlan'],
                     products: [],

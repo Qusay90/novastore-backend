@@ -1664,7 +1664,7 @@
                 container.innerHTML = `
                     <div class="cart-empty-msg">
                         <span style="font-size: 3rem; display:block; margin-bottom:15px;">🛒</span>
-                        Sepetiniz şu an bomboş.<br>Hemen ürün eklemeye başlayın!
+                        Sepetiniz boş.<br>Alışverişe devam ederek ürün ekleyebilirsiniz.
                     </div>`;
                 totalEl.innerText = "0.00";
                 badge.innerText = "0";
@@ -2050,7 +2050,7 @@
                         url: mediaUrl,
                         type: isVideoMedia(mediaUrl) ? 'video' : 'image',
                         altText: index === 0
-                            ? String(product?.name || 'Urun medyasi')
+                            ? String(product?.name || 'Ürün medyası')
                             : `${String(product?.name || 'Ürün')} görsel ${index + 1}`
                     };
                 }).filter(Boolean)
@@ -2061,7 +2061,7 @@
                 normalizedItems.push({
                     url: normalizedFallbackUrl,
                     type: isVideoMedia(normalizedFallbackUrl) ? 'video' : 'image',
-                    altText: String(product?.name || 'Urun medyasi')
+                    altText: String(product?.name || 'Ürün medyası')
                 });
             }
 
@@ -2070,7 +2070,7 @@
 
         function buildMainMediaMarkup(mediaItem, activeIndex, totalItems) {
             const safeUrl = escapeHtmlAttribute(mediaItem?.url || '');
-            const safeAlt = escapeHtmlAttribute(mediaItem?.altText || 'Urun medyasi');
+            const safeAlt = escapeHtmlAttribute(mediaItem?.altText || 'Ürün medyası');
             const mainMediaTag = mediaItem?.type === 'video'
                 ? `<video src="${safeUrl}" class="main-image is-video" autoplay muted loop playsinline preload="metadata"></video>`
                 : `<img src="${safeUrl}" class="main-image" id="main-product-image" alt="${safeAlt}">`;
@@ -2094,7 +2094,7 @@
 
         function buildLightboxMediaMarkup(mediaItem) {
             const safeUrl = escapeHtmlAttribute(mediaItem?.url || '');
-            const safeAlt = escapeHtmlAttribute(mediaItem?.altText || 'Urun medyasi');
+            const safeAlt = escapeHtmlAttribute(mediaItem?.altText || 'Ürün medyası');
 
             if (mediaItem?.type === 'video') {
                 return `<video src="${safeUrl}" class="media-lightbox-media is-video" controls autoplay playsinline></video>`;
@@ -2179,7 +2179,7 @@
             lightboxMediaItems = [{
                 url: String(url || ''),
                 type: type === 'video' ? 'video' : 'image',
-                altText: String(altText || 'Urun medyasi')
+                altText: String(altText || 'Ürün medyası')
             }];
             lightboxMediaIndex = 0;
             renderLightboxMedia();
@@ -2315,7 +2315,7 @@
                 return `
                     <div class="review-preview-item">
                         ${previewTag}
-                        <button type="button" class="review-preview-remove" onclick="removeSelectedReviewMedia(${index})">Kaldir</button>
+                        <button type="button" class="review-preview-remove" onclick="removeSelectedReviewMedia(${index})">Kaldır</button>
                         <div class="review-preview-meta">
                             <div class="review-preview-name">${escapeHtml(file.name)}</div>
                         </div>
@@ -2772,7 +2772,7 @@
                         </div>
 
                         ${priceHtml}
-                        ${soldOut ? '<div class="catalog-sold-out-badge" style="position:static; display:inline-flex; margin-bottom:14px;">Tükendi · satın alınamaz</div>' : ''}
+                        ${soldOut ? '<div class="catalog-sold-out-badge" style="position:static; display:inline-flex; margin-bottom:14px;">Stokta Yok</div>' : ''}
 
                         <div class="description-box">
                             <div class="description-title">Ürün Açıklaması</div>
@@ -2784,11 +2784,11 @@
 
                         <div style="display: flex; gap: 15px; margin-top: 10px;">
                             <button class="btn-add-large" style="flex: 1;" ${soldOut ? 'disabled aria-disabled="true"' : `onclick="addToCart(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price}, '${imageUrl}', ${product.old_price ? `'${product.old_price}'` : 'null'})"`}>
-                                ${soldOut ? 'Tükendi' : '🛒 Sepete Ekle'}
+                                ${soldOut ? 'Stokta Yok' : '🛒 Sepete Ekle'}
                             </button>
                             
                             <button class="btn-buy-now" style="flex: 1;" ${soldOut ? 'disabled aria-disabled="true"' : `onclick="buyNow(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${product.price})"`}>
-                                ${soldOut ? 'Satın alınamaz' : '⚡ Şimdi Al'}
+                                ${soldOut ? 'Stokta Yok' : '⚡ Şimdi Al'}
                             </button>
                         </div>
                     </div>
