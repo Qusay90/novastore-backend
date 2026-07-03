@@ -61,15 +61,63 @@ const isSafeLocalDatabase = (target) => {
     return true;
 };
 
+const applyDevelopmentPreviewFallback = (env = process.env) => {
+    const nodeEnv = String(env.NODE_ENV || '').trim().toLowerCase();
+    const target = getDatabaseTarget(env);
+    const localPreviewRequested = isTruthy(env.NOVASTORE_LOCAL_PREVIEW);
+    const allowRemoteDatabase = isTruthy(env.NOVASTORE_ALLOW_REMOTE_DB);
+
+    if (
+        nodeEnv !== 'development' ||
+        !localPreviewRequested ||
+        !target.isSupabaseHost ||
+        allowRemoteDatabase
+    ) {
+        return {
+            applied: false,
+            originalTarget: target
+        };
+    }
+
+    env.DATABASE_URL = 'postgresql://novastore_preview:novastore_preview@127.0.0.1:55432/novastore_preview';
+    env.DB_HOST = '127.0.0.1';
+    env.DB_PORT = '55432';
+    env.DB_NAME = 'novastore_preview';
+    env.DB_USER = 'novastore_preview';
+    env.DB_PASSWORD = 'novastore_preview';
+    env.DB_SSL = 'false';
+    env.SUPABASE_USE_POOLER = 'false';
+    env.SUPABASE_POOLER_HOST = '';
+    env.SUPABASE_REGION = '';
+    env.SUPABASE_PROJECT_REF = '';
+    env.NOVASTORE_SAFE_LOCAL_BACKEND = 'false';
+    env.NOVASTORE_ALLOW_REMOTE_DB = 'false';
+    env.SKIP_SCHEMA_INIT = 'true';
+    env.NOVASTORE_ALLOW_SCHEMA_INIT = 'false';
+    env.NOVASTORE_LOCAL_PREVIEW = 'true';
+
+    return {
+        applied: true,
+        originalTarget: target,
+        previewTarget: getDatabaseTarget(env)
+    };
+};
+
 const resolveStartupSafety = (env = process.env) => {
-    const nodeEnv = String(env.NODE_ENV || 'development').toLowerCase();
+    const explicitNodeEnv = String(env.NODE_ENV || '').trim().toLowerCase();
+    const nodeEnv = explicitNodeEnv || 'development';
     const target = getDatabaseTarget(env);
     const safeLocalMode = isTruthy(env.NOVASTORE_SAFE_LOCAL_BACKEND);
+    const localPreviewMode = isTruthy(env.NOVASTORE_LOCAL_PREVIEW);
     const allowRemoteDatabase = isTruthy(env.NOVASTORE_ALLOW_REMOTE_DB);
     const skipSchemaInit = isTruthy(env.SKIP_SCHEMA_INIT);
     const allowSchemaInit = isTruthy(env.NOVASTORE_ALLOW_SCHEMA_INIT);
     const isProduction = nodeEnv === 'production';
     const safeLocalDatabase = isSafeLocalDatabase(target);
+    const isPreviewSinkTarget =
+        String(target.host || '').toLowerCase() === '127.0.0.1' &&
+        String(target.port || '') === '55432' &&
+        target.database === 'novastore_preview';
     const errors = [];
     const warnings = [];
 
@@ -94,6 +142,27 @@ const resolveStartupSafety = (env = process.env) => {
         }
     }
 
+    if (localPreviewMode) {
+        if (explicitNodeEnv !== 'development') {
+            errors.push('Local preview yalnizca acik NODE_ENV=development ile kullanilabilir.');
+        }
+        if (allowRemoteDatabase) {
+            errors.push('NOVASTORE_LOCAL_PREVIEW ve NOVASTORE_ALLOW_REMOTE_DB birlikte kullanilamaz.');
+        }
+        if (!isPreviewSinkTarget) {
+            errors.push(
+                `Local preview yalnizca 127.0.0.1:55432/novastore_preview sink hedefini kullanabilir. ` +
+                `Hedef: ${target.label}`
+            );
+        }
+        if (!skipSchemaInit || allowSchemaInit) {
+            errors.push('Local preview schema init calistiramaz; SKIP_SCHEMA_INIT=true ve NOVASTORE_ALLOW_SCHEMA_INIT=false gerekir.');
+        }
+        if (safeLocalMode) {
+            errors.push('NOVASTORE_LOCAL_PREVIEW ve NOVASTORE_SAFE_LOCAL_BACKEND birlikte kullanilamaz.');
+        }
+    }
+
     if (isProduction && allowSchemaInit) {
         errors.push('Production ortaminda schema init izni reddedildi.');
     }
@@ -106,7 +175,12 @@ const resolveStartupSafety = (env = process.env) => {
         warnings.push('Schema init atlanacak. Calistirmak icin NOVASTORE_ALLOW_SCHEMA_INIT=true ve local/test DB gerekir.');
     }
 
-    const shouldRunSchemaInit = !skipSchemaInit && allowSchemaInit && safeLocalDatabase && !isProduction;
+    const shouldRunSchemaInit =
+        !localPreviewMode &&
+        !skipSchemaInit &&
+        allowSchemaInit &&
+        safeLocalDatabase &&
+        !isProduction;
 
     return {
         canStart: errors.length === 0,
@@ -114,13 +188,15 @@ const resolveStartupSafety = (env = process.env) => {
         warnings,
         nodeEnv,
         safeLocalMode,
+        localPreviewMode,
         allowRemoteDatabase,
         skipSchemaInit,
         allowSchemaInit,
         shouldRunSchemaInit,
-        shouldVerifyDbConnection: !skipSchemaInit || safeLocalMode,
+        shouldVerifyDbConnection: localPreviewMode ? false : !skipSchemaInit || safeLocalMode,
         target,
-        safeLocalDatabase
+        safeLocalDatabase,
+        isPreviewSinkTarget
     };
 };
 
@@ -128,5 +204,6 @@ module.exports = {
     isTruthy,
     getDatabaseTarget,
     isSafeLocalDatabase,
+    applyDevelopmentPreviewFallback,
     resolveStartupSafety
 };

@@ -1,5 +1,17 @@
 require('dotenv').config({ quiet: true });
-const { resolveStartupSafety } = require('./config/startupSafety');
+const {
+    applyDevelopmentPreviewFallback,
+    resolveStartupSafety
+} = require('./config/startupSafety');
+
+const previewFallback = applyDevelopmentPreviewFallback(process.env);
+if (previewFallback.applied) {
+    console.warn(
+        `Startup preview: UI-only localhost modu etkin. ` +
+        `Uzak Supabase hedefi kullanilmayacak; DB dogrulamasi ve schema init atlanacak. ` +
+        `Onceki hedef: ${previewFallback.originalTarget.label}`
+    );
+}
 
 const startupSafety = resolveStartupSafety(process.env);
 startupSafety.warnings.forEach((warning) => console.warn(`Startup warning: ${warning}`));

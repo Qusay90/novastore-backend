@@ -11,6 +11,7 @@ const {
 const root = path.join(__dirname, '..');
 const localPort = 5204;
 const failedDatabasePort = 5205;
+const previewPort = 5206;
 
 const waitForExit = (child, timeoutMs = 5000) => new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Blocked server did not exit in time')), timeoutMs);
@@ -93,6 +94,87 @@ const isPortOpen = (port) => new Promise((resolve) => {
     assert.match(blockedDirectDbOutput, /Database startup blocked: Remote veritabani/);
     assert.doesNotMatch(blockedDirectDbOutput, /pg must not load/);
 
+    const supabaseRemoteEnv = buildLocalServerEnv({
+        NODE_ENV: 'development',
+        DATABASE_URL: 'postgresql://postgres:secret@db.projectref.supabase.co:5432/postgres',
+        DB_HOST: '',
+        DB_PORT: '',
+        DB_NAME: '',
+        DB_USER: '',
+        DB_PASSWORD: '',
+        NOVASTORE_LOCAL_PREVIEW: 'false',
+        NOVASTORE_SAFE_LOCAL_BACKEND: 'false',
+        NOVASTORE_ALLOW_REMOTE_DB: 'false',
+        SKIP_SCHEMA_INIT: 'true',
+        NOVASTORE_ALLOW_SCHEMA_INIT: 'false',
+        NODE_OPTIONS: `--require=${path.join(__dirname, 'helpers', 'blockPgLoad.js')}`
+    });
+    const blockedSupabase = spawn(process.execPath, ['server.js'], {
+        cwd: root,
+        env: supabaseRemoteEnv,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+    });
+    let blockedSupabaseOutput = '';
+    blockedSupabase.stdout.on('data', (chunk) => { blockedSupabaseOutput += chunk.toString(); });
+    blockedSupabase.stderr.on('data', (chunk) => { blockedSupabaseOutput += chunk.toString(); });
+    const blockedSupabaseCode = await waitForExit(blockedSupabase);
+    assert.notStrictEqual(blockedSupabaseCode, 0);
+    assert.match(blockedSupabaseOutput, /Startup blocked: Remote veritabani/);
+    assert.doesNotMatch(blockedSupabaseOutput, /Startup preview:/);
+    assert.doesNotMatch(blockedSupabaseOutput, /pg must not load/);
+
+    const stagingPreview = spawn(process.execPath, ['server.js'], {
+        cwd: root,
+        env: {
+            ...supabaseRemoteEnv,
+            NODE_ENV: 'staging',
+            NOVASTORE_LOCAL_PREVIEW: 'true'
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+    });
+    let stagingPreviewOutput = '';
+    stagingPreview.stdout.on('data', (chunk) => { stagingPreviewOutput += chunk.toString(); });
+    stagingPreview.stderr.on('data', (chunk) => { stagingPreviewOutput += chunk.toString(); });
+    const stagingPreviewCode = await waitForExit(stagingPreview);
+    assert.notStrictEqual(stagingPreviewCode, 0);
+    assert.match(stagingPreviewOutput, /Startup blocked: Local preview yalnizca acik NODE_ENV=development/);
+    assert.doesNotMatch(stagingPreviewOutput, /Startup preview:/);
+    assert.doesNotMatch(stagingPreviewOutput, /pg must not load/);
+
+    let previewServer;
+    try {
+        previewServer = spawnLocalServer({
+            root,
+            port: previewPort,
+            env: {
+                NODE_ENV: 'development',
+                DATABASE_URL: 'postgresql://postgres:secret@db.projectref.supabase.co:5432/postgres',
+                DB_HOST: '',
+                DB_PORT: '',
+                DB_NAME: '',
+                DB_USER: '',
+                DB_PASSWORD: '',
+                NOVASTORE_LOCAL_PREVIEW: 'true',
+                NOVASTORE_SAFE_LOCAL_BACKEND: 'false',
+                NOVASTORE_ALLOW_REMOTE_DB: 'false',
+                SKIP_SCHEMA_INIT: 'true',
+                NOVASTORE_ALLOW_SCHEMA_INIT: 'false',
+                NODE_OPTIONS: ''
+            }
+        });
+        const previewOutput = await waitForServer(previewServer);
+        assert.match(previewOutput, /Startup preview: UI-only localhost modu etkin/);
+        assert.match(previewOutput, /Veritabani hedefi: 127\.0\.0\.1:55432\/novastore_preview/);
+        assert.match(previewOutput, /Veritabani baglantisi ve schema init SKIP_SCHEMA_INIT=true ile atlandi/);
+        assert.doesNotMatch(previewOutput, /Veritabani baglantisi dogrulandi/);
+        assert.strictEqual(await isPortOpen(previewPort), true);
+    } finally {
+        await stopServerProcess(previewServer);
+    }
+    assert.strictEqual(await isPortOpen(previewPort), false);
+
     const failedDatabase = spawn(process.execPath, ['server.js'], {
         cwd: root,
         env: buildLocalServerEnv({
@@ -112,15 +194,23 @@ const isPortOpen = (port) => new Promise((resolve) => {
     assert.doesNotMatch(failedDatabaseOutput, /NovaStore sunucusu/);
     assert.strictEqual(await isPortOpen(failedDatabasePort), false);
 
-    let localServer;
-    try {
-        localServer = spawnLocalServer({ root, port: localPort });
-        await waitForServer(localServer);
-        assert.strictEqual(await isPortOpen(localPort), true);
-    } finally {
-        await stopServerProcess(localServer);
+    if (await isPortOpen(55432)) {
+        let localServer;
+        try {
+            localServer = spawnLocalServer({
+                root,
+                port: localPort,
+                env: { NOVASTORE_LOCAL_PREVIEW: 'false' }
+            });
+            await waitForServer(localServer);
+            assert.strictEqual(await isPortOpen(localPort), true);
+        } finally {
+            await stopServerProcess(localServer);
+        }
+        assert.strictEqual(await isPortOpen(localPort), false);
+    } else {
+        console.log('server startup safety local DB branch skipped: 127.0.0.1:55432 is unavailable');
     }
-    assert.strictEqual(await isPortOpen(localPort), false);
 
     console.log('server startup safety smoke passed');
 })().catch((error) => {
