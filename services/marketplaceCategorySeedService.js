@@ -6,6 +6,12 @@ const {
 
 const SEED_LOCK_KEY = 'novastore-marketplace-category-seed-v1';
 
+const normalizeSeedSiblingName = (value) =>
+    normalizeLegacyCategoryName(value)
+        .replace(/\s*\.+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
 class MarketplaceCategorySeedConflictError extends Error {
     constructor(report) {
         super(`Marketplace category seed has ${report.conflicts.length} conflict(s).`);
@@ -113,6 +119,8 @@ const normalizeComparable = (value) => {
 };
 
 const mutableFields = Object.freeze([
+    'name',
+    'slug',
     'path',
     'depth',
     'sort_order',
@@ -186,8 +194,10 @@ const planOrApplySeed = async (queryable, { apply = false, tree = MARKETPLACE_CA
             categoryBySlug.set(String(category.slug).toLocaleLowerCase('tr-TR'), category);
         }
         const siblingKey = `${category.parent_id === null ? 'root' : Number(category.parent_id)}::` +
-            normalizeLegacyCategoryName(category.name);
-        categoryBySiblingName.set(siblingKey, category);
+            normalizeSeedSiblingName(category.name);
+        if (!categoryBySiblingName.has(siblingKey)) {
+            categoryBySiblingName.set(siblingKey, category);
+        }
     });
     current.aliases.forEach((alias) => {
         aliasByNormalized.set(
@@ -212,39 +222,59 @@ const planOrApplySeed = async (queryable, { apply = false, tree = MARKETPLACE_CA
         const existing = categoryBySlug.get(record.slug.toLocaleLowerCase('tr-TR'));
         const aliasOwnerId = aliasByNormalized.get(normalizeLegacyCategoryName(record.slug));
         const siblingKey = `${expectedParentId === null ? 'root' : expectedParentId}::` +
-            normalizeLegacyCategoryName(record.name);
+            normalizeSeedSiblingName(record.name);
         const sibling = categoryBySiblingName.get(siblingKey);
 
-        if (existing) {
+        const matched = existing || sibling || null;
+        if (matched) {
+            const matchedBySlug = Boolean(existing);
             const identityMatches =
-                !existing.deleted_at &&
-                normalizeLegacyCategoryName(existing.name) === normalizeLegacyCategoryName(record.name) &&
-                (existing.parent_id === null ? null : Number(existing.parent_id)) === expectedParentId;
+                !matched.deleted_at &&
+                normalizeSeedSiblingName(matched.name) === normalizeSeedSiblingName(record.name) &&
+                (matched.parent_id === null ? null : Number(matched.parent_id)) === expectedParentId;
 
-            if (!identityMatches || (aliasOwnerId && aliasOwnerId !== Number(existing.id))) {
+            if (!identityMatches || (aliasOwnerId && aliasOwnerId !== Number(matched.id))) {
                 report.conflicts.push({
                     key: record.key,
                     slug: record.slug,
-                    existing_category_id: Number(existing.id),
-                    reason: existing.deleted_at ? 'archived_slug_conflict' : 'slug_identity_conflict'
+                    existing_category_id: Number(matched.id),
+                    reason: matched.deleted_at
+                        ? (matchedBySlug ? 'archived_slug_conflict' : 'archived_sibling_name_conflict')
+                        : (matchedBySlug ? 'slug_identity_conflict' : 'sibling_slug_alias_conflict')
                 });
                 resolvedByKey.set(record.key, { unavailable: true });
                 continue;
             }
 
-            const changedFields = getChangedFields(existing, record);
+            const changedFields = getChangedFields(matched, record);
             if (changedFields.length > 0) {
                 if (apply) {
+                    if (
+                        matched.slug &&
+                        String(matched.slug).toLocaleLowerCase('tr-TR') !== record.slug.toLocaleLowerCase('tr-TR')
+                    ) {
+                        const aliasResult = await queryable.query(
+                            `INSERT INTO category_aliases (
+                                category_id, alias, normalized_alias, alias_type, redirect_status
+                             )
+                             VALUES ($1, $2, $3, 'legacy_slug', 301)
+                             ON CONFLICT DO NOTHING`,
+                            [matched.id, matched.slug, normalizeLegacyCategoryName(matched.slug)]
+                        );
+                        report.aliases_created += aliasResult.rowCount;
+                    }
                     await queryable.query(`
                         UPDATE categories SET
-                            path=$2, depth=$3, sort_order=$4,
-                            is_active=$5, is_customer_visible=$6,
-                            show_in_menu=$7, show_on_home=$8, hide_when_empty=$9,
-                            description=$10, seo_title=$11, seo_description=$12,
-                            icon=$13, accent_color=$14, updated_at=CURRENT_TIMESTAMP
+                            name=$2, slug=$3, path=$4, depth=$5, sort_order=$6,
+                            is_active=$7, is_customer_visible=$8,
+                            show_in_menu=$9, show_on_home=$10, hide_when_empty=$11,
+                            description=$12, seo_title=$13, seo_description=$14,
+                            icon=$15, accent_color=$16, updated_at=CURRENT_TIMESTAMP
                         WHERE id=$1
                     `, [
-                        existing.id,
+                        matched.id,
+                        record.name,
+                        record.slug,
                         record.path,
                         record.depth,
                         record.sort_order,
@@ -262,14 +292,14 @@ const planOrApplySeed = async (queryable, { apply = false, tree = MARKETPLACE_CA
                 }
                 report.updated.push({
                     key: record.key,
-                    id: Number(existing.id),
+                    id: Number(matched.id),
                     slug: record.slug,
                     fields: changedFields
                 });
             } else {
                 report.existing.push({
                     key: record.key,
-                    id: Number(existing.id),
+                    id: Number(matched.id),
                     slug: record.slug
                 });
             }
@@ -280,15 +310,30 @@ const planOrApplySeed = async (queryable, { apply = false, tree = MARKETPLACE_CA
                      VALUES ($1)
                      ON CONFLICT DO NOTHING
                      RETURNING category_id`,
-                    [existing.id]
+                    [matched.id]
                 );
                 report.stats_created += statsResult.rowCount;
             }
             resolvedByKey.set(record.key, {
-                id: Number(existing.id),
+                id: Number(matched.id),
                 path: record.path,
                 depth: record.depth,
                 existing: true
+            });
+            categoryBySlug.delete(String(matched.slug || '').toLocaleLowerCase('tr-TR'));
+            categoryBySlug.set(record.slug.toLocaleLowerCase('tr-TR'), {
+                ...matched,
+                name: record.name,
+                slug: record.slug,
+                path: record.path,
+                depth: record.depth
+            });
+            categoryBySiblingName.set(siblingKey, {
+                ...matched,
+                name: record.name,
+                slug: record.slug,
+                path: record.path,
+                depth: record.depth
             });
             continue;
         }
@@ -299,17 +344,6 @@ const planOrApplySeed = async (queryable, { apply = false, tree = MARKETPLACE_CA
                 slug: record.slug,
                 existing_category_id: aliasOwnerId,
                 reason: 'alias_slug_conflict'
-            });
-            resolvedByKey.set(record.key, { unavailable: true });
-            continue;
-        }
-
-        if (sibling) {
-            report.conflicts.push({
-                key: record.key,
-                slug: record.slug,
-                existing_category_id: Number(sibling.id),
-                reason: sibling.deleted_at ? 'archived_sibling_name_conflict' : 'sibling_name_conflict'
             });
             resolvedByKey.set(record.key, { unavailable: true });
             continue;
@@ -434,6 +468,7 @@ const runMarketplaceCategorySeed = async (pool, { apply = false, tree } = {}) =>
 module.exports = {
     SEED_LOCK_KEY,
     MarketplaceCategorySeedConflictError,
+    normalizeSeedSiblingName,
     flattenTree,
     planOrApplySeed,
     runMarketplaceCategorySeed

@@ -546,7 +546,7 @@ const moveCategory = async (categoryId, input = {}) => withCategoryTransaction(a
     }
     const duplicate = await client.query(
         `SELECT 1 FROM categories
-         WHERE id <> $1 AND name = $2
+         WHERE id <> $1 AND LOWER(BTRIM(name)) = LOWER(BTRIM($2))
            AND COALESCE(parent_id, 0) = COALESCE($3::INTEGER, 0)
            AND deleted_at IS NULL LIMIT 1`,
         [categoryId, category.name, parent?.id || null]

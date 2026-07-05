@@ -162,11 +162,11 @@ const MARKETPLACE_CATEGORY_TREE = Object.freeze([
         node('Bebek Bezi & Islak Mendil'),
         node('Bebek Arabası & Oto Koltuğu'),
         node('Bebek Odası'),
+        node('Hamile Giyim & Ürünleri'),
         node('Oyuncak', [
             node('Eğitici Oyuncak'), node('Bebek Oyuncağı'),
             node('Oyun Seti'), node('Puzzle'), node('Akülü Araç')
-        ]),
-        node('Hamile Giyim & Ürünleri')
+        ])
     ]),
     root('Kozmetik & Kişisel Bakım', 'sparkles', '#E11D48', [
         node('Parfüm & Deodorant'),

@@ -7,7 +7,7 @@ const { spawn } = require('child_process');
 const pool = require('../config/db');
 const createCoreSchema = require('../models/createCoreDb');
 const { resolveStartupSafety } = require('../config/startupSafety');
-const { flattenTree, runMarketplaceCategorySeed } =
+const { flattenTree, planOrApplySeed, runMarketplaceCategorySeed } =
     require('../services/marketplaceCategorySeedService');
 const { buildLocalServerEnv } = require('./helpers/localServerProcess');
 const adminRoutes = require('../routes/adminCategoryRoutes');
@@ -72,9 +72,106 @@ const runChild = (args, env, timeoutMs = 30000) => new Promise((resolve, reject)
     assert.strictEqual(records.length, 279);
     assert.strictEqual(records.filter((record) => record.depth === 0).length, 10);
     assert.strictEqual(new Set(records.map((record) => record.slug)).size, records.length);
+    assert(records.some((record) =>
+        record.key === 'Anne, Bebek & Oyuncak > Hamile Giyim & Ürünleri' &&
+        record.sort_order === 4
+    ));
+    assert(records.some((record) =>
+        record.key === 'Anne, Bebek & Oyuncak > Oyuncak' &&
+        record.sort_order === 5
+    ));
 
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await createCoreSchema();
+
+    const seedUpgradeClient = await pool.connect();
+    try {
+        await seedUpgradeClient.query('BEGIN');
+        const legacyRoot = await seedUpgradeClient.query(`
+            INSERT INTO categories (
+                name, slug, path, depth, sort_order,
+                is_active, is_customer_visible, hide_when_empty
+            )
+            VALUES (
+                'Seed Test Root.', 'seed-test-root-old', 'seed-test-root-old', 0, 0,
+                TRUE, TRUE, TRUE
+            )
+            RETURNING id
+        `);
+        const legacyRootId = Number(legacyRoot.rows[0].id);
+        const legacyLeaf = await seedUpgradeClient.query(`
+            INSERT INTO categories (
+                name, parent_id, slug, path, depth, sort_order,
+                is_active, is_customer_visible, hide_when_empty
+            )
+            VALUES (
+                'Seed Test Leaf.', $1, 'seed-test-leaf-old',
+                'seed-test-root-old/seed-test-leaf-old', 1, 0,
+                TRUE, TRUE, TRUE
+            )
+            RETURNING id
+        `, [legacyRootId]);
+        const legacyLeafId = Number(legacyLeaf.rows[0].id);
+        await seedUpgradeClient.query(
+            'INSERT INTO category_stats (category_id) VALUES ($1), ($2)',
+            [legacyRootId, legacyLeafId]
+        );
+        const upgradeTree = [{
+            name: 'Seed Test Root',
+            children: [{ name: 'Seed Test Leaf', children: [] }]
+        }];
+        const upgradeReport = await planOrApplySeed(seedUpgradeClient, {
+            apply: true,
+            tree: upgradeTree
+        });
+        assert.strictEqual(upgradeReport.added.length, 0);
+        assert.strictEqual(upgradeReport.updated.length, 2);
+        assert.strictEqual(upgradeReport.conflicts.length, 0);
+        assert.strictEqual(upgradeReport.aliases_created, 2);
+        const upgradedRows = await seedUpgradeClient.query(`
+            SELECT id, name, slug, path, depth
+            FROM categories
+            WHERE id = ANY($1::INTEGER[])
+            ORDER BY id
+        `, [[legacyRootId, legacyLeafId]]);
+        assert.deepStrictEqual(
+            upgradedRows.rows.map((row) => ({
+                id: Number(row.id),
+                name: row.name,
+                slug: row.slug,
+                path: row.path,
+                depth: Number(row.depth)
+            })),
+            [
+                {
+                    id: legacyRootId,
+                    name: 'Seed Test Root',
+                    slug: 'seed-test-root',
+                    path: 'seed-test-root',
+                    depth: 0
+                },
+                {
+                    id: legacyLeafId,
+                    name: 'Seed Test Leaf',
+                    slug: 'seed-test-leaf',
+                    path: 'seed-test-root/seed-test-leaf',
+                    depth: 1
+                }
+            ]
+        );
+        const repeatedUpgrade = await planOrApplySeed(seedUpgradeClient, {
+            apply: true,
+            tree: upgradeTree
+        });
+        assert.strictEqual(repeatedUpgrade.added.length, 0);
+        assert.strictEqual(repeatedUpgrade.updated.length, 0);
+        assert.strictEqual(repeatedUpgrade.existing.length, 2);
+        assert.strictEqual(repeatedUpgrade.conflicts.length, 0);
+        assert.strictEqual(repeatedUpgrade.aliases_created, 0);
+    } finally {
+        await seedUpgradeClient.query('ROLLBACK');
+        seedUpgradeClient.release();
+    }
 
     const sentinelCategory = await pool.query(`
         INSERT INTO categories (

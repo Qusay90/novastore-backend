@@ -76,10 +76,13 @@ const request = async (base, url, { method = 'GET', body, headers = {}, redirect
             seo_title: 'Root A SEO'
         });
         const rootBResponse = await createRoot('Root B');
+        const rootCResponse = await createRoot('Root C');
         assert.strictEqual(rootAResponse.status, 201);
         assert.strictEqual(rootBResponse.status, 201);
+        assert.strictEqual(rootCResponse.status, 201);
         const rootA = rootAResponse.body.category;
         const rootB = rootBResponse.body.category;
+        const rootC = rootCResponse.body.category;
         assert.strictEqual(rootA.slug, 'root-a');
         assert.strictEqual(rootA.path, 'root-a');
         assert.strictEqual(rootA.depth, 0);
@@ -93,6 +96,46 @@ const request = async (base, url, { method = 'GET', body, headers = {}, redirect
         assert.strictEqual(sameNameFirstParent.status, 201);
         assert.strictEqual(sameNameOtherParent.status, 201);
         assert.strictEqual(duplicateSameParent.status, 409);
+        assert.notStrictEqual(
+            sameNameFirstParent.body.category.slug,
+            sameNameOtherParent.body.category.slug
+        );
+        assert.notStrictEqual(
+            sameNameFirstParent.body.category.path,
+            sameNameOtherParent.body.category.path
+        );
+        const conflictingSharedMove = await request(
+            api.base,
+            `/api/admin/categories/${sameNameFirstParent.body.category.id}/move`,
+            {
+                method: 'PATCH',
+                headers: adminHeaders,
+                body: { parentId: rootB.id }
+            }
+        );
+        assert.strictEqual(conflictingSharedMove.status, 409);
+        assert.strictEqual(conflictingSharedMove.body.code, 'CATEGORY_CONFLICT');
+        const allowedSharedMove = await request(
+            api.base,
+            `/api/admin/categories/${sameNameFirstParent.body.category.id}/move`,
+            {
+                method: 'PATCH',
+                headers: adminHeaders,
+                body: { parentId: rootC.id }
+            }
+        );
+        assert.strictEqual(allowedSharedMove.status, 200);
+        const sharedRows = await pool.query(`
+            SELECT id, name, slug, path
+            FROM categories
+            WHERE id = ANY($1::INTEGER[])
+            ORDER BY id
+        `, [[sameNameFirstParent.body.category.id, sameNameOtherParent.body.category.id]]);
+        assert.strictEqual(new Set(sharedRows.rows.map((row) => row.name)).size, 1);
+        assert.strictEqual(new Set(sharedRows.rows.map((row) => row.slug)).size, 2);
+        assert.strictEqual(new Set(sharedRows.rows.map((row) => row.path)).size, 2);
+        assert(sharedRows.rows.some((row) => row.path === 'root-c/shared-name'));
+        assert(sharedRows.rows.some((row) => row.path === 'root-b/shared-name-2'));
         const child = childResponse.body.category;
 
         const grandResponse = await createRoot('Grand Child', { parentId: child.id });
