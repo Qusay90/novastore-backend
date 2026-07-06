@@ -40,11 +40,13 @@ const createDuplicateWebhookClient = () => {
     const originalConnect = pool.connect;
     const originalNodeEnv = process.env.NODE_ENV;
     const originalSecret = process.env.IYZICO_WEBHOOK_SECRET;
+    const originalAllowUnsigned = process.env.IYZICO_ALLOW_UNSIGNED_WEBHOOKS;
     const client = createDuplicateWebhookClient();
 
     pool.connect = async () => client;
     process.env.NODE_ENV = 'test';
     delete process.env.IYZICO_WEBHOOK_SECRET;
+    process.env.IYZICO_ALLOW_UNSIGNED_WEBHOOKS = 'true';
 
     try {
         const res = createRes();
@@ -75,6 +77,11 @@ const createDuplicateWebhookClient = () => {
             delete process.env.IYZICO_WEBHOOK_SECRET;
         } else {
             process.env.IYZICO_WEBHOOK_SECRET = originalSecret;
+        }
+        if (originalAllowUnsigned === undefined) {
+            delete process.env.IYZICO_ALLOW_UNSIGNED_WEBHOOKS;
+        } else {
+            process.env.IYZICO_ALLOW_UNSIGNED_WEBHOOKS = originalAllowUnsigned;
         }
     }
 

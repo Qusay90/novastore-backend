@@ -180,7 +180,8 @@ const makeInitializeReq = () => ({
         phone: '05551234567',
         address: 'Test Mahallesi',
         cartItems: [{ productId: 101, quantity: 1 }],
-        paymentMethod: 'card'
+        paymentMethod: 'card',
+        analyticsSessionKey: 'guest-session-security'
     }
 });
 
@@ -443,6 +444,10 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
         assert.strictEqual(initRun.client.state.notificationInserts, 0);
         const paymentInsert = initRun.client.state.calls.find((call) => /INSERT INTO payments/i.test(call.sql));
         assert.ok(paymentInsert);
+        const initRawRequest = JSON.parse(paymentInsert.params[7]);
+        assert.strictEqual(initRawRequest.idempotency.key, 'idem-paytr-security');
+        assert.match(initRawRequest.idempotency.ownerKey, /^[a-f0-9]{64}$/);
+        assert.match(initRawRequest.idempotency.requestHash, /^[a-f0-9]{64}$/);
         assertNoSecrets(initRun.res.body);
         assertNoSecrets(paymentInsert.params);
 
@@ -451,7 +456,9 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
                 order_id: 9001,
                 payment_ref: initRun.res.body.paymentRef,
                 status: PAYMENT_STATUS.REQUIRES_ACTION,
-                provider: 'paytr'
+                provider: 'paytr',
+                order_user_id: null,
+                raw_request: paymentInsert.params[7]
             }]
         });
         assert.strictEqual(duplicateInit.res.code, 200);

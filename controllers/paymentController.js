@@ -14,7 +14,13 @@ const {
     buildPaytrTokenPayload,
     verifyPaytrCallbackHash
 } = require('../services/paytrPaymentService');
-const { createPendingPaymentOrder, reserveStock, restockItems, appendOrderEvent } = require('../services/orderService');
+const {
+    createPendingPaymentOrder,
+    reserveStock,
+    restockItems,
+    appendOrderEvent
+} = require('../services/orderService');
+const { consumeCouponUsageIfNeeded } = require('../services/couponUsageService');
 const { PAYMENT_STATUS, ORDER_STATUS, REFUND_STATUS } = require('../constants/orderStatus');
 
 const readIdempotencyKey = (req) => {
@@ -39,19 +45,76 @@ const createDeterministicKeyFromBody = (body) => {
     return `AUTO-${crypto.createHash('sha256').update(seed).digest('hex').slice(0, 32)}`;
 };
 
+const stableStringify = (value) => {
+    if (Array.isArray(value)) {
+        return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+    }
+
+    if (value && typeof value === 'object') {
+        return `{${Object.keys(value)
+            .filter((key) => value[key] !== undefined)
+            .sort()
+            .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+            .join(',')}}`;
+    }
+
+    return JSON.stringify(value === undefined ? null : value);
+};
+
+const hashIdempotencyPart = (value) => (
+    crypto.createHash('sha256').update(String(value || '')).digest('hex')
+);
+
+const normalizeIdempotencyBody = (body = {}) => ({
+    analyticsSessionKey: String(body.analyticsSessionKey || '').trim(),
+    fullName: String(body.fullName || '').trim(),
+    email: String(body.email || '').trim().toLowerCase(),
+    phone: String(body.phone || '').trim(),
+    address: body.address,
+    cartItems: Array.isArray(body.cartItems) ? body.cartItems : [],
+    couponCode: body.couponCode || null,
+    paymentMethod: body.paymentMethod || 'card'
+});
+
+const buildPaymentIdempotencyContext = ({ body = {}, userId = null, idempotencyKey }) => {
+    const normalizedBody = normalizeIdempotencyBody(body);
+    const ownerSeed = userId
+        ? `user:${Number(userId)}`
+        : `guest:${normalizedBody.analyticsSessionKey || normalizedBody.email}`;
+
+    return {
+        key: idempotencyKey,
+        ownerKey: hashIdempotencyPart(ownerSeed),
+        requestHash: hashIdempotencyPart(stableStringify(normalizedBody))
+    };
+};
+
+const readStoredIdempotencyContext = (rawRequest) => {
+    const parsed = safeJsonParse(rawRequest, {});
+    const stored = parsed && typeof parsed === 'object' ? parsed.idempotency : null;
+    return stored && typeof stored === 'object' ? stored : null;
+};
+
+const idempotencyContextMatches = (storedContext, expectedContext) => (
+    storedContext &&
+    storedContext.key === expectedContext.key &&
+    storedContext.ownerKey === expectedContext.ownerKey &&
+    storedContext.requestHash === expectedContext.requestHash
+);
+
 const readClientIp = (req) => {
     const forwardedFor = String((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim();
     return forwardedFor || req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || '127.0.0.1';
 };
 
-const incrementCouponUsageIfNeeded = async (client, coupon) => {
-    if (!coupon || !coupon.applied || !coupon.couponId) return;
+const truthyEnvValues = new Set(['1', 'true', 'yes', 'on']);
 
-    await client.query(
-        'UPDATE coupons SET used_count = used_count + 1, updated_at = NOW() WHERE id = $1',
-        [coupon.couponId]
-    );
-};
+const isTruthyEnv = (value) => truthyEnvValues.has(String(value || '').trim().toLowerCase());
+
+const isUnsignedIyzicoWebhookMockAllowed = () => (
+    process.env.NODE_ENV !== 'production' &&
+    isTruthyEnv(process.env.IYZICO_ALLOW_UNSIGNED_WEBHOOKS)
+);
 
 const safeJsonParse = (value, fallback = {}) => {
     if (!value) return fallback;
@@ -78,6 +141,26 @@ const toPaytrMinorUnits = (amount) => {
     return Math.round((numericAmount + Number.EPSILON) * 100);
 };
 
+const toComparableMoney = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const numeric = Number(String(value).replace(',', '.'));
+    if (!Number.isFinite(numeric) || numeric <= 0) return null;
+    return Math.round((numeric + Number.EPSILON) * 100);
+};
+
+const readIyzicoPayloadAmount = (payload = {}) => (
+    payload.paidPrice ??
+    payload.price ??
+    payload.amount ??
+    payload.totalAmount ??
+    payload.total_amount ??
+    null
+);
+
+const readIyzicoPayloadCurrency = (payload = {}) => String(
+    payload.currency ?? payload.currencyCode ?? payload.currency_code ?? ''
+).trim().toUpperCase();
+
 const PAYTR_FAILED_STATUSES = new Set([
     'failed',
     'fail',
@@ -89,6 +172,9 @@ const PAYTR_FAILED_STATUSES = new Set([
     'expired',
     'error'
 ]);
+
+const IYZICO_SUCCESS_STATUSES = new Set(['SUCCESS', 'PAID']);
+const IYZICO_FAILED_STATUSES = new Set(['FAILURE', 'FAILED']);
 
 const isPaytrFailedStatus = (status) => PAYTR_FAILED_STATUSES.has(String(status || '').trim().toLowerCase());
 
@@ -268,7 +354,7 @@ const finalizePaytrSuccess = async (payload) => {
             ]
         );
 
-        await incrementCouponUsageIfNeeded(client, rawRequest.coupon);
+        await consumeCouponUsageIfNeeded(client, rawRequest.coupon);
 
         await client.query(
             `UPDATE orders
@@ -540,9 +626,14 @@ const initializePayment = async (req, res) => {
         const userId = user ? user.id : null;
 
         const idempotencyKey = readIdempotencyKey(req) || createDeterministicKeyFromBody(req.body);
+        const idempotencyContext = buildPaymentIdempotencyContext({
+            body: req.body,
+            userId,
+            idempotencyKey
+        });
 
         const existingPayment = await client.query(
-            `SELECT p.*, o.id AS order_id
+            `SELECT p.*, o.id AS order_id, o.user_id AS order_user_id
              FROM payments p
              JOIN orders o ON o.id = p.order_id
              WHERE p.idempotency_key = $1`,
@@ -551,6 +642,24 @@ const initializePayment = async (req, res) => {
 
         if (existingPayment.rows.length > 0) {
             const row = existingPayment.rows[0];
+            const storedIdempotency = readStoredIdempotencyContext(row.raw_request);
+
+            if (!idempotencyContextMatches(storedIdempotency, idempotencyContext)) {
+                return res.status(409).json({
+                    error: 'Idempotency key farklı bir ödeme isteği için kullanılmış.'
+                });
+            }
+
+            const ownerUserId = row.order_user_id === null || row.order_user_id === undefined
+                ? null
+                : Number(row.order_user_id);
+
+            if (userId !== null && ownerUserId !== userId) {
+                return res.status(409).json({
+                    error: 'Idempotency key farklı bir kullanıcıya ait.'
+                });
+            }
+
             return res.status(200).json({
                 message: 'Idempotent tekrar iste\u011Fi, mevcut \u00F6deme d\u00F6n\u00FCld\u00FC.',
                 orderId: row.order_id,
@@ -589,7 +698,8 @@ const initializePayment = async (req, res) => {
             couponCode,
             coupon: pricing.coupon,
             stockReserved: false,
-            finalizesOnWebhook: true
+            finalizesOnWebhook: true,
+            idempotency: idempotencyContext
         };
 
         if (paymentMethod === 'havale') {
@@ -787,17 +897,31 @@ const webhookIyzico = async (req, res) => {
 
         const signature = String(req.headers['x-iyzico-signature'] || '').trim();
         const signatureSecret = String(process.env.IYZICO_WEBHOOK_SECRET || '').trim();
-        const isProductionWebhook = process.env.NODE_ENV === 'production';
+        const unsignedMockAllowed = isUnsignedIyzicoWebhookMockAllowed();
 
-        if (isProductionWebhook && !signatureSecret) {
-            return res.status(503).json({ error: 'Webhook imza anahtar\u0131 production ortam\u0131nda yap\u0131land\u0131r\u0131lmal\u0131d\u0131r.' });
+        if (!signatureSecret && !unsignedMockAllowed) {
+            return res.status(503).json({ error: 'Iyzico webhook imza anahtari yapilandirilmalidir.' });
         }
 
-        if (isProductionWebhook && !signature) {
-            return res.status(401).json({ error: 'Production ortam\u0131nda imzas\u0131z \u00F6deme webhook iste\u011Fi kabul edilmez.' });
+        if (!signature && !unsignedMockAllowed) {
+            return res.status(401).json({ error: 'Imzasiz Iyzico webhook istegi kabul edilmez.' });
         }
 
-        const signatureValid = signatureSecret ? verifyWebhookSignature(payload, signature, signatureSecret) : true;
+        const signatureValid = Boolean(signatureSecret && signature && verifyWebhookSignature(payload, signature, signatureSecret));
+        const unsignedMockAccepted = !signatureSecret && unsignedMockAllowed;
+
+        if (!signatureValid && !unsignedMockAccepted) {
+            return res.status(401).json({ error: 'Webhook imza dogrulamasi basarisiz.' });
+        }
+
+        if (!IYZICO_SUCCESS_STATUSES.has(rawStatus) && !IYZICO_FAILED_STATUSES.has(rawStatus)) {
+            return res.status(202).json({
+                ok: true,
+                processed: false,
+                finalizationImplemented: false,
+                status: rawStatus
+            });
+        }
 
         await client.query('BEGIN');
 
@@ -812,21 +936,24 @@ const webhookIyzico = async (req, res) => {
 
         const webhookRow = webhookInsert.rows[0];
 
-        if (!signatureValid) {
-            await client.query('ROLLBACK');
-            return res.status(401).json({ error: 'Webhook imza do\u011Frulamas\u0131 ba\u015Far\u0131s\u0131z.' });
-        }
-
         if (webhookRow.processed === true) {
             await client.query('COMMIT');
             return res.status(200).json({ ok: true, processed: true, duplicate: true });
         }
 
         const paymentResult = await client.query(
-            `SELECT p.*, o.items, o.user_id, o.customer_name, o.id AS order_id, o.status AS order_status
+            `SELECT p.*,
+                    o.items,
+                    o.user_id,
+                    o.customer_name,
+                    o.id AS order_id,
+                    o.status AS order_status,
+                    o.payment_status AS order_payment_status,
+                    o.total_amount AS order_total_amount
              FROM payments p
              JOIN orders o ON o.id = p.order_id
-             WHERE p.payment_ref = $1`,
+             WHERE p.payment_ref = $1
+             FOR UPDATE OF p, o`,
             [paymentRef]
         );
 
@@ -836,11 +963,55 @@ const webhookIyzico = async (req, res) => {
         }
 
         const payment = paymentResult.rows[0];
+
+        if (payment.provider !== 'iyzico' || payment.payment_ref !== paymentRef) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'Iyzico odeme kaydi uyusmuyor.' });
+        }
+
+        const expectedAmount = toComparableMoney(payment.amount || payment.order_total_amount);
+        const callbackAmount = toComparableMoney(readIyzicoPayloadAmount(payload));
+        if (expectedAmount === null || callbackAmount === null || expectedAmount !== callbackAmount) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'Iyzico odeme tutari uyusmuyor.' });
+        }
+
+        const expectedCurrency = String(payment.currency || '').trim().toUpperCase();
+        const callbackCurrency = readIyzicoPayloadCurrency(payload);
+        if (!expectedCurrency || expectedCurrency !== callbackCurrency) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'Iyzico odeme para birimi uyusmuyor.' });
+        }
+
+        const isSuccess = IYZICO_SUCCESS_STATUSES.has(rawStatus);
+        const isFailure = IYZICO_FAILED_STATUSES.has(rawStatus);
+
+        const terminalPaid = (
+            payment.status === PAYMENT_STATUS.PAID ||
+            payment.order_payment_status === PAYMENT_STATUS.PAID ||
+            payment.order_status === ORDER_STATUS.HAZIRLANIYOR
+        );
+        const terminalFailed = (
+            payment.status === PAYMENT_STATUS.FAILED ||
+            payment.order_payment_status === PAYMENT_STATUS.FAILED ||
+            payment.order_status === ORDER_STATUS.IPTAL_EDILDI
+        );
+
+        if (terminalPaid || terminalFailed) {
+            await client.query('UPDATE webhook_events SET processed = TRUE WHERE id = $1', [webhookRow.id]);
+            await client.query('COMMIT');
+            return res.status(200).json({
+                ok: true,
+                processed: true,
+                duplicate: true,
+                status: terminalPaid ? 'PAID' : 'FAILED'
+            });
+        }
+
         const rawRequest = safeJsonParse(payment.raw_request, {});
         const parsedItemsRaw = safeJsonParse(payment.items, []);
         const parsedItems = Array.isArray(parsedItemsRaw) ? parsedItemsRaw : [];
         const stockWasReserved = rawRequest.stockReserved === true || rawRequest.finalizesOnWebhook !== true;
-        const isSuccess = rawStatus === 'SUCCESS' || rawStatus === 'PAID';
 
         if (isSuccess) {
             if (!stockWasReserved) {
@@ -864,7 +1035,7 @@ const webhookIyzico = async (req, res) => {
                 ]
             );
 
-            await incrementCouponUsageIfNeeded(client, rawRequest.coupon);
+            await consumeCouponUsageIfNeeded(client, rawRequest.coupon);
 
             await client.query(
                 `UPDATE orders
@@ -881,7 +1052,7 @@ const webhookIyzico = async (req, res) => {
                 paymentRef,
                 stockReservedBeforeWebhook: stockWasReserved
             });
-        } else {
+        } else if (isFailure) {
             await client.query(
                 `UPDATE payments
                  SET status = $1,

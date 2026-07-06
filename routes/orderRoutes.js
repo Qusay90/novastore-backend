@@ -10,7 +10,7 @@ const {
 } = require('../controllers/orderController');
 const { authenticate, requireAdmin, requireSelfOrAdmin } = require('../middlewares/authMiddleware');
 
-// Guest checkout acik kalir, token varsa controller user'i dogrular
+// Legacy direct order creation is disabled; checkout must initialize payment first.
 router.post('/', createOrder);
 
 router.get('/', authenticate, requireAdmin, getAllOrders);

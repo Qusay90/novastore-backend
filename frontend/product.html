@@ -2880,7 +2880,7 @@
             selectedReviewFiles.forEach((file) => formData.append('media', file));
 
             try {
-                const response = await fetch('/api/reviews', {
+                const response = await fetch(`/api/reviews?productId=${encodeURIComponent(productId)}`, {
                     method: 'POST',
                     headers: buildApiHeaders(),
                     body: formData
@@ -2915,18 +2915,22 @@
                         let html = '';
                         questions.forEach(q => {
                             const dateStr = new Date(q.answered_at || q.created_at).toLocaleDateString('tr-TR');
+                            const createdDateStr = new Date(q.created_at).toLocaleDateString('tr-TR');
+                            const safeQuestion = escapeHtml(q.question || '');
+                            const safeUserName = escapeHtml(q.user_name || 'M\u00fc\u015fteri');
+                            const answerHtml = q.answer ? escapeHtml(q.answer) : '<em>Satıcı henüz yanıtlamadı.</em>';
                             html += `
                                 <div class="qa-card">
                                     <div class="qa-q">
                                         <span style="background: #EAEAEA; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; height: fit-content;">Soru</span>
                                         <div style="flex: 1;">
-                                            <div>${q.question}</div>
-                                            <div style="font-size: 0.75rem; color: #888; margin-top: 5px;">${q.user_name} - ${new Date(q.created_at).toLocaleDateString()}</div>
+                                            <div>${safeQuestion}</div>
+                                            <div style="font-size: 0.75rem; color: #888; margin-top: 5px;">${safeUserName} - ${createdDateStr}</div>
                                         </div>
                                     </div>
                                     <div class="qa-a">
                                         <div style="font-weight: 600; color: #00897B; margin-bottom: 5px; font-size: 0.85rem;">Satıcı Yanıtı <span style="color:#aaa; font-weight:normal; margin-left:10px;">${dateStr}</span></div>
-                                        <div>${q.answer || '<em>Satıcı henüz yanıtlamadı.</em>'}</div>
+                                        <div>${answerHtml}</div>
                                     </div>
                                 </div>
                             `;

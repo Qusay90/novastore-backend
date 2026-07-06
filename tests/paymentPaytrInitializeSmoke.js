@@ -130,10 +130,11 @@ const createFakeClient = ({ existingPaymentRows = [] } = {}) => {
     };
 };
 
-const makeReq = () => ({
+const makeReq = ({ body = {}, headers = {} } = {}) => ({
     headers: {
         'idempotency-key': 'idem-paytr-1',
-        'x-forwarded-for': '203.0.113.10'
+        'x-forwarded-for': '203.0.113.10',
+        ...headers
     },
     ip: '203.0.113.10',
     body: {
@@ -142,11 +143,13 @@ const makeReq = () => ({
         phone: '05551234567',
         address: 'Test Mahallesi, Test Sokak No:1',
         cartItems: [{ productId: 101, quantity: 1 }],
-        paymentMethod: 'card'
+        paymentMethod: 'card',
+        analyticsSessionKey: 'guest-session-1',
+        ...body
     }
 });
 
-const callInitialize = async ({ configureEnv, clientOptions = {} }) => {
+const callInitialize = async ({ configureEnv, clientOptions = {}, reqOptions = {} }) => {
     const originalConnect = pool.connect;
     const client = createFakeClient(clientOptions);
     pool.connect = async () => client;
@@ -154,7 +157,7 @@ const callInitialize = async ({ configureEnv, clientOptions = {} }) => {
 
     try {
         const res = createRes();
-        await initializePayment(makeReq(), res);
+        await initializePayment(makeReq(reqOptions), res);
         return { client, res };
     } finally {
         pool.connect = originalConnect;
@@ -199,6 +202,9 @@ const findOrderPaymentUpdate = (client) => client.calls.find((call) => /UPDATE o
         assert.strictEqual(rawRequest.stockReserved, false);
         assert.strictEqual(rawRequest.finalizesOnWebhook, true);
         assert.strictEqual(rawRequest.paytr.merchantOid, paytrRes.body.paymentRef);
+        assert.strictEqual(rawRequest.idempotency.key, 'idem-paytr-1');
+        assert.match(rawRequest.idempotency.ownerKey, /^[a-f0-9]{64}$/);
+        assert.match(rawRequest.idempotency.requestHash, /^[a-f0-9]{64}$/);
         assert.strictEqual(rawResponse.type, 'iframe');
         assert.strictEqual(rawResponse.token, paytrRes.body.paymentAction.token);
 
@@ -232,7 +238,9 @@ const findOrderPaymentUpdate = (client) => client.calls.find((call) => /UPDATE o
                         order_id: 7001,
                         payment_ref: paytrRes.body.paymentRef,
                         status: PAYMENT_STATUS.REQUIRES_ACTION,
-                        provider: 'paytr'
+                        provider: 'paytr',
+                        order_user_id: null,
+                        raw_request: paytrPaymentInsert.params[7]
                     }
                 ]
             }
@@ -247,6 +255,45 @@ const findOrderPaymentUpdate = (client) => client.calls.find((call) => /UPDATE o
         assert.strictEqual(duplicateRun.client.calls.some((call) => /INSERT INTO payments/i.test(call.sql)), false);
         assert.strictEqual(duplicateRun.client.calls.some((call) => /UPDATE products\s+SET stock = stock -/i.test(call.sql)), false);
         assert.strictEqual(duplicateRun.client.calls.some((call) => /UPDATE coupons SET used_count/i.test(call.sql)), false);
+
+        const bodyMismatchRun = await callInitialize({
+            configureEnv: applyPaytrEnv,
+            reqOptions: { body: { phone: '05550000000' } },
+            clientOptions: {
+                existingPaymentRows: [
+                    {
+                        order_id: 7001,
+                        payment_ref: paytrRes.body.paymentRef,
+                        status: PAYMENT_STATUS.REQUIRES_ACTION,
+                        provider: 'paytr',
+                        order_user_id: null,
+                        raw_request: paytrPaymentInsert.params[7]
+                    }
+                ]
+            }
+        });
+        assert.strictEqual(bodyMismatchRun.res.code, 409);
+        assert.match(bodyMismatchRun.res.body.error, /Idempotency key/i);
+        assert.strictEqual(bodyMismatchRun.client.calls.some((call) => /INSERT INTO orders|INSERT INTO payments/i.test(call.sql)), false);
+
+        const guestSessionMismatchRun = await callInitialize({
+            configureEnv: applyPaytrEnv,
+            reqOptions: { body: { analyticsSessionKey: 'guest-session-2' } },
+            clientOptions: {
+                existingPaymentRows: [
+                    {
+                        order_id: 7001,
+                        payment_ref: paytrRes.body.paymentRef,
+                        status: PAYMENT_STATUS.REQUIRES_ACTION,
+                        provider: 'paytr',
+                        order_user_id: null,
+                        raw_request: paytrPaymentInsert.params[7]
+                    }
+                ]
+            }
+        });
+        assert.strictEqual(guestSessionMismatchRun.res.code, 409);
+        assert.strictEqual(guestSessionMismatchRun.client.calls.some((call) => /INSERT INTO orders|INSERT INTO payments/i.test(call.sql)), false);
 
         const iyzicoRun = await callInitialize({
             configureEnv: () => {

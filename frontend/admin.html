@@ -5249,12 +5249,16 @@
             });
             itemsHtml += '</div>';
 
+            const safeCustomerName = escapeAdminHtml(order.customer_name || 'Bilinmiyor');
+            const safeCustomerPhone = escapeAdminHtml(order.phone || '');
+            const safeCustomerAddress = escapeAdminHtml(order.address || '');
+
             document.getElementById('order-modal-body').innerHTML = `
     <div
         style="background: var(--table-hover); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border);">
-        <div style="margin-bottom:5px;"><strong>Müşteri:</strong> ${order.customer_name}</div>
-        <div style="margin-bottom:5px;"><strong>Telefon:</strong> ${order.phone}</div>
-        <div><strong>Adres:</strong> ${order.address}</div>
+        <div style="margin-bottom:5px;"><strong>Müşteri:</strong> ${safeCustomerName}</div>
+        <div style="margin-bottom:5px;"><strong>Telefon:</strong> ${safeCustomerPhone}</div>
+        <div><strong>Adres:</strong> ${safeCustomerAddress}</div>
     </div>
     <h4>Sipariş İçeriği</h4>
     ${itemsHtml}
@@ -5546,6 +5550,7 @@
             };
             const icon = icons[notif.type] || '🔔';
             const timeStr = new Date(notif.created_at).toLocaleString('tr-TR');
+            const safeMessage = escapeAdminHtml(notif.message || '');
 
             const item = document.createElement('div');
             item.className = 'notif-item' + (notif.is_read ? '' : ' unread');
@@ -5553,7 +5558,7 @@
             item.innerHTML = `
         <div class="notif-icon-box">${icon}</div>
         <div class="notif-text">
-            <p>${notif.message}</p>
+            <p>${safeMessage}</p>
             <small>${timeStr}</small>
         </div>
         `;
@@ -5728,21 +5733,29 @@
                     questions.forEach(q => {
                         const dateStr = new Date(q.created_at).toLocaleDateString('tr-TR');
                         const isAnswered = q.answer !== null;
+                        const questionText = String(q.question || '');
+                        const answerText = String(q.answer || '');
+                        const safeProductImage = escapeAdminHtml(q.product_image || 'https://via.placeholder.com/40');
+                        const safeProductName = escapeAdminHtml(q.product_name || 'Ürün');
+                        const safeUserName = escapeAdminHtml(q.user_name || 'Müşteri');
+                        const safeQuestion = escapeAdminHtml(questionText);
+                        const questionArg = encodeURIComponent(questionText);
+                        const answerArg = encodeURIComponent(answerText);
 
                         html += `
         <tr style="${!isAnswered ? 'background: rgba(247, 148, 29, 0.05); font-weight:600;' : ''}">
             <td>
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <img src="${q.product_image || 'https://via.placeholder.com/40'}"
+                    <img src="${safeProductImage}"
                         style="width:40px; height:40px; object-fit:cover; border-radius:6px;">
                     <div style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
-                        title="${q.product_name}">${q.product_name}</div>
+                        title="${safeProductName}">${safeProductName}</div>
                 </div>
             </td>
-            <td>${q.user_name}</td>
+            <td>${safeUserName}</td>
             <td>
                 <div style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
-                    title="${q.question}">${q.question}</div>
+                    title="${safeQuestion}">${safeQuestion}</div>
             </td>
             <td>
                 ${isAnswered
@@ -5751,7 +5764,7 @@
             </td>
             <td>${dateStr}</td>
             <td>
-                <button class="btn-edit" onclick="openAnswerModal(${q.id}, '${q.question.replace(/'/g, "\\'")}', '${(q.answer || '').replace(/'/g, "\\'")}')">
+                <button class="btn-edit" onclick="openAnswerModal(${Number(q.id)}, decodeURIComponent('${questionArg}'), decodeURIComponent('${answerArg}'))">
                     ${isAnswered ? 'Güncelle' : 'Yanıtla'}
                 </button>
             </td>
@@ -5767,7 +5780,7 @@
                         return;
                     }
                     tbody.innerHTML = `<tr>
-            <td colspan="6" style="text-align:center; color:red; padding: 20px;">Hata: ${errData.error || 'Bilinmeyen bir hata oluştu.'}</td>
+            <td colspan="6" style="text-align:center; color:red; padding: 20px;">Hata: ${escapeAdminHtml(errData.error || 'Bilinmeyen bir hata oluştu.')}</td>
         </tr>`;
                 }
             } catch (err) {
@@ -5981,6 +5994,7 @@
             const icon = icons[notif.type] || '🔔';
             const title = metas[notif.type] || 'Bildirim';
             const typeClass = classes[notif.type] || 'info';
+            const safeMessage = escapeAdminHtml(notif.message || '');
 
             const toast = document.createElement('div');
             toast.className = `toast ${typeClass}`;
@@ -5989,7 +6003,7 @@
                 <div class="toast-icon">${icon}</div>
                 <div class="toast-content">
                     <div class="toast-title">${title}</div>
-                    <div class="toast-message">${notif.message}</div>
+                    <div class="toast-message">${safeMessage}</div>
                 </div>
                 <button class="toast-close" onclick="event.stopPropagation(); this.parentElement.classList.add('removing'); setTimeout(() => this.parentElement.remove(), 320)">✕</button>
             `;

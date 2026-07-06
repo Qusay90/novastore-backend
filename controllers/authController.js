@@ -1,13 +1,43 @@
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { Resend } = require('resend');
 const { getAppBaseUrl, getMailFrom } = require('../config/appConfig');
+
+const PASSWORD_RESET_TOKEN_PURPOSE = 'password_reset';
+const PASSWORD_RESET_TOKEN_TTL_SECONDS = 60 * 60;
 
 const ensureJwtSecret = () => {
     if (!process.env.JWT_SECRET) {
         throw new Error('Server JWT config missing');
     }
+};
+
+const createPasswordResetTokenPayload = (userId) => ({
+    id: Number(userId),
+    purpose: PASSWORD_RESET_TOKEN_PURPOSE,
+    jti: crypto.randomBytes(16).toString('hex')
+});
+
+const hashPasswordResetToken = (token) => (
+    crypto.createHash('sha256').update(String(token || '')).digest('hex')
+);
+
+const verifyPasswordResetToken = (token) => {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = Number(decoded && decoded.id);
+
+    if (
+        !decoded ||
+        decoded.purpose !== PASSWORD_RESET_TOKEN_PURPOSE ||
+        !Number.isInteger(userId) ||
+        userId <= 0
+    ) {
+        throw new Error('Invalid password reset token');
+    }
+
+    return { id: userId };
 };
 
 const login = async (req, res) => {
@@ -68,10 +98,25 @@ const forgotPassword = async (req, res) => {
         const user = userResult.rows[0];
 
         const resetToken = jwt.sign(
-            { id: user.id },
+            createPasswordResetTokenPayload(user.id),
             process.env.JWT_SECRET,
-            { expiresIn: '1h' }
+            { expiresIn: PASSWORD_RESET_TOKEN_TTL_SECONDS }
         );
+        const resetTokenHash = hashPasswordResetToken(resetToken);
+        const resetTokenExpiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_SECONDS * 1000);
+
+        const resetStateResult = await pool.query(
+            `UPDATE users
+             SET password_reset_token_hash = $1,
+                 password_reset_expires_at = $2
+             WHERE id = $3
+             RETURNING id`,
+            [resetTokenHash, resetTokenExpiresAt, user.id]
+        );
+
+        if (resetStateResult.rows.length === 0) {
+            return res.status(200).json({ message: neutralMessage });
+        }
 
         const baseUrl = getAppBaseUrl(req);
         const resetLink = `${baseUrl}/reset-password.html?token=${resetToken}`;
@@ -181,7 +226,14 @@ const changePassword = async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, req.user.id]);
+        await pool.query(
+            `UPDATE users
+             SET password = $1,
+                 password_reset_token_hash = NULL,
+                 password_reset_expires_at = NULL
+             WHERE id = $2`,
+            [hashedPassword, req.user.id]
+        );
         res.status(200).json({ message: 'Şifren başarıyla güncellendi.' });
     } catch (err) {
         console.error('Şifre değiştirme hatası:', err.message);
@@ -216,16 +268,24 @@ const resetPassword = async (req, res) => {
     try {
         ensureJwtSecret();
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = verifyPasswordResetToken(token);
         const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const resetTokenHash = hashPasswordResetToken(token);
 
         const result = await pool.query(
-            'UPDATE users SET password = $1 WHERE id = $2 RETURNING id',
-            [hashedPassword, decoded.id]
+            `UPDATE users
+             SET password = $1,
+                 password_reset_token_hash = NULL,
+                 password_reset_expires_at = NULL
+             WHERE id = $2
+               AND password_reset_token_hash = $3
+               AND password_reset_expires_at > NOW()
+             RETURNING id`,
+            [hashedPassword, decoded.id, resetTokenHash]
         );
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'Kullanıcı bulunamadı.' });
+            return res.status(400).json({ message: 'Geçersiz veya süresi dolmuş bağlantı.' });
         }
 
         res.status(200).json({ message: 'Şifreniz başarıyla güncellendi.' });
