@@ -3,6 +3,7 @@ const { createNotification } = require('./notificationController');
 const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
 const { ORDER_STATUS } = require('../constants/orderStatus');
 const { maskFullName } = require('../services/privacyService');
+const { reviewUpload, uploadReviewMediaFiles, cleanupCloudinaryAssets } = require('../config/cloudinary');
 
 const MAX_REVIEW_MEDIA_COUNT = 4;
 const MAX_REVIEW_COMMENT_LENGTH = 2000;
@@ -129,43 +130,144 @@ const loadReviewMediaMap = async (reviewIds) => {
     return mediaMap;
 };
 
+const firstReviewFieldValue = (value) => {
+    if (Array.isArray(value)) return firstReviewFieldValue(value[0]);
+    if (value === undefined || value === null) return null;
+
+    const normalized = String(value).trim();
+    return normalized === '' ? null : normalized;
+};
+
+const getReviewFieldValue = (source, ...names) => {
+    if (!source) return null;
+
+    for (const name of names) {
+        const value = firstReviewFieldValue(source[name]);
+        if (value !== null) return value;
+    }
+
+    return null;
+};
+
+const parsePositiveInteger = (value) => {
+    const numericValue = Number(value);
+    return Number.isInteger(numericValue) && numericValue > 0 ? numericValue : null;
+};
+
+const isMultipartReviewRequest = (req) => {
+    return /^multipart\/form-data(?:;|$)/i.test(String(req.headers['content-type'] || ''));
+};
+
+const getMultipartPreflightProductId = (req) => {
+    return getReviewFieldValue(req.query, 'productId', 'product_id')
+        || firstReviewFieldValue(req.headers['x-review-product-id']);
+};
+
+const parseReviewMediaUpload = (req, res) => new Promise((resolve, reject) => {
+    reviewUpload.array('media', MAX_REVIEW_MEDIA_COUNT)(req, res, (err) => {
+        if (err) return reject(err);
+        return resolve();
+    });
+});
+
+const sendReviewUploadError = (res, err) => {
+    const errorCode = String(err.code || '');
+    const statusCode = err.statusCode || (errorCode.startsWith('LIMIT_') ? 400 : 500);
+    return res.status(statusCode).json({ error: err.message || 'Yorum medyası yüklenemedi.' });
+};
+
+const sendReviewPermissionError = (res, permission) => {
+    const statusCode = permission.code === 'ALREADY_REVIEWED' ? 400 : 403;
+    return res.status(statusCode).json({ error: permission.message, code: permission.code });
+};
+
 // 1. Ürüne yorum ekleme
 const addReview = async (req, res) => {
     let client;
+    let uploadedReviewFiles = [];
 
     try {
-        const { productId, rating, comment } = req.body;
+        const multipartRequest = isMultipartReviewRequest(req);
+        const productId = multipartRequest
+            ? getMultipartPreflightProductId(req)
+            : getReviewFieldValue(req.body, 'productId', 'product_id');
         const userId = req.user.id;
 
-        if (!productId || !rating) {
-            return res.status(400).json({ error: 'Ürün ve puan bilgisi zorunludur.' });
+        if (!productId) {
+            return res.status(400).json({ error: '\u00dcr\u00fcn bilgisi zorunludur.' });
         }
 
-        const numericProductId = Number(productId);
-        if (!Number.isInteger(numericProductId) || numericProductId <= 0) {
+        const numericProductId = parsePositiveInteger(productId);
+        if (!numericProductId) {
             return res.status(400).json({ error: 'Geçerli bir ürün seçmelisiniz.' });
         }
 
-        const numericRating = Number(rating);
-        if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
-            return res.status(400).json({ error: 'Puan 1 ile 5 arasinda olmalidir.' });
-        }
+        let rating = getReviewFieldValue(req.body, 'rating');
+        let comment = getReviewFieldValue(req.body, 'comment');
+        let numericRating;
+        let normalizedComment;
+        let pendingReviewFiles = [];
 
-        const normalizedComment = normalizeReviewComment(comment);
-        if (normalizedComment && normalizedComment.length > MAX_REVIEW_COMMENT_LENGTH) {
-            return res.status(400).json({ error: 'Yorum metni çok uzun. Lütfen daha kısa bir yorum yazın.' });
-        }
+        if (!multipartRequest) {
+            numericRating = Number(rating);
+            if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
+                return res.status(400).json({ error: 'Puan 1 ile 5 arasinda olmalidir.' });
+            }
 
-        const reviewMedia = buildReviewMediaPayload(req.files);
-        if (reviewMedia.length > MAX_REVIEW_MEDIA_COUNT) {
-            return res.status(400).json({ error: 'En fazla 4 görsel veya video ekleyebilirsiniz.' });
+            normalizedComment = normalizeReviewComment(comment);
+            if (normalizedComment && normalizedComment.length > MAX_REVIEW_COMMENT_LENGTH) {
+                return res.status(400).json({ error: 'Yorum metni çok uzun. Lütfen daha kısa bir yorum yazın.' });
+            }
+
+            pendingReviewFiles = Array.isArray(req.files) ? req.files : [];
+            if (pendingReviewFiles.length > MAX_REVIEW_MEDIA_COUNT) {
+                return res.status(400).json({ error: 'En fazla 4 görsel veya video ekleyebilirsiniz.' });
+            }
+
         }
 
         const permission = await getReviewPermission(userId, numericProductId);
         if (!permission.canReview) {
-            const statusCode = permission.code === 'ALREADY_REVIEWED' ? 400 : 403;
-            return res.status(statusCode).json({ error: permission.message, code: permission.code });
+            return sendReviewPermissionError(res, permission);
         }
+
+        if (multipartRequest) {
+            try {
+                await parseReviewMediaUpload(req, res);
+            } catch (err) {
+                return sendReviewUploadError(res, err);
+            }
+
+            const parsedProductId = getReviewFieldValue(req.body, 'productId', 'product_id');
+            if (parsedProductId && parsePositiveInteger(parsedProductId) !== numericProductId) {
+                return res.status(400).json({ error: 'Yorum iste\u011findeki \u00fcr\u00fcn bilgisi tutars\u0131z.' });
+            }
+
+            rating = getReviewFieldValue(req.body, 'rating');
+            comment = getReviewFieldValue(req.body, 'comment');
+
+            if (!rating) {
+                return res.status(400).json({ error: 'Puan bilgisi zorunludur.' });
+            }
+
+            numericRating = Number(rating);
+            if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
+                return res.status(400).json({ error: 'Puan 1 ile 5 arasinda olmalidir.' });
+            }
+
+            normalizedComment = normalizeReviewComment(comment);
+            if (normalizedComment && normalizedComment.length > MAX_REVIEW_COMMENT_LENGTH) {
+                return res.status(400).json({ error: 'Yorum metni \u00e7ok uzun. L\u00fctfen daha k\u0131sa bir yorum yaz\u0131n.' });
+            }
+
+            pendingReviewFiles = Array.isArray(req.files) ? req.files : [];
+            if (pendingReviewFiles.length > MAX_REVIEW_MEDIA_COUNT) {
+                return res.status(400).json({ error: 'En fazla 4 g\u00f6rsel veya video ekleyebilirsiniz.' });
+            }
+        }
+
+        uploadedReviewFiles = await uploadReviewMediaFiles(pendingReviewFiles);
+        const reviewMedia = buildReviewMediaPayload(uploadedReviewFiles);
 
         client = await pool.connect();
         await client.query('BEGIN');
@@ -209,6 +311,10 @@ const addReview = async (req, res) => {
             try {
                 await client.query('ROLLBACK');
             } catch (_) { }
+        }
+
+        if (uploadedReviewFiles.length > 0) {
+            await cleanupCloudinaryAssets(uploadedReviewFiles);
         }
 
         console.error('Yorum ekleme hatası:', err.message);

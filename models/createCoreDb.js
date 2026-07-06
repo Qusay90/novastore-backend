@@ -15,6 +15,8 @@ const createCoreSchema = async () => {
             email VARCHAR(100) UNIQUE NOT NULL,
             phone VARCHAR(20),
             password VARCHAR(255) NOT NULL,
+            password_reset_token_hash VARCHAR(64),
+            password_reset_expires_at TIMESTAMP,
             role VARCHAR(20) DEFAULT 'customer',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -22,6 +24,8 @@ const createCoreSchema = async () => {
         ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(100);
         ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(100);
         ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token_hash VARCHAR(64);
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMP;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'customer';
         ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 

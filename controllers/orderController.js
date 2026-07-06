@@ -14,6 +14,7 @@ const {
     parseItems,
     updateOrderStatus: applyOrderStatus
 } = require('../services/orderService');
+const { consumeCouponUsageIfNeeded } = require('../services/couponUsageService');
 
 const orderSelectSql = `
     SELECT o.*, s.tracking_url, s.eta_date
@@ -38,15 +39,6 @@ const runOrderQueryWithFallback = async (client, primaryQuery, params, fallbackQ
         if (!isShipmentSchemaMismatch) throw err;
         return client.query(fallbackQuery, params);
     }
-};
-
-const incrementCouponUsageIfNeeded = async (client, coupon) => {
-    if (!coupon || !coupon.applied || !coupon.couponId) return;
-
-    await client.query(
-        'UPDATE coupons SET used_count = used_count + 1, updated_at = NOW() WHERE id = $1',
-        [coupon.couponId]
-    );
 };
 
 const notifyOrderCreated = async (orderId, userId, customerName) => {
@@ -132,6 +124,13 @@ const normalizeOrderVisibility = (row = {}) => {
 
 // 1. Yeni Siparis Olusturma (legacy/fallback)
 const createOrder = async (req, res) => {
+    return res.status(410).json({
+        code: 'LEGACY_ORDER_CREATE_DISABLED',
+        error: 'Eski sipari\u015f olu\u015fturma endpointi devre d\u0131\u015f\u0131. \u00d6deme ba\u015flatmak i\u00e7in /api/payments/initialize kullan\u0131n.'
+    });
+};
+
+const createReservedLegacyOrder = async (req, res) => {
     const client = await pool.connect();
     try {
         const {
@@ -167,7 +166,7 @@ const createOrder = async (req, res) => {
             paymentMethod
         });
 
-        await incrementCouponUsageIfNeeded(client, pricing.coupon);
+        await consumeCouponUsageIfNeeded(client, pricing.coupon);
 
         await client.query(
             `INSERT INTO payments

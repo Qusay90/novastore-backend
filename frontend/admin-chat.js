@@ -9,6 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const adminToken = localStorage.getItem('nova_admin_token');
     let adminUserId = 1;
 
+    function displayText(value, fallback = '') {
+        const text = value === null || value === undefined ? fallback : String(value);
+        return text || fallback;
+    }
+
     try {
         const payload = JSON.parse(atob((adminToken || '').split('.')[1] || ''));
         if (payload && Number.isInteger(Number(payload.id))) adminUserId = Number(payload.id);
@@ -41,12 +46,20 @@ document.addEventListener('DOMContentLoaded', () => {
         users.forEach((user) => {
             const item = document.createElement('div');
             item.className = 'chat-user-item';
-            item.innerHTML = `
-                <div>
-                    <div class="chat-user-item-name">${user.name}</div>
-                    <div style="font-size: 0.8rem; color: #666;">${user.email}</div>
-                </div>
-            `;
+
+            const content = document.createElement('div');
+            const name = document.createElement('div');
+            name.className = 'chat-user-item-name';
+            name.textContent = displayText(user.name, 'M\u00fc\u015fteri');
+
+            const email = document.createElement('div');
+            email.style.fontSize = '0.8rem';
+            email.style.color = '#666';
+            email.textContent = displayText(user.email);
+
+            content.appendChild(name);
+            content.appendChild(email);
+            item.appendChild(content);
 
             item.addEventListener('click', () => {
                 document.querySelectorAll('.chat-user-item').forEach((el) => el.classList.remove('active'));
@@ -60,7 +73,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function openUserChat(user) {
         currentChatUserId = user.id;
-        chatHeader.innerHTML = `<span>&#128172; ${user.name} ile G\u00f6r\u00fc\u015f\u00fcl\u00fcyor</span>`;
+        chatHeader.textContent = '';
+        const title = document.createElement('span');
+        title.appendChild(document.createTextNode(`${String.fromCodePoint(128172)} `));
+        title.appendChild(document.createTextNode(`${displayText(user.name, 'M\u00fc\u015fteri')} ile G\u00f6r\u00fc\u015f\u00fcl\u00fcyor`));
+        chatHeader.appendChild(title);
         chatInput.disabled = false;
         sendChatBtn.disabled = false;
         chatInput.focus();
@@ -99,14 +116,19 @@ document.addEventListener('DOMContentLoaded', () => {
             minute: '2-digit'
         });
 
-        const bubbleHTML = `
-            <div class="admin-chat-bubble ${type}">
-                <div>${msg.message}</div>
-                <div class="admin-chat-time">${timeStr}</div>
-            </div>
-        `;
+        const bubble = document.createElement('div');
+        bubble.className = `admin-chat-bubble ${type === 'sent' ? 'sent' : 'received'}`;
 
-        chatMessages.insertAdjacentHTML('beforeend', bubbleHTML);
+        const messageBody = document.createElement('div');
+        messageBody.textContent = displayText(msg.message);
+
+        const messageTime = document.createElement('div');
+        messageTime.className = 'admin-chat-time';
+        messageTime.textContent = timeStr;
+
+        bubble.appendChild(messageBody);
+        bubble.appendChild(messageTime);
+        chatMessages.appendChild(bubble);
         setTimeout(() => {
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }, 50);
