@@ -34,11 +34,14 @@ assert.strictEqual(tree.length, 10);
 const fashion = tree.find((item) => item.name === 'Moda & Giyim');
 assert(fashion.children.some((item) => item.name === 'Kadın'));
 assert(fashion.children.some((item) => item.name === 'Erkek'));
+assert(fashion.children.some((item) => item.name === 'Çocuk'));
+assert(fashion.children.some((item) => item.name === 'Bebek'));
 
 const filterNames = helper.getFilterNames('Kadın');
 assert(filterNames.includes('Kadın'));
-assert(filterNames.includes('Tulum.'));
+assert(filterNames.includes('Tulum'));
 assert.strictEqual(helper.normalizeName('Tulum.'), 'tulum');
+assert(filterNames.map(helper.normalizeName).includes(helper.normalizeName('Tulum.')));
 
 for (const source of [indexSource, productSource, categoriesSource]) {
     assert(source.includes('category-navigation-fallback.js'));

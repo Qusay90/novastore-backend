@@ -36,10 +36,79 @@
             node('Makyaj')
         ]),
         node('Moda & Giyim', [
-            node('Kadın'),
-            node('Erkek'),
-            node('Çocuk'),
-            node('Bebek')
+            node('Kadın', [
+                node('Giyim', [
+                    node('Üst Giyim', [
+                        node('Tişört'), node('Gömlek'), node('Bluz'), node('Sweatshirt'),
+                        node('Kazak'), node('Hırka'), node('Body')
+                    ]),
+                    node('Alt Giyim', [
+                        node('Pantolon'), node('Jean'), node('Etek'), node('Şort'),
+                        node('Tayt'), node('Eşofman Altı')
+                    ]),
+                    node('Elbise & Tulum', [
+                        node('Elbise'), node('Gömlek Elbise'), node('Tulum')
+                    ]),
+                    node('Takım', [
+                        node('İkili Takım'), node('Eşofman Takımı'), node('Ceketli Takım')
+                    ]),
+                    node('Dış Giyim', [
+                        node('Ceket'), node('Mont'), node('Kaban'), node('Trençkot'), node('Yelek')
+                    ])
+                ]),
+                node('İç Giyim & Ev Giyim', [
+                    node('Sütyen'), node('Külot'), node('Atlet'), node('Pijama'),
+                    node('Gecelik'), node('Çorap'), node('Termal İçlik')
+                ]),
+                node('Ayakkabı'),
+                node('Aksesuar')
+            ]),
+            node('Erkek', [
+                node('Giyim', [
+                    node('Üst Giyim', [
+                        node('Tişört'), node('Polo Yaka'), node('Gömlek'),
+                        node('Sweatshirt'), node('Kazak'), node('Hırka')
+                    ]),
+                    node('Alt Giyim', [
+                        node('Pantolon'), node('Jean'), node('Şort'), node('Eşofman Altı')
+                    ]),
+                    node('Takım', [
+                        node('Eşofman Takımı'), node('Alt-Üst Takım'), node('Takım Elbise')
+                    ]),
+                    node('Dış Giyim', [
+                        node('Ceket'), node('Mont'), node('Kaban'), node('Yelek')
+                    ])
+                ]),
+                node('İç Giyim & Ev Giyim', [
+                    node('Boxer'), node('Slip'), node('Atlet'), node('Pijama'),
+                    node('Çorap'), node('Termal İçlik')
+                ]),
+                node('Ayakkabı'),
+                node('Aksesuar')
+            ]),
+            node('Çocuk', [
+                node('Kız Çocuk', [
+                    node('Üst Giyim'), node('Alt Giyim'), node('Elbise'), node('Takım'),
+                    node('Dış Giyim'), node('İç Giyim & Pijama'), node('Çorap')
+                ]),
+                node('Erkek Çocuk', [
+                    node('Üst Giyim'), node('Alt Giyim'), node('Takım'),
+                    node('Dış Giyim'), node('İç Giyim & Pijama'), node('Çorap')
+                ]),
+                node('Çocuk Ayakkabı'),
+                node('Çocuk Aksesuar')
+            ]),
+            node('Bebek', [
+                node('Kız Bebek', [
+                    node('Zıbın & Body'), node('Tulum'), node('Takım'), node('Üst Giyim'),
+                    node('Alt Giyim'), node('Dış Giyim'), node('Pijama'), node('Çorap')
+                ]),
+                node('Erkek Bebek', [
+                    node('Zıbın & Body'), node('Tulum'), node('Takım'), node('Üst Giyim'),
+                    node('Alt Giyim'), node('Dış Giyim'), node('Pijama'), node('Çorap')
+                ]),
+                node('Yenidoğan')
+            ])
         ]),
         node('Oto, Bahçe & Yapı Market', [
             node('Oto Aksesuar'),
@@ -140,25 +209,11 @@
         return Array.from(MARKETPLACE_ROOT_MARKERS).some((marker) => rootNames.has(marker));
     }
 
-    function mergeLiveFashionRoots(fallbackTree, liveTree) {
-        const liveFashionRoots = liveTree.filter((item) => {
-            const normalized = normalizeName(item.name);
-            return normalized === 'kadın' || normalized === 'erkek' || normalized === 'çocuk' || normalized === 'bebek';
-        });
-        if (!liveFashionRoots.length) return fallbackTree;
-
-        return fallbackTree.map((item) => (
-            normalizeName(item.name) === 'moda & giyim'
-                ? node(item.name, liveFashionRoots)
-                : item
-        ));
-    }
-
     function buildNavigationTree(categories) {
         const liveTree = buildTreeFromRecords(categories);
         const tree = liveTree.length >= 4 && hasMarketplaceRoots(liveTree)
             ? liveTree
-            : mergeLiveFashionRoots(cloneTree(MARKETPLACE_FALLBACK_TREE), liveTree);
+            : cloneTree(MARKETPLACE_FALLBACK_TREE);
 
         activeTree = tree;
         return tree;
