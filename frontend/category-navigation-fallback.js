@@ -144,6 +144,9 @@
     ]);
 
     let activeTree = cloneTree(MARKETPLACE_FALLBACK_TREE);
+    let activeLiveTree = [];
+    let activeNavigationUsesLiveTree = false;
+    const fallbackNameCounts = countNames(MARKETPLACE_FALLBACK_TREE);
 
     function normalizeName(value) {
         return String(value || '')
@@ -186,6 +189,30 @@
         return target;
     }
 
+    function countNames(tree, counts = new Map()) {
+        (tree || []).forEach((item) => {
+            const normalized = normalizeName(item.name);
+            if (normalized) counts.set(normalized, (counts.get(normalized) || 0) + 1);
+            countNames(item.children, counts);
+        });
+        return counts;
+    }
+
+    function collectSpecificFallbackNames(item, target = []) {
+        if (!item?.name) return target;
+        const normalized = normalizeName(item.name);
+        if (normalized && (!target.some((name) => normalizeName(name) === normalized))) {
+            target.push(item.name);
+        }
+        (item.children || []).forEach((child) => {
+            const childNormalized = normalizeName(child.name);
+            if (fallbackNameCounts.get(childNormalized) === 1) {
+                collectSpecificFallbackNames(child, target);
+            }
+        });
+        return target;
+    }
+
     function buildTreeFromRecords(categories) {
         const usable = Array.isArray(categories) ? categories.filter(isVisibleCategory) : [];
         const byParent = new Map();
@@ -211,10 +238,10 @@
 
     function buildNavigationTree(categories) {
         const liveTree = buildTreeFromRecords(categories);
-        const tree = liveTree.length >= 4 && hasMarketplaceRoots(liveTree)
-            ? liveTree
-            : cloneTree(MARKETPLACE_FALLBACK_TREE);
+        activeNavigationUsesLiveTree = liveTree.length >= 4 && hasMarketplaceRoots(liveTree);
+        const tree = activeNavigationUsesLiveTree ? liveTree : cloneTree(MARKETPLACE_FALLBACK_TREE);
 
+        activeLiveTree = liveTree;
         activeTree = tree;
         return tree;
     }
@@ -232,8 +259,30 @@
     }
 
     function getFilterNames(categoryName) {
-        const match = findNodeByName(activeTree, categoryName) || findNodeByName(MARKETPLACE_FALLBACK_TREE, categoryName);
-        return match ? collectNames(match) : [categoryName];
+        const names = [];
+        const addName = (name) => {
+            const normalized = normalizeName(name);
+            if (!normalized || names.some((current) => normalizeName(current) === normalized)) return;
+            names.push(name);
+        };
+
+        const liveMatch = findNodeByName(activeLiveTree, categoryName);
+        if (liveMatch) {
+            collectNames(liveMatch).forEach(addName);
+        }
+
+        const navigationMatch = findNodeByName(activeTree, categoryName);
+        if (navigationMatch && activeNavigationUsesLiveTree) {
+            collectNames(navigationMatch).forEach(addName);
+        }
+
+        const fallbackMatch = findNodeByName(MARKETPLACE_FALLBACK_TREE, categoryName);
+        if (fallbackMatch) {
+            collectSpecificFallbackNames(fallbackMatch).forEach(addName);
+        }
+
+        if (!names.length) addName(categoryName);
+        return names;
     }
 
     window.NovaStoreCategoryNavigation = {

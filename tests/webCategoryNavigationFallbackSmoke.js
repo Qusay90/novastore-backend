@@ -39,9 +39,34 @@ assert(fashion.children.some((item) => item.name === 'Bebek'));
 
 const filterNames = helper.getFilterNames('Kadın');
 assert(filterNames.includes('Kadın'));
-assert(filterNames.includes('Tulum'));
+assert(filterNames.includes('Tulum.'));
 assert.strictEqual(helper.normalizeName('Tulum.'), 'tulum');
 assert(filterNames.map(helper.normalizeName).includes(helper.normalizeName('Tulum.')));
+
+const matchesCategory = (product, categoryName) => {
+    const targets = new Set(helper.getFilterNames(categoryName).map(helper.normalizeName).filter(Boolean));
+    return product.categories.some((category) => targets.has(helper.normalizeName(category)));
+};
+
+const sampleProducts = [
+    { name: 'Erkek çocuk takım', categories: ['Erkek Çocuk', 'Takım'] },
+    { name: 'Kız çocuk takım', categories: ['Kız Çocuk', 'Takım'] },
+    { name: 'Kadın ferace', categories: ['Kadın', 'İkili Takım'] },
+    { name: 'Tulum ürünü', categories: ['Tulum.'] }
+];
+
+assert.deepStrictEqual(
+    sampleProducts.filter((product) => matchesCategory(product, 'Kadın')).map((product) => product.name),
+    ['Kadın ferace', 'Tulum ürünü']
+);
+assert.deepStrictEqual(
+    sampleProducts.filter((product) => matchesCategory(product, 'Erkek Çocuk')).map((product) => product.name),
+    ['Erkek çocuk takım']
+);
+assert.deepStrictEqual(
+    sampleProducts.filter((product) => matchesCategory(product, 'Kız Çocuk')).map((product) => product.name),
+    ['Kız çocuk takım']
+);
 
 for (const source of [indexSource, productSource, categoriesSource]) {
     assert(source.includes('category-navigation-fallback.js'));
