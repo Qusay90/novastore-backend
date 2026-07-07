@@ -81,7 +81,6 @@ import com.novastore.app.core.theme.Orange
 import com.novastore.app.core.ui.optimizedImageUrl
 import com.novastore.app.data.local.TurkeyLocations
 import com.novastore.app.data.model.CartItem
-import com.novastore.app.data.model.Category
 import com.novastore.app.data.model.CustomerAddress
 import com.novastore.app.data.model.Product
 import kotlinx.coroutines.delay
@@ -106,10 +105,6 @@ fun HomeScreen(
     val selectedAddressId by viewModel.selectedAddressId.collectAsState()
     val selectedAddress = addresses.firstOrNull { it.id == selectedAddressId } ?: addresses.firstOrNull()
     var showAddressDialog by remember { mutableStateOf(false) }
-
-    BackHandler(enabled = uiState.selectedCategorySlug != null) {
-        viewModel.navigateToParentCategory()
-    }
 
     LaunchedEffect(refreshToken) {
         if (refreshToken > 0) {
@@ -263,7 +258,7 @@ fun HomeScreen(
 @Composable
 private fun ProductCatalogGrid(
     uiState: HomeUiState,
-    onCategorySelect: (Category?) -> Unit,
+    onCategorySelect: (String?) -> Unit,
     onFilterSelect: (HomeProductFilter) -> Unit,
     onSortSelect: (HomeProductSort) -> Unit,
     onResetCatalog: () -> Unit,
@@ -281,7 +276,7 @@ private fun ProductCatalogGrid(
     }
     val filteredProducts = remember(
         uiState.products,
-        uiState.selectedCategorySlug,
+        uiState.selectedCategory,
         uiState.searchQuery
     ) {
         uiState.filteredProducts
@@ -357,9 +352,8 @@ private fun ProductCatalogGrid(
         // 1. Category Row
         item(span = { GridItemSpan(2) }) {
             CategoryFilterRow(
-                categories = uiState.categories,
-                selectedCategorySlug = uiState.selectedCategorySlug,
-                breadcrumb = uiState.categoryBreadcrumb,
+                categories = uiState.categories.map { it.name },
+                selectedCategory = uiState.selectedCategory,
                 onCategorySelect = onCategorySelect
             )
         }
@@ -556,128 +550,28 @@ private fun SearchBar(
 
 @Composable
 private fun CategoryFilterRow(
-    categories: List<Category>,
-    selectedCategorySlug: String?,
-    breadcrumb: List<Category>,
-    onCategorySelect: (Category?) -> Unit
+    categories: List<String>,
+    selectedCategory: String?,
+    onCategorySelect: (String?) -> Unit
 ) {
-    Column(
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        item {
             CategoryChip(
                 name = "Tümü",
-                isSelected = selectedCategorySlug == null,
+                isSelected = selectedCategory == null,
                 onClick = { onCategorySelect(null) }
             )
-            if (breadcrumb.isNotEmpty()) {
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = breadcrumb.joinToString(" › ") { it.name },
-                    color = Color(0xFF64748B),
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-            }
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        categories.forEach { category ->
-            CategoryTreeNode(
-                category = category,
-                selectedCategorySlug = selectedCategorySlug,
-                onCategorySelect = onCategorySelect,
-                level = 0
-            )
-        }
-    }
-}
-
-private fun Category.containsSlug(slug: String?): Boolean =
-    this.slug == slug || children.any { it.containsSlug(slug) }
-
-@Composable
-private fun CategoryTreeNode(
-    category: Category,
-    selectedCategorySlug: String?,
-    onCategorySelect: (Category) -> Unit,
-    level: Int
-) {
-    val hasChildren = category.children.isNotEmpty()
-    var expanded by rememberSaveable(category.id) {
-        mutableStateOf(category.containsSlug(selectedCategorySlug) && category.slug != selectedCategorySlug)
-    }
-
-    LaunchedEffect(selectedCategorySlug) {
-        if (category.containsSlug(selectedCategorySlug) && category.slug != selectedCategorySlug) {
-            expanded = true
-        }
-    }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = (level * 14).dp, bottom = 5.dp),
-        shape = RoundedCornerShape(9.dp),
-        color = if (selectedCategorySlug == category.slug) Orange.copy(alpha = 0.10f) else Color.White,
-        border = BorderStroke(
-            1.dp,
-            if (selectedCategorySlug == category.slug) Orange else Color(0xFFE2E8F0)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onCategorySelect(category) }
-                .padding(start = 12.dp, top = 5.dp, bottom = 5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = category.name,
-                modifier = Modifier.weight(1f),
-                color = if (selectedCategorySlug == category.slug) Orange else NavyDark,
-                fontWeight = if (selectedCategorySlug == category.slug) FontWeight.Bold else FontWeight.Medium,
-                fontSize = 13.sp
-            )
-            if (category.subtreeVisibleProductCount > 0) {
-                Text(
-                    text = category.subtreeVisibleProductCount.toString(),
-                    color = Color(0xFF64748B),
-                    fontSize = 11.sp
-                )
-            }
-            if (hasChildren) {
-                IconButton(
-                    onClick = { expanded = !expanded },
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (expanded) "Alt kategorileri kapat" else "Alt kategorileri aç",
-                        tint = Orange,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier.width(10.dp))
-            }
-        }
-    }
-
-    if (expanded) {
-        category.children.forEach { child ->
-            CategoryTreeNode(
-                category = child,
-                selectedCategorySlug = selectedCategorySlug,
-                onCategorySelect = onCategorySelect,
-                level = level + 1
+        items(categories) { categoryName ->
+            CategoryChip(
+                name = categoryName,
+                isSelected = selectedCategory == categoryName,
+                onClick = { onCategorySelect(categoryName) }
             )
         }
     }

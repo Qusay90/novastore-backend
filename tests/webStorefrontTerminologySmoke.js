@@ -14,19 +14,15 @@ const sources = {
     paymentResult: readFrontend('payment-result.html'),
     forgotPassword: readFrontend('forgot-password.html'),
     resetPassword: readFrontend('reset-password.html'),
-    catalog: readFrontend('catalog-navigation.js'),
     collections: readFrontend('storefront-collections.js'),
     favorites: readFrontend('favorites-sync.js'),
     chat: readFrontend('chat.js')
 };
 
-assert(sources.catalog.includes('placeholder="En az '));
-assert(sources.catalog.includes('placeholder="En fazla '));
-assert(sources.catalog.includes('Detayları Gör'));
 assert(sources.collections.includes("'Güncel Seçki'"));
 assert(sources.collections.includes('Detayları Gör'));
 
-for (const source of [sources.index, sources.product, sources.catalog, sources.collections]) {
+for (const source of [sources.index, sources.product, sources.collections]) {
     assert(source.includes('Stokta Yok'));
 }
 

@@ -5,7 +5,6 @@ const vm = require('vm');
 
 const root = path.join(__dirname, '..');
 const collectionSource = fs.readFileSync(path.join(root, 'frontend', 'storefront-collections.js'), 'utf8');
-const navigationSource = fs.readFileSync(path.join(root, 'frontend', 'catalog-navigation.js'), 'utf8');
 const indexSource = fs.readFileSync(path.join(root, 'frontend', 'index.html'), 'utf8');
 const pageSource = fs.readFileSync(path.join(root, 'frontend', 'collections.html'), 'utf8');
 const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
@@ -80,35 +79,6 @@ collections._test.updateMetadata({
 assert.strictEqual(sandbox.document.title, 'Vitrin SEO | NovaStore');
 assert.strictEqual(headNodes.find((node) => node.rel === 'canonical').href, 'https://store.test/koleksiyon/vitrin');
 
-const navSandbox = {
-    window: {},
-    document: { getElementById: () => null, addEventListener: () => {} },
-    fetch: async () => ({ ok: true, status: 200, json: async () => [] }),
-    URL,
-    URLSearchParams,
-    console
-};
-vm.runInNewContext(navigationSource, navSandbox, { filename: 'catalog-navigation.js' });
-const nav = navSandbox.window.NovaStoreCatalogNavigation;
-const navigationMarkup = nav._test.renderNavigationItems([{
-    id: 1,
-    title: 'Koleksiyonlar',
-    target: null,
-    children: [{
-        id: 2,
-        title: '<img src=x>',
-        target: { type: 'collection', url: '/koleksiyon/vitrin' },
-        children: []
-    }]
-}]);
-assert(navigationMarkup.includes('/koleksiyon/vitrin'));
-assert(navigationMarkup.includes('catalog-nav-toggle'));
-assert(navigationMarkup.includes('&lt;img src=x&gt;'));
-assert(!navigationMarkup.includes('<img src=x>'));
-assert.strictEqual(nav._test.navigationItemUrl({ target: { url: 'https://evil.test' } }), '');
-
-assert(navigationSource.includes('/api/public/navigation/${encodeURIComponent(code)}'));
-assert(navigationSource.includes('const tree = await fetchCategoryTree()'));
 assert(indexSource.includes('id="home-collections"'));
 assert(indexSource.includes('storefront-collections.js'));
 assert(pageSource.includes('id="collection-page-content"'));

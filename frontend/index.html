@@ -11,7 +11,6 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <script src="mobile-bridge.js"></script>
-    <script src="catalog-navigation.js"></script>
     <script src="storefront-collections.js"></script>
     <script src="shared-state-sync.js"></script>
     <script src="favorites-sync.js"></script>
@@ -1630,6 +1629,32 @@
         }
 
         // --- KATEGORİ SİSTEMİ ---
+        function getProductCategoryNames(product) {
+            const rawCategories = Array.isArray(product?.categories) && product.categories.length > 0
+                ? product.categories
+                : [product?.category];
+            const seen = new Set();
+
+            return rawCategories
+                .map((value) => String(value || '').trim())
+                .filter((value) => {
+                    if (!value) return false;
+                    const lookupKey = value.toLocaleLowerCase('tr-TR');
+                    if (seen.has(lookupKey)) return false;
+                    seen.add(lookupKey);
+                    return true;
+                });
+        }
+
+        function productMatchesCategory(product, categoryName) {
+            const normalizedTarget = String(categoryName || '').trim().toLocaleLowerCase('tr-TR');
+            if (!normalizedTarget) return true;
+
+            return getProductCategoryNames(product).some((currentCategory) =>
+                currentCategory.toLocaleLowerCase('tr-TR') === normalizedTarget
+            );
+        }
+
         function setCategoryMenuOpenState(menuItem, isOpen) {
             menuItem.classList.toggle('is-open', Boolean(isOpen));
             const trigger = menuItem.querySelector('.category-trigger');
@@ -1659,11 +1684,8 @@
         }
 
         async function fetchNavigationCategories() {
-            if (window.NovaStoreCatalogNavigation) {
-                return window.NovaStoreCatalogNavigation.mountMenu({ menuId: 'category-menu' });
-            }
             try {
-                const res = await fetch('/api/public/categories');
+                const res = await fetch('/api/categories');
                 const categories = await res.json();
 
                 const menu = document.getElementById('category-menu');
@@ -1751,14 +1773,16 @@
         }
 
         // --- 3. ÜRÜNLERİ VİTRİNE DİZME ---
-        async function fetchProducts(categorySlug = null, searchFilter = null) {
+        async function fetchProducts(categoryFilter = null, searchFilter = null) {
             try {
-                const endpoint = categorySlug
-                    ? `/api/products?categorySlug=${encodeURIComponent(categorySlug)}`
-                    : '/api/products';
-                const response = await fetch(endpoint);
-                if (!response.ok) throw new Error('Ürünler yüklenemedi.');
+                const response = await fetch('/api/products');
                 let products = await response.json();
+
+                if (categoryFilter) {
+                    products = products.filter(p => productMatchesCategory(p, categoryFilter));
+                    const titleEl = document.getElementById('urunler-title');
+                    if (titleEl) titleEl.innerText = `${categoryFilter} Ürünleri`;
+                }
 
                 if (searchFilter) {
                     const s = searchFilter.toLowerCase();
@@ -1886,31 +1910,16 @@
         }
 
         // --- SAYFA YÜKLENDİĞİNDE ---
-        document.addEventListener('DOMContentLoaded', async () => {
+        document.addEventListener('DOMContentLoaded', () => {
             checkUserStatus();
             renderCartUI();
             fetchNavigationCategories();
 
             const urlParams = new URLSearchParams(window.location.search);
+            const catFilter = urlParams.get('category');
             const searchFilter = urlParams.get('search');
-            let categorySlug = null;
-            if (window.NovaStoreCatalogNavigation) {
-                try {
-                    const resolution = await window.NovaStoreCatalogNavigation.resolveCategoryFromLocation();
-                    if (resolution.error) {
-                        document.getElementById('products-container').innerHTML =
-                            `<p class="catalog-error-state">${escapeHtml(resolution.error)}</p>`;
-                        return;
-                    }
-                    categorySlug = resolution.category?.slug || null;
-                    if (resolution.category) {
-                        document.getElementById('urunler-title').innerText = `${resolution.category.name} Ürünleri`;
-                    }
-                } catch (error) {
-                    console.error('Kategori bağlantısı çözülemedi:', error);
-                }
-            }
-            fetchProducts(categorySlug, searchFilter);
+
+            fetchProducts(catFilter, searchFilter);
             // Bildirim sistemini başlat
             initNotifications();
         });

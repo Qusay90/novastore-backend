@@ -10,7 +10,6 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <script src="mobile-bridge.js"></script>
-    <script src="catalog-navigation.js"></script>
     <script src="shared-state-sync.js"></script>
     <script src="favorites-sync.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1544,7 +1543,6 @@
         </ul>
     </nav>
 
-    <div id="product-category-breadcrumb" style="max-width:1200px; margin:18px auto 0; padding:0 20px;"></div>
     <div class="product-container" id="product-detail-area">
         <h2 style="text-align: center; width: 100%; grid-column: 1 / -1;">Ürün aranıyor...</h2>
     </div>
@@ -1856,11 +1854,8 @@
         }
 
         async function fetchNavigationCategories() {
-            if (window.NovaStoreCatalogNavigation) {
-                return window.NovaStoreCatalogNavigation.mountMenu({ menuId: 'category-menu' });
-            }
             try {
-                const res = await fetch('/api/public/categories');
+                const res = await fetch('/api/categories');
                 const categories = await res.json();
 
                 const menu = document.getElementById('category-menu');
@@ -2576,7 +2571,6 @@
 
                 const product = await productRes.json();
                 const reviewData = await reviewsRes.json();
-                window.NovaStoreCatalogNavigation?.renderProductBreadcrumb(product);
 
                 const imageUrl = product.image_url || 'https://via.placeholder.com/500?text=Görsel+Yok';
 

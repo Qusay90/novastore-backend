@@ -9,10 +9,9 @@
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
-    <script src="/mobile-bridge.js"></script>
-    <script src="/catalog-navigation.js"></script>
+    <script src="mobile-bridge.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="style.css">
     <style>
         body {
             margin: 0;
@@ -208,16 +207,68 @@
 
 <body>
     <main class="native-categories-page">
+        <h1 class="native-categories-title">Kategoriler</h1>
+        <p class="native-categories-lead">Alışverişini hızlandıran ana bölümler ve alt kategoriler.</p>
         <section class="native-categories-list" id="native-categories-list">
             <div class="native-loading"><span class="native-loading-spinner"></span><strong>Kategoriler yükleniyor...</strong></div>
         </section>
     </main>
 
     <script>
-        function loadNativeCategories() {
-            return window.NovaStoreCatalogNavigation.loadCategoryPage({
-                containerId: 'native-categories-list'
-            });
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function categoryUrl(name) {
+            return 'index.html?category=' + encodeURIComponent(name || '');
+        }
+
+        async function loadNativeCategories() {
+            const list = document.getElementById('native-categories-list');
+
+            try {
+                const response = await fetch('/api/categories');
+                const categories = await response.json();
+                const mainCategories = Array.isArray(categories)
+                    ? categories.filter((category) => category.parent_id === null)
+                    : [];
+
+                if (!mainCategories.length) {
+                    list.innerHTML = '<div class="native-category-empty">Kategori bulunamadı.</div>';
+                    return;
+                }
+
+                list.innerHTML = mainCategories.map((main) => {
+                    const children = categories.filter((category) => category.parent_id === main.id);
+                    const firstLetter = String(main.name || 'N').trim().charAt(0).toLocaleUpperCase('tr-TR');
+                    const childText = children.length
+                        ? children.length + ' alt kategori'
+                        : 'Tüm ürünleri görüntüle';
+                    const childrenHtml = children.length
+                        ? '<div class="native-subcategory-list">' + children.map((child) => (
+                            '<a class="native-subcategory-link" href="' + categoryUrl(child.name) + '">' + escapeHtml(child.name) + '</a>'
+                        )).join('') + '</div>'
+                        : '';
+
+                    return [
+                        '<article class="native-category-card">',
+                        '<a class="native-category-main" href="' + categoryUrl(main.name) + '">',
+                        '<span class="native-category-mark">' + escapeHtml(firstLetter) + '</span>',
+                        '<span class="native-category-copy"><strong>' + escapeHtml(main.name) + '</strong><em>' + childText + '</em></span>',
+                        '<span class="native-category-arrow">&rsaquo;</span>',
+                        '</a>',
+                        childrenHtml,
+                        '</article>'
+                    ].join('');
+                }).join('');
+            } catch (error) {
+                list.innerHTML = '<div class="native-category-error">Kategoriler yüklenemedi.</div>';
+            }
         }
 
         if (document.readyState === 'loading') {
