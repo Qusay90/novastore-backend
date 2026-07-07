@@ -11,6 +11,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <script src="mobile-bridge.js"></script>
+    <script src="category-navigation-fallback.js"></script>
     <script src="storefront-collections.js"></script>
     <script src="shared-state-sync.js"></script>
     <script src="favorites-sync.js"></script>
@@ -1646,12 +1647,17 @@
                 });
         }
 
+        function normalizeCategoryNameForMatch(value) {
+            return (window.NovaStoreCategoryNavigation?.normalizeName || ((name) => String(name || '').trim().replace(/[.\s]+$/g, '').toLocaleLowerCase('tr-TR')))(value);
+        }
+
         function productMatchesCategory(product, categoryName) {
-            const normalizedTarget = String(categoryName || '').trim().toLocaleLowerCase('tr-TR');
-            if (!normalizedTarget) return true;
+            const filterNames = window.NovaStoreCategoryNavigation?.getFilterNames(categoryName) || [categoryName];
+            const normalizedTargets = new Set(filterNames.map(normalizeCategoryNameForMatch).filter(Boolean));
+            if (normalizedTargets.size === 0) return true;
 
             return getProductCategoryNames(product).some((currentCategory) =>
-                currentCategory.toLocaleLowerCase('tr-TR') === normalizedTarget
+                normalizedTargets.has(normalizeCategoryNameForMatch(currentCategory))
             );
         }
 
@@ -1691,11 +1697,14 @@
                 const menu = document.getElementById('category-menu');
                 menu.innerHTML = '';
 
-                const mainCats = categories.filter(c => c.parent_id === null);
+                const mainCats = window.NovaStoreCategoryNavigation?.buildNavigationTree(categories)
+                    || categories.filter(c => c.parent_id === null);
                 const themeColors = ['#F7941D', '#1976D2', '#388E3C', '#D32F2F', '#7B1FA2', '#00796B', '#FBC02D', '#C2185B', '#0F2A43'];
 
                 menu.innerHTML = mainCats.map((main, index) => {
-                    const subCats = categories.filter(c => c.parent_id === main.id);
+                    const subCats = Array.isArray(main.children)
+                        ? main.children
+                        : categories.filter(c => c.parent_id === main.id);
                     const hasChildren = subCats.length > 0;
                     const subHtml = hasChildren
                         ? `
@@ -1910,10 +1919,10 @@
         }
 
         // --- SAYFA YÜKLENDİĞİNDE ---
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             checkUserStatus();
             renderCartUI();
-            fetchNavigationCategories();
+            await fetchNavigationCategories();
 
             const urlParams = new URLSearchParams(window.location.search);
             const catFilter = urlParams.get('category');

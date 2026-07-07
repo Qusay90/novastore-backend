@@ -10,6 +10,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <script src="mobile-bridge.js"></script>
+    <script src="category-navigation-fallback.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -235,7 +236,8 @@
                 const response = await fetch('/api/categories');
                 const categories = await response.json();
                 const mainCategories = Array.isArray(categories)
-                    ? categories.filter((category) => category.parent_id === null)
+                    ? (window.NovaStoreCategoryNavigation?.buildNavigationTree(categories)
+                        || categories.filter((category) => category.parent_id === null))
                     : [];
 
                 if (!mainCategories.length) {
@@ -244,7 +246,9 @@
                 }
 
                 list.innerHTML = mainCategories.map((main) => {
-                    const children = categories.filter((category) => category.parent_id === main.id);
+                    const children = Array.isArray(main.children)
+                        ? main.children
+                        : categories.filter((category) => category.parent_id === main.id);
                     const firstLetter = String(main.name || 'N').trim().charAt(0).toLocaleUpperCase('tr-TR');
                     const childText = children.length
                         ? children.length + ' alt kategori'
