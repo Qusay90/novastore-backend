@@ -4,6 +4,7 @@ import com.novastore.app.core.network.NovaStoreApi
 import com.novastore.app.data.model.AskQuestionRequest
 import com.novastore.app.data.model.Category
 import com.novastore.app.data.model.Product
+import com.novastore.app.data.model.matchesCategorySelection
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -27,6 +28,23 @@ class ProductRepository @Inject constructor(
         }
     }
 
+    suspend fun getProductsByCategory(
+        category: Category,
+        includeDescendants: Boolean = true,
+        forceRefresh: Boolean = false
+    ): Result<List<Product>> {
+        val categoryKey = category.categoryKey.trim()
+        if (categoryKey.isBlank()) return getProducts(forceRefresh)
+
+        return runCatching {
+            api.getProducts(category = categoryKey, includeDescendants = includeDescendants)
+                .also { cachedProducts = it }
+        }.recoverCatching { error ->
+            cachedProducts?.filter { it.matchesCategorySelection(category, includeDescendants) }
+                ?: throw error
+        }
+    }
+
     suspend fun getProduct(id: Int): Result<Product> = runCatching {
         cachedProducts?.firstOrNull { it.id == id }?.let { return@runCatching it }
         api.getProduct(id)
@@ -38,7 +56,7 @@ class ProductRepository @Inject constructor(
                 cachedCategories?.let { return@runCatching it }
             }
 
-            api.getCategories().also { cachedCategories = it }
+            api.getCategories(format = "tree").also { cachedCategories = it }
         }
     }
 
