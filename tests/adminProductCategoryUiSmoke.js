@@ -119,7 +119,11 @@ assert(adminHtml.includes('Ana Ürün Kategorisi'));
 assert(adminHtml.includes("formData.append('categoryIds'"));
 assert(adminHtml.includes("formData.append('primaryCategoryId'"));
 assert(adminHtml.includes("formData.append('publicationStatus'"));
-assert(adminHtml.includes("formData.append(\n                    'isCustomerVisible'"));
+assert.match(
+    adminHtml.replace(/\r\n/g, '\n'),
+    /formData\.append\(\s*['"]isCustomerVisible['"]/,
+    'Expected product form submission to append isCustomerVisible to FormData'
+);
 assert(categoryModuleSource.includes("request('/api/admin/categories?format=tree')"));
 assert(!productModuleSource.includes('/api/categories'));
 assert(productModuleSource.includes('textContent = message'));
