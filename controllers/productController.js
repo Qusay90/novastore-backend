@@ -19,6 +19,7 @@ const {
     getPublicCategoryBySlug,
     listPublicCategories
 } = require('../services/categoryService');
+const { normalizeLegacyCategoryName } = require('../services/categoryV2BackfillService');
 const DEFAULT_PRODUCT_CATEGORY = 'Kategorisiz';
 const BACKGROUND_REMOVAL_TRANSFORMATION = [
     { effect: 'background_removal' },
@@ -569,43 +570,124 @@ const buildProductMediaMap = (mediaRows) => {
     return mediaByProductId;
 };
 
-const resolvePublicProductCategoryId = async (query = {}) => {
+const normalizeCategoryPathLookup = (value) =>
+    String(value || '')
+        .trim()
+        .replace(/^\/+|\/+$/g, '')
+        .replace(/\/+/g, '/')
+        .toLocaleLowerCase('tr-TR');
+
+const buildCategoryNotPublicError = () => {
+    const error = new Error('Kategori bulunamadı veya yayında değil.');
+    error.statusCode = 404;
+    error.code = 'CATEGORY_NOT_PUBLIC';
+    return error;
+};
+
+const buildAmbiguousCategoryError = (candidates) => {
+    const error = new Error('Kategori adı birden fazla aktif kategoriyle eşleşiyor.');
+    error.statusCode = 409;
+    error.code = 'AMBIGUOUS_CATEGORY';
+    error.candidateCategoryIds = candidates.map((category) => Number(category.id));
+    return error;
+};
+
+const findPublicCategoryById = async (requestedId, categories = null) => {
+    if (!Number.isInteger(requestedId)) return null;
+    const publicCategories = categories || await listPublicCategories({ format: 'flat' });
+    return publicCategories.find((category) => Number(category.id) === requestedId) || null;
+};
+
+const resolvePublicCategoryReference = async (reference) => {
+    const categoryReference = String(reference || '').trim();
+    if (!categoryReference) return null;
+
+    const publicCategories = await listPublicCategories({ format: 'flat' });
+    const numericReference = Number(categoryReference);
+    if (Number.isInteger(numericReference)) {
+        const byId = await findPublicCategoryById(numericReference, publicCategories);
+        if (byId) return byId;
+        throw buildCategoryNotPublicError();
+    }
+
+    const normalizedPath = normalizeCategoryPathLookup(categoryReference);
+    const byPath = publicCategories.find(
+        (category) => normalizeCategoryPathLookup(category.path) === normalizedPath
+    );
+    if (byPath) return byPath;
+
+    const normalizedSlug = categoryReference.toLocaleLowerCase('tr-TR');
+    const bySlug = publicCategories.find(
+        (category) => String(category.slug || '').toLocaleLowerCase('tr-TR') === normalizedSlug
+    );
+    if (bySlug) return bySlug;
+
+    const normalizedName = normalizeLegacyCategoryName(categoryReference);
+    const legacyNameMatches = publicCategories.filter(
+        (category) => normalizeLegacyCategoryName(category.name) === normalizedName
+    );
+    if (legacyNameMatches.length === 1) return legacyNameMatches[0];
+    if (legacyNameMatches.length > 1) throw buildAmbiguousCategoryError(legacyNameMatches);
+
+    throw buildCategoryNotPublicError();
+};
+
+const hasExplicitIncludeDescendantsFlag = (query = {}) =>
+    Object.prototype.hasOwnProperty.call(query, 'includeDescendants') ||
+    Object.prototype.hasOwnProperty.call(query, 'include_descendants');
+
+const resolveIncludeDescendants = (query = {}, defaultValue = true) =>
+    hasExplicitIncludeDescendantsFlag(query)
+        ? parseBooleanFlag(query.includeDescendants ?? query.include_descendants)
+        : defaultValue;
+
+const resolvePublicProductCategorySelection = async (query = {}) => {
+    const existingContractIncludeDescendants = resolveIncludeDescendants(query, true);
     const slug = String(query.categorySlug || query.category_slug || '').trim();
     if (slug) {
         let detail = await getPublicCategoryBySlug(slug);
         if (detail.redirect) {
             detail = await getPublicCategoryBySlug(detail.redirect.canonical_slug);
         }
-        return Number(detail.category.id);
+        return {
+            categoryId: Number(detail.category.id),
+            includeDescendants: existingContractIncludeDescendants
+        };
     }
 
     const rawId = query.categoryId ?? query.category_id;
-    if (rawId === undefined || rawId === null || rawId === '') return null;
-    const requestedId = Number(rawId);
-    if (!Number.isInteger(requestedId)) return null;
-    const categories = await listPublicCategories({ format: 'flat' });
-    const selected = categories.find((category) => Number(category.id) === requestedId);
-    if (!selected) {
-        const error = new Error('Kategori bulunamadı veya yayında değil.');
-        error.statusCode = 404;
-        error.code = 'CATEGORY_NOT_PUBLIC';
-        throw error;
+    if (rawId !== undefined && rawId !== null && rawId !== '') {
+        const requestedId = Number(rawId);
+        if (!Number.isInteger(requestedId)) return null;
+        const selected = await findPublicCategoryById(requestedId);
+        if (!selected) throw buildCategoryNotPublicError();
+        return {
+            categoryId: requestedId,
+            includeDescendants: existingContractIncludeDescendants
+        };
     }
-    return requestedId;
+
+    const categoryReference = String(query.category || '').trim();
+    if (!categoryReference) return null;
+    const selected = await resolvePublicCategoryReference(categoryReference);
+    return {
+        categoryId: Number(selected.id),
+        includeDescendants: resolveIncludeDescendants(query, false)
+    };
 };
 
 const getAllProducts = async (req, res) => {
     try {
         const isAdmin = getUserFromRequestIfAny(req)?.role === 'admin';
-        const selectedCategoryId = isAdmin ? null : await resolvePublicProductCategoryId(req.query || {});
+        const selectedCategory = isAdmin ? null : await resolvePublicProductCategorySelection(req.query || {});
         let visibilityWhere = isAdmin
             ? ''
             : `WHERE p.publication_status = 'active'
                  AND p.is_customer_visible = TRUE
                  AND p.deleted_at IS NULL`;
         const productQueryParams = [];
-        if (selectedCategoryId !== null) {
-            productQueryParams.push(selectedCategoryId);
+        if (selectedCategory !== null) {
+            productQueryParams.push(selectedCategory.categoryId, selectedCategory.includeDescendants);
             visibilityWhere += `
                 AND EXISTS (
                     WITH RECURSIVE selected_categories AS (
@@ -619,7 +701,8 @@ const getAllProducts = async (req, res) => {
                         SELECT child.id
                         FROM categories child
                         JOIN selected_categories parent ON child.parent_id = parent.id
-                        WHERE child.is_active = TRUE
+                        WHERE $2::BOOLEAN = TRUE
+                          AND child.is_active = TRUE
                           AND child.is_customer_visible = TRUE
                           AND child.deleted_at IS NULL
                     )
@@ -688,7 +771,8 @@ const getAllProducts = async (req, res) => {
         }
         res.status(err.statusCode || 500).json({
             error: err.statusCode ? err.message : 'Ürünler getirilirken sunucu hatası oluştu.',
-            code: err.code
+            code: err.code,
+            candidateCategoryIds: err.candidateCategoryIds
         });
     }
 };
