@@ -1,5 +1,5 @@
 (function () {
-    const node = (name, children = []) => ({ name, children });
+    const node = (name, children = [], extra = {}) => ({ name, children, ...extra });
 
     const MARKETPLACE_FALLBACK_TREE = Object.freeze([
         node('Anne, Bebek & Oyuncak', [
@@ -163,6 +163,17 @@
         return category?.parent_id ?? category?.parentId ?? null;
     }
 
+    function categoryPath(category) {
+        return String(
+            category?.path
+            || category?.fullSlugPath
+            || category?.full_slug_path
+            || category?.slug
+            || category?.name
+            || ''
+        ).trim();
+    }
+
     function isVisibleCategory(category) {
         return Boolean(category?.name)
             && category.is_active !== false
@@ -179,7 +190,12 @@
     }
 
     function cloneTree(tree) {
-        return tree.map((item) => node(item.name, cloneTree(item.children || [])));
+        return tree.map((item) => node(item.name, cloneTree(item.children || []), {
+            id: item.id,
+            slug: item.slug,
+            path: item.path,
+            pathLabel: item.pathLabel
+        }));
     }
 
     function collectNames(item, target = []) {
@@ -223,12 +239,25 @@
         });
         byParent.forEach((items) => items.sort(compareCategories));
 
-        const buildNode = (category) => node(
-            category.name,
-            (byParent.get(String(categoryId(category))) || []).map(buildNode)
-        );
+        const buildNode = (category, parentNames = []) => {
+            const childRecords = Array.isArray(category.children) && category.children.length
+                ? category.children
+                : (byParent.get(String(categoryId(category))) || []);
+            const pathNames = [...parentNames, category.name].filter(Boolean);
+            return node(
+                category.name,
+                childRecords.map((child) => buildNode(child, pathNames)),
+                {
+                    id: categoryId(category),
+                    parent_id: parentId(category),
+                    slug: category.slug,
+                    path: categoryPath(category),
+                    pathLabel: pathNames.join(' > ')
+                }
+            );
+        };
 
-        return (byParent.get('root') || []).map(buildNode);
+        return (byParent.get('root') || []).map((category) => buildNode(category));
     }
 
     function hasMarketplaceRoots(tree) {
@@ -285,8 +314,16 @@
         return names;
     }
 
+    function categoryUrl(category) {
+        const key = typeof category === 'string'
+            ? category
+            : categoryPath(category) || category?.name || '';
+        return `categories.html?category=${encodeURIComponent(key)}`;
+    }
+
     window.NovaStoreCategoryNavigation = {
         buildNavigationTree,
+        categoryUrl,
         getFilterNames,
         normalizeName
     };

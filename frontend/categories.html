@@ -10,7 +10,10 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <script src="mobile-bridge.js"></script>
+    <script src="shared-state-sync.js"></script>
+    <script src="favorites-sync.js"></script>
     <script src="category-navigation-fallback.js"></script>
+    <script src="catalog-plp.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -198,6 +201,210 @@
             box-shadow: 0 0 0 4px rgba(247, 148, 29, 0.12);
         }
 
+        .category-plp-shell {
+            display: grid;
+            gap: 16px;
+        }
+
+        .category-plp-breadcrumb {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            color: #64748B;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+
+        .category-plp-breadcrumb a,
+        .category-plp-product-link,
+        .category-plp-child {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .category-plp-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #E2E8F0;
+        }
+
+        .category-plp-kicker {
+            margin: 0 0 4px;
+            color: #F7941D;
+            font-size: 0.76rem;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .category-plp-header h1 {
+            margin: 0;
+            color: #0F2A43;
+            font-size: 1.4rem;
+            line-height: 1.15;
+        }
+
+        .category-plp-count {
+            color: #0F2A43;
+            white-space: nowrap;
+        }
+
+        .category-plp-children {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .category-plp-child {
+            min-height: 42px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            background: #FFFFFF;
+            color: #0F2A43;
+        }
+
+        .category-plp-child span {
+            color: #64748B;
+            font-size: 0.78rem;
+        }
+
+        .category-plp-tools label {
+            display: grid;
+            gap: 6px;
+            color: #0F2A43;
+            font-size: 0.84rem;
+            font-weight: 800;
+        }
+
+        .category-plp-tools input {
+            min-height: 42px;
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            padding: 0 12px;
+            font: inherit;
+        }
+
+        .category-plp-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px;
+        }
+
+        .category-plp-product {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            background: #FFFFFF;
+            padding: 12px;
+        }
+
+        .category-plp-product-media {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            background: #F1F5F9;
+            overflow: hidden;
+        }
+
+        .category-plp-product-media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .category-plp-product .product-title {
+            min-height: 42px;
+            margin: 10px 0;
+            color: #0F2A43;
+            font-size: 0.95rem;
+            line-height: 1.25;
+        }
+
+        .category-plp-product-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .category-plp-price {
+            display: grid;
+            gap: 2px;
+            color: #0F2A43;
+        }
+
+        .category-plp-price span {
+            color: #94A3B8;
+            font-size: 0.78rem;
+            text-decoration: line-through;
+        }
+
+        .category-plp-price strong {
+            color: #F7941D;
+        }
+
+        .btn-favorite {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 36px;
+            height: 36px;
+            border: 1px solid #E2E8F0;
+            border-radius: 50%;
+            background: #FFFFFF;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .btn-favorite svg {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: #64748B;
+            stroke-width: 2;
+        }
+
+        .btn-favorite.active svg {
+            fill: #EF4444;
+            stroke: #EF4444;
+        }
+
+        .btn-add {
+            width: 38px;
+            height: 38px;
+            border: none;
+            border-radius: 8px;
+            background: #F8FAFC;
+            cursor: pointer;
+        }
+
+        .btn-add:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .category-plp-empty {
+            padding: 22px;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            background: #FFFFFF;
+            color: #64748B;
+            text-align: center;
+            font-weight: 800;
+        }
+
         @keyframes nativeLoadingSpin {
             to {
                 transform: rotate(360deg);
@@ -225,15 +432,34 @@
                 .replace(/'/g, '&#39;');
         }
 
-        function categoryUrl(name) {
-            return 'index.html?category=' + encodeURIComponent(name || '');
+        function categoryUrl(category) {
+            if (window.NovaStoreCategoryNavigation?.categoryUrl) {
+                return window.NovaStoreCategoryNavigation.categoryUrl(category);
+            }
+            const key = category && typeof category === 'object'
+                ? (category.path || category.slug || category.name || '')
+                : String(category || '');
+            return 'categories.html?category=' + encodeURIComponent(key);
         }
 
         async function loadNativeCategories() {
             const list = document.getElementById('native-categories-list');
+            const title = document.querySelector('.native-categories-title');
+            const lead = document.querySelector('.native-categories-lead');
 
             try {
-                const response = await fetch('/api/categories');
+                const mountedPlp = await window.NovaStoreCategoryPlp?.mountCategoryPlp?.({
+                    document,
+                    location: window.location,
+                    history: window.history,
+                    fetch: window.fetch.bind(window),
+                    container: list,
+                    title,
+                    lead
+                });
+                if (mountedPlp) return;
+
+                const response = await fetch('/api/public/categories?format=tree');
                 const categories = await response.json();
                 const mainCategories = Array.isArray(categories)
                     ? (window.NovaStoreCategoryNavigation?.buildNavigationTree(categories)
@@ -255,13 +481,13 @@
                         : 'Tüm ürünleri görüntüle';
                     const childrenHtml = children.length
                         ? '<div class="native-subcategory-list">' + children.map((child) => (
-                            '<a class="native-subcategory-link" href="' + categoryUrl(child.name) + '">' + escapeHtml(child.name) + '</a>'
+                            '<a class="native-subcategory-link" href="' + categoryUrl(child) + '">' + escapeHtml(child.pathLabel || child.name) + '</a>'
                         )).join('') + '</div>'
                         : '';
 
                     return [
                         '<article class="native-category-card">',
-                        '<a class="native-category-main" href="' + categoryUrl(main.name) + '">',
+                        '<a class="native-category-main" href="' + categoryUrl(main) + '">',
                         '<span class="native-category-mark">' + escapeHtml(firstLetter) + '</span>',
                         '<span class="native-category-copy"><strong>' + escapeHtml(main.name) + '</strong><em>' + childText + '</em></span>',
                         '<span class="native-category-arrow">&rsaquo;</span>',
