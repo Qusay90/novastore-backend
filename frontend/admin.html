@@ -663,7 +663,7 @@
 
         .selected-category-chip {
             display: inline-flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 8px;
             background: #E3F2FD;
             color: #1565C0;
@@ -671,7 +671,13 @@
             border-radius: 999px;
             font-size: 0.86rem;
             font-weight: 600;
-            line-height: 1;
+            line-height: 1.35;
+            max-width: 100%;
+        }
+
+        .selected-category-label {
+            min-width: 0;
+            overflow-wrap: anywhere;
         }
 
         .selected-category-remove {

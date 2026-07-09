@@ -39,15 +39,57 @@ const categories = [
     { id: 6, name: 'Other Root', parent_id: null, depth: 0 },
     { id: 7, name: 'Tekrarlı', parent_id: 6, depth: 1 },
     { id: 8, name: 'Tekrarlı', parent_id: 3, depth: 3 },
-    { id: 9, name: 'Archived Leaf', parent_id: 3, depth: 3, deleted_at: '2026-07-02T00:00:00Z' }
+    { id: 9, name: 'Archived Leaf', parent_id: 3, depth: 3, deleted_at: '2026-07-02T00:00:00Z' },
+    { id: 10, name: 'Kadın', parent_id: null, depth: 0 },
+    { id: 11, name: 'Giyim', parent_id: 10, depth: 1 },
+    { id: 12, name: 'Pantolon', parent_id: 11, depth: 2 },
+    { id: 13, name: 'Erkek', parent_id: null, depth: 0 },
+    { id: 14, name: 'Giyim', parent_id: 13, depth: 1 },
+    { id: 15, name: 'Pantolon', parent_id: 14, depth: 2 },
+    { id: 16, name: 'Pasif Leaf', parent_id: 14, depth: 2, is_active: false }
 ];
 
 productAdmin.setCategories(categories);
-assert(elements['prod-category'].innerHTML.includes('Level 3 · üst kategori'));
+assert(elements['prod-category'].innerHTML.includes('Root &gt; Level 2 &gt; Level 3 · üst kategori'));
+assert(elements['prod-category'].innerHTML.includes('Kadın &gt; Giyim &gt; Pantolon'));
+assert(elements['prod-category'].innerHTML.includes('Erkek &gt; Giyim &gt; Pantolon'));
+assert.match(elements['prod-category'].innerHTML, /value="16" disabled>Erkek &gt; Giyim &gt; Pasif Leaf \(pasif\/gizli\)/);
 assert(elements['prod-category'].innerHTML.includes('&lt;img src=x'));
 assert(!elements['prod-category'].innerHTML.includes('<img src=x'));
+assert.strictEqual(
+    productAdmin._test.categoryBreadcrumb(categories.find((category) => category.id === 15)),
+    'Erkek > Giyim > Pantolon'
+);
 
 assert.strictEqual(productAdmin.selectCategory(3), false, 'Parent category must be rejected');
+assert.strictEqual(productAdmin.selectCategory(9), false, 'Archived category must be rejected');
+assert.strictEqual(productAdmin.selectCategory(16), false, 'Inactive category must be rejected');
+assert.match(elements['product-category-error'].textContent, /pasif veya müşteriden gizli kategori/i);
+assert.strictEqual(productAdmin.selectCategory(12), true);
+assert.strictEqual(productAdmin.selectCategory(15), true);
+assert.strictEqual(productAdmin.setPrimary(15), true);
+assert(elements['selected-product-categories'].innerHTML.includes('Kadın &gt; Giyim &gt; Pantolon'));
+assert(elements['selected-product-categories'].innerHTML.includes('Erkek &gt; Giyim &gt; Pantolon'));
+assert(elements['selected-product-categories'].innerHTML.includes('title="Erkek &gt; Giyim &gt; Pantolon"'));
+assert(elements['prod-primary-category'].innerHTML.includes('Kadın &gt; Giyim &gt; Pantolon'));
+assert(elements['prod-primary-category'].innerHTML.includes('Erkek &gt; Giyim &gt; Pantolon'));
+assert.deepStrictEqual(JSON.parse(JSON.stringify(productAdmin.getSubmission('active'))), {
+    hasAssignment: true,
+    categoryIds: [15, 12],
+    primaryCategoryId: 15,
+    categoryNames: ['Pantolon', 'Pantolon']
+});
+assert(productAdmin.renderProductBadges({
+    categoryIds: [12, 15],
+    primaryCategoryId: 12
+}).includes('Kadın &gt; Giyim &gt; Pantolon'));
+assert(productAdmin.renderProductBadges({
+    categoryIds: [12, 15],
+    primaryCategoryId: 12
+}).includes('Erkek &gt; Giyim &gt; Pantolon'));
+
+productAdmin.reset();
+assert.strictEqual(productAdmin.selectCategory(3), false, 'Parent category must remain rejected');
 assert.match(elements['product-category-error'].textContent, /üst kategori seçilemez/i);
 assert.strictEqual(productAdmin.selectCategory(4), true);
 assert.strictEqual(productAdmin.selectCategory(5), true);
