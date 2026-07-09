@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.novastore.app.data.model.Category
 import com.novastore.app.data.model.CustomerAddress
 import com.novastore.app.data.model.Product
+import com.novastore.app.data.model.findCategoryPath
+import com.novastore.app.data.model.flattenCategoryTree
 import com.novastore.app.data.repository.CustomerLocalRepository
 import com.novastore.app.data.repository.ProductRepository
 import com.novastore.app.data.repository.AuthRepository
@@ -39,7 +41,10 @@ data class HomeUiState(
     val isRefreshing: Boolean = false,
     val products: List<Product> = emptyList(),
     val categories: List<Category> = emptyList(),
-    val selectedCategory: String? = null,
+    val selectedCategoryId: Int? = null,
+    val selectedCategoryName: String? = null,
+    val selectedCategoryPath: String? = null,
+    val selectedCategoryBreadcrumb: List<Category> = emptyList(),
     val searchQuery: String = "",
     val selectedFilter: HomeProductFilter = HomeProductFilter.ALL,
     val selectedSort: HomeProductSort = HomeProductSort.FEATURED,
@@ -49,10 +54,6 @@ data class HomeUiState(
         get() {
             val normalizedQuery = searchQuery.trim().lowercase(Locale("tr", "TR"))
             val filtered = products.filter { product ->
-                val matchesCategory = selectedCategory == null ||
-                        product.categories.contains(selectedCategory) ||
-                        product.category.equals(selectedCategory, ignoreCase = true)
-
                 val matchesSearch = normalizedQuery.isBlank() ||
                         product.name.lowercase(Locale("tr", "TR")).contains(normalizedQuery) ||
                         product.category.lowercase(Locale("tr", "TR")).contains(normalizedQuery) ||
@@ -66,7 +67,7 @@ data class HomeUiState(
                     HomeProductFilter.OUT_OF_STOCK -> product.stock <= 0
                 }
                 
-                matchesCategory && matchesSearch && matchesFilter
+                matchesSearch && matchesFilter
             }
 
             val sorted = when (selectedSort) {
@@ -79,6 +80,25 @@ data class HomeUiState(
             }
             return sorted.sortedByDescending { it.stock > 0 }
         }
+
+    val selectedCategory: String?
+        get() = selectedCategoryName
+
+    val visibleCategoryLevel: List<Category>
+        get() {
+            val current = selectedCategoryBreadcrumb.lastOrNull()
+            if (current != null && current.children.isNotEmpty()) return current.children
+
+            val parent = selectedCategoryBreadcrumb.dropLast(1).lastOrNull()
+            if (parent != null) return parent.children
+
+            return categories
+        }
+
+    val selectedCategoryPathLabel: String?
+        get() = selectedCategoryBreadcrumb
+            .takeIf { it.isNotEmpty() }
+            ?.joinToString(" > ") { it.name }
 }
 
 @HiltViewModel
@@ -140,7 +160,11 @@ class HomeViewModel @Inject constructor(
                         isLoading = false,
                         isRefreshing = false,
                         products = products,
-                        categories = categories
+                        categories = categories,
+                        selectedCategoryId = null,
+                        selectedCategoryName = null,
+                        selectedCategoryPath = null,
+                        selectedCategoryBreadcrumb = emptyList()
                     )
                 }
             } else {
@@ -161,8 +185,74 @@ class HomeViewModel @Inject constructor(
     }
 
     fun selectCategory(categoryName: String?) {
-        Timber.d("Selected category changed to: $categoryName")
-        _uiState.update { it.copy(selectedCategory = categoryName) }
+        val category = categoryName?.let { name ->
+            _uiState.value.categories
+                .flattenCategoryTree()
+                .firstOrNull { it.name == name }
+        }
+        selectCategory(category)
+    }
+
+    fun selectCategory(category: Category?) {
+        if (category == null) {
+            resetCatalogPosition()
+            return
+        }
+
+        val categoryPath = category.categoryKey.trim()
+        if (categoryPath.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    error = "Kategori yolu bulunamadı.",
+                    selectedCategoryId = null,
+                    selectedCategoryName = null,
+                    selectedCategoryPath = null,
+                    selectedCategoryBreadcrumb = emptyList()
+                )
+            }
+            return
+        }
+
+        Timber.d("Selected category changed")
+        val trail = _uiState.value.categories.findCategoryPath(category.id).ifEmpty { listOf(category) }
+        _uiState.update {
+            it.copy(
+                isRefreshing = true,
+                selectedCategoryId = category.id,
+                selectedCategoryName = category.name,
+                selectedCategoryPath = categoryPath,
+                selectedCategoryBreadcrumb = trail,
+                error = null
+            )
+        }
+
+        viewModelScope.launch {
+            val productsResult = productRepository.getProductsByCategory(category, includeDescendants = true)
+            _uiState.update {
+                if (productsResult.isSuccess) {
+                    it.copy(
+                        isRefreshing = false,
+                        products = productsResult.getOrDefault(emptyList()),
+                        error = null
+                    )
+                } else {
+                    it.copy(
+                        isRefreshing = false,
+                        error = productsResult.exceptionOrNull()?.message ?: "Kategori ürünleri yüklenemedi."
+                    )
+                }
+            }
+        }
+    }
+
+    fun navigateCategoryBack() {
+        val previousTrail = _uiState.value.selectedCategoryBreadcrumb.dropLast(1)
+        val parent = previousTrail.lastOrNull()
+        if (parent == null) {
+            resetCatalogPosition()
+        } else {
+            selectCategory(parent)
+        }
     }
 
     fun updateSearchQuery(query: String) {
@@ -183,10 +273,32 @@ class HomeViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 searchQuery = "",
-                selectedCategory = null,
+                selectedCategoryId = null,
+                selectedCategoryName = null,
+                selectedCategoryPath = null,
+                selectedCategoryBreadcrumb = emptyList(),
                 selectedFilter = HomeProductFilter.ALL,
-                selectedSort = HomeProductSort.FEATURED
+                selectedSort = HomeProductSort.FEATURED,
+                isRefreshing = true,
+                error = null
             )
+        }
+        viewModelScope.launch {
+            val productsResult = productRepository.getProducts(forceRefresh = true)
+            _uiState.update {
+                if (productsResult.isSuccess) {
+                    it.copy(
+                        isRefreshing = false,
+                        products = productsResult.getOrDefault(emptyList()),
+                        error = null
+                    )
+                } else {
+                    it.copy(
+                        isRefreshing = false,
+                        error = productsResult.exceptionOrNull()?.message ?: "Ürünler yüklenemedi."
+                    )
+                }
+            }
         }
     }
 

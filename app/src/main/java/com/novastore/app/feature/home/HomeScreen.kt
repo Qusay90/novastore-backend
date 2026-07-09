@@ -81,6 +81,7 @@ import com.novastore.app.core.theme.Orange
 import com.novastore.app.core.ui.optimizedImageUrl
 import com.novastore.app.data.local.TurkeyLocations
 import com.novastore.app.data.model.CartItem
+import com.novastore.app.data.model.Category
 import com.novastore.app.data.model.CustomerAddress
 import com.novastore.app.data.model.Product
 import kotlinx.coroutines.delay
@@ -214,6 +215,10 @@ fun HomeScreen(
                         onCatalogInteraction()
                         viewModel.selectCategory(it)
                     },
+                    onCategoryBack = {
+                        onCatalogInteraction()
+                        viewModel.navigateCategoryBack()
+                    },
                     onFilterSelect = {
                         onCatalogInteraction()
                         viewModel.selectFilter(it)
@@ -258,7 +263,8 @@ fun HomeScreen(
 @Composable
 private fun ProductCatalogGrid(
     uiState: HomeUiState,
-    onCategorySelect: (String?) -> Unit,
+    onCategorySelect: (Category?) -> Unit,
+    onCategoryBack: () -> Unit,
     onFilterSelect: (HomeProductFilter) -> Unit,
     onSortSelect: (HomeProductSort) -> Unit,
     onResetCatalog: () -> Unit,
@@ -276,7 +282,7 @@ private fun ProductCatalogGrid(
     }
     val filteredProducts = remember(
         uiState.products,
-        uiState.selectedCategory,
+        uiState.selectedCategoryId,
         uiState.searchQuery
     ) {
         uiState.filteredProducts
@@ -352,9 +358,11 @@ private fun ProductCatalogGrid(
         // 1. Category Row
         item(span = { GridItemSpan(2) }) {
             CategoryFilterRow(
-                categories = uiState.categories.map { it.name },
-                selectedCategory = uiState.selectedCategory,
-                onCategorySelect = onCategorySelect
+                categories = uiState.visibleCategoryLevel,
+                selectedCategoryId = uiState.selectedCategoryId,
+                breadcrumbLabel = uiState.selectedCategoryPathLabel,
+                onCategorySelect = onCategorySelect,
+                onBack = onCategoryBack
             )
         }
 
@@ -368,7 +376,7 @@ private fun ProductCatalogGrid(
         }
 
         // 2. Dynamic Deals Strip
-        if (discountedProducts.isNotEmpty() && uiState.selectedCategory == null && uiState.searchQuery.isEmpty()) {
+        if (discountedProducts.isNotEmpty() && uiState.selectedCategoryPath == null && uiState.searchQuery.isEmpty()) {
             item(span = { GridItemSpan(2) }) {
                 HorizontalDealsSection(
                     products = discountedProducts,
@@ -380,7 +388,7 @@ private fun ProductCatalogGrid(
         // 4. Products Grid Title
         item(span = { GridItemSpan(2) }) {
             Text(
-                text = if (uiState.selectedCategory != null) "${uiState.selectedCategory} Ürünleri" else "Yeni Gelenler",
+                text = if (uiState.selectedCategoryName != null) "${uiState.selectedCategoryName} Ürünleri" else "Yeni Gelenler",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = NavyDark,
@@ -550,29 +558,53 @@ private fun SearchBar(
 
 @Composable
 private fun CategoryFilterRow(
-    categories: List<String>,
-    selectedCategory: String?,
-    onCategorySelect: (String?) -> Unit
+    categories: List<Category>,
+    selectedCategoryId: Int?,
+    breadcrumbLabel: String?,
+    onCategorySelect: (Category?) -> Unit,
+    onBack: () -> Unit
 ) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    ) {
-        item {
-            CategoryChip(
-                name = "Tümü",
-                isSelected = selectedCategory == null,
-                onClick = { onCategorySelect(null) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (!breadcrumbLabel.isNullOrBlank()) {
+            Text(
+                text = breadcrumbLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFF64748B),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 2.dp, bottom = 4.dp)
             )
         }
-        items(categories) { categoryName ->
-            CategoryChip(
-                name = categoryName,
-                isSelected = selectedCategory == categoryName,
-                onClick = { onCategorySelect(categoryName) }
-            )
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) {
+            item {
+                CategoryChip(
+                    name = "Tümü",
+                    isSelected = selectedCategoryId == null,
+                    onClick = { onCategorySelect(null) }
+                )
+            }
+            if (selectedCategoryId != null) {
+                item {
+                    CategoryChip(
+                        name = "Geri",
+                        isSelected = false,
+                        onClick = onBack
+                    )
+                }
+            }
+            items(categories, key = { it.id }) { category ->
+                CategoryChip(
+                    name = category.displayNameWithCount,
+                    isSelected = selectedCategoryId == category.id,
+                    onClick = { onCategorySelect(category) }
+                )
+            }
         }
     }
 }
@@ -667,7 +699,9 @@ private fun CategoryChip(
                 text = name,
                 style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp),
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) Orange else NavyDark
+                color = if (isSelected) Orange else NavyDark,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

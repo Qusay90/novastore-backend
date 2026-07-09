@@ -16,7 +16,8 @@ data class Product(
     val categories: List<String>,
     @SerializedName("average_rating") val averageRating: String,
     @SerializedName("review_count") val reviewCount: Int,
-    val media: List<ProductMedia>
+    val media: List<ProductMedia>,
+    @SerializedName(value = "categoryRelations", alternate = ["category_relations"]) val categoryRelations: List<ProductCategoryRelation> = emptyList()
 ) {
     // Computed property to calculate discount percentage
     val discountPercentage: Int
@@ -24,6 +25,39 @@ data class Product(
             if (oldPrice == null || oldPrice <= price) return 0
             return (((oldPrice - price) / oldPrice) * 100).toInt()
         }
+}
+
+@Serializable
+data class ProductCategoryRelation(
+    @SerializedName(value = "categoryId", alternate = ["category_id"]) val categoryId: Int = 0,
+    @SerializedName(value = "isPrimary", alternate = ["is_primary"]) val isPrimary: Boolean = false,
+    val category: Category? = null
+)
+
+private fun String.normalizedCategoryText(): String =
+    trim().lowercase(java.util.Locale("tr", "TR"))
+
+private fun String.normalizedCategoryPath(): String =
+    trim().trim('/').lowercase(java.util.Locale("tr", "TR"))
+
+fun Product.matchesCategorySelection(selectedCategory: Category, includeDescendants: Boolean = true): Boolean {
+    val targetPath = selectedCategory.categoryKey.normalizedCategoryPath()
+    val targetName = selectedCategory.name.normalizedCategoryText()
+
+    if (targetPath.isNotEmpty()) {
+        val relationMatches = categoryRelations.any { relation ->
+            val relationPath = relation.category?.categoryKey?.normalizedCategoryPath().orEmpty()
+            relationPath == targetPath || (includeDescendants && relationPath.startsWith("$targetPath/"))
+        }
+        if (relationMatches) return true
+    }
+
+    val legacyNames = buildList {
+        add(this@matchesCategorySelection.category)
+        categories.forEach(::add)
+    }.map { it.normalizedCategoryText() }
+
+    return targetName.isNotEmpty() && legacyNames.any { it == targetName }
 }
 
 @Serializable

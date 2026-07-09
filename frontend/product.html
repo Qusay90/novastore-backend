@@ -1856,7 +1856,7 @@
 
         async function fetchNavigationCategories() {
             try {
-                const res = await fetch('/api/categories');
+                const res = await fetch('/api/public/categories?format=tree');
                 const categories = await res.json();
 
                 const menu = document.getElementById('category-menu');

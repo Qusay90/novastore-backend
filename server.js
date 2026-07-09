@@ -121,9 +121,19 @@ const sendCategoryPage = (res, statusCode = 200) => {
     return res.sendFile(path.join(__dirname, 'frontend', 'categories.html'));
 };
 
-app.get(['/kategori/:slug', '/category/:slug'], async (req, res) => {
+app.get(/^\/(?:kategori|category)\/(.+)/, async (req, res) => {
+    const requestedPath = String(req.params[0] || '').replace(/^\/+|\/+$/g, '');
+    if (!requestedPath) return sendCategoryPage(res);
+
+    const usesAlternatePrefix = req.path.toLocaleLowerCase('tr-TR').startsWith('/category/');
+    if (usesAlternatePrefix) {
+        return res.redirect(301, `/kategori/${requestedPath.split('/').map(encodeURIComponent).join('/')}`);
+    }
+
+    if (requestedPath.includes('/')) return sendCategoryPage(res);
+
     try {
-        const detail = await getPublicCategoryBySlug(req.params.slug);
+        const detail = await getPublicCategoryBySlug(requestedPath);
         if (detail.redirect) {
             return res.redirect(
                 detail.redirect.status,
@@ -131,10 +141,8 @@ app.get(['/kategori/:slug', '/category/:slug'], async (req, res) => {
             );
         }
         const canonicalSlug = String(detail.category?.slug || '');
-        const usesAlternatePrefix = req.path.toLocaleLowerCase('tr-TR').startsWith('/category/');
         if (canonicalSlug && (
-            usesAlternatePrefix ||
-            canonicalSlug !== String(req.params.slug || '').toLocaleLowerCase('tr-TR')
+            canonicalSlug !== requestedPath.toLocaleLowerCase('tr-TR')
         )) {
             return res.redirect(301, `/kategori/${encodeURIComponent(canonicalSlug)}`);
         }

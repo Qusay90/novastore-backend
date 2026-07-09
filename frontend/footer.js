@@ -453,7 +453,7 @@
         if (!container) return;
 
         try {
-            const response = await fetch('/api/categories');
+            const response = await fetch('/api/public/categories?format=tree');
             if (!response.ok) throw new Error('Kategori isteği başarısız.');
             const categories = await response.json();
             const items = getFooterCategoryItems(categories);
@@ -464,7 +464,10 @@
             }
 
             container.innerHTML = items
-                .map((item) => `<a class="nova-footer-category-item" href="index.html?category=${encodeURIComponent(item.name)}">${item.name}</a>`)
+                .map((item) => {
+                    const key = item.path || item.slug || item.name;
+                    return `<a class="nova-footer-category-item" href="categories.html?category=${encodeURIComponent(key)}">${item.name}</a>`;
+                })
                 .join('');
         } catch (_) {
             container.innerHTML = '<span class="nova-footer-loading">Kategoriler şu anda alınamadı.</span>';

@@ -6,7 +6,10 @@ import retrofit2.http.*
 interface NovaStoreApi {
     // Products
     @GET("api/products")
-    suspend fun getProducts(): List<Product>
+    suspend fun getProducts(
+        @Query("category") category: String? = null,
+        @Query("includeDescendants") includeDescendants: Boolean? = null
+    ): List<Product>
 
     @GET("api/products/{id}")
     suspend fun getProduct(@Path("id") id: Int): Product
@@ -21,8 +24,8 @@ interface NovaStoreApi {
     suspend fun getUserProductQuestions(): List<ProductQuestion>
 
     // Categories
-    @GET("api/categories")
-    suspend fun getCategories(): List<Category>
+    @GET("api/public/categories")
+    suspend fun getCategories(@Query("format") format: String = "tree"): List<Category>
 
     // Auth
     @POST("api/users/login")
