@@ -272,11 +272,13 @@ const fetcher = async (requestPath) => {
     assert.strictEqual(missingResult.category, null);
     assert(missingContainer.innerHTML.includes('Kategori bulunamadı.'));
 
-    assert(categoriesSource.includes('catalog-plp.js'));
+    assert(categoriesSource.includes('src="/catalog-plp.js"'));
+    assert(categoriesSource.includes('src="/category-navigation-fallback.js"'));
+    assert(categoriesSource.includes('src="/shared-state-sync.js"'));
+    assert(categoriesSource.includes('src="/favorites-sync.js"'));
+    assert(categoriesSource.includes('href="/style.css"'));
     assert(categoriesSource.includes('/api/public/categories?format=tree'));
     assert(categoriesSource.includes('NovaStoreCategoryPlp'));
-    assert(categoriesSource.includes('shared-state-sync.js'));
-    assert(categoriesSource.includes('favorites-sync.js'));
     assert(serverSource.includes('kategori|category'));
     assert(serverSource.includes('sendCategoryPage(res)'));
 
