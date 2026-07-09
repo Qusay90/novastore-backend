@@ -123,6 +123,10 @@ assert.strictEqual(
     plp.categoryProductsUrl('kadin/giyim/pantolon'),
     '/api/products?category=kadin%2Fgiyim%2Fpantolon&includeDescendants=true'
 );
+assert.strictEqual(
+    plp.categoryQueryUrl('kadin/giyim/pantolon'),
+    '/kategori/kadin/giyim/pantolon'
+);
 
 const publicTree = [{
     id: 1,
@@ -156,6 +160,7 @@ assert.strictEqual(
 );
 assert(plp.buildBreadcrumbHtml(pantolon).includes('Ana Sayfa'));
 assert(plp.buildBreadcrumbHtml(pantolon).includes('Kadın'));
+assert(plp.buildChildCategoryHtml(tree[0].children).includes('/kategori/kadin/giyim'));
 
 const productCard = plp.buildProductCardHtml({
     id: 7,
@@ -295,7 +300,7 @@ const fetcher = async (requestPath) => {
     assert.strictEqual(modaRoot.children[0].path, 'moda-giyim/kadin');
     assert.strictEqual(
         sandbox.NovaStoreCategoryNavigation.categoryUrl(modaRoot.children[0]),
-        'categories.html?category=moda-giyim%2Fkadin'
+        '/kategori/moda-giyim/kadin'
     );
 
     console.log('category PLP storefront smoke passed');

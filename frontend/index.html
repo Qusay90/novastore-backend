@@ -637,6 +637,11 @@
             border-radius: 6px 6px 0 0;
         }
 
+        .category-trigger-row {
+            display: flex;
+            align-items: stretch;
+        }
+
         .category-trigger {
             border: none;
             background: transparent;
@@ -649,10 +654,22 @@
             color: #0F2A43;
             transition: all 0.3s;
             font: inherit;
+            text-decoration: none;
+        }
+
+        .category-toggle {
+            width: 36px;
+            border: none;
+            background: transparent;
+            color: #0F2A43;
+            cursor: pointer;
+            font: inherit;
         }
 
         .category-item:hover .category-trigger,
-        .category-item.is-open .category-trigger {
+        .category-item.is-open .category-trigger,
+        .category-item:hover .category-toggle,
+        .category-item.is-open .category-toggle {
             color: #F7941D;
             background-color: #E8EEF2;
         }
@@ -698,11 +715,37 @@
             font-weight: 500;
             cursor: pointer;
             transition: background 0.2s, color 0.2s;
+            text-decoration: none;
         }
 
         .subcategory-item:hover {
             background: #f1f1f1;
             color: #0F2A43;
+        }
+
+        .subcategory-node {
+            list-style: none;
+        }
+
+        .subcategory-node.has-children > .subcategory-item {
+            color: #0F2A43;
+            font-weight: 750;
+        }
+
+        .subcategory-children {
+            margin: 0 10px 6px 20px;
+            padding: 0 0 0 10px;
+            border-left: 2px solid #E8EEF2;
+            list-style: none;
+        }
+
+        .subcategory-children .subcategory-item {
+            padding: 8px 10px;
+            font-size: 0.82rem;
+        }
+
+        .is-presentation-only {
+            cursor: default;
         }
 
         /* =============================================
@@ -763,8 +806,7 @@
             .category-nav {
                 padding: 0 4%;
                 justify-content: flex-start;
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
+                overflow: visible;
                 scrollbar-width: none;
             }
 
@@ -773,13 +815,30 @@
             }
 
             .category-menu {
-                white-space: nowrap;
-                min-width: max-content;
+                width: 100%;
+                min-width: 0;
+                flex-wrap: wrap;
+                white-space: normal;
             }
 
             .category-item {
-                padding: 10px 14px;
+                position: static;
+                padding: 0;
                 font-size: 0.88rem;
+            }
+
+            .category-trigger {
+                padding: 12px 10px;
+            }
+
+            .subcategory-menu {
+                top: 100%;
+                left: 12px;
+                right: 12px;
+                min-width: 0;
+                max-height: 58vh;
+                overflow-y: auto;
+                border-radius: 0 0 8px 8px;
             }
 
             /* Hero alanı */
@@ -1663,9 +1722,9 @@
 
         function setCategoryMenuOpenState(menuItem, isOpen) {
             menuItem.classList.toggle('is-open', Boolean(isOpen));
-            const trigger = menuItem.querySelector('.category-trigger');
-            if (trigger) {
-                trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            const toggle = menuItem.querySelector('.category-toggle');
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
             }
         }
 
@@ -1680,6 +1739,18 @@
         function bindCategoryMenuInteractions(menu) {
             if (menu.dataset.interactionsBound === 'true') return;
 
+            menu.addEventListener('click', (event) => {
+                const toggle = event.target.closest('.category-toggle');
+                if (!toggle || !menu.contains(toggle)) return;
+                event.preventDefault();
+                event.stopPropagation();
+                const menuItem = toggle.closest('.category-item');
+                if (!menuItem) return;
+                const shouldOpen = !menuItem.classList.contains('is-open');
+                closeCategoryMenus(menu, shouldOpen ? menuItem : null);
+                setCategoryMenuOpenState(menuItem, shouldOpen);
+            });
+
             document.addEventListener('click', (event) => {
                 if (!menu.contains(event.target)) {
                     closeCategoryMenus(menu);
@@ -1690,61 +1761,13 @@
         }
 
         async function fetchNavigationCategories() {
-            try {
-                const res = await fetch('/api/public/categories?format=tree');
-                const categories = await res.json();
+            const menu = document.getElementById('category-menu');
+            const navigation = window.NovaStoreCategoryNavigation;
+            const themeColors = ['#F7941D', '#1976D2', '#388E3C', '#D32F2F', '#7B1FA2', '#00796B', '#FBC02D', '#C2185B', '#0F2A43'];
 
-                const menu = document.getElementById('category-menu');
-                menu.innerHTML = '';
-
-                const mainCats = window.NovaStoreCategoryNavigation?.buildNavigationTree(categories)
-                    || categories.filter(c => c.parent_id === null);
-                const themeColors = ['#F7941D', '#1976D2', '#388E3C', '#D32F2F', '#7B1FA2', '#00796B', '#FBC02D', '#C2185B', '#0F2A43'];
-
-                menu.innerHTML = mainCats.map((main, index) => {
-                    const subCats = Array.isArray(main.children)
-                        ? main.children
-                        : categories.filter(c => c.parent_id === main.id);
-                    const hasChildren = subCats.length > 0;
-                    const subHtml = hasChildren
-                        ? `
-                            <ul class="subcategory-menu">
-                                ${subCats.map((sub) => `
-                                    <li>
-                                        <button type="button" class="subcategory-item" data-category-name="${escapeHtmlAttribute(sub.name)}">${escapeHtml(sub.name)}</button>
-                                    </li>
-                                `).join('')}
-                            </ul>
-                        `
-                        : '';
-
-                    const bottomColor = themeColors[index % themeColors.length];
-
-                    return `
-                        <li class="category-item ${hasChildren ? 'has-children' : ''}" data-category-name="${escapeHtmlAttribute(main.name)}" style="border-bottom-color: ${bottomColor};">
-                            <button type="button" class="category-trigger" aria-expanded="false">
-                                <span>${escapeHtml(main.name)}</span>
-                                ${hasChildren ? '<span class="category-caret">&#9662;</span>' : ''}
-                            </button>
-                            ${subHtml}
-                        </li>
-                    `;
-                }).join('');
-
-                menu.querySelectorAll('.category-item').forEach((menuItem) => {
-                    const trigger = menuItem.querySelector('.category-trigger');
-                    const categoryName = menuItem.dataset.categoryName || '';
-                    const hasChildren = menuItem.classList.contains('has-children');
-
-                    if (!trigger) return;
-
-                    if (!hasChildren) {
-                        trigger.addEventListener('click', () => {
-                            window.location.href = `index.html?category=${encodeURIComponent(categoryName)}`;
-                        });
-                        return;
-                    }
-
+            const mountMenu = (categories) => {
+                menu.innerHTML = navigation?.renderStorefrontMenu(categories, themeColors) || '';
+                menu.querySelectorAll('.category-item.has-children').forEach((menuItem) => {
                     menuItem.addEventListener('mouseenter', () => {
                         if (!window.matchMedia('(hover: hover)').matches) return;
                         closeCategoryMenus(menu, menuItem);
@@ -1755,28 +1778,18 @@
                         if (!window.matchMedia('(hover: hover)').matches) return;
                         setCategoryMenuOpenState(menuItem, false);
                     });
-
-                    trigger.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        const shouldOpen = !menuItem.classList.contains('is-open');
-                        closeCategoryMenus(menu, shouldOpen ? menuItem : null);
-                        setCategoryMenuOpenState(menuItem, shouldOpen);
-                    });
                 });
-
-                menu.querySelectorAll('.subcategory-item').forEach((subTrigger) => {
-                    subTrigger.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        const categoryName = subTrigger.dataset.categoryName || '';
-                        if (!categoryName) return;
-                        window.location.href = `index.html?category=${encodeURIComponent(categoryName)}`;
-                    });
-                });
-
                 bindCategoryMenuInteractions(menu);
+            };
+
+            try {
+                const res = await fetch('/api/public/categories?format=tree');
+                if (!res.ok) throw new Error(`Kategori isteği başarısız (${res.status}).`);
+                const categories = await res.json();
+                const mainCats = navigation?.buildNavigationTree(categories) || [];
+                mountMenu(mainCats);
             } catch (err) {
+                mountMenu(navigation?.buildFallbackNavigationTree?.() || []);
                 console.error("Kategoriler yüklenirken hata:", err);
             }
         }

@@ -67,8 +67,18 @@ const block = collections._test.renderCollectionBlock({
     products: [{ id: 1, name: 'Stoklu', price: 100, stock: 2, is_purchasable: true }]
 });
 assert(block.includes('/koleksiyon/vitrin'));
+assert(block.includes('Devamını gör'));
 assert(block.includes('&lt;img src=x&gt;'));
 assert(!block.includes('<img src=x>'));
+
+const emptyProducts = collections._test.renderCollectionProducts([]);
+assert(emptyProducts.includes('Bu koleksiyonda henüz ürün yok.'));
+assert(emptyProducts.includes('/index.html'));
+const productGrid = collections._test.renderCollectionProducts([
+    { id: 1, name: 'Stoklu', price: 100, stock: 2, is_purchasable: true }
+]);
+assert(productGrid.includes('catalog-product-grid'));
+assert(productGrid.includes('Stoklu'));
 
 collections._test.updateMetadata({
     name: 'Vitrin',
@@ -83,6 +93,9 @@ assert(indexSource.includes('id="home-collections"'));
 assert(indexSource.includes('storefront-collections.js'));
 assert(pageSource.includes('id="collection-page-content"'));
 assert(pageSource.includes('/storefront-collections.js'));
+assert(pageSource.includes('class="collection-page-header"'));
+assert(pageSource.includes('href="/index.html">Alışverişe dön</a>'));
+assert(pageSource.includes('src="/footer.js"'));
 assert(serverSource.includes("app.get('/koleksiyon/:slug'"));
 
 console.log('web collection storefront smoke passed');

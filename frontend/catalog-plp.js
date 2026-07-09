@@ -54,7 +54,7 @@
     }
 
     function categoryQueryUrl(categoryPath) {
-        return `categories.html?category=${encodeURIComponent(normalizePath(categoryPath))}`;
+        return canonicalCategoryPath(categoryPath);
     }
 
     function canonicalCategoryPath(categoryPath) {

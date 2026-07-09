@@ -130,20 +130,7 @@
         ])
     ]);
 
-    const MARKETPLACE_ROOT_MARKERS = new Set([
-        'anne, bebek & oyuncak',
-        'beyaz eşya & elektrikli ev aletleri',
-        'elektronik',
-        'ev & yaşam',
-        'kitap, kırtasiye & hobi',
-        'kozmetik & kişisel bakım',
-        'moda & giyim',
-        'oto, bahçe & yapı market',
-        'spor & outdoor',
-        'süpermarket & petshop'
-    ]);
-
-    let activeTree = cloneTree(MARKETPLACE_FALLBACK_TREE);
+    let activeTree = [];
     let activeLiveTree = [];
     let activeNavigationUsesLiveTree = false;
     const fallbackNameCounts = countNames(MARKETPLACE_FALLBACK_TREE);
@@ -169,7 +156,6 @@
             || category?.fullSlugPath
             || category?.full_slug_path
             || category?.slug
-            || category?.name
             || ''
         ).trim();
     }
@@ -189,12 +175,13 @@
         return String(a.name || '').localeCompare(String(b.name || ''), 'tr');
     }
 
-    function cloneTree(tree) {
-        return tree.map((item) => node(item.name, cloneTree(item.children || []), {
+    function cloneTree(tree, { presentationOnly = false } = {}) {
+        return tree.map((item) => node(item.name, cloneTree(item.children || [], { presentationOnly }), {
             id: item.id,
             slug: item.slug,
             path: item.path,
-            pathLabel: item.pathLabel
+            pathLabel: item.pathLabel,
+            presentationOnly: presentationOnly || item.presentationOnly === true
         }));
     }
 
@@ -260,19 +247,16 @@
         return (byParent.get('root') || []).map((category) => buildNode(category));
     }
 
-    function hasMarketplaceRoots(tree) {
-        const rootNames = new Set(tree.map((item) => normalizeName(item.name)));
-        return Array.from(MARKETPLACE_ROOT_MARKERS).some((marker) => rootNames.has(marker));
-    }
-
     function buildNavigationTree(categories) {
         const liveTree = buildTreeFromRecords(categories);
-        activeNavigationUsesLiveTree = liveTree.length >= 4 && hasMarketplaceRoots(liveTree);
-        const tree = activeNavigationUsesLiveTree ? liveTree : cloneTree(MARKETPLACE_FALLBACK_TREE);
-
+        activeNavigationUsesLiveTree = liveTree.length > 0;
         activeLiveTree = liveTree;
-        activeTree = tree;
-        return tree;
+        activeTree = liveTree;
+        return liveTree;
+    }
+
+    function buildFallbackNavigationTree() {
+        return cloneTree(MARKETPLACE_FALLBACK_TREE, { presentationOnly: true });
     }
 
     function findNodeByName(items, categoryName) {
@@ -314,17 +298,101 @@
         return names;
     }
 
+    function encodeCategoryPath(value) {
+        return String(value || '')
+            .trim()
+            .replace(/^\/+|\/+$/g, '')
+            .split('/')
+            .map((segment) => segment.trim())
+            .filter(Boolean)
+            .map(encodeURIComponent)
+            .join('/');
+    }
+
     function categoryUrl(category) {
-        const key = typeof category === 'string'
-            ? category
-            : categoryPath(category) || category?.name || '';
-        return `categories.html?category=${encodeURIComponent(key)}`;
+        if (!category || typeof category !== 'object' || category.presentationOnly === true) return null;
+        const encodedPath = encodeCategoryPath(categoryPath(category));
+        return encodedPath ? `/kategori/${encodedPath}` : null;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function renderCategoryTarget(category, className, content) {
+        const url = categoryUrl(category);
+        if (!url) {
+            return `<span class="${className} is-presentation-only" aria-disabled="true">${content}</span>`;
+        }
+        return `<a class="${className}" href="${escapeHtml(url)}">${content}</a>`;
+    }
+
+    function renderSubcategoryNodes(categories, depth = 1) {
+        if (!Array.isArray(categories) || categories.length === 0) return '';
+        const listClass = depth === 1 ? 'subcategory-menu' : 'subcategory-children';
+        return `<ul class="${listClass}" data-category-depth="${depth}">${categories.map((category) => {
+            const children = Array.isArray(category.children) ? category.children : [];
+            const target = renderCategoryTarget(
+                category,
+                'subcategory-item',
+                escapeHtml(category.name)
+            );
+            return `<li class="subcategory-node${children.length ? ' has-children' : ''}" data-category-depth="${depth}">
+                ${target}
+                ${renderSubcategoryNodes(children, depth + 1)}
+            </li>`;
+        }).join('')}</ul>`;
+    }
+
+    function renderStorefrontMenu(categories, themeColors = []) {
+        if (!Array.isArray(categories)) return '';
+        return categories.map((category, index) => {
+            const children = Array.isArray(category.children) ? category.children : [];
+            const hasChildren = children.length > 0;
+            const color = themeColors.length ? themeColors[index % themeColors.length] : '#F7941D';
+            const target = renderCategoryTarget(
+                category,
+                'category-trigger',
+                `<span>${escapeHtml(category.name)}</span>`
+            );
+            const toggle = hasChildren
+                ? `<button type="button" class="category-toggle" aria-expanded="false" aria-label="${escapeHtml(category.name)} alt kategorilerini aç"><span class="category-caret" aria-hidden="true">&#9662;</span></button>`
+                : '';
+            return `<li class="category-item${hasChildren ? ' has-children' : ''}" style="border-bottom-color:${escapeHtml(color)}">
+                <div class="category-trigger-row">${target}${toggle}</div>
+                ${renderSubcategoryNodes(children)}
+            </li>`;
+        }).join('');
+    }
+
+    function renderDirectoryTree(categories, depth = 1) {
+        if (!Array.isArray(categories) || categories.length === 0) return '';
+        return `<ul class="native-subcategory-tree" data-category-depth="${depth}">${categories.map((category) => {
+            const children = Array.isArray(category.children) ? category.children : [];
+            const target = renderCategoryTarget(
+                category,
+                'native-subcategory-link',
+                escapeHtml(category.name)
+            );
+            return `<li class="native-subcategory-node" data-category-depth="${depth}">
+                ${target}
+                ${renderDirectoryTree(children, depth + 1)}
+            </li>`;
+        }).join('')}</ul>`;
     }
 
     window.NovaStoreCategoryNavigation = {
+        buildFallbackNavigationTree,
         buildNavigationTree,
         categoryUrl,
         getFilterNames,
-        normalizeName
+        normalizeName,
+        renderDirectoryTree,
+        renderStorefrontMenu
     };
 })();
