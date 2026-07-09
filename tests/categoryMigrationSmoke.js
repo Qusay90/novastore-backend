@@ -1,7 +1,10 @@
 const assert = require('assert');
 const pool = require('../config/db');
 const { resolveStartupSafety } = require('../config/startupSafety');
-const { applyCategoryV2Schema } = require('../models/categoryV2Schema');
+const {
+    applyCategoryV2Schema,
+    applyCategoryV2BackfillConstraints
+} = require('../models/categoryV2Schema');
 
 const EXPECTED_TABLES = [
     'categories',
@@ -58,7 +61,9 @@ const EXPECTED_STATS_COLUMNS = [
 
 const EXPECTED_INDEXES = [
     'idx_categories_parent_sort',
+    'idx_categories_path_unique',
     'idx_categories_public_visibility',
+    'idx_categories_sibling_name_unique',
     'idx_categories_slug_unique',
     'idx_category_aliases_category_id',
     'idx_category_aliases_normalized_unique',
@@ -105,6 +110,7 @@ const assertContainsAll = (actual, expected, label) => {
         await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
 
         await applyCategoryV2Schema(client);
+        await applyCategoryV2BackfillConstraints(client);
 
         const tableResult = await client.query(
             `SELECT table_name
@@ -178,6 +184,7 @@ const assertContainsAll = (actual, expected, label) => {
         );
 
         await applyCategoryV2Schema(client);
+        await applyCategoryV2BackfillConstraints(client);
 
         const preservedResult = await client.query(
             `SELECT p.category,
@@ -235,7 +242,9 @@ const assertContainsAll = (actual, expected, label) => {
         `);
 
         await applyCategoryV2Schema(client);
+        await applyCategoryV2BackfillConstraints(client);
         await applyCategoryV2Schema(client);
+        await applyCategoryV2BackfillConstraints(client);
 
         const legacyUpgradeResult = await client.query(
             `SELECT p.name,

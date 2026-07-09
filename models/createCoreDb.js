@@ -62,8 +62,8 @@ const createCoreSchema = async () => {
 
         CREATE TABLE IF NOT EXISTS categories (
             id SERIAL PRIMARY KEY,
-            name VARCHAR(255) UNIQUE NOT NULL,
-            parent_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            parent_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
