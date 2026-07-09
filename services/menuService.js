@@ -54,6 +54,27 @@ const safePublicAssetUrl = (value) => {
     }
 };
 
+const buildPublicCategoryTarget = (category) => {
+    if (!category) return null;
+    const rawPath = cleanText(category.path || category.slug, 1000);
+    if (!rawPath) return null;
+    const encodedPath = rawPath
+        .replace(/^\/+|\/+$/g, '')
+        .split('/')
+        .map((segment) => segment.trim())
+        .filter(Boolean)
+        .map(encodeURIComponent)
+        .join('/');
+    if (!encodedPath) return null;
+    return {
+        type: 'category',
+        id: category.id,
+        slug: category.slug,
+        path: category.path || category.slug,
+        url: `/kategori/${encodedPath}`
+    };
+};
+
 const normalizeMenu = (row) => ({
     ...row,
     id: Number(row.id)
@@ -458,14 +479,7 @@ const getPublicNavigation = async (code, { queryable = pool } = {}) => {
         let target = null;
         if (item.target_type === 'category') {
             const category = categoriesById.get(item.category_id);
-            if (category) {
-                target = {
-                    type: 'category',
-                    id: category.id,
-                    slug: category.slug,
-                    url: `/kategori/${encodeURIComponent(category.slug)}`
-                };
-            }
+            target = buildPublicCategoryTarget(category);
         } else if (item.target_type === 'collection') {
             const collection = collectionsById.get(item.collection_id);
             if (collection) {
@@ -509,6 +523,7 @@ const getPublicNavigation = async (code, { queryable = pool } = {}) => {
 
 module.exports = {
     MenuDomainError,
+    buildPublicCategoryTarget,
     listAdminMenus,
     createMenu,
     updateMenu,

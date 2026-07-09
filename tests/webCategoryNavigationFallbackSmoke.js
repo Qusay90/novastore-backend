@@ -8,6 +8,7 @@ const helperSource = fs.readFileSync(path.join(root, 'frontend', 'category-navig
 const indexSource = fs.readFileSync(path.join(root, 'frontend', 'index.html'), 'utf8');
 const productSource = fs.readFileSync(path.join(root, 'frontend', 'product.html'), 'utf8');
 const categoriesSource = fs.readFileSync(path.join(root, 'frontend', 'categories.html'), 'utf8');
+const footerSource = fs.readFileSync(path.join(root, 'frontend', 'footer.js'), 'utf8');
 
 const sandbox = { window: {} };
 vm.runInNewContext(helperSource, sandbox, { filename: 'category-navigation-fallback.js' });
@@ -15,65 +16,96 @@ vm.runInNewContext(helperSource, sandbox, { filename: 'category-navigation-fallb
 const helper = sandbox.window.NovaStoreCategoryNavigation;
 assert(helper, 'category navigation helper should be registered');
 
-const liveLegacyShape = [
-    { id: 15, name: 'Erkek', parent_id: null, is_active: true, is_customer_visible: true, show_in_menu: true },
-    { id: 33, name: 'Kadın', parent_id: null, is_active: true, is_customer_visible: true, show_in_menu: true },
-    { id: 37, name: 'Giyim.', parent_id: 33, is_active: true, is_customer_visible: true, show_in_menu: true },
-    { id: 42, name: 'Elbise & Tulum.', parent_id: 37, is_active: true, is_customer_visible: true, show_in_menu: true },
-    { id: 44, name: 'Tulum.', parent_id: 42, is_active: true, is_customer_visible: true, show_in_menu: true }
-];
+const liveTreePayload = [{
+    id: 1,
+    name: 'Kadın',
+    slug: 'kadin',
+    path: 'kadin',
+    parent_id: null,
+    children: [{
+        id: 2,
+        name: 'Giyim',
+        slug: 'giyim',
+        path: 'kadin/giyim',
+        parent_id: 1,
+        children: [{
+            id: 3,
+            name: 'Pantolon',
+            slug: 'pantolon',
+            path: 'kadin/giyim/pantolon',
+            parent_id: 2,
+            children: []
+        }]
+    }]
+}, {
+    id: 4,
+    name: 'Elektronik',
+    slug: 'elektronik',
+    path: 'elektronik',
+    parent_id: null,
+    children: [{
+        id: 5,
+        name: 'Bilgisayar',
+        slug: 'bilgisayar',
+        path: 'elektronik/bilgisayar',
+        parent_id: 4,
+        children: [{
+            id: 6,
+            name: 'Laptop',
+            slug: 'laptop',
+            path: 'elektronik/bilgisayar/laptop',
+            parent_id: 5,
+            children: []
+        }]
+    }]
+}];
 
-const tree = helper.buildNavigationTree(liveLegacyShape);
-const rootNames = tree.map((item) => item.name);
-assert(rootNames.includes('Anne, Bebek & Oyuncak'));
-assert(rootNames.includes('Elektronik'));
-assert(rootNames.includes('Moda & Giyim'));
-assert(rootNames.includes('Süpermarket & Petshop'));
-assert.strictEqual(tree.length, 10);
-
-const fashion = tree.find((item) => item.name === 'Moda & Giyim');
-assert(fashion.children.some((item) => item.name === 'Kadın'));
-assert(fashion.children.some((item) => item.name === 'Erkek'));
-assert(fashion.children.some((item) => item.name === 'Çocuk'));
-assert(fashion.children.some((item) => item.name === 'Bebek'));
-
-const filterNames = helper.getFilterNames('Kadın');
-assert(filterNames.includes('Kadın'));
-assert(filterNames.includes('Tulum.'));
-assert.strictEqual(helper.normalizeName('Tulum.'), 'tulum');
-assert(filterNames.map(helper.normalizeName).includes(helper.normalizeName('Tulum.')));
-
-const matchesCategory = (product, categoryName) => {
-    const targets = new Set(helper.getFilterNames(categoryName).map(helper.normalizeName).filter(Boolean));
-    return product.categories.some((category) => targets.has(helper.normalizeName(category)));
-};
-
-const sampleProducts = [
-    { name: 'Erkek çocuk takım', categories: ['Erkek Çocuk', 'Takım'] },
-    { name: 'Kız çocuk takım', categories: ['Kız Çocuk', 'Takım'] },
-    { name: 'Kadın ferace', categories: ['Kadın', 'İkili Takım'] },
-    { name: 'Tulum ürünü', categories: ['Tulum.'] }
-];
-
-assert.deepStrictEqual(
-    sampleProducts.filter((product) => matchesCategory(product, 'Kadın')).map((product) => product.name),
-    ['Kadın ferace', 'Tulum ürünü']
+const tree = helper.buildNavigationTree(liveTreePayload);
+assert.strictEqual(tree.length, 2, 'a successful live tree must not be replaced because it has fewer than four roots');
+assert(!tree.some((item) => item.name === 'Moda & Giyim'));
+const women = tree.find((item) => item.name === 'Kadın');
+assert(women);
+assert.strictEqual(helper.categoryUrl(women), '/kategori/kadin');
+assert.strictEqual(helper.categoryUrl(women.children[0]), '/kategori/kadin/giyim');
+assert.strictEqual(helper.categoryUrl(women.children[0].children[0]), '/kategori/kadin/giyim/pantolon');
+assert.strictEqual(
+    helper.categoryUrl({ name: 'Erkek', slug: 'erkek', path: 'erkek' }),
+    '/kategori/erkek'
 );
-assert.deepStrictEqual(
-    sampleProducts.filter((product) => matchesCategory(product, 'Erkek Çocuk')).map((product) => product.name),
-    ['Erkek çocuk takım']
-);
-assert.deepStrictEqual(
-    sampleProducts.filter((product) => matchesCategory(product, 'Kız Çocuk')).map((product) => product.name),
-    ['Kız çocuk takım']
-);
+
+const menuMarkup = helper.renderStorefrontMenu(tree, ['#F7941D']);
+assert(menuMarkup.includes('Kadın'));
+assert(menuMarkup.includes('Giyim'));
+assert(menuMarkup.includes('Pantolon'));
+assert(menuMarkup.includes('href="/kategori/kadin/giyim/pantolon"'));
+assert(menuMarkup.includes('href="/kategori/elektronik/bilgisayar/laptop"'));
+assert(!menuMarkup.includes('index.html?category='));
+
+const directoryMarkup = helper.renderDirectoryTree(women.children);
+assert(directoryMarkup.includes('data-category-depth="2"'));
+assert(directoryMarkup.includes('href="/kategori/kadin/giyim/pantolon"'));
+
+const fallbackTree = helper.buildFallbackNavigationTree();
+assert(fallbackTree.some((item) => item.name === 'Moda & Giyim'));
+assert.strictEqual(helper.categoryUrl(fallbackTree[0]), null);
+const fallbackMarkup = helper.renderStorefrontMenu(fallbackTree);
+assert(fallbackMarkup.includes('is-presentation-only'));
+assert(!fallbackMarkup.includes('href="/kategori/'));
 
 for (const source of [indexSource, productSource, categoriesSource]) {
     assert(source.includes('category-navigation-fallback.js'));
     assert(source.includes('NovaStoreCategoryNavigation'));
 }
 
-assert(indexSource.includes('await fetchNavigationCategories();'));
-assert(indexSource.includes('getFilterNames(categoryName)'));
+assert(indexSource.includes('renderStorefrontMenu'));
+assert(indexSource.includes('buildFallbackNavigationTree'));
+assert(!indexSource.includes('window.location.href = `index.html?category='));
+assert(productSource.includes('renderStorefrontMenu'));
+assert(productSource.includes('buildFallbackNavigationTree'));
+assert(!productSource.includes('window.location.href = `index.html?category='));
+assert(categoriesSource.includes('renderDirectoryTree'));
+assert(footerSource.includes('footerCategoryUrl'));
+assert(footerSource.includes("category?.path || category?.slug || ''"));
+assert(!footerSource.includes('categories.html?category='));
 
 console.log('web category navigation fallback smoke passed');

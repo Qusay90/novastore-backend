@@ -132,10 +132,25 @@
         }
 
         .native-subcategory-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
             padding: 0 14px 14px 70px;
+        }
+
+        .native-subcategory-tree {
+            display: grid;
+            gap: 7px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .native-subcategory-tree .native-subcategory-tree {
+            margin: 7px 0 0 12px;
+            padding-left: 12px;
+            border-left: 2px solid #FED7AA;
+        }
+
+        .native-subcategory-node {
+            list-style: none;
         }
 
         .native-subcategory-link {
@@ -154,6 +169,11 @@
             line-height: 1;
             text-align: center;
             box-shadow: none;
+        }
+
+        .native-subcategory-link.is-presentation-only,
+        .native-category-main.is-presentation-only {
+            cursor: default;
         }
 
         .native-category-empty,
@@ -437,9 +457,41 @@
                 return window.NovaStoreCategoryNavigation.categoryUrl(category);
             }
             const key = category && typeof category === 'object'
-                ? (category.path || category.slug || category.name || '')
-                : String(category || '');
-            return 'categories.html?category=' + encodeURIComponent(key);
+                ? (category.path || category.slug || '')
+                : '';
+            const encoded = String(key)
+                .replace(/^\/+|\/+$/g, '')
+                .split('/')
+                .filter(Boolean)
+                .map(encodeURIComponent)
+                .join('/');
+            return encoded ? '/kategori/' + encoded : null;
+        }
+
+        function renderNativeCategoryCards(mainCategories) {
+            return mainCategories.map((main) => {
+                const children = Array.isArray(main.children) ? main.children : [];
+                const firstLetter = String(main.name || 'N').trim().charAt(0).toLocaleUpperCase('tr-TR');
+                const childText = children.length
+                    ? children.length + ' alt kategori'
+                    : 'Tüm ürünleri görüntüle';
+                const childrenHtml = children.length
+                    ? '<div class="native-subcategory-list">' +
+                        (window.NovaStoreCategoryNavigation?.renderDirectoryTree(children) || '') +
+                        '</div>'
+                    : '';
+                const content = [
+                    '<span class="native-category-mark">' + escapeHtml(firstLetter) + '</span>',
+                    '<span class="native-category-copy"><strong>' + escapeHtml(main.name) + '</strong><em>' + childText + '</em></span>',
+                    '<span class="native-category-arrow">&rsaquo;</span>'
+                ].join('');
+                const target = categoryUrl(main);
+                const mainHtml = target
+                    ? '<a class="native-category-main" href="' + escapeHtml(target) + '">' + content + '</a>'
+                    : '<div class="native-category-main is-presentation-only">' + content + '</div>';
+
+                return '<article class="native-category-card">' + mainHtml + childrenHtml + '</article>';
+            }).join('');
         }
 
         async function loadNativeCategories() {
@@ -460,6 +512,7 @@
                 if (mountedPlp) return;
 
                 const response = await fetch('/api/public/categories?format=tree');
+                if (!response.ok) throw new Error(`Kategori isteği başarısız (${response.status}).`);
                 const categories = await response.json();
                 const mainCategories = Array.isArray(categories)
                     ? (window.NovaStoreCategoryNavigation?.buildNavigationTree(categories)
@@ -471,33 +524,12 @@
                     return;
                 }
 
-                list.innerHTML = mainCategories.map((main) => {
-                    const children = Array.isArray(main.children)
-                        ? main.children
-                        : categories.filter((category) => category.parent_id === main.id);
-                    const firstLetter = String(main.name || 'N').trim().charAt(0).toLocaleUpperCase('tr-TR');
-                    const childText = children.length
-                        ? children.length + ' alt kategori'
-                        : 'Tüm ürünleri görüntüle';
-                    const childrenHtml = children.length
-                        ? '<div class="native-subcategory-list">' + children.map((child) => (
-                            '<a class="native-subcategory-link" href="' + categoryUrl(child) + '">' + escapeHtml(child.pathLabel || child.name) + '</a>'
-                        )).join('') + '</div>'
-                        : '';
-
-                    return [
-                        '<article class="native-category-card">',
-                        '<a class="native-category-main" href="' + categoryUrl(main) + '">',
-                        '<span class="native-category-mark">' + escapeHtml(firstLetter) + '</span>',
-                        '<span class="native-category-copy"><strong>' + escapeHtml(main.name) + '</strong><em>' + childText + '</em></span>',
-                        '<span class="native-category-arrow">&rsaquo;</span>',
-                        '</a>',
-                        childrenHtml,
-                        '</article>'
-                    ].join('');
-                }).join('');
+                list.innerHTML = renderNativeCategoryCards(mainCategories);
             } catch (error) {
-                list.innerHTML = '<div class="native-category-error">Kategoriler yüklenemedi.</div>';
+                const fallback = window.NovaStoreCategoryNavigation?.buildFallbackNavigationTree?.() || [];
+                list.innerHTML = fallback.length
+                    ? renderNativeCategoryCards(fallback)
+                    : '<div class="native-category-error">Kategoriler yüklenemedi.</div>';
             }
         }
 

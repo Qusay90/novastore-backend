@@ -12,6 +12,29 @@
         { label: 'Pinterest', iconClass: 'fa-pinterest-p', href: 'https://www.pinterest.com/novastoretr/' }
     ];
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function footerCategoryUrl(category) {
+        const sharedUrl = window.NovaStoreCategoryNavigation?.categoryUrl?.(category);
+        if (sharedUrl) return sharedUrl;
+        const rawPath = String(category?.path || category?.slug || '').trim();
+        const encodedPath = rawPath
+            .replace(/^\/+|\/+$/g, '')
+            .split('/')
+            .map((segment) => segment.trim())
+            .filter(Boolean)
+            .map(encodeURIComponent)
+            .join('/');
+        return encodedPath ? `/kategori/${encodedPath}` : null;
+    }
+
     function injectIconFont() {
         if (document.getElementById('nova-footer-icon-font')) return;
 
@@ -464,10 +487,11 @@
             }
 
             container.innerHTML = items
-                .map((item) => {
-                    const key = item.path || item.slug || item.name;
-                    return `<a class="nova-footer-category-item" href="categories.html?category=${encodeURIComponent(key)}">${item.name}</a>`;
-                })
+                .map((item) => ({ item, url: footerCategoryUrl(item) }))
+                .filter(({ url }) => Boolean(url))
+                .map(({ item, url }) =>
+                    `<a class="nova-footer-category-item" href="${escapeHtml(url)}">${escapeHtml(item.name)}</a>`
+                )
                 .join('');
         } catch (_) {
             container.innerHTML = '<span class="nova-footer-loading">Kategoriler şu anda alınamadı.</span>';

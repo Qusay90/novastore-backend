@@ -68,6 +68,14 @@
         </article>`;
     }
 
+    function renderCollectionProducts(products) {
+        const items = Array.isArray(products) ? products : [];
+        if (items.length === 0) {
+            return '<div class="catalog-empty-state">Bu koleksiyonda henüz ürün yok. <a href="/index.html">Alışverişe dön</a></div>';
+        }
+        return `<div class="catalog-product-grid">${items.map(renderProductCard).join('')}</div>`;
+    }
+
     function renderCollectionBlock(detail) {
         const collection = detail.collection;
         const products = Array.isArray(detail.products) ? detail.products : [];
@@ -79,7 +87,7 @@
                     <h2>${escapeHtml(collection.name)}</h2>
                     <p>${escapeHtml(collection.description || '')}</p>
                 </div>
-                <a href="${escapeHtml(collectionUrl(collection))}">Tümünü gör →</a>
+                <a href="${escapeHtml(collectionUrl(collection))}">Devamını gör →</a>
             </div>
             <div class="catalog-product-grid">${products.map(renderProductCard).join('')}</div>
         </section>`;
@@ -163,7 +171,7 @@
                 </header>
                 <section class="catalog-page-products">
                     <h2>Ürünler</h2>
-                    <div class="catalog-product-grid">${detail.products.map(renderProductCard).join('')}</div>
+                    ${renderCollectionProducts(detail.products)}
                 </section>
                 ${renderPagination(collection, detail.pagination)}`;
         } catch (error) {
@@ -186,6 +194,7 @@
             collectionSlugFromPath,
             renderProductCard,
             renderCollectionBlock,
+            renderCollectionProducts,
             renderPagination,
             updateMetadata
         }
