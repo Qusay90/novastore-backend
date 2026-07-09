@@ -167,6 +167,10 @@
             setError('Seçilen kategori mevcut değil veya arşivlenmiş.');
             return false;
         }
+        if (category.is_active === false || category.is_customer_visible === false) {
+            setError('Pasif veya müşteriden gizli kategori ürüne atanamaz.');
+            return false;
+        }
         if (!state.leafIds.has(id)) {
             setError('Ürünler yalnızca ürün atanabilir son kategorilere atanabilir; üst kategori seçilemez.');
             return false;
@@ -199,12 +203,33 @@
         return true;
     }
 
+    function categoryBreadcrumb(category) {
+        if (!category) return '';
+        const names = [];
+        const visited = new Set();
+        let current = category;
+
+        while (current) {
+            const currentId = Number(current.id);
+            const visitKey = Number.isInteger(currentId) ? `id:${currentId}` : current;
+            if (visited.has(visitKey)) break;
+            visited.add(visitKey);
+            names.unshift(String(current.name || (Number.isInteger(currentId) ? `Kategori #${currentId}` : 'Kategori')));
+
+            if (current.parent_id === null || current.parent_id === undefined || current.parent_id === '') break;
+            const parentId = Number(current.parent_id);
+            if (!Number.isInteger(parentId)) break;
+            current = state.byId.get(parentId);
+        }
+
+        return names.join(' > ');
+    }
+
     function categoryLabel(category) {
-        const prefix = '— '.repeat(Math.max(0, Number(category.depth || 0)));
         const suffix = category.is_active === false || category.is_customer_visible === false
             ? ' (pasif/gizli)'
             : '';
-        return `${prefix}${category.name}${suffix}`;
+        return `${categoryBreadcrumb(category)}${suffix}`;
     }
 
     function renderCategorySelect() {
@@ -214,8 +239,10 @@
         state.categories.forEach((category) => {
             if (category.deleted_at || state.selectedIds.includes(Number(category.id))) return;
             const isLeaf = state.leafIds.has(Number(category.id));
+            const isInactive = category.is_active === false || category.is_customer_visible === false;
+            const isSelectable = isLeaf && !isInactive;
             options.push(
-                `<option value="${Number(category.id)}"${isLeaf ? '' : ' disabled'}>` +
+                `<option value="${Number(category.id)}"${isSelectable ? '' : ' disabled'}>` +
                 `${escapeHtml(categoryLabel(category))}${isLeaf ? '' : ' · üst kategori'}</option>`
             );
         });
@@ -233,8 +260,9 @@
         container.innerHTML = state.selectedIds.map((id) => {
             const category = state.byId.get(id);
             const primary = id === state.primaryId ? '<strong class="primary-category-mark">Ana Ürün Kategorisi</strong>' : '';
-            return `<span class="selected-category-chip">
-                <span>${escapeHtml(category?.name || `Kategori #${id}`)}</span>
+            const label = category ? categoryLabel(category) : `Kategori #${id}`;
+            return `<span class="selected-category-chip" title="${escapeHtml(label)}">
+                <span class="selected-category-label">${escapeHtml(label)}</span>
                 ${primary}
                 <button type="button" class="selected-category-remove"
                     onclick="NovaStoreAdminProducts.removeCategory(${id})"
@@ -249,9 +277,10 @@
         const options = ['<option value="">Ana ürün kategorisi seçin</option>'];
         state.selectedIds.forEach((id) => {
             const category = state.byId.get(id);
+            const label = category ? categoryLabel(category) : `Kategori #${id}`;
             options.push(
                 `<option value="${id}"${id === state.primaryId ? ' selected' : ''}>` +
-                `${escapeHtml(category?.name || `Kategori #${id}`)}</option>`
+                `${escapeHtml(label)}</option>`
             );
         });
         select.innerHTML = options.join('');
@@ -412,11 +441,14 @@
     function productCategoryNames(product = {}) {
         const ids = parseIds(product.categoryIds ?? product.category_ids);
         if (ids.length) {
-            return ids.map((id) => ({
-                id,
-                name: state.byId.get(id)?.name || `Kategori #${id}`,
-                primary: id === Number(product.primaryCategoryId ?? product.primary_category_id)
-            }));
+            return ids.map((id) => {
+                const category = state.byId.get(id);
+                return {
+                    id,
+                    name: category ? categoryLabel(category) : `Kategori #${id}`,
+                    primary: id === Number(product.primaryCategoryId ?? product.primary_category_id)
+                };
+            });
         }
         return legacyNames(product).map((name, index) => ({ id: null, name, primary: index === 0 }));
     }
@@ -446,6 +478,8 @@
             parseIds,
             legacyNames,
             resolveProductSelection,
+            categoryBreadcrumb,
+            categoryLabel,
             productCategoryNames,
             getState: () => ({
                 selectedIds: [...state.selectedIds],
