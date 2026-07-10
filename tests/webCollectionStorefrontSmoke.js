@@ -43,6 +43,8 @@ const collections = sandbox.window.NovaStorefrontCollections;
 assert(collections);
 assert.strictEqual(collections._test.collectionSlugFromPath('/koleksiyon/vitrin'), 'vitrin');
 assert.strictEqual(collections.collectionUrl({ slug: 'yeni-gelenler' }), '/koleksiyon/yeni-gelenler');
+assert.strictEqual(collections._test.formatPrice(29999), '29.999,00');
+assert.strictEqual(collections._test.formatPrice('899.9'), '899,90');
 
 const soldOutMarkup = collections._test.renderProductCard({
     id: 2,
@@ -54,6 +56,7 @@ const soldOutMarkup = collections._test.renderProductCard({
 });
 assert(soldOutMarkup.includes('Stokta Yok'));
 assert(soldOutMarkup.includes('disabled'));
+assert(soldOutMarkup.includes('80,00 TL'));
 assert(soldOutMarkup.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
 assert(!soldOutMarkup.includes('javascript:alert(1)'));
 
