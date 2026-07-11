@@ -18,6 +18,11 @@
     const collectionUrl = (collection) =>
         `/koleksiyon/${encodeURIComponent(String(collection?.slug || ''))}`;
 
+    const formatPrice = (value) => Number(value || 0).toLocaleString('tr-TR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+
     const collectionSlugFromPath = (pathname) => {
         const match = String(pathname || '').match(/^\/koleksiyon\/([^/?#]+)\/?$/i);
         if (!match) return null;
@@ -61,7 +66,7 @@
                 </div>
                 <strong>${escapeHtml(product.name)}</strong>
             </a>
-            <span class="catalog-product-price">${escapeHtml(product.price)} TL</span>
+            <span class="catalog-product-price">${formatPrice(product.price)} TL</span>
             ${soldOut
                 ? '<button type="button" disabled>Stokta Yok</button>'
                 : `<a class="catalog-product-action" href="/product.html?id=${Number(product.id)}">Detayları Gör</a>`}
@@ -191,6 +196,7 @@
         _test: {
             escapeHtml,
             safeUrl,
+            formatPrice,
             collectionSlugFromPath,
             renderProductCard,
             renderCollectionBlock,
