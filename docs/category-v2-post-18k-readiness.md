@@ -196,10 +196,128 @@ Restore kabul şartları:
 
 ## 6. Production preflight SQL
 
-### 6.1 Kategori bütünlüğü
+Preflight iki ayrı gate olarak yürütülür. Gate A legacy production şemasında v2 nesnelerine dokunmaz. Gate B yalnız additive foundation başarıyla uygulandıktan sonra çalıştırılır. Her iki gate'in çıktısı timestamp'li artifact olarak saklanır.
+
+### 6.1 Gate A — Foundation öncesi legacy-safe preflight
+
+Gate A başlamadan önce backup dosyaları, SHA-256 manifest ve başarılı restore testinin kanıtı operator tarafından doğrulanmalıdır. Aşağıdaki envanter sorguları tablo veya kolon eksik olsa da güvenlidir:
 
 ```sql
--- Aynı parent altında duplicate aktif isim
+-- Gerekli legacy tabloların envanteri
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN ('categories', 'products', 'users', 'orders')
+ORDER BY table_name;
+
+-- categories ve products kolon envanteri
+SELECT table_name, column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name IN ('categories', 'products')
+ORDER BY table_name, ordinal_position;
+
+-- categories üzerindeki mevcut unique constraint'ler
+SELECT conname, pg_get_constraintdef(oid) AS definition
+FROM pg_constraint
+WHERE conrelid = to_regclass('public.categories')
+  AND contype = 'u'
+ORDER BY conname;
+
+-- Constraint dışında oluşturulmuş unique index'ler dahil tüm index envanteri
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename = 'categories'
+ORDER BY indexname;
+```
+
+Sonraki legacy sorguları yalnız envanter `categories` tablosunda `id`, `name` ve `parent_id` kolonlarının bulunduğunu doğruladıktan sonra çalıştırılır. Bu sorgular hiçbir v2-only tablo veya kolon kullanmaz:
+
+```sql
+-- Aynı parent altında duplicate legacy isim
+SELECT COALESCE(parent_id, 0) AS parent_scope,
+       LOWER(BTRIM(name)) AS normalized_name,
+       COUNT(*) AS row_count,
+       ARRAY_AGG(id ORDER BY id) AS category_ids
+FROM categories
+GROUP BY COALESCE(parent_id, 0), LOWER(BTRIM(name))
+HAVING COUNT(*) > 1;
+
+-- Orphan parent
+SELECT c.id, c.name, c.parent_id
+FROM categories c
+LEFT JOIN categories p ON p.id = c.parent_id
+WHERE c.parent_id IS NOT NULL AND p.id IS NULL;
+
+-- Self parent
+SELECT id, name, parent_id
+FROM categories
+WHERE parent_id = id;
+
+-- Cycle kontrolü: boş sonuç beklenir
+WITH RECURSIVE category_walk AS (
+  SELECT
+    id,
+    parent_id,
+    name,
+    ARRAY[id] AS path_ids,
+    false AS has_cycle
+  FROM categories
+
+  UNION ALL
+
+  SELECT
+    c.id,
+    c.parent_id,
+    c.name,
+    cw.path_ids || c.id,
+    c.id = ANY(cw.path_ids) AS has_cycle
+  FROM categories c
+  JOIN category_walk cw ON c.parent_id = cw.id
+  WHERE cw.has_cycle = false
+    AND cardinality(cw.path_ids) < 100
+)
+SELECT DISTINCT
+  id,
+  parent_id,
+  name,
+  path_ids
+FROM category_walk
+WHERE has_cycle = true;
+```
+
+Gate A kabul şartları:
+
+- Backup manifest doğrulanmış ve restore testi geçmiş olmalı.
+- `categories(id, name, parent_id)` ve legacy ürün alanları envanterde görünmeli.
+- Orphan, self-parent ve cycle sonuçları boş olmalı.
+- Same-parent duplicate isimler ve global `categories.name UNIQUE` durumu migration kararına eklenmeli.
+
+### 6.2 Gate B — Foundation sonrası v2 integrity preflight
+
+Bu gate `20260701_category_v2_additive_foundation.sql` uygulandıktan sonra çalıştırılır. İlk çalıştırma backfill öncesi baseline üretir. Null/blank path ve primary eksikliği bu aşamada beklenebilir; aynı sorgular backfill apply sonrasında tekrar çalıştırıldığında kritik sonuçların boş olması gerekir.
+
+```sql
+-- V2 tablo envanteri
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN ('product_categories', 'category_aliases', 'category_stats')
+ORDER BY table_name;
+
+-- V2 kategori ve ürün kolon envanteri
+SELECT table_name, column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND (
+    (table_name = 'categories' AND column_name IN ('slug', 'path', 'depth', 'deleted_at'))
+    OR
+    (table_name = 'products' AND column_name IN ('publication_status', 'is_customer_visible', 'deleted_at'))
+  )
+ORDER BY table_name, column_name;
+
+-- Deleted kayıtlar hariç same-parent duplicate isim
 SELECT COALESCE(parent_id, 0) AS parent_scope,
        LOWER(BTRIM(name)) AS normalized_name,
        COUNT(*) AS row_count,
@@ -218,29 +336,12 @@ WHERE deleted_at IS NULL AND NULLIF(BTRIM(path), '') IS NOT NULL
 GROUP BY LOWER(BTRIM(path))
 HAVING COUNT(*) > 1;
 
--- Null/blank path
+-- Null/blank path: backfill öncesi baseline, apply sonrası boş sonuç beklenir
 SELECT id, name, parent_id
 FROM categories
 WHERE deleted_at IS NULL AND NULLIF(BTRIM(path), '') IS NULL;
 
--- Orphan parent
-SELECT c.id, c.name, c.parent_id
-FROM categories c
-LEFT JOIN categories p ON p.id = c.parent_id
-WHERE c.parent_id IS NOT NULL AND p.id IS NULL;
-
--- Self parent
-SELECT id, name, parent_id
-FROM categories
-WHERE parent_id = id;
-```
-
-Cycle kontrolü mevcut `categoryV2BackfillService` dry-run raporuyla ve ayrıca recursive CTE ile yapılmalıdır. Her cycle/orphan apply öncesi manuel karara bağlanmalıdır.
-
-### 6.2 Product-category bütünlüğü
-
-```sql
--- FK dışı/bozuk ilişkiler (FK yoksa da yakalar)
+-- FK dışı/bozuk product-category ilişkileri
 SELECT pc.product_id, pc.category_id
 FROM product_categories pc
 LEFT JOIN products p ON p.id = pc.product_id
@@ -254,7 +355,7 @@ WHERE is_primary = TRUE
 GROUP BY product_id
 HAVING COUNT(*) > 1;
 
--- Görünür ürünlerde primary eksikliği
+-- Görünür ürünlerde primary eksikliği: apply sonrası boş sonuç beklenir
 SELECT p.id, p.name, p.category, p.categories
 FROM products p
 LEFT JOIN product_categories pc
@@ -264,15 +365,35 @@ WHERE p.deleted_at IS NULL
   AND p.is_customer_visible = TRUE
   AND pc.product_id IS NULL;
 
--- İlişki özeti
-SELECT
-  COUNT(DISTINCT product_id) AS related_products,
-  COUNT(*) AS relation_count,
-  COUNT(*) FILTER (WHERE is_primary) AS primary_count
-FROM product_categories;
+-- category_stats aritmetik tutarlılığı
+SELECT category_id,
+       visible_product_count,
+       descendant_visible_product_count,
+       subtree_visible_product_count,
+       sellable_product_count,
+       descendant_sellable_product_count,
+       subtree_sellable_product_count
+FROM category_stats
+WHERE subtree_visible_product_count
+        <> visible_product_count + descendant_visible_product_count
+   OR subtree_sellable_product_count
+        <> sellable_product_count + descendant_sellable_product_count;
+
+-- Constraint migration öncesi envanter, migration sonrası iki index de zorunlu
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename = 'categories'
+  AND indexname IN (
+    'idx_categories_sibling_name_unique',
+    'idx_categories_path_unique'
+  )
+ORDER BY indexname;
 ```
 
 ### 6.3 Legacy ambiguity ve unmatched envanteri
+
+Bu sorgu Gate B içinde, additive kolonlar ve tablolar doğrulandıktan sonra çalıştırılır:
 
 ```sql
 WITH legacy_names AS (
@@ -302,24 +423,24 @@ WHERE category_match_count <> 1
 ORDER BY category_match_count DESC, legacy_name, product_id;
 ```
 
-`category_match_count = 0` unmatched, `> 1` ambiguous kabul edilir. Ambiguous kayıtlar otomatik tahmin edilmez.
+`category_match_count = 0` unmatched, `> 1` ambiguous kabul edilir. Ambiguous kayıtlar otomatik tahmin edilmez. Gate B ve ambiguity raporu backfill apply sonrasında verification olarak tekrar çalıştırılır.
 
 ## 7. Migration ve backfill sırası
 
-1. Onaylı backup al.
-2. Backup restore testini tamamla.
-3. Production read-only preflight çalıştır; sonuçları timestamp'li artifact olarak sakla.
+1. Onaylı production backup al ve SHA-256 manifestini doğrula.
+2. Backup'ı ayrı restore hedefinde geri yükle ve restore testini tamamla.
+3. Gate A legacy-safe preflight çalıştır; sonuçları timestamp'li artifact olarak sakla.
 4. Uygulama sürümünü ve rollback commit'ini sabitle.
 5. `20260701_category_v2_additive_foundation.sql` için production dry review yap, sonra transaction kontrollü uygula.
-6. `20260702_menu_collection_foundation.sql` içindeki `order_items` backfill DML'ini ayrıca incele; yalnız preflight temizse uygula.
-7. `20260703_collection_home_visibility.sql` uygula.
-8. `20260704_attribute_filter_foundation.sql` uygula.
+6. Gate B foundation sonrası v2 integrity preflight çalıştır ve backfill öncesi baseline'ı sakla.
+7. `20260702_category_v2_backfill_constraints.sql` migration'ını yalnız duplicate sibling name/path ve kategori graph sorunları kritik engel üretmiyorsa uygula.
+8. `idx_categories_sibling_name_unique` ve `idx_categories_path_unique` indexlerini doğrula.
 9. Category backfill dry-run çalıştır ve raporu onaylat.
 10. Ambiguous/unmatched/orphan/cycle/primary-missing kayıtlar için manuel mapping kararı al.
 11. Backfill apply çalıştır.
-12. Backfill verification SQL'lerini çalıştır.
-13. `20260702_category_v2_backfill_constraints.sql` migration'ını yalnız duplicate/path/orphan preflight temizken uygula.
-14. Constraint ve index envanterini doğrula.
+12. Gate B, ambiguity envanteri ve verification SQL'lerini tekrar çalıştır; null path ve uygun ürünlerde primary eksikliği kalmadığını doğrula.
+13. `20260702_menu_collection_foundation.sql` içindeki `order_items` backfill DML'ini ayrıca incele; yalnız kendi preflight'ı temizse uygula.
+14. `20260703_collection_home_visibility.sql` ve `20260704_attribute_filter_foundation.sql` migration'larını ayrı doğrulama kapılarıyla uygula.
 15. App deploy yap.
 16. Endpoint/browser/admin smoke ve monitoring başlat.
 
