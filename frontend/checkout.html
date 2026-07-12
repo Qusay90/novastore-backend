@@ -746,9 +746,9 @@
             }
             cart.forEach(item => {
                 totalAmount += parseFloat(item.price) * item.quantity;
-                itemsContainer.innerHTML += `<div class="summary-item"><span>${item.quantity} adet ${item.name}</span><span style="font-weight:600;">${(item.price * item.quantity).toFixed(2)} TL</span></div>`;
+                itemsContainer.innerHTML += `<div class="summary-item"><span>${item.quantity} adet ${item.name}</span><span style="font-weight:600;">${NovaStoreSharedState.formatPrice(item.price * item.quantity)} TL</span></div>`;
             });
-            document.getElementById('checkout-total').innerText = totalAmount.toFixed(2);
+            document.getElementById('checkout-total').innerText = NovaStoreSharedState.formatPrice(totalAmount);
         }
 
         async function loadSharedCheckoutDraft() {
@@ -1044,8 +1044,8 @@
 
                 if (data.coupon && data.coupon.applied) {
                     appliedCouponCode = code;
-                    resultEl.innerHTML = `<span style="color:#2E7D32; font-weight:600;">Kupon uygulandı! ${data.coupon.discountAmount.toFixed(2)} TL indirim.</span>`;
-                    document.getElementById('checkout-total').innerText = data.totals.total.toFixed(2);
+                    resultEl.innerHTML = `<span style="color:#2E7D32; font-weight:600;">Kupon uygulandı! ${NovaStoreSharedState.formatPrice(data.coupon.discountAmount)} TL indirim.</span>`;
+                    document.getElementById('checkout-total').innerText = NovaStoreSharedState.formatPrice(data.totals.total);
                 } else {
                     appliedCouponCode = null;
                     resultEl.innerHTML = `<span style="color:#E65100;">${data.coupon.reason || 'Kupon geçerli değil.'}</span>`;
