@@ -4,37 +4,42 @@ Bu belge, Tur 18K sonrasındaki staging bulgularını ve production'a geçiş i�
 
 ## 1. Mevcut doğrulama özeti
 
-- Kategori public tree, descendant ürün filtreleme, canonical PLP, recursive storefront menüsü, koleksiyon route'u ve admin breadcrumb etiketleri staging'de çalışıyor.
+- Category v2 staging functional gate geçti.
+- Kategori public tree, descendant ürün filtreleme, recursive storefront menüsü ve grandchild kategori bağlantıları staging'de çalışıyor.
+- Doğrudan `/kategori/<path>` açılışı, query fallback, breadcrumb ve canonical PLP staging'de doğrulandı.
+- Footer kategori bağlantıları canonical `/kategori/<path>` URL'lerini kullanıyor.
+- Koleksiyon route'u ve Türkçe fiyat biçimi (`29.999,00 TL`, `899,90 TL`) staging'de doğrulandı.
 - Aynı kategori adı farklı parent altında staging'de doğrulandı.
-- Admin kategori ve ürün kategori bağlama akışları çalışıyor.
-- Admin dashboard açılışında üç ayrı non-category endpoint hatası devam ediyor:
-  - `GET /api/returns/admin/all`
-  - `GET /api/admin/behavior?days=<n>`
-  - `GET /api/notifications/admin`
-- Collection kartları fiyatı raw DB değeriyle yazdırıyor. Bu sorun `fix/storefront-price-formatting` branch'inde frontend-only olarak düzeltildi.
+- Admin kategori ağacı, ürün kategori bağlama ve tam breadcrumb etiketleri staging runtime'da çalışıyor.
+- Admin support additive migration'ları staging DB'de uygulandı. Authenticated admin runtime smoke sırasında:
+  - İade paneli güvenli boş durum gösterdi.
+  - Davranış analitiği metrikleri yüklendi.
+  - Bildirim paneli `Henüz bildirim yok.` gösterdi.
+  - Notification `forEach` TypeError, `42P01`, `42703` veya görünür `500` görülmedi.
+- Bu staging kanıtı production şemasının hazır olduğunu göstermez. Admin support migration'ları production'da henüz uygulanmadı.
 - `/api/analytics/page-enter` istemcisi non-2xx cevapları kontrol etmediği için analytics 500 hatası tarayıcı konsolunda sessiz kalabilir. No-write kuralı nedeniyle endpoint'e doğrudan POST smoke yapılmadı.
 
 ## 2. Admin console error audit
 
 | Alan | Frontend çağrısı | Backend bağımlılığı | Bulgular | Category release etkisi |
 |---|---|---|---|---|
-| İade talepleri | `fetchReturnsForDashboard` | `returns`, `orders`, `users` | Backend hata cevabı `adminReadJson` tarafından doğru biçimde yakalanıyor ve dashboard fallback gösteriyor. | Kategori için blocker değil; iade modülü için blocker. |
-| Davranış analitiği | `fetchBehaviorAnalytics` | `visitor_sessions`, `page_visits`, `product_actions`, ürün ve sipariş tabloları | Backend 500 dönüyor; frontend boş analytics bileşenleri render ediyor. | Kategori için blocker değil; analytics readiness için blocker. |
-| Bildirimler | `fetchAdminNotifications` | `notifications` | Backend hata nesnesi döndüğünde frontend dizi doğrulaması yapmadan `forEach` çağırıyor. | Kategori için blocker değil; admin notification readiness için blocker. |
+| İade talepleri | `fetchReturnsForDashboard` | `returns`, `orders`, `users` | Staging schema apply sonrası authenticated runtime boş durumla açıldı; görünür schema/500 hatası yok. | Staging gate geçti; production migration apply edilene kadar production blocker. |
+| Davranış analitiği | `fetchBehaviorAnalytics` | `visitor_sessions`, `page_visits`, `product_actions`, ürün ve sipariş tabloları | Staging schema apply sonrası metrikler yüklendi; görünür schema/500 hatası yok. | Staging gate geçti; production migration apply edilene kadar production blocker. |
+| Bildirimler | `fetchAdminNotifications` | `notifications` | Array guard staging frontend'de doğrulandı; boş liste güvenli render edildi ve `forEach` TypeError görülmedi. | Kod riski düşürüldü; production deploy ve monitoring sonrası kapatılır. |
 
-Muhtemel ortak kök neden staging bootstrap kapsamının kategori/menu/collection tablolarıyla sınırlı kalmasıdır. Repo'da ilgili şemalar ayrı initializer'larda bulunur:
+Önceki ortak kök neden staging bootstrap kapsamının kategori/menu/collection tablolarıyla sınırlı kalmasıydı. Dar additive migration'lar staging'de uygulandı; production için aynı migration'lar ayrı onay kapısıyla bekliyor:
 
-- `models/createCommerceDb.js`
-- `models/createAnalyticsDb.js`
-- `models/createNotificationDb.js`
+- `migrations/20260712_admin_notifications_foundation.sql`
+- `migrations/20260712_admin_returns_foundation.sql`
+- `migrations/20260712_admin_analytics_foundation.sql`
 
-Frontend hatalarını susturmak DB/schema eksikliğini çözmez. Önce read-only schema inventory ve backend log kanıtı alınmalıdır. Bildirim payload guard'ı ayrıca yapılabilir, ancak bu yalnız ikincil defensive handling düzeltmesidir.
+Frontend guard gerçek DB/schema eksikliğini gizlemez. Production readiness için additive migration apply, information schema doğrulaması ve authenticated endpoint smoke birlikte tamamlanmalıdır.
 
 ## 3. Category theme ve UX polish planı
 
 ### 3.1 Acil UX düzeltmeleri
 
-1. Collection ve bütün ürün kartlarında tek fiyat formatı kullan: `29.999,00 TL`.
+1. Collection fiyat düzeltmesini koru; home, cart drawer, product ve checkout dahil bütün fiyat yüzeylerini ortak `tr-TR` formatter'a geçir.
 2. PLP toolbar'a sonuç sayısı, sıralama select'i ve mobil filtre butonu ekle.
 3. PLP kartında favori/sepet işlemi sonrası görünür ve `aria-live` destekli kısa durum bildirimi göster.
 4. Favori butonunun `title` ve `aria-label` değerini aktif duruma göre değiştir.
@@ -93,7 +98,8 @@ Backend/API gerektiren ölçekli aşama:
 
 | İş | Production öncesi mi? | Gerekçe |
 |---|---|---|
-| Fiyat formatı | Evet | Küçük ve görünür güven/polish sorunu. |
+| Collection fiyat formatı | Tamamlandı | Staging'de `29.999,00 TL` ve `899,90 TL` doğrulandı. |
+| Site geneli ortak fiyat formatter | Tercihen evet | Home, cart drawer, product ve checkout yüzeylerinde format drift'i kalabilir. |
 | Favori/sepet erişilebilir durum metni | Tercihen evet | Temel etkileşim geri bildirimi. |
 | PLP sort ve mobil filtre butonu iskeleti | Tercihen evet | Profesyonel kategori deneyiminin temel parçası. |
 | Server-side facet API | Sonra yapılabilir | Veri ve performans ölçeğiyle birlikte tasarlanmalı. |
@@ -136,7 +142,11 @@ Supabase Free plan için manuel logical export zorunludur. Önerilen üç parça
 
 ```powershell
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$backupDir = "D:\secure-backups\novastore-$stamp"
+$backupRoot = $env:CATEGORY_V2_BACKUP_ROOT
+if ([string]::IsNullOrWhiteSpace($backupRoot)) {
+  throw 'CATEGORY_V2_BACKUP_ROOT is required.'
+}
+$backupDir = Join-Path $backupRoot "novastore-$stamp"
 New-Item -ItemType Directory -Path $backupDir | Out-Null
 
 supabase db dump --db-url $env:CATEGORY_V2_PRODUCTION_DATABASE_URL `
@@ -149,7 +159,13 @@ supabase db dump --db-url $env:CATEGORY_V2_PRODUCTION_DATABASE_URL `
   -f "$backupDir\data.sql" --use-copy --data-only `
   -x "storage.buckets_vectors" -x "storage.vector_indexes"
 
-Get-FileHash "$backupDir\*.sql" -Algorithm SHA256 |
+Get-ChildItem $backupDir -Filter '*.sql' |
+  Select-Object Name, Length |
+  Format-Table -AutoSize |
+  Out-File "$backupDir\FILE-SIZES.txt"
+
+Get-ChildItem $backupDir -Filter '*.sql' |
+  Get-FileHash -Algorithm SHA256 |
   Format-Table Path, Hash -AutoSize |
   Out-File "$backupDir\SHA256SUMS.txt"
 ```
@@ -158,7 +174,7 @@ Backup kabul şartları:
 
 - Üç dosya da sıfırdan büyük.
 - Komut exit code'ları `0`.
-- SHA-256 manifest üretildi.
+- Dosya boyutu envanteri ve SHA-256 manifest üretildi.
 - Backup klasörü erişim kontrollü ve şifreli bir off-site konuma kopyalandı.
 - Secret içeren shell transcript veya command history saklanmadı.
 
@@ -172,22 +188,32 @@ Restore doğrudan production'a yapılmaz. İki kabul edilebilir hedef:
 Restore sırası:
 
 ```powershell
-psql --set ON_ERROR_STOP=1 --single-transaction `
-  --dbname $env:CATEGORY_V2_RESTORE_DATABASE_URL `
-  --file roles.sql
+$backupDir = $env:CATEGORY_V2_BACKUP_ARTIFACT_PATH
+if ([string]::IsNullOrWhiteSpace($backupDir)) {
+  throw 'CATEGORY_V2_BACKUP_ARTIFACT_PATH is required.'
+}
+$rolesFile = Join-Path $backupDir 'roles.sql'
+$schemaFile = Join-Path $backupDir 'schema.sql'
+$dataFile = Join-Path $backupDir 'data.sql'
 
 psql --set ON_ERROR_STOP=1 --single-transaction `
   --dbname $env:CATEGORY_V2_RESTORE_DATABASE_URL `
-  --file schema.sql
+  --file $rolesFile
 
 psql --set ON_ERROR_STOP=1 --single-transaction `
   --dbname $env:CATEGORY_V2_RESTORE_DATABASE_URL `
-  --file data.sql
+  --file $schemaFile
+
+psql --set ON_ERROR_STOP=1 --single-transaction `
+  --dbname $env:CATEGORY_V2_RESTORE_DATABASE_URL `
+  --file $dataFile
 ```
 
 Restore kabul şartları:
 
 - Restore komutları hatasız tamamlanır.
+- Restore hedefinin PostgreSQL major sürümü, role oluşturma yetkileri, extension'ları ve ownership modeli dump ile uyumludur.
+- Hosted restore hedefi role restore'a izin vermiyorsa `roles.sql` adımı atlanmaz; önceden review edilmiş uyumluluk prosedürüyle uygulanır veya eşdeğer roller kontrollü oluşturulur.
 - Kritik tablo row count'ları kaynak backup envanteriyle eşleşir.
 - PK/FK/unique index envanteri oluşur.
 - `products`, `categories`, `users`, `orders`, `product_categories` örnek sorguları çalışır.
@@ -294,16 +320,25 @@ Gate A kabul şartları:
 - Orphan, self-parent ve cycle sonuçları boş olmalı.
 - Same-parent duplicate isimler ve global `categories.name UNIQUE` durumu migration kararına eklenmeli.
 
-### 6.2 Gate B — Foundation sonrası v2 integrity preflight
+### 6.2 Gate B — Foundation sonrası v2 ve admin-support integrity preflight
 
-Bu gate `20260701_category_v2_additive_foundation.sql` uygulandıktan sonra çalıştırılır. İlk çalıştırma backfill öncesi baseline üretir. Null/blank path ve primary eksikliği bu aşamada beklenebilir; aynı sorgular backfill apply sonrasında tekrar çalıştırıldığında kritik sonuçların boş olması gerekir.
+Bu gate `20260701_category_v2_additive_foundation.sql` ve üç admin-support additive migration uygulandıktan sonra çalıştırılır. İlk çalıştırma backfill öncesi baseline üretir. Null/blank path ve primary eksikliği bu aşamada beklenebilir; aynı sorgular backfill apply sonrasında tekrar çalıştırıldığında kritik sonuçların boş olması gerekir.
 
 ```sql
 -- V2 tablo envanteri
 SELECT table_name
 FROM information_schema.tables
 WHERE table_schema = 'public'
-  AND table_name IN ('product_categories', 'category_aliases', 'category_stats')
+  AND table_name IN (
+    'product_categories',
+    'category_aliases',
+    'category_stats',
+    'returns',
+    'notifications',
+    'visitor_sessions',
+    'page_visits',
+    'product_actions'
+  )
 ORDER BY table_name;
 
 -- V2 kategori ve ürün kolon envanteri
@@ -314,6 +349,29 @@ WHERE table_schema = 'public'
     (table_name = 'categories' AND column_name IN ('slug', 'path', 'depth', 'deleted_at'))
     OR
     (table_name = 'products' AND column_name IN ('publication_status', 'is_customer_visible', 'deleted_at'))
+  )
+ORDER BY table_name, column_name;
+
+-- Admin-support kolon envanteri
+SELECT table_name, column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND (
+    (table_name = 'orders' AND column_name IN (
+      'refund_status',
+      'cancel_reason',
+      'shipment_status',
+      'updated_at',
+      'analytics_session_key'
+    ))
+    OR
+    (table_name = 'notifications' AND column_name IN (
+      'user_id',
+      'type',
+      'message',
+      'is_read',
+      'created_at'
+    ))
   )
 ORDER BY table_name, column_name;
 
@@ -391,6 +449,13 @@ WHERE schemaname = 'public'
 ORDER BY indexname;
 ```
 
+Admin-support endpoint readiness bu envanterden sonra, yalnız read-only authenticated GET ile doğrulanır:
+
+- `GET /api/returns/admin/all`: schema hatası olmadan `200` ve array response.
+- `GET /api/admin/behavior?days=30`: schema hatası olmadan `200` ve analytics object.
+- `GET /api/notifications/admin`: schema hatası olmadan `200` ve array response.
+- Admin UI'da `42P01`, `42703`, görünür `500` veya notification `forEach` TypeError bulunmamalı.
+
 ### 6.3 Legacy ambiguity ve unmatched envanteri
 
 Bu sorgu Gate B içinde, additive kolonlar ve tablolar doğrulandıktan sonra çalıştırılır:
@@ -432,30 +497,42 @@ ORDER BY category_match_count DESC, legacy_name, product_id;
 3. Gate A legacy-safe preflight çalıştır; sonuçları timestamp'li artifact olarak sakla.
 4. Uygulama sürümünü ve rollback commit'ini sabitle.
 5. `20260701_category_v2_additive_foundation.sql` için production dry review yap, sonra transaction kontrollü uygula.
-6. Gate B foundation sonrası v2 integrity preflight çalıştır ve backfill öncesi baseline'ı sakla.
-7. `20260702_category_v2_backfill_constraints.sql` migration'ını yalnız duplicate sibling name/path ve kategori graph sorunları kritik engel üretmiyorsa uygula.
+6. Foundation sonrası kategori envanterini çalıştır; duplicate sibling name, path ve graph sorunlarını kontrol et.
+7. `20260702_category_v2_backfill_constraints.sql` migration'ını yalnız kategori preflight'ı temizse transaction kontrollü uygula.
 8. `idx_categories_sibling_name_unique` ve `idx_categories_path_unique` indexlerini doğrula.
-9. Category backfill dry-run çalıştır ve raporu onaylat.
-10. Ambiguous/unmatched/orphan/cycle/primary-missing kayıtlar için manuel mapping kararı al.
-11. Backfill apply çalıştır.
-12. Gate B, ambiguity envanteri ve verification SQL'lerini tekrar çalıştır; null path ve uygun ürünlerde primary eksikliği kalmadığını doğrula.
-13. `20260702_menu_collection_foundation.sql` içindeki `order_items` backfill DML'ini ayrıca incele; yalnız kendi preflight'ı temizse uygula.
-14. `20260703_collection_home_visibility.sql` ve `20260704_attribute_filter_foundation.sql` migration'larını ayrı doğrulama kapılarıyla uygula.
-15. App deploy yap.
-16. Endpoint/browser/admin smoke ve monitoring başlat.
+9. Admin-support additive migration'larını kendi aralarında sırayla ve transaction kontrollü uygula:
+   - `20260712_admin_notifications_foundation.sql`
+   - `20260712_admin_returns_foundation.sql`
+   - `20260712_admin_analytics_foundation.sql`
+10. Gate B v2/admin-support integrity preflight çalıştır; kategori baseline'ını, admin-support tablo/kolon/index envanterini ve read-only endpoint readiness sonucunu sakla.
+11. Category backfill dry-run çalıştır ve raporu onaylat.
+12. Ambiguous/unmatched/orphan/cycle/primary-missing kayıtlar için manuel mapping kararı al.
+13. İkinci operatör onayı olmadan ilerleme; onaydan sonra backfill apply çalıştır.
+14. Gate B, ambiguity envanteri ve verification SQL'lerini tekrar çalıştır; null path ve uygun ürünlerde primary eksikliği kalmadığını doğrula.
+15. `20260702_menu_collection_foundation.sql` içindeki `order_items` backfill DML'ini ayrıca incele; yalnız kendi preflight'ı temizse uygula.
+16. `20260703_collection_home_visibility.sql` ve `20260704_attribute_filter_foundation.sql` migration'larını ayrı doğrulama kapılarıyla uygula.
+17. Final API, admin, storefront ve Android smoke tamamlanmadan app deploy onayı verme.
+18. Onaylı app deploy'u yap ve monitoring başlat.
 
 Önemli: `scripts/categoryV2Backfill.js` bilinçli olarak local test DB'ye kilitlidir. Production'da kullanılmamalıdır. Production için ayrı, iki kişilik onay isteyen, default dry-run olan bir operator runner veya imzalı SQL runbook hazırlanmalıdır.
+
+### 7.1 Production-safe category backfill runner blocker'ı
+
+Production-safe runner henüz mevcut değildir ve production rollout için kritik blocker'dır. Local veya staging test scriptleri production hedefinde doğrudan çalıştırılmaz. Runner ya da imzalı operator runbook aşağıdaki şartların tamamını sağlamalıdır:
 
 Önerilen production runner guard'ları:
 
 - `CATEGORY_V2_ROLLOUT_TARGET=production`
 - `CATEGORY_V2_ALLOW_PRODUCTION_BACKFILL=YES_I_HAVE_VERIFIED_BACKUP_AND_RESTORE`
+- Yalnız açıkça verilen production DB URL env adı; `.env DATABASE_URL` fallback'i yok.
 - Beklenen production project ref allowlist'i.
 - Default mode `--dry-run`; `--apply` açıkça verilmeden write yok.
 - Backup artifact path ve SHA-256 manifest zorunlu.
 - Preflight artifact path zorunlu.
 - Apply öncesi ikinci operatör onay kodu.
 - SQL transaction, statement timeout ve advisory lock.
+- Ambiguous ve unmatched kayıtları otomatik tahmin etmeyen manuel karar kapısı.
+- Dry-run ve apply sonuçlarını timestamp'li, secretsiz rapor artifact'ına yazma.
 - Secret, connection string ve row payload loglama yasağı.
 
 ## 8. Verification checklist
@@ -469,6 +546,9 @@ DB:
 - Her uygun üründe en fazla ve mümkünse tam bir primary ilişki var.
 - Legacy `products.category` ve `products.categories` korunuyor.
 - Backfill ikinci dry-run'ı değişiklik önermiyor.
+- `returns`, `notifications`, `visitor_sessions`, `page_visits` ve `product_actions` tabloları mevcut.
+- `orders.analytics_session_key` ve admin-support migration'larının beklediği additive kolonlar mevcut.
+- Admin-support index envanteri üç migration dosyasıyla uyumlu.
 
 API ve UI:
 
@@ -480,6 +560,8 @@ API ve UI:
 - `/koleksiyon/<slug>`
 - Admin kategori ağacı
 - Admin ürün dropdown/chip/primary breadcrumb
+- Authenticated returns, behavior analytics ve notifications GET smoke
+- Admin UI'da notification `forEach` TypeError, `42P01`, `42703` veya görünür `500` olmaması
 - Favori, sepet ve checkout'a girişe kadar smoke
 - Android public-tree, descendant listing ve `Tümü` reset
 
@@ -516,17 +598,35 @@ API ve UI:
 ## 11. Final risk register
 
 | Alan | Risk | Şiddet | Production blocker mı? | Önerilen çözüm | Tur |
-|---|---|---:|---|---|
-| Production DB | Doğrulanmış backup ve restore testi yok | Kritik | Evet | Üç parçalı logical dump, checksum, ayrı hedefte restore testi | Production backup gate |
-| Category backfill | Production dry-run/apply yapılmadı | Kritik | Evet | Production-safe runner ve manuel ambiguity mapping | Production data gate |
-| Admin dashboard | Return endpoint 500 | Yüksek | Kategori için hayır; iade modülü için evet | Schema inventory, backend log, commerce schema rollout | Admin readiness |
-| Admin dashboard | Behavior analytics endpoint 500 | Yüksek | Kategori için hayır; analytics için evet | Analytics schema inventory ve controlled rollout | Analytics readiness |
-| Admin dashboard | Notification endpoint hata payload'ı dizi sanılıyor | Orta | Hayır | Önce notification schema; sonra `adminReadJson` ve array guard | Admin defensive fix |
-| Analytics | `/api/analytics/page-enter` 500 geçmişi; client non-2xx'i sessiz yutuyor | Yüksek | Gözlemlenebilirlik için evet | Read-only log kanıtı, analytics schema rollout, response status telemetry | Analytics readiness |
-| PLP | Sol filtre/facet ve sort eksik | Orta | Küçük katalog için hayır | Toolbar + drawer; sonra server-side facet API | UX polish |
-| Mobil kategori | Tam drawer/geri akışı yok | Orta | Hayır | Root/child/grandchild drawer ve focus yönetimi | UX polish |
-| Favori/sepet | Toast ve screen-reader status eksik | Orta | Hayır | Ortak action feedback helper | Accessibility polish |
-| Collection | Raw fiyat formatı | Orta | Tercihen evet | Ortak `tr-TR`, iki basamak fiyat helper'ı | `fix/storefront-price-formatting` |
-| Collection | PLP'den kopuk kart/layout | Orta | Hayır | Ortak kart ve toolbar bileşenleri | UX polish |
-| Staging güvenliği | Paylaşılan admin test parolası ve geçici admin role | Yüksek | Evet | Parola rotasyonu; gerekmiyorsa role kaldırma/hesabı kapatma | Security cleanup |
-| Git hygiene | `.kotlin/sessions/*.salive` untracked oluşabiliyor | Düşük | Hayır | Kaynağın Android Studio/Kotlin compiler olduğu doğrulanınca ayrı turda ignore kuralı | Repo hygiene |
+|---|---|---:|---|---|---|
+| Production DB | Doğrulanmış backup ve restore testi yok | Kritik | Evet | Parametrik logical dump, size/checksum manifest ve ayrı hedefte restore testi | Tur 20A |
+| Production data gate | Production preflight ve category dry-run yapılmadı | Kritik | Evet | Gate A/B artifact'ları ve onaylı dry-run | Tur 20B |
+| Category backfill | Production-safe category backfill runner yok | Kritik | Evet | Explicit target/URL, default dry-run, iki kişi onayı, advisory lock ve secretsiz rapor | Tur 20B |
+| Admin support schema | Admin support migration'ları production'da uygulanmadı | Yüksek | Evet | Üç additive migration, inventory ve authenticated GET smoke | Tur 20B/20C |
+| Staging güvenliği | Paylaşılan admin test parolası ve geçici admin role | Yüksek | Evet, operasyonel | Parola rotasyonu; gerekmiyorsa role düşürme veya hesabı devre dışı bırakma | Tur 19G |
+| Android | Final unit test, assemble ve APK runtime smoke tekrarlanmadı | Yüksek | Evet | Production base URL/config ile final Android gate | Tur 20C |
+| Analytics | `/api/analytics/page-enter` 500 geçmişi; client non-2xx'i sessiz yutuyor | Yüksek | Genel go-live için evet | Staging runtime/log kanıtı, production schema doğrulaması ve status telemetry | Tur 19G/20C |
+| Notifications | Array guard staging'de geçti; production deploy sonrası regresyon riski | Düşük | Hayır | Authenticated smoke ve TypeError/5xx monitoring | Tur 20C |
+| Fiyat | Site genelinde ortak fiyat formatter yok | Orta | Tercihen | Home, cart drawer, PLP, product, collection ve checkout ortak helper | Tur 19 UX |
+| Collection | Kartlarda favori/sepet aksiyonu yok | Orta | Hayır | Ortak product-card action renderer | Tur 19 UX |
+| PLP | Sol filtre/facet ve sort eksik | Orta | Hayır | Toolbar + drawer; sonra server-side facet API | Tur 19 UX |
+| Mobil kategori | Tam drawer/drill-down polish eksik | Orta | Hayır | Root/child/grandchild drawer, geri akışı ve focus yönetimi | Tur 19 UX |
+| Favori/sepet | Toast ve `aria-live` feedback eksik | Orta | Hayır | Ortak action feedback helper | Tur 19 UX |
+
+## 12. Production readiness kararı
+
+- **Category v2 staging functional readiness:** Passed.
+- **Production deployment readiness:** Not ready.
+
+Production deploy onayı verilmemesinin blocker nedenleri:
+
+1. Production backup ve bağımsız restore testi yok.
+2. Production Gate A/Gate B preflight artifact'ları yok.
+3. Production category backfill dry-run yapılmadı.
+4. Admin-support additive migration'ları production'da uygulanmadı.
+5. Production-safe category backfill runner veya imzalı operator runbook hazır değil.
+6. Final Android unit/build/APK runtime gate tamamlanmadı.
+
+### 12.1 Staging admin cleanup
+
+Staging admin test hesabının parolası rotate edilmelidir. Hesaba artık ihtiyaç yoksa admin role düşürülmeli veya test hesabı devre dışı bırakılmalıdır. Bu işlem staging DB/auth write gerektirdiği için bu dokümantasyon turunun parçası değildir; ayrı, manuel ve audit kaydı tutulan Tur 19G operasyonu olarak yürütülmelidir.
