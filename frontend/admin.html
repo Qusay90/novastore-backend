@@ -5834,25 +5834,34 @@
         }
 
         async function fetchAdminNotifications() {
+            const list = document.getElementById('notif-list');
+            if (!list) return;
+
             try {
                 const res = await adminApiFetch('/api/notifications/admin');
-                const data = await res.json();
-                const list = document.getElementById('notif-list');
+                const data = await adminReadJson(res, 'Bildirimler yüklenemedi.');
+                if (!Array.isArray(data)) {
+                    throw new Error('Bildirimler yüklenemedi.');
+                }
+
                 list.innerHTML = '';
                 unreadCount = 0;
 
-                if (!data || data.length === 0) {
+                if (data.length === 0) {
                     list.innerHTML = '<div class="notif-empty">Henüz bildirim yok.</div>';
                     return;
                 }
 
-                data.forEach(n => {
-                    addNotifToDropdown(n, false);
-                    if (!n.is_read) unreadCount++;
-                });
+                for (const notification of data) {
+                    addNotifToDropdown(notification, false);
+                    if (!notification.is_read) unreadCount++;
+                }
 
                 updateBadge();
             } catch (e) {
+                list.innerHTML = '<div class="notif-empty notif-error">Bildirimler yüklenemedi.</div>';
+                unreadCount = 0;
+                updateBadge();
                 console.error('Bildirimler çekilemedi:', e);
             }
         }
