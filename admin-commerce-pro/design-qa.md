@@ -1,47 +1,49 @@
 # NovaStore Admin Commerce Pro — Design QA
 
+Tarih: 2026-07-13
+
 Hedef: `reference/admin-hybrid-target.png` (1487 × 1058)
+
 Entegrasyon çıktısı: `../frontend/admin-commerce-pro.html`
-Doğrulama tarihi: 2026-07-13
 
-## Görsel karşılaştırma
+## Bu turda tamamlanan kontroller
 
-### Masaüstü — 1487 × 1058
+- Hedef görsel ile bulut tarayıcıdan alınan 1363 × 936 entegrasyon görüntüsü aynı karşılaştırma yüzeyinde incelendi. Görüntü düzeltme öncesi build'e aitti ve hedefle aynı viewport değildi; bu nedenle yalnızca sorun keşfi için kullanıldı.
+- Düzeltme öncesi etkileşimli kontrolde şu hatalar yeniden üretildi:
+  - Komut paleti arama alanı yerine kapatma düğmesine odaklanıyordu.
+  - Kaydedilmiş görünüm seçimi tablo filtresini uygulamıyordu.
+  - Sipariş dışı sekmeye geçildiğinde eski sipariş denetçisi açık kalıyordu.
+  - `Teslim Edildi` siparişte “sonraki aşama” işlemi durumu geriye alıyordu.
+  - Satıcı karar modalında Escape, modal ile birlikte bağlamsal menüyü de kapatıyor ve odağı kaybediyordu.
+- Kaynakta bu davranışlar düzeltildi; ayrıca mobil başlık kontrolleri sarılabilir hale getirildi, bağlamsal navigasyon görünür durum değiştirecek şekilde bağlandı, filtre/görünüm durumu eşitlendi, toast/statusbar çakışması giderildi ve erişilebilir ad/aktif durumlar tamamlandı.
+- Hedefteki iki serili gelir eğrisi, elde çizilmiş bir asset yerine yerel veriyle çalışan `uPlot` grafiği olarak uygulandı.
+- Vite `6.4.3` sürümüne yükseltildi ve npm audit sonucu `0 vulnerabilities` oldu.
 
-- Referanstaki ikon rayı, bağlamsal menü, üst araç çubuğu, yoğun operasyon panosu, KPI/modül yerleşimi, veri tablosu ve sağ sipariş denetçisi aynı bilgi mimarisini koruyor.
-- Sayfa genişliği tam viewport içinde kaldı; belge seviyesinde yatay taşma, kırpılan başlık veya erişilemeyen ana aksiyon bulunmadı.
-- Sağ denetçi 326 px genişliğinde ve viewport içinde kaldı. Tablo yoğunluğu, durum rozetleri ve aksiyon hiyerarşisi referansla uyumlu.
-- Entegrasyona özel önizleme uyarısı bilinçli bir farktır; canlı işlem yapılmadığını görünür kılar.
+## Deterministik doğrulama
 
-### Mobil — 390 × 844
+- `npm run build:integrated`: geçti; bağımsız HTML üretildi.
+- `node tests/adminCommerceProPreviewSmoke.js`: geçti; üretilen HTML kaynak fingerprint'i ile eşleşiyor.
+- Dokuz mevcut admin/startup smoke testi: geçti.
+- `npm ls --depth=0`: geçti.
+- `npm audit --omit=dev --package-lock-only`: geçti, 0 açık.
+- `frontend/admin.html` inline JavaScript parse kontrolü: geçti.
+- `git diff --check`: geçti.
+- Kaynak ve build statik kontrollerinde uygulama kaynaklı `fetch`, XHR, WebSocket, EventSource, ödeme sağlayıcısı veya `/api` çağrısı yok; aktif haricî script, stylesheet ve görsel kaynağı bulunmuyor.
+- Mevcut NovaStore PNG favicon'u gömülü veri URI'si olarak taşınıyor; bağımsız çıktıda ayrı dosya veya ağ isteği gerektirmiyor.
 
-- İkon rayı, kompakt üst bar ve içerik kartları viewport içinde kaldı; belge seviyesinde yatay taşma oluşmadı.
-- Bağlamsal menü açıldı; dış alana tıklama ve `Escape` ile kapandı.
-- Sipariş denetçisi 334 px kullanılabilir genişliğe oturdu, kaydırılabilir kaldı ve `Escape` ile kapandı.
-- Tablo kendi yatay kaydırma alanını kullanıyor; sayfanın tamamını genişletmiyor.
+## Açık browser kanıtı blokeri
 
-## Etkileşim doğrulaması
+Bulut tarayıcı `http://terminal.local:4173/admin-commerce-pro.html` adresini açtı, ancak rebuild ve cache-busting URL sonrasında da düzeltme öncesi paketi sunmaya devam etti. Temiz `4271` portu tarayıcı katmanında `ERR_BLOCKED_BY_CLIENT` ile reddedildi. Bu yüzden güncel build için aşağıdaki zorunlu kanıtlar üretilemedi:
 
-- Sipariş çalışma alanı, sekmeler, satır seçimi, arama/durum filtreleri ve sipariş denetçisi çalıştı.
-- Ürün aramasında `NovaTech` tek doğru satıra indi; `Düşük stok` filtresi doğru sonucu verdi.
-- Finans tarafında `Ödemeye hazır` filtresi doğru hakediş satırını gösterdi.
-- Satıcı onay önizleme modalı açıldı ve iptal/Escape ile kapandı.
-- Modül rol düzeninde `Finans Yöneticisi` seçildi; modül anahtarı durum değiştirdi.
-- Komut paleti `Ctrl+K` ile açıldı ve `Escape` ile kapandı.
-- Hızlı oluşturma modalı açıldı; ürün, satıcı, mutabakat ve koleksiyon seçenekleri erişilebilirdi.
-- Ayarlar formu yalnız yerel önizleme durumunu güncelledi ve başarı bildirimi gösterdi.
+1. 1487 × 1058 hedef/uygulama eş-viewport ve eş-state görsel karşılaştırması.
+2. 390 × 844 mobil menü, scrim, Escape, başlık kontrolleri ve denetçi alt aksiyon kontrolü.
+3. Düzeltme sonrası ana navigasyon, görünüm/filtre, modal odağı, sipariş aşaması ve satıcı karar akışı.
+4. Düzeltme sonrası console ve runtime network kaydı.
 
-## Console ve ağ
+Düzeltme öncesi sayfada uygulamaya ait console error/warning görülmedi; tek hata tarayıcı eklentisinin `chrome-extension://...` metadata mesajıydı. Bu sonuç güncel build için devralınmamıştır.
 
-- İlk çalıştırmada eksik `favicon.ico` isteği nedeniyle tek bir 404 bulundu. Favicon gömülü veri URI'sine taşındı; bağımsız bir dosya veya haricî istek gerektirmiyor.
-- Uygulama kaynaklı JavaScript hata veya uyarısı bulunmadı.
-- Yerel önizlemede yalnız `127.0.0.1` Vite kaynakları yüklendi; API, ödeme, WebSocket veya haricî origin isteği gözlenmedi.
-- Entegre HTML script, CSS, font, ikon ve ürün görsellerini kendi içinde taşıyor; çözümlenmemiş `/assets` veya `/src` yolu bırakmıyor.
+`/admin-commerce-pro.html`, mevcut `admin.html` gibi statik bir istemci kabuğudur. Önizleme yalnızca gömülü mock veri içerir ve hiçbir API/ödeme/auth entegrasyonu yapmaz; bu nedenle mevcut mimariye göre yeni bir gerçek-veri sızıntısı olarak değerlendirilmedi. `noindex` erişim kontrolü değildir ve ileride gerçek entegrasyon eklenirse route ayrıca korunmalıdır.
 
-## Otomatik kontroller
+Draft PR, yukarıdaki güncel desktop/mobile browser kanıtları tamamlanmadan merge-ready kabul edilmemelidir.
 
-- Entegre build ve bağımsız önizleme smoke testi geçti.
-- Admin regresyon smoke testleri ve startup safety testi geçti.
-- Git whitespace kontrolleri geçti.
-
-final result: passed
+final result: blocked

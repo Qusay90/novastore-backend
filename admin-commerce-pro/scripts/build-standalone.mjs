@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,9 +74,31 @@ if (unresolved.length > 0) {
   throw new Error(`Standalone içinde çözümlenmemiş asset kaldı: ${[...new Set(unresolved)].join(", ")}`);
 }
 
+const fingerprintFiles = [
+  "index.html",
+  "package.json",
+  "package-lock.json",
+  "vite.config.mjs",
+  "scripts/build-standalone.mjs",
+  "src/App.jsx",
+  "src/main.jsx",
+  "src/styles.css",
+  "public/icons.js",
+  "public/favicon-96x96.png",
+  ...imageNames.map((name) => `public/assets/${name}`),
+  ...fontNames.map((name) => `public/assets/fonts/${name}`),
+];
+const fingerprint = createHash("sha256");
+for (const relativePath of fingerprintFiles) {
+  fingerprint.update(relativePath);
+  fingerprint.update(await readFile(path.join(root, relativePath)));
+}
+const sourceFingerprint = fingerprint.digest("hex");
+
 const safeIcons = icons.replaceAll("</script", "<\\/script");
 const safeJavascript = javascript.replaceAll("</script", "<\\/script");
 const safeCss = css.replaceAll("</style", "<\\/style");
+const favicon = await encode(path.join(root, "public", "favicon-96x96.png"), "image/png");
 
 const html = `<!doctype html>
 <html lang="tr">
@@ -85,7 +108,8 @@ const html = `<!doctype html>
     <meta name="theme-color" content="#031d39" />
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <meta name="description" content="NovaStore çok satıcılı yönetim konsolu etkileşimli önizlemesi" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23031d39'/%3E%3Cpath d='M15 45V19h8l18 16V19h8v26h-8L23 29v16z' fill='%23fff'/%3E%3C/svg%3E" />
+    <link rel="icon" type="image/png" href="${favicon}" />
+    <meta name="novastore-source-fingerprint" content="${sourceFingerprint}" />
     <title>NovaStore Admin Commerce Pro — Önizleme</title>
     <style>${safeCss}</style>
   </head>

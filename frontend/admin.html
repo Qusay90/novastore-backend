@@ -279,6 +279,28 @@
             background: var(--accent);
         }
 
+        .commerce-pro-preview-link-short {
+            display: none;
+        }
+
+        @media (max-width: 1180px) {
+            .commerce-pro-preview-link {
+                width: 42px;
+                min-width: 42px;
+                padding: 0;
+            }
+
+            .commerce-pro-preview-link-full {
+                display: none;
+            }
+
+            .commerce-pro-preview-link-short {
+                display: inline;
+                font-size: 0.72rem;
+                letter-spacing: 0.03em;
+            }
+        }
+
         /* ANA İÇERİK */
         .main-content {
             flex-grow: 1;
@@ -2012,7 +2034,10 @@
                 <span>Yönetici</span>
                 <div class="admin-avatar">A</div>
                 <a class="commerce-pro-preview-link" href="admin-commerce-pro.html" target="_blank"
-                    rel="noopener" title="Commerce Pro tasarım önizlemesini yeni sekmede aç">Commerce Pro Önizleme</a>
+                    rel="noopener" aria-label="Commerce Pro tasarım önizlemesini yeni sekmede aç"
+                    title="Commerce Pro tasarım önizlemesini yeni sekmede aç"><span
+                        class="commerce-pro-preview-link-full">Commerce Pro Önizleme</span><span
+                        class="commerce-pro-preview-link-short" aria-hidden="true">Pro</span></a>
                 <button class="btn-logout topbar-logout" onclick="adminLogout()">Çıkış</button>
             </div>
         </header>

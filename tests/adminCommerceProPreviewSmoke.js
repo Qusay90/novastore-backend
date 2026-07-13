@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -25,13 +26,43 @@ const previewSource = fs.readFileSync(previewPath, 'utf8');
 const adminSource = fs.readFileSync(adminPath, 'utf8');
 const applicationSource = [appPath, mainPath].map((file) => fs.readFileSync(file, 'utf8')).join('\n');
 const designQaSource = fs.readFileSync(designQaPath, 'utf8');
+const fingerprintFiles = [
+    'index.html',
+    'package.json',
+    'package-lock.json',
+    'vite.config.mjs',
+    'scripts/build-standalone.mjs',
+    'src/App.jsx',
+    'src/main.jsx',
+    'src/styles.css',
+    'public/icons.js',
+    'public/favicon-96x96.png',
+    'public/assets/category-home.webp',
+    'public/assets/phone-iphone.webp',
+    'public/assets/phone-samsung.webp',
+    'public/assets/product-bedding.webp',
+    'public/assets/product-headphones.webp',
+    'public/assets/product-laptop.webp',
+    'public/assets/product-vacuum.webp',
+    'public/assets/product-watch.webp',
+    'public/assets/fonts/inter-latin-ext-400-normal.woff2',
+    'public/assets/fonts/inter-latin-ext-600-normal.woff2',
+    'public/assets/fonts/inter-latin-ext-700-normal.woff2',
+    'public/assets/fonts/inter-latin-ext-800-normal.woff2'
+];
+const fingerprint = createHash('sha256');
+for (const relativePath of fingerprintFiles) {
+    fingerprint.update(relativePath);
+    fingerprint.update(fs.readFileSync(path.join(repositoryRoot, 'admin-commerce-pro', relativePath)));
+}
+const expectedFingerprint = fingerprint.digest('hex');
 
 assert.match(previewSource, /<!doctype html>/i, 'önizleme geçerli bir HTML belgesi olmalı');
 assert.match(previewSource, /<html\b[^>]*\blang=["']tr["']/i, 'önizleme Türkçe belge dili tanımlamalı');
 assert.match(previewSource, /<div\s+id=["']root["']\s*>\s*<\/div>/i, 'React kök elemanı bulunmalı');
 assert.match(
     previewSource,
-    /<link\b[^>]*\brel=["']icon["'][^>]*\bhref=["']data:image\/svg\+xml,/i,
+    /<link\b[^>]*\brel=["']icon["'][^>]*\bhref=["']data:image\/png;base64,/i,
     'önizleme favicon isteği için haricî veya eksik bir dosyaya bağlı olmamalı'
 );
 
@@ -39,6 +70,14 @@ const robotsMeta = previewSource.match(/<meta\b[^>]*\bname=["']robots["'][^>]*>/
 assert.ok(robotsMeta, 'önizleme robots meta etiketi içermeli');
 assert.match(robotsMeta, /\bcontent=["'][^"']*noindex[^"']*["']/i, 'önizleme noindex olmalı');
 assert.match(robotsMeta, /\bcontent=["'][^"']*nofollow[^"']*["']/i, 'önizleme nofollow olmalı');
+
+const fingerprintMeta = previewSource.match(/<meta\b[^>]*\bname=["']novastore-source-fingerprint["'][^>]*>/i)?.[0];
+assert.ok(fingerprintMeta, 'önizleme kaynak parmak izi içermeli');
+assert.match(
+    fingerprintMeta,
+    new RegExp(`\\bcontent=["']${expectedFingerprint}["']`, 'i'),
+    'frontend/admin-commerce-pro.html kaynak kod ve assetlerle aynı build’den üretilmiş olmalı'
+);
 
 for (const marker of [
     'Commerce Pro önizlemesi',
@@ -121,8 +160,8 @@ assert.match(previewLink, /\brel=["'][^"']*noopener[^"']*["']/i, 'yeni sekme ba�
 
 assert.match(
     designQaSource,
-    /^final result:\s*passed\s*$/im,
-    'güncel masaüstü/mobil tasarım QA sonucu passed olmalı'
+    /^final result:\s*blocked\s*$/im,
+    'düzeltme sonrası masaüstü/mobil browser kanıtı tamamlanana kadar tasarım QA sonucu blocked kalmalı'
 );
 
 console.log('admin Commerce Pro preview smoke passed');
