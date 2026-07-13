@@ -8,6 +8,7 @@ const previewPath = path.join(repositoryRoot, 'frontend', 'admin-commerce-pro.ht
 const adminPath = path.join(repositoryRoot, 'frontend', 'admin.html');
 const appPath = path.join(repositoryRoot, 'admin-commerce-pro', 'src', 'App.jsx');
 const mainPath = path.join(repositoryRoot, 'admin-commerce-pro', 'src', 'main.jsx');
+const designQaPath = path.join(repositoryRoot, 'admin-commerce-pro', 'design-qa.md');
 
 assert.ok(
     fs.existsSync(previewPath),
@@ -23,10 +24,16 @@ assert.ok(fs.existsSync(adminPath), 'frontend/admin.html bulunamadı');
 const previewSource = fs.readFileSync(previewPath, 'utf8');
 const adminSource = fs.readFileSync(adminPath, 'utf8');
 const applicationSource = [appPath, mainPath].map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+const designQaSource = fs.readFileSync(designQaPath, 'utf8');
 
 assert.match(previewSource, /<!doctype html>/i, 'önizleme geçerli bir HTML belgesi olmalı');
 assert.match(previewSource, /<html\b[^>]*\blang=["']tr["']/i, 'önizleme Türkçe belge dili tanımlamalı');
 assert.match(previewSource, /<div\s+id=["']root["']\s*>\s*<\/div>/i, 'React kök elemanı bulunmalı');
+assert.match(
+    previewSource,
+    /<link\b[^>]*\brel=["']icon["'][^>]*\bhref=["']data:image\/svg\+xml,/i,
+    'önizleme favicon isteği için haricî veya eksik bir dosyaya bağlı olmamalı'
+);
 
 const robotsMeta = previewSource.match(/<meta\b[^>]*\bname=["']robots["'][^>]*>/i)?.[0];
 assert.ok(robotsMeta, 'önizleme robots meta etiketi içermeli');
@@ -111,5 +118,11 @@ const previewLink = adminSource.match(
 assert.ok(previewLink, 'frontend/admin.html Commerce Pro önizlemesine bağlantı vermeli');
 assert.match(previewLink, /\btarget=["']_blank["']/i, 'önizleme bağlantısı yeni sekmede açılmalı');
 assert.match(previewLink, /\brel=["'][^"']*noopener[^"']*["']/i, 'yeni sekme bağlantısı noopener kullanmalı');
+
+assert.match(
+    designQaSource,
+    /^final result:\s*passed\s*$/im,
+    'güncel masaüstü/mobil tasarım QA sonucu passed olmalı'
+);
 
 console.log('admin Commerce Pro preview smoke passed');

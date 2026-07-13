@@ -85,6 +85,7 @@ const html = `<!doctype html>
     <meta name="theme-color" content="#031d39" />
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <meta name="description" content="NovaStore çok satıcılı yönetim konsolu etkileşimli önizlemesi" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23031d39'/%3E%3Cpath d='M15 45V19h8l18 16V19h8v26h-8L23 29v16z' fill='%23fff'/%3E%3C/svg%3E" />
     <title>NovaStore Admin Commerce Pro — Önizleme</title>
     <style>${safeCss}</style>
   </head>
