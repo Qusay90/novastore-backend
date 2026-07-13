@@ -1177,6 +1177,7 @@ dialog.modal::backdrop { background: rgba(4, 23, 46, 0.58); }
 .modal-header h2 { margin: 2px 0 0; font-size: 16px; }
 .modal-form { display: grid; gap: 13px; padding: 16px; }
 .modal-form.two-column { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.modal-error { margin: -4px 0 0; padding: 8px 10px; color: var(--red); background: var(--red-bg); border: 1px solid color-mix(in srgb, var(--red) 30%, transparent); border-radius: var(--radius-sm); font-size: 9px; font-weight: 700; }
 .modal-form footer { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; padding-top: 6px; }
 .quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 16px; }
 .quick-grid button { display: grid; grid-template-columns: 34px 1fr; min-height: 82px; padding: 12px; gap: 3px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; text-align: left; }

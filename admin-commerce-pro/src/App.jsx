@@ -199,7 +199,7 @@ function AppHeader({ title, section, contextOpen, onToggleContext, contextToggle
   return <>
     <header className="topbar">
       <div className="topbar-leading"><button ref={contextToggleRef} className="icon-button rail-toggle" onClick={onToggleContext} aria-label={contextOpen ? "Bağlamsal menüyü daralt" : "Bağlamsal menüyü aç"} aria-expanded={contextOpen} aria-controls="context-navigation"><Icon name={contextOpen ? "back" : "menu"} /></button><div className="breadcrumb"><span>Çalışma Alanları</span><Icon name="right" />{section && <><span>{section}</span><Icon name="right" /></>}<strong>{title}</strong></div></div>
-      <button className="command-trigger" onClick={onCommand} data-testid="command-open"><Icon name="search" /><span>Ara veya komut çalıştır…</span><kbd>⌘ K</kbd></button>
+      <button className="command-trigger" onClick={onCommand} aria-label="Komut paletini aç" data-testid="command-open"><Icon name="search" /><span>Ara veya komut çalıştır…</span><kbd>⌘ K</kbd></button>
       <label className="date-select"><span className="sr-only">Tarih aralığı</span><Icon name="calendar" /><select aria-label="Tarih aralığı" defaultValue="7 Tem 2026 – 13 Tem 2026" onChange={(event) => onNotify(`“${event.target.value}” örnek tarih aralığı seçildi.`)}><option>7 Tem 2026 – 13 Tem 2026</option><option>30 Haz 2026 – 6 Tem 2026</option><option>Son 30 gün</option></select></label>
       <button className="icon-button notification-button" aria-label="Örnek bildirimleri göster" onClick={() => onNotify("8 örnek bildirim bulunuyor; canlı bildirim bağlantısı bu önizlemede kapalıdır.")}><Icon name="bell" /><span className="notification-dot">8</span></button>
       <button className="profile-button" onClick={() => onNotify("Profil ve rol yönetimi sonraki API entegrasyon turuna hazırdır.")}><span className="avatar avatar-small">AK</span><span>Operasyon Yöneticisi</span><Icon name="sort" /></button>
@@ -364,19 +364,20 @@ export function App() {
   const [filter, setFilter] = useState({ status: "Tümü", query: "" });
   const [tab, setTab] = useState("orders");
   const [editingLayout, setEditingLayout] = useState(false);
-  const [savedViews, setSavedViews] = useState([{ name: "Bugünkü operasyon", status: "Tümü" }, { name: "Bekleyen satıcı onayı", status: "Yeni" }, { name: "SLA riski yüksek", status: "Hazırlanıyor" }]);
+  const [savedViews, setSavedViews] = useState([{ name: "Bugünkü operasyon", status: "Tümü", query: "" }, { name: "Bekleyen satıcı onayı", status: "Yeni", query: "" }, { name: "SLA riski yüksek", status: "Hazırlanıyor", query: "" }]);
   const [activeView, setActiveView] = useState("Bugünkü operasyon");
   const [contextItem, setContextItem] = useState("Siparişler");
   const [modules, setModules] = useState(moduleCatalog);
   const [dialog, setDialog] = useState(null);
+  const [saveViewError, setSaveViewError] = useState("");
   const [toast, setToast] = useState("");
   const toastTimerRef = useRef(null);
   const returnFocus = useRef(null);
   const contextPanelRef = useRef(null);
   const contextToggleRef = useRef(null);
   const notify = (message) => { setToast(message); window.clearTimeout(toastTimerRef.current); toastTimerRef.current = window.setTimeout(() => setToast(""), 2800); };
-  const openDialog = (name) => { returnFocus.current = document.activeElement; setDialog(name); };
-  const closeDialog = () => { setDialog(null); requestAnimationFrame(() => returnFocus.current?.focus?.()); };
+  const openDialog = (name) => { returnFocus.current = document.activeElement; if (name === "save-view") setSaveViewError(""); setDialog(name); };
+  const closeDialog = () => { setDialog(null); setSaveViewError(""); requestAnimationFrame(() => returnFocus.current?.focus?.()); };
   const navigate = (next) => {
     setDomain(next);
     setDialog(null);
@@ -396,7 +397,7 @@ export function App() {
   const applyView = (view) => {
     if (!view) return;
     setActiveView(view.name);
-    setFilter({ status: view.status, query: "" });
+    setFilter({ status: view.status, query: view.query || "" });
     setTab("orders");
     setDomain("operations");
     setContextItem("Siparişler");
@@ -404,6 +405,27 @@ export function App() {
     setSelected([]);
     if (window.innerWidth <= 760) setContextOpen(false);
     notify(`“${view.name}” örnek görünümü uygulandı.`);
+  };
+  const saveView = (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const name = String(new FormData(form).get("name") || "").trim();
+    const nameInput = form.elements.namedItem("name");
+    if (!name) {
+      setSaveViewError("Görünüm adı boş bırakılamaz.");
+      nameInput?.focus();
+      return;
+    }
+    const normalizedName = name.toLocaleLowerCase("tr-TR");
+    if (savedViews.some((view) => view.name.toLocaleLowerCase("tr-TR") === normalizedName)) {
+      setSaveViewError("Bu adla bir görünüm zaten var.");
+      nameInput?.focus();
+      return;
+    }
+    setSavedViews([...savedViews, { name, status: filter.status, query: filter.query }]);
+    setActiveView(name);
+    closeDialog();
+    notify(`“${name}” görünümü yalnız bu önizleme oturumunda kaydedildi.`);
   };
   const selectContextItem = (label) => {
     setContextItem(label);
@@ -425,7 +447,7 @@ export function App() {
   };
   useEffect(() => {
     const onKey = (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === "k") { event.preventDefault(); openDialog("command"); }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === "k") { event.preventDefault(); if (!dialog && !document.querySelector("dialog[open]")) openDialog("command"); }
       if (event.key === "Escape" && contextOpen && !dialog && !document.querySelector("dialog[open]")) closeContext();
     };
     window.addEventListener("keydown", onKey);
@@ -463,7 +485,7 @@ export function App() {
     <div className="admin-main"><AppHeader title={title} section={section} contextOpen={contextOpen} onToggleContext={toggleContext} contextToggleRef={contextToggleRef} onCommand={() => openDialog("command")} onQuickCreate={() => openDialog("quick-create")} onNotify={notify} toast={toast} /><main className="content-area">{body}</main><footer className="statusbar"><PreviewBanner /><span>Örnek veri · kalıcı kayıt yok</span><span>API ve ödeme bağlantıları kapalı</span><button onClick={() => notify("Örnek arayüz durumu yenilendi.")}><Icon name="refresh" />Önizlemeyi yenile</button></footer></div>
     {dialog === "command" && <CommandPalette onClose={closeDialog} navigate={navigate} />}
     {dialog === "quick-create" && <Modal title="Hızlı oluştur" onClose={closeDialog}><div className="quick-grid"><button onClick={() => { navigate("catalog"); closeDialog(); }}><Icon name="package" /><strong>Yeni ürün</strong><small>Ürün ve varyant akışını önizle</small></button><button onClick={() => { navigate("sellers"); closeDialog(); }}><Icon name="user" /><strong>Satıcı daveti</strong><small>Mağaza başlangıcını önizle</small></button><button onClick={() => { navigate("finance"); closeDialog(); }}><Icon name="card" /><strong>Mutabakat</strong><small>Finans akışını önizle</small></button><button onClick={() => { closeDialog(); notify("Koleksiyon taslağı yalnız önizleme oturumunda oluşturuldu."); }}><Icon name="grid" /><strong>Koleksiyon</strong><small>Vitrin akışını önizle</small></button></div></Modal>}
-    {dialog === "save-view" && <Modal title="Görünümü kaydet" onClose={closeDialog}><form className="modal-form" onSubmit={(e) => { e.preventDefault(); const name = new FormData(e.currentTarget).get("name"); setSavedViews([...savedViews, { name, status: filter.status }]); setActiveView(name); closeDialog(); notify(`“${name}” görünümü yalnız bu önizleme oturumunda kaydedildi.`); }}><label><span>Görünüm adı</span><input name="name" required placeholder="Örn. Bugünkü öncelikler" data-autofocus /></label><label><span>Örnek ekip erişimi</span><select name="scope"><option>Yalnızca ben</option><option>Operasyon ekibi</option><option>Tüm yöneticiler</option></select></label><footer><button type="button" className="secondary-button" onClick={closeDialog}>İptal</button><button className="primary-button">Önizlemede kaydet</button></footer></form></Modal>}
+    {dialog === "save-view" && <Modal title="Görünümü kaydet" onClose={closeDialog}><form className="modal-form" onSubmit={saveView}><label><span>Görünüm adı</span><input name="name" required placeholder="Örn. Bugünkü öncelikler" data-autofocus aria-invalid={saveViewError ? "true" : undefined} aria-describedby={saveViewError ? "save-view-error" : undefined} onChange={() => saveViewError && setSaveViewError("")} /></label>{saveViewError && <p className="modal-error" id="save-view-error" role="alert">{saveViewError}</p>}<label><span>Örnek ekip erişimi</span><select name="scope"><option>Yalnızca ben</option><option>Operasyon ekibi</option><option>Tüm yöneticiler</option></select></label><footer><button type="button" className="secondary-button" onClick={closeDialog}>İptal</button><button className="primary-button">Önizlemede kaydet</button></footer></form></Modal>}
     {dialog === "new-product" && <Modal title="Yeni ürün taslağı" onClose={closeDialog} wide><form className="modal-form two-column" onSubmit={(e) => { e.preventDefault(); closeDialog(); notify("Ürün taslağı yalnız bu önizleme oturumunda oluşturuldu."); }}><label><span>Ürün adı</span><input required placeholder="Ürün adını girin" data-autofocus /></label><label><span>Satıcı</span><select><option>NovaStore</option><option>TeknoPark</option><option>Eviva Home</option></select></label><label><span>Kategori</span><select><option>Elektronik</option><option>Ev & Yaşam</option><option>Moda</option></select></label><label><span>Stok kodu</span><input required placeholder="NVS-" /></label><label><span>Satış fiyatı</span><input type="number" min="0" required /></label><label><span>Başlangıç stoku</span><input type="number" min="0" required /></label><footer><button type="button" className="secondary-button" onClick={closeDialog}>İptal</button><button className="primary-button">Önizlemede oluştur</button></footer></form></Modal>}
   </div>;
 }

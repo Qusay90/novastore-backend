@@ -177,6 +177,41 @@ assert.match(
     /@media \(max-width: 760px\)[\s\S]*?\.command-trigger \{ display: grid;/,
     'mobil görünüm komut paleti için dokunmatik tetikleyiciyi korumalı'
 );
+assert.match(
+    applicationSource,
+    /className="command-trigger"[^>]*aria-label="Komut paletini aç"/,
+    'mobil komut paleti tetikleyicisi görünür metin saklandığında da erişilebilir ada sahip olmalı'
+);
+assert.match(
+    applicationSource,
+    /setFilter\(\{ status: view\.status, query: view\.query \|\| "" \}\)/,
+    'kaydedilmiş görünüm uygulanırken arama sorgusu geri yüklenmeli'
+);
+assert.match(
+    applicationSource,
+    /\{ name, status: filter\.status, query: filter\.query \}/,
+    'kaydedilmiş görünüm etkin arama sorgusunu saklamalı'
+);
+assert.match(
+    applicationSource,
+    /savedViews\.some\(\(view\) => view\.name\.toLocaleLowerCase\("tr-TR"\) === normalizedName\)/,
+    'yinelenen kaydedilmiş görünüm adları büyük-küçük harf duyarsız engellenmeli'
+);
+assert.match(
+    applicationSource,
+    /className="modal-error"[^>]*id="save-view-error"[^>]*role="alert"/,
+    'kaydedilmiş görünüm doğrulama hatası modal içinde erişilebilir biçimde açıklanmalı'
+);
+assert.match(
+    applicationSource,
+    /aria-invalid=\{saveViewError \? "true" : undefined\}[\s\S]{0,160}aria-describedby=\{saveViewError \? "save-view-error" : undefined\}/,
+    'kaydedilmiş görünüm adı alanı modal doğrulama mesajına bağlanmalı'
+);
+assert.match(
+    applicationSource,
+    /event\.preventDefault\(\); if \(!dialog && !document\.querySelector\("dialog\[open\]"\)\) openDialog\("command"\)/,
+    'komut paleti kısayolu açık bir modalı ve odak geri dönüş hedefini değiştirmemeli'
+);
 
 for (const [pattern, label] of forbiddenRuntimePatterns) {
     assert.doesNotMatch(previewSource, pattern, `önizleme ${label} içeremez`);
