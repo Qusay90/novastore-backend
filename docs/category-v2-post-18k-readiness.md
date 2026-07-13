@@ -296,14 +296,86 @@ Media backup uygulama sırası:
 | Production PostgreSQL major | GO | `17.6` doğrulandı. |
 | Restore image | GO | `postgres:17` hazır. |
 | Backup klasörü | GO | `C:\Users\kusay\NovaStore-Secure-Backups\production\` hazır; timestamp'li alt klasör kullanılacak. |
-| Production DB URL aktarımı | NO-GO | URL yalnız operator PowerShell environment variable'ına secretsiz aktarım yöntemiyle verilmeli. |
-| Off-site hedef | NO-GO | Erişim kontrollü ve şifreli hedef belirlenmeli. |
-| İkinci doğrulayıcı | NO-GO | SHA-256 ve restore sonucunu onaylayacak kişi veya iki aşamalı manuel kontrol atanmalı. |
-| Maintenance window | NO-GO | Kesin tarih/saat ve rollback karar noktası belirlenmeli. |
-| Storage/media kararı | NO-GO | Kritik product/review binary kapsamı ve retention onaylanmalı. |
+| Production DB URL aktarımı | GO | Yalnız operator PowerShell Process env kullanılacak; kalıcı User env, dosya, chat veya transcript kullanılmayacak. |
+| Off-site hedef | Kısmi GO | BitLocker şifreli harici disk seçildi; gerçek backup öncesi diskin fiziksel olarak hazır ve erişilebilir olduğu doğrulanmalı. Client-side encrypted cloud yalnız ek kopya olabilir. |
+| İkinci doğrulayıcı | Kısmi GO / yüksek risk | İkinci kişi yok; iki ayrı terminal oturumunda SHA-256 ve ayrı restore checklist kontrolü zorunlu. |
+| Maintenance window | Kısmi GO | Cumartesi'yi Pazar'a bağlayan `02:00-04:00 Europe/Istanbul` seçildi; ilk öneri `19/07/2026 02:00-04:00`, kesin tarih rollout öncesi yeniden onaylanmalı. |
+| Storage/media kararı | GO | Tüm `novastore_products` ve `novastore_reviews` binary asset'leri; inventory, export, off-site kopya ve örnek restore zorunlu. |
+| Backup retention | GO | 60 gün. |
+| Restore hedefi | GO | Local disposable PostgreSQL 17; local role/extension/policy uyumsuzluğunda ayrı Supabase restore project ikinci opsiyon. |
+| Operator ve approver | Kısmi GO / yüksek risk | DB operator, migration approver, deploy approver ve rollback yetkilisi Kusay. Görev ayrılığı yok; iki aşamalı manuel doğrulama zorunlu. |
 | Cloudinary inventory planı | GO | Artifact yolları, alanlar ve karşılaştırma adımları tanımlandı. |
 | Media backup uygulaması | NO-GO | Inventory, kritik export, SHA-256, off-site copy ve örnek restore henüz yapılmadı. |
-| Render production auto-deploy | GO | Kapalı olduğu operasyon öncesi tekrar doğrulanmalı. |
+| Render production auto-deploy | Kısmi GO | Kapalı; production service adı ve panel durumu backup/restore gününde Kusay tarafından timestamp ile yeniden doğrulanmalı. |
+
+### 5.6 Kilitlenmiş operasyon kararları
+
+- **Off-site hedef:** BitLocker şifreli harici disk. Erişim sorumlusu Kusay. Client-side encrypted cloud yalnız ikincil kopya olarak kullanılabilir.
+- **İkinci doğrulayıcı:** İkinci kişi yok. İki aşamalı manuel doğrulama kabul edildi; bu yöntem migration/backfill için yüksek artık risk taşır.
+- **SHA-256 prosedürü:** İlk dosya boyutu ve SHA-256 kontrolünden sonra PowerShell kapatılır. Yeni terminal oturumunda SHA-256 yeniden üretilir ve restore raporu ayrı checklist ile kontrol edilir.
+- **Maintenance window:** Cumartesi'yi Pazar'a bağlayan `02:00-04:00 Europe/Istanbul`. İlk önerilen pencere `19/07/2026 02:00-04:00`; kesin tarih production rollout öncesi Kusay tarafından son kez onaylanır.
+- **DB URL aktarımı:** Yalnız operator PowerShell Process env. Önerilen env adı `CATEGORY_V2_PRODUCTION_DATABASE_URL`; değer chat, dosya, rapor, komut çıktısı veya kalıcı User env içinde tutulmaz. Terminal transcript/logging kapalı olur.
+- **Media kapsamı:** Tüm `novastore_products` ve `novastore_reviews` binary asset'leri. `novastore_product_previews` geçici kabul edilir, ayrıca listelenir ve kritik kapsama otomatik alınmaz.
+- **Media kanıtı:** Cloudinary inventory, binary export, SHA-256 manifest, BitLocker off-site kopya ve örnek asset açılma/restore testi zorunludur.
+- **Retention:** Backup artifact'ları 60 gün saklanır; rollout stabil olduktan sonra arşiv/temizlik politikası ayrıca değerlendirilir.
+- **Restore hedefi:** `postgres:17` image ile local disposable PostgreSQL 17. Role, extension veya policy uyumsuzluğunda ayrı Supabase restore project ikinci opsiyondur.
+- **Yetkiler:** DB operator, migration approver, deploy approver ve rollback karar yetkilisi Kusay. Operator/approver aynı kişi riski kabul edilmiştir; iki aşamalı manuel doğrulama zorunludur.
+- **Local upload kontrolü:** `frontend/uploads/local-products` envanteri alınır ve Git/deploy artifact kapsamı ayrıca doğrulanır.
+- **Render production:** Auto-deploy kapalıdır. Production service adı, branch ve auto-deploy durumu backup/restore gününde Kusay tarafından tekrar doğrulanır ve secretsiz timestamp kaydı tutulur.
+
+### 5.7 Tur 20A gerçek backup prompt taslağı
+
+Bu prompt yalnız kalan gün-başı kontrolleri tamamlandıktan ve kullanıcı açık onay verdikten sonra ayrı bir turda kullanılabilir. Bu bölümün eklenmesi production bağlantısı veya backup onayı değildir.
+
+```text
+Tur 20A — Production Backup ve Local Restore Gate
+
+Amaç:
+- Production PostgreSQL 17.6 veritabanından logical backup almak.
+- Backup dosya boyutlarını ve SHA-256 manifestini doğrulamak.
+- Backup'ı postgres:17 disposable local PostgreSQL üzerinde restore etmek.
+- Restore sonucu için tablo, row count, constraint/index ve read-only smoke kanıtı üretmek.
+
+Zorunlu guard'lar:
+- Production DB URL yalnız CATEGORY_V2_PRODUCTION_DATABASE_URL Process env üzerinden okunacak.
+- URL, parola veya secret terminale, rapora, dosyaya ya da command history'ye yazılmayacak.
+- Backup root: C:\Users\kusay\NovaStore-Secure-Backups\production\
+- Timestamp'li novastore-prod-YYYYMMDD-HHmmss alt klasörü kullanılacak.
+- PostgreSQL major: 17.6; restore image: postgres:17.
+- BitLocker şifreli harici disk hazır ve erişilebilir olacak.
+- Render production auto-deploy, service ve branch Kusay tarafından panelden yeniden doğrulanacak.
+- Docker engine ve Supabase CLI sürümü kaydedilecek.
+
+Backup kapsamı:
+- roles.sql, schema.sql ve data.sql ayrı üretilecek.
+- FILE-SIZES.txt ve SHA256SUMS.txt oluşturulacak.
+- İlk SHA-256 kontrolünden sonra PowerShell kapatılacak.
+- Yeni terminal oturumunda SHA-256 yeniden üretilecek ve iki sonuç karşılaştırılacak.
+- Backup BitLocker şifreli harici diske kopyalanacak.
+
+Media kapsamı:
+- novastore_products ve novastore_reviews inventory alınacak.
+- Tüm kritik product/review binary asset'leri export edilecek.
+- CLOUDINARY-SHA256SUMS.txt üretilecek.
+- frontend/uploads/local-products ayrıca kontrol edilecek.
+- Off-site kopyadan örnek media açılma/restore testi yapılacak.
+
+Restore:
+- Disposable local postgres:17 container kullanılacak.
+- Restore yalnız local hedefe yapılacak.
+- Restore verification ayrı checklist ve secretsiz raporla doğrulanacak.
+
+Kesin kapsam dışı:
+- Production migration yok.
+- Backfill yok.
+- Deploy yok.
+- Production data/schema write yok; yalnız logical dump için read erişimi.
+- Production cleanup, delete, truncate veya constraint değişikliği yok.
+
+Bir guard veya manuel onay eksikse hiçbir production bağlantısı kurmadan dur ve NO-GO raporla.
+```
+
+Tur 20A gerçek backup başlangıç kararı: **Kısmi GO / henüz başlatma**. BitLocker diskin fiziksel hazırlığı, kesin maintenance tarihi, Render panelinin gün-başı doğrulaması ve Process env'in operator tarafından güvenli kurulumu tamamlanmadan production bağlantısı kurulmaz.
 
 ## 6. Production preflight SQL
 
@@ -685,9 +757,11 @@ API ve UI:
 | Alan | Risk | Şiddet | Production blocker mı? | Önerilen çözüm | Tur |
 |---|---|---:|---|---|---|
 | Production DB | Doğrulanmış backup ve restore testi yok | Kritik | Evet | Parametrik logical dump, size/checksum manifest ve ayrı hedefte restore testi | Tur 20A |
+| Operasyon yönetişimi | İkinci doğrulayıcı yok; operator ve tüm approver rolleri aynı kişide | Yüksek | Migration/backfill için evet | İki terminal oturumunda SHA-256, ayrı restore checklist, açık risk kabulü ve mümkünse ikinci kişi | Tur 20A/20B |
+| Off-site backup | BitLocker harici disk seçildi ancak fiziksel hazırlık henüz doğrulanmadı | Yüksek | Evet | Backup gününde disk, BitLocker durumu, boş alan ve örnek okuma kontrolü | Tur 20A |
 | Production data gate | Production preflight ve category dry-run yapılmadı | Kritik | Evet | Gate A/B artifact'ları ve onaylı dry-run | Tur 20B |
 | Category backfill | Production-safe category backfill runner yok | Kritik | Evet | Explicit target/URL, default dry-run, iki kişi onayı, advisory lock ve secretsiz rapor | Tur 20B |
-| Cloudinary/media | Cloudinary inventory ve kritik binary media backup uygulanmadı | Yüksek | Evet, medya kaybı kabul edilemiyorsa | Cloudinary inventory, kritik asset export, SHA-256 manifest, şifreli off-site kopya ve örnek restore | Tur 20A-media / 20A.7 |
+| Cloudinary/media | Tüm product/review binary kapsamı seçildi ancak inventory ve export uygulanmadı | Yüksek | Evet, medya kaybı kabul edilemiyorsa | Cloudinary inventory, tam product/review export, SHA-256 manifest, BitLocker off-site kopya ve örnek restore | Tur 20A-media |
 | Admin support schema | Admin support migration'ları production'da uygulanmadı | Yüksek | Evet | Üç additive migration, inventory ve authenticated GET smoke | Tur 20B/20C |
 | Staging güvenliği | Paylaşılan admin test parolası ve geçici admin role | Yüksek | Evet, operasyonel | Parola rotasyonu; gerekmiyorsa role düşürme veya hesabı devre dışı bırakma | Tur 19G |
 | Android | Final unit test, assemble ve APK runtime smoke tekrarlanmadı | Yüksek | Evet | Production base URL/config ile final Android gate | Tur 20C |
