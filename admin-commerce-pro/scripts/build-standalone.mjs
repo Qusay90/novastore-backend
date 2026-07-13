@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createSourceFingerprint, fontNames, imageNames } from "./source-fingerprint.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = path.join(root, "dist");
@@ -37,28 +37,10 @@ let [javascript, css, icons] = await Promise.all([
   readFile(path.join(root, "public", "icons.js"), "utf8"),
 ]);
 
-const imageNames = [
-  "category-home.webp",
-  "phone-iphone.webp",
-  "phone-samsung.webp",
-  "product-bedding.webp",
-  "product-headphones.webp",
-  "product-laptop.webp",
-  "product-vacuum.webp",
-  "product-watch.webp",
-];
-
 for (const name of imageNames) {
   const dataUrl = await encode(path.join(assets, name), "image/webp");
   javascript = javascript.replaceAll(`/assets/${name}`, dataUrl);
 }
-
-const fontNames = [
-  "inter-latin-ext-400-normal.woff2",
-  "inter-latin-ext-600-normal.woff2",
-  "inter-latin-ext-700-normal.woff2",
-  "inter-latin-ext-800-normal.woff2",
-];
 
 for (const name of fontNames) {
   const dataUrl = await encode(path.join(assets, "fonts", name), "font/woff2");
@@ -74,26 +56,14 @@ if (unresolved.length > 0) {
   throw new Error(`Standalone içinde çözümlenmemiş asset kaldı: ${[...new Set(unresolved)].join(", ")}`);
 }
 
-const fingerprintFiles = [
-  "index.html",
-  "package.json",
-  "package-lock.json",
-  "vite.config.mjs",
-  "scripts/build-standalone.mjs",
-  "src/App.jsx",
-  "src/main.jsx",
-  "src/styles.css",
-  "public/icons.js",
-  "public/favicon-96x96.png",
-  ...imageNames.map((name) => `public/assets/${name}`),
-  ...fontNames.map((name) => `public/assets/fonts/${name}`),
-];
-const fingerprint = createHash("sha256");
-for (const relativePath of fingerprintFiles) {
-  fingerprint.update(relativePath);
-  fingerprint.update(await readFile(path.join(root, relativePath)));
+const [{ value: sourceFingerprint }, builtFingerprint] = await Promise.all([
+  createSourceFingerprint(root),
+  readFile(path.join(dist, ".source-fingerprint"), "utf8").catch(() => ""),
+]);
+
+if (builtFingerprint.trim() !== sourceFingerprint) {
+  throw new Error("Vite çıktısı güncel kaynak parmak iziyle eşleşmiyor. Önce `npm run build` çalıştırılmalıdır.");
 }
-const sourceFingerprint = fingerprint.digest("hex");
 
 const safeIcons = icons.replaceAll("</script", "<\\/script");
 const safeJavascript = javascript.replaceAll("</script", "<\\/script");
@@ -107,6 +77,7 @@ const html = `<!doctype html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#031d39" />
     <meta name="robots" content="noindex,nofollow,noarchive" />
+    <meta http-equiv="Content-Security-Policy" content="connect-src 'none'" />
     <meta name="description" content="NovaStore çok satıcılı yönetim konsolu etkileşimli önizlemesi" />
     <link rel="icon" type="image/png" href="${favicon}" />
     <meta name="novastore-source-fingerprint" content="${sourceFingerprint}" />

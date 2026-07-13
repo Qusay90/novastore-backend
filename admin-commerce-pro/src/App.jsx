@@ -1,15 +1,71 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
+import {
+  analyticsPeriods,
+  auditRecords,
+  buildCsv,
+  categoryPreviewRows,
+  customerRecords,
+  filterTemplateRows,
+  initialWorkspaceSettings,
+  matchesQuery,
+  matchesStore,
+  moduleRecords,
+  notificationRows,
+  orderRecords,
+  paginateRows,
+  productFromDraft,
+  productRecords,
+  markNotificationsRead,
+  returnRows,
+  roleLayoutSeed,
+  sellerApplicationRecords,
+  sellerOrderRows,
+  setCustomerSegment,
+  setOrderOwner,
+  setOrderStatuses,
+  setSellerDecision,
+  settlementRecords,
+  stockRiskRows,
+  toggleModuleAvailability,
+  validateProductDraft,
+} from "./previewModel.js";
 
 const money = (value) => new Intl.NumberFormat("tr-TR", {
-  style: "currency", currency: "TRY", maximumFractionDigits: 0,
+  style: "currency",
+  currency: "TRY",
+  maximumFractionDigits: 0,
 }).format(value);
 
 const nextOrderStatus = {
   Yeni: "Hazırlanıyor",
   Hazırlanıyor: "Kargoya Verildi",
   "Kargoya Verildi": "Teslim Edildi",
+};
+
+const dateProfiles = {
+  "7 Tem 2026 – 13 Tem 2026": {
+    scale: 1,
+    revenue: "₺12,8 Mn",
+    orders: "6.842",
+    label: "Bu hafta",
+    days: ["7 Tem", "8 Tem", "9 Tem", "10 Tem", "11 Tem", "12 Tem", "13 Tem"],
+  },
+  "30 Haz 2026 – 6 Tem 2026": {
+    scale: 0.86,
+    revenue: "₺11,0 Mn",
+    orders: "5.908",
+    label: "Önceki hafta",
+    days: ["30 Haz", "1 Tem", "2 Tem", "3 Tem", "4 Tem", "5 Tem", "6 Tem"],
+  },
+  "Son 30 gün": {
+    scale: 4.18,
+    revenue: "₺53,7 Mn",
+    orders: "28.604",
+    label: "Son 30 gün",
+    days: ["14 Haz", "19 Haz", "24 Haz", "29 Haz", "4 Tem", "9 Tem", "13 Tem"],
+  },
 };
 
 const revenueSeries = [
@@ -21,11 +77,6 @@ const revenueSeries = [
   { day: "12 Tem", current: 1500000, previous: 1180000 },
   { day: "13 Tem", current: 2000000, previous: 1310000 },
 ];
-
-function Icon({ name, className = "icon" }) {
-  const markup = window.NovaIcons?.icon?.(name, className) || "";
-  return <span className="icon-wrap" aria-hidden="true" dangerouslySetInnerHTML={{ __html: markup }} />;
-}
 
 const domains = [
   { id: "dashboard", label: "Pano", icon: "house" },
@@ -41,94 +92,187 @@ const domains = [
 ];
 
 const contextByDomain = {
-  dashboard: [["Genel Bakış", ""], ["Bugünkü Öncelikler", "12"], ["Mağaza Sağlığı", ""], ["Ekip Aktivitesi", ""]],
-  operations: [
-    ["Bugün", "12"], ["Siparişler", "28"], ["İadeler", "7"], ["Müşteri Soruları", "9"],
+  dashboard: [
+    { label: "Genel Bakış" },
+    { label: "Bugünkü Öncelikler", count: "12", route: "operations", routeItem: "Bugün" },
+    { label: "Mağaza Sağlığı" },
+    { label: "Ekip Aktivitesi", route: "audit" },
   ],
-  catalog: [["Tüm Ürünler", "2.416"], ["Onay Bekleyen", "18"], ["Kategoriler", "42"], ["Filtre Şablonları", "12"]],
-  customers: [["Tüm Müşteriler", "86B"], ["Segmentler", "8"], ["Müşteri Soruları", "9"], ["İade Davranışı", ""]],
-  sellers: [["Satıcı Başvuruları", "7"], ["Aktif Satıcılar", "24"], ["Ürün Onayları", "18"], ["Performans", ""]],
-  finance: [["Genel Bakış", ""], ["Hakedişler", "14"], ["Komisyonlar", ""], ["Mutabakat", "3"]],
-  reports: [["Satış Raporları", ""], ["Dönüşüm", ""], ["Ürün İçgörüleri", ""], ["Müşteri Davranışı", ""]],
-  modules: [["Modül Merkezi", ""], ["Etkin Modüller", "8"], ["Rol Düzenleri", "3"]],
-  audit: [["İşlem Geçmişi", ""], ["Güvenlik", ""], ["Dışa Aktarımlar", ""]],
-  settings: [["Genel", ""], ["Ekip ve Roller", "12"], ["Bildirimler", ""], ["Entegrasyonlar", "4"]],
+  operations: [
+    { label: "Bugün", count: "12" },
+    { label: "Siparişler", count: "28" },
+    { label: "İadeler", count: "3" },
+    { label: "Müşteri Soruları", disabled: true },
+  ],
+  catalog: [
+    { label: "Tüm Ürünler", count: "5" },
+    { label: "Onay Bekleyen", count: "1" },
+    { label: "Kategoriler", count: "5" },
+    { label: "Filtre Şablonları", count: "3" },
+  ],
+  customers: [
+    { label: "Tüm Müşteriler", count: "5" },
+    { label: "Segmentler", count: "3" },
+    { label: "Müşteri Soruları", disabled: true },
+    { label: "İade Davranışı", disabled: true },
+  ],
+  sellers: [
+    { label: "Satıcı Başvuruları", count: "4" },
+    { label: "Aktif Satıcılar", disabled: true },
+    { label: "Ürün Onayları", route: "catalog", routeItem: "Onay Bekleyen", count: "1" },
+    { label: "Performans", disabled: true },
+  ],
+  finance: [
+    { label: "Genel Bakış", disabled: true },
+    { label: "Hakedişler", count: "4" },
+    { label: "Komisyonlar", disabled: true },
+    { label: "Mutabakat", disabled: true },
+  ],
+  reports: [
+    { label: "Satış Raporları" },
+    { label: "Dönüşüm", disabled: true },
+    { label: "Ürün İçgörüleri", disabled: true },
+    { label: "Müşteri Davranışı", disabled: true },
+  ],
+  modules: [
+    { label: "Modül Merkezi" },
+    { label: "Etkin Modüller", count: "4" },
+    { label: "Rol Düzenleri", count: "3" },
+  ],
+  audit: [
+    { label: "İşlem Geçmişi" },
+    { label: "Güvenlik", disabled: true },
+    { label: "Dışa Aktarımlar" },
+  ],
+  settings: [
+    { label: "Genel" },
+    { label: "Ekip ve Roller", disabled: true },
+    { label: "Bildirimler" },
+    { label: "Entegrasyonlar", disabled: true },
+  ],
 };
 
-const initialOrders = [
-  { id: "NS-10482", seller: "TeknoPark Mağazası", customer: "Seda Arslan", product: "Apple iPhone 15 128 GB", channel: "Web", amount: 51999, status: "Hazırlanıyor", age: "1 sa 18 dk", owner: "Mehmet A.", image: "/assets/phone-iphone.webp" },
-  { id: "NS-10483", seller: "NovaStore", customer: "Ahmet Demir", product: "NovaTech AeroBook 14", channel: "Web", amount: 18999, status: "Kargoya Verildi", age: "1 sa 07 dk", owner: "Ece T.", image: "/assets/product-laptop.webp" },
-  { id: "NS-10481", seller: "Eviva Home", customer: "Mustafa Çelik", product: "NovaHome S10 Robot Süpürge", channel: "Hepsiburada", amount: 7999, status: "Yeni", age: "1 sa 35 dk", owner: "Ece T.", image: "/assets/product-vacuum.webp" },
-  { id: "NS-10480", seller: "TeknoPark", customer: "Elif Nazlı", product: "Samsung Galaxy S24 256 GB", channel: "Trendyol", amount: 38999, status: "Kargoya Verildi", age: "1 sa 52 dk", owner: "Mehmet A.", image: "/assets/phone-samsung.webp" },
-  { id: "NS-10479", seller: "Eviva Home", customer: "Burak Güneş", product: "NovaSound Bar 600", channel: "Web", amount: 4999, status: "Teslim Edildi", age: "2 sa 11 dk", owner: "Ece T.", image: "/assets/product-headphones.webp" },
-  { id: "NS-10478", seller: "NovaStore", customer: "Gamze İnce", product: "Nova Cook Airfryer 5.5L", channel: "Mobil", amount: 2899, status: "Hazırlanıyor", age: "2 sa 37 dk", owner: "Mehmet A.", image: "/assets/category-home.webp" },
-  { id: "NS-10477", seller: "TeknoPark", customer: "Buse Yıldız", product: "Logitech MX Master 3S", channel: "Web", amount: 2199, status: "Yeni", age: "3 sa 05 dk", owner: "Ece T.", image: "/assets/product-laptop.webp" },
+const savedViewSeed = [
+  { name: "Tüm siparişler", status: "Tümü", query: "", scope: "Operasyon ekibi" },
+  { name: "Yeni siparişler", status: "Yeni", query: "", scope: "Yalnızca ben" },
+  { name: "Hazırlanan siparişler", status: "Hazırlanıyor", query: "", scope: "Tüm yöneticiler" },
 ];
 
-const products = [
-  { sku: "NVS-IP15-128", name: "Apple iPhone 15 128 GB", seller: "TeknoPark", category: "Cep Telefonu", stock: 42, price: 51999, status: "Yayında", image: "/assets/phone-iphone.webp" },
-  { sku: "NVS-AB14-512", name: "NovaTech AeroBook 14", seller: "NovaStore", category: "Dizüstü Bilgisayar", stock: 18, price: 18999, status: "Yayında", image: "/assets/product-laptop.webp" },
-  { sku: "NVS-S10-RBT", name: "NovaHome S10 Robot Süpürge", seller: "Eviva Home", category: "Elektrikli Ev Aleti", stock: 7, price: 7999, status: "Düşük stok", image: "/assets/product-vacuum.webp" },
-  { sku: "NVS-WCH-02", name: "Smartix Watch 2", seller: "TeknoPark", category: "Akıllı Saat", stock: 0, price: 3499, status: "Stokta yok", image: "/assets/product-watch.webp" },
-  { sku: "NVS-BDS-04", name: "Soft Touch Nevresim Seti", seller: "Eviva Home", category: "Ev Tekstili", stock: 84, price: 1299, status: "Onay bekliyor", image: "/assets/product-bedding.webp" },
-];
+const roleSeed = roleLayoutSeed.map((role, index) => ({
+  ...role,
+  moduleIds: index === 0
+    ? moduleRecords.map((item) => item.id)
+    : index === 1
+      ? ["catalog-health", "seller-approvals", "customer-voice", "conversion-lab"]
+      : ["settlement-radar", "conversion-lab", "live-orders"],
+}));
 
-const sellerApplications = [
-  { id: "SLR-208", name: "Dora Kozmetik", owner: "Derya Aydın", category: "Kozmetik", products: 126, commission: "%14", risk: "Düşük", status: "İncelemede" },
-  { id: "SLR-207", name: "Atlas Outdoor", owner: "Can Öztürk", category: "Spor & Outdoor", products: 84, commission: "%12", risk: "Düşük", status: "Belge bekleniyor" },
-  { id: "SLR-206", name: "Minika Dünyası", owner: "Selin Kaya", category: "Anne & Çocuk", products: 218, commission: "%16", risk: "Orta", status: "İncelemede" },
-  { id: "SLR-205", name: "MobilPlus", owner: "Okan Şen", category: "Elektronik", products: 342, commission: "%10", risk: "Yüksek", status: "İncelemede" },
-];
+const focusableSelector = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
 
-const settlements = [
-  { id: "HKD-0726", seller: "TeknoPark", period: "01–07 Tem 2026", gross: 482140, commission: 48214, returns: 12490, net: 421436, status: "Ödemeye hazır" },
-  { id: "HKD-0725", seller: "Eviva Home", period: "01–07 Tem 2026", gross: 214890, commission: 30085, returns: 7999, net: 176806, status: "Kontrol ediliyor" },
-  { id: "HKD-0724", seller: "Dora Kozmetik", period: "01–07 Tem 2026", gross: 118420, commission: 16579, returns: 2840, net: 99001, status: "Blokeli" },
-  { id: "HKD-0719", seller: "Atlas Outdoor", period: "24–30 Haz 2026", gross: 97220, commission: 11666, returns: 0, net: 85554, status: "Ödendi" },
-];
+function handleFocusTrap(event, container, onEscape) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    onEscape();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = Array.from(container.querySelectorAll(focusableSelector))
+    .filter((node) => !node.hidden && node.getAttribute("aria-hidden") !== "true" && node.getClientRects().length > 0);
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (document.activeElement === container) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+  } else if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
 
-const auditRows = [
-  ["10:24", "Mehmet Akın", "Sipariş durumunu güncelledi", "NS-10482 · Hazırlanıyor", "Web"],
-  ["10:18", "Ece Tan", "Satıcı başvurusunu inceledi", "SLR-208 · Dora Kozmetik", "Web"],
-  ["09:56", "Sistem", "Hakediş raporu oluşturdu", "HKD-0726 · TeknoPark", "Otomasyon"],
-  ["09:41", "Ayşe Kara", "Ürün yayına alındı", "NVS-IP15-128", "Web"],
-  ["09:12", "Sistem", "Sipariş oluşturuldu", "NS-10482", "API"],
-];
+function downloadCsv(filename, columns, rows) {
+  const blob = new Blob([buildCsv(columns, rows)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
 
-const moduleCatalog = [
-  { id: "live-orders", name: "Canlı Sipariş Akışı", description: "Sipariş SLA ve sahiplik takibi", version: "v2.4.1", dependency: "Sipariş çekirdeği", health: "Sağlıklı", enabled: true },
-  { id: "seller-approvals", name: "Satıcı Onayları", description: "Yeni başvuru ve belge kontrolü", version: "v1.8.0", dependency: "KYC ve roller", health: "Sağlıklı", enabled: true },
-  { id: "catalog-health", name: "Katalog Sağlığı", description: "Stok, medya ve içerik tamlığı", version: "v3.1.2", dependency: "Kanonik katalog", health: "Sağlıklı", enabled: true },
-  { id: "settlement-radar", name: "Hakediş Radarı", description: "Ödeme ve mutabakat riskleri", version: "v1.6.4", dependency: "Finansal ledger", health: "Sağlıklı", enabled: true },
-  { id: "customer-voice", name: "Müşteri Sesi", description: "Soru, iade ve memnuniyet özeti", version: "v1.2.0", dependency: "Müşteriler", health: "Hazır", enabled: false },
-  { id: "conversion-lab", name: "Dönüşüm Laboratuvarı", description: "Ürün bazlı davranış içgörüleri", version: "v2.0.3", dependency: "Raporlar", health: "Hazır", enabled: false },
-];
+function Icon({ name, className = "icon" }) {
+  const markup = window.NovaIcons?.icon?.(name, className) || "";
+  return (
+    <span
+      className="icon-wrap"
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: markup }}
+    />
+  );
+}
 
-const initialSettings = {
-  name: "NovaStore Pazaryeri",
-  email: "operasyon@novastore.tr",
-  timezone: "Europe/İstanbul",
-  approval: true,
-  settlement: true,
-  digest: false,
-};
-
-function Modal({ title, children, onClose, wide = false, testId }) {
+function Modal({ title, children, onClose, wide = false, testId, cardClass = "" }) {
   const ref = useRef(null);
+  const triggerRef = useRef(null);
   const titleId = useId();
+
   useEffect(() => {
     const node = ref.current;
-    if (!node) return;
-    node.showModal();
-    requestAnimationFrame(() => {
-      const preferred = node.querySelector("[data-autofocus], .command-input input, .modal-form input, .modal-form select, .quick-grid button, .modal-actions button");
+    if (!node) return undefined;
+    triggerRef.current = document.activeElement;
+    if (!node.open) node.showModal();
+    const frame = requestAnimationFrame(() => {
+      const preferred = node.querySelector(
+        "[data-autofocus], .command-input input, .modal-form input, .modal-form select, .quick-grid button, .modal-actions button",
+      );
       (preferred || node.querySelector("button"))?.focus();
     });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (node.open) node.close();
+      requestAnimationFrame(() => triggerRef.current?.focus?.());
+    };
   }, []);
+
   return (
-    <dialog ref={ref} className={`modal ${wide ? "modal-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} data-testid={testId} onCancel={(e) => { e.preventDefault(); onClose(); }} onClick={(e) => { if (e.target === ref.current) onClose(); }}>
-      <div className="modal-card" role="document">
-        <header className="modal-header"><div><span className="eyebrow">NovaStore Yönetim</span><h2 id={titleId}>{title}</h2></div><button className="icon-button" onClick={onClose} aria-label="Pencereyi kapat"><Icon name="close" /></button></header>
+    <dialog
+      ref={ref}
+      className={"modal " + (wide ? "modal-wide" : "")}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      data-testid={testId}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === ref.current) onClose();
+      }}
+      onKeyDown={(event) => handleFocusTrap(event, ref.current, onClose)}
+    >
+      <div className={("modal-card " + cardClass).trim()} role="document">
+        <header className="modal-header">
+          <div>
+            <span className="eyebrow">NovaStore Yönetim · yerel önizleme</span>
+            <h2 id={titleId}>{title}</h2>
+          </div>
+          <button className="icon-button" onClick={onClose} aria-label="Pencereyi kapat">
+            <Icon name="close" />
+          </button>
+        </header>
         {children}
       </div>
     </dialog>
@@ -136,24 +280,57 @@ function Modal({ title, children, onClose, wide = false, testId }) {
 }
 
 function Status({ children }) {
-  const key = String(children).toLocaleLowerCase("tr-TR").replaceAll("\u0307", "").replaceAll(" ", "-");
-  return <span className={`status status-${key}`}>{children}</span>;
+  const key = String(children)
+    .toLocaleLowerCase("tr-TR")
+    .replaceAll("\u0307", "")
+    .replaceAll(" ", "-");
+  return <span className={"status status-" + key}>{children}</span>;
 }
 
 function Kpi({ label, value, trend, tone = "positive" }) {
-  return <article className="kpi-card"><span>{label}</span><strong>{value}</strong><small className={tone}>{trend}</small></article>;
+  return (
+    <article className="kpi-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small className={tone}>{trend}</small>
+    </article>
+  );
+}
+
+function EmptyState({ title = "Kayıt bulunamadı", description, onReset }) {
+  return (
+    <div className="empty-state" role="status">
+      <Icon name="search" />
+      <h3>{title}</h3>
+      <p>{description || "Filtreleri değiştirip yeniden deneyin."}</p>
+      {onReset && <button className="secondary-button small" onClick={onReset}>Filtreleri temizle</button>}
+    </div>
+  );
+}
+
+function EmptyTable({ colSpan, title, description, onReset }) {
+  return (
+    <tr>
+      <td colSpan={colSpan}>
+        <EmptyState title={title} description={description} onReset={onReset} />
+      </td>
+    </tr>
+  );
 }
 
 function PreviewBanner() {
-  return <div className="preview-banner" role="note" data-testid="preview-banner">
-    <Icon name="info" />
-    <strong>Commerce Pro önizlemesi</strong>
-    <span>Örnek veriler kullanılır; hiçbir işlem kaydedilmez ve ödeme isteği gönderilmez.</span>
-  </div>;
+  return (
+    <div className="preview-banner" role="note" data-testid="preview-banner">
+      <Icon name="info" />
+      <strong>Commerce Pro önizlemesi</strong>
+      <span>Örnek veriler kullanılır; hiçbir işlem kaydedilmez ve ödeme isteği gönderilmez.</span>
+    </div>
+  );
 }
 
-function RevenueChart() {
+function RevenueChart({ scale = 1, labels = dateProfiles["7 Tem 2026 – 13 Tem 2026"].days }) {
   const mountRef = useRef(null);
+
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return undefined;
@@ -161,24 +338,39 @@ function RevenueChart() {
       width: Math.max(1, Math.floor(mount.clientWidth || 640)),
       height: 142,
       padding: [8, 10, 0, 0],
-      scales: { x: { time: false }, y: { range: [0, 2200000] } },
+      scales: { x: { time: false }, y: { range: [0, 2200000 * scale] } },
       axes: [
-        { stroke: "#69798e", grid: { show: false }, ticks: { show: false }, font: "10px Inter", size: 24, values: (_chart, values) => values.map((value) => revenueSeries[Math.round(value)]?.day || "") },
-        { stroke: "#69798e", grid: { stroke: "#dfe5ec", width: 1 }, ticks: { show: false }, font: "10px Inter", size: 42, values: (_chart, values) => values.map((value) => `${String(value / 1000000).replace(".", ",")}M`) },
+        {
+          stroke: "#53657a",
+          grid: { show: false },
+          ticks: { show: false },
+          font: "11px Inter",
+          size: 24,
+          values: (_chart, values) => values.map((value) => labels[Math.round(value)] || ""),
+        },
+        {
+          stroke: "#53657a",
+          grid: { stroke: "#dfe5ec", width: 1 },
+          ticks: { show: false },
+          font: "11px Inter",
+          size: 48,
+          values: (_chart, values) => values.map((value) => String((value / 1000000).toFixed(1)).replace(".", ",") + "M"),
+        },
       ],
       series: [
         {},
         { label: "Bu dönem", stroke: "#d95a1a", width: 3, points: { show: true, size: 6, width: 2, stroke: "#d95a1a", fill: "#fff" } },
-        { label: "Önceki dönem", stroke: "#91a0b2", width: 2, dash: [8, 7], points: { show: false } },
+        { label: "Önceki dönem", stroke: "#64758a", width: 2, dash: [8, 7], points: { show: false } },
       ],
       legend: { show: false },
       cursor: { show: false },
       select: { show: false },
     }, [
       revenueSeries.map((_item, index) => index),
-      revenueSeries.map((item) => item.current),
-      revenueSeries.map((item) => item.previous),
+      revenueSeries.map((item) => Math.round(item.current * scale)),
+      revenueSeries.map((item) => Math.round(item.previous * scale)),
     ], mount);
+
     const resize = () => {
       const width = Math.floor(mount.clientWidth);
       if (width > 0) chart.setSize({ width, height: 142 });
@@ -191,183 +383,1469 @@ function RevenueChart() {
       window.removeEventListener("resize", resize);
       chart.destroy();
     };
-  }, []);
-  return <div className="revenue-chart" role="img" aria-label="Son yedi gün net ciro eğilimi. Bu dönem 410 bin liradan 2 milyon liraya yükselmiştir; önceki dönem kesikli çizgiyle gösterilir."><div ref={mountRef} aria-hidden="true" /> <ul className="sr-only">{revenueSeries.map((item) => <li key={item.day}>{item.day}: bu dönem {money(item.current)}, önceki dönem {money(item.previous)}</li>)}</ul></div>;
+  }, [labels, scale]);
+
+  return (
+    <>
+      <div
+        className="revenue-chart"
+        role="img"
+        aria-label="Seçili dönemin net ciro eğilimi; turuncu çizgi bu dönemi, kesikli çizgi önceki dönemi gösterir."
+      >
+        <div ref={mountRef} aria-hidden="true" />
+      </div>
+      <ul className="sr-only">
+        {revenueSeries.map((item, index) => (
+          <li key={labels[index]}>
+            {labels[index]}: bu dönem {money(item.current * scale)}, önceki dönem {money(item.previous * scale)}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
 }
 
-function AppHeader({ title, section, contextOpen, onToggleContext, contextToggleRef, onCommand, onQuickCreate, onNotify, toast }) {
-  return <>
-    <header className="topbar">
-      <div className="topbar-leading"><button ref={contextToggleRef} className="icon-button rail-toggle" onClick={onToggleContext} aria-label={contextOpen ? "Bağlamsal menüyü daralt" : "Bağlamsal menüyü aç"} aria-expanded={contextOpen} aria-controls="context-navigation"><Icon name={contextOpen ? "back" : "menu"} /></button><div className="breadcrumb"><span>Çalışma Alanları</span><Icon name="right" />{section && <><span>{section}</span><Icon name="right" /></>}<strong>{title}</strong></div></div>
-      <button className="command-trigger" onClick={onCommand} aria-label="Komut paletini aç" data-testid="command-open"><Icon name="search" /><span>Ara veya komut çalıştır…</span><kbd>⌘ K</kbd></button>
-      <label className="date-select"><span className="sr-only">Tarih aralığı</span><Icon name="calendar" /><select aria-label="Tarih aralığı" defaultValue="7 Tem 2026 – 13 Tem 2026" onChange={(event) => onNotify(`“${event.target.value}” örnek tarih aralığı seçildi.`)}><option>7 Tem 2026 – 13 Tem 2026</option><option>30 Haz 2026 – 6 Tem 2026</option><option>Son 30 gün</option></select></label>
-      <button className="icon-button notification-button" aria-label="Örnek bildirimleri göster" onClick={() => onNotify("8 örnek bildirim bulunuyor; canlı bildirim bağlantısı bu önizlemede kapalıdır.")}><Icon name="bell" /><span className="notification-dot">8</span></button>
-      <button className="profile-button" onClick={() => onNotify("Profil ve rol yönetimi sonraki API entegrasyon turuna hazırdır.")}><span className="avatar avatar-small">AK</span><span>Operasyon Yöneticisi</span><Icon name="sort" /></button>
-      <button className="primary-button quick-create" onClick={onQuickCreate}><Icon name="plus" />Hızlı oluştur</button>
-    </header>
-    {toast && <div className="toast" role="status" style={{ pointerEvents: "none" }}>{toast}</div>}
-  </>;
+function AppHeader({
+  title,
+  section,
+  contextOpen,
+  onToggleContext,
+  contextToggleRef,
+  onCommand,
+  onQuickCreate,
+  onNotifications,
+  onProfile,
+  notifications,
+  dateRange,
+  setDateRange,
+  showDate,
+  toast,
+  clearToast,
+}) {
+  const unread = notifications.filter((item) => !item.read).length;
+  return (
+    <>
+      <header className="topbar">
+        <div className="topbar-leading">
+          <button
+            ref={contextToggleRef}
+            className="icon-button rail-toggle"
+            onClick={onToggleContext}
+            aria-label={contextOpen ? "Bağlamsal menüyü daralt" : "Bağlamsal menüyü aç"}
+            aria-expanded={contextOpen}
+            aria-controls="context-navigation"
+          >
+            <Icon name={contextOpen ? "back" : "menu"} />
+          </button>
+          <div className="breadcrumb">
+            <span>Çalışma Alanları</span>
+            <Icon name="right" />
+            {section && (
+              <>
+                <span>{section}</span>
+                <Icon name="right" />
+              </>
+            )}
+            <strong>{title}</strong>
+          </div>
+        </div>
+        <button
+          className="command-trigger"
+          onClick={onCommand}
+          aria-label="Komut paletini aç"
+          data-testid="command-open"
+        >
+          <Icon name="search" />
+          <span>Ara veya komut çalıştır…</span>
+          <kbd>⌘ K</kbd>
+        </button>
+        {showDate && <label className="date-select">
+          <span className="sr-only">Tarih aralığı</span>
+          <Icon name="calendar" />
+          <select aria-label="Tarih aralığı" value={dateRange} onChange={(event) => setDateRange(event.target.value)}>
+            {Object.keys(dateProfiles).map((item) => <option key={item}>{item}</option>)}
+          </select>
+        </label>}
+        <button
+          className="icon-button notification-button"
+          aria-label={unread + " okunmamış örnek bildirimi göster"}
+          onClick={onNotifications}
+        >
+          <Icon name="bell" />
+          {unread > 0 && <span className="notification-dot">{unread}</span>}
+        </button>
+        <button className="profile-button" onClick={onProfile}>
+          <span className="avatar avatar-small">AK</span>
+          <span>Operasyon Yöneticisi</span>
+          <Icon name="sort" />
+        </button>
+        <button className="primary-button quick-create" onClick={onQuickCreate}>
+          <Icon name="plus" />
+          Hızlı oluştur
+        </button>
+      </header>
+      {toast && (
+        <div className="toast" role="status">
+          <span>{toast}</span>
+          <button onClick={clearToast} aria-label="Bildirimi kapat"><Icon name="close" /></button>
+        </div>
+      )}
+    </>
+  );
 }
 
-function IconRail({ active, setActive }) {
-  return <nav className="icon-rail" aria-label="Ana çalışma alanları" data-testid="admin-sidebar">
-    <div className="rail-logo" aria-label="NovaStore"><span className="nova-mark"><Icon name="star" /></span><span>NovaStore</span></div>
-    <div className="rail-nav">
-      <button className={active === "dashboard" ? "active" : ""} aria-current={active === "dashboard" ? "page" : undefined} aria-label="Pano" title="Pano" onClick={() => setActive("dashboard")} data-testid="nav-dashboard"><Icon name="house" /></button>
-      <button className={active === "operations" ? "active" : ""} aria-current={active === "operations" ? "page" : undefined} aria-label="Siparişler" title="Siparişler" onClick={() => setActive("operations")} data-testid="nav-orders"><Icon name="orders" /></button>
-      <button className={active === "catalog" ? "active" : ""} aria-current={active === "catalog" ? "page" : undefined} aria-label="Ürünler" title="Ürünler" onClick={() => setActive("catalog")} data-testid="nav-products"><Icon name="package" /></button>
-      <button className={active === "customers" ? "active" : ""} aria-current={active === "customers" ? "page" : undefined} aria-label="Müşteriler" title="Müşteriler" onClick={() => setActive("customers")} data-testid="nav-customers"><Icon name="user" /></button>
-      <button className={active === "sellers" ? "active" : ""} aria-current={active === "sellers" ? "page" : undefined} aria-label="Satıcılar" title="Satıcılar" onClick={() => setActive("sellers")} data-testid="nav-sellers"><Icon name="storefront" /></button>
-      <button className={active === "finance" ? "active" : ""} aria-current={active === "finance" ? "page" : undefined} aria-label="Finans" title="Finans" onClick={() => setActive("finance")} data-testid="nav-finance"><Icon name="card" /></button>
-      <button className={active === "reports" ? "active" : ""} aria-current={active === "reports" ? "page" : undefined} aria-label="Raporlar" title="Raporlar" onClick={() => setActive("reports")} data-testid="nav-reports"><Icon name="chart" /></button>
-      <button className={active === "modules" ? "active" : ""} aria-current={active === "modules" ? "page" : undefined} aria-label="Modüller" title="Modüller" onClick={() => setActive("modules")} data-testid="nav-modules"><Icon name="grid" /></button>
-    </div>
-    <div className="rail-bottom"><button className={active === "audit" ? "active" : ""} aria-current={active === "audit" ? "page" : undefined} aria-label="Denetim" title="Denetim" onClick={() => setActive("audit")} data-testid="nav-audit"><Icon name="shield" /></button><button className={active === "settings" ? "active" : ""} aria-current={active === "settings" ? "page" : undefined} aria-label="Ayarlar" title="Ayarlar" onClick={() => setActive("settings")} data-testid="nav-settings"><Icon name="settings" /></button><span className="avatar">AK</span></div>
-  </nav>;
+function IconRail({ active, setActive, onProfile, inactive = false }) {
+  return (
+    <nav className="icon-rail" aria-label="Ana çalışma alanları" data-testid="admin-sidebar" inert={inactive ? true : undefined}>
+      <div className="rail-logo" aria-label="NovaStore">
+        <span className="nova-mark"><Icon name="star" /></span>
+        <span>NovaStore</span>
+      </div>
+      <div className="rail-nav">
+        {domains.slice(0, 8).map((item) => (
+          <button
+            key={item.id}
+            className={active === item.id ? "active" : ""}
+            aria-current={active === item.id ? "page" : undefined}
+            aria-label={item.label}
+            title={item.label}
+            onClick={() => setActive(item.id)}
+            data-testid={"nav-" + item.id}
+          >
+            <Icon name={item.icon} />
+          </button>
+        ))}
+      </div>
+      <div className="rail-bottom">
+        {domains.slice(8).map((item) => (
+          <button
+            key={item.id}
+            className={active === item.id ? "active" : ""}
+            aria-current={active === item.id ? "page" : undefined}
+            aria-label={item.label}
+            title={item.label}
+            onClick={() => setActive(item.id)}
+            data-testid={"nav-" + item.id}
+          >
+            <Icon name={item.icon} />
+          </button>
+        ))}
+        <button className="rail-profile" onClick={onProfile} aria-label="Profil ve rol önizlemesini aç" title="Profil">
+          <span className="avatar">AK</span>
+        </button>
+      </div>
+    </nav>
+  );
 }
 
-function ContextRail({ domain, open, savedViews, activeItem, onItem, onView, onSaveView, onNavigate, onClose, store, onStoreChange, panelRef }) {
+function ContextRail({
+  domain,
+  open,
+  mobile,
+  savedViews,
+  activeItem,
+  onItem,
+  onView,
+  onSaveView,
+  onNavigate,
+  onClose,
+  store,
+  onStoreChange,
+  dateRange,
+  onDateRangeChange,
+  panelRef,
+}) {
   if (!open) return null;
   const title = domains.find((item) => item.id === domain)?.label;
-  return <aside ref={panelRef} className="context-rail" id="context-navigation" data-testid="context-navigation" tabIndex="-1">
-    <div className="context-title"><h1>{title}</h1><Icon name="back" /></div>
-    <label className="context-store"><Icon name="storefront" /><select aria-label="Örnek kapsam" value={store} onChange={(event) => onStoreChange(event.target.value)}><option>Tüm Mağazalar · 24</option><option>NovaStore</option><option>TeknoPark · 2 mağaza</option><option>Eviva Home</option></select></label>
-    <nav className="context-nav" aria-label={`${title} bölümleri`}>{contextByDomain[domain].map(([label, count], index) => <button key={label} className={activeItem === label ? "active" : ""} aria-current={activeItem === label ? "page" : undefined} onClick={() => onItem(label)}><Icon name={index === 0 ? "house" : index === 1 ? "orders" : "right"} /><span>{label}</span>{count && <b>{count}</b>}</button>)}</nav>
-    {domain === "operations" && <section className="saved-views"><header><strong>Kaydedilmiş Görünümler</strong><button className="icon-button small" onClick={onSaveView} aria-label="Görünüm kaydet"><Icon name="plus" /></button></header>{savedViews.map((view) => <button key={view.name} onClick={() => onView(view)}><Icon name="bookmark" /><span>{view.name}</span></button>)}</section>}
-    {domain === "operations" && <section className="marketplace-links"><strong>Pazaryeri</strong><button onClick={() => onNavigate("sellers")}><Icon name="user" />Satıcı Başvuruları<b>7</b></button><button onClick={() => onNavigate("catalog")}><Icon name="package" />Ürün Onayları<b>18</b></button></section>}
-    <button className="collapse-caption" onClick={onClose}><Icon name="back" />Menüyü daralt</button>
-  </aside>;
+  const items = contextByDomain[domain] || [];
+
+  return (
+    <aside
+      ref={panelRef}
+      className="context-rail"
+      id="context-navigation"
+      data-testid="context-navigation"
+      tabIndex="-1"
+      role={mobile ? "dialog" : undefined}
+      aria-modal={mobile ? "true" : undefined}
+      aria-label={mobile ? title + " bağlamsal menüsü" : undefined}
+      onKeyDown={(event) => mobile && handleFocusTrap(event, panelRef.current, onClose)}
+    >
+      <div className="context-title">
+        <h1>{title}</h1>
+        <button className="icon-button small" onClick={onClose} aria-label="Bağlamsal menüyü kapat">
+          <Icon name="back" />
+        </button>
+      </div>
+      {["operations", "catalog", "finance"].includes(domain) && <label className="context-store">
+        <Icon name="storefront" />
+        <select aria-label="Örnek kapsam" value={store} onChange={(event) => onStoreChange(event.target.value)}>
+          <option>Tüm Mağazalar · 24</option>
+          <option>NovaStore</option>
+          <option>TeknoPark · 2 mağaza</option>
+          <option>Eviva Home</option>
+        </select>
+      </label>}
+      {["dashboard", "operations"].includes(domain) && <label className="context-store context-date">
+        <Icon name="calendar" />
+        <select aria-label="Bağlamsal tarih aralığı" value={dateRange} onChange={(event) => onDateRangeChange(event.target.value)}>
+          {Object.keys(dateProfiles).map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </label>}
+      <nav className="context-nav" aria-label={title + " bölümleri"}>
+        {items.map((item, index) => (
+          <button
+            key={item.label}
+            className={activeItem === item.label && !item.disabled ? "active" : ""}
+            aria-current={activeItem === item.label && !item.disabled ? "page" : undefined}
+            disabled={item.disabled}
+            title={item.disabled ? "Gerçek servis entegrasyonunda etkinleşecek" : undefined}
+            onClick={() => onItem(item)}
+          >
+            <Icon name={index === 0 ? "house" : index === 1 ? "orders" : "right"} />
+            <span>{item.label}</span>
+            {item.disabled ? <b className="integration-badge">Entegrasyonda</b> : item.count && <b>{item.count}</b>}
+          </button>
+        ))}
+      </nav>
+      {domain === "operations" && (
+        <section className="saved-views">
+          <header>
+            <strong>Kaydedilmiş Görünümler</strong>
+            <button className="icon-button small" onClick={onSaveView} aria-label="Görünüm kaydet">
+              <Icon name="plus" />
+            </button>
+          </header>
+          {savedViews.map((view) => (
+            <button key={view.name} onClick={() => onView(view)}>
+              <Icon name="bookmark" />
+              <span>{view.name}</span>
+            </button>
+          ))}
+        </section>
+      )}
+      {domain === "operations" && (
+        <section className="marketplace-links">
+          <strong>Pazaryeri</strong>
+          <button onClick={() => onNavigate("sellers", "Satıcı Başvuruları")}>
+            <Icon name="user" />
+            Satıcı Başvuruları
+            <b>4</b>
+          </button>
+          <button onClick={() => onNavigate("catalog", "Onay Bekleyen")}>
+            <Icon name="package" />
+            Ürün Onayları
+            <b>1</b>
+          </button>
+        </section>
+      )}
+      <button className="collapse-caption" onClick={onClose}>
+        <Icon name="back" />
+        Menüyü daralt
+      </button>
+    </aside>
+  );
 }
 
-function Operations({ orders, setOrders, selected, setSelected, currentId, setCurrentId, filter, setFilter, tab, setTab, editingLayout, setEditingLayout, savedViews, activeView, onCustomFilter, onApplyView, onSaveView, store, setStore, notify }) {
+function OperationsPreviewTable({ tab, store }) {
+  if (tab === "seller-orders") {
+    const rows = sellerOrderRows.filter((row) => matchesStore(row, store));
+    return (
+      <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Satıcı siparişleri tablosu, yatay kaydırılabilir">
+        <table className="data-table">
+          <caption className="sr-only">Örnek satıcı siparişleri</caption>
+          <thead><tr><th scope="col">Satıcı siparişi</th><th scope="col">Ana sipariş</th><th scope="col">Satıcı</th><th scope="col">Ürün</th><th scope="col">Tutar</th><th scope="col">Kargo</th><th scope="col">Durum</th></tr></thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td><strong>{row.id}</strong></td><td>{row.parent}</td><td>{row.seller}</td><td>{row.item}</td>
+                <td>{money(row.amount)}</td><td>{row.shipping}</td><td><Status>{row.status}</Status></td>
+              </tr>
+            ))}
+            {rows.length === 0 && <EmptyTable colSpan={7} title="Bu kapsamda satıcı siparişi yok" />}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+  if (tab === "returns") {
+    const rows = returnRows.filter((row) => matchesStore(row, store));
+    return (
+      <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="İadeler tablosu, yatay kaydırılabilir">
+        <table className="data-table">
+          <caption className="sr-only">Örnek iade talepleri</caption>
+          <thead><tr><th scope="col">İade</th><th scope="col">Sipariş</th><th scope="col">Müşteri</th><th scope="col">Satıcı</th><th scope="col">Neden</th><th scope="col">Tutar</th><th scope="col">SLA</th><th scope="col">Durum</th></tr></thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td><strong>{row.id}</strong></td><td>{row.order}</td><td>{row.customer}</td><td>{row.seller}</td>
+                <td>{row.reason}</td><td>{money(row.amount)}</td><td className="sla">{row.sla}</td><td><Status>{row.status}</Status></td>
+              </tr>
+            ))}
+            {rows.length === 0 && <EmptyTable colSpan={8} title="Bu kapsamda iade talebi yok" />}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+  const rows = stockRiskRows.filter((row) => matchesStore(row, store));
+  return (
+    <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Stok riskleri tablosu, yatay kaydırılabilir">
+      <table className="data-table">
+        <caption className="sr-only">Örnek stok riskleri</caption>
+        <thead><tr><th scope="col">SKU</th><th scope="col">Ürün</th><th scope="col">Satıcı</th><th scope="col">Kullanılabilir</th><th scope="col">Rezerve</th><th scope="col">Stok süresi</th><th scope="col">Durum</th></tr></thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.sku}>
+              <td><strong>{row.sku}</strong></td><td>{row.product}</td><td>{row.seller}</td><td>{row.available}</td>
+              <td>{row.reserved}</td><td>{row.cover}</td><td><Status>{row.status}</Status></td>
+            </tr>
+          ))}
+          {rows.length === 0 && <EmptyTable colSpan={7} title="Bu kapsamda stok riski yok" />}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function OrderInspectorContent({ order, notes, setNotes, notify, updateStatus, openDialog }) {
+  return (
+    <>
+      <div className="inspector-body">
+        <section>
+          <span className="section-label">Satıcı / Mağaza</span>
+          <div className="entity-line">
+            <Icon name="storefront" />
+            <div><strong>{order.seller}</strong><small>Örnek puan: 4,8 · 7.842 sipariş</small></div>
+            <button className="link-button" onClick={() => openDialog("store-detail", { seller: order.seller })}>Mağazayı önizle</button>
+          </div>
+        </section>
+        <section>
+          <span className="section-label">Müşteri</span>
+          <div className="entity-line">
+            <span className="avatar avatar-small">{order.customer.split(" ").map((word) => word[0]).join("")}</span>
+            <div><strong>{order.customer}</strong><small>{order.customer.toLocaleLowerCase("tr-TR").replace(" ", ".")}@email.com</small></div>
+          </div>
+        </section>
+        <section>
+          <span className="section-label">Örnek tahsilat özeti</span>
+          <div className="split-line"><Status>Tamamlandı</Status><span>Örnek kart •••• 4242</span><strong>{money(order.amount)}</strong></div>
+        </section>
+        <section>
+          <span className="section-label">Ürün</span>
+          <div className="inspector-product"><img src={order.image} alt="" /><div><strong>{order.product}</strong><small>1 adet · örnek tutar</small></div><b>{money(order.amount)}</b></div>
+        </section>
+        <section>
+          <span className="section-label">Örnek olay akışı</span>
+          <ol className="timeline"><li><b>Sipariş oluşturuldu</b><time>09:12</time></li><li><b>Kontrol tamamlandı</b><time>09:18</time></li><li><b>{order.status}</b><time>10:03</time></li></ol>
+        </section>
+        <label className="note-field">
+          <span>Yerel önizleme notu</span>
+          <textarea
+            value={notes[order.id] || ""}
+            onChange={(event) => setNotes((current) => ({ ...current, [order.id]: event.target.value }))}
+            onBlur={() => notify(order.id + " notu bu oturumda korundu.")}
+            placeholder="Bu sipariş için bir not ekleyin…"
+          />
+          <small>Yalnız bu oturumda korunur.</small>
+        </label>
+      </div>
+      <footer className="inspector-actions">
+        <select aria-label="Sipariş durumu" value={order.status} onChange={(event) => updateStatus(order.id, event.target.value)} data-testid="inspector-status">
+          <option>Yeni</option><option>Hazırlanıyor</option><option>Kargoya Verildi</option><option>Teslim Edildi</option><option>İptal Edildi</option>
+        </select>
+        <button className="primary-button" disabled={!nextOrderStatus[order.status]} onClick={() => nextOrderStatus[order.status] && updateStatus(order.id, nextOrderStatus[order.status])}>
+          {nextOrderStatus[order.status] ? "Sonraki aşamayı önizle" : "Akış tamamlandı"}
+        </button>
+      </footer>
+    </>
+  );
+}
+
+function Operations({
+  orders,
+  setOrders,
+  selected,
+  setSelected,
+  currentId,
+  setCurrentId,
+  filter,
+  setFilter,
+  tab,
+  setTab,
+  editingLayout,
+  setEditingLayout,
+  savedViews,
+  activeView,
+  onCustomFilter,
+  onApplyView,
+  onSaveView,
+  store,
+  setStore,
+  dateRange,
+  notify,
+  openDialog,
+  notes,
+  setNotes,
+  visiblePanels,
+  setVisiblePanels,
+  compact,
+  contextItem,
+  initialOrderId,
+}) {
   const [page, setPage] = useState(1);
-  const visible = useMemo(() => orders.filter((order) => (filter.status === "Tümü" || order.status === filter.status) && (filter.query === "" || Object.values(order).some((v) => String(v).toLocaleLowerCase("tr-TR").includes(filter.query.toLocaleLowerCase("tr-TR"))))), [orders, filter]);
+  const [pageSize, setPageSize] = useState(5);
+  const scopedOrders = useMemo(() => orders.filter((order) => matchesStore(order, store)), [orders, store]);
+  const filtered = useMemo(
+    () => scopedOrders.filter((order) => (
+      (contextItem !== "Bugün" || order.today)
+      && (filter.status === "Tümü" || order.status === filter.status)
+      && matchesQuery(order, filter.query)
+    )),
+    [scopedOrders, filter, contextItem],
+  );
+  const pagination = paginateRows(filtered, page, pageSize);
   const current = currentId ? orders.find((order) => order.id === currentId) : null;
   const inspectorRef = useRef(null);
   const rowTriggerRef = useRef(null);
-  const allSelected = visible.length > 0 && visible.every((order) => selected.includes(order.id));
-  const visibleSelected = visible.filter((order) => selected.includes(order.id));
-  const updateStatus = (id, status) => { setOrders((rows) => rows.map((row) => row.id === id ? { ...row, status } : row)); notify(`${id} durumu önizlemede “${status}” olarak güncellendi.`); };
-  const bulkStatus = (status) => { const visibleIds = new Set(visibleSelected.map((order) => order.id)); setOrders((rows) => rows.map((row) => visibleIds.has(row.id) ? { ...row, status } : row)); notify(`${visibleIds.size} örnek sipariş önizlemede güncellendi.`); setSelected([]); };
-  const openInspector = (id, trigger) => { rowTriggerRef.current = trigger; setCurrentId(id); requestAnimationFrame(() => inspectorRef.current?.focus()); };
-  const closeInspector = () => { setCurrentId(""); requestAnimationFrame(() => rowTriggerRef.current?.focus?.()); };
-  return <div className={`workspace operations-workspace ${editingLayout ? "is-editing" : ""}`}>
-    <div className="workspace-heading operations-heading"><div><h2>Canlı Sipariş Operasyonu</h2></div><div className="heading-actions"><label className="heading-select"><Icon name="storefront" /><select aria-label="Mağaza kapsamı" value={store} onChange={(event) => setStore(event.target.value)} data-testid="store-scope"><option>Tüm Mağazalar · 24</option><option>NovaStore</option><option>TeknoPark · 2 mağaza</option><option>Eviva Home</option></select></label><label className="heading-select"><Icon name="bookmark" /><select aria-label="Görünüm" value={activeView} onChange={(event) => onApplyView(savedViews.find((view) => view.name === event.target.value))}>{activeView === "" && <option value="" disabled>Özel görünüm</option>}{savedViews.map((view) => <option key={view.name}>{view.name}</option>)}</select></label><button className={editingLayout ? "secondary-button active" : "secondary-button"} onClick={() => setEditingLayout(!editingLayout)} data-testid="layout-edit"><Icon name="grid" />{editingLayout ? "Düzenlemeyi bitir" : "Düzeni düzenle"}</button><button className="secondary-button" onClick={onSaveView}><Icon name="bookmark" />Görünümü kaydet</button></div></div>
-    {editingLayout && <div className="edit-banner"><Icon name="info" /><span>Bileşen yerleşimi düzenleme durumu önizleniyor; sürükleme ve kalıcı yerleşim bu izole sürümde kapalıdır.</span><button onClick={() => setEditingLayout(false)}>Bitti</button></div>}
-    <section className="kpi-grid" aria-label="Temel performans göstergeleri"><Kpi label="Net Ciro" value="₺12.845.230" trend="↑ %14,6 · önceki döneme göre" /><Kpi label="Sipariş" value="6.842" trend="↑ %12,3 · önceki döneme göre" /><Kpi label="Bekleyen Satıcı Onayı" value="2.214" trend="↑ %18,7 · aksiyon gerekli" tone="warning" /><Kpi label="İade Oranı" value="%4,28" trend="↓ 0,56 puan · iyileşme" /></section>
-    <section className="insight-grid">
-      <article className="module-card revenue-module"><header><h3>Net Ciro</h3><button className="icon-button small" aria-label="Net ciro modülü seçeneklerini önizle" onClick={() => notify("Net ciro modülü seçenekleri bu önizlemede bilgilendirme amaçlıdır.")}><Icon name="menu" /></button></header><div className="chart-legend" aria-hidden="true"><span className="current-line">Bu dönem</span><span className="previous-line">Önceki dönem</span></div><RevenueChart /></article>
-      <article className="module-card distribution-module"><header><h3>Sipariş Durum Dağılımı</h3><button className="icon-button small" aria-label="Sipariş dağılımı modülü seçeneklerini önizle" onClick={() => notify("Sipariş dağılımı modülü seçenekleri bu önizlemede bilgilendirme amaçlıdır.")}><Icon name="menu" /></button></header>{[["Yeni", 2214, 32, "blue"], ["Hazırlanıyor", 1876, 27, "orange"], ["Kargoya Verildi", 1642, 24, "green"], ["Teslim Edildi", 876, 13, "gray"], ["İptal / İade", 234, 4, "red"]].map(([label, value, percent, tone]) => <div className={`distribution-row tone-${tone}`} key={label}><span>{label}</span><progress max="100" value={percent} /><b>{value.toLocaleString("tr-TR")}</b><small>%{percent}</small></div>)}</article>
-    </section>
-    <section className="ledger-card">
-      <nav className="ledger-tabs" aria-label="Operasyon kayıt türleri">{[["orders", "Siparişler", 28], ["seller-orders", "Satıcı Siparişleri", 42], ["returns", "İadeler", 7], ["stock", "Stok", 14]].map(([id, label, count]) => <button className={tab === id ? "active" : ""} aria-current={tab === id ? "page" : undefined} onClick={() => { setTab(id); if (id !== "orders") setCurrentId(""); }} key={id} data-testid={`ledger-tab-${id}`}>{label}<b>{count}</b></button>)}</nav>
-      {tab !== "orders" ? <div className="state-panel"><Icon name={tab === "returns" ? "back" : "package"} /><h3>{tab === "returns" ? "İade talepleri" : tab === "stock" ? "Stok riskleri" : "Satıcı siparişleri"}</h3><p>Bu görünüm seçili mağaza kapsamına göre hazırlandı. Örnek kayıtlar operasyon tasarımının bir parçasıdır.</p><button className="primary-button" onClick={() => setTab("orders")}>Siparişlere dön</button></div> : <>
-        <div className="ledger-toolbar">
-          {visibleSelected.length > 0 ? <div className="bulk-toolbar" data-testid="bulk-actions"><strong>{visibleSelected.length} sipariş seçildi</strong><button onClick={() => setSelected([])}>Seçimi temizle</button><select aria-label="Toplu durum güncelle" defaultValue="" onChange={(e) => e.target.value && bulkStatus(e.target.value)}><option value="">Durumu güncelle</option><option>Hazırlanıyor</option><option>Kargoya Verildi</option><option>İptal Edildi</option></select><button onClick={() => notify(`${visibleSelected.length} örnek sipariş için satıcı atama akışı önizlendi.`)}>Satıcı atamayı önizle</button></div> : <div className="filter-toolbar"><label className="table-search"><Icon name="search" /><input type="search" value={filter.query} onChange={(e) => { onCustomFilter(); setFilter({ ...filter, query: e.target.value }); }} placeholder="Sipariş, müşteri veya ürün ara" aria-label="Siparişlerde ara" data-testid="filter-search" /></label><select aria-label="Sipariş durumu" value={filter.status} onChange={(e) => { onCustomFilter(); setFilter({ ...filter, status: e.target.value }); }} data-testid="status-filter"><option>Tümü</option><option>Yeni</option><option>Hazırlanıyor</option><option>Kargoya Verildi</option><option>Teslim Edildi</option></select><button className="secondary-button" onClick={() => onApplyView(savedViews[0])}><Icon name="filter" />Filtreleri temizle</button></div>}
+  const selectAllRef = useRef(null);
+  const filtersMountedRef = useRef(false);
+  const visibleSelected = pagination.rows.filter((order) => selected.includes(order.id));
+  const allSelected = pagination.rows.length > 0 && visibleSelected.length === pagination.rows.length;
+  const someSelected = visibleSelected.length > 0 && !allSelected;
+  const profile = dateProfiles[dateRange];
+  const storeRatio = orders.length > 0 ? scopedOrders.length / orders.length : 0;
+  const allStores = store.startsWith("Tüm Mağazalar");
+  const scopedScale = profile.scale * (allStores ? 1 : storeRatio);
+  const scopedRevenue = allStores
+    ? profile.revenue
+    : money(Math.round(12800000 * scopedScale));
+  const scopedOrderCount = allStores
+    ? profile.orders
+    : Math.round(6842 * scopedScale).toLocaleString("tr-TR");
+  const scopedApprovalCount = Math.round(2214 * storeRatio).toLocaleString("tr-TR");
+
+  useEffect(() => {
+    if (!filtersMountedRef.current) {
+      filtersMountedRef.current = true;
+      return;
+    }
+    setPage(1);
+    setSelected([]);
+    setCurrentId("");
+  }, [filter.status, filter.query, store, tab, pageSize, contextItem]);
+
+  useEffect(() => {
+    setPage(pagination.page);
+  }, [pagination.page]);
+
+  useEffect(() => {
+    if (!initialOrderId) return;
+    const targetIndex = filtered.findIndex((order) => order.id === initialOrderId);
+    if (targetIndex >= 0) setPage(Math.floor(targetIndex / pageSize) + 1);
+    setCurrentId(initialOrderId);
+  }, [initialOrderId]);
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someSelected;
+  }, [someSelected]);
+
+  useEffect(() => {
+    if (!currentId || compact) return undefined;
+    const frame = requestAnimationFrame(() => inspectorRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [compact, currentId]);
+
+  const updateStatus = (id, status) => {
+    setOrders((rows) => setOrderStatuses(rows, [id], status));
+    notify(id + " durumu önizlemede “" + status + "” olarak güncellendi.");
+  };
+
+  const bulkStatus = (status) => {
+    const visibleIds = new Set(visibleSelected.map((order) => order.id));
+    setOrders((rows) => setOrderStatuses(rows, visibleIds, status));
+    setSelected([]);
+    notify(visibleIds.size + " görünür örnek sipariş güncellendi.");
+  };
+
+  const openInspector = (id, trigger) => {
+    rowTriggerRef.current = trigger;
+    setCurrentId(id);
+    requestAnimationFrame(() => inspectorRef.current?.focus());
+  };
+
+  const closeInspector = () => {
+    setCurrentId("");
+    requestAnimationFrame(() => rowTriggerRef.current?.focus?.());
+  };
+
+  return (
+    <div className={"workspace operations-workspace " + (editingLayout ? "is-editing" : "")}>
+      <div className="workspace-heading operations-heading">
+        <div>
+          <span className="eyebrow">{profile.label} · örnek veri</span>
+          <h2 tabIndex="-1">Canlı Sipariş Operasyonu</h2>
         </div>
-        <div className="table-scroll"><table className="data-table"><thead><tr><th><input type="checkbox" aria-label="Tüm siparişleri seç" checked={allSelected} onChange={(e) => setSelected(e.target.checked ? visible.map((order) => order.id) : [])} /></th><th>Sipariş ID</th><th>Satıcı / Mağaza</th><th>Müşteri</th><th>Ürün</th><th>Kanal</th><th>Tutar</th><th>Durum</th><th>SLA Yaşı</th><th>Sahip</th><th><span className="sr-only">İşlem</span></th></tr></thead><tbody>{visible.map((order) => <tr key={order.id} className={current?.id === order.id ? "selected-row" : ""} onClick={(event) => openInspector(order.id, event.currentTarget.querySelector("button"))} data-testid="table-row" data-row-id={order.id}><td onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={`${order.id} satırını seç`} data-testid="row-select" checked={selected.includes(order.id)} onChange={(e) => setSelected(e.target.checked ? [...selected, order.id] : selected.filter((id) => id !== order.id))} /></td><td><strong>{order.id}</strong></td><td><span className="seller-cell"><Icon name="storefront" />{order.seller}</span></td><td>{order.customer}</td><td><span className="product-cell"><img src={order.image} alt="" />{order.product}</span></td><td>{order.channel}</td><td><strong>{money(order.amount)}</strong></td><td><Status>{order.status}</Status></td><td className="sla">{order.age}</td><td>{order.owner}</td><td><button className="icon-button small" aria-label={`${order.id} siparişini incele`} onClick={(event) => { event.stopPropagation(); openInspector(order.id, event.currentTarget); }}><Icon name="menu" /></button></td></tr>)}</tbody></table></div>
-        <footer className="table-footer"><span>Toplam 28 örnek kayıttan 1–{visible.length} arası gösteriliyor</span><nav aria-label="Örnek sayfalama">{[1, 2, 3, 4].map((item) => <button key={item} aria-current={page === item ? "page" : undefined} onClick={() => { setPage(item); notify(`${item}. örnek sayfa seçildi.`); }}>{item}</button>)}</nav><label>Satır <select onChange={(event) => notify(`Sayfa başına ${event.target.value} satır seçildi.`)}><option>20</option><option>50</option></select></label></footer>
-      </>}
-    </section>
-    {current && <aside ref={inspectorRef} className="inspector" role="complementary" aria-labelledby={`inspector-title-${current.id}`} tabIndex="-1" data-testid="row-inspector" onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); closeInspector(); } }}><header><div><span className="eyebrow">Örnek sipariş ayrıntısı</span><h3 id={`inspector-title-${current.id}`}>Sipariş #{current.id}</h3></div><button className="icon-button" onClick={closeInspector} aria-label="Denetçiyi kapat"><Icon name="close" /></button></header><section><span className="section-label">Satıcı / Mağaza</span><div className="entity-line"><Icon name="storefront" /><div><strong>{current.seller}</strong><small>Örnek puan: 4,8 · 7.842 sipariş</small></div><button className="link-button" onClick={() => notify(`${current.seller} örnek mağaza görünümü açıldı.`)}>Mağazayı önizle</button></div></section><section><span className="section-label">Müşteri</span><div className="entity-line"><span className="avatar avatar-small">{current.customer.split(" ").map((word) => word[0]).join("")}</span><div><strong>{current.customer}</strong><small>{current.customer.toLocaleLowerCase("tr-TR").replace(" ", ".")}@email.com</small></div></div></section><section><span className="section-label">Örnek ödeme</span><div className="split-line"><Status>Ödendi</Status><span>Örnek kart •••• 4242</span><strong>{money(current.amount)}</strong></div></section><section><span className="section-label">Örnek teslimat adresi</span><p>{current.customer}<br />Kozyatağı Mah. Değirmen Sk. No:12 D:7<br />34742 Kadıköy / İstanbul</p></section><section><span className="section-label">Ürün ve hizmet (2)</span><div className="inspector-product"><img src={current.image} alt="" /><div><strong>{current.product}</strong><small>1 adet · örnek tutar</small></div><b>{money(current.amount)}</b></div><div className="inspector-product"><Icon name="shield" /><div><strong>2 Yıl Ek Garanti</strong><small>Örnek hizmet · toplam fiyata dahil</small></div><b>Dahil</b></div></section><section className="inspector-totals" aria-label="Örnek sipariş toplamı"><div><span>Ara toplam</span><strong>{money(current.amount)}</strong></div><div><span>Platform komisyonu</span><strong>−{money(Math.round(current.amount * 0.09))}</strong></div><div><span>Toplam</span><strong>{money(current.amount)}</strong></div></section><section><span className="section-label">Örnek olay akışı</span><ol className="timeline"><li><b>Sipariş oluşturuldu</b><time>09:12</time></li><li><b>Ödeme doğrulandı</b><time>09:12</time></li><li><b>{current.status}</b><time>10:03</time></li><li><b>Son kontrol</b><time>10:24</time></li></ol></section><label className="note-field"><span>Yerel önizleme notu</span><textarea defaultValue="Müşteri hediye paketi talep etti." /></label><footer><select aria-label="Sipariş durumu" value={current.status} onChange={(e) => updateStatus(current.id, e.target.value)} data-testid="inspector-status"><option>Yeni</option><option>Hazırlanıyor</option><option>Kargoya Verildi</option><option>Teslim Edildi</option><option>İptal Edildi</option></select><button className="primary-button" disabled={!nextOrderStatus[current.status]} onClick={() => nextOrderStatus[current.status] && updateStatus(current.id, nextOrderStatus[current.status])}>{nextOrderStatus[current.status] ? "Sonraki aşamayı önizle" : "Akış tamamlandı"}</button></footer></aside>}
-  </div>;
+        <div className="heading-actions">
+          <label className="heading-select">
+            <Icon name="storefront" />
+            <select aria-label="Mağaza kapsamı" value={store} onChange={(event) => setStore(event.target.value)} data-testid="store-scope">
+              <option>Tüm Mağazalar · 24</option><option>NovaStore</option><option>TeknoPark · 2 mağaza</option><option>Eviva Home</option>
+            </select>
+          </label>
+          <label className="heading-select">
+            <Icon name="bookmark" />
+            <select aria-label="Görünüm" value={activeView} onChange={(event) => onApplyView(savedViews.find((view) => view.name === event.target.value))}>
+              {activeView === "" && <option value="" disabled>Özel görünüm</option>}
+              {savedViews.map((view) => <option key={view.name}>{view.name}</option>)}
+            </select>
+          </label>
+          <button className={"secondary-button " + (editingLayout ? "active" : "")} onClick={() => setEditingLayout(!editingLayout)} data-testid="layout-edit">
+            <Icon name="grid" />{editingLayout ? "Düzenlemeyi bitir" : "Düzeni düzenle"}
+          </button>
+          <button className="secondary-button" onClick={onSaveView}><Icon name="bookmark" />Görünümü kaydet</button>
+        </div>
+      </div>
+      {editingLayout && (
+        <div className="edit-banner">
+          <Icon name="info" />
+          <span>Bu oturumda görünür analiz modüllerini seçin. Sıralama ve kalıcı rol düzeni entegrasyon aşamasındadır.</span>
+          <label><input type="checkbox" checked={visiblePanels.revenue} onChange={(event) => setVisiblePanels({ ...visiblePanels, revenue: event.target.checked })} /> Net Ciro</label>
+          <label><input type="checkbox" checked={visiblePanels.distribution} onChange={(event) => setVisiblePanels({ ...visiblePanels, distribution: event.target.checked })} /> Dağılım</label>
+          <button onClick={() => setEditingLayout(false)}>Bitti</button>
+        </div>
+      )}
+      <section className="kpi-grid" aria-label="Temel performans göstergeleri">
+        <Kpi label="Net Ciro" value={scopedRevenue} trend="↑ %14,6 · seçili mağaza ve dönem" />
+        <Kpi label="Sipariş" value={scopedOrderCount} trend="↑ %12,3 · seçili mağaza ve dönem" />
+        <Kpi label="Bekleyen Satıcı Onayı" value={scopedApprovalCount} trend="↑ %18,7 · seçili mağaza örneği" tone="warning" />
+        <Kpi label="İade Oranı" value="%4,28" trend="↓ 0,56 puan · iyileşme" />
+      </section>
+      {(visiblePanels.revenue || visiblePanels.distribution) && (
+        <section className="insight-grid">
+          {visiblePanels.revenue && (
+            <article className="module-card revenue-module">
+              <header>
+                <h3>Net Ciro</h3>
+                <details className="module-menu">
+                  <summary aria-label="Net ciro modülü açıklaması"><Icon name="menu" /></summary>
+                  <p>Seçili tarih aralığına göre yerel örnek seri yeniden hesaplanır.</p>
+                </details>
+              </header>
+              <div className="chart-legend" aria-hidden="true"><span className="current-line">Bu dönem</span><span className="previous-line">Önceki dönem</span></div>
+              <RevenueChart scale={scopedScale} labels={profile.days} />
+            </article>
+          )}
+          {visiblePanels.distribution && (
+            <article className="module-card distribution-module">
+              <header>
+                <h3>Sipariş Durum Dağılımı</h3>
+                <details className="module-menu">
+                  <summary aria-label="Sipariş dağılımı açıklaması"><Icon name="menu" /></summary>
+                  <p>Dağılım göstergeleri örnek dönem ölçeğini temsil eder.</p>
+                </details>
+              </header>
+              {[["Yeni", 32, "blue"], ["Hazırlanıyor", 27, "orange"], ["Kargoya Verildi", 24, "green"], ["Teslim Edildi", 13, "gray"], ["İptal / İade", 4, "red"]].map(([label, percent, tone]) => (
+                <div className={"distribution-row tone-" + tone} key={label}>
+                  <span>{label}</span><progress max="100" value={percent} aria-label={label + " yüzde " + percent} />
+                  <b>{Math.round(6842 * scopedScale * percent / 100).toLocaleString("tr-TR")}</b><small>%{percent}</small>
+                </div>
+              ))}
+            </article>
+          )}
+        </section>
+      )}
+      <section className="ledger-card">
+        <div className="ledger-tabs" role="tablist" aria-label="Operasyon kayıt türleri">
+          {[["orders", "Siparişler", filtered.length], ["seller-orders", "Satıcı Siparişleri", sellerOrderRows.length], ["returns", "İadeler", returnRows.length], ["stock", "Stok", stockRiskRows.length]].map(([id, label, count]) => (
+            <button
+              role="tab"
+              aria-selected={tab === id}
+              className={tab === id ? "active" : ""}
+              onClick={() => {
+                setTab(id);
+                if (id !== "orders") setCurrentId("");
+              }}
+              key={id}
+              data-testid={"ledger-tab-" + id}
+            >
+              {label}<b>{count}</b>
+            </button>
+          ))}
+        </div>
+        {tab !== "orders" ? (
+          <div role="tabpanel" aria-label={tab === "returns" ? "İadeler" : tab === "stock" ? "Stok" : "Satıcı Siparişleri"}>
+            <OperationsPreviewTable tab={tab} store={store} />
+          </div>
+        ) : (
+          <div role="tabpanel" aria-label="Siparişler">
+            <div className="ledger-toolbar">
+              {visibleSelected.length > 0 ? (
+                <div className="bulk-toolbar" data-testid="bulk-actions">
+                  <strong>{visibleSelected.length} görünür sipariş seçildi</strong>
+                  <button onClick={() => setSelected([])}>Seçimi temizle</button>
+                  <select aria-label="Toplu durum güncelle" defaultValue="" onChange={(event) => event.target.value && bulkStatus(event.target.value)}>
+                    <option value="">Durumu güncelle</option><option>Hazırlanıyor</option><option>Kargoya Verildi</option><option>İptal Edildi</option>
+                  </select>
+                  <button onClick={() => openDialog("assign-owner", { ids: visibleSelected.map((item) => item.id) })}>Sahip ata</button>
+                </div>
+              ) : (
+                <div className="filter-toolbar">
+                  <label className="table-search">
+                    <Icon name="search" />
+                    <input
+                      type="search"
+                      value={filter.query}
+                      onChange={(event) => {
+                        onCustomFilter();
+                        setFilter({ ...filter, query: event.target.value });
+                      }}
+                      placeholder="Sipariş, müşteri veya ürün ara"
+                      aria-label="Siparişlerde ara"
+                      data-testid="filter-search"
+                    />
+                  </label>
+                  <select
+                    aria-label="Sipariş durumu"
+                    value={filter.status}
+                    onChange={(event) => {
+                      onCustomFilter();
+                      setFilter({ ...filter, status: event.target.value });
+                    }}
+                    data-testid="status-filter"
+                  >
+                    <option>Tümü</option><option>Yeni</option><option>Hazırlanıyor</option><option>Kargoya Verildi</option><option>Teslim Edildi</option><option>İptal Edildi</option>
+                  </select>
+                  <button className="secondary-button" onClick={() => onApplyView(savedViews[0])}><Icon name="filter" />Filtreleri temizle</button>
+                </div>
+              )}
+            </div>
+            <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Sipariş tablosu, yatay kaydırılabilir">
+              <table className="data-table">
+                <caption className="sr-only">Filtrelenmiş örnek siparişler</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        aria-label="Bu sayfadaki tüm siparişleri seç"
+                        checked={allSelected}
+                        onChange={(event) => {
+                          const pageIds = pagination.rows.map((order) => order.id);
+                          setSelected(event.target.checked
+                            ? Array.from(new Set(selected.concat(pageIds)))
+                            : selected.filter((id) => !pageIds.includes(id)));
+                        }}
+                      />
+                    </th>
+                    <th scope="col">Sipariş ID</th><th scope="col">Satıcı / Mağaza</th><th scope="col">Müşteri</th><th scope="col">Ürün</th>
+                    <th scope="col">Kanal</th><th scope="col">Tutar</th><th scope="col">Durum</th><th scope="col">SLA Yaşı</th><th scope="col">Sahip</th><th scope="col"><span className="sr-only">İşlem</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagination.rows.map((order) => (
+                    <tr
+                      key={order.id}
+                      className={current?.id === order.id ? "selected-row" : ""}
+                      onClick={(event) => openInspector(order.id, event.currentTarget.querySelector("button"))}
+                      data-testid="table-row"
+                      data-row-id={order.id}
+                    >
+                      <td onClick={(event) => event.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={order.id + " satırını seç"}
+                          data-testid="row-select"
+                          checked={selected.includes(order.id)}
+                          onChange={(event) => setSelected(event.target.checked ? selected.concat(order.id) : selected.filter((id) => id !== order.id))}
+                        />
+                      </td>
+                      <td><strong>{order.id}</strong></td>
+                      <td><span className="seller-cell"><Icon name="storefront" />{order.seller}</span></td>
+                      <td>{order.customer}</td>
+                      <td><span className="product-cell"><img src={order.image} alt="" />{order.product}</span></td>
+                      <td>{order.channel}</td><td><strong>{money(order.amount)}</strong></td><td><Status>{order.status}</Status></td>
+                      <td className="sla">{order.age}</td><td>{order.owner}</td>
+                      <td><button className="icon-button small" aria-label={order.id + " siparişini incele"} onClick={(event) => { event.stopPropagation(); openInspector(order.id, event.currentTarget); }}><Icon name="menu" /></button></td>
+                    </tr>
+                  ))}
+                  {pagination.rows.length === 0 && (
+                    <EmptyTable
+                      colSpan={11}
+                      title="Sipariş bulunamadı"
+                      description="Arama, durum veya mağaza kapsamını değiştirin."
+                      onReset={() => onApplyView(savedViews[0])}
+                    />
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <footer className="table-footer">
+              <span>Toplam {filtered.length} kayıttan {pagination.start}–{pagination.end} arası gösteriliyor</span>
+              <nav aria-label="Sipariş sayfalama">
+                {Array.from({ length: pagination.pageCount }, (_item, index) => index + 1).map((item) => (
+                  <button key={item} aria-current={pagination.page === item ? "page" : undefined} onClick={() => { setPage(item); setSelected([]); setCurrentId(""); }}>{item}</button>
+                ))}
+              </nav>
+              <label>Satır <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}><option>5</option><option>10</option><option>20</option></select></label>
+            </footer>
+          </div>
+        )}
+      </section>
+      {current && compact && (
+        <Modal title={"Sipariş #" + current.id} onClose={closeInspector} testId="row-inspector" cardClass="order-inspector-modal">
+          <OrderInspectorContent order={current} notes={notes} setNotes={setNotes} notify={notify} updateStatus={updateStatus} openDialog={openDialog} />
+        </Modal>
+      )}
+      {current && !compact && (
+        <aside
+          ref={inspectorRef}
+          className="inspector"
+          role="complementary"
+          aria-labelledby={"inspector-title-" + current.id}
+          tabIndex="-1"
+          data-testid="row-inspector"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              closeInspector();
+            }
+          }}
+        >
+          <header>
+            <div><span className="eyebrow">Örnek sipariş ayrıntısı</span><h3 id={"inspector-title-" + current.id}>Sipariş #{current.id}</h3></div>
+            <button className="icon-button" onClick={closeInspector} aria-label="Denetçiyi kapat"><Icon name="close" /></button>
+          </header>
+          <OrderInspectorContent order={current} notes={notes} setNotes={setNotes} notify={notify} updateStatus={updateStatus} openDialog={openDialog} />
+        </aside>
+      )}
+    </div>
+  );
 }
 
-function Dashboard({ orders, onOpenOrders, notify }) {
+function Dashboard({ orders, onOpenOrders, onHealth, dateRange }) {
   const urgent = orders.filter((order) => order.status === "Yeni" || order.status === "Hazırlanıyor");
-  return <div className="workspace page-workspace dashboard-page"><div className="workspace-heading"><div><span className="eyebrow">Yönetici özeti · örnek veri</span><h2>Genel Bakış</h2><p>Satış sağlığını, açık operasyon işlerini ve risk kuyruklarını tek ekranda izleyin.</p></div><button className="primary-button" onClick={onOpenOrders}><Icon name="orders" />Sipariş operasyonuna git</button></div><section className="kpi-grid"><Kpi label="Net satış" value="₺12,8 Mn" trend="↑ %14,6 · önceki dönem" /><Kpi label="Açık operasyon işi" value={String(urgent.length + 21)} trend="12 kritik SLA" tone="warning" /><Kpi label="Mutabakat farkı" value="₺99.001" trend="3 örnek kayıt" tone="warning" /><Kpi label="Satıcı sağlığı" value="%96,4" trend="24 aktif mağaza" /></section><section className="analytics-grid"><article className="module-card"><header><div><span className="eyebrow">Bugünün öncelikleri</span><h3>Operasyon kuyruğu</h3></div><button className="link-button" onClick={onOpenOrders}>Tümünü aç</button></header>{[["Geciken siparişler", 12, 76], ["Kritik stok", 14, 58], ["Satıcı başvuruları", 7, 42], ["İade SLA riski", 5, 30]].map(([label, value, progress]) => <div className="metric-progress" key={label}><span>{label}</span><progress max="100" value={progress} /><strong>{value}</strong></div>)}</article><article className="module-card"><header><div><span className="eyebrow">Sistem durumu</span><h3>Bağlantı sağlığı</h3></div></header>{[["Katalog", "Sağlıklı"], ["Sipariş akışı", "Sağlıklı"], ["Bildirim kuyruğu", "Önizleme"], ["Ödeme bağlantısı", "Kapalı"]].map(([label, state]) => <div className="check-line" key={label}><Icon name={state === "Kapalı" ? "warning" : "check"} /><span>{label}</span><small>{state}</small></div>)}<button className="secondary-button small" onClick={() => notify("Sistem sağlık ayrıntıları yalnız örnek durumlarla gösteriliyor.")}>Sağlık ayrıntısını önizle</button></article></section></div>;
+  const profile = dateProfiles[dateRange];
+  return (
+    <div className="workspace page-workspace dashboard-page">
+      <div className="workspace-heading">
+        <div><span className="eyebrow">{profile.label} · yönetici özeti</span><h2 tabIndex="-1">Genel Bakış</h2><p>Satış sağlığını, açık operasyon işlerini ve risk kuyruklarını tek ekranda izleyin.</p></div>
+        <button className="primary-button" onClick={onOpenOrders}><Icon name="orders" />Sipariş operasyonuna git</button>
+      </div>
+      <section className="kpi-grid">
+        <Kpi label="Net satış" value={profile.revenue} trend="↑ %14,6 · önceki dönem" />
+        <Kpi label="Açık operasyon işi" value={String(urgent.length + 21)} trend="12 kritik SLA" tone="warning" />
+        <Kpi label="Mutabakat farkı" value="₺99.001" trend="3 örnek kayıt" tone="warning" />
+        <Kpi label="Satıcı sağlığı" value="%96,4" trend="24 aktif mağaza" />
+      </section>
+      <section className="analytics-grid">
+        <article className="module-card">
+          <header><div><span className="eyebrow">Bugünün öncelikleri</span><h3>Operasyon kuyruğu</h3></div><button className="link-button" onClick={onOpenOrders}>Tümünü aç</button></header>
+          {[["Geciken siparişler", 12, 76], ["Kritik stok", 14, 58], ["Satıcı başvuruları", 4, 42], ["İade SLA riski", 3, 30]].map(([label, value, progress]) => (
+            <div className="metric-progress" key={label}><span>{label}</span><progress max="100" value={progress} aria-label={label + " yoğunluğu yüzde " + progress} /><strong>{value}</strong></div>
+          ))}
+        </article>
+        <article className="module-card">
+          <header><div><span className="eyebrow">Sistem durumu</span><h3>Bağlantı sözleşmesi</h3></div></header>
+          {[["Katalog", "Yerel örnek"], ["Sipariş akışı", "Yerel örnek"], ["Bildirim kuyruğu", "Önizleme"], ["Canlı tahsilat", "Entegrasyonda"]].map(([label, state]) => (
+            <div className="check-line" key={label}><Icon name={state === "Entegrasyonda" ? "warning" : "check"} /><span>{label}</span><small>{state}</small></div>
+          ))}
+          <button className="secondary-button small" onClick={onHealth}>Sağlık ayrıntısını önizle</button>
+        </article>
+      </section>
+    </div>
+  );
 }
 
-function Catalog({ notify, onCreate }) {
+function Catalog({ products, store, contextItem, collectionDrafts, onCreate, onEdit }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Tümü");
-  const visible = products.filter((p) => (status === "Tümü" || p.status === status) && `${p.name} ${p.sku}`.toLocaleLowerCase("tr-TR").includes(query.toLocaleLowerCase("tr-TR")));
-  return <div className="workspace page-workspace"><div className="workspace-heading"><div><span className="eyebrow">Çoklu satıcı kataloğu</span><h2>Ürün ve Katalog Yönetimi</h2><p>Kanonik katalog ve satıcı teklifleri: ürün içeriğini tek kayıtta, satıcıya özgü fiyat ve stok tekliflerini ayrı yönetin.</p></div><button className="primary-button" onClick={onCreate}><Icon name="plus" />Yeni ürün</button></div><section className="kpi-grid compact"><Kpi label="Yayındaki ürün" value="2.416" trend="↑ 84 · bu ay" /><Kpi label="Onay bekleyen" value="18" trend="7 satıcıdan" tone="warning" /><Kpi label="Düşük stok" value="42" trend="Aksiyon gerekli" tone="warning" /><Kpi label="İçerik tamlığı" value="%94" trend="↑ 3 puan" /></section><section className="table-card"><header className="card-header"><div><h3>Tüm ürünler</h3><p>Kanonik ürün, satıcı teklifi, varyant, stok ve yayın durumları</p></div><div className="filter-toolbar"><label className="table-search"><Icon name="search" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ürün veya SKU ara" aria-label="Ürün veya SKU ara" data-testid="catalog-search" /></label><select aria-label="Ürün durumu" value={status} onChange={(e) => setStatus(e.target.value)} data-testid="catalog-filter"><option>Tümü</option><option>Yayında</option><option>Düşük stok</option><option>Stokta yok</option><option>Onay bekliyor</option></select></div></header><div className="table-scroll"><table className="data-table"><thead><tr><th>Ürün</th><th>SKU</th><th>Satıcı teklifi</th><th>Kategori</th><th>Stok</th><th>Fiyat</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>{visible.map((product) => <tr key={product.sku} data-testid={`catalog-row-${product.sku}`}><td><span className="product-cell"><img src={product.image} alt="" /><strong>{product.name}</strong></span></td><td>{product.sku}</td><td>{product.seller}</td><td>{product.category}</td><td><strong className={product.stock < 10 ? "negative" : ""}>{product.stock}</strong></td><td>{money(product.price)}</td><td><Status>{product.status}</Status></td><td><button className="secondary-button small" onClick={() => notify(`${product.name} düzenleme paneli açıldı.`)}>Düzenle</button></td></tr>)}</tbody></table></div></section></div>;
+  const mode = contextItem === "Kategoriler" ? "categories" : contextItem === "Filtre Şablonları" ? "templates" : "products";
+  const forcedStatus = contextItem === "Onay Bekleyen" ? "Onay bekliyor" : status;
+  const scopedProducts = products.filter((product) => matchesStore(product, store));
+  const visible = scopedProducts.filter((product) => (
+    (forcedStatus === "Tümü" || product.status === forcedStatus)
+    && matchesQuery(product, query)
+  ));
+
+  if (mode === "categories") {
+    return (
+      <div className="workspace page-workspace">
+        <div className="workspace-heading"><div><span className="eyebrow">Katalog yapısı · yerel örnek</span><h2 tabIndex="-1">Kategoriler</h2><p>Ürün taksonomisini ve yayın durumlarını entegrasyondan önce inceleyin.</p></div></div>
+        <section className="table-card">
+          <header className="card-header"><div><h3>Kategori ağacı önizlemesi</h3><p>Salt okunur örnek yapı</p></div></header>
+          <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Kategori tablosu, yatay kaydırılabilir"><table className="data-table"><caption className="sr-only">Örnek kategoriler</caption><thead><tr><th scope="col">Kategori</th><th scope="col">Yol</th><th scope="col">Seviye</th><th scope="col">Ürün</th><th scope="col">Durum</th></tr></thead><tbody>{categoryPreviewRows.map((row) => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{row.path}</td><td>{row.depth}</td><td>{row.products.toLocaleString("tr-TR")}</td><td><Status>{row.state}</Status></td></tr>)}</tbody></table></div>
+        </section>
+      </div>
+    );
+  }
+
+  if (mode === "templates") {
+    return (
+      <div className="workspace page-workspace">
+        <div className="workspace-heading"><div><span className="eyebrow">Filtre anatomisi · yerel örnek</span><h2 tabIndex="-1">Filtre Şablonları</h2><p>Kategori özelliklerinin sayısal ve zorunlu alan sözleşmesini inceleyin.</p></div></div>
+        <section className="table-card">
+          <header className="card-header"><div><h3>Şablon önizlemeleri</h3><p>Düzenleme gerçek kategori servisiyle etkinleşecek</p></div></header>
+          <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Filtre şablonları tablosu, yatay kaydırılabilir"><table className="data-table"><caption className="sr-only">Örnek filtre şablonları</caption><thead><tr><th scope="col">Şablon</th><th scope="col">Kategori</th><th scope="col">Özellik</th><th scope="col">Zorunlu</th><th scope="col">Durum</th></tr></thead><tbody>{filterTemplateRows.map((row) => <tr key={row.id}><td><strong>{row.name}</strong><small className="block-note">{row.id}</small></td><td>{row.category}</td><td>{row.attributes}</td><td>{row.required}</td><td><Status>{row.state}</Status></td></tr>)}</tbody></table></div>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="workspace page-workspace">
+      <div className="workspace-heading">
+        <div><span className="eyebrow">Çoklu satıcı kataloğu · yerel CRUD</span><h2 tabIndex="-1">Ürün ve Katalog Yönetimi</h2><p>Kanonik ürün içeriğini, satıcı teklifini, fiyatı ve stoku bu oturumda düzenleyin.{collectionDrafts.length > 0 ? " " + collectionDrafts.length + " yerel koleksiyon taslağı bulunuyor." : ""}</p></div>
+        <button className="primary-button" onClick={onCreate}><Icon name="plus" />Yeni ürün</button>
+      </div>
+      <section className="kpi-grid compact">
+        <Kpi label="Kapsamdaki ürün" value={String(scopedProducts.length)} trend="Oturum içi kayıt" />
+        <Kpi label="Onay bekleyen" value={String(scopedProducts.filter((item) => item.status === "Onay bekliyor").length)} trend="İnceleme kuyruğu" tone="warning" />
+        <Kpi label="Düşük stok" value={String(scopedProducts.filter((item) => item.stock < 10).length)} trend="Aksiyon gerekli" tone="warning" />
+        <Kpi label="İçerik tamlığı" value="%94" trend="Örnek gösterge" />
+      </section>
+      <section className="table-card">
+        <header className="card-header">
+          <div><h3>{contextItem === "Onay Bekleyen" ? "Onay bekleyen ürünler" : "Tüm ürünler"}</h3><p>Arama, durum filtresi, oluşturma ve düzenleme yerel olarak çalışır</p></div>
+          <div className="filter-toolbar">
+            <label className="table-search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ürün veya SKU ara" aria-label="Ürün veya SKU ara" data-testid="catalog-search" /></label>
+            {contextItem !== "Onay Bekleyen" && (
+              <select aria-label="Ürün durumu" value={status} onChange={(event) => setStatus(event.target.value)} data-testid="catalog-filter">
+                <option>Tümü</option><option>Yayında</option><option>Düşük stok</option><option>Stokta yok</option><option>Onay bekliyor</option>
+              </select>
+            )}
+          </div>
+        </header>
+        <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Ürün tablosu, yatay kaydırılabilir">
+          <table className="data-table">
+            <caption className="sr-only">Filtrelenmiş örnek ürünler</caption>
+            <thead><tr><th scope="col">Ürün</th><th scope="col">SKU</th><th scope="col">Satıcı teklifi</th><th scope="col">Kategori</th><th scope="col">Stok</th><th scope="col">Fiyat</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+            <tbody>
+              {visible.map((product) => (
+                <tr key={product.sku} data-testid={"catalog-row-" + product.sku}>
+                  <td><span className="product-cell"><img src={product.image} alt="" /><strong>{product.name}</strong></span></td>
+                  <td>{product.sku}</td><td>{product.seller}</td><td>{product.category}</td>
+                  <td><strong className={product.stock < 10 ? "negative" : ""}>{product.stock}</strong></td>
+                  <td>{money(product.price)}</td><td><Status>{product.status}</Status></td>
+                  <td><button className="secondary-button small" onClick={() => onEdit(product)}>Düzenle</button></td>
+                </tr>
+              ))}
+              {visible.length === 0 && <EmptyTable colSpan={8} title="Ürün bulunamadı" onReset={() => { setQuery(""); setStatus("Tümü"); }} />}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
 }
 
-function Sellers({ notify }) {
-  const [items, setItems] = useState(sellerApplications);
-  const [active, setActive] = useState(items[0]?.id);
-  const [pendingDecision, setPendingDecision] = useState("");
-  const decisionTriggerRef = useRef(null);
-  const seller = items.find((item) => item.id === active);
-  const closeDecision = () => { setPendingDecision(""); requestAnimationFrame(() => decisionTriggerRef.current?.focus?.()); };
-  const openDecision = (status, trigger) => { decisionTriggerRef.current = trigger; setPendingDecision(status); };
-  const decide = (status) => { setItems((rows) => rows.map((row) => row.id === active ? { ...row, status: `${status} · örnek` } : row)); notify(`${seller.name} için “${status}” akışı yalnız önizlemede uygulandı.`); closeDecision(); };
-  return <div className="workspace page-workspace with-side-detail"><main><div className="workspace-heading"><div><span className="eyebrow">Pazaryeri büyümesi · örnek veri</span><h2>Satıcı Başvuruları</h2><p>Örnek belgeleri, risk sinyallerini ve ticari koşulları karşılaştırın.</p></div><button className="secondary-button" onClick={() => notify("Gelişmiş satıcı filtresi API bağlama turuna hazırdır.")}><Icon name="filter" />Gelişmiş filtre</button></div><section className="kpi-grid compact"><Kpi label="Aktif satıcı" value="24" trend="Örnek kapsam" /><Kpi label="Başvuru" value="7" trend="4 örnek belge" tone="warning" /><Kpi label="Ürün onayı" value="18" trend="Örnek kuyruk" /><Kpi label="Satıcı SLA" value="%96,4" trend="Örnek gösterge" /></section><section className="table-card"><header className="card-header"><div><h3>Örnek inceleme kuyruğu</h3><p>Risk ve belge durumuna göre sıralandı</p></div></header><div className="table-scroll"><table className="data-table"><thead><tr><th>Başvuru</th><th>Yetkili</th><th>Kategori</th><th>Ürün</th><th>Komisyon</th><th>Risk</th><th>Durum</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} className={active === item.id ? "selected-row" : ""} onClick={() => setActive(item.id)} data-testid={`seller-row-${item.id}`}><td><button className="row-entity-button" onClick={(event) => { event.stopPropagation(); setActive(item.id); }} aria-label={`${item.name} başvurusunu incele`}><strong>{item.name}</strong><small>{item.id}</small></button></td><td>{item.owner}</td><td>{item.category}</td><td>{item.products}</td><td>{item.commission}</td><td><Status>{item.risk}</Status></td><td><Status>{item.status}</Status></td></tr>)}</tbody></table></div></section></main>{seller && <aside className="detail-panel" role="complementary" aria-labelledby="seller-detail-title" data-testid="seller-detail"><header><div><span className="eyebrow">{seller.id}</span><h3 id="seller-detail-title">{seller.name}</h3></div><Status>{seller.status}</Status></header><div className="detail-hero"><span className="avatar">{seller.name.split(" ").map((w) => w[0]).join("")}</span><div><strong>{seller.owner}</strong><small>Örnek şirket yetkilisi · doğrulama simülasyonu</small></div></div><dl className="detail-list"><div><dt>Kategori</dt><dd>{seller.category}</dd></div><div><dt>Planlanan ürün</dt><dd>{seller.products}</dd></div><div><dt>Komisyon teklifi</dt><dd>{seller.commission}</dd></div><div><dt>Risk seviyesi</dt><dd><Status>{seller.risk}</Status></dd></div></dl><section><h4>Örnek belge kontrolü</h4>{["Vergi levhası", "İmza sirküleri", "Banka hesabı", "Mesafeli satış sözleşmesi"].map((label, index) => <div className="check-line" key={label}><Icon name={index === 2 && seller.risk === "Yüksek" ? "warning" : "check"} /><span>{label}</span><small>{index === 2 && seller.risk === "Yüksek" ? "İncelenmeli" : "Örnek doğrulandı"}</small></div>)}</section><label className="note-field"><span>İnceleme notu</span><textarea placeholder="Önizleme için bir not ekleyin…" /></label><footer><button className="danger-button" onClick={(event) => openDecision("Reddedildi", event.currentTarget)} data-testid="seller-reject">Red akışını önizle</button><button className="primary-button" onClick={(event) => openDecision("Onaylandı", event.currentTarget)} data-testid="seller-approve">Onay akışını önizle</button></footer></aside>}{pendingDecision && <Modal title={pendingDecision === "Onaylandı" ? "Onay akışını önizle" : "Red akışını önizle"} onClose={closeDecision} testId="confirmation-dialog"><div className="confirmation-body"><Icon name={pendingDecision === "Onaylandı" ? "check" : "warning"} /><p><strong>{seller.name}</strong> için “{pendingDecision}” durumunun arayüz etkisini önizliyorsunuz. Canlı satıcı erişimi veya teklif akışı değişmez.</p></div><footer className="modal-actions"><button className="secondary-button" onClick={closeDecision}>İptal</button><button className={pendingDecision === "Onaylandı" ? "primary-button" : "danger-button"} onClick={() => decide(pendingDecision)}>Önizlemede uygula</button></footer></Modal>}</div>;
+function CustomerDetail({ customer, onClose, onSegment }) {
+  return (
+    <Modal title={customer.name} onClose={onClose} wide testId="customer-detail">
+      <div className="detail-modal-body">
+        <div className="detail-hero"><span className="avatar">{customer.name.split(" ").map((word) => word[0]).join("")}</span><div><strong>{customer.email}</strong><small>{customer.id} · {customer.city}</small></div></div>
+        <dl className="detail-list detail-grid"><div><dt>Sipariş</dt><dd>{customer.orders}</dd></div><div><dt>Yaşam boyu değer</dt><dd>{money(customer.lifetimeValue)}</dd></div><div><dt>İzin</dt><dd>{customer.consent}</dd></div><div><dt>Son aktivite</dt><dd>{customer.lastActivity}</dd></div></dl>
+        <section className="notice-card"><Icon name="info" /><div><strong>Destek özeti</strong><p>{customer.support}</p></div></section>
+        <label className="form-field"><span>Yerel segment</span><select value={customer.segment} onChange={(event) => onSegment(event.target.value)}><option>Yeni</option><option>Sadık</option><option>VIP</option></select></label>
+      </div>
+      <footer className="modal-actions"><button className="primary-button" onClick={onClose}>Tamam</button></footer>
+    </Modal>
+  );
 }
 
-function Finance({ notify }) {
-  const [rows, setRows] = useState(settlements);
-  const [status, setStatus] = useState("Tüm durumlar");
-  const visible = rows.filter((row) => status === "Tüm durumlar" || row.status === status);
-  const previewSettlement = (id) => { setRows((all) => all.map((row) => row.id === id ? { ...row, status: "Akış önizlendi" } : row)); notify(`${id} için ödeme akışı yalnız arayüzde önizlendi; hiçbir talep gönderilmedi.`); };
-  return <div className="workspace page-workspace"><div className="workspace-heading"><div><span className="eyebrow">Finans ve mutabakat · örnek veri</span><h2>Satıcı Hakedişleri</h2><p>Komisyon, iade ve ödeme durumlarının gelecekteki ledger deneyimini güvenli örneklerle inceleyin.</p></div><button className="secondary-button" onClick={() => notify("Örnek hakediş raporu dışa aktarma akışı önizlendi.")}><Icon name="download" />Raporu önizle</button></div><section className="kpi-grid compact"><Kpi label="Ödenecek net tutar" value="₺598.242" trend="14 örnek hakediş" /><Kpi label="Platform komisyonu" value="₺96.544" trend="Örnek ort. %13,4" /><Kpi label="Blokeli tutar" value="₺99.001" trend="3 örnek mutabakat" tone="warning" /><Kpi label="Bu ay ödenen" value="₺2.184.640" trend="Örnek dönem" /></section><section className="table-card" data-testid="finance-ledger"><header className="card-header"><div><h3>Hakediş takvimi</h3><p>Örnek dönem · hiçbir finansal işlem kaydedilmez</p></div><div className="filter-toolbar"><select aria-label="Hakediş durumu" value={status} data-testid="finance-filter" onChange={(event) => { setStatus(event.target.value); notify(`“${event.target.value}” örnek hakediş filtresi uygulandı.`); }}><option>Tüm durumlar</option><option>Ödemeye hazır</option><option>Kontrol ediliyor</option><option>Blokeli</option><option>Ödendi</option></select></div></header><div className="table-scroll"><table className="data-table"><thead><tr><th>Hakediş</th><th>Satıcı</th><th>Dönem</th><th>Brüt satış</th><th>Komisyon</th><th>İade</th><th>Net hakediş</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>{visible.map((row) => <tr key={row.id} data-testid={`finance-row-${row.id}`}><td><strong>{row.id}</strong></td><td>{row.seller}</td><td>{row.period}</td><td>{money(row.gross)}</td><td className="negative">−{money(row.commission)}</td><td className="negative">−{money(row.returns)}</td><td><strong>{money(row.net)}</strong></td><td><Status>{row.status}</Status></td><td>{row.status === "Ödemeye hazır" ? <button className="primary-button small" onClick={() => previewSettlement(row.id)} data-testid="finance-settle">Akışı önizle</button> : <button className="secondary-button small" onClick={() => notify(`${row.id} örnek mutabakat detayı açıldı.`)}>İncele</button>}</td></tr>)}</tbody></table></div></section></div>;
-}
-
-function Customers({ notify }) {
+function Customers({ customers, setCustomers, contextItem, initialCustomerId, notify }) {
   const [query, setQuery] = useState("");
-  const customers = [
-    ["Seda Arslan", "seda.arslan@email.com", "7", "₺86.240", "VIP", "2 gün önce"],
-    ["Ahmet Demir", "ahmet.demir@email.com", "4", "₺32.680", "Sadık", "Bugün"],
-    ["Mustafa Çelik", "mustafa.celik@email.com", "11", "₺118.940", "VIP", "Dün"],
-    ["Elif Nazlı", "elif.nazli@email.com", "2", "₺12.480", "Yeni", "3 gün önce"],
-    ["Burak Güneş", "burak.gunes@email.com", "6", "₺44.120", "Sadık", "Bugün"],
-  ].filter((row) => row.join(" ").toLocaleLowerCase("tr-TR").includes(query.toLocaleLowerCase("tr-TR")));
-  return <div className="workspace page-workspace"><div className="workspace-heading"><div><span className="eyebrow">Müşteri merkezi · örnek veri</span><h2>Müşteriler</h2><p>Örnek sipariş değeri, destek geçmişi ve izinli segmentleri tek müşteri görünümünde inceleyin.</p></div><button className="secondary-button" onClick={() => notify("Örnek müşteri segmenti dışa aktarma akışı önizlendi.")}><Icon name="download" />Dışa aktarmayı önizle</button></div><section className="kpi-grid compact"><Kpi label="Toplam müşteri" value="86.420" trend="Örnek gösterge" /><Kpi label="Tekrar satın alma" value="%31,8" trend="Örnek gösterge" /><Kpi label="Açık soru" value="9" trend="Örnek kuyruk" tone="warning" /><Kpi label="Müşteri değeri" value="₺4.860" trend="Örnek 12 aylık ortalama" /></section><section className="table-card"><header className="card-header"><div><h3>Örnek müşteri listesi</h3><p>Arama ve tablo davranışı etkileşimlidir</p></div><label className="table-search"><Icon name="search" /><input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Müşteri veya e-posta ara" aria-label="Müşterilerde ara" /></label></header><div className="table-scroll"><table className="data-table"><thead><tr><th>Müşteri</th><th>E-posta</th><th>Sipariş</th><th>Yaşam boyu değer</th><th>Segment</th><th>Son aktivite</th><th>İşlem</th></tr></thead><tbody>{customers.map((row) => <tr key={row[1]}><td><strong>{row[0]}</strong></td><td>{row[1]}</td><td>{row[2]}</td><td><strong>{row[3]}</strong></td><td><Status>{row[4]}</Status></td><td>{row[5]}</td><td><button className="secondary-button small" onClick={() => notify(`${row[0]} örnek müşteri görünümü açıldı.`)}>İncele</button></td></tr>)}</tbody></table></div></section></div>;
-}
+  const [segment, setSegment] = useState("Tümü");
+  const [activeId, setActiveId] = useState(initialCustomerId || "");
+  const visible = customers.filter((customer) => (
+    (segment === "Tümü" || customer.segment === segment)
+    && matchesQuery(customer, query)
+  ));
+  const active = customers.find((customer) => customer.id === activeId);
+  const segmentSummaries = ["Yeni", "Sadık", "VIP"].map((name) => {
+    const members = customers.filter((customer) => customer.segment === name);
+    return {
+      name,
+      count: members.length,
+      value: members.reduce((sum, customer) => sum + customer.lifetimeValue, 0),
+    };
+  });
 
-function Analytics({ notify }) {
-  const top = [["Apple iPhone 15 128 GB", 1248, 64884000, 82], ["NovaTech AeroBook 14", 864, 16415136, 64], ["NovaHome S10 Robot Süpürge", 622, 4975378, 48], ["Smartix Watch 2", 518, 1812482, 38]];
-  return <div className="workspace page-workspace"><div className="workspace-heading"><div><span className="eyebrow">Büyüme analizi · örnek veri</span><h2>Satış ve Dönüşüm</h2><p>Mağaza, satıcı ve ürün performansını aynı ölçüm çerçevesinde karşılaştırın.</p></div><div className="heading-actions"><select aria-label="Rapor dönemi" onChange={(event) => notify(`“${event.target.value}” örnek rapor dönemi seçildi.`)}><option>Son 30 gün</option><option>Son 7 gün</option><option>Bu yıl</option></select><button className="secondary-button" onClick={() => notify("Örnek analiz dışa aktarma akışı önizlendi.")}><Icon name="download" />Dışa aktarmayı önizle</button></div></div><section className="kpi-grid"><Kpi label="Brüt ürün hacmi" value="₺18,4 Mn" trend="Örnek dönem · ↑ %16,8" /><Kpi label="Net ciro" value="₺12,8 Mn" trend="Örnek dönem · ↑ %14,6" /><Kpi label="Dönüşüm" value="%3,82" trend="Örnek dönem · ↑ 0,42 puan" /><Kpi label="Ort. sepet" value="₺1.877" trend="Örnek dönem · ↑ %4,1" /></section><section className="analytics-grid"><article className="module-card analytics-main"><header><div><span className="eyebrow">Kanal karşılaştırması</span><h3>Gelir katkısı</h3></div></header>{[["NovaStore Web", 48, "₺6,2 Mn"], ["NovaStore Mobil", 28, "₺3,6 Mn"], ["Trendyol", 14, "₺1,8 Mn"], ["Hepsiburada", 10, "₺1,2 Mn"]].map(([label, value, amount]) => <div className="metric-progress" key={label}><span>{label}</span><progress max="100" value={value} /><strong>{amount}</strong></div>)}</article><article className="module-card"><header><h3>Dönüşüm hunisi</h3></header>{[["Ürün görüntüleme", "412.840", 100], ["Sepete ekleme", "46.218", 68], ["Ödeme başlangıcı", "18.664", 44], ["Sipariş", "15.782", 36]].map(([label, value, progress]) => <div className="funnel-row" key={label}><span>{label}</span><progress max="100" value={progress} /><strong>{value}</strong></div>)}</article></section><section className="table-card"><header className="card-header"><div><h3>Ürün performansı</h3><p>Örnek satış, ciro ve içerik kalitesi birlikte</p></div></header><div className="table-scroll"><table className="data-table"><thead><tr><th>Ürün</th><th>Sipariş</th><th>Net ciro</th><th>Dönüşüm</th><th>Katalog skoru</th></tr></thead><tbody>{top.map(([name, order, revenue, score]) => <tr key={name}><td><strong>{name}</strong></td><td>{order.toLocaleString("tr-TR")}</td><td>{money(revenue)}</td><td>%{(score / 18).toFixed(2).replace(".", ",")}</td><td><span className="score"><progress max="100" value={score} />%{score}</span></td></tr>)}</tbody></table></div></section></div>;
-}
+  useEffect(() => {
+    if (initialCustomerId) setActiveId(initialCustomerId);
+  }, [initialCustomerId]);
 
-function Modules({ modules, setModules, notify }) {
-  const [activeRole, setActiveRole] = useState("operations");
-  const toggle = (id) => { const target = modules.find((item) => item.id === id); setModules((all) => all.map((item) => item.id === id ? { ...item, enabled: !item.enabled } : item)); notify(`${target.name} önizlemede ${target.enabled ? "devre dışı" : "etkin"} görünecek şekilde değiştirildi.`); };
-  const roles = [["operations", "OY", "Operasyon Yöneticisi", "8 modül · varsayılan"], ["catalog", "KE", "Katalog Editörü", "5 modül"], ["finance", "FY", "Finans Yöneticisi", "4 modül"]];
-  const roleModules = {
-    operations: ["live-orders", "seller-approvals", "catalog-health", "settlement-radar", "customer-voice", "conversion-lab"],
-    catalog: ["catalog-health", "seller-approvals", "customer-voice", "conversion-lab"],
-    finance: ["settlement-radar", "conversion-lab", "live-orders"],
+  const exportRows = () => {
+    downloadCsv("novastore-musteri-onizleme.csv", [
+      { label: "Müşteri", value: "name" },
+      { label: "E-posta", value: "email" },
+      { label: "Sipariş", value: "orders" },
+      { label: "Yaşam boyu değer", value: "lifetimeValue" },
+      { label: "Segment", value: "segment" },
+    ], visible);
+    notify(visible.length + " örnek müşteri CSV olarak indirildi.");
   };
-  const visibleModules = modules.filter((item) => roleModules[activeRole].includes(item.id));
-  return <div className="workspace page-workspace"><div className="workspace-heading"><div><span className="eyebrow">Kişiselleştirilebilir çalışma alanı · önizleme</span><h2>Modül Merkezi</h2><p>Ekip rollerinin dashboard bileşimini, sürümünü, bağımlılıklarını ve sağlık durumunu yerel örnek durumlarla inceleyin.</p></div><button className="primary-button" onClick={() => notify("Örnek rol düzeni yalnız bu oturumda oluşturuldu.")}><Icon name="plus" />Rol düzenini önizle</button></div><section className="role-layouts" aria-label="Rol düzenleri">{roles.map(([id, initials, label, detail]) => <button key={id} className={activeRole === id ? "active" : ""} aria-pressed={activeRole === id} onClick={() => { setActiveRole(id); notify(`“${label}” örnek rol düzeni seçildi.`); }}><span className="avatar">{initials}</span><span><strong>{label}</strong><small>{detail}</small></span></button>)}</section><section className="module-grid">{visibleModules.map((item) => <article className={`module-option ${item.enabled ? "enabled" : ""}`} key={item.id} data-testid={`module-${item.id}`}><div className="module-preview" data-testid="module-card"><Icon name={item.id.includes("seller") ? "user" : item.id.includes("settlement") ? "card" : "chart"} /></div><div><h3>{item.name}</h3><p>{item.description}</p><dl className="module-meta"><div><dt>Sürüm</dt><dd>{item.version}</dd></div><div><dt>Bağımlılık</dt><dd>{item.dependency}</dd></div><div><dt>Durum</dt><dd>Önizleme</dd></div></dl></div><label className="switch" data-testid="module-toggle"><input type="checkbox" checked={item.enabled} onChange={() => toggle(item.id)} aria-label={`${item.name} modülünü ${item.enabled ? "devre dışı bırak" : "etkinleştir"}`} data-testid={`module-toggle-${item.id}`} /><span>{item.enabled ? "Etkin" : "Devre dışı"}</span></label></article>)}</section></div>;
+
+  return (
+    <div className="workspace page-workspace">
+      <div className="workspace-heading">
+        <div><span className="eyebrow">Müşteri merkezi · örnek veri</span><h2 tabIndex="-1">{contextItem === "Segmentler" ? "Müşteri Segmentleri" : "Müşteriler"}</h2><p>Arama, segment, müşteri ayrıntısı ve güvenli CSV önizlemesini inceleyin.</p></div>
+        <button className="secondary-button" onClick={exportRows}><Icon name="download" />CSV indir</button>
+      </div>
+      <section className="kpi-grid compact"><Kpi label="Örnek müşteri" value={String(customers.length)} trend="Yerel kayıt" /><Kpi label="Tekrar satın alma" value="%31,8" trend="Örnek gösterge" /><Kpi label="Açık soru" value="9" trend="Entegrasyonda" tone="warning" /><Kpi label="Ortalama değer" value={money(Math.round(customers.reduce((sum, item) => sum + item.lifetimeValue, 0) / customers.length))} trend="Örnek ortalama" /></section>
+      {contextItem === "Segmentler" && (
+        <section className="segment-grid" aria-label="Yerel müşteri segmentleri">
+          {segmentSummaries.map((item) => (
+            <button key={item.name} className={segment === item.name ? "active" : ""} aria-pressed={segment === item.name} onClick={() => setSegment(segment === item.name ? "Tümü" : item.name)}>
+              <span className="eyebrow">Yerel segment</span>
+              <strong>{item.name}</strong>
+              <span>{item.count} müşteri · {money(item.value)}</span>
+            </button>
+          ))}
+        </section>
+      )}
+      <section className="table-card">
+        <header className="card-header">
+          <div><h3>Örnek müşteri listesi</h3><p>Detay ve segment değişiklikleri bu oturumda korunur</p></div>
+          <div className="filter-toolbar">
+            <label className="table-search"><Icon name="search" /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Müşteri veya e-posta ara" aria-label="Müşterilerde ara" /></label>
+            <select aria-label="Müşteri segmenti" value={segment} onChange={(event) => setSegment(event.target.value)}><option>Tümü</option><option>Yeni</option><option>Sadık</option><option>VIP</option></select>
+          </div>
+        </header>
+        <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Müşteri tablosu, yatay kaydırılabilir">
+          <table className="data-table">
+            <caption className="sr-only">Filtrelenmiş örnek müşteriler</caption>
+            <thead><tr><th scope="col">Müşteri</th><th scope="col">E-posta</th><th scope="col">Sipariş</th><th scope="col">Yaşam boyu değer</th><th scope="col">Segment</th><th scope="col">Son aktivite</th><th scope="col">İşlem</th></tr></thead>
+            <tbody>
+              {visible.map((customer) => <tr key={customer.id}><td><strong>{customer.name}</strong><small className="block-note">{customer.id}</small></td><td>{customer.email}</td><td>{customer.orders}</td><td><strong>{money(customer.lifetimeValue)}</strong></td><td><Status>{customer.segment}</Status></td><td>{customer.lastActivity}</td><td><button className="secondary-button small" onClick={() => setActiveId(customer.id)}>İncele</button></td></tr>)}
+              {visible.length === 0 && <EmptyTable colSpan={7} title="Müşteri bulunamadı" onReset={() => { setQuery(""); setSegment("Tümü"); }} />}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {active && <CustomerDetail customer={active} onClose={() => setActiveId("")} onSegment={(value) => { setCustomers((rows) => setCustomerSegment(rows, active.id, value)); notify(active.name + " segmenti bu oturumda güncellendi."); }} />}
+    </div>
+  );
 }
 
-function Audit({ notify }) {
+function SellerDetailContent({ seller, note, setNote, onDecision, onClose }) {
+  return (
+    <>
+      <header className="detail-panel-header">
+        <div><span className="eyebrow">{seller.id}</span><h3>{seller.name}</h3></div>
+        <div className="detail-heading-actions"><Status>{seller.status}</Status>{onClose && <button className="icon-button" onClick={onClose} aria-label="Satıcı ayrıntısını kapat"><Icon name="close" /></button>}</div>
+      </header>
+      <div className="detail-panel-body">
+        <div className="detail-hero"><span className="avatar">{seller.name.split(" ").map((word) => word[0]).join("")}</span><div><strong>{seller.owner}</strong><small>Örnek şirket yetkilisi · doğrulama simülasyonu</small></div></div>
+        <dl className="detail-list"><div><dt>Kategori</dt><dd>{seller.category}</dd></div><div><dt>Planlanan ürün</dt><dd>{seller.products}</dd></div><div><dt>Komisyon teklifi</dt><dd>{seller.commission}</dd></div><div><dt>Risk seviyesi</dt><dd><Status>{seller.risk}</Status></dd></div></dl>
+        {seller.decisionReason && <section className="notice-card"><Icon name="info" /><div><strong>Son karar gerekçesi</strong><p>{seller.decisionReason}</p></div></section>}
+        <section><h4>Örnek belge kontrolü</h4>{["Vergi levhası", "İmza sirküleri", "Banka hesabı", "Mesafeli satış sözleşmesi"].map((label, index) => <div className="check-line" key={label}><Icon name={index === 2 && seller.risk === "Yüksek" ? "warning" : "check"} /><span>{label}</span><small>{index === 2 && seller.risk === "Yüksek" ? "İncelenmeli" : "Örnek doğrulandı"}</small></div>)}</section>
+        <label className="note-field"><span>İnceleme notu</span><textarea value={note || ""} onChange={(event) => setNote(event.target.value)} placeholder="Önizleme için bir not ekleyin…" /><small>Yalnız bu oturumda korunur.</small></label>
+      </div>
+      <footer>
+        <button className="danger-button" onClick={() => onDecision("Reddedildi")} disabled={seller.status === "Reddedildi"} data-testid="seller-reject">Red akışı</button>
+        <button className="primary-button" onClick={() => onDecision("Onaylandı")} disabled={seller.status === "Onaylandı"} data-testid="seller-approve">Onay akışı</button>
+      </footer>
+    </>
+  );
+}
+
+function Sellers({ sellers, setSellers, notes, setNotes, mobile, initialSellerId, draftInvites, notify }) {
+  const [activeId, setActiveId] = useState(initialSellerId || (mobile ? "" : sellers[0]?.id || ""));
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState({ risk: "Tümü", category: "Tümü", status: "Tümü" });
+  const [pendingDecision, setPendingDecision] = useState(null);
+  const [reason, setReason] = useState("");
+  const [decisionError, setDecisionError] = useState("");
+  const seller = sellers.find((item) => item.id === activeId);
+  const decisionSeller = sellers.find((item) => item.id === pendingDecision?.sellerId);
+  const visible = sellers.filter((item) => (
+    (filters.risk === "Tümü" || item.risk === filters.risk)
+    && (filters.category === "Tümü" || item.category === filters.category)
+    && (filters.status === "Tümü" || item.status === filters.status)
+  ));
+
+  useEffect(() => {
+    setActiveId(initialSellerId || (mobile ? "" : sellerApplicationRecords[0]?.id || ""));
+  }, [mobile, initialSellerId]);
+
+  useEffect(() => {
+    if (activeId && !visible.some((item) => item.id === activeId)) {
+      setActiveId(mobile ? "" : visible[0]?.id || "");
+    }
+  }, [activeId, filters.risk, filters.category, filters.status, mobile, sellers]);
+
+  const decide = () => {
+    if (!pendingDecision || !decisionSeller) {
+      setPendingDecision(null);
+      return;
+    }
+    if (pendingDecision.status === "Reddedildi" && reason.trim().length < 5) {
+      setDecisionError("Red gerekçesi en az 5 karakter olmalıdır.");
+      return;
+    }
+    setSellers((rows) => setSellerDecision(rows, decisionSeller.id, pendingDecision.status, reason));
+    notify(decisionSeller.name + " durumu önizlemede “" + pendingDecision.status + "” oldu.");
+    setPendingDecision(null);
+    setReason("");
+    setDecisionError("");
+  };
+
+  const detailContent = seller && (
+    <SellerDetailContent
+      seller={seller}
+      note={notes[seller.id]}
+      setNote={(value) => setNotes({ ...notes, [seller.id]: value })}
+      onDecision={(value) => { setPendingDecision({ sellerId: seller.id, status: value }); setReason(""); setDecisionError(""); }}
+      onClose={null}
+    />
+  );
+
+  return (
+    <div className="workspace split-workspace">
+      <div className="split-main">
+        <div className="workspace-heading">
+          <div><span className="eyebrow">Çoklu satıcı kabulü · güvenli simülasyon</span><h2 tabIndex="-1">Satıcı Başvuruları</h2><p>Belge, risk ve komisyon kararını gerçek erişim açmadan inceleyin.{draftInvites.length > 0 ? " " + draftInvites.length + " gönderilmemiş yerel davet taslağı bulunuyor." : ""}</p></div>
+          <button className="secondary-button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}><Icon name="filter" />Gelişmiş filtre</button>
+        </div>
+        {filtersOpen && (
+          <section className="filter-panel" aria-label="Satıcı filtreleri">
+            <label>Risk<select value={filters.risk} onChange={(event) => setFilters({ ...filters, risk: event.target.value })}><option>Tümü</option><option>Düşük</option><option>Orta</option><option>Yüksek</option></select></label>
+            <label>Kategori<select value={filters.category} onChange={(event) => setFilters({ ...filters, category: event.target.value })}><option>Tümü</option>{Array.from(new Set(sellers.map((item) => item.category))).map((item) => <option key={item}>{item}</option>)}</select></label>
+            <label>Durum<select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option>Tümü</option>{Array.from(new Set(sellers.map((item) => item.status))).map((item) => <option key={item}>{item}</option>)}</select></label>
+            <button className="secondary-button small" onClick={() => setFilters({ risk: "Tümü", category: "Tümü", status: "Tümü" })}>Temizle</button>
+          </section>
+        )}
+        <section className="table-card">
+          <header className="card-header"><div><h3>Örnek inceleme kuyruğu</h3><p>Risk ve belge durumuna göre filtrelenir</p></div></header>
+          <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Satıcı başvuruları tablosu, yatay kaydırılabilir">
+            <table className="data-table">
+              <caption className="sr-only">Filtrelenmiş örnek satıcı başvuruları</caption>
+              <thead><tr><th scope="col">Başvuru</th><th scope="col">Yetkili</th><th scope="col">Kategori</th><th scope="col">Ürün</th><th scope="col">Komisyon</th><th scope="col">Risk</th><th scope="col">Durum</th></tr></thead>
+              <tbody>
+                {visible.map((item) => (
+                  <tr key={item.id} className={activeId === item.id ? "selected-row" : ""} onClick={() => setActiveId(item.id)} data-testid={"seller-row-" + item.id}>
+                    <td><button className="row-entity-button" onClick={(event) => { event.stopPropagation(); setActiveId(item.id); }} aria-label={item.name + " başvurusunu incele"}><strong>{item.name}</strong><small>{item.id}</small></button></td>
+                    <td>{item.owner}</td><td>{item.category}</td><td>{item.products}</td><td>{item.commission}</td><td><Status>{item.risk}</Status></td><td><Status>{item.status}</Status></td>
+                  </tr>
+                ))}
+                {visible.length === 0 && <EmptyTable colSpan={7} title="Satıcı başvurusu bulunamadı" onReset={() => setFilters({ risk: "Tümü", category: "Tümü", status: "Tümü" })} />}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      {!mobile && seller && <aside className="detail-panel" role="complementary" aria-label={seller.name + " ayrıntısı"} data-testid="seller-detail">{detailContent}</aside>}
+      {mobile && seller && <Modal title="Satıcı başvurusu" onClose={() => setActiveId("")} wide testId="seller-detail" cardClass="seller-detail-modal">{detailContent}</Modal>}
+      {pendingDecision && decisionSeller && (
+        <Modal title={pendingDecision.status === "Onaylandı" ? "Onay etkisini doğrula" : "Red etkisini doğrula"} onClose={() => setPendingDecision(null)} testId="confirmation-dialog">
+          <div className="confirmation-body"><Icon name={pendingDecision.status === "Onaylandı" ? "check" : "warning"} /><p><strong>{decisionSeller.name}</strong> için “{pendingDecision.status}” durumu yalnız yerel örnek kaydı değiştirir. Canlı satıcı erişimi açılmaz.</p></div>
+          {pendingDecision.status === "Reddedildi" && <label className="form-field"><span>Red gerekçesi</span><textarea value={reason} onChange={(event) => { setReason(event.target.value); setDecisionError(""); }} aria-invalid={decisionError ? "true" : undefined} aria-describedby={decisionError ? "seller-decision-error" : undefined} data-autofocus />{decisionError && <small className="modal-error" id="seller-decision-error" role="alert">{decisionError}</small>}</label>}
+          <footer className="modal-actions"><button className="secondary-button" onClick={() => setPendingDecision(null)}>İptal</button><button className={pendingDecision.status === "Onaylandı" ? "primary-button" : "danger-button"} onClick={decide}>Önizlemede uygula</button></footer>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function SettlementDetail({ row, onClose, onPreview }) {
+  return (
+    <Modal title={"Hakediş " + row.id} onClose={onClose} wide testId="settlement-detail">
+      <div className="detail-modal-body">
+        <div className="detail-hero"><span className="avatar">{row.seller.split(" ").map((word) => word[0]).join("")}</span><div><strong>{row.seller}</strong><small>{row.period} · yerel örnek ledger</small></div></div>
+        <dl className="detail-list detail-grid"><div><dt>Brüt satış</dt><dd>{money(row.gross)}</dd></div><div><dt>Komisyon</dt><dd>−{money(row.commission)}</dd></div><div><dt>İade</dt><dd>−{money(row.returns)}</dd></div><div><dt>Net hakediş</dt><dd><strong>{money(row.net)}</strong></dd></div></dl>
+        <section className="notice-card"><Icon name="shield" /><div><strong>Güvenli önizleme sınırı</strong><p>Bu yüzey para transferi, banka talimatı veya canlı muhasebe kaydı üretmez.</p></div></section>
+      </div>
+      <footer className="modal-actions"><button className="secondary-button" onClick={onClose}>Kapat</button>{row.status === "Ödemeye hazır" && <button className="primary-button" onClick={onPreview}>Akışı önizle</button>}</footer>
+    </Modal>
+  );
+}
+
+function Finance({ rows, setRows, store, contextItem, notify }) {
+  const [status, setStatus] = useState("Tüm durumlar");
+  const [detailId, setDetailId] = useState("");
+  const [confirmId, setConfirmId] = useState("");
+  const scopedRows = rows.filter((row) => matchesStore(row, store));
+  const visible = scopedRows.filter((row) => status === "Tüm durumlar" || row.status === status);
+  const detail = rows.find((row) => row.id === detailId);
+  const confirming = rows.find((row) => row.id === confirmId);
+
+  const exportRows = () => {
+    downloadCsv("novastore-hakedis-onizleme.csv", [
+      { label: "Hakediş", value: "id" }, { label: "Satıcı", value: "seller" }, { label: "Dönem", value: "period" },
+      { label: "Brüt", value: "gross" }, { label: "Komisyon", value: "commission" }, { label: "İade", value: "returns" },
+      { label: "Net", value: "net" }, { label: "Durum", value: "status" },
+    ], visible);
+    notify(visible.length + " örnek hakediş CSV olarak indirildi.");
+  };
+
+  const previewSettlement = () => {
+    setRows((all) => all.map((row) => row.id === confirmId ? { ...row, status: "Akış önizlendi" } : row));
+    notify(confirmId + " için yalnız arayüz durumu değişti; finansal talep gönderilmedi.");
+    setConfirmId("");
+    setDetailId("");
+  };
+
+  return (
+    <div className="workspace page-workspace">
+      <div className="workspace-heading">
+        <div><span className="eyebrow">Finans ve mutabakat · güvenli örnek</span><h2 tabIndex="-1">{contextItem === "Genel Bakış" ? "Finans Genel Bakış" : "Satıcı Hakedişleri"}</h2><p>Komisyon, iade ve durum anatomisini finansal işlem üretmeden inceleyin.</p></div>
+        <button className="secondary-button" onClick={exportRows}><Icon name="download" />CSV indir</button>
+      </div>
+      <section className="kpi-grid compact"><Kpi label="Ödenecek net tutar" value={money(scopedRows.filter((row) => row.status === "Ödemeye hazır").reduce((sum, row) => sum + row.net, 0))} trend="Kapsamdaki örnek" /><Kpi label="Platform komisyonu" value={money(scopedRows.reduce((sum, row) => sum + row.commission, 0))} trend="Kapsamdaki toplam" /><Kpi label="Blokeli tutar" value={money(scopedRows.filter((row) => row.status === "Blokeli").reduce((sum, row) => sum + row.net, 0))} trend="İnceleme gerekli" tone="warning" /><Kpi label="Ödenmiş örnek" value={String(scopedRows.filter((row) => row.status === "Ödendi").length)} trend="Canlı veri değil" /></section>
+      <section className="table-card" data-testid="finance-ledger">
+        <header className="card-header"><div><h3>Hakediş takvimi</h3><p>Hiçbir finansal işlem kaydedilmez</p></div><div className="filter-toolbar"><select aria-label="Hakediş durumu" value={status} data-testid="finance-filter" onChange={(event) => setStatus(event.target.value)}><option>Tüm durumlar</option><option>Ödemeye hazır</option><option>Kontrol ediliyor</option><option>Blokeli</option><option>Ödendi</option><option>Akış önizlendi</option></select></div></header>
+        <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Hakediş tablosu, yatay kaydırılabilir">
+          <table className="data-table">
+            <caption className="sr-only">Filtrelenmiş örnek hakedişler</caption>
+            <thead><tr><th scope="col">Hakediş</th><th scope="col">Satıcı</th><th scope="col">Dönem</th><th scope="col">Brüt satış</th><th scope="col">Komisyon</th><th scope="col">İade</th><th scope="col">Net hakediş</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+            <tbody>
+              {visible.map((row) => <tr key={row.id} data-testid={"finance-row-" + row.id}><td><strong>{row.id}</strong></td><td>{row.seller}</td><td>{row.period}</td><td>{money(row.gross)}</td><td className="negative">−{money(row.commission)}</td><td className="negative">−{money(row.returns)}</td><td><strong>{money(row.net)}</strong></td><td><Status>{row.status}</Status></td><td><button className={row.status === "Ödemeye hazır" ? "primary-button small" : "secondary-button small"} onClick={() => row.status === "Ödemeye hazır" ? setConfirmId(row.id) : setDetailId(row.id)} data-testid={row.status === "Ödemeye hazır" ? "finance-settle" : undefined}>{row.status === "Ödemeye hazır" ? "Akışı önizle" : "İncele"}</button></td></tr>)}
+              {visible.length === 0 && <EmptyTable colSpan={9} title="Bu filtrede hakediş yok" onReset={() => setStatus("Tüm durumlar")} />}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {detail && <SettlementDetail row={detail} onClose={() => setDetailId("")} onPreview={() => { setDetailId(""); setConfirmId(detail.id); }} />}
+      {confirming && (
+        <Modal title="Hakediş akışını doğrula" onClose={() => setConfirmId("")} testId="confirmation-dialog">
+          <div className="confirmation-body"><Icon name="warning" /><p><strong>{confirming.id}</strong> yalnız “Akış önizlendi” durumuna geçecek. Para transferi veya dış sistem çağrısı yapılmayacak.</p></div>
+          <footer className="modal-actions"><button className="secondary-button" onClick={() => setConfirmId("")}>İptal</button><button className="primary-button" onClick={previewSettlement}>Yerelde uygula</button></footer>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function Analytics({ contextItem, notify }) {
+  const [period, setPeriod] = useState("Son 30 gün");
+  const metrics = analyticsPeriods[period];
+  const top = [["Apple iPhone 15 128 GB", 1248, 64884000, 82], ["NovaTech AeroBook 14", 864, 16415136, 64], ["NovaHome S10 Robot Süpürge", 622, 4975378, 48], ["Smartix Watch 2", 518, 1812482, 38]];
+  const scaled = top.map(([name, orders, revenue, score]) => [name, Math.round(orders * metrics.multiplier), Math.round(revenue * metrics.multiplier), score]);
+  const channelRows = [["NovaStore Web", 48, 6200000], ["NovaStore Mobil", 28, 3600000], ["Trendyol", 14, 1800000], ["Hepsiburada", 10, 1200000]];
+  const funnelRows = [["Ürün görüntüleme", 412840, 100], ["Sepete ekleme", 46218, 68], ["Ödeme başlangıcı", 18664, 44], ["Sipariş", 15782, 36]];
+  const exportRows = () => {
+    downloadCsv("novastore-rapor-" + period.toLocaleLowerCase("tr-TR").replaceAll(" ", "-") + ".csv", [
+      { label: "Ürün", value: (row) => row[0] }, { label: "Sipariş", value: (row) => row[1] },
+      { label: "Net ciro", value: (row) => row[2] }, { label: "Katalog skoru", value: (row) => row[3] },
+    ], scaled);
+    notify(period + " örnek raporu CSV olarak indirildi.");
+  };
+  return (
+    <div className="workspace page-workspace">
+      <div className="workspace-heading">
+        <div><span className="eyebrow">{contextItem} · örnek veri</span><h2 tabIndex="-1">Satış ve Dönüşüm</h2><p>Mağaza, satıcı ve ürün performansını seçili dönemle yeniden hesaplayın.</p></div>
+        <div className="heading-actions"><select aria-label="Rapor dönemi" value={period} onChange={(event) => setPeriod(event.target.value)}>{Object.keys(analyticsPeriods).map((item) => <option key={item}>{item}</option>)}</select><button className="secondary-button" onClick={exportRows}><Icon name="download" />CSV indir</button></div>
+      </div>
+      <section className="kpi-grid"><Kpi label="Brüt ürün hacmi" value={metrics.gross} trend={period + " · örnek"} /><Kpi label="Net ciro" value={metrics.net} trend="Yerel hesaplama" /><Kpi label="Dönüşüm" value={metrics.conversion} trend="Örnek oran" /><Kpi label="Ort. sepet" value={metrics.basket} trend="Örnek değer" /></section>
+      <section className="analytics-grid">
+        <article className="module-card analytics-main"><header><div><span className="eyebrow">Kanal karşılaştırması</span><h3>Gelir katkısı</h3></div></header>{channelRows.map(([label, value, amount]) => <div className="metric-progress" key={label}><span>{label}</span><progress max="100" value={value} aria-label={label + " katkısı yüzde " + value} /><strong>{money(Math.round(amount * metrics.multiplier))}</strong></div>)}</article>
+        <article className="module-card"><header><h3>Dönüşüm hunisi</h3></header>{funnelRows.map(([label, value, progress]) => <div className="funnel-row" key={label}><span>{label}</span><progress max="100" value={progress} aria-label={label + " yüzde " + progress} /><strong>{Math.round(value * metrics.multiplier).toLocaleString("tr-TR")}</strong></div>)}</article>
+      </section>
+      <section className="table-card">
+        <header className="card-header"><div><h3>Ürün performansı</h3><p>{period} · ölçeklenmiş örnek veriler</p></div></header>
+        <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Ürün performansı tablosu, yatay kaydırılabilir"><table className="data-table"><caption className="sr-only">Örnek ürün performansı</caption><thead><tr><th scope="col">Ürün</th><th scope="col">Sipariş</th><th scope="col">Net ciro</th><th scope="col">Katalog skoru</th></tr></thead><tbody>{scaled.map(([name, orders, revenue, score]) => <tr key={name}><td><strong>{name}</strong></td><td>{orders.toLocaleString("tr-TR")}</td><td>{money(revenue)}</td><td><span className="score"><progress max="100" value={score} aria-label={name + " katalog skoru yüzde " + score} />%{score}</span></td></tr>)}</tbody></table></div>
+      </section>
+    </div>
+  );
+}
+
+function Modules({ modules, setModules, roles, setRoles, contextItem, notify }) {
+  const [activeRole, setActiveRole] = useState(roles[0]?.id || "");
+  const [pendingModule, setPendingModule] = useState("");
+  const [creatingRole, setCreatingRole] = useState(false);
+  const currentRole = roles.find((role) => role.id === activeRole) || roles[0];
+  const visibleModules = modules.filter((item) => contextItem !== "Etkin Modüller" || item.enabled);
+  const roleModules = modules.filter((item) => currentRole?.moduleIds.includes(item.id));
+  const target = modules.find((item) => item.id === pendingModule);
+
+  const createRole = (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const label = String(new FormData(form).get("label") || "").trim();
+    if (!label) return;
+    const id = "role-" + Date.now();
+    const initials = label.split(" ").map((part) => part[0]).join("").slice(0, 2).toLocaleUpperCase("tr-TR");
+    const role = { id, initials, label, detail: "Yeni · oturum içi", moduleIds: modules.filter((item) => item.enabled).map((item) => item.id) };
+    setRoles(roles.concat(role));
+    setActiveRole(id);
+    setCreatingRole(false);
+    notify("“" + label + "” rol düzeni bu oturumda oluşturuldu.");
+  };
+
+  const applyToggle = () => {
+    setModules((all) => toggleModuleAvailability(all, pendingModule));
+    notify(target.name + " önizleme durumu değiştirildi.");
+    setPendingModule("");
+  };
+
+  return (
+    <div className="workspace page-workspace">
+      <div className="workspace-heading">
+        <div><span className="eyebrow">Kişiselleştirilebilir çalışma alanı · önizleme</span><h2 tabIndex="-1">{contextItem}</h2><p>{contextItem === "Rol Düzenleri" ? "Rol bazında görünür modül bileşimini inceleyin ve oturum içi bir düzen oluşturun." : "Modül bağımlılıklarını ve çalışma alanı genelindeki yerel kullanılabilirlik durumunu inceleyin."}</p></div>
+        {contextItem === "Rol Düzenleri" && <button className="primary-button" onClick={() => setCreatingRole(true)}><Icon name="plus" />Rol düzeni oluştur</button>}
+      </div>
+      {contextItem === "Rol Düzenleri" ? (
+        <>
+          <section className="role-layouts" aria-label="Rol düzenleri">
+            {roles.map((role) => <button key={role.id} className={activeRole === role.id ? "active" : ""} aria-pressed={activeRole === role.id} onClick={() => setActiveRole(role.id)}><span className="avatar">{role.initials}</span><span><strong>{role.label}</strong><small>{role.detail}</small></span></button>)}
+          </section>
+          <section className="table-card role-module-summary">
+            <header className="card-header"><div><h3>{currentRole?.label} modül görünürlüğü</h3><p>Bu sözleşme rol bileşimini gösterir; gerçek RBAC yetkisi veya özellik bayrağı uygulanmaz.</p></div></header>
+            <div className="role-module-list">
+              {roleModules.map((item) => <div key={item.id}><span><strong>{item.name}</strong><small>{item.description}</small></span><Status>{item.enabled ? "Kullanılabilir" : "Genel olarak kapalı"}</Status></div>)}
+            </div>
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="notice-card workspace-notice"><Icon name="info" /><div><strong>Çalışma alanı genelinde yerel durum</strong><p>Aşağıdaki anahtarlar seçili role üyelik eklemez; yalnız modülün bu önizleme oturumundaki genel kullanılabilirliğini değiştirir.</p></div></section>
+          <section className="module-grid">
+            {visibleModules.map((item) => (
+              <article className={"module-option " + (item.enabled ? "enabled" : "")} key={item.id} data-testid={"module-" + item.id}>
+                <div className="module-preview" data-testid="module-card"><Icon name={item.id.includes("seller") ? "user" : item.id.includes("settlement") ? "card" : "chart"} /></div>
+                <div><h3>{item.name}</h3><p>{item.description}</p><dl className="module-meta"><div><dt>Sürüm</dt><dd>{item.version}</dd></div><div><dt>Bağımlılık</dt><dd>{item.dependency}</dd></div><div><dt>Sağlık</dt><dd>{item.health}</dd></div></dl></div>
+                <label className="switch" data-testid="module-toggle"><input type="checkbox" checked={item.enabled} onChange={() => setPendingModule(item.id)} aria-label={item.name + " modülünün genel önizleme durumunu " + (item.enabled ? "devre dışı bırak" : "etkinleştir")} data-testid={"module-toggle-" + item.id} /><span>{item.enabled ? "Etkin" : "Devre dışı"}</span></label>
+              </article>
+            ))}
+            {visibleModules.length === 0 && <EmptyState title="Bu görünümde etkin modül yok" description="Modül Merkezi görünümünden bir modülü etkinleştirin." />}
+          </section>
+        </>
+      )}
+      {target && <Modal title="Modül etkisini doğrula" onClose={() => setPendingModule("")} testId="confirmation-dialog"><div className="confirmation-body"><Icon name="warning" /><p><strong>{target.name}</strong> yalnız bu önizleme oturumunda çalışma alanı genelinde {target.enabled ? "devre dışı" : "etkin"} görünecek. Rol üyeliği, gerçek özellik bayrağı veya veri dönüşümü değişmez.</p></div><dl className="detail-list"><div><dt>Bağımlılık</dt><dd>{target.dependency}</dd></div><div><dt>Sürüm</dt><dd>{target.version}</dd></div></dl><footer className="modal-actions"><button className="secondary-button" onClick={() => setPendingModule("")}>İptal</button><button className="primary-button" onClick={applyToggle}>Yerelde uygula</button></footer></Modal>}
+      {creatingRole && <Modal title="Rol düzeni oluştur" onClose={() => setCreatingRole(false)}><form className="modal-form" onSubmit={createRole}><label><span>Rol adı</span><input name="label" required minLength="3" data-autofocus placeholder="Örn. Müşteri Deneyimi" /></label><p className="form-hint">Yeni düzen, şu anda etkin modüllerle yalnız bu oturumda oluşturulur.</p><footer><button type="button" className="secondary-button" onClick={() => setCreatingRole(false)}>İptal</button><button className="primary-button">Önizlemede oluştur</button></footer></form></Modal>}
+    </div>
+  );
+}
+
+function Audit({ contextItem, notify }) {
   const [query, setQuery] = useState("");
-  const visible = auditRows.filter((row) => row.join(" ").toLocaleLowerCase("tr-TR").includes(query.toLocaleLowerCase("tr-TR")));
-  return <div className="workspace page-workspace"><div className="workspace-heading"><div><span className="eyebrow">İzlenebilirlik ve güvenlik · örnek veri</span><h2>Denetim Kayıtları</h2><p>Gelecekteki yönetici, sistem ve entegrasyon işlemlerinin değiştirilemez zaman çizgisini inceleyin.</p></div><button className="secondary-button" onClick={() => notify("Örnek denetim dışa aktarma akışı önizlendi.")}><Icon name="download" />CSV akışını önizle</button></div><section className="notice-card"><Icon name="shield" /><div><strong>Denetim tasarım sözleşmesi hazır</strong><p>Bu kayıtlar örnektir; canlı bütünlük veya entegrasyon durumu bildirmez.</p></div></section><section className="table-card"><header className="card-header"><div><h3>Örnek işlem geçmişi</h3><p>Arama ve kayıt anatomisi etkileşimlidir</p></div><label className="table-search"><Icon name="search" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Kullanıcı, kayıt veya işlem ara" aria-label="Denetim kayıtlarında ara" /></label></header><div className="table-scroll"><table className="data-table"><thead><tr><th>Saat</th><th>Aktör</th><th>İşlem</th><th>Hedef</th><th>Kaynak</th><th>Sonuç</th></tr></thead><tbody>{visible.map((row) => <tr key={row.join("-")}><td>{row[0]}</td><td><strong>{row[1]}</strong></td><td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td><td><Status>Örnek</Status></td></tr>)}</tbody></table></div></section></div>;
+  const [source, setSource] = useState("Tümü");
+  const visible = auditRecords.filter((row) => (source === "Tümü" || row.source === source) && matchesQuery(row, query));
+  const exportRows = () => {
+    downloadCsv("novastore-denetim-onizleme.csv", [
+      { label: "Saat", value: "time" }, { label: "Aktör", value: "actor" }, { label: "İşlem", value: "action" },
+      { label: "Hedef", value: "target" }, { label: "Kaynak", value: "source" },
+    ], visible);
+    notify(visible.length + " örnek denetim kaydı CSV olarak indirildi.");
+  };
+
+  if (contextItem === "Dışa Aktarımlar") {
+    return (
+      <div className="workspace page-workspace">
+        <div className="workspace-heading"><div><span className="eyebrow">Yerel çıktı geçmişi</span><h2 tabIndex="-1">Dışa Aktarım Önizlemeleri</h2><p>Bu liste örnek çıktı sözleşmesini gösterir; sunucuda dosya tutulmaz.</p></div></div>
+        <section className="table-card"><header className="card-header"><div><h3>Örnek çıktılar</h3><p>Gerçek arşiv entegrasyonda etkinleşir</p></div></header><div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Dışa aktarım tablosu, yatay kaydırılabilir"><table className="data-table"><caption className="sr-only">Örnek dışa aktarımlar</caption><thead><tr><th scope="col">Dosya</th><th scope="col">Alan</th><th scope="col">Kayıt</th><th scope="col">Oluşturan</th><th scope="col">Durum</th></tr></thead><tbody><tr><td><strong>siparis-onizleme.csv</strong></td><td>Operasyon</td><td>28</td><td>Ayşe Kara</td><td><Status>Örnek</Status></td></tr><tr><td><strong>musteri-onizleme.csv</strong></td><td>Müşteri</td><td>5</td><td>Mehmet Akın</td><td><Status>Örnek</Status></td></tr></tbody></table></div></section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="workspace page-workspace">
+      <div className="workspace-heading"><div><span className="eyebrow">İzlenebilirlik · örnek veri</span><h2 tabIndex="-1">Denetim Kayıtları</h2><p>Gelecekteki yönetici ve sistem işlemlerinin kayıt anatomisini inceleyin.</p></div><button className="secondary-button" onClick={exportRows}><Icon name="download" />CSV indir</button></div>
+      <section className="notice-card"><Icon name="shield" /><div><strong>Denetim tasarım sözleşmesi hazır</strong><p>Bu kayıtlar örnektir; canlı bütünlük veya entegrasyon durumu bildirmez.</p></div></section>
+      <section className="table-card">
+        <header className="card-header"><div><h3>Örnek işlem geçmişi</h3><p>Arama ve kaynak filtresi etkileşimlidir</p></div><div className="filter-toolbar"><label className="table-search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Kullanıcı, kayıt veya işlem ara" aria-label="Denetim kayıtlarında ara" /></label><select aria-label="Denetim kaynağı" value={source} onChange={(event) => setSource(event.target.value)}><option>Tümü</option>{Array.from(new Set(auditRecords.map((row) => row.source))).map((item) => <option key={item}>{item}</option>)}</select></div></header>
+        <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Denetim kayıtları tablosu, yatay kaydırılabilir"><table className="data-table"><caption className="sr-only">Filtrelenmiş örnek denetim kayıtları</caption><thead><tr><th scope="col">Saat</th><th scope="col">Aktör</th><th scope="col">İşlem</th><th scope="col">Hedef</th><th scope="col">Kaynak</th><th scope="col">Sonuç</th></tr></thead><tbody>{visible.map((row) => <tr key={row.time + row.target}><td>{row.time}</td><td><strong>{row.actor}</strong></td><td>{row.action}</td><td>{row.target}</td><td>{row.source}</td><td><Status>Örnek</Status></td></tr>)}{visible.length === 0 && <EmptyTable colSpan={6} title="Denetim kaydı bulunamadı" onReset={() => { setQuery(""); setSource("Tümü"); }} />}</tbody></table></div>
+      </section>
+    </div>
+  );
 }
 
-function Settings({ notify }) {
-  const [form, setForm] = useState(initialSettings);
+function Settings({ saved, setSaved, contextItem, notify }) {
+  const [form, setForm] = useState(saved);
+  const [error, setError] = useState("");
+  const notificationRef = useRef(null);
+  const dirty = JSON.stringify(form) !== JSON.stringify(saved);
   const field = (key, value) => setForm({ ...form, [key]: value });
-  return <div className="workspace page-workspace settings-page"><div className="workspace-heading"><div><span className="eyebrow">Çalışma alanı ayarları · önizleme</span><h2>Genel Ayarlar</h2><p>Marka, bildirim ve operasyon varsayılanlarının örnek form davranışını inceleyin.</p></div></div><form onSubmit={(e) => { e.preventDefault(); notify("Ayarlar yalnız bu önizleme oturumunda kaydedildi."); }}><section className="form-card"><header><h3>Mağaza bilgileri</h3><p>Bu alanlar canlı sisteme gönderilmez.</p></header><div className="form-grid"><label><span>Çalışma alanı adı</span><input value={form.name} onChange={(e) => field("name", e.target.value)} /></label><label><span>Operasyon e-postası</span><input type="email" value={form.email} onChange={(e) => field("email", e.target.value)} /></label><label><span>Saat dilimi</span><select value={form.timezone} onChange={(e) => field("timezone", e.target.value)}><option>Europe/İstanbul</option><option>Europe/Berlin</option></select></label><label><span>Varsayılan mağaza kapsamı</span><select onChange={(e) => notify(`“${e.target.value}” örnek kapsamı seçildi.`)}><option>Tüm Mağazalar · 24</option><option>NovaStore</option></select></label></div></section><section className="form-card"><header><h3>İş akışı bildirimleri</h3><p>Yalnızca yerel form durumu değişir.</p></header>{[["approval", "Yeni satıcı başvuruları", "Başvuru ve belge değişikliklerini bildir"], ["settlement", "Hakediş riskleri", "Bloke ve mutabakat kayıtlarını bildir"], ["digest", "Günlük yönetici özeti", "Her gün saat 09:00’da özet gönder"]].map(([key, title, description]) => <label className="setting-toggle" key={key}><span><strong>{title}</strong><small>{description}</small></span><input type="checkbox" checked={form[key]} onChange={(e) => field(key, e.target.checked)} /></label>)}</section><footer className="form-actions"><button type="button" className="secondary-button" onClick={() => { setForm(initialSettings); notify("Örnek ayarlar başlangıç değerlerine döndürüldü."); }}>Değişiklikleri iptal et</button><button className="primary-button">Önizlemede kaydet</button></footer></form></div>;
+
+  useEffect(() => {
+    setForm(saved);
+  }, [saved]);
+
+  useEffect(() => {
+    if (contextItem === "Bildirimler") notificationRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [contextItem]);
+
+  const submit = (event) => {
+    event.preventDefault();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      setError("Geçerli bir operasyon e-postası girin.");
+      return;
+    }
+    setSaved(form);
+    setError("");
+    notify("Ayar snapshot’ı yalnız bu önizleme oturumunda kaydedildi.");
+  };
+
+  return (
+    <div className="workspace page-workspace settings-page">
+      <div className="workspace-heading"><div><span className="eyebrow">Çalışma alanı ayarları · önizleme</span><h2 tabIndex="-1">Genel Ayarlar</h2><p>Marka, kapsam ve bildirim varsayılanlarının kontrollü form davranışını inceleyin.</p></div>{dirty && <Status>Kaydedilmemiş</Status>}</div>
+      <form onSubmit={submit}>
+        <section className="form-card">
+          <header><h3>Mağaza bilgileri</h3><p>Bu alanlar canlı sisteme gönderilmez.</p></header>
+          <div className="form-grid">
+            <label><span>Çalışma alanı adı</span><input value={form.name} onChange={(event) => field("name", event.target.value)} required minLength="3" /></label>
+            <label><span>Operasyon e-postası</span><input type="email" value={form.email} onChange={(event) => { field("email", event.target.value); setError(""); }} aria-invalid={error ? "true" : undefined} aria-describedby={error ? "settings-email-error" : undefined} />{error && <small className="modal-error" id="settings-email-error" role="alert">{error}</small>}</label>
+            <label><span>Saat dilimi</span><select value={form.timezone} onChange={(event) => field("timezone", event.target.value)}><option>Europe/Istanbul</option><option>Europe/Berlin</option></select></label>
+            <label><span>Varsayılan mağaza kapsamı</span><select value={form.store} onChange={(event) => field("store", event.target.value)}><option>Tüm Mağazalar · 24</option><option>NovaStore</option><option>TeknoPark · 2 mağaza</option><option>Eviva Home</option></select></label>
+          </div>
+        </section>
+        <section className="form-card" ref={notificationRef}>
+          <header><h3>İş akışı bildirimleri</h3><p>Yalnızca yerel form durumu değişir.</p></header>
+          {[["approval", "Yeni satıcı başvuruları", "Başvuru ve belge değişikliklerini bildir"], ["settlement", "Hakediş riskleri", "Bloke ve mutabakat kayıtlarını bildir"], ["digest", "Günlük yönetici özeti", "Her gün saat 09:00’da özet göster"]].map(([key, title, description]) => <label className="setting-toggle" key={key}><span><strong>{title}</strong><small>{description}</small></span><input type="checkbox" checked={form[key]} onChange={(event) => field(key, event.target.checked)} /></label>)}
+        </section>
+        <footer className="form-actions"><span className="form-hint">{dirty ? "Yerel değişiklikler henüz kaydedilmedi." : "Kaydedilen yerel snapshot gösteriliyor."}</span><button type="button" className="secondary-button" disabled={!dirty} onClick={() => { setForm(saved); setError(""); notify("Değişiklikler son kaydedilen snapshot’a döndürüldü."); }}>Değişiklikleri iptal et</button><button className="primary-button" disabled={!dirty}>Önizlemede kaydet</button></footer>
+      </form>
+    </div>
+  );
 }
 
-function CommandPalette({ onClose, navigate }) {
+function CommandPalette({ onClose, run, orders, products, sellers, customers }) {
   const [query, setQuery] = useState("");
-  const commands = [...domains.map((item) => ({ label: `${item.label} çalışma alanına git`, section: item.id, icon: item.icon })), { label: "Yeni ürün oluştur", section: "catalog", icon: "plus" }, { label: "Satıcı başvurularını incele", section: "sellers", icon: "user" }, { label: "Hakedişleri kontrol et", section: "finance", icon: "card" }];
-  const filtered = commands.filter((item) => item.label.toLocaleLowerCase("tr-TR").includes(query.toLocaleLowerCase("tr-TR")));
-  return <Modal title="Komut paleti" onClose={onClose} wide><div className="command-input"><Icon name="search" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Sayfa, kayıt veya komut ara…" autoFocus /></div><div className="command-results">{filtered.map((item) => <button key={item.label} onClick={() => { navigate(item.section); onClose(); }}><Icon name={item.icon} /><span>{item.label}</span><kbd>↵</kbd></button>)}{filtered.length === 0 && <div className="empty-inline">Eşleşen komut bulunamadı.</div>}</div></Modal>;
+  const [activeIndex, setActiveIndex] = useState(0);
+  const listId = useId();
+  const commands = useMemo(() => [
+    ...domains.map((item) => ({ id: "domain-" + item.id, label: item.label + " çalışma alanına git", section: item.id, icon: item.icon, kind: "navigate" })),
+    { id: "create-product", label: "Yeni ürün oluştur", section: "catalog", icon: "plus", kind: "product-create" },
+    ...orders.map((item) => ({ id: "order-" + item.id, label: item.id + " · " + item.customer, section: "operations", icon: "orders", kind: "order", entityId: item.id })),
+    ...products.map((item) => ({ id: "product-" + item.sku, label: item.sku + " · " + item.name, section: "catalog", icon: "package", kind: "product", entityId: item.sku })),
+    ...sellers.map((item) => ({ id: "seller-" + item.id, label: item.id + " · " + item.name, section: "sellers", icon: "user", kind: "seller", entityId: item.id })),
+    ...customers.map((item) => ({ id: "customer-" + item.id, label: item.id + " · " + item.name, section: "customers", icon: "user", kind: "customer", entityId: item.id })),
+  ], [orders, products, sellers, customers]);
+  const filtered = commands.filter((item) => matchesQuery(item, query)).slice(0, 12);
+  const safeIndex = Math.min(activeIndex, Math.max(0, filtered.length - 1));
+
+  const execute = (item) => {
+    if (!item) return;
+    run(item);
+  };
+
+  return (
+    <Modal title="Komut paleti" onClose={onClose} wide>
+      <div className="command-input">
+        <Icon name="search" />
+        <label className="sr-only" htmlFor={listId + "-input"}>Sayfa, kayıt veya komut ara</label>
+        <input
+          id={listId + "-input"}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="true"
+          aria-controls={listId}
+          aria-activedescendant={filtered[safeIndex] ? listId + "-" + filtered[safeIndex].id : undefined}
+          value={query}
+          onChange={(event) => { setQuery(event.target.value); setActiveIndex(0); }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown") { event.preventDefault(); setActiveIndex(Math.min(safeIndex + 1, filtered.length - 1)); }
+            if (event.key === "ArrowUp") { event.preventDefault(); setActiveIndex(Math.max(safeIndex - 1, 0)); }
+            if (event.key === "Enter") { event.preventDefault(); execute(filtered[safeIndex]); }
+          }}
+          placeholder="Sayfa, kayıt veya komut ara…"
+          data-autofocus
+        />
+      </div>
+      <div className="command-count" role="status">{filtered.length} sonuç</div>
+      <div className="command-results" id={listId} role="listbox">
+        {filtered.map((item, index) => <button id={listId + "-" + item.id} role="option" aria-selected={safeIndex === index} className={safeIndex === index ? "active" : ""} key={item.id} onMouseEnter={() => setActiveIndex(index)} onClick={() => execute(item)}><Icon name={item.icon} /><span>{item.label}</span><kbd>↵</kbd></button>)}
+        {filtered.length === 0 && <div className="empty-inline">Eşleşen komut bulunamadı.</div>}
+      </div>
+    </Modal>
+  );
+}
+
+function ProductDialog({ product, products, onClose, onSave }) {
+  const [draft, setDraft] = useState(product || { name: "", seller: "NovaStore", category: "Elektronik", sku: "NVS-", price: "", stock: "", status: "" });
+  const [error, setError] = useState("");
+  const field = (key, value) => setDraft({ ...draft, [key]: value });
+  const submit = (event) => {
+    event.preventDefault();
+    const issue = validateProductDraft(draft, products, product?.sku || "");
+    if (issue) {
+      setError(issue);
+      return;
+    }
+    onSave(productFromDraft(draft, product), product?.sku || "");
+  };
+  return (
+    <Modal title={product ? "Ürünü düzenle" : "Yeni ürün taslağı"} onClose={onClose} wide testId="product-dialog">
+      <form className="modal-form two-column" onSubmit={submit}>
+        <label><span>Ürün adı</span><input value={draft.name} onChange={(event) => { field("name", event.target.value); setError(""); }} required minLength="3" data-autofocus /></label>
+        <label><span>Satıcı</span><select value={draft.seller} onChange={(event) => field("seller", event.target.value)}><option>NovaStore</option><option>TeknoPark</option><option>Eviva Home</option></select></label>
+        <label><span>Kategori</span><select value={draft.category} onChange={(event) => field("category", event.target.value)}><option>Elektronik</option><option>Cep Telefonu</option><option>Dizüstü Bilgisayar</option><option>Elektrikli Ev Aleti</option><option>Akıllı Saat</option><option>Ev & Yaşam</option><option>Ev Tekstili</option></select></label>
+        <label><span>Stok kodu</span><input value={draft.sku} onChange={(event) => { field("sku", event.target.value); setError(""); }} required aria-invalid={error ? "true" : undefined} aria-describedby={error ? "product-error" : undefined} /></label>
+        <label><span>Satış fiyatı</span><input type="number" min="1" value={draft.price} onChange={(event) => { field("price", event.target.value); setError(""); }} required /></label>
+        <label><span>Başlangıç stoku</span><input type="number" min="0" step="1" value={draft.stock} onChange={(event) => {
+          const stock = event.target.value;
+          const derivedStatus = stock === "" ? "" : Number(stock) === 0 ? "Stokta yok" : Number(stock) < 10 ? "Düşük stok" : "Yayında";
+          setDraft({ ...draft, stock, status: draft.status === "Onay bekliyor" ? draft.status : derivedStatus });
+          setError("");
+        }} required /></label>
+        <label><span>Durum</span><select value={draft.status || ""} onChange={(event) => field("status", event.target.value)}><option value="">Stoka göre belirle</option><option>Yayında</option><option>Düşük stok</option><option>Onay bekliyor</option><option>Stokta yok</option></select></label>
+        {error && <p className="modal-error form-span" id="product-error" role="alert">{error}</p>}
+        <footer><button type="button" className="secondary-button" onClick={onClose}>İptal</button><button className="primary-button">{product ? "Değişiklikleri uygula" : "Önizlemede oluştur"}</button></footer>
+      </form>
+    </Modal>
+  );
+}
+
+function SimpleFormDialog({ type, onClose, onSave }) {
+  const isInvite = type === "seller-invite";
+  return (
+    <Modal title={isInvite ? "Satıcı daveti taslağı" : "Koleksiyon taslağı"} onClose={onClose}>
+      <form className="modal-form" onSubmit={(event) => {
+        event.preventDefault();
+        const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+        onSave(values);
+      }}>
+        {isInvite ? (
+          <>
+            <label><span>Mağaza adı</span><input name="store" required minLength="3" data-autofocus /></label>
+            <label><span>Yetkili e-postası</span><input name="email" type="email" required /></label>
+            <p className="form-hint">Gerçek davet e-postası entegrasyon aşamasında etkinleşir.</p>
+          </>
+        ) : (
+          <>
+            <label><span>Koleksiyon adı</span><input name="name" required minLength="3" data-autofocus /></label>
+            <label><span>Vitrin konumu</span><select name="placement"><option>Ana sayfa</option><option>Kategori vitrini</option></select></label>
+            <p className="form-hint">Taslak bu sayfa yenilendiğinde sıfırlanır.</p>
+          </>
+        )}
+        <footer><button type="button" className="secondary-button" onClick={onClose}>İptal</button><button className="primary-button">Yerel taslak oluştur</button></footer>
+      </form>
+    </Modal>
+  );
 }
 
 export function App() {
+  const [generation, setGeneration] = useState(0);
+  const [mobile, setMobile] = useState(() => window.innerWidth <= 760);
+  const [compact, setCompact] = useState(() => window.innerWidth <= 1279);
   const [domain, setDomain] = useState("operations");
   const [contextOpen, setContextOpen] = useState(() => window.innerWidth > 760);
   const [store, setStore] = useState("Tüm Mağazalar · 24");
-  const [orders, setOrders] = useState(initialOrders);
-  const [selected, setSelected] = useState(["NS-10482", "NS-10483", "NS-10481"]);
-  const [currentId, setCurrentId] = useState(() => window.innerWidth > 760 ? "NS-10482" : "");
+  const [dateRange, setDateRange] = useState("7 Tem 2026 – 13 Tem 2026");
+  const [orders, setOrders] = useState(() => orderRecords.map((item) => ({ ...item })));
+  const [products, setProducts] = useState(() => productRecords.map((item) => ({ ...item })));
+  const [customers, setCustomers] = useState(() => customerRecords.map((item) => ({ ...item })));
+  const [sellers, setSellers] = useState(() => sellerApplicationRecords.map((item) => ({ ...item })));
+  const [sellerNotes, setSellerNotes] = useState({});
+  const [settlements, setSettlements] = useState(() => settlementRecords.map((item) => ({ ...item })));
+  const [modules, setModules] = useState(() => moduleRecords.map((item) => ({ ...item })));
+  const [roles, setRoles] = useState(() => roleSeed.map((item) => ({ ...item, moduleIds: item.moduleIds.slice() })));
+  const [settings, setSettings] = useState({ ...initialWorkspaceSettings });
+  const [notifications, setNotifications] = useState(() => notificationRows.map((item) => ({ ...item })));
+  const [quickDrafts, setQuickDrafts] = useState({ sellerInvites: [], collections: [] });
+  const [selected, setSelected] = useState([]);
+  const [currentId, setCurrentId] = useState("");
   const [filter, setFilter] = useState({ status: "Tümü", query: "" });
   const [tab, setTab] = useState("orders");
   const [editingLayout, setEditingLayout] = useState(false);
-  const [savedViews, setSavedViews] = useState([{ name: "Bugünkü operasyon", status: "Tümü", query: "" }, { name: "Bekleyen satıcı onayı", status: "Yeni", query: "" }, { name: "SLA riski yüksek", status: "Hazırlanıyor", query: "" }]);
-  const [activeView, setActiveView] = useState("Bugünkü operasyon");
+  const [orderNotes, setOrderNotes] = useState({});
+  const [operationPanels, setOperationPanels] = useState({ revenue: true, distribution: true });
+  const [savedViews, setSavedViews] = useState(() => savedViewSeed.map((item) => ({ ...item })));
+  const [activeView, setActiveView] = useState("Tüm siparişler");
   const [contextItem, setContextItem] = useState("Siparişler");
-  const [modules, setModules] = useState(moduleCatalog);
+  const [entityFocus, setEntityFocus] = useState(null);
   const [dialog, setDialog] = useState(null);
   const [saveViewError, setSaveViewError] = useState("");
   const [toast, setToast] = useState("");
@@ -375,25 +1853,60 @@ export function App() {
   const returnFocus = useRef(null);
   const contextPanelRef = useRef(null);
   const contextToggleRef = useRef(null);
-  const notify = (message) => { setToast(message); window.clearTimeout(toastTimerRef.current); toastTimerRef.current = window.setTimeout(() => setToast(""), 2800); };
-  const openDialog = (name) => { returnFocus.current = document.activeElement; if (name === "save-view") setSaveViewError(""); setDialog(name); };
-  const closeDialog = () => { setDialog(null); setSaveViewError(""); requestAnimationFrame(() => returnFocus.current?.focus?.()); };
-  const navigate = (next) => {
-    setDomain(next);
+  const headingRef = useRef(null);
+
+  const notify = (message) => {
+    setToast(message);
+    window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(""), 5500);
+  };
+
+  const openDialog = (type, data = {}) => {
+    returnFocus.current = document.activeElement;
+    if (type === "save-view") setSaveViewError("");
+    setDialog({ type, data });
+  };
+
+  const closeDialog = () => {
     setDialog(null);
-    setContextItem(next === "operations" ? "Siparişler" : contextByDomain[next]?.[0]?.[0] || "");
-    if (next === "operations") {
-      const firstVisible = orders.find((order) => (filter.status === "Tümü" || order.status === filter.status) && (filter.query === "" || Object.values(order).some((value) => String(value).toLocaleLowerCase("tr-TR").includes(filter.query.toLocaleLowerCase("tr-TR")))));
-      setTab("orders");
-      setCurrentId(window.innerWidth > 760 ? firstVisible?.id || "" : "");
-    } else setCurrentId("");
-    if (window.innerWidth <= 760) setContextOpen(false);
+    setSaveViewError("");
+    requestAnimationFrame(() => returnFocus.current?.focus?.());
   };
-  const closeContext = () => { setContextOpen(false); requestAnimationFrame(() => contextToggleRef.current?.focus?.()); };
+
+  const navigate = (next, requestedItem) => {
+    setDomain(next);
+    const defaultItem = requestedItem || (next === "operations" ? "Siparişler" : contextByDomain[next]?.find((item) => !item.disabled)?.label || "");
+    setContextItem(defaultItem);
+    setEntityFocus(null);
+    setSelected([]);
+    setCurrentId("");
+    if (next === "operations") setTab(defaultItem === "İadeler" ? "returns" : "orders");
+    if (mobile) setContextOpen(false);
+    requestAnimationFrame(() => headingRef.current?.querySelector("h2")?.focus());
+  };
+
+  const closeContext = () => {
+    setContextOpen(false);
+    requestAnimationFrame(() => contextToggleRef.current?.focus?.());
+  };
+
   const toggleContext = () => {
-    if (contextOpen) closeContext();
-    else { setContextOpen(true); requestAnimationFrame(() => contextPanelRef.current?.focus?.()); }
+    if (contextOpen) {
+      closeContext();
+    } else {
+      setCurrentId("");
+      setContextOpen(true);
+      requestAnimationFrame(() => contextPanelRef.current?.focus?.());
+    }
   };
+
+  const setStoreScope = (next) => {
+    setStore(next);
+    setSelected([]);
+    setCurrentId("");
+    notify("“" + next + "” mağaza kapsamı yerel veriye uygulandı.");
+  };
+
   const applyView = (view) => {
     if (!view) return;
     setActiveView(view.name);
@@ -403,13 +1916,19 @@ export function App() {
     setContextItem("Siparişler");
     setCurrentId("");
     setSelected([]);
-    if (window.innerWidth <= 760) setContextOpen(false);
-    notify(`“${view.name}” örnek görünümü uygulandı.`);
+    if (mobile) {
+      setContextOpen(false);
+      requestAnimationFrame(() => headingRef.current?.querySelector("h2")?.focus());
+    }
+    notify("“" + view.name + "” örnek görünümü uygulandı.");
   };
+
   const saveView = (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const name = String(new FormData(form).get("name") || "").trim();
+    const formData = new FormData(form);
+    const name = String(formData.get("name") || "").trim();
+    const scope = String(formData.get("scope") || "Yalnızca ben");
     const nameInput = form.elements.namedItem("name");
     if (!name) {
       setSaveViewError("Görünüm adı boş bırakılamaz.");
@@ -422,40 +1941,138 @@ export function App() {
       nameInput?.focus();
       return;
     }
-    setSavedViews([...savedViews, { name, status: filter.status, query: filter.query }]);
+    setSavedViews(savedViews.concat({ name, status: filter.status, query: filter.query, scope }));
     setActiveView(name);
     closeDialog();
-    notify(`“${name}” görünümü yalnız bu önizleme oturumunda kaydedildi.`);
+    notify("“" + name + "” görünümü yalnız bu önizleme oturumunda kaydedildi.");
   };
-  const selectContextItem = (label) => {
-    setContextItem(label);
-    if (domain !== "operations") {
-      notify(`“${label}” alt görünümü önizleme kapsamında seçildi.`);
+
+  const selectContextItem = (item) => {
+    if (item.disabled) return;
+    if (item.route) {
+      navigate(item.route, item.routeItem);
       return;
     }
-    if (label === "Bugün") {
-      applyView(savedViews[0]);
-      setContextItem("Bugün");
-    } else if (label === "Siparişler") {
-      const firstVisible = orders.find((order) => (filter.status === "Tümü" || order.status === filter.status) && (filter.query === "" || Object.values(order).some((value) => String(value).toLocaleLowerCase("tr-TR").includes(filter.query.toLocaleLowerCase("tr-TR")))));
-      setTab("orders");
-      setCurrentId(window.innerWidth > 760 ? firstVisible?.id || "" : "");
-    } else if (label === "İadeler") {
-      setTab("returns");
-      setCurrentId("");
-    } else if (label === "Müşteri Soruları") navigate("customers");
+    setContextItem(item.label);
+    const opensHealth = domain === "dashboard" && item.label === "Mağaza Sağlığı";
+    if (domain === "operations") {
+      if (item.label === "Bugün") {
+        setFilter({ status: "Tümü", query: "" });
+        setActiveView("");
+        setTab("orders");
+        setSelected([]);
+        setCurrentId("");
+      } else if (item.label === "Siparişler") {
+        setTab("orders");
+      } else if (item.label === "İadeler") {
+        setTab("returns");
+      }
+    }
+    if (mobile) {
+      setContextOpen(false);
+      requestAnimationFrame(() => {
+        headingRef.current?.querySelector("h2")?.focus();
+        if (opensHealth) openDialog("health");
+      });
+    } else if (opensHealth) {
+      openDialog("health");
+    }
   };
+
+  const runCommand = (command) => {
+    closeDialog();
+    if (["order", "seller", "customer"].includes(command.kind)) {
+      setGeneration((value) => value + 1);
+    }
+    if (command.kind === "product-create") {
+      navigate("catalog", "Tüm Ürünler");
+      requestAnimationFrame(() => openDialog("product", {}));
+      return;
+    }
+    navigate(command.section);
+    if (command.kind === "order") {
+      setStore("Tüm Mağazalar · 24");
+      setFilter({ status: "Tümü", query: "" });
+      setActiveView("");
+      setContextItem("Siparişler");
+      setTab("orders");
+      setEntityFocus({ kind: "order", id: command.entityId });
+    } else if (command.kind === "product") {
+      setStore("Tüm Mağazalar · 24");
+      const product = products.find((item) => item.sku === command.entityId);
+      requestAnimationFrame(() => openDialog("product", { product }));
+    } else if (command.kind === "seller" || command.kind === "customer") {
+      setEntityFocus({ kind: command.kind, id: command.entityId });
+    }
+  };
+
+  const saveProduct = (nextProduct, editingSku) => {
+    setProducts((rows) => editingSku
+      ? rows.map((item) => item.sku === editingSku ? nextProduct : item)
+      : [nextProduct].concat(rows));
+    closeDialog();
+    notify(nextProduct.name + (editingSku ? " güncellendi." : " yerel kataloğa eklendi."));
+  };
+
+  const assignOwner = (event) => {
+    event.preventDefault();
+    const owner = String(new FormData(event.currentTarget).get("owner") || "");
+    const ids = new Set(dialog.data.ids || []);
+    setOrders((rows) => setOrderOwner(rows, ids, owner));
+    setSelected([]);
+    closeDialog();
+    notify(ids.size + " görünür sipariş “" + owner + "” sahibine atandı.");
+  };
+
+  const resetPreview = () => {
+    setDomain("operations");
+    setContextItem("Siparişler");
+    setStore("Tüm Mağazalar · 24");
+    setDateRange("7 Tem 2026 – 13 Tem 2026");
+    setOrders(orderRecords.map((item) => ({ ...item })));
+    setProducts(productRecords.map((item) => ({ ...item })));
+    setCustomers(customerRecords.map((item) => ({ ...item })));
+    setSellers(sellerApplicationRecords.map((item) => ({ ...item })));
+    setSellerNotes({});
+    setSettlements(settlementRecords.map((item) => ({ ...item })));
+    setModules(moduleRecords.map((item) => ({ ...item })));
+    setRoles(roleSeed.map((item) => ({ ...item, moduleIds: item.moduleIds.slice() })));
+    setSettings({ ...initialWorkspaceSettings });
+    setNotifications(notificationRows.map((item) => ({ ...item })));
+    setQuickDrafts({ sellerInvites: [], collections: [] });
+    setSelected([]);
+    setCurrentId("");
+    setFilter({ status: "Tümü", query: "" });
+    setTab("orders");
+    setEditingLayout(false);
+    setOrderNotes({});
+    setOperationPanels({ revenue: true, distribution: true });
+    setSavedViews(savedViewSeed.map((item) => ({ ...item })));
+    setActiveView("Tüm siparişler");
+    setEntityFocus(null);
+    setGeneration((value) => value + 1);
+    closeDialog();
+    notify("Tüm yerel örnek durumları başlangıç değerlerine döndürüldü.");
+  };
+
   useEffect(() => {
     const onKey = (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === "k") { event.preventDefault(); if (!dialog && !document.querySelector("dialog[open]")) openDialog("command"); }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === "k") {
+        event.preventDefault();
+        if (!dialog && !document.querySelector("dialog[open]")) openDialog("command");
+      }
       if (event.key === "Escape" && contextOpen && !dialog && !document.querySelector("dialog[open]")) closeContext();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [contextOpen, dialog]);
+
   useEffect(() => {
     const onResize = () => {
-      if (window.innerWidth <= 760) {
+      const isMobile = window.innerWidth <= 760;
+      setCompact(window.innerWidth <= 1279);
+      setMobile(isMobile);
+      if (isMobile) {
         setContextOpen(false);
         setCurrentId("");
       }
@@ -463,29 +2080,106 @@ export function App() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
   useEffect(() => () => window.clearTimeout(toastTimerRef.current), []);
+
   const title = domains.find((item) => item.id === domain)?.label || "Operasyon";
-  const section = { operations: "Operasyon", sellers: "Pazaryeri", modules: "Yönetim", audit: "Yönetim", settings: "Yönetim" }[domain];
+  const section = { operations: "Operasyon", sellers: "Pazaryeri", finance: "Pazaryeri", modules: "Yönetim", audit: "Yönetim", settings: "Yönetim" }[domain];
+  const pageKey = domain + "-" + generation;
   const body = {
-    dashboard: <Dashboard orders={orders} onOpenOrders={() => navigate("operations")} notify={notify} />,
-    operations: <Operations orders={orders} setOrders={setOrders} selected={selected} setSelected={setSelected} currentId={currentId} setCurrentId={setCurrentId} filter={filter} setFilter={setFilter} tab={tab} setTab={(next) => { setTab(next); setContextItem(next === "returns" ? "İadeler" : "Siparişler"); }} editingLayout={editingLayout} setEditingLayout={setEditingLayout} savedViews={savedViews} activeView={activeView} onCustomFilter={() => { setActiveView(""); setCurrentId(""); setSelected([]); }} onApplyView={applyView} onSaveView={() => openDialog("save-view")} store={store} setStore={(next) => { setStore(next); notify(`“${next}” örnek mağaza kapsamı seçildi.`); }} notify={notify} />,
-    catalog: <Catalog notify={notify} onCreate={() => openDialog("new-product")} />,
-    customers: <Customers notify={notify} />,
-    sellers: <Sellers notify={notify} />,
-    finance: <Finance notify={notify} />,
-    reports: <Analytics notify={notify} />,
-    modules: <Modules modules={modules} setModules={setModules} notify={notify} />,
-    audit: <Audit notify={notify} />,
-    settings: <Settings notify={notify} />,
+    dashboard: <Dashboard key={pageKey} orders={orders} onOpenOrders={() => navigate("operations", "Siparişler")} onHealth={() => openDialog("health")} dateRange={dateRange} />,
+    operations: <Operations key={pageKey} orders={orders} setOrders={setOrders} selected={selected} setSelected={setSelected} currentId={currentId} setCurrentId={setCurrentId} filter={filter} setFilter={setFilter} tab={tab} setTab={(next) => { setTab(next); setContextItem(next === "returns" ? "İadeler" : "Siparişler"); }} editingLayout={editingLayout} setEditingLayout={setEditingLayout} savedViews={savedViews} activeView={activeView} onCustomFilter={() => { setActiveView(""); setCurrentId(""); setSelected([]); }} onApplyView={applyView} onSaveView={() => openDialog("save-view")} store={store} setStore={setStoreScope} dateRange={dateRange} notify={notify} openDialog={openDialog} notes={orderNotes} setNotes={setOrderNotes} visiblePanels={operationPanels} setVisiblePanels={setOperationPanels} compact={compact} contextItem={contextItem} initialOrderId={entityFocus?.kind === "order" ? entityFocus.id : ""} />,
+    catalog: <Catalog key={pageKey + contextItem} products={products} store={store} contextItem={contextItem} collectionDrafts={quickDrafts.collections} onCreate={() => openDialog("product")} onEdit={(product) => openDialog("product", { product })} />,
+    customers: <Customers key={pageKey} customers={customers} setCustomers={setCustomers} contextItem={contextItem} initialCustomerId={entityFocus?.kind === "customer" ? entityFocus.id : ""} notify={notify} />,
+    sellers: <Sellers key={pageKey} sellers={sellers} setSellers={setSellers} notes={sellerNotes} setNotes={setSellerNotes} mobile={mobile} initialSellerId={entityFocus?.kind === "seller" ? entityFocus.id : ""} draftInvites={quickDrafts.sellerInvites} notify={notify} />,
+    finance: <Finance key={pageKey} rows={settlements} setRows={setSettlements} store={store} contextItem={contextItem} notify={notify} />,
+    reports: <Analytics key={pageKey} contextItem={contextItem} notify={notify} />,
+    modules: <Modules key={pageKey} modules={modules} setModules={setModules} roles={roles} setRoles={setRoles} contextItem={contextItem} notify={notify} />,
+    audit: <Audit key={pageKey + contextItem} contextItem={contextItem} notify={notify} />,
+    settings: <Settings key={pageKey} saved={settings} setSaved={setSettings} contextItem={contextItem} notify={notify} />,
   }[domain];
-  return <div className={`admin-shell ${contextOpen ? "context-open" : "context-closed"}`} data-testid="admin-shell">
-    <IconRail active={domain} setActive={navigate} />
-    <ContextRail domain={domain} open={contextOpen} savedViews={savedViews} activeItem={contextItem} onItem={selectContextItem} onView={applyView} onSaveView={() => openDialog("save-view")} onNavigate={navigate} onClose={closeContext} store={store} onStoreChange={(next) => { setStore(next); notify(`“${next}” örnek mağaza kapsamı seçildi.`); }} panelRef={contextPanelRef} />
-    {contextOpen && <button className="context-scrim" aria-label="Bağlamsal menüyü kapat" onClick={closeContext} data-testid="context-scrim" />}
-    <div className="admin-main"><AppHeader title={title} section={section} contextOpen={contextOpen} onToggleContext={toggleContext} contextToggleRef={contextToggleRef} onCommand={() => openDialog("command")} onQuickCreate={() => openDialog("quick-create")} onNotify={notify} toast={toast} /><main className="content-area">{body}</main><footer className="statusbar"><PreviewBanner /><span>Örnek veri · kalıcı kayıt yok</span><span>API ve ödeme bağlantıları kapalı</span><button onClick={() => notify("Örnek arayüz durumu yenilendi.")}><Icon name="refresh" />Önizlemeyi yenile</button></footer></div>
-    {dialog === "command" && <CommandPalette onClose={closeDialog} navigate={navigate} />}
-    {dialog === "quick-create" && <Modal title="Hızlı oluştur" onClose={closeDialog}><div className="quick-grid"><button onClick={() => { navigate("catalog"); closeDialog(); }}><Icon name="package" /><strong>Yeni ürün</strong><small>Ürün ve varyant akışını önizle</small></button><button onClick={() => { navigate("sellers"); closeDialog(); }}><Icon name="user" /><strong>Satıcı daveti</strong><small>Mağaza başlangıcını önizle</small></button><button onClick={() => { navigate("finance"); closeDialog(); }}><Icon name="card" /><strong>Mutabakat</strong><small>Finans akışını önizle</small></button><button onClick={() => { closeDialog(); notify("Koleksiyon taslağı yalnız önizleme oturumunda oluşturuldu."); }}><Icon name="grid" /><strong>Koleksiyon</strong><small>Vitrin akışını önizle</small></button></div></Modal>}
-    {dialog === "save-view" && <Modal title="Görünümü kaydet" onClose={closeDialog}><form className="modal-form" onSubmit={saveView}><label><span>Görünüm adı</span><input name="name" required placeholder="Örn. Bugünkü öncelikler" data-autofocus aria-invalid={saveViewError ? "true" : undefined} aria-describedby={saveViewError ? "save-view-error" : undefined} onChange={() => saveViewError && setSaveViewError("")} /></label>{saveViewError && <p className="modal-error" id="save-view-error" role="alert">{saveViewError}</p>}<label><span>Örnek ekip erişimi</span><select name="scope"><option>Yalnızca ben</option><option>Operasyon ekibi</option><option>Tüm yöneticiler</option></select></label><footer><button type="button" className="secondary-button" onClick={closeDialog}>İptal</button><button className="primary-button">Önizlemede kaydet</button></footer></form></Modal>}
-    {dialog === "new-product" && <Modal title="Yeni ürün taslağı" onClose={closeDialog} wide><form className="modal-form two-column" onSubmit={(e) => { e.preventDefault(); closeDialog(); notify("Ürün taslağı yalnız bu önizleme oturumunda oluşturuldu."); }}><label><span>Ürün adı</span><input required placeholder="Ürün adını girin" data-autofocus /></label><label><span>Satıcı</span><select><option>NovaStore</option><option>TeknoPark</option><option>Eviva Home</option></select></label><label><span>Kategori</span><select><option>Elektronik</option><option>Ev & Yaşam</option><option>Moda</option></select></label><label><span>Stok kodu</span><input required placeholder="NVS-" /></label><label><span>Satış fiyatı</span><input type="number" min="0" required /></label><label><span>Başlangıç stoku</span><input type="number" min="0" required /></label><footer><button type="button" className="secondary-button" onClick={closeDialog}>İptal</button><button className="primary-button">Önizlemede oluştur</button></footer></form></Modal>}
-  </div>;
+
+  return (
+    <div className={"admin-shell " + (contextOpen ? "context-open" : "context-closed")} data-testid="admin-shell">
+      <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
+      <IconRail active={domain} setActive={navigate} onProfile={() => openDialog("profile")} inactive={mobile && contextOpen} />
+      <ContextRail domain={domain} open={contextOpen} mobile={mobile} savedViews={savedViews} activeItem={contextItem} onItem={selectContextItem} onView={applyView} onSaveView={() => openDialog("save-view")} onNavigate={navigate} onClose={closeContext} store={store} onStoreChange={setStoreScope} dateRange={dateRange} onDateRangeChange={(next) => { setDateRange(next); notify("“" + next + "” dönemi örnek göstergelere uygulandı."); }} panelRef={contextPanelRef} />
+      {contextOpen && <button className="context-scrim" aria-label="Bağlamsal menüyü kapat" onClick={closeContext} data-testid="context-scrim" />}
+      <div className="admin-main" inert={mobile && contextOpen ? true : undefined}>
+        <AppHeader title={title} section={section} contextOpen={contextOpen} onToggleContext={toggleContext} contextToggleRef={contextToggleRef} onCommand={() => openDialog("command")} onQuickCreate={() => openDialog("quick-create")} onNotifications={() => openDialog("notifications")} onProfile={() => openDialog("profile")} notifications={notifications} dateRange={dateRange} setDateRange={(next) => { setDateRange(next); notify("“" + next + "” dönemi örnek göstergelere uygulandı."); }} showDate={domain === "dashboard" || domain === "operations"} toast={toast} clearToast={() => setToast("")} />
+        <main className="content-area" id="main-content" ref={headingRef} tabIndex="-1">{body}</main>
+        <footer className="statusbar"><PreviewBanner /><span>Örnek veri · kalıcı kayıt yok</span><span>API ve ödeme bağlantıları kapalı</span><button aria-label="Önizlemeyi başlangıç değerlerine döndür" onClick={() => openDialog("reset")}><Icon name="refresh" />Önizlemeyi yenile</button></footer>
+      </div>
+
+      {dialog?.type === "command" && <CommandPalette onClose={closeDialog} run={runCommand} orders={orders} products={products} sellers={sellers} customers={customers} />}
+      {dialog?.type === "quick-create" && (
+        <Modal title="Hızlı oluştur" onClose={closeDialog}>
+          <div className="quick-grid">
+            <button onClick={() => { closeDialog(); navigate("catalog", "Tüm Ürünler"); requestAnimationFrame(() => openDialog("product")); }}><Icon name="package" /><strong>Yeni ürün</strong><small>Yerel katalog kaydı oluştur</small></button>
+            <button onClick={() => { closeDialog(); requestAnimationFrame(() => openDialog("seller-invite")); }}><Icon name="user" /><strong>Satıcı daveti</strong><small>Gönderimsiz taslak oluştur · {quickDrafts.sellerInvites.length} taslak</small></button>
+            <button onClick={() => { closeDialog(); navigate("finance", "Hakedişler"); requestAnimationFrame(() => openDialog("settlement-summary")); }}><Icon name="card" /><strong>Mutabakat</strong><small>Finans özetini incele</small></button>
+            <button onClick={() => { closeDialog(); requestAnimationFrame(() => openDialog("collection")); }}><Icon name="grid" /><strong>Koleksiyon</strong><small>Yerel vitrin taslağı oluştur · {quickDrafts.collections.length} taslak</small></button>
+          </div>
+        </Modal>
+      )}
+      {dialog?.type === "save-view" && (
+        <Modal title="Görünümü kaydet" onClose={closeDialog}>
+          <form className="modal-form" onSubmit={saveView}>
+            <label><span>Görünüm adı</span><input name="name" required placeholder="Örn. Bugünkü öncelikler" data-autofocus aria-invalid={saveViewError ? "true" : undefined} aria-describedby={saveViewError ? "save-view-error" : undefined} onChange={() => saveViewError && setSaveViewError("")} /></label>
+            {saveViewError && <p className="modal-error" id="save-view-error" role="alert">{saveViewError}</p>}
+            <label><span>Örnek ekip erişimi</span><select name="scope"><option>Yalnızca ben</option><option>Operasyon ekibi</option><option>Tüm yöneticiler</option></select></label>
+            <p className="form-hint">Erişim etiketi kayda eklenir; gerçek yetkilendirme entegrasyonda uygulanır.</p>
+            <footer><button type="button" className="secondary-button" onClick={closeDialog}>İptal</button><button className="primary-button">Önizlemede kaydet</button></footer>
+          </form>
+        </Modal>
+      )}
+      {dialog?.type === "product" && <ProductDialog product={dialog.data.product} products={products} onClose={closeDialog} onSave={saveProduct} />}
+      {(dialog?.type === "seller-invite" || dialog?.type === "collection") && <SimpleFormDialog type={dialog.type} onClose={closeDialog} onSave={(values) => {
+        const isInvite = dialog.type === "seller-invite";
+        const key = isInvite ? "sellerInvites" : "collections";
+        setQuickDrafts((current) => ({ ...current, [key]: current[key].concat({ ...values, id: key + "-" + (current[key].length + 1) }) }));
+        closeDialog();
+        notify((isInvite ? "Satıcı daveti" : "Koleksiyon") + " yalnız bu oturumda taslak olarak kaydedildi; dış ileti gönderilmedi.");
+      }} />}
+      {dialog?.type === "assign-owner" && (
+        <Modal title="Sipariş sahibi ata" onClose={closeDialog}>
+          <form className="modal-form" onSubmit={assignOwner}><p>{dialog.data.ids.length} görünür sipariş için yerel sahiplik değişecek.</p><label><span>Operasyon sahibi</span><select name="owner" data-autofocus><option>Mehmet A.</option><option>Ece T.</option><option>Ayşe K.</option></select></label><footer><button type="button" className="secondary-button" onClick={closeDialog}>İptal</button><button className="primary-button">Yerelde ata</button></footer></form>
+        </Modal>
+      )}
+      {dialog?.type === "store-detail" && (
+        <Modal title={dialog.data.seller + " mağaza özeti"} onClose={closeDialog} wide>
+          <div className="detail-modal-body"><div className="detail-hero"><span className="avatar">{dialog.data.seller.split(" ").map((word) => word[0]).join("").slice(0, 2)}</span><div><strong>{dialog.data.seller}</strong><small>Yerel mağaza kartı · canlı satıcı profili değil</small></div></div><dl className="detail-list detail-grid"><div><dt>Örnek puan</dt><dd>4,8 / 5</dd></div><div><dt>SLA uyumu</dt><dd>%96,4</dd></div><div><dt>Açık sipariş</dt><dd>{orders.filter((row) => row.seller.includes(dialog.data.seller.split(" ")[0])).length}</dd></div><div><dt>Risk</dt><dd><Status>Düşük</Status></dd></div></dl></div>
+          <footer className="modal-actions"><button className="primary-button" onClick={closeDialog}>Tamam</button></footer>
+        </Modal>
+      )}
+      {dialog?.type === "notifications" && (
+        <Modal title="Örnek bildirimler" onClose={closeDialog} wide>
+          <div className="notification-list">{notifications.map((item) => <article key={item.id} className={item.read ? "read" : ""}><span className={"notification-tone " + item.tone} /><div><strong>{item.title}</strong><small>{item.detail}</small></div><button className="secondary-button small" disabled={item.read} onClick={() => setNotifications((rows) => markNotificationsRead(rows, item.id))}>{item.read ? "Okundu" : "Okundu işaretle"}</button></article>)}</div>
+          <footer className="modal-actions"><button className="secondary-button" onClick={() => setNotifications((rows) => markNotificationsRead(rows))}>Tümünü okundu işaretle</button><button className="primary-button" onClick={closeDialog}>Kapat</button></footer>
+        </Modal>
+      )}
+      {dialog?.type === "profile" && (
+        <Modal title="Profil ve rol önizlemesi" onClose={closeDialog}>
+          <div className="profile-summary"><span className="avatar">AK</span><div><strong>Ayşe Kara</strong><small>operasyon@novastore.tr</small></div></div><dl className="detail-list"><div><dt>Etkin rol</dt><dd>Operasyon Yöneticisi</dd></div><div><dt>Kapsam</dt><dd>{store}</dd></div><div><dt>Oturum</dt><dd>Yerel önizleme</dd></div></dl><p className="form-hint">Gerçek rol değişimi, oturum ve yetki denetimi entegrasyon aşamasında etkinleşir.</p>
+          <footer className="modal-actions"><button className="primary-button" onClick={closeDialog}>Tamam</button></footer>
+        </Modal>
+      )}
+      {dialog?.type === "health" && (
+        <Modal title="Mağaza sağlığı önizlemesi" onClose={closeDialog} wide>
+          <div className="health-grid">{[["Katalog örneği", "Sağlıklı", "14 Tem 2026 · 10:24"], ["Sipariş örneği", "Sağlıklı", "14 Tem 2026 · 10:22"], ["Bildirim örneği", "Önizleme", "Canlı kuyruk kapalı"], ["Tahsilat bağlantısı", "Entegrasyonda", "Hiçbir istek gönderilmez"]].map(([name, status, detail]) => <article key={name}><Icon name={status === "Entegrasyonda" ? "warning" : "check"} /><div><strong>{name}</strong><small>{detail}</small></div><Status>{status}</Status></article>)}</div>
+          <footer className="modal-actions"><button className="primary-button" onClick={closeDialog}>Tamam</button></footer>
+        </Modal>
+      )}
+      {dialog?.type === "settlement-summary" && (
+        <Modal title="Mutabakat özeti" onClose={closeDialog} wide>
+          <div className="detail-modal-body"><p>Yerel hakediş kayıtlarında <strong>{settlements.filter((row) => row.status === "Blokeli").length} blokeli</strong> ve <strong>{settlements.filter((row) => row.status === "Ödemeye hazır").length} hazır</strong> örnek bulunuyor.</p><section className="notice-card"><Icon name="shield" /><div><strong>Finansal işlem kapalı</strong><p>Bu özet yalnız arayüz akışını gösterir; transfer veya mutabakat kaydı üretmez.</p></div></section></div><footer className="modal-actions"><button className="secondary-button" onClick={closeDialog}>Kapat</button><button className="primary-button" onClick={() => { closeDialog(); navigate("finance", "Hakedişler"); }}>Hakedişlere git</button></footer>
+        </Modal>
+      )}
+      {dialog?.type === "reset" && (
+        <Modal title="Önizlemeyi başlangıca döndür" onClose={closeDialog} testId="confirmation-dialog">
+          <div className="confirmation-body"><Icon name="warning" /><p>Ürün, sipariş, satıcı, müşteri, modül ve ayarlarda yaptığınız tüm yerel değişiklikler sıfırlanacak.</p></div><footer className="modal-actions"><button className="secondary-button" onClick={closeDialog}>Vazgeç</button><button className="danger-button" onClick={resetPreview}>Tüm yerel durumu sıfırla</button></footer>
+        </Modal>
+      )}
+    </div>
+  );
 }

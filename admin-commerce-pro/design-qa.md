@@ -1,58 +1,54 @@
 # NovaStore Admin Commerce Pro — Design QA
 
-Tarih: 2026-07-13
+Tarih: 2026-07-14
 
 Hedef: `reference/admin-hybrid-target.png` (1487 × 1058)
 
 Entegrasyon çıktısı: `../frontend/admin-commerce-pro.html`
 
-## Bu turda tamamlanan kontroller
+## Bu turda uygulanan ve statik incelenen kontroller
 
-- Hedef görsel ile bulut tarayıcıdan alınan 1363 × 936 entegrasyon görüntüsü aynı karşılaştırma yüzeyinde incelendi. Görüntü düzeltme öncesi build'e aitti ve hedefle aynı viewport değildi; bu nedenle yalnızca sorun keşfi için kullanıldı.
-- Düzeltme öncesi etkileşimli kontrolde şu hatalar yeniden üretildi:
-  - Komut paleti arama alanı yerine kapatma düğmesine odaklanıyordu.
-  - Kaydedilmiş görünüm seçimi tablo filtresini uygulamıyordu.
-  - Sipariş dışı sekmeye geçildiğinde eski sipariş denetçisi açık kalıyordu.
-  - `Teslim Edildi` siparişte “sonraki aşama” işlemi durumu geriye alıyordu.
-  - Satıcı karar modalında Escape, modal ile birlikte bağlamsal menüyü de kapatıyor ve odağı kaybediyordu.
-- Kaynakta bu davranışlar düzeltildi; ayrıca mobil başlık kontrolleri sarılabilir hale getirildi, bağlamsal navigasyon görünür durum değiştirecek şekilde bağlandı, filtre/görünüm durumu eşitlendi, toast/statusbar çakışması giderildi ve erişilebilir ad/aktif durumlar tamamlandı.
-- Son kod inceleme turunda mobil komut düğmesine erişilebilir ad eklendi; kaydedilmiş görünümler arama sorgusunu koruyacak hale getirildi; boş/yinelenen görünüm adı hatası modal içinde `role="alert"` ile açıklandı ve Ctrl/Cmd+K kısayolunun açık modalı veya odak dönüş hedefini bozması engellendi.
-- Hedefteki iki serili gelir eğrisi, elde çizilmiş bir asset yerine yerel veriyle çalışan `uPlot` grafiği olarak uygulandı.
-- Vite `6.4.3` sürümüne yükseltildi ve npm audit sonucu `0 vulnerabilities` oldu.
+- Yüzeysel demo durumu kaldırıldı; 28 deterministik sipariş gerçek sayfalama, 12 kayıttan Bugün görünümü, mağaza kapsamı, arama, durum filtresi, toplu seçim, sahip atama, durum ilerletme ve oturum içi notlarla bağlandı. Tarih dönemi yalnız KPI ve grafikleri değiştirir; sipariş satırlarına tarih filtresi uygulanmaz.
+- Satıcı siparişleri, iadeler, stok riskleri, doğrulamalı ürün CRUD, kategori/filtre şablonları, müşteri segmentleri, satıcı karar akışı, hakediş simülasyonu, ölçeklenen raporlar, modül/rol yüzeyleri, denetim, ayarlar, bildirimler ve hızlı-oluştur taslakları yerel örnek veriye bağlandı.
+- Etkin görünen ama işlem yapmayan kontroller ya işlevsel hale getirildi ya da `Entegrasyonda` etiketiyle devre dışı bırakıldı. Canlı servis, auth, ödeme veya veritabanı davranışı taklit edilmedi.
+- Compact sipariş ayrıntısı native modal/backdrop/focus containment kullanıyor. Mobil bağlamsal menü arka planı inert yapıyor, odağı yeni başlığa taşıyor ve panel başlangıcından ileri/geri Tab döngüsünü koruyor.
+- Mobil üst çubuk taşması, satıcı modalinin dört satırlı scroll anatomisi, yatay tablo ipuçları, dokunma hedefleri, safe-area sınırları ve durum çubuğundaki sıfırlama erişimi düzeltildi.
+- Komut paleti sipariş, ürün, müşteri ve satıcı hedeflerini doğru kapsama açıyor; CSV formül enjeksiyonu `=`, `+`, `-`, `@`, tab ve carriage-return başlangıçları için etkisizleştiriliyor.
 
 ## Deterministik doğrulama
 
-- `npm run build:integrated`: geçti; bağımsız HTML üretildi.
-- `node tests/adminCommerceProPreviewSmoke.js`: geçti; üretilen HTML kaynak fingerprint'i ile eşleşiyor.
-- Dokuz mevcut admin/startup smoke testi: geçti.
-- `npm ls --depth=0`: geçti.
-- `npm audit --omit=dev --package-lock-only`: geçti, 0 açık.
-- `frontend/admin.html` inline JavaScript parse kontrolü: geçti.
-- `git diff --check`: geçti.
-- Kaynak ve build statik kontrollerinde uygulama kaynaklı `fetch`, XHR, WebSocket, EventSource, ödeme sağlayıcısı veya `/api` çağrısı yok; aktif haricî script, stylesheet ve görsel kaynağı bulunmuyor.
-- Mevcut NovaStore PNG favicon'u gömülü veri URI'si olarak taşınıyor; bağımsız çıktıda ayrı dosya veya ağ isteği gerektirmiyor.
+- `npm run verify`: geçti; Vite build, entegre artifact, model smoke ve preview smoke birlikte doğrulandı.
+- Standalone ve entegre HTML byte-byte aynı üretildi; standalone artifact üzerinde ikinci preview smoke geçti.
+- Eski `dist` ile doğrudan standalone üretme negatif testi beklenen biçimde reddedildi. Vite artık build-time kaynak parmak izi yazıyor; üretici bu parmak izi güncel değilse çıktı üretmiyor.
+- `adminCommerceProModelSmoke`: geçti; 28 sipariş/12 Bugün kaydı, sayfalama, Türkçe arama, mağaza kapsamı, sipariş durum/sahip geçişleri, müşteri segmenti, satıcı kararı, modül/bildirim geçişleri, ürün doğrulama, CSV güvenliği, fixture benzersizliği ve ana kayıt ilişkileri doğrulandı.
+- Sekiz mevcut admin UI/auth/XSS smoke testi ile `startupSafetySmoke` ve `serverStartupSafetySmoke`: geçti. Server startup testi remote DB'ye bağlanmadı; yalnız `127.0.0.1` test hedeflerini kullandı ve `55432` dalını yerel veritabanı bulunmadığı için atladı.
+- Root ve Commerce Pro `npm ls --depth=0`: geçti. Root ve Commerce Pro production audit: `0 vulnerabilities`.
+- Script sözdizimi kontrolleri ve `git diff --check`: geçti.
+- Kaynak/artifact statik kontrollerinde `fetch`, XHR, WebSocket, EventSource, `sendBeacon`, `/api`, PayTR veya iyzico çağrısı yok. Standalone CSP `connect-src 'none'`; haricî aktif script, stylesheet, font veya görsel kaynağı yok.
+- Dedicated disposable PostgreSQL gerektiren ve şema silen migration smoke çalıştırılmadı; remote/production veritabanına hiçbir bağlantı kurulmadı.
 
-## Geçici mock Preview
+## Geçici mock Preview kaydı
 
-- Vercel deployment: `dpl_2XUoNaP6N368tjvtWrJeTKThunUU`
-- Durum: `READY`, target production değildir.
+- Önceki Vercel deployment: `dpl_2XUoNaP6N368tjvtWrJeTKThunUU`
 - URL: `https://novastore-commerce-pro-preview-hjnn1hz23-qusay90s-projects.vercel.app`
-- İçerik: yalnız güncel bağımsız mock HTML ile 1487 × 1058 ve 390 × 844 QA iframe kabukları.
-- Güvenlik sınırı: remote DB, auth, secret, API veya ödeme bağlantısı yoktur; `no-store`, `noindex`, kısıtlı CSP ve Permissions-Policy başlıkları uygulanmıştır.
+- Target production değildir; sır, environment variable, remote DB, auth, API veya ödeme bağlantısı yoktur.
+- Bu kayıt önceki artifact'a aittir. Güncel commit yeniden deploy edilip build kimliği doğrulanmadıkça güncel QA kanıtı olarak kullanılmamalıdır.
 
 ## Açık browser kanıtı blokeri
 
-Kullanıcı, Vercel Preview URL'sinin Work Mode cloud browser ile açılması ve etkileşimli QA yapılması için 2026-07-13 tarihinde açık onay verdi. Buna rağmen Work Mode browser güvenlik katmanı ilgili Vercel alan adını açma eylemini reddetti ve aynı sonuca farklı URL, raw CDP, başka browser yüzeyi veya dolaylı yöntemle ulaşmayı açıkça yasakladı. Bu yüzden güncel build için aşağıdaki zorunlu kanıtlar üretilemedi:
+Kullanıcı, Work Mode cloud browser'ın yerel önizlemeyi ve Vercel Preview'ı açıp etkileşimli QA yapmasına açıkça izin verdi. Buna rağmen seçili Work Mode browser güvenlik katmanı `http://127.0.0.1:4173` açma eylemini kullanıcı isteğiyle çeliştiği gerekçesiyle reddetti ve localhost varyantı, raw CDP, başka browser yüzeyi veya dolaylı workaround kullanımını açıkça yasakladı. Yerel Vite sunucusu da ortamda `uv_interface_addresses returned Unknown system error 1` ile başlatılamadı. Önceki Vercel URL'si de aynı browser güvenlik katmanı tarafından reddedilmişti; bu turda yasaklı yolu tekrar denemek veya farklı browser kullanmak yerine güvenlik sınırına uyuldu.
+
+Bu nedenle güncel build için aşağıdaki zorunlu kanıtlar üretilemedi:
 
 1. 1487 × 1058 hedef/uygulama eş-viewport ve eş-state görsel karşılaştırması.
-2. 390 × 844 mobil menü, scrim, Escape, başlık kontrolleri ve denetçi alt aksiyon kontrolü.
-3. Düzeltme sonrası ana navigasyon, görünüm/filtre, modal odağı, sipariş aşaması ve satıcı karar akışı.
-4. Düzeltme sonrası console ve runtime network kaydı.
+2. 390 × 844 mobil menü, scrim, modal, tablo kaydırma, safe-area ve alt aksiyon görsel kontrolü.
+3. Düzeltme sonrası ana navigasyon, filtre/sayfalama, CRUD, modal odağı, komut hedefleme, satıcı kararı ve sıfırlama etkileşim kaydı.
+4. Güncel browser console error/warning ve runtime network request kaydı.
 
-Düzeltme öncesi yerel sayfada uygulamaya ait console error/warning görülmedi; tek hata tarayıcı eklentisinin `chrome-extension://...` metadata mesajıydı. Bu sonuç güncel Vercel build'i için devralınmamıştır. Vercel deployment'ın `READY` olması browser-rendered console ve runtime network kanıtının yerine geçmez.
+Statik no-network kontrolü, CSP ve production build başarısı browser-rendered console/network kanıtının yerine geçmez. `noindex` erişim kontrolü değildir; gerçek entegrasyon eklendiğinde route auth ve seller-scope/RBAC ile ayrıca korunmalıdır.
 
-`/admin-commerce-pro.html`, mevcut `admin.html` gibi statik bir istemci kabuğudur. Önizleme yalnızca gömülü mock veri içerir ve hiçbir API/ödeme/auth entegrasyonu yapmaz; bu nedenle mevcut mimariye göre yeni bir gerçek-veri sızıntısı olarak değerlendirilmedi. `noindex` erişim kontrolü değildir ve ileride gerçek entegrasyon eklenirse route ayrıca korunmalıdır.
+Model testleri temel durum geçişlerini doğrular; modal odağı, responsive yerleşim ve uçtan uca kullanıcı yolculukları güncel browser oturumu olmadan davranışsal olarak geçmiş sayılmaz.
 
-Draft PR, yukarıdaki güncel desktop/mobile browser kanıtları tamamlanmadan merge-ready kabul edilmemelidir.
+Draft PR #15, güncel desktop/mobile browser kanıtları tamamlanmadan merge-ready kabul edilmemelidir. Bu nedenle design QA `passed` durumuna getirilemez.
 
 final result: blocked

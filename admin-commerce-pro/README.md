@@ -10,6 +10,19 @@ NovaStore'un Commerce Pro görsel yönünü, yoğun operasyon masası yaklaşım
 - Dinamik modül yükleme, migration, seller scope/RBAC enforcement ve çok satıcılı backend bu değişiklikte uygulanmaz.
 - `frontend/admin.html`, önizlemeyi yeni sekmede açan güvenli bir bağlantı içerir.
 
+## Etkileşim kapsamı
+
+Önizleme yalnız tarayıcı belleğinde çalışan gerçekçi bir yönetim oturumudur. Aşağıdaki akışlar sayfa yenilenene kadar yerel olarak durum değiştirir:
+
+- 28 siparişte mağaza kapsamı, 12 kayıttan Bugün görünümü, arama, durum filtresi, gerçek sayfalama, satır/toplu seçim, sahip atama, durum ilerletme ve sipariş notu; KPI/grafiklerde ayrı tarih dönemi kapsamı.
+- Satıcı siparişleri, iadeler ve stok riskleri; ürün arama/filtreleme ile doğrulamalı ürün oluşturma ve düzenleme.
+- Müşteri arama, segment kartları, segment değişikliği ve CSV; satıcı filtreleri, belge ayrıntısı, not, onay/red ve zorunlu red gerekçesi.
+- Mağaza kapsamlı hakediş filtreleri, ayrıntı, güvenli akış simülasyonu ve CSV; dönemle ölçeklenen satış raporu ve CSV.
+- Modül genel kullanılabilirlik simülasyonu, rol düzeni özeti/oluşturma, denetim arama/CSV, çalışma alanı ayarları, bildirimler ve yerel hızlı-oluştur taslakları.
+- Klavyeyle kullanılabilen komut paleti, odak geri dönüşü, mobil bağlamsal menü, compact sipariş modalı, boş durumlar ve önizlemeyi sıfırlama.
+
+Gerçek servis gerektiren görünür kontroller etkin bir sahte işlem yapmaz; devre dışı ve `Entegrasyonda` etiketiyle sunulur.
+
 ## Yerel geliştirme
 
 ```bash
@@ -31,23 +44,32 @@ Bu komut fontları, ürün görsellerini, ikonları, CSS'i ve JavaScript'i tek b
 
 ## Güvenli doğrulama
 
-Repo kökünden:
+Commerce Pro klasöründen tam build + model + artifact doğrulaması:
 
 ```bash
-node tests/adminCommerceProPreviewSmoke.js
+cd admin-commerce-pro
+npm run verify
 ```
 
-Smoke testi bağımsız çıktıyı, önizleme uyarısını, ana admindeki bağlantıyı ve istemeden eklenebilecek API/ağ/ödeme çağrılarını kontrol eder. Production DB veya ödeme testi çalıştırmaz.
+Repo kökünden bağımsız artifact kontrolleri:
 
-## Ayrı Render önizlemesi
+```bash
+node tests/adminCommerceProModelSmoke.mjs
+node tests/adminCommerceProPreviewSmoke.js
+COMMERCE_PRO_PREVIEW_PATH=admin-commerce-pro/standalone/index.html node tests/adminCommerceProPreviewSmoke.js
+```
 
-Dağıtım için ayrıca yetki verildiğinde bu dal, sır veya environment variable eklenmeden ayrı bir Render **Static Site** olarak bağlanabilir:
+Testler sayfalama/arama/mağaza kapsamı/ürün doğrulama/CSV güvenliği ve örnek veri ilişkilerini; bağımsız çıktının kaynak parmak izini, CSP'sini, önizleme uyarısını, ana admindeki bağlantıyı ve istemeden eklenebilecek API/ağ/ödeme çağrılarını kontrol eder. Vite build, kendi kaynak parmak izini `dist` içine yazar; standalone üretici eski bir bundle'ı güncel kaynaklarla yeniden damgalamayı reddeder. Production DB veya ödeme testi çalıştırılmaz.
+
+## Geçici mock önizlemesi
+
+Dağıtım için ayrıca yetki verildiğinde bu dal, sır veya environment variable eklenmeden ayrı bir Vercel Preview veya eşdeğer static preview olarak yayınlanabilir:
 
 - Build command: `cd admin-commerce-pro && npm ci && npm run build:integrated`
 - Publish directory: `frontend`
 - Preview route: `/admin-commerce-pro.html`
 
-Bu repository değişikliği deploy yapmaz. Geri alma; `frontend/admin.html` içindeki önizleme bağlantısını, `frontend/admin-commerce-pro.html` çıktısını ve `admin-commerce-pro/` kaynak klasörünü kaldırmakla sınırlıdır.
+Preview production hedefi değildir; gerçek auth, veritabanı veya ödeme environment'ı bağlanmamalıdır. Geri alma; preview deployment'ını silmek ve gerekirse `frontend/admin.html` içindeki bağlantı ile önizleme artifact'ını kaldırmakla sınırlıdır.
 
 ## Gelecek entegrasyon kapısı
 

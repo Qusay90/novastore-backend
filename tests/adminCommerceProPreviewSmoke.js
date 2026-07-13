@@ -5,12 +5,42 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const repositoryRoot = path.join(__dirname, '..');
-const previewPath = path.join(repositoryRoot, 'frontend', 'admin-commerce-pro.html');
+const previewPath = process.env.COMMERCE_PRO_PREVIEW_PATH
+    ? path.resolve(process.env.COMMERCE_PRO_PREVIEW_PATH)
+    : path.join(repositoryRoot, 'frontend', 'admin-commerce-pro.html');
 const adminPath = path.join(repositoryRoot, 'frontend', 'admin.html');
-const appPath = path.join(repositoryRoot, 'admin-commerce-pro', 'src', 'App.jsx');
-const mainPath = path.join(repositoryRoot, 'admin-commerce-pro', 'src', 'main.jsx');
+const commerceProRoot = path.join(repositoryRoot, 'admin-commerce-pro');
+const sourceRoot = path.join(commerceProRoot, 'src');
 const stylesPath = path.join(repositoryRoot, 'admin-commerce-pro', 'src', 'styles.css');
 const designQaPath = path.join(repositoryRoot, 'admin-commerce-pro', 'design-qa.md');
+const standaloneBuilderPath = path.join(commerceProRoot, 'scripts', 'build-standalone.mjs');
+const viteConfigPath = path.join(commerceProRoot, 'vite.config.mjs');
+
+const compareNames = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
+
+function listSourceModules(directory) {
+    const entries = fs.readdirSync(directory, { withFileTypes: true })
+        .sort((left, right) => compareNames(left.name, right.name));
+
+    return entries.flatMap((entry) => {
+        const entryPath = path.join(directory, entry.name);
+        if (entry.isDirectory()) return listSourceModules(entryPath);
+        if (!entry.isFile() || !/\.(?:js|jsx|ts|tsx)$/.test(entry.name)) return [];
+        return [path.relative(commerceProRoot, entryPath).split(path.sep).join('/')];
+    }).sort(compareNames);
+}
+
+function listSourceFiles(directory) {
+    const entries = fs.readdirSync(directory, { withFileTypes: true })
+        .sort((left, right) => compareNames(left.name, right.name));
+
+    return entries.flatMap((entry) => {
+        const entryPath = path.join(directory, entry.name);
+        if (entry.isDirectory()) return listSourceFiles(entryPath);
+        if (!entry.isFile()) return [];
+        return [path.relative(commerceProRoot, entryPath).split(path.sep).join('/')];
+    }).sort(compareNames);
+}
 
 assert.ok(
     fs.existsSync(previewPath),
@@ -25,18 +55,27 @@ assert.ok(fs.existsSync(adminPath), 'frontend/admin.html bulunamadı');
 
 const previewSource = fs.readFileSync(previewPath, 'utf8');
 const adminSource = fs.readFileSync(adminPath, 'utf8');
-const applicationSource = [appPath, mainPath].map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+const sourceModuleFiles = listSourceModules(sourceRoot);
+const sourceFiles = listSourceFiles(sourceRoot);
+const sourceModules = sourceModuleFiles.map((relativePath) => ({
+    relativePath,
+    source: fs.readFileSync(path.join(commerceProRoot, relativePath), 'utf8')
+}));
+const applicationSource = sourceModules
+    .map(({ relativePath, source }) => `/* ${relativePath} */\n${source}`)
+    .join('\n');
 const stylesSource = fs.readFileSync(stylesPath, 'utf8');
 const designQaSource = fs.readFileSync(designQaPath, 'utf8');
+const standaloneBuilderSource = fs.readFileSync(standaloneBuilderPath, 'utf8');
+const viteConfigSource = fs.readFileSync(viteConfigPath, 'utf8');
 const fingerprintFiles = [
     'index.html',
     'package.json',
     'package-lock.json',
     'vite.config.mjs',
     'scripts/build-standalone.mjs',
-    'src/App.jsx',
-    'src/main.jsx',
-    'src/styles.css',
+    'scripts/source-fingerprint.mjs',
+    ...sourceFiles,
     'public/icons.js',
     'public/favicon-96x96.png',
     'public/assets/category-home.webp',
@@ -51,11 +90,35 @@ const fingerprintFiles = [
     'public/assets/fonts/inter-latin-ext-600-normal.woff2',
     'public/assets/fonts/inter-latin-ext-700-normal.woff2',
     'public/assets/fonts/inter-latin-ext-800-normal.woff2'
-];
+].sort(compareNames);
+
+assert.ok(sourceModuleFiles.length > 0, 'src altında en az bir JavaScript modülü bulunmalı');
+assert.ok(sourceFiles.includes('src/styles.css'), 'tüm src girdileri fingerprint kapsamına alınmalı');
+assert.deepEqual(sourceFiles, [...sourceFiles].sort(compareNames), 'src fingerprint girdileri deterministik sırada taranmalı');
+assert.ok(
+    sourceModuleFiles.includes('src/previewModel.js'),
+    'previewModel.js kaynak taraması ve fingerprint kapsamına alınmalı'
+);
+assert.deepEqual(
+    sourceModuleFiles,
+    [...sourceModuleFiles].sort(compareNames),
+    'kaynak modülleri deterministik sırada taranmalı'
+);
+assert.match(
+    standaloneBuilderSource,
+    /builtFingerprint\.trim\(\) !== sourceFingerprint/,
+    'standalone üretici eski Vite çıktısını güncel kaynak parmak iziyle damgalamamalı'
+);
+assert.match(
+    viteConfigSource,
+    /buildStart\(\)[\s\S]{0,180}createSourceFingerprint\(root\)[\s\S]{0,260}writeFile\(path\.join\(root, "dist", "\.source-fingerprint"\), buildSourceFingerprint/,
+    'Vite build kendi kaynak parmak izini dist içine yazmalı'
+);
+
 const fingerprint = createHash('sha256');
 for (const relativePath of fingerprintFiles) {
     fingerprint.update(relativePath);
-    fingerprint.update(fs.readFileSync(path.join(repositoryRoot, 'admin-commerce-pro', relativePath)));
+    fingerprint.update(fs.readFileSync(path.join(commerceProRoot, relativePath)));
 }
 const expectedFingerprint = fingerprint.digest('hex');
 
@@ -119,8 +182,14 @@ assert.doesNotMatch(previewSource, /(?:src|href)=["']\/src\//i, 'çözümlenmemi
 assert.doesNotMatch(previewSource, /(?:src|href)=["'][^"']*icons\.js/i, 'ikon paketi HTML içine gömülmeli');
 assert.match(previewSource, /data:image\/webp;base64,/i, 'ürün görselleri HTML içine gömülmeli');
 assert.match(previewSource, /data:font\/woff2;base64,/i, 'font dosyaları HTML içine gömülmeli');
+assert.match(
+    previewSource,
+    /<meta\b[^>]*\bhttp-equiv=["']Content-Security-Policy["'][^>]*\bcontent=["']connect-src 'none'["'][^>]*>/i,
+    'bağımsız önizleme runtime bağlantılarını CSP ile de kapatmalı'
+);
 
 const forbiddenRuntimePatterns = [
+    [/\bfetch\s*\(/, 'fetch çağrısı'],
     [/\bnew\s+XMLHttpRequest\b|\bXMLHttpRequest\s*\(/, 'XMLHttpRequest çağrısı'],
     [/\bnew\s+WebSocket\b|\bWebSocket\s*\(/, 'WebSocket bağlantısı'],
     [/\bnew\s+EventSource\b|\bEventSource\s*\(/, 'EventSource bağlantısı'],
@@ -131,15 +200,20 @@ const forbiddenRuntimePatterns = [
     [/\biyzico\b/i, 'iyzico referansı']
 ];
 
-assert.doesNotMatch(
-    applicationSource,
-    /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bEventSource\b|\bsendBeacon\s*\(/,
-    'uygulama kaynak kodu ağ çağrısı içeremez'
-);
+for (const { relativePath, source } of sourceModules) {
+    assert.doesNotMatch(
+        source,
+        /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bEventSource\b|\bsendBeacon\s*\(/,
+        `${relativePath} ağ çağrısı içeremez`
+    );
+    for (const [pattern, label] of forbiddenRuntimePatterns) {
+        assert.doesNotMatch(source, pattern, `${relativePath} ${label} içeremez`);
+    }
+}
 
 assert.match(
     applicationSource,
-    /domain === "operations" && <section className="saved-views"/,
+    /\{domain === "operations" && \(\s*<section className="saved-views"/,
     'sipariş kaydedilmiş görünümleri yalnız operasyon alanında sunulmalı'
 );
 assert.doesNotMatch(
@@ -149,17 +223,17 @@ assert.doesNotMatch(
 );
 assert.match(
     applicationSource,
-    /const visibleSelected = visible\.filter/,
-    'toplu işlem sayacı yalnız görünür sipariş seçimlerini kullanmalı'
+    /const visibleSelected = pagination\.rows\.filter/,
+    'toplu işlem sayacı yalnız sayfadaki görünür sipariş seçimlerini kullanmalı'
 );
 assert.match(
     applicationSource,
-    /visibleIds\.has\(row\.id\)/,
+    /setOrderStatuses\(rows, visibleIds, status\)/,
     'toplu durum güncellemesi görünmeyen siparişleri değiştirmemeli'
 );
 assert.match(
     applicationSource,
-    /<select aria-label="Örnek kapsam" value=\{store\}/,
+    /<select\s+aria-label="Örnek kapsam"\s+value=\{store\}/,
     'bağlamsal kapsam seçicisi ortak mağaza durumuna bağlı olmalı'
 );
 assert.match(
@@ -184,13 +258,23 @@ assert.match(
 );
 assert.match(
     applicationSource,
+    /\.\.\.orders\.map\(\(item\) => \(\{ id: "order-" \+ item\.id/,
+    'komut paleti örnek siparişlerin tamamını aranabilir tutmalı'
+);
+assert.doesNotMatch(
+    applicationSource,
+    /orders\.slice\(0,\s*8\)\.map/,
+    'komut paleti sipariş aramasını ilk kayıtlarla sınırlamamalı'
+);
+assert.match(
+    applicationSource,
     /setFilter\(\{ status: view\.status, query: view\.query \|\| "" \}\)/,
     'kaydedilmiş görünüm uygulanırken arama sorgusu geri yüklenmeli'
 );
 assert.match(
     applicationSource,
-    /\{ name, status: filter\.status, query: filter\.query \}/,
-    'kaydedilmiş görünüm etkin arama sorgusunu saklamalı'
+    /savedViews\.concat\(\{ name, status: filter\.status, query: filter\.query, scope \}\)/,
+    'kaydedilmiş görünüm etkin arama sorgusunu ve kapsam etiketini saklamalı'
 );
 assert.match(
     applicationSource,
@@ -209,9 +293,41 @@ assert.match(
 );
 assert.match(
     applicationSource,
-    /event\.preventDefault\(\); if \(!dialog && !document\.querySelector\("dialog\[open\]"\)\) openDialog\("command"\)/,
+    /event\.preventDefault\(\);[\s\S]{0,180}if \(!dialog && !document\.querySelector\("dialog\[open\]"\)\) openDialog\("command"\)/,
     'komut paleti kısayolu açık bir modalı ve odak geri dönüş hedefini değiştirmemeli'
 );
+
+for (const [pattern, label] of [
+    [/\bpaginateRows\(filtered, page, pageSize\)/, 'gerçek sipariş sayfalama modeli'],
+    [/function OperationsPreviewTable\(/, 'satıcı siparişi, iade ve stok tablo yüzeyi'],
+    [/function ProductDialog\(/, 'yerel ürün oluşturma ve düzenleme yüzeyi'],
+    [/\bvalidateProductDraft\(draft, products, product\?\.sku \|\| ""\)/, 'ürün doğrulama sözleşmesi'],
+    [/function downloadCsv\(/, 'güvenli yerel CSV üretimi'],
+    [/disabled=\{item\.disabled\}/, 'entegrasyona ertelenen bağlam kontrolleri'],
+    [/role="combobox"[\s\S]{0,240}aria-activedescendant=/, 'klavye erişilebilir komut paleti'],
+    [/function EmptyTable\(/, 'filtrelenmiş boş tablo durumu'],
+    [/setDateRange\(next\)/, 'kontrollü tarih aralığı'],
+    [/setStoreScope/, 'ortak mağaza kapsamı uygulaması']
+]) {
+    assert.match(applicationSource, pattern, 'uygulama ' + label + ' içermeli');
+}
+
+for (const [pattern, label] of [
+    [/current && compact && \([\s\S]{0,220}<Modal[^>]+testId="row-inspector"/, 'compact sipariş modalı'],
+    [/document\.activeElement === container[\s\S]{0,160}event\.shiftKey \? last : first/, 'container başlangıçlı odak döngüsü'],
+    [/contextItem === "Segmentler"[\s\S]{0,300}className="segment-grid"/, 'etkileşimli müşteri segment görünümü'],
+    [/contextItem === "Rol Düzenleri"[\s\S]{0,500}role-module-summary/, 'rol düzenine özgü modül özeti'],
+    [/contextItem !== "Bugün" \|\| order\.today/, 'bugüne özgü sipariş kapsamı'],
+    [/cardClass="seller-detail-modal"/, 'dört satırlı mobil satıcı modalı'],
+    [/Dönüşüm", disabled: true/, 'ertelenmiş dönüşüm raporu kontrolü'],
+    [/Ürün İçgörüleri", disabled: true/, 'ertelenmiş ürün içgörüleri kontrolü']
+]) {
+    assert.match(applicationSource, pattern, 'uygulama ' + label + ' içermeli');
+}
+
+assert.match(stylesSource, /\.seller-detail-modal\s*\{[\s\S]{0,140}grid-template-rows:\s*auto auto minmax\(0, 1fr\) auto/, 'mobil satıcı modalı dört açık grid satırı tanımlamalı');
+assert.match(stylesSource, /\.topbar \.date-select \{ display: none; \}/, 'dar üst çubuk bağlamsal tarih kontrolünü çoğaltmamalı');
+assert.match(stylesSource, /\.statusbar > span \{ display: none; \}/, 'mobil durum çubuğu yalnız metinleri gizleyip sıfırlama düğmesini korumalı');
 
 for (const [pattern, label] of forbiddenRuntimePatterns) {
     assert.doesNotMatch(previewSource, pattern, `önizleme ${label} içeremez`);
@@ -236,10 +352,24 @@ assert.ok(previewLink, 'frontend/admin.html Commerce Pro önizlemesine bağlant�
 assert.match(previewLink, /\btarget=["']_blank["']/i, 'önizleme bağlantısı yeni sekmede açılmalı');
 assert.match(previewLink, /\brel=["'][^"']*noopener[^"']*["']/i, 'yeni sekme bağlantısı noopener kullanmalı');
 
+const designQaFinalResults = Array.from(
+    designQaSource.matchAll(/^final result:\s*(\S+)\s*$/gim),
+    (match) => match[1].toLocaleLowerCase('tr-TR')
+);
+assert.deepEqual(
+    designQaFinalResults,
+    ['blocked'],
+    'masaüstü/mobil browser kanıtı tamamlanana kadar tasarım QA tek bir blocked sonucu taşımalı'
+);
 assert.match(
     designQaSource,
-    /^final result:\s*blocked\s*$/im,
-    'düzeltme sonrası masaüstü/mobil browser kanıtı tamamlanana kadar tasarım QA sonucu blocked kalmalı'
+    /^## Açık browser kanıtı blokeri\s*$/im,
+    'design QA güncel browser kanıtı blokerini açıkça belgelemeli'
+);
+assert.match(
+    designQaSource,
+    /Draft PR[\s\S]{0,240}merge-ready kabul edilmemelidir\./i,
+    'design QA browser kanıtı tamamlanmadan PR için merge-ready sonucu vermemeli'
 );
 
 console.log('admin Commerce Pro preview smoke passed');

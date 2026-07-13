@@ -8,7 +8,11 @@
     "build": "vite build",
     "build:standalone": "npm run build && node scripts/build-standalone.mjs",
     "build:integrated": "npm run build && node scripts/build-standalone.mjs --output ../frontend/admin-commerce-pro.html",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:model": "node ../tests/adminCommerceProModelSmoke.mjs",
+    "test:preview": "node ../tests/adminCommerceProPreviewSmoke.js",
+    "test": "npm run test:model && npm run test:preview",
+    "verify": "npm run build:integrated && npm test"
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.0.4",
