@@ -1199,18 +1199,18 @@
                         <div style="display: flex; flex-direction: column; gap: 4px; background: #FAFAFA; border: 1px solid #EAEAEA; border-radius: 8px; padding: 6px 8px; margin-top: 6px; width: fit-content;">
                             <div style="display: flex; align-items: center; gap: 6px;">
                                 <span style="color: #00897B; font-size: 0.65rem; font-weight: 700; background: #E0F2F1; padding: 2px 4px; border-radius: 4px;">Sepete Özel</span>
-                                <span style="color: #888; text-decoration: line-through; font-size: 0.7rem;">${parseFloat(item.old_price).toFixed(2)} TL</span>
+                                <span style="color: #888; text-decoration: line-through; font-size: 0.7rem;">${NovaStoreSharedState.formatPrice(item.old_price)} TL</span>
                                 <span style="background: #00897B; color: white; padding: 2px 4px; border-radius: 4px; font-weight: bold; font-size: 0.65rem;">%${discountRate}</span>
                             </div>
                             <div style="color: #00897B; font-weight: 800; font-size: 0.95rem; line-height: 1;">
-                                ${parseFloat(item.price).toFixed(2)} <span style="font-size: 0.7rem; font-weight: 600;">TL</span>
+                                ${NovaStoreSharedState.formatPrice(item.price)} <span style="font-size: 0.7rem; font-weight: 600;">TL</span>
                             </div>
                         </div>
                     `;
                 } else {
                     priceSectionHtml = `
                         <div style="color: #0F2A43; font-weight: 800; font-size: 1rem; margin-top: 6px;">
-                            ${parseFloat(item.price).toFixed(2)} <span style="font-size: 0.75rem; font-weight: 600;">TL</span>
+                            ${NovaStoreSharedState.formatPrice(item.price)} <span style="font-size: 0.75rem; font-weight: 600;">TL</span>
                         </div>
                     `;
                 }
@@ -1243,7 +1243,7 @@
                 `;
             });
 
-            totalEl.innerText = total.toFixed(2);
+            totalEl.innerText = NovaStoreSharedState.formatPrice(total);
             badge.innerText = totalItems;
 
             if (checkoutBtn) {

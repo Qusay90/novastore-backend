@@ -95,6 +95,14 @@
         return [...byId.values()];
     }
 
+    function formatPrice(value) {
+        const amount = Number(value || 0);
+        return (Number.isFinite(amount) ? amount : 0).toLocaleString('tr-TR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
     function wait(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
@@ -292,6 +300,7 @@
         loadCheckout,
         writeCartLocal,
         normalizeCartItems,
+        formatPrice,
         isCartMigrationComplete,
         reportError
     };

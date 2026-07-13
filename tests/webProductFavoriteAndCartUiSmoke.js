@@ -75,6 +75,13 @@ const ok = (payload, status = 200) => ({
 
 const frontendDir = path.join(__dirname, '..', 'frontend');
 const productSource = fs.readFileSync(path.join(frontendDir, 'product.html'), 'utf8');
+const indexSource = fs.readFileSync(path.join(frontendDir, 'index.html'), 'utf8');
+const profileSource = fs.readFileSync(path.join(frontendDir, 'profile.html'), 'utf8');
+const checkoutSource = fs.readFileSync(path.join(frontendDir, 'checkout.html'), 'utf8');
+
+[indexSource, productSource, profileSource, checkoutSource].forEach((source) => {
+    assert(source.includes('NovaStoreSharedState.formatPrice'));
+});
 
 assert.match(
     productSource,
@@ -114,6 +121,10 @@ global.fetch = async (requestPath, options = {}) => {
 
 require('../frontend/shared-state-sync');
 require('../frontend/favorites-sync');
+
+assert.strictEqual(global.NovaStoreSharedState.formatPrice(29999), '29.999,00');
+assert.strictEqual(global.NovaStoreSharedState.formatPrice('899.9'), '899,90');
+assert.strictEqual(global.NovaStoreSharedState.formatPrice('invalid'), '0,00');
 
 const sidebar = { classList: new FakeClassList('cart-sidebar') };
 const overlay = { classList: new FakeClassList('cart-overlay') };
@@ -162,7 +173,7 @@ vm.runInContext(`
         );
         document.getElementById('cart-total-price').textContent = cart
             .reduce((total, item) => total + (item.price * item.quantity), 0)
-            .toFixed(2);
+            .toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
     ${pageFunctions}
     globalThis.productPage = {
@@ -210,7 +221,7 @@ vm.runInContext(`
     assert.strictEqual(sidebar.classList.contains('open'), true);
     assert.strictEqual(overlay.classList.contains('open'), true);
     assert.strictEqual(cartCount.textContent, '2');
-    assert.strictEqual(cartTotal.textContent, '2500.00');
+    assert.strictEqual(cartTotal.textContent, '2.500,00');
 
     const visibleRemoveButton = {
         isVisible() {
@@ -233,7 +244,7 @@ vm.runInContext(`
     assert.deepStrictEqual(cartPayload.items.map((item) => item.productId), [11]);
     assert.deepStrictEqual(context.productPage.getCart().map((item) => item.productId), [11]);
     assert.strictEqual(cartCount.textContent, '1');
-    assert.strictEqual(cartTotal.textContent, '1500.00');
+    assert.strictEqual(cartTotal.textContent, '1.500,00');
 
     console.log('web product favorite and visible cart UI smoke passed');
 })().catch((error) => {
