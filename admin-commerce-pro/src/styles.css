@@ -861,6 +861,18 @@ progress::-moz-progress-bar { background: var(--blue); }
 .data-table td > strong { color: var(--ink); }
 .data-table input[type="checkbox"] { width: 15px; height: 15px; min-height: 0; padding: 0; accent-color: var(--orange-600); }
 
+.row-entity-button {
+  display: grid;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  text-align: left;
+}
+
+.row-entity-button strong { color: var(--ink); }
+.row-entity-button small { color: var(--muted); }
+
 .seller-cell,
 .product-cell { display: flex; align-items: center; min-width: 0; gap: 6px; }
 .seller-cell .icon-wrap { color: var(--navy-800); }
@@ -1271,7 +1283,9 @@ dialog.modal::backdrop { background: rgba(4, 23, 46, 0.58); }
     background: rgba(4, 23, 46, 0.48);
     border: 0;
   }
-  .command-trigger { display: none; }
+  .command-trigger { display: grid; place-items: center; flex: 0 0 40px; width: 40px; min-width: 40px; padding: 0; }
+  .command-trigger span,
+  .command-trigger kbd { display: none; }
   .topbar { justify-content: space-between; }
   .topbar-leading { flex: 1; max-width: none; }
   .profile-button { display: none; }

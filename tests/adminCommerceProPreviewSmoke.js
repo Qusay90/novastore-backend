@@ -9,6 +9,7 @@ const previewPath = path.join(repositoryRoot, 'frontend', 'admin-commerce-pro.ht
 const adminPath = path.join(repositoryRoot, 'frontend', 'admin.html');
 const appPath = path.join(repositoryRoot, 'admin-commerce-pro', 'src', 'App.jsx');
 const mainPath = path.join(repositoryRoot, 'admin-commerce-pro', 'src', 'main.jsx');
+const stylesPath = path.join(repositoryRoot, 'admin-commerce-pro', 'src', 'styles.css');
 const designQaPath = path.join(repositoryRoot, 'admin-commerce-pro', 'design-qa.md');
 
 assert.ok(
@@ -25,6 +26,7 @@ assert.ok(fs.existsSync(adminPath), 'frontend/admin.html bulunamadı');
 const previewSource = fs.readFileSync(previewPath, 'utf8');
 const adminSource = fs.readFileSync(adminPath, 'utf8');
 const applicationSource = [appPath, mainPath].map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+const stylesSource = fs.readFileSync(stylesPath, 'utf8');
 const designQaSource = fs.readFileSync(designQaPath, 'utf8');
 const fingerprintFiles = [
     'index.html',
@@ -133,6 +135,47 @@ assert.doesNotMatch(
     applicationSource,
     /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bEventSource\b|\bsendBeacon\s*\(/,
     'uygulama kaynak kodu ağ çağrısı içeremez'
+);
+
+assert.match(
+    applicationSource,
+    /domain === "operations" && <section className="saved-views"/,
+    'sipariş kaydedilmiş görünümleri yalnız operasyon alanında sunulmalı'
+);
+assert.doesNotMatch(
+    applicationSource,
+    /domain === "operations" \|\| domain === "catalog"/,
+    'sipariş kaydedilmiş görünümleri katalog alanına sızmamalı'
+);
+assert.match(
+    applicationSource,
+    /const visibleSelected = visible\.filter/,
+    'toplu işlem sayacı yalnız görünür sipariş seçimlerini kullanmalı'
+);
+assert.match(
+    applicationSource,
+    /visibleIds\.has\(row\.id\)/,
+    'toplu durum güncellemesi görünmeyen siparişleri değiştirmemeli'
+);
+assert.match(
+    applicationSource,
+    /<select aria-label="Örnek kapsam" value=\{store\}/,
+    'bağlamsal kapsam seçicisi ortak mağaza durumuna bağlı olmalı'
+);
+assert.match(
+    applicationSource,
+    /toastTimerRef/,
+    'bildirim zamanlayıcısı renderlar arasında kalıcı bir ref kullanmalı'
+);
+assert.match(
+    applicationSource,
+    /className="row-entity-button"[\s\S]{0,300}aria-label=/,
+    'satıcı satırları klavye ve ekran okuyucu için adlandırılmış kontrol içermeli'
+);
+assert.match(
+    stylesSource,
+    /@media \(max-width: 760px\)[\s\S]*?\.command-trigger \{ display: grid;/,
+    'mobil görünüm komut paleti için dokunmatik tetikleyiciyi korumalı'
 );
 
 for (const [pattern, label] of forbiddenRuntimePatterns) {
