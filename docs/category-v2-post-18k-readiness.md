@@ -220,6 +220,91 @@ Restore kabul şartları:
 - Auth/storage özel trigger veya policy değişiklikleri ayrıca doğrulanır.
 - Restore DB üzerinde uygulama read-only smoke testi geçer.
 
+### 5.4 Cloudinary/media backup gate
+
+DB logical dump, medya ilişkilerini ve URL metadata'sını korur; Cloudinary üzerinde duran binary görsel/video dosyalarını içermez. Bu nedenle Cloudinary backup, DB backup ve restore testinden ayrı bir production release gate'idir. Medya kaybı kabul edilemiyorsa bu gate tamamlanmadan migration, backfill veya deploy onayı verilmez.
+
+Ana Cloudinary klasörleri:
+
+- `novastore_products`: ürün medyası; kritik backup kapsamındadır.
+- `novastore_reviews`: yorum medyası; kritik backup kapsamındadır.
+- `novastore_product_previews`: geçici preview asset'leri içerebilir. Kritik kapsama otomatik alınmaz; retention ve iş değeri ayrıca değerlendirilir.
+
+Supabase Storage'ın ürün veya yorum medyası için aktif ana kaynak olduğuna dair mevcut kod kanıtı yoktur. Ana medya kaynağı Cloudinary kabul edilir; rollout öncesi env adı ve uygulama kullanım noktaları secretsiz envanterle yeniden doğrulanır.
+
+DB dump'ın koruduğu medya alanları:
+
+- `products.image_url`
+- `product_media.media_url`
+- `product_media.is_main`
+- `product_media.sort_order`
+- `product_media.created_at`
+- `review_media.media_url`
+- `review_media.media_type`
+- `review_media.sort_order`
+- `review_media.created_at`
+
+DB dump'ın kapsamadığı varlıklar ve garantiler:
+
+- Cloudinary binary görsel/video dosyaları.
+- Tam `public_id` metadata'sı.
+- `bytes`, `format` ve `resource_type` metadata'sı.
+- Transformation türevleri.
+- Folder/prefix export'u.
+- Asset delivery veya silinen asset'i geri getirme garantisi.
+
+Önerilen backup artifact yapısı:
+
+```text
+media/
+  cloudinary-inventory.json
+  cloudinary-inventory.csv
+  unreachable-assets.json
+  exported-assets/
+  CLOUDINARY-SHA256SUMS.txt
+```
+
+Cloudinary inventory her asset için şu alanları içermelidir:
+
+- `public_id`
+- `secure_url`
+- `resource_type`
+- `format`
+- `bytes`
+- `created_at`
+- `folder/prefix`
+
+Media backup uygulama sırası:
+
+1. `novastore_products` ve `novastore_reviews` envanterini secretsiz artifact olarak al.
+2. DB'deki product/review media URL'lerini Cloudinary inventory ile karşılaştır.
+3. DB'de olup Cloudinary inventory içinde bulunmayan URL'leri `media/unreachable-assets.json` dosyasına yaz.
+4. Kritik product/review binary asset'lerini `media/exported-assets/` altına export et.
+5. Export edilen dosyaların boyutlarını doğrula ve `media/CLOUDINARY-SHA256SUMS.txt` SHA-256 manifestini üret.
+6. DB ve media backup artifact'larını erişim kontrollü, şifreli off-site hedefe kopyala.
+7. Off-site kopyadan seçilmiş ürün ve yorum asset'lerini geri açma/restore testiyle doğrula.
+8. DB restore ile media restore sonuçlarını tek, timestamp'li ve secretsiz release gate raporunda birleştir.
+
+`frontend/uploads/local-products` altındaki local ürün dosyaları ayrıca listelenir. Git veya deploy artifact'ı içinde korunan bu dosyalar Cloudinary binary export kapsamına karıştırılmaz; artifact retention ve geri yükleme yöntemi ayrı kaydedilir.
+
+### 5.5 Backup ve media GO/NO-GO
+
+| Alan | Durum | Eksik aksiyon |
+|---|---|---|
+| Docker engine | GO | Disposable restore hedefinde tekrar health kontrolü yap. |
+| Supabase CLI | GO | Gerçek backup turunda sürümü artifact raporuna kaydet. |
+| Production PostgreSQL major | GO | `17.6` doğrulandı. |
+| Restore image | GO | `postgres:17` hazır. |
+| Backup klasörü | GO | `C:\Users\kusay\NovaStore-Secure-Backups\production\` hazır; timestamp'li alt klasör kullanılacak. |
+| Production DB URL aktarımı | NO-GO | URL yalnız operator PowerShell environment variable'ına secretsiz aktarım yöntemiyle verilmeli. |
+| Off-site hedef | NO-GO | Erişim kontrollü ve şifreli hedef belirlenmeli. |
+| İkinci doğrulayıcı | NO-GO | SHA-256 ve restore sonucunu onaylayacak kişi veya iki aşamalı manuel kontrol atanmalı. |
+| Maintenance window | NO-GO | Kesin tarih/saat ve rollback karar noktası belirlenmeli. |
+| Storage/media kararı | NO-GO | Kritik product/review binary kapsamı ve retention onaylanmalı. |
+| Cloudinary inventory planı | GO | Artifact yolları, alanlar ve karşılaştırma adımları tanımlandı. |
+| Media backup uygulaması | NO-GO | Inventory, kritik export, SHA-256, off-site copy ve örnek restore henüz yapılmadı. |
+| Render production auto-deploy | GO | Kapalı olduğu operasyon öncesi tekrar doğrulanmalı. |
+
 ## 6. Production preflight SQL
 
 Preflight iki ayrı gate olarak yürütülür. Gate A legacy production şemasında v2 nesnelerine dokunmaz. Gate B yalnız additive foundation başarıyla uygulandıktan sonra çalıştırılır. Her iki gate'in çıktısı timestamp'li artifact olarak saklanır.
@@ -602,6 +687,7 @@ API ve UI:
 | Production DB | Doğrulanmış backup ve restore testi yok | Kritik | Evet | Parametrik logical dump, size/checksum manifest ve ayrı hedefte restore testi | Tur 20A |
 | Production data gate | Production preflight ve category dry-run yapılmadı | Kritik | Evet | Gate A/B artifact'ları ve onaylı dry-run | Tur 20B |
 | Category backfill | Production-safe category backfill runner yok | Kritik | Evet | Explicit target/URL, default dry-run, iki kişi onayı, advisory lock ve secretsiz rapor | Tur 20B |
+| Cloudinary/media | Cloudinary inventory ve kritik binary media backup uygulanmadı | Yüksek | Evet, medya kaybı kabul edilemiyorsa | Cloudinary inventory, kritik asset export, SHA-256 manifest, şifreli off-site kopya ve örnek restore | Tur 20A-media / 20A.7 |
 | Admin support schema | Admin support migration'ları production'da uygulanmadı | Yüksek | Evet | Üç additive migration, inventory ve authenticated GET smoke | Tur 20B/20C |
 | Staging güvenliği | Paylaşılan admin test parolası ve geçici admin role | Yüksek | Evet, operasyonel | Parola rotasyonu; gerekmiyorsa role düşürme veya hesabı devre dışı bırakma | Tur 19G |
 | Android | Final unit test, assemble ve APK runtime smoke tekrarlanmadı | Yüksek | Evet | Production base URL/config ile final Android gate | Tur 20C |
@@ -621,11 +707,12 @@ API ve UI:
 Production deploy onayı verilmemesinin blocker nedenleri:
 
 1. Production backup ve bağımsız restore testi yok.
-2. Production Gate A/Gate B preflight artifact'ları yok.
-3. Production category backfill dry-run yapılmadı.
-4. Admin-support additive migration'ları production'da uygulanmadı.
-5. Production-safe category backfill runner veya imzalı operator runbook hazır değil.
-6. Final Android unit/build/APK runtime gate tamamlanmadı.
+2. Cloudinary inventory, kritik binary export, off-site kopya ve örnek media restore testi yok.
+3. Production Gate A/Gate B preflight artifact'ları yok.
+4. Production category backfill dry-run yapılmadı.
+5. Admin-support additive migration'ları production'da uygulanmadı.
+6. Production-safe category backfill runner veya imzalı operator runbook hazır değil.
+7. Final Android unit/build/APK runtime gate tamamlanmadı.
 
 ### 12.1 Staging admin cleanup
 
