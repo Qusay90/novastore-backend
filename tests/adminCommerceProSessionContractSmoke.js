@@ -110,6 +110,8 @@ const chainFor = (rows, queries) => [
     assert.equal(validAdmin.payload.capabilities.returnsRead, true);
     assert.equal(validAdmin.payload.capabilities.firstPartyCatalogRead, true);
     assert.equal(validAdmin.payload.capabilities.catalogStructureRead, true);
+    assert.equal(validAdmin.payload.capabilities.firstPartyCatalogWrite, false);
+    assert.equal(validAdmin.payload.capabilities.catalogStructureWrite, false);
     assert.equal(validAdmin.payload.capabilities.notificationsRead, true);
     assert.equal(validAdmin.payload.capabilities.orderStatusWrite, false);
     assert.equal(validAdmin.payload.capabilities.orderCancelWrite, false);
@@ -121,17 +123,25 @@ const chainFor = (rows, queries) => [
 
     const enabledWriteCapabilities = getAdminCommerceCapabilities({
         NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: 'true',
-        NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'true'
+        NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'true',
+        NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED: 'true',
+        NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'true'
     });
     assert.equal(enabledWriteCapabilities.orderCancelWrite, true);
     assert.equal(enabledWriteCapabilities.manualShipmentWrite, true);
+    assert.equal(enabledWriteCapabilities.firstPartyCatalogWrite, true);
+    assert.equal(enabledWriteCapabilities.catalogStructureWrite, true);
     assert.equal(enabledWriteCapabilities.orderStatusWrite, false);
     const nonExplicitWriteCapabilities = getAdminCommerceCapabilities({
         NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: '1',
-        NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'yes'
+        NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'yes',
+        NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED: '1',
+        NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'yes'
     });
     assert.equal(nonExplicitWriteCapabilities.orderCancelWrite, false);
     assert.equal(nonExplicitWriteCapabilities.manualShipmentWrite, false);
+    assert.equal(nonExplicitWriteCapabilities.firstPartyCatalogWrite, false);
+    assert.equal(nonExplicitWriteCapabilities.catalogStructureWrite, false);
 
     const guardFailure = await runChain([
         privateNoStore,

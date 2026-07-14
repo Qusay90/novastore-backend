@@ -43,7 +43,9 @@ const reserveStock = async (client, pricedItems) => {
     for (const item of pricedItems) {
         const updateResult = await client.query(
             `UPDATE products
-             SET stock = stock - $1
+             SET stock = stock - $1,
+                 revision = revision + 1,
+                 updated_at = CURRENT_TIMESTAMP
              WHERE id = $2 AND stock >= $1
              RETURNING id, stock`,
             [item.quantity, item.id]
@@ -68,7 +70,11 @@ const restockItems = async (client, items) => {
         if (!Number.isInteger(productId) || quantity <= 0) continue;
 
         await client.query(
-            'UPDATE products SET stock = stock + $1 WHERE id = $2',
+            `UPDATE products
+             SET stock = stock + $1,
+                 revision = revision + 1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2`,
             [quantity, productId]
         );
         changedProductIds.push(productId);
@@ -111,7 +117,9 @@ const releaseStockReservation = async ({ client = pool, payment, items, reasonCo
     for (const item of normalizedItems) {
         const result = await client.query(
             `UPDATE products
-             SET stock = stock + $1
+             SET stock = stock + $1,
+                 revision = revision + 1,
+                 updated_at = CURRENT_TIMESTAMP
              WHERE id = $2
              RETURNING id, stock`,
             [item.quantity, item.productId]

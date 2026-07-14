@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
+const { requireCurrentAdmin } = require('../middlewares/currentAdmin');
 const {
     getMenus,
     postMenu,
@@ -12,7 +13,7 @@ const {
 } = require('../controllers/adminMenuController');
 
 const router = express.Router();
-router.use(authenticate, requireAdmin);
+router.use(authenticate, requireAdmin, requireCurrentAdmin);
 router.get('/menus', getMenus);
 router.post('/menus', postMenu);
 router.patch('/menus/:id', patchMenu);

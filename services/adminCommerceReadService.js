@@ -87,6 +87,7 @@ const createGetAdminProductSummaries = (database) => async (req, res) => {
                     p.deleted_at,
                     p.created_at,
                     p.updated_at,
+                    p.revision,
                     primary_category.id AS primary_category_id,
                     primary_category.name AS primary_category_name,
                     primary_category.path AS primary_category_path,
@@ -159,6 +160,7 @@ const createGetAdminCatalogStructureSummary = (database) => async (req, res) => 
                         category.show_on_home,
                         category.hide_when_empty,
                         category.deleted_at,
+                        category.revision,
                         (
                             SELECT COUNT(*)::INT
                             FROM categories child
@@ -203,6 +205,7 @@ const createGetAdminCatalogStructureSummary = (database) => async (req, res) => 
                         definition.is_variant_relevant,
                         definition.sort_order,
                         definition.is_active,
+                        definition.revision,
                         (
                             SELECT COUNT(*)::INT
                             FROM attribute_options option_item
@@ -241,6 +244,7 @@ const createGetAdminCatalogStructureSummary = (database) => async (req, res) => 
                         category.path AS category_path,
                         template.sort_order,
                         template.is_active,
+                        template.revision,
                         COUNT(template_link.attribute_id)::INT AS attribute_count,
                         COUNT(template_link.attribute_id) FILTER (
                             WHERE COALESCE(template_link.is_required, definition.is_required) = TRUE
@@ -270,6 +274,7 @@ const createGetAdminCatalogStructureSummary = (database) => async (req, res) => 
                         collection.is_active,
                         collection.show_on_home,
                         collection.deleted_at,
+                        collection.revision,
                         (
                             SELECT COUNT(*)::INT
                             FROM collection_rules collection_rule
@@ -302,6 +307,7 @@ const createGetAdminCatalogStructureSummary = (database) => async (req, res) => 
                         menu.code,
                         menu.name,
                         menu.is_active,
+                        menu.revision,
                         COUNT(menu_item.id)::INT AS item_count,
                         COUNT(menu_item.id) FILTER (WHERE menu_item.is_active = TRUE)::INT AS active_item_count,
                         COUNT(menu_item.id) FILTER (WHERE menu_item.parent_id IS NULL)::INT AS root_item_count
@@ -326,7 +332,8 @@ const createGetAdminCatalogStructureSummary = (database) => async (req, res) => 
                         menu_item.collection_id,
                         (menu_item.internal_url IS NOT NULL) AS has_internal_url,
                         menu_item.sort_order,
-                        menu_item.is_active
+                        menu_item.is_active,
+                        menu_item.revision
                     FROM menu_items menu_item
                     JOIN menus menu ON menu.id = menu_item.menu_id
                     ORDER BY menu.code ASC,

@@ -8,7 +8,7 @@ Yığın tabanı: `codex/admin-commerce-pro-preview` (`1954d4b`)
 
 ## Sonuç
 
-Commerce Pro tasarım prototipi tamamlandı; tek-satıcı salt-okunur entegrasyon katmanı Dashboard, sipariş, iade, admin bildirimi, NovaStore birinci taraf ürün özeti ve ortak katalog yapısına kadar ilerledi. Mevcut backend hâlâ tek satıcılıdır; satıcı organizasyonu, satıcı kapsamlı yetkilendirme, teklif, seller-order, değişmez finansal kayıt, hakediş ve payout modelleri henüz yoktur.
+Commerce Pro tasarım prototipi tamamlandı; tek-satıcı salt-okunur entegrasyon katmanı Dashboard, sipariş, iade, admin bildirimi, NovaStore birinci taraf ürün özeti ve ortak katalog yapısına kadar ilerledi. Tur 3C katalog yazma güvenlik temeli de tamamlandı; yeni Commerce Pro CRUD/UI henüz açılmadı. Mevcut backend hâlâ tek satıcılıdır; satıcı organizasyonu, satıcı kapsamlı yetkilendirme, teklif, seller-order, değişmez finansal kayıt, hakediş ve payout modelleri henüz yoktur.
 
 - Gerçek tek-satıcı Commerce Pro cutover için kalan: **yaklaşık 2–3,5 hafta**.
 - Dar kapsamlı, login zorunlu ilk satış pilotu için kalan: **yaklaşık 4–7 hafta**.
@@ -109,7 +109,8 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 | 2B | Kod ve otomatik QA tamam; browser QA blokeli | `5cfe701` | Hard-delete/generic geçiş/sahte shipment/iade yazmaları kapalı; iptal stok kanıtına, callback'ler payment state + kalıcı reconciliation görevine bağlandı; bağımsız P0/P1 incelemesi temiz |
 | 2C | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | `756cc96` | Admin iptali ve manuel kargo devri ayrı default-off capability; expected-state/idempotency/audit/XSS sınırları testli; gerçek refund, return write ve taşıyıcı çağrısı kapalı |
 | 3A | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | `2358238` | Bounded/current-admin birinci taraf ürün özeti ve salt-okunur Commerce Pro ekranı; ürün/medya yazmaları kapalı |
-| 3B | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | Bu commit | Altı bounded/current-admin katalog yapı sayfası ve salt-okunur sekmeli Commerce Pro ekranı; ham URL/medya/yazma yok |
+| 3B | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | `927bc7b` | Altı bounded/current-admin katalog yapı sayfası ve salt-okunur sekmeli Commerce Pro ekranı; ham URL/medya/yazma yok |
+| 3C | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | Bu commit | Ürün hard-delete global kapalı; katalog mutation rotaları güncel DB admin rolüne bağlı; default-off write capability, revision ve append-only audit/atomik executor temeli hazır; yeni CRUD/UI veya sağlayıcı mutation'ı yok |
 
 ## Tur 2 güvenlik bölümü
 
@@ -156,6 +157,10 @@ Tur 3A, mevcut sınırsız `GET /api/products` yolunu yeniden kullanmaz. Entegre
 
 Tur 3B, mevcut unbounded legacy admin kategori/attribute/koleksiyon/menü yollarını Commerce Pro'ya açmaz. Tek current-admin/no-store endpoint altı ayrı 1–100 sayfa döndürür. Ürün bağlantılı sayaçlar yalnız active/non-deleted `novastore-platform` store ve silinmemiş ürün kapsamındadır; menü item iç URL'si yalnız var/yok sinyaline indirgenir. Endpoint ve UI hiçbir mutation, medya URL'si, seller/offer, risk veya ürün onay alanı taşımaz.
 
+Tur 3C, geçerli ürün kimliğinde kalıcı silmeyi veritabanına veya Cloudinary'ye dokunmadan `410 PRODUCT_HARD_DELETE_DISABLED` ile kapatır; legacy admin ürün listesindeki silme aksiyonu kaldırılmış, arşiv yayın durumu görünür hale getirilmiştir. Ürün/medya ile kategori/özellik/koleksiyon/menü mutation rotaları JWT'deki eski role ek olarak güncel DB admin rolünü doğrular; medya yükleme middleware'i bu kontrolden sonra çalışır.
+
+`firstPartyCatalogWrite` ve `catalogStructureWrite` capability'leri sırasıyla `NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED` ve `NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED` ile varsayılan kapalıdır. Sekiz katalog tablosuna pozitif `revision BIGINT` ve ayrı append-only `admin_catalog_audit_events` şeması eklenmiştir. Gelecek JSON mutation executor'ı eksik revision'da `428 ADMIN_CATALOG_PRECONDITION_REQUIRED`, stale revision'da `409 ADMIN_CATALOG_REVISION_CONFLICT` üretir; hedef satırı kendisi kilitler, revision artışını CAS ile sahiplenir ve mutation + audit aynı transaction içinde tamamlanmadan commit etmez. Create audit anahtarı eklenen satırın gerçek kimliğinden türetilir. `revision` doğrudan satır mutation tokenıdır; DTO'daki ilişkisel sayaçların bütünü için değişmez snapshot iddiası taşımaz. Bu tur capability/policy/migration temelidir: yeni Commerce Pro yazma endpoint'i veya UI kontrolü açmaz ve mevcut legacy mutation yollarının tamamının audit executor'ına bağlandığı iddia edilmez.
+
 PR #15’in `design-qa.md` sonucu, gerçek masaüstü/mobil browser kanıtı alınana kadar `blocked` kalır. Bu plan browser kısıtını atlatma yetkisi vermez.
 
 ## Tur 1 geri alma sınırı
@@ -173,3 +178,7 @@ Tur 2B migration veya production ayarı eklemez; mevcut tablo ve event kayıtlar
 ## Tur 2C geri alma sınırı
 
 Tur 2C şema/migration veya haricî sağlayıcı entegrasyonu eklemez. En hızlı operasyonel kapatma iki env bayrağını tanımsız/`false` tutmaktır; bu durumda session capability'leri ve sunucu mutation kapıları birlikte kapanır. Kod geri alma gerektiğinde capability service/middleware, admin cancel policy, manual shipment policy/service/controller/route, Commerce Pro mutation adapter/UI, üretilen live artifact ve ilgili testler birlikte geri alınır. Salt-okunur shipment/return görünümü, Tur 2B güvenlik çekirdeği ve eski `create`/return write kilitleri geri açılmaz.
+
+## Tur 3C geri alma sınırı
+
+Tur 3C migration artifact'ı additive'dir ancak production veya uzak veritabanında çalıştırılmamıştır. En hızlı operasyonel kapatma iki katalog write env bayrağını tanımsız/`false` tutmaktır. Kod geri alınacaksa capability/policy/executor, revision projection/artışları, current-admin route guard'ları, hard-delete kilidi, legacy UI düzeltmesi ve testler birlikte değerlendirilir. Şema uygulanmış bir ortamda revision kolonları veya audit tablosu veri incelemesi olmadan düşürülmez; ürün hard-delete kilidini geri açmak ayrıca açık güvenlik onayı gerektirir.

@@ -5,6 +5,7 @@ const {
 } = require('./categoryV2Schema');
 const { applyMenuCollectionSchema } = require('./menuCollectionSchema');
 const { applyAttributeSchema } = require('./attributeSchema');
+const { applyAdminCatalogAuditSchema } = require('./adminCatalogAuditSchema');
 
 const createCoreSchema = async () => {
     const query = `
@@ -169,6 +170,7 @@ const createCoreSchema = async () => {
     await applyCategoryV2BackfillConstraints(pool);
     await applyMenuCollectionSchema(pool);
     await applyAttributeSchema(pool);
+    await applyAdminCatalogAuditSchema(pool);
     console.log('Temel veritabani schema hazir.');
 };
 

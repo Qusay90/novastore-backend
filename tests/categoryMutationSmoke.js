@@ -6,6 +6,7 @@ const pool = require('../config/db');
 const createCoreSchema = require('../models/createCoreDb');
 const { resolveStartupSafety } = require('../config/startupSafety');
 const { recalculateAllCategoryStats, reconcileCategoryStats } = require('../services/categoryStatsService');
+const { seedCurrentAdminUsers } = require('./helpers/seedCurrentAdminUsers');
 const adminRoutes = require('../routes/adminCategoryRoutes');
 const publicRoutes = require('../routes/publicCategoryRoutes');
 const legacyRoutes = require('../routes/categoryRoutes');
@@ -53,6 +54,7 @@ const request = async (base, url, { method = 'GET', body, headers = {}, redirect
     assert.strictEqual(safety.target.database, 'novastore_category_v2_test');
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await createCoreSchema();
+    await seedCurrentAdminUsers(pool);
     const api = await startApi();
 
     try {

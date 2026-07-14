@@ -426,7 +426,10 @@ const updateSubtreeMetadata = async (client, rootId) => {
     while (queue.length) {
         const current = queue.shift();
         await client.query(
-            'UPDATE categories SET path = $2, depth = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+            `UPDATE categories
+             SET path = $2, depth = $3, revision = revision + 1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
             [current.id, current.path, current.depth]
         );
         for (const childId of children.get(current.id) || []) {
@@ -524,11 +527,22 @@ const updateCategory = async (categoryId, input = {}) => withCategoryTransaction
             accent_color=$7, description=$8, seo_title=$9, seo_description=$10,
             sort_order=$11, is_active=$12, is_customer_visible=$13,
             show_in_menu=$14, show_on_home=$15, hide_when_empty=$16,
-            google_taxonomy_id=$17, updated_at=CURRENT_TIMESTAMP
+            google_taxonomy_id=$17,
+            revision=revision + $18,
+            updated_at=CURRENT_TIMESTAMP
         WHERE id=$1 RETURNING *
-    `, [categoryId, nextName, nextSlug, ...CATEGORY_MUTATION_FIELDS.map((field) => merged[field])]);
+    `, [
+        categoryId,
+        nextName,
+        nextSlug,
+        ...CATEGORY_MUTATION_FIELDS.map((field) => merged[field]),
+        nextSlug === current.slug ? 1 : 0
+    ]);
     if (nextSlug !== current.slug) await updateSubtreeMetadata(client, categoryId);
-    return normalizeCategoryRow(result.rows[0]);
+    const updated = nextSlug === current.slug
+        ? result.rows[0]
+        : (await client.query('SELECT * FROM categories WHERE id=$1', [categoryId])).rows[0];
+    return normalizeCategoryRow(updated);
 });
 
 const moveCategory = async (categoryId, input = {}) => withCategoryTransaction(async (client) => {
@@ -569,6 +583,7 @@ const setCategoryArchived = async (categoryId, archived) => withCategoryTransact
         `UPDATE categories
          SET deleted_at = CASE WHEN $2 THEN COALESCE(deleted_at, CURRENT_TIMESTAMP) ELSE NULL END,
              is_active = CASE WHEN $2 THEN FALSE ELSE TRUE END,
+             revision = revision + 1,
              updated_at = CURRENT_TIMESTAMP
          WHERE id=$1 RETURNING *`,
         [categoryId, archived === true]

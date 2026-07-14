@@ -1,9 +1,10 @@
 const express = require('express');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
+const { requireCurrentAdmin } = require('../middlewares/currentAdmin');
 const controller = require('../controllers/adminAttributeController');
 
 const router = express.Router();
-router.use(authenticate, requireAdmin);
+router.use(authenticate, requireAdmin, requireCurrentAdmin);
 
 router.get('/attributes', controller.getAttributes);
 router.post('/attributes', controller.postAttribute);

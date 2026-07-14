@@ -6,7 +6,7 @@ Tarih: 14 Temmuz 2026
 
 ## Kısa cevap
 
-NovaStore bugün gerçek ödeme alarak satışa açılmaya hazır değildir. Commerce Pro arayüzü ile mevcut backend arasındaki tek-satıcı entegrasyonu ilerliyor; sipariş/ödeme yaşam döngüsünün güvenlik çekirdeği ve bounded birinci taraf ürün okuması tamamlandı. Buna karşılık gerçek ödeme sağlayıcısı, güvenli iade/refund zinciri, taşıyıcı doğrulaması, güncel browser UAT'i ve production cutover kapıları hâlâ kapalıdır.
+NovaStore bugün gerçek ödeme alarak satışa açılmaya hazır değildir. Commerce Pro arayüzü ile mevcut backend arasındaki tek-satıcı entegrasyonu ilerliyor; sipariş/ödeme yaşam döngüsünün güvenlik çekirdeği, bounded ürün/katalog yapısı okuması ve katalog yazma güvenlik temeli tamamlandı. Buna karşılık gerçek ödeme sağlayıcısı, güvenli iade/refund zinciri, taşıyıcı doğrulaması, güncel browser UAT'i ve production cutover kapıları hâlâ kapalıdır.
 
 Tek geliştirici + Codex ile kesintisiz çalışma varsayımında kalan yaklaşık süreler:
 
@@ -27,7 +27,7 @@ Bu tarihler taahhüt değil planlama aralığıdır. PayTR/iyzico, KYC, kargo ve
 | Admin auth ve salt-okunur entegrasyon | İleri aşama | Güncel DB admin rolü, fail-closed capability, Dashboard, sipariş, iade, admin bildirim ve NovaStore birinci taraf ürün özetleri bağlı. |
 | Sipariş/ödeme güvenlik çekirdeği | İleri aşama | Hard-delete ve generic durum mutation'ı kapalı; iptal stok kanıtına, callback'ler kilitli payment state ve kalıcı reconciliation kaydına bağlı. |
 | Kontrollü admin operasyonları | Otomatik QA tamam | Admin iptali ve manuel kargo devri varsayılan kapalı kill-switch arkasında, expected-state/idempotency/audit sınırlarıyla tamamlandı. Taşıyıcı API'si, etiket ve otomatik refund yok; gerçek PostgreSQL contention ile browser QA kanıtı açık. |
-| Birinci taraf katalog yönetimi | Tur 3A–3B otomatik QA tamam | Bounded/current-admin ürün özeti ile kategori, özellik, şablon, koleksiyon ve menü yapısı salt-okunur bağlı. Yazma güvenlik temeli kurulmadan CRUD, hard-delete veya Cloudinary mutation açılmayacak; gerçek PostgreSQL ve browser kanıtı açık. |
+| Birinci taraf katalog yönetimi | Tur 3A–3C otomatik QA tamam | Bounded/current-admin ürün ve katalog yapı okumaları bağlı. Ürün hard-delete kapalı; current-admin guard, default-off write capability, revision ve append-only audit/atomik mutation temeli hazır. Commerce Pro CRUD/UI hâlâ açılmadı; migration deploy'u, gerçek PostgreSQL ve browser kanıtı açık. |
 | Müşteri, destek ve kampanya operasyonu | Eksik | Bounded admin DTO, pagination, PII sınırı ve mutation politikaları tamamlanmalı. |
 | İade ve refund | Blokeli | Return writes bilerek kapalı. İdempotent iade kalemi, ödeme refund, stok hareketi ve reconciliation modeli migration/onay gerektiriyor. |
 | Gerçek ödeme | Blokeli | PayTR initialize test tokenı ve iyzico initialize mock. Sağlayıcının güncel raw-body imza sözleşmesiyle staging UAT yapılmadan ödeme go/no-go kapalı. |
@@ -42,13 +42,14 @@ Her tur `plan → uygulama → test → doğrulama → commit → push` sırası
 1. **Tur 2C — güvenli operasyon yazmaları (kod ve otomatik QA tamam):** feature-gated admin iptali ve manuel kargo devri; stale-state, idempotency, audit ve post-commit bildirim testleri tamamlandı. İade/refund kapalı kalır; runtime PostgreSQL/browser kanıtı ilgili ortam sağlandığında ayrıca alınır.
 2. **Tur 3A — birinci taraf ürün okuması (kod ve otomatik QA tamam):** bounded/current-admin ürün özeti Commerce Pro'ya bağlandı; gerçek PostgreSQL/browser kanıtı açık, ürün/medya yazmaları kapalı.
 3. **Tur 3B — ortak katalog yapısı (kod ve otomatik QA tamam):** kategori, özellik tanımı/şablonu, koleksiyon, menü ve menü öğesi altı bounded sayfayla Commerce Pro'ya salt-okunur bağlandı; ham iç URL ve medya alanları dışarıda.
-4. **Tur 3C–3F — güvenli katalog CRUD (sıradaki aktif turlar):** hard-delete yerine arşivleme/yayın politikası, default-off capability, optimistic concurrency ve audit; medya sağlayıcısına gerçek mutation yok.
-5. **Tur 4 — müşteri ve operasyon:** bounded müşteri özeti, soru/yorum/destek, kampanya görünümü, pagination ve PII/RBAC sınırları.
-6. **Tur 5 — Commerce Pro cutover hazırlığı:** legacy parity, feature flag, performans/güvenlik, rollback; seçili browser yeniden kullanılabildiğinde masaüstü/mobil, console ve network UAT.
-7. **Tek-satıcı satış pilotu kapısı:** gerçek provider adapterları ve staging UAT yalnız ayrıca onaylanır; refund, taşıyıcı, fatura, mutabakat ve incident runbook birlikte geçmeden canlı ödeme açılmaz.
-8. **Çok-satıcı Tur 0–3:** domain/ADR, seller identity ve tenant RBAC, onboarding/KYC, kanonik katalog + seller offer + sürümlü yayın politikası.
-9. **Çok-satıcı Tur 4–6:** checkout rezervasyonu, seller-order ayrımı, satır bazlı iade/anlaşmazlık, immutable finans snapshot'ı ve çift taraflı ledger.
-10. **Çok-satıcı Tur 7–9:** PayTR platform transfer mock/staging, seller portalı, reconciliation, 1–3 satıcılı kontrollü pilot ve kademeli rollout.
+4. **Tur 3C — katalog yazma güvenlik temeli (kod ve otomatik QA tamam):** ürün hard-delete kilidi, güncel DB admin guard'ları, default-off capability, row-level revision ve append-only audit/atomik executor sözleşmesi tamamlandı; production migration, yeni CRUD/UI ve Cloudinary mutation yapılmadı.
+5. **Tur 3D–3F — güvenli katalog CRUD ve geniş doğrulama (sıradaki aktif turlar):** medyasız ürün JSON create/update/archive, ardından katalog yapısı CRUD'u ve disposable PostgreSQL/legacy parity/browser kanıtı.
+6. **Tur 4 — müşteri ve operasyon:** bounded müşteri özeti, soru/yorum/destek, kampanya görünümü, pagination ve PII/RBAC sınırları.
+7. **Tur 5 — Commerce Pro cutover hazırlığı:** legacy parity, feature flag, performans/güvenlik, rollback; seçili browser yeniden kullanılabildiğinde masaüstü/mobil, console ve network UAT.
+8. **Tek-satıcı satış pilotu kapısı:** gerçek provider adapterları ve staging UAT yalnız ayrıca onaylanır; refund, taşıyıcı, fatura, mutabakat ve incident runbook birlikte geçmeden canlı ödeme açılmaz.
+9. **Çok-satıcı Tur 0–3:** domain/ADR, seller identity ve tenant RBAC, onboarding/KYC, kanonik katalog + seller offer + sürümlü yayın politikası.
+10. **Çok-satıcı Tur 4–6:** checkout rezervasyonu, seller-order ayrımı, satır bazlı iade/anlaşmazlık, immutable finans snapshot'ı ve çift taraflı ledger.
+11. **Çok-satıcı Tur 7–9:** PayTR platform transfer mock/staging, seller portalı, reconciliation, 1–3 satıcılı kontrollü pilot ve kademeli rollout.
 
 ## Ürün onayı ve risk etiketi kararı
 

@@ -42,7 +42,7 @@ const createFakeClient = () => {
                 return { rows: [{ id: params[1], stock: 4 }] };
             }
 
-            if (/UPDATE products SET stock = stock \+/i.test(sql)) {
+            if (/UPDATE products\s+SET stock = stock \+/i.test(sql)) {
                 return { rows: [] };
             }
 
@@ -82,7 +82,7 @@ const createFakeClient = () => {
 
     await restockItems(client, [{ productId: 101, quantity: 1 }]);
     assert.strictEqual(
-        client.calls.some((call) => /UPDATE products SET stock = stock \+/i.test(call.sql)),
+        client.calls.some((call) => /UPDATE products\s+SET stock = stock \+/i.test(call.sql)),
         true,
         'legacy reserved failure path can restock productId payloads'
     );

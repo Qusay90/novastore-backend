@@ -1,6 +1,14 @@
 const { isAdminCommerceCapabilityEnabled } = require('../services/adminCommerceCapabilityService');
 
 const DISABLED_CAPABILITY_RESPONSES = Object.freeze({
+    firstPartyCatalogWrite: Object.freeze({
+        code: 'ADMIN_CATALOG_PRODUCT_WRITE_DISABLED',
+        error: 'Birinci taraf ürün yazma güvenlik anahtarı kapalı.'
+    }),
+    catalogStructureWrite: Object.freeze({
+        code: 'ADMIN_CATALOG_STRUCTURE_WRITE_DISABLED',
+        error: 'Katalog yapısı yazma güvenlik anahtarı kapalı.'
+    }),
     orderCancelWrite: Object.freeze({
         code: 'ADMIN_ORDER_CANCEL_WRITE_DISABLED',
         error: 'Yönetici sipariş iptali güvenlik anahtarı kapalı.'

@@ -60,6 +60,7 @@ const rowsFor = (sql, count = 101) => {
             show_on_home: false,
             hide_when_empty: true,
             deleted_at: null,
+            revision: 1,
             child_count: 0,
             first_party_product_count: 2,
             attribute_template_count: 1
@@ -77,6 +78,7 @@ const rowsFor = (sql, count = 101) => {
             is_variant_relevant: false,
             sort_order: index,
             is_active: true,
+            revision: 1,
             option_count: 3,
             template_count: 2,
             first_party_value_count: 4
@@ -91,6 +93,7 @@ const rowsFor = (sql, count = 101) => {
             category_path: `kategori-${index + 1}`,
             sort_order: index,
             is_active: true,
+            revision: 1,
             attribute_count: 4,
             required_count: 2,
             filterable_count: 3
@@ -107,6 +110,7 @@ const rowsFor = (sql, count = 101) => {
             is_active: true,
             show_on_home: false,
             deleted_at: null,
+            revision: 1,
             rule_count: index % 2,
             first_party_manual_product_count: index % 2 === 0 ? 5 : 0
         }));
@@ -117,6 +121,7 @@ const rowsFor = (sql, count = 101) => {
             code: index % 2 === 0 ? 'main' : 'footer',
             name: `Menü ${index + 1}`,
             is_active: true,
+            revision: 1,
             item_count: 6,
             active_item_count: 5,
             root_item_count: 2
@@ -134,7 +139,8 @@ const rowsFor = (sql, count = 101) => {
             collection_id: null,
             has_internal_url: false,
             sort_order: index,
-            is_active: true
+            is_active: true,
+            revision: 1
         }));
     }
     throw new Error(`Beklenmeyen yapı sorgusu: ${sql}`);
@@ -144,24 +150,24 @@ const expectedKeys = Object.freeze({
     categories: [
         'attribute_template_count', 'child_count', 'deleted_at', 'depth', 'first_party_product_count',
         'hide_when_empty', 'id', 'is_active', 'is_customer_visible', 'name', 'parent_id', 'path',
-        'show_in_menu', 'show_on_home', 'slug', 'sort_order'
+        'revision', 'show_in_menu', 'show_on_home', 'slug', 'sort_order'
     ],
     attributeDefinitions: [
         'code', 'first_party_value_count', 'id', 'is_active', 'is_filterable', 'is_required',
-        'is_variant_relevant', 'name', 'option_count', 'sort_order', 'template_count', 'type', 'unit'
+        'is_variant_relevant', 'name', 'option_count', 'revision', 'sort_order', 'template_count', 'type', 'unit'
     ],
     attributeTemplates: [
         'attribute_count', 'category_id', 'category_name', 'category_path', 'filterable_count', 'id',
-        'is_active', 'name', 'required_count', 'sort_order'
+        'is_active', 'name', 'required_count', 'revision', 'sort_order'
     ],
     collections: [
         'collection_type', 'deleted_at', 'first_party_manual_product_count', 'id', 'is_active', 'name',
-        'rule_code', 'rule_count', 'show_on_home', 'slug', 'sort_order'
+        'revision', 'rule_code', 'rule_count', 'show_on_home', 'slug', 'sort_order'
     ],
-    menus: ['active_item_count', 'code', 'id', 'is_active', 'item_count', 'name', 'root_item_count'],
+    menus: ['active_item_count', 'code', 'id', 'is_active', 'item_count', 'name', 'revision', 'root_item_count'],
     menuItems: [
         'category_id', 'collection_id', 'has_internal_url', 'id', 'is_active', 'menu_code', 'menu_id',
-        'parent_id', 'sort_order', 'target_type', 'title'
+        'parent_id', 'revision', 'sort_order', 'target_type', 'title'
     ]
 });
 

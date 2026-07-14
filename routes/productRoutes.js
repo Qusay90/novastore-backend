@@ -14,19 +14,20 @@ const {
 } = require('../controllers/productController');
 const { upload, previewUpload } = require('../config/cloudinary');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
+const { requireCurrentAdmin } = require('../middlewares/currentAdmin');
 
 router.get('/', getAllProducts);
 
 // Medya yolu, '/:id' ile cakismamasi icin once tanimlanir
-router.post('/media-preview/remove-background', authenticate, requireAdmin, previewUpload.single('media'), previewProductMediaBackgroundRemoval);
-router.post('/media-preview/cleanup', authenticate, requireAdmin, cleanupProductMediaPreview);
-router.post('/media/:mediaId/remove-background-preview', authenticate, requireAdmin, previewExistingProductMediaBackgroundRemoval);
-router.post('/media/:mediaId/remove-background-apply', authenticate, requireAdmin, applyExistingProductMediaBackgroundRemoval);
-router.delete('/media/:mediaId', authenticate, requireAdmin, deleteProductMedia);
+router.post('/media-preview/remove-background', authenticate, requireAdmin, requireCurrentAdmin, previewUpload.single('media'), previewProductMediaBackgroundRemoval);
+router.post('/media-preview/cleanup', authenticate, requireAdmin, requireCurrentAdmin, cleanupProductMediaPreview);
+router.post('/media/:mediaId/remove-background-preview', authenticate, requireAdmin, requireCurrentAdmin, previewExistingProductMediaBackgroundRemoval);
+router.post('/media/:mediaId/remove-background-apply', authenticate, requireAdmin, requireCurrentAdmin, applyExistingProductMediaBackgroundRemoval);
+router.delete('/media/:mediaId', authenticate, requireAdmin, requireCurrentAdmin, deleteProductMedia);
 
 router.get('/:id', getProductById);
-router.post('/', authenticate, requireAdmin, upload.array('media', 10), createProduct);
-router.put('/:id', authenticate, requireAdmin, upload.array('media', 10), updateProduct);
-router.delete('/:id', authenticate, requireAdmin, deleteProduct);
+router.post('/', authenticate, requireAdmin, requireCurrentAdmin, upload.array('media', 10), createProduct);
+router.put('/:id', authenticate, requireAdmin, requireCurrentAdmin, upload.array('media', 10), updateProduct);
+router.delete('/:id', authenticate, requireAdmin, requireCurrentAdmin, deleteProduct);
 
 module.exports = router;

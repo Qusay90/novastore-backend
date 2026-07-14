@@ -535,6 +535,7 @@ const applyBackfillPlan = async (queryable, plan) => {
              SET slug = COALESCE(slug, $2),
                  path = COALESCE(path, $3),
                  depth = COALESCE(depth, $4),
+                 revision = revision + 1,
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $1`,
             [category.id, category.slug, category.path, category.depth]
@@ -593,6 +594,7 @@ const applyBackfillPlan = async (queryable, plan) => {
     const storeUpdate = await queryable.query(
         `UPDATE products
          SET store_id = $1,
+             revision = revision + 1,
              updated_at = CURRENT_TIMESTAMP
          WHERE store_id IS NULL`,
         [platformStoreId]

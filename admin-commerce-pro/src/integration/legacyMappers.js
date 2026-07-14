@@ -13,6 +13,12 @@ const toInteger = (value, field) => {
   return parsed;
 };
 
+const toPositiveInteger = (value, field) => {
+  const parsed = toInteger(value, field);
+  if (parsed < 1) throw new TypeError(`${field} pozitif olmalıdır.`);
+  return parsed;
+};
+
 const toNullableFiniteNumber = (value, field) => (
   value === null || value === undefined || value === "" ? null : toFiniteNumber(value, field)
 );
@@ -171,7 +177,7 @@ export function normalizeFirstPartyCatalogProduct(row) {
   }
   const requiredFields = [
     "id", "name", "price", "old_price", "currency", "stock", "publication_status",
-    "is_customer_visible", "created_at", "updated_at", "deleted_at", "primary_category_id",
+    "is_customer_visible", "created_at", "updated_at", "deleted_at", "revision", "primary_category_id",
     "primary_category_name", "primary_category_path", "category_count", "has_media",
   ];
   if (requiredFields.some((field) => !Object.prototype.hasOwnProperty.call(row, field))) {
@@ -206,6 +212,7 @@ export function normalizeFirstPartyCatalogProduct(row) {
     customerVisible: toBoolean(row.is_customer_visible, "product.is_customer_visible"),
     createdAt: toStrictNullableDate(row.created_at, "product.created_at"),
     updatedAt: toStrictNullableDate(row.updated_at, "product.updated_at"),
+    revision: toPositiveInteger(row.revision, "product.revision"),
     deletedAt: toStrictNullableDate(row.deleted_at, "product.deleted_at"),
     primaryCategoryId,
     primaryCategoryName,

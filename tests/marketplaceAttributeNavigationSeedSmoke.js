@@ -24,6 +24,7 @@ const adminCollectionRoutes = require('../routes/adminCollectionRoutes');
 const publicCategoryRoutes = require('../routes/publicCategoryRoutes');
 const publicNavigationRoutes = require('../routes/publicNavigationRoutes');
 const publicCollectionRoutes = require('../routes/publicCollectionRoutes');
+const { seedCurrentAdminUsers } = require('./helpers/seedCurrentAdminUsers');
 
 const root = path.join(__dirname, '..');
 process.env.JWT_SECRET = 'marketplace-attribute-navigation-seed-smoke';
@@ -80,6 +81,7 @@ const startApi = async () => {
 
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await createCoreSchema();
+    await seedCurrentAdminUsers(pool);
     await createNotificationsTable();
     await createCommerceSchema();
     await runMarketplaceCategorySeed(pool, { apply: true });

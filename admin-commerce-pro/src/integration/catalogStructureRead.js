@@ -68,7 +68,7 @@ const normalizeCategory = (row) => {
   requiredFields(row, [
     "id", "name", "slug", "path", "depth", "parent_id", "sort_order", "is_active",
     "is_customer_visible", "show_in_menu", "show_on_home", "hide_when_empty", "deleted_at",
-    "child_count", "first_party_product_count", "attribute_template_count",
+    "revision", "child_count", "first_party_product_count", "attribute_template_count",
   ], "catalogStructure.category");
   const parentId = nullablePositiveInteger(row.parent_id, "category.parent_id");
   const depth = nullableNonnegativeInteger(row.depth, "category.depth");
@@ -87,6 +87,7 @@ const normalizeCategory = (row) => {
     showOnHome: boolean(row.show_on_home, "category.show_on_home"),
     hideWhenEmpty: boolean(row.hide_when_empty, "category.hide_when_empty"),
     deletedAt: nullableDate(row.deleted_at, "category.deleted_at"),
+    revision: positiveInteger(row.revision, "category.revision"),
     childCount: nonnegativeInteger(row.child_count, "category.child_count"),
     firstPartyProductCount: nonnegativeInteger(row.first_party_product_count, "category.first_party_product_count"),
     attributeTemplateCount: nonnegativeInteger(row.attribute_template_count, "category.attribute_template_count"),
@@ -96,7 +97,7 @@ const normalizeCategory = (row) => {
 const normalizeAttributeDefinition = (row) => {
   requiredFields(row, [
     "id", "code", "name", "type", "unit", "is_filterable", "is_required", "is_variant_relevant",
-    "sort_order", "is_active", "option_count", "template_count", "first_party_value_count",
+    "sort_order", "is_active", "revision", "option_count", "template_count", "first_party_value_count",
   ], "catalogStructure.attributeDefinition");
   const type = requiredText(row.type, "attribute.type");
   if (!ATTRIBUTE_TYPES.has(type)) throw new TypeError("attribute.type desteklenen tür olmalıdır.");
@@ -111,6 +112,7 @@ const normalizeAttributeDefinition = (row) => {
     variantRelevant: boolean(row.is_variant_relevant, "attribute.is_variant_relevant"),
     sortOrder: integer(row.sort_order, "attribute.sort_order"),
     active: boolean(row.is_active, "attribute.is_active"),
+    revision: positiveInteger(row.revision, "attribute.revision"),
     optionCount: nonnegativeInteger(row.option_count, "attribute.option_count"),
     templateCount: nonnegativeInteger(row.template_count, "attribute.template_count"),
     firstPartyValueCount: nonnegativeInteger(row.first_party_value_count, "attribute.first_party_value_count"),
@@ -120,7 +122,7 @@ const normalizeAttributeDefinition = (row) => {
 const normalizeAttributeTemplate = (row) => {
   requiredFields(row, [
     "id", "name", "category_id", "category_name", "category_path", "sort_order", "is_active",
-    "attribute_count", "required_count", "filterable_count",
+    "revision", "attribute_count", "required_count", "filterable_count",
   ], "catalogStructure.attributeTemplate");
   const attributeCount = nonnegativeInteger(row.attribute_count, "template.attribute_count");
   const requiredCount = nonnegativeInteger(row.required_count, "template.required_count");
@@ -136,6 +138,7 @@ const normalizeAttributeTemplate = (row) => {
     categoryPath: nullableText(row.category_path, "template.category_path"),
     sortOrder: integer(row.sort_order, "template.sort_order"),
     active: boolean(row.is_active, "template.is_active"),
+    revision: positiveInteger(row.revision, "template.revision"),
     attributeCount,
     requiredCount,
     filterableCount,
@@ -145,7 +148,7 @@ const normalizeAttributeTemplate = (row) => {
 const normalizeCollection = (row) => {
   requiredFields(row, [
     "id", "name", "slug", "collection_type", "rule_code", "sort_order", "is_active", "show_on_home",
-    "deleted_at", "rule_count", "first_party_manual_product_count",
+    "deleted_at", "revision", "rule_count", "first_party_manual_product_count",
   ], "catalogStructure.collection");
   const type = requiredText(row.collection_type, "collection.collection_type");
   const ruleCode = nullableText(row.rule_code, "collection.rule_code");
@@ -163,6 +166,7 @@ const normalizeCollection = (row) => {
     active: boolean(row.is_active, "collection.is_active"),
     showOnHome: boolean(row.show_on_home, "collection.show_on_home"),
     deletedAt: nullableDate(row.deleted_at, "collection.deleted_at"),
+    revision: positiveInteger(row.revision, "collection.revision"),
     ruleCount: nonnegativeInteger(row.rule_count, "collection.rule_count"),
     firstPartyManualProductCount: nonnegativeInteger(row.first_party_manual_product_count, "collection.first_party_manual_product_count"),
   });
@@ -170,7 +174,7 @@ const normalizeCollection = (row) => {
 
 const normalizeMenu = (row) => {
   requiredFields(row, [
-    "id", "code", "name", "is_active", "item_count", "active_item_count", "root_item_count",
+    "id", "code", "name", "is_active", "revision", "item_count", "active_item_count", "root_item_count",
   ], "catalogStructure.menu");
   const code = requiredText(row.code, "menu.code");
   if (!MENU_CODES.has(code)) throw new TypeError("menu.code desteklenen kod olmalıdır.");
@@ -183,6 +187,7 @@ const normalizeMenu = (row) => {
     code,
     name: requiredText(row.name, "menu.name"),
     active: boolean(row.is_active, "menu.is_active"),
+    revision: positiveInteger(row.revision, "menu.revision"),
     itemCount,
     activeItemCount,
     rootItemCount,
@@ -192,7 +197,7 @@ const normalizeMenu = (row) => {
 const normalizeMenuItem = (row) => {
   requiredFields(row, [
     "id", "menu_id", "menu_code", "parent_id", "title", "target_type", "category_id",
-    "collection_id", "has_internal_url", "sort_order", "is_active",
+    "collection_id", "has_internal_url", "sort_order", "is_active", "revision",
   ], "catalogStructure.menuItem");
   const menuCode = requiredText(row.menu_code, "menuItem.menu_code");
   if (!MENU_CODES.has(menuCode)) throw new TypeError("menuItem.menu_code desteklenen kod olmalıdır.");
@@ -218,6 +223,7 @@ const normalizeMenuItem = (row) => {
     hasInternalUrl,
     sortOrder: integer(row.sort_order, "menuItem.sort_order"),
     active: boolean(row.is_active, "menuItem.is_active"),
+    revision: positiveInteger(row.revision, "menuItem.revision"),
   });
 };
 

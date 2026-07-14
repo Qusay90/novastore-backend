@@ -59,6 +59,7 @@ const productRow = (id) => ({
     deleted_at: null,
     created_at: '2026-07-14T10:00:00.000Z',
     updated_at: '2026-07-14T11:00:00.000Z',
+    revision: 3,
     primary_category_id: 4,
     primary_category_name: 'Telefon',
     primary_category_path: 'elektronik/telefon',
@@ -106,6 +107,7 @@ const productRow = (id) => ({
         'primary_category_name',
         'primary_category_path',
         'publication_status',
+        'revision',
         'stock',
         'updated_at'
     ]);
@@ -134,7 +136,8 @@ const productRow = (id) => ({
         'p.is_customer_visible',
         'p.deleted_at',
         'p.created_at',
-        'p.updated_at'
+        'p.updated_at',
+        'p.revision'
     ]) {
         assert.match(projection, new RegExp(column.replace('.', '\\.'), 'i'));
     }

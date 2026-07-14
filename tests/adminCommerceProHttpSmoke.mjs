@@ -127,6 +127,9 @@ assert.equal(hasCapability(capabilities, "sellerAdmin"), false, "boolean olmayan
 assert.equal(hasCapability(capabilities, "unknown"), false, "bilinmeyen yetki fail-closed olmalı");
 assert.equal(hasCapability(resolveCapabilities({ catalogStructureRead: true }), "catalogStructureRead"), true);
 assert.equal(hasCapability(resolveCapabilities({ catalogStructureRead: "true" }), "catalogStructureRead"), false);
+assert.equal(hasCapability(resolveCapabilities({ firstPartyCatalogWrite: true }), "firstPartyCatalogWrite"), true);
+assert.equal(hasCapability(resolveCapabilities({ firstPartyCatalogWrite: "true" }), "firstPartyCatalogWrite"), false);
+assert.equal(hasCapability(resolveCapabilities({ catalogStructureWrite: true }), "catalogStructureWrite"), true);
 assert.equal(currentErrorMayPreserveData({ status: 403 }), false, "403 sonrası hassas stale veri korunmamalı");
 assert.equal(currentErrorMayPreserveData({ status: 401 }), false, "401 sonrası hassas stale veri korunmamalı");
 assert.equal(currentErrorMayPreserveData({ status: 500 }), true, "geçici sunucu hatasında son başarılı veri korunabilmeli");
@@ -215,6 +218,7 @@ const catalogPage = normalizeFirstPartyCatalogPage({
     is_customer_visible: true,
     created_at: "2026-07-10T09:00:00.000Z",
     updated_at: null,
+    revision: 4,
     deleted_at: null,
     primary_category_id: "4",
     primary_category_name: "Kulaklık",
@@ -240,7 +244,7 @@ const deletedCatalogProduct = normalizeFirstPartyCatalogPage({
   catalogMode: "first_party",
   items: [{
     id: 13, name: "Arşiv Kayıt", price: 10, old_price: null, currency: "TRY", stock: 0,
-    publication_status: "active", is_customer_visible: true, created_at: null, updated_at: null,
+    publication_status: "active", is_customer_visible: true, created_at: null, updated_at: null, revision: 2,
     deleted_at: "2026-07-14T10:00:00.000Z", primary_category_id: null,
     primary_category_name: null, primary_category_path: null, category_count: 0, has_media: false,
   }],
@@ -274,7 +278,7 @@ assert.throws(() => normalizeFirstPartyCatalogPage({
   items: [{
     id: 1, name: "Ürün", price: 10, old_price: null, currency: "TRY", stock: 0,
     publication_status: "seller_pending", is_customer_visible: true, created_at: null,
-    updated_at: null, deleted_at: null, primary_category_id: null, primary_category_name: null,
+    updated_at: null, deleted_at: null, revision: 1, primary_category_id: null, primary_category_name: null,
     primary_category_path: null, category_count: 0, has_media: false,
   }],
   limit: 100,
@@ -285,7 +289,7 @@ assert.throws(() => normalizeFirstPartyCatalogPage({
   items: [{
     id: 1, name: "Ürün", price: 10, old_price: null, currency: "TRY", stock: 0,
     publication_status: "archived", is_customer_visible: false, created_at: null,
-    updated_at: null, deleted_at: "2026-07-14T10:00:00.000Z", primary_category_id: null,
+    updated_at: null, deleted_at: "2026-07-14T10:00:00.000Z", revision: 1, primary_category_id: null,
     primary_category_name: null, primary_category_path: "Yetim yol", category_count: 0, has_media: false,
   }],
   limit: 100,
@@ -298,32 +302,32 @@ const catalogStructurePayload = {
   categories: { items: [{
     id: 1, name: "Elektronik", slug: "elektronik", path: "elektronik", depth: 0, parent_id: null,
     sort_order: 0, is_active: true, is_customer_visible: true, show_in_menu: true, show_on_home: false,
-    hide_when_empty: true, deleted_at: null, child_count: 2, first_party_product_count: 8,
+    hide_when_empty: true, deleted_at: null, revision: 3, child_count: 2, first_party_product_count: 8,
     attribute_template_count: 1,
   }], limit: 100, hasMore: false },
   attributeDefinitions: { items: [{
     id: 2, code: "renk", name: "Renk", type: "option", unit: null, is_filterable: true,
-    is_required: false, is_variant_relevant: true, sort_order: 0, is_active: true, option_count: 4,
+    is_required: false, is_variant_relevant: true, sort_order: 0, is_active: true, revision: 2, option_count: 4,
     template_count: 1, first_party_value_count: 5,
   }], limit: 100, hasMore: false },
   attributeTemplates: { items: [{
     id: 3, name: "Telefon özellikleri", category_id: 1, category_name: "Elektronik",
-    category_path: "elektronik", sort_order: 0, is_active: true, attribute_count: 4,
+    category_path: "elektronik", sort_order: 0, is_active: true, revision: 2, attribute_count: 4,
     required_count: 2, filterable_count: 3,
   }], limit: 100, hasMore: false },
   collections: { items: [{
     id: 4, name: "Yeni gelenler", slug: "yeni-gelenler", collection_type: "dynamic",
-    rule_code: "new_arrivals", sort_order: 0, is_active: true, show_on_home: true, deleted_at: null,
+    rule_code: "new_arrivals", sort_order: 0, is_active: true, show_on_home: true, deleted_at: null, revision: 2,
     rule_count: 1, first_party_manual_product_count: 0,
   }], limit: 100, hasMore: false },
   menus: { items: [{
-    id: 5, code: "main", name: "Ana menü", is_active: true, item_count: 2,
+    id: 5, code: "main", name: "Ana menü", is_active: true, revision: 2, item_count: 2,
     active_item_count: 2, root_item_count: 1,
   }], limit: 100, hasMore: false },
   menuItems: { items: [{
     id: 6, menu_id: 5, menu_code: "main", parent_id: null, title: "Elektronik",
     target_type: "category", category_id: 1, collection_id: null, has_internal_url: false,
-    sort_order: 0, is_active: true,
+    sort_order: 0, is_active: true, revision: 2,
   }], limit: 100, hasMore: false },
 };
 const catalogStructure = normalizeCatalogStructureSummary(catalogStructurePayload);
@@ -375,7 +379,7 @@ const fixtureHttp = {
       catalogMode: "first_party",
       items: [{
         id: 1, name: "Ürün", price: "10", old_price: null, currency: "TRY", stock: 1,
-        publication_status: "active", is_customer_visible: true, created_at: null, updated_at: null,
+        publication_status: "active", is_customer_visible: true, created_at: null, updated_at: null, revision: 1,
         deleted_at: null, primary_category_id: null, primary_category_name: null,
         primary_category_path: null, category_count: 0, has_media: false,
       }],

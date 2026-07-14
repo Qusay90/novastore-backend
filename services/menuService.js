@@ -15,6 +15,24 @@ class MenuDomainError extends Error {
     }
 }
 
+const withOptionalTransaction = async (queryable, operation) => {
+    if (typeof queryable.connect !== 'function' || typeof queryable.release === 'function') {
+        return operation(queryable);
+    }
+    const client = await queryable.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await operation(client);
+        await client.query('COMMIT');
+        return result;
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
 const asInteger = (value, field, { nullable = false, min = 0 } = {}) => {
     if (nullable && (value === null || value === undefined || value === '')) return null;
     const parsed = Number(value);
@@ -162,7 +180,7 @@ const createMenu = async (body = {}, { queryable = pool } = {}) => {
     }
 };
 
-const updateMenu = async (id, body = {}, { queryable = pool } = {}) => {
+const updateMenu = async (id, body = {}, { queryable = pool, bumpRevision = true } = {}) => {
     const existing = await getMenu(id, queryable);
     const code = String(body.code ?? existing.code).trim().toLowerCase();
     const name = cleanText(body.name ?? existing.name, 120, { nullable: false });
@@ -171,10 +189,18 @@ const updateMenu = async (id, body = {}, { queryable = pool } = {}) => {
     try {
         const result = await queryable.query(`
             UPDATE menus
-            SET code = $1, name = $2, is_active = $3, updated_at = CURRENT_TIMESTAMP
+            SET code = $1, name = $2, is_active = $3,
+                revision = revision + CASE WHEN $5::BOOLEAN THEN 1 ELSE 0 END,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = $4
             RETURNING *
-        `, [code, name, body.is_active ?? body.isActive ?? existing.is_active, existing.id]);
+        `, [
+            code,
+            name,
+            body.is_active ?? body.isActive ?? existing.is_active,
+            existing.id,
+            bumpRevision !== false
+        ]);
         return normalizeMenu(result.rows[0]);
     } catch (error) {
         if (error.code === '23505') {
@@ -330,7 +356,11 @@ const createMenuItem = async (body = {}, { queryable = pool } = {}) => {
     return normalizeMenuItem(result.rows[0]);
 };
 
-const updateMenuItem = async (id, body = {}, { queryable = pool } = {}) => {
+const updateMenuItem = async (
+    id,
+    body = {},
+    { queryable = pool, bumpRevision = true } = {}
+) => {
     const existing = await getMenuItem(id, queryable);
     const menuId = asInteger(body.menu_id ?? body.menuId ?? existing.menu_id, 'menu_id', { min: 1 });
     await getMenu(menuId, queryable);
@@ -364,6 +394,7 @@ const updateMenuItem = async (id, body = {}, { queryable = pool } = {}) => {
             accent_color = $11,
             sort_order = $12,
             is_active = $13,
+            revision = revision + CASE WHEN $15::BOOLEAN THEN 1 ELSE 0 END,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = $14
         RETURNING *
@@ -381,50 +412,53 @@ const updateMenuItem = async (id, body = {}, { queryable = pool } = {}) => {
         cleanText(body.accent_color ?? body.accentColor ?? existing.accent_color, 20),
         asInteger(body.sort_order ?? body.sortOrder ?? existing.sort_order, 'sort_order'),
         body.is_active ?? body.isActive ?? existing.is_active,
-        existing.id
+        existing.id,
+        bumpRevision !== false
     ]);
     return normalizeMenuItem(result.rows[0]);
 };
 
-const archiveMenuItem = async (id, archived = true, { queryable = pool } = {}) => {
+const archiveMenuItem = async (
+    id,
+    archived = true,
+    { queryable = pool, bumpRevision = true } = {}
+) => {
     const existing = await getMenuItem(id, queryable);
     const result = await queryable.query(`
         UPDATE menu_items
-        SET is_active = $1, updated_at = CURRENT_TIMESTAMP
+        SET is_active = $1,
+            revision = revision + CASE WHEN $3::BOOLEAN THEN 1 ELSE 0 END,
+            updated_at = CURRENT_TIMESTAMP
         WHERE id = $2
         RETURNING *
-    `, [!archived, existing.id]);
+    `, [!archived, existing.id, bumpRevision !== false]);
     return normalizeMenuItem(result.rows[0]);
 };
 
-const reorderMenuItems = async (items, { queryable = pool } = {}) => {
+const reorderMenuItems = async (
+    items,
+    { queryable = pool, bumpRevision = true } = {}
+) => {
     if (!Array.isArray(items) || items.length === 0 || items.length > 500) {
         throw new MenuDomainError('Reorder için 1-500 öğe gönderilmelidir.');
     }
-    const client = typeof queryable.connect === 'function' ? await queryable.connect() : queryable;
-    const shouldRelease = client !== queryable;
-    try {
-        await client.query('BEGIN');
+    return withOptionalTransaction(queryable, async (client) => {
         const updated = [];
         for (const item of items) {
             const existing = await getMenuItem(item.id, client);
             const sortOrder = asInteger(item.sort_order ?? item.sortOrder, 'sort_order');
             const result = await client.query(`
                 UPDATE menu_items
-                SET sort_order = $1, updated_at = CURRENT_TIMESTAMP
+                SET sort_order = $1,
+                    revision = revision + CASE WHEN $3::BOOLEAN THEN 1 ELSE 0 END,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = $2
                 RETURNING *
-            `, [sortOrder, existing.id]);
+            `, [sortOrder, existing.id, bumpRevision !== false]);
             updated.push(normalizeMenuItem(result.rows[0]));
         }
-        await client.query('COMMIT');
         return updated;
-    } catch (error) {
-        await client.query('ROLLBACK').catch(() => {});
-        throw error;
-    } finally {
-        if (shouldRelease) client.release();
-    }
+    });
 };
 
 const getPublicNavigation = async (code, { queryable = pool } = {}) => {

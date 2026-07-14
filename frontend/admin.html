@@ -2632,6 +2632,7 @@
                                 <option value="inactive">Pasif</option>
                                 <option value="pending_approval">Yayın İncelemesinde</option>
                                 <option value="draft">Taslak</option>
+                                <option value="archived">Arşivde</option>
                             </select>
                             <small style="display:block; margin-top:6px; color:#6B7280;">NovaStore'un birinci taraf iç yayın durumudur; satıcı ürün izni değildir.</small>
                         </div>
@@ -5396,7 +5397,8 @@
                 active: 'Aktif',
                 inactive: 'Pasif',
                 draft: 'Taslak',
-                pending_approval: 'Yayın İncelemesinde'
+                pending_approval: 'Yayın İncelemesinde',
+                archived: 'Arşivde'
             };
             const normalized = String(status || 'active').trim().toLowerCase();
             return labels[normalized] || status || 'Aktif';
@@ -5437,7 +5439,6 @@
         <td>${escapeAdminHtml(stockCount)}${stockState}</td>
         <td>
             <button onclick="editProduct(${p.id})" class="btn-edit">✏️ Düzenle</button>
-            <button onclick="deleteProduct(${p.id})" class="btn-delete">🗑️ Sil</button>
         </td>
     </tr>
     `;
@@ -5534,19 +5535,6 @@
                 alert(e.message || 'Görsel silinemedi.');
                 console.error(e);
                 btnEl.innerText = 'x';
-            }
-        }
-
-        async function deleteProduct(id) {
-            if (!confirm("Silmek istediğinize emin misiniz?")) return;
-            try {
-                const response = await adminApiFetch('/api/products/' + id, { method: 'DELETE' });
-                await adminReadJson(response, 'Ürün silinemedi.');
-                alert('Ürün silindi!');
-                fetchProducts();
-                fetchStats();
-            } catch (e) {
-                alert(e.message || 'Ürün silinemedi.');
             }
         }
 

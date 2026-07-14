@@ -15,6 +15,7 @@ const {
     assertCategoryMoveAllowed,
     flattenCategoryTree
 } = require('../services/categoryService');
+const { seedCurrentAdminUsers } = require('./helpers/seedCurrentAdminUsers');
 
 process.env.JWT_SECRET = 'category-api-smoke-secret';
 
@@ -79,6 +80,7 @@ const bearer = (role) => ({
         await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
         await applyCategoryV2Schema(client);
         await applyCategoryV2BackfillConstraints(client);
+        await seedCurrentAdminUsers(client);
 
         const categoryResult = await client.query(`
             INSERT INTO categories (

@@ -10,6 +10,7 @@ const { applyMenuCollectionSchema } = require('../models/menuCollectionSchema');
 const { recalculateAllCategoryStats } = require('../services/categoryStatsService');
 const { resolveStartupSafety } = require('../config/startupSafety');
 const { ORDER_STATUS, PAYMENT_STATUS } = require('../constants/orderStatus');
+const { seedCurrentAdminUsers } = require('./helpers/seedCurrentAdminUsers');
 
 const root = path.join(__dirname, '..');
 const port = 5199;
@@ -56,6 +57,7 @@ const request = async (pathname, {
 
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await createCoreSchema();
+    await seedCurrentAdminUsers(pool);
     await createNotificationsTable();
     await createCommerceSchema();
 

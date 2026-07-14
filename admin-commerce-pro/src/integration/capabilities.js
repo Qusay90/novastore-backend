@@ -4,6 +4,8 @@ export const COMMERCE_CAPABILITY_KEYS = Object.freeze([
   "returnsRead",
   "firstPartyCatalogRead",
   "catalogStructureRead",
+  "firstPartyCatalogWrite",
+  "catalogStructureWrite",
   "notificationsRead",
   "manualShipmentWrite",
   "orderCancelWrite",
