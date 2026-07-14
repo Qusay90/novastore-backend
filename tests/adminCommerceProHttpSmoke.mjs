@@ -7,8 +7,14 @@ import {
 } from "../admin-commerce-pro/src/integration/adminHttp.js";
 import { resolveCapabilities, hasCapability } from "../admin-commerce-pro/src/integration/capabilities.js";
 import {
+  filterFirstPartyCatalogProducts,
+  isCatalogProductEffectivelyVisible,
+  resolveCatalogPublicationStatus,
+} from "../admin-commerce-pro/src/integration/catalogRead.js";
+import {
   normalizeAdminSession,
   normalizeDashboardStats,
+  normalizeFirstPartyCatalogPage,
   normalizeNotificationSummaryPage,
   normalizeOrderSummaryPage,
   normalizeReturnSummaryPage,
@@ -189,6 +195,96 @@ assert.equal(notificationPage.items[0].id, "NT-000005");
 assert.equal(notificationPage.items[0].isRead, false);
 assert.throws(() => normalizeNotificationSummaryPage({ items: [{ id: 5, is_read: 0 }], limit: 50, hasMore: false }), /boolean/);
 
+const catalogPage = normalizeFirstPartyCatalogPage({
+  catalogMode: "first_party",
+  items: [{
+    id: 12,
+    name: "Nova Kulaklık",
+    price: "1299.90",
+    old_price: "1499.90",
+    currency: "TRY",
+    stock: "8",
+    publication_status: "active",
+    is_customer_visible: true,
+    created_at: "2026-07-10T09:00:00.000Z",
+    updated_at: null,
+    deleted_at: null,
+    primary_category_id: "4",
+    primary_category_name: "Kulaklık",
+    primary_category_path: "Elektronik / Ses / Kulaklık",
+    category_count: "2",
+    has_media: true,
+  }],
+  limit: 100,
+  hasMore: true,
+});
+assert.equal(catalogPage.items[0].id, "PR-000012");
+assert.equal(catalogPage.items[0].price, 1299.9);
+assert.equal(catalogPage.items[0].oldPrice, 1499.9);
+assert.equal(catalogPage.items[0].stock, 8);
+assert.equal(catalogPage.items[0].primaryCategoryId, 4);
+assert.equal(catalogPage.items[0].categoryCount, 2);
+assert.equal(catalogPage.items[0].hasMedia, true);
+assert.equal(catalogPage.items[0].deletedAt, null);
+assert.equal("sellerId" in catalogPage.items[0], false, "birinci taraf ürüne sahte satıcı eklenmemeli");
+assert.equal("risk" in catalogPage.items[0], false, "ürün özetine uydurma risk eklenmemeli");
+assert.equal("approvalAction" in catalogPage.items[0], false, "ürün özetine manuel onay aksiyonu eklenmemeli");
+const deletedCatalogProduct = normalizeFirstPartyCatalogPage({
+  catalogMode: "first_party",
+  items: [{
+    id: 13, name: "Arşiv Kayıt", price: 10, old_price: null, currency: "TRY", stock: 0,
+    publication_status: "active", is_customer_visible: true, created_at: null, updated_at: null,
+    deleted_at: "2026-07-14T10:00:00.000Z", primary_category_id: null,
+    primary_category_name: null, primary_category_path: null, category_count: 0, has_media: false,
+  }],
+  limit: 100,
+  hasMore: false,
+}).items[0];
+assert.equal(deletedCatalogProduct.deletedAt instanceof Date, true, "silinmiş kayıt bilgisi UI fail-closed görünürlüğü için korunmalı");
+assert.equal(deletedCatalogProduct.publicationStatus, "active", "mapper backend yayın durumunu uydurma bir değere çevirmemeli");
+assert.equal(resolveCatalogPublicationStatus(deletedCatalogProduct), "deleted", "silinmiş kayıt etkin yayın durumunda arşivli sayılmalı");
+assert.equal(isCatalogProductEffectivelyVisible(deletedCatalogProduct), false, "silinmiş kayıt ham görünürlük bayrağı açık olsa da görünmemeli");
+assert.deepEqual(
+  filterFirstPartyCatalogProducts([catalogPage.items[0], deletedCatalogProduct], { visibility: "visible" }).map((item) => item.rawId),
+  [12],
+  "etkin görünürlük filtresi silinmiş kaydı fail-closed dışarıda bırakmalı",
+);
+assert.deepEqual(
+  filterFirstPartyCatalogProducts([catalogPage.items[0], deletedCatalogProduct], { publication: "deleted", stock: "out_of_stock", query: "arşiv" }).map((item) => item.rawId),
+  [13],
+  "yayın, stok ve Türkçe arama filtreleri birlikte çalışmalı",
+);
+assert.throws(() => normalizeFirstPartyCatalogPage({ catalogMode: "marketplace", items: [], limit: 100, hasMore: false }), /first_party/);
+assert.throws(() => normalizeFirstPartyCatalogPage({ catalogMode: "first_party", items: [], limit: 100, hasMore: "false" }), /boolean/);
+assert.throws(() => normalizeFirstPartyCatalogPage({
+  catalogMode: "first_party",
+  items: [{ id: 1 }],
+  limit: 100,
+  hasMore: false,
+}), /eksik alan/);
+assert.throws(() => normalizeFirstPartyCatalogPage({
+  catalogMode: "first_party",
+  items: [{
+    id: 1, name: "Ürün", price: 10, old_price: null, currency: "TRY", stock: 0,
+    publication_status: "seller_pending", is_customer_visible: true, created_at: null,
+    updated_at: null, deleted_at: null, primary_category_id: null, primary_category_name: null,
+    primary_category_path: null, category_count: 0, has_media: false,
+  }],
+  limit: 100,
+  hasMore: false,
+}), /yayın durumu/);
+assert.throws(() => normalizeFirstPartyCatalogPage({
+  catalogMode: "first_party",
+  items: [{
+    id: 1, name: "Ürün", price: 10, old_price: null, currency: "TRY", stock: 0,
+    publication_status: "archived", is_customer_visible: false, created_at: null,
+    updated_at: null, deleted_at: "2026-07-14T10:00:00.000Z", primary_category_id: null,
+    primary_category_name: null, primary_category_path: "Yetim yol", category_count: 0, has_media: false,
+  }],
+  limit: 100,
+  hasMore: false,
+}), /kategori yolu/);
+
 const session = normalizeAdminSession({
   user: { id: 7, role: "admin" },
   commerceMode: "single_vendor",
@@ -199,13 +295,26 @@ assert.equal(session.commerceMode, "single_vendor");
 assert.throws(() => normalizeAdminSession({ user: { id: 8, role: "customer" } }), /admin/);
 assert.throws(() => normalizeAdminSession({ user: { id: 8, role: "admin" }, commerceMode: "multi_vendor" }), /çalışma modu/);
 
+const fixtureRequests = [];
 const fixtureHttp = {
   async request(path) {
-    if (path === "/api/admin/session") return { user: { id: 7, role: "admin" }, commerceMode: "single_vendor", capabilities: { dashboardRead: true, ordersRead: true, returnsRead: true, notificationsRead: true } };
+    fixtureRequests.push(path);
+    if (path === "/api/admin/session") return { user: { id: 7, role: "admin" }, commerceMode: "single_vendor", capabilities: { dashboardRead: true, ordersRead: true, returnsRead: true, notificationsRead: true, firstPartyCatalogRead: true } };
     if (path === "/api/admin/stats") return { totalRevenue: "10", totalOrders: 1, totalProducts: 2, totalUsers: 3 };
     if (path === "/api/admin/orders/summary?limit=100") return { items: [{ id: 1, customer_name: "Müşteri", total_amount: "10", status: "Onay Bekliyor", payment_status: "PAID", item_count: 1, created_at: "2026-07-14T10:00:00.000Z" }], limit: 100, hasMore: false };
     if (path === "/api/admin/returns/summary?limit=100") return { items: [{ id: 1, order_id: 1, reason_code: "DİĞER", status: "REQUESTED", refund_amount: "10", currency: "TRY", payment_status: "PAID" }], limit: 100, hasMore: false };
     if (path === "/api/admin/notifications/summary?limit=50") return { items: [{ id: 1, type: "new_order", message: "Yeni sipariş", is_read: false }], limit: 50, hasMore: false };
+    if (path === "/api/admin/catalog/products/summary?limit=100") return {
+      catalogMode: "first_party",
+      items: [{
+        id: 1, name: "Ürün", price: "10", old_price: null, currency: "TRY", stock: 1,
+        publication_status: "active", is_customer_visible: true, created_at: null, updated_at: null,
+        deleted_at: null, primary_category_id: null, primary_category_name: null,
+        primary_category_path: null, category_count: 0, has_media: false,
+      }],
+      limit: 100,
+      hasMore: false,
+    };
     throw new Error("unexpected path");
   },
 };
@@ -215,5 +324,8 @@ assert.equal((await adapter.dashboard()).totalRevenue, 10);
 assert.equal((await adapter.orders()).items[0].id, "NS-000001");
 assert.equal((await adapter.returns()).items[0].id, "RT-000001");
 assert.equal((await adapter.notifications()).items[0].id, "NT-000001");
+assert.equal((await adapter.catalog()).items[0].id, "PR-000001");
+assert.equal(fixtureRequests.at(-1), "/api/admin/catalog/products/summary?limit=100");
+assert.equal(fixtureRequests.some((path) => /^https?:|^\/\//.test(path)), false, "adapter yalnız same-origin mutlak API yolu kullanmalı");
 
 console.log("admin Commerce Pro HTTP and mapper smoke passed");

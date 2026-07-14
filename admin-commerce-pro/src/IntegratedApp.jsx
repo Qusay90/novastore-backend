@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createSameOriginAdapter } from "./adapters/sameOriginAdapter.js";
 import { hasCapability } from "./integration/capabilities.js";
+import {
+  CATALOG_PUBLICATION_FILTER_OPTIONS,
+  CATALOG_PUBLICATION_STATUS_LABELS,
+  filterFirstPartyCatalogProducts,
+  isCatalogProductEffectivelyVisible,
+  resolveCatalogPublicationStatus,
+} from "./integration/catalogRead.js";
 import { ADMIN_TOKEN_KEY, createAdminHttp } from "./integration/adminHttp.js";
 import {
   createMutationIdempotencyKey,
@@ -569,6 +576,123 @@ function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities,
   );
 }
 
+function Catalog({ catalogPage, error, refreshing, onRefresh }) {
+  const products = catalogPage.items;
+  const [query, setQuery] = useState("");
+  const [publication, setPublication] = useState("all");
+  const [stock, setStock] = useState("all");
+  const [visibility, setVisibility] = useState("all");
+  const filtered = useMemo(() => filterFirstPartyCatalogProducts(products, {
+    publication,
+    query,
+    stock,
+    visibility,
+  }), [products, publication, query, stock, visibility]);
+
+  const resetFilters = () => {
+    setQuery("");
+    setPublication("all");
+    setStock("all");
+    setVisibility("all");
+  };
+
+  return (
+    <section className="workspace live-workspace" data-testid="live-catalog">
+      <header className="workspace-heading operations-heading">
+        <div>
+          <span className="eyebrow">Entegre backend · birinci taraf · salt okunur</span>
+          <h2 tabIndex="-1">Ürünler</h2>
+          <p>En fazla son {catalogPage.limit} NovaStore ürün kaydı, ürün kimliği azalan sırada gösterilir.</p>
+        </div>
+        <button className="secondary-button" onClick={onRefresh} disabled={refreshing}>
+          <Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}
+        </button>
+      </header>
+
+      <ResourceWarning error={error} onRetry={onRefresh} />
+      <section className="notice-card live-boundary-notice" role="note">
+        <Icon name="shield" />
+        <div>
+          <strong>Tek satıcılı, salt okunur katalog</strong>
+          <p>Bu liste yalnız NovaStore'un mevcut birinci taraf ürün kayıtlarını gösterir. “İç yayın incelemesi” satıcı izni değildir; satıcı, teklif, risk veya manuel ürün onay kuyruğu oluşturulmaz. Ürün ve medya yazmaları bu turda kapalıdır.</p>
+        </div>
+      </section>
+
+      <section className="table-card">
+        <div className="ledger-toolbar filter-toolbar live-filter-toolbar live-catalog-filters">
+          <label className="table-search">
+            <Icon name="search" />
+            <span className="sr-only">Ürün ara</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ürün, kayıt veya kategori ara" />
+          </label>
+          <label className="heading-select">
+            <span className="sr-only">Yayın durumuna göre filtrele</span>
+            <select value={publication} onChange={(event) => setPublication(event.target.value)}>
+              {CATALOG_PUBLICATION_FILTER_OPTIONS.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+            </select>
+          </label>
+          <label className="heading-select">
+            <span className="sr-only">Stok durumuna göre filtrele</span>
+            <select value={stock} onChange={(event) => setStock(event.target.value)}>
+              <option value="all">Tüm stok durumları</option>
+              <option value="in_stock">Stokta</option>
+              <option value="out_of_stock">Tükendi</option>
+            </select>
+          </label>
+          <label className="heading-select">
+            <span className="sr-only">Etkin vitrin görünürlüğüne göre filtrele</span>
+            <select value={visibility} onChange={(event) => setVisibility(event.target.value)}>
+              <option value="all">Tüm görünürlükler</option>
+              <option value="visible">Vitrinde görünür</option>
+              <option value="hidden">Vitrinde görünmez</option>
+            </select>
+          </label>
+          <span className="live-result-count">{filtered.length} / {products.length} kayıt{catalogPage.hasMore ? " · daha eski ürünler bu turda gösterilmiyor" : ""}</span>
+        </div>
+
+        {products.length === 0 ? (
+          <div className="state-panel">
+            <Icon name="package" />
+            <h3>Henüz ürün kaydı yok</h3>
+            <p>Backend birinci taraf katalog için boş bir liste döndürdü.</p>
+            <button className="secondary-button" onClick={onRefresh} disabled={refreshing}>{refreshing ? "Yenileniyor" : "Yeniden dene"}</button>
+          </div>
+        ) : filtered.length > 0 ? (
+          <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Birinci taraf ürün özeti tablosu">
+            <table className="data-table live-catalog-table">
+              <caption className="sr-only">Entegre backend'den okunan salt okunur birinci taraf ürün özetleri</caption>
+              <thead><tr><th scope="col">Ürün</th><th scope="col">Birincil kategori</th><th scope="col">Fiyat</th><th scope="col">Stok</th><th scope="col">Yayın</th><th scope="col">Etkin vitrin</th><th scope="col">Medya</th><th scope="col">Güncellendi</th></tr></thead>
+              <tbody>{filtered.map((product) => {
+                const publicationStatus = resolveCatalogPublicationStatus(product);
+                const customerVisible = isCatalogProductEffectivelyVisible(product);
+                return (
+                  <tr key={product.id}>
+                    <td><span className="live-catalog-product"><Icon name="package" /><span><strong>{product.name}</strong><small>{product.id}</small></span></span></td>
+                    <td><span className="live-customer-cell"><strong>{product.primaryCategoryName || "Birincil kategori yok"}</strong><small>{product.primaryCategoryPath || `${product.categoryCount} kategori bağlantısı`}</small></span></td>
+                    <td><span className="live-customer-cell"><strong>{money(product.price, product.currency)}</strong>{product.oldPrice !== null && <small>Önceki {money(product.oldPrice, product.currency)}</small>}</span></td>
+                    <td><span className={`status ${product.stock > 0 ? "status-stokta" : "status-stokta-yok"}`}>{product.stock > 0 ? `${product.stock} adet` : "Tükendi"}</span></td>
+                    <td><span className={`status status-${statusClass(CATALOG_PUBLICATION_STATUS_LABELS[publicationStatus])}`}>{CATALOG_PUBLICATION_STATUS_LABELS[publicationStatus]}</span>{product.deletedAt && <small className="live-status-note">Silinmiş kayıt vitrine açılamaz.</small>}</td>
+                    <td><span className={`status ${customerVisible ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{customerVisible ? "Görünür" : "Görünmez"}</span>{!customerVisible && product.customerVisible && <small className="live-status-note">Ham bayrak açık; yayın veya arşiv durumu vitrine kapatır.</small>}</td>
+                    <td><span className={`live-media-presence ${product.hasMedia ? "has-media" : "no-media"}`}><Icon name={product.hasMedia ? "check" : "warning"} />{product.hasMedia ? "Mevcut" : "Yok"}</span></td>
+                    <td><span className="live-customer-cell"><strong>{dateTime(product.updatedAt || product.createdAt)}</strong><small>{product.updatedAt ? "Son güncelleme" : product.createdAt ? "Oluşturulma" : "Tarih bilgisi yok"}</small></span></td>
+                  </tr>
+                );
+              })}</tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="state-panel">
+            <Icon name="search" />
+            <h3>Eşleşen ürün yok</h3>
+            <p>Arama, yayın, stok veya görünürlük filtresini değiştirin.</p>
+            <button className="secondary-button" onClick={resetFilters}>Filtreleri temizle</button>
+          </div>
+        )}
+      </section>
+    </section>
+  );
+}
+
 function Returns({ returnPage, error, refreshing, onRefresh }) {
   const returns = returnPage.items;
   const [query, setQuery] = useState("");
@@ -663,7 +787,7 @@ const railItems = [
   { id: "orders", label: "Siparişler", icon: "orders", capability: "ordersRead", implemented: true },
   { id: "returns", label: "İadeler", icon: "refresh", capability: "returnsRead", implemented: true },
   { id: "notifications", label: "Bildirimler", icon: "bell", capability: "notificationsRead", implemented: true },
-  { id: "catalog", label: "Ürünler · sonraki tur", icon: "package", capability: "firstPartyCatalogRead", implemented: false },
+  { id: "catalog", label: "Ürünler", icon: "package", capability: "firstPartyCatalogRead", implemented: true },
   { id: "customers", label: "Müşteriler · endpoint yok", icon: "user", capability: "customerAdmin", implemented: false },
   { id: "sellers", label: "Satıcılar · altyapı yok", icon: "storefront", capability: "sellerAdmin", implemented: false },
   { id: "finance", label: "Finans · ledger yok", icon: "card", capability: "settlements", implemented: false },
@@ -674,8 +798,9 @@ const pageCapabilities = Object.freeze({
   orders: "ordersRead",
   returns: "returnsRead",
   notifications: "notificationsRead",
+  catalog: "firstPartyCatalogRead",
 });
-const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler" });
+const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler", catalog: "Ürünler" });
 const noSupportedModuleError = Object.freeze({
   message: "Bu admin oturumunda Commerce Pro'nun entegre salt-okunur modülleri açık değil.",
 });
@@ -691,6 +816,9 @@ const returnsUnavailableError = Object.freeze({
 const notificationsUnavailableError = Object.freeze({
   message: "Bildirim özeti okuma yeteneği bu admin oturumunda açık değil.",
 });
+const catalogUnavailableError = Object.freeze({
+  message: "Birinci taraf katalog okuma yeteneği bu admin oturumunda açık değil.",
+});
 
 export function IntegratedApp() {
   const [page, setPage] = useState("dashboard");
@@ -705,6 +833,7 @@ export function IntegratedApp() {
   const loadNotifications = useCallback(({ signal }) => adapter.notifications({ signal }), [adapter]);
   const loadOrders = useCallback(({ signal }) => adapter.orders({ signal }), [adapter]);
   const loadReturns = useCallback(({ signal }) => adapter.returns({ signal }), [adapter]);
+  const loadCatalog = useCallback(({ signal }) => adapter.catalog({ signal }), [adapter]);
   const sessionResource = useResource(loadSession, { preserveDataOnError: false });
   const sessionLoaded = sessionResource.phase === "ready";
   const capabilities = sessionResource.data?.capabilities || {};
@@ -712,6 +841,7 @@ export function IntegratedApp() {
   const ordersEnabled = sessionLoaded && hasCapability(capabilities, "ordersRead");
   const returnsEnabled = sessionLoaded && hasCapability(capabilities, "returnsRead");
   const notificationsEnabled = sessionLoaded && hasCapability(capabilities, "notificationsRead");
+  const catalogEnabled = sessionLoaded && hasCapability(capabilities, "firstPartyCatalogRead");
   const mutationActions = useMemo(() => adapter.mutationActions(capabilities), [adapter, capabilities]);
   const cancelWriteEnabled = typeof mutationActions.cancelOrder === "function";
   const shipmentWriteEnabled = typeof mutationActions.createManualShipment === "function";
@@ -719,14 +849,16 @@ export function IntegratedApp() {
   const notificationsResource = useResource(loadNotifications, { enabled: notificationsEnabled });
   const ordersResource = useResource(loadOrders, { enabled: ordersEnabled });
   const returnsResource = useResource(loadReturns, { enabled: returnsEnabled });
+  const catalogResource = useResource(loadCatalog, { enabled: catalogEnabled });
   const statsLoaded = statsResource.phase === "ready";
   const ordersLoaded = ordersResource.phase === "ready" || ordersResource.phase === "empty";
   const returnsLoaded = returnsResource.phase === "ready" || returnsResource.phase === "empty";
   const notificationsLoaded = notificationsResource.phase === "ready" || notificationsResource.phase === "empty";
+  const catalogLoaded = catalogResource.phase === "ready" || catalogResource.phase === "empty";
   const enabledPages = useMemo(() => Object.keys(pageCapabilities).filter((pageId) => (
     hasCapability(capabilities, pageCapabilities[pageId])
   )), [capabilities]);
-  const lastUpdatedAt = [ordersResource.updatedAt, returnsResource.updatedAt, notificationsResource.updatedAt]
+  const lastUpdatedAt = [ordersResource.updatedAt, returnsResource.updatedAt, notificationsResource.updatedAt, catalogResource.updatedAt]
     .filter(Boolean)
     .sort((left, right) => right.getTime() - left.getTime())[0] || null;
 
@@ -789,6 +921,7 @@ export function IntegratedApp() {
     if (notificationsEnabled) notificationsResource.reload();
     if (ordersEnabled) ordersResource.reload();
     if (returnsEnabled) returnsResource.reload();
+    if (catalogEnabled) catalogResource.reload();
   };
   const logout = () => {
     localStorage.removeItem(ADMIN_TOKEN_KEY);
@@ -824,6 +957,12 @@ export function IntegratedApp() {
       : notificationsLoaded
         ? <Notifications notificationPage={notificationsResource.data} error={notificationsResource.error} refreshing={notificationsResource.refreshing} onRefresh={notificationsResource.reload} />
         : <StatePanel phase={notificationsResource.phase} error={notificationsResource.error} onRetry={notificationsResource.reload} />;
+  } else if (page === "catalog") {
+    pageContent = !catalogEnabled
+      ? <StatePanel phase="forbidden" error={catalogUnavailableError} onRetry={catalogResource.reload} />
+      : catalogLoaded
+        ? <Catalog catalogPage={catalogResource.data} error={catalogResource.error} refreshing={catalogResource.refreshing} onRefresh={catalogResource.reload} />
+        : <StatePanel phase={catalogResource.phase} error={catalogResource.error} onRetry={catalogResource.reload} />;
   } else {
     pageContent = <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={sessionResource.reload} />;
   }
@@ -836,6 +975,7 @@ export function IntegratedApp() {
         <nav className="rail-nav">
           {railItems.map((item) => {
             const enabled = item.implemented && hasCapability(capabilities, item.capability);
+            if (item.id === "catalog" && !enabled) return null;
             return (
               <button
                 key={item.id}
@@ -859,10 +999,10 @@ export function IntegratedApp() {
             <button className={page === "orders" ? "active" : ""} onClick={() => navigate("orders")} disabled={!hasCapability(capabilities, "ordersRead")}><Icon name="orders" /><span>Siparişler</span><b>{ordersResource.data?.items.length || 0}</b></button>
             <button className={page === "returns" ? "active" : ""} onClick={() => navigate("returns")} disabled={!hasCapability(capabilities, "returnsRead")}><Icon name="refresh" /><span>İadeler</span><b>{returnsResource.data?.items.length || 0}</b></button>
             <button className={page === "notifications" ? "active" : ""} onClick={() => navigate("notifications")} disabled={!hasCapability(capabilities, "notificationsRead")}><Icon name="bell" /><span>Bildirimler</span><b>{notificationsResource.data?.items.filter((item) => !item.isRead).length || 0}</b></button>
+            {catalogEnabled && <button className={page === "catalog" ? "active" : ""} onClick={() => navigate("catalog")}><Icon name="package" /><span>Ürünler</span><b>{catalogResource.data?.items.length || 0}</b></button>}
           </section>
           <section className="marketplace-links">
             <strong>Planlanan modüller</strong>
-            <button disabled><Icon name="package" /><span>Katalog</span><small>Tur 3</small></button>
             <button disabled><Icon name="storefront" /><span>Satıcılar</span><small>Tur 6</small></button>
             <button disabled><Icon name="card" /><span>Hakedişler</span><small>Tur 8</small></button>
           </section>
@@ -889,8 +1029,8 @@ export function IntegratedApp() {
         <footer className="statusbar">
           <div className="preview-banner live-banner" role="note" data-testid="live-banner"><Icon name="shield" /><strong>Entegre tek-satıcı modu</strong><span>Mock fallback yok · {cancelWriteEnabled || shipmentWriteEnabled ? "yazmalar capability ve doğrulamayla sınırlı" : "bu oturum yazma isteği göndermez"}</span></div>
           <span className={sessionLoaded ? "healthy" : ""}>{sessionLoaded ? "Oturum doğrulandı" : sessionResource.phase === "error" ? "Bağlantı hatası" : "Bağlantı bekleniyor"}</span>
-          <span>{lastUpdatedAt ? `Son operasyon okuması ${dateTime(lastUpdatedAt)}` : "Operasyon verisi bekleniyor"}</span>
-          <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing || returnsResource.refreshing || notificationsResource.refreshing}><Icon name="refresh" />Yenile</button>
+          <span>{lastUpdatedAt ? `Son veri okuması ${dateTime(lastUpdatedAt)}` : "Entegre veri bekleniyor"}</span>
+          <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing || returnsResource.refreshing || notificationsResource.refreshing || catalogResource.refreshing}><Icon name="refresh" />Yenile</button>
         </footer>
       </div>
     </div>

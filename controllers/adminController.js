@@ -4,6 +4,7 @@ const {
     ADMIN_COMMERCE_CAPABILITIES,
     createGetAdminNotificationSummaries,
     createGetAdminOrderSummaries,
+    createGetAdminProductSummaries,
     createGetAdminReturnSummaries,
     getAdminSession
 } = require('../services/adminCommerceReadService');
@@ -13,6 +14,7 @@ const SALES_EXCLUDED_STATUSES = [ORDER_STATUS.IPTAL_EDILDI, ORDER_STATUS.IADE_ED
 
 const getAdminNotificationSummaries = createGetAdminNotificationSummaries(pool);
 const getAdminOrderSummaries = createGetAdminOrderSummaries(pool);
+const getAdminProductSummaries = createGetAdminProductSummaries(pool);
 const getAdminReturnSummaries = createGetAdminReturnSummaries(pool);
 
 const clampAnalyticsDays = (rawValue) => {
@@ -651,6 +653,7 @@ module.exports = {
     ADMIN_COMMERCE_CAPABILITIES,
     getAdminNotificationSummaries,
     getAdminOrderSummaries,
+    getAdminProductSummaries,
     getAdminReturnSummaries,
     getAdminSession,
     getDashboardStats,

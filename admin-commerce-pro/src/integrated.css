@@ -99,6 +99,38 @@
 .live-banner .icon-wrap { color: var(--green); }
 .live-orders-table { min-width: 1210px; }
 .live-returns-table { min-width: 1040px; }
+.live-catalog-table { min-width: 1120px; }
+
+.live-catalog-product,
+.live-media-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-catalog-product > .icon-wrap {
+  width: 32px;
+  height: 32px;
+  color: var(--navy-800);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.live-catalog-product > span:last-child { display: grid; gap: 2px; }
+.live-catalog-product small { color: var(--muted); font-size: 9px; }
+.live-media-presence { color: var(--ink-2); font-weight: 700; }
+.live-media-presence.has-media .icon-wrap { color: var(--green); }
+.live-media-presence.no-media .icon-wrap { color: var(--amber); }
+
+.status-iç-yayın-incelemesi { color: var(--amber); background: var(--amber-bg); border-color: #e7c47e; }
+.status-yayınlanmamış,
+.status-yayın-dışı,
+.status-arşivli,
+.status-arşivli-kayıt { color: var(--red); background: var(--red-bg); border-color: #efaaaa; }
+
+.live-catalog-filters .heading-select { min-width: 154px; }
+.live-catalog-filters .heading-select:nth-of-type(2) { min-width: 174px; }
 
 .danger-button.small {
   min-height: 32px;
@@ -197,6 +229,9 @@
   .live-refresh { width: 40px; min-width: 40px; padding: 0; }
   .live-result-count { margin-left: 0; }
   .live-filter-toolbar .heading-select { width: 100%; }
+  .live-catalog-filters .heading-select,
+  .live-catalog-filters .table-search { min-width: 0; min-height: 44px; height: 44px; }
+  [data-testid="live-catalog"] .state-panel button { min-height: 44px; }
   .operations-heading > .secondary-button { flex: 0 0 auto; width: 100%; min-height: 44px; }
   .live-operation-buttons { align-items: stretch; flex-direction: column; }
   .live-operation-buttons button { min-height: 44px; }

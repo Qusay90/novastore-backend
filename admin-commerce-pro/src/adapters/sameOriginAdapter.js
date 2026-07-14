@@ -6,6 +6,7 @@ import {
 import {
   normalizeAdminSession,
   normalizeDashboardStats,
+  normalizeFirstPartyCatalogPage,
   normalizeNotificationSummaryPage,
   normalizeOrderSummaryPage,
   normalizeReturnSummaryPage,
@@ -38,6 +39,10 @@ export function createSameOriginAdapter(http) {
     await http.request("/api/admin/notifications/summary?limit=50", { signal }),
   );
 
+  const catalog = async ({ signal } = {}) => normalizeFirstPartyCatalogPage(
+    await http.request("/api/admin/catalog/products/summary?limit=100", { signal }),
+  );
+
   const mutationActions = (capabilities) => {
     const actions = {};
     if (hasCapability(capabilities, "orderCancelWrite")) {
@@ -65,5 +70,5 @@ export function createSameOriginAdapter(http) {
     return Object.freeze(actions);
   };
 
-  return Object.freeze({ session, dashboard, notifications, orders, returns, mutationActions });
+  return Object.freeze({ catalog, session, dashboard, notifications, orders, returns, mutationActions });
 }

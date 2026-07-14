@@ -8,7 +8,7 @@ Yığın tabanı: `codex/admin-commerce-pro-preview` (`1954d4b`)
 
 ## Sonuç
 
-Commerce Pro tasarım prototipi tamamlandı; tek-satıcı salt-okunur entegrasyon katmanı Dashboard, sipariş, iade ve admin bildirimlerine kadar ilerledi. Mevcut backend hâlâ tek satıcılıdır; satıcı organizasyonu, satıcı kapsamlı yetkilendirme, teklif, seller-order, değişmez finansal kayıt, hakediş ve payout modelleri henüz yoktur.
+Commerce Pro tasarım prototipi tamamlandı; tek-satıcı salt-okunur entegrasyon katmanı Dashboard, sipariş, iade, admin bildirimi ve NovaStore birinci taraf ürün özetine kadar ilerledi. Mevcut backend hâlâ tek satıcılıdır; satıcı organizasyonu, satıcı kapsamlı yetkilendirme, teklif, seller-order, değişmez finansal kayıt, hakediş ve payout modelleri henüz yoktur.
 
 - Gerçek tek-satıcı Commerce Pro cutover için kalan: **yaklaşık 2–3,5 hafta**.
 - Dar kapsamlı, login zorunlu ilk satış pilotu için kalan: **yaklaşık 4–7 hafta**.
@@ -70,7 +70,7 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 | Admin oturumu | `GET /api/admin/session` | Admin JWT + güncel DB rolü | Tur 1’de eklendi; capability’ler fail-closed |
 | Dashboard | `GET /api/admin/stats` | Admin JWT + güncel DB rolü | Tur 1; `private, no-store` |
 | Siparişler | `GET /api/admin/orders/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 1; sınırlı ve PII azaltılmış özet DTO, client-side filtre geçici |
-| Ürünler | `GET /api/products` | Public, admin JWT ile ek alanlar | Tur 3; yalnız birinci taraf olarak eşlenir |
+| Ürünler | `GET /api/admin/catalog/products/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 3A; active/non-deleted `novastore-platform` store scope, bounded ve salt-okunur DTO |
 | İadeler | `GET /api/admin/returns/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 2A; sınırlı, PII azaltılmış ve salt-okunur |
 | Bildirimler | `GET /api/admin/notifications/summary?limit=50` | Admin JWT + güncel DB rolü | Tur 2A; yalnız admin kayıtları, sınırlı ve salt-okunur |
 | Kategori/özellik/menü/koleksiyon | `/api/admin/...` | Admin JWT | Tur 3 |
@@ -107,7 +107,8 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 | 1 | Kod ve otomatik QA tamam; browser QA blokeli | `989cbeb` | Preview/entegre build, auth, mapper, CSP ve artifact testleri yeşil; Work Mode browser kanıtı eksik |
 | 2A | Kod ve otomatik QA tamam; browser QA blokeli | `eea2b1c` | İade/bildirim salt-okunur bağlandı; yerel kargo/refund sınırları görünür; write capability'leri kapalı; full verify yeşil |
 | 2B | Kod ve otomatik QA tamam; browser QA blokeli | `5cfe701` | Hard-delete/generic geçiş/sahte shipment/iade yazmaları kapalı; iptal stok kanıtına, callback'ler payment state + kalıcı reconciliation görevine bağlandı; bağımsız P0/P1 incelemesi temiz |
-| 2C | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | Bu commit | Admin iptali ve manuel kargo devri ayrı default-off capability; expected-state/idempotency/audit/XSS sınırları testli; gerçek refund, return write ve taşıyıcı çağrısı kapalı |
+| 2C | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | `756cc96` | Admin iptali ve manuel kargo devri ayrı default-off capability; expected-state/idempotency/audit/XSS sınırları testli; gerçek refund, return write ve taşıyıcı çağrısı kapalı |
+| 3A | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | Bu commit | Bounded/current-admin birinci taraf ürün özeti ve salt-okunur Commerce Pro ekranı; ürün/medya yazmaları kapalı |
 
 ## Tur 2 güvenlik bölümü
 
@@ -140,6 +141,17 @@ Tur 2C kontrollü operasyon özeti:
 - Manuel shipment; operatörün verdiği sağlayıcı/takip numarasını idempotent yerel kayıt olarak saklar, siparişi `Kargoya Verildi` yapar ve audit event üretir. Taşıyıcı API'si, label, doğrulanmış tracking URL, teslim teyidi veya provider refund çalıştırmaz.
 - Eski `POST /api/shipments/:orderId/create` yolu `410 SHIPMENT_CREATE_DISABLED`, return create/update yolları `503 RETURN_WRITES_DISABLED` kalır. İade yazımı migration, satır bazlı stok/refund ve reconciliation sözleşmesi onaylanmadan açılmaz.
 - İki capability tam boolean `true` dışında istemcide fail-closed; env değeri de yalnız tam `true` ile açılır. Bayrak kapalıyken admin write DB guard'ından önce durur.
+
+## Tur 3 yürütme dilimleri
+
+1. **3A — ürün salt-okunur:** bounded/current-admin ürün özet API'si; gerçek NovaStore birinci taraf kayıtları; seller/offer/risk/onay ve medya URL'si yok.
+2. **3B — yapı salt-okunur:** derin kategori, özellik şablonu, koleksiyon ve menü özetleri.
+3. **3C — yazma güvenlik temeli:** ürün hard-delete kilidi, güncel DB admin rolü, default-off capability, optimistic concurrency ve audit sözleşmesi.
+4. **3D — medyasız ürün JSON CRUD:** create/update/archive; Cloudinary middleware ve gerçek medya mutation'ı yok.
+5. **3E — kategori/özellik/koleksiyon/menü CRUD:** arşivleme, strict doğrulama, audit ve stale-state kontrolü.
+6. **3F — geniş doğrulama:** disposable yerel PostgreSQL, legacy parity, artifact ve browser kanıtı. Seçili Work Mode browser engeli sürdüğü sürece görsel/etkileşimli kapı blokeli kalır.
+
+Tur 3A, mevcut sınırsız `GET /api/products` yolunu yeniden kullanmaz. Entegre istemci yalnız yeni bounded admin DTO'suna bağlanır; kaynak satır active/non-deleted `novastore-platform` mağaza kimliğiyle fail-closed doğrulanır. Açıklama, medya URL'si, `store_id`, satıcı, teklif, risk veya manuel ürün onayı alanı uydurulmaz.
 
 PR #15’in `design-qa.md` sonucu, gerçek masaüstü/mobil browser kanıtı alınana kadar `blocked` kalır. Bu plan browser kısıtını atlatma yetkisi vermez.
 

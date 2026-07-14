@@ -2,6 +2,7 @@ const {
     ADMIN_COMMERCE_CAPABILITY_DEFAULTS,
     getAdminCommerceCapabilities
 } = require('./adminCommerceCapabilityService');
+const { PLATFORM_STORE } = require('./categoryV2BackfillService');
 
 const ADMIN_COMMERCE_CAPABILITIES = ADMIN_COMMERCE_CAPABILITY_DEFAULTS;
 
@@ -65,6 +66,67 @@ const createGetAdminOrderSummaries = (database) => async (req, res) => {
     } catch (error) {
         console.error('Admin sipariş özetleri hatası:', error.message);
         return res.status(500).json({ error: 'Sipariş özetleri getirilemedi.' });
+    }
+};
+
+const createGetAdminProductSummaries = (database) => async (req, res) => {
+    const limit = parseOrderSummaryLimit(req.query?.limit);
+
+    try {
+        const result = await database.query(
+            `
+                SELECT
+                    p.id,
+                    p.name,
+                    p.price,
+                    p.old_price,
+                    'TRY'::TEXT AS currency,
+                    COALESCE(p.stock, 0)::INT AS stock,
+                    p.publication_status,
+                    p.is_customer_visible,
+                    p.deleted_at,
+                    p.created_at,
+                    p.updated_at,
+                    primary_category.id AS primary_category_id,
+                    primary_category.name AS primary_category_name,
+                    primary_category.path AS primary_category_path,
+                    (
+                        SELECT COUNT(*)::INT
+                        FROM product_categories category_link
+                        WHERE category_link.product_id = p.id
+                    ) AS category_count,
+                    EXISTS (
+                        SELECT 1
+                        FROM product_media media
+                        WHERE media.product_id = p.id
+                    ) AS has_media
+                FROM products p
+                INNER JOIN stores first_party_store
+                    ON first_party_store.id = p.store_id
+                   AND LOWER(first_party_store.slug) = LOWER($1)
+                   AND first_party_store.is_active = TRUE
+                   AND first_party_store.deleted_at IS NULL
+                LEFT JOIN LATERAL (
+                    SELECT category.id, category.name, category.path
+                    FROM product_categories primary_link
+                    JOIN categories category ON category.id = primary_link.category_id
+                    WHERE primary_link.product_id = p.id
+                      AND primary_link.is_primary = TRUE
+                    ORDER BY category.id ASC
+                    LIMIT 1
+                ) primary_category ON TRUE
+                ORDER BY p.id DESC
+                LIMIT $2
+            `,
+            [PLATFORM_STORE.slug, limit + 1]
+        );
+        return res.status(200).json({
+            catalogMode: 'first_party',
+            ...toSummaryPage(result.rows, limit)
+        });
+    } catch (error) {
+        console.error('Admin ürün özetleri hatası:', error.message);
+        return res.status(500).json({ error: 'Ürün özetleri getirilemedi.' });
     }
 };
 
@@ -136,6 +198,7 @@ module.exports = {
     ADMIN_COMMERCE_CAPABILITIES,
     createGetAdminNotificationSummaries,
     createGetAdminOrderSummaries,
+    createGetAdminProductSummaries,
     createGetAdminReturnSummaries,
     getAdminCommerceCapabilities,
     getAdminSession,

@@ -44,6 +44,40 @@ const toCurrencyCode = (value, field) => {
   return code;
 };
 
+const productPublicationStatuses = new Set([
+  "draft",
+  "pending_approval",
+  "active",
+  "inactive",
+  "rejected",
+  "archived",
+]);
+
+const toRequiredText = (value, field) => {
+  if (typeof value !== "string" || !value.trim()) throw new TypeError(`${field} boş olmayan bir metin olmalıdır.`);
+  return value.trim();
+};
+
+const toStrictNullableText = (value, field) => {
+  if (value === null) return null;
+  return toRequiredText(value, field);
+};
+
+const toStrictNullablePositiveInteger = (value, field) => {
+  if (value === null) return null;
+  const parsed = toInteger(value, field);
+  if (parsed < 1) throw new TypeError(`${field} pozitif olmalıdır.`);
+  return parsed;
+};
+
+const toStrictNullableFiniteNumber = (value, field) => (
+  value === null ? null : toFiniteNumber(value, field)
+);
+
+const toStrictNullableDate = (value, field) => (
+  value === null ? null : toDateValue(value, field)
+);
+
 export function normalizeDashboardStats(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new TypeError("Dashboard istatistik yanıtı nesne olmalıdır.");
@@ -131,6 +165,56 @@ export function normalizeNotificationSummary(row) {
   });
 }
 
+export function normalizeFirstPartyCatalogProduct(row) {
+  if (!row || typeof row !== "object" || Array.isArray(row)) {
+    throw new TypeError("Birinci taraf ürün özeti nesne olmalıdır.");
+  }
+  const requiredFields = [
+    "id", "name", "price", "old_price", "currency", "stock", "publication_status",
+    "is_customer_visible", "created_at", "updated_at", "deleted_at", "primary_category_id",
+    "primary_category_name", "primary_category_path", "category_count", "has_media",
+  ];
+  if (requiredFields.some((field) => !Object.prototype.hasOwnProperty.call(row, field))) {
+    throw new TypeError("Birinci taraf ürün özeti eksik alan içeriyor.");
+  }
+  const rawId = toInteger(row.id, "product.id");
+  if (rawId < 1) throw new TypeError("product.id pozitif olmalıdır.");
+  const publicationStatus = toRequiredText(row.publication_status, "product.publication_status");
+  if (!productPublicationStatuses.has(publicationStatus)) {
+    throw new TypeError("product.publication_status desteklenen bir yayın durumu olmalıdır.");
+  }
+  if (row.currency !== "TRY") throw new TypeError("product.currency TRY olmalıdır.");
+
+  const primaryCategoryId = toStrictNullablePositiveInteger(row.primary_category_id, "product.primary_category_id");
+  const primaryCategoryName = toStrictNullableText(row.primary_category_name, "product.primary_category_name");
+  if ((primaryCategoryId === null) !== (primaryCategoryName === null)) {
+    throw new TypeError("product birincil kategori kimliği ve adı birlikte bulunmalıdır.");
+  }
+  if (primaryCategoryId === null && row.primary_category_path !== null) {
+    throw new TypeError("product birincil kategori yolu kategori bağlantısı olmadan gelemez.");
+  }
+
+  return Object.freeze({
+    id: `PR-${String(rawId).padStart(6, "0")}`,
+    rawId,
+    name: toRequiredText(row.name, "product.name"),
+    price: toFiniteNumber(row.price, "product.price"),
+    oldPrice: toStrictNullableFiniteNumber(row.old_price, "product.old_price"),
+    currency: "TRY",
+    stock: toInteger(row.stock, "product.stock"),
+    publicationStatus,
+    customerVisible: toBoolean(row.is_customer_visible, "product.is_customer_visible"),
+    createdAt: toStrictNullableDate(row.created_at, "product.created_at"),
+    updatedAt: toStrictNullableDate(row.updated_at, "product.updated_at"),
+    deletedAt: toStrictNullableDate(row.deleted_at, "product.deleted_at"),
+    primaryCategoryId,
+    primaryCategoryName,
+    primaryCategoryPath: toStrictNullableText(row.primary_category_path, "product.primary_category_path"),
+    categoryCount: toInteger(row.category_count, "product.category_count"),
+    hasMedia: toBoolean(row.has_media, "product.has_media"),
+  });
+}
+
 const normalizeSummaryPage = (payload, itemNormalizer, label) => {
   if (!payload || typeof payload !== "object" || !Array.isArray(payload.items)) {
     throw new TypeError(`${label} yanıtı items dizisi içermelidir.`);
@@ -155,6 +239,13 @@ export function normalizeReturnSummaryPage(payload) {
 
 export function normalizeNotificationSummaryPage(payload) {
   return normalizeSummaryPage(payload, normalizeNotificationSummary, "notifications");
+}
+
+export function normalizeFirstPartyCatalogPage(payload) {
+  if (payload?.catalogMode !== "first_party") {
+    throw new TypeError("catalog.catalogMode first_party olmalıdır.");
+  }
+  return normalizeSummaryPage(payload, normalizeFirstPartyCatalogProduct, "catalog");
 }
 
 export function normalizeAdminSession(payload) {
