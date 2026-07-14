@@ -6,7 +6,15 @@ import { fileURLToPath } from "node:url";
 import { createSourceFingerprint, fontNames, imageNames } from "./source-fingerprint.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const dist = path.join(root, "dist");
+const modeFlag = process.argv.indexOf("--mode");
+const modeArgument = modeFlag >= 0 ? process.argv[modeFlag + 1] : "preview";
+
+if (!["preview", "integrated"].includes(modeArgument)) {
+  throw new Error("`--mode` yalnızca preview veya integrated olabilir.");
+}
+
+const integrated = modeArgument === "integrated";
+const dist = path.join(root, integrated ? "dist-integrated" : "dist");
 const assets = path.join(dist, "assets");
 const outputFlag = process.argv.indexOf("--output");
 const outputArgument = outputFlag >= 0 ? process.argv[outputFlag + 1] : "standalone/index.html";
@@ -18,9 +26,10 @@ if (!outputArgument || outputArgument.startsWith("--")) {
 const output = path.resolve(root, outputArgument);
 const outputDirectory = path.dirname(output);
 
-const files = await readdir(assets);
-const jsFile = files.find((name) => /^index-.+\.js$/.test(name));
-const cssFile = files.find((name) => /^index-.+\.css$/.test(name));
+const files = (await readdir(assets)).sort();
+const entryName = integrated ? "integrated" : "index";
+const jsFile = files.find((name) => new RegExp(`^${entryName}-.+\\.js$`).test(name));
+const cssFile = files.find((name) => new RegExp(`^${entryName}-.+\\.css$`).test(name));
 
 if (!jsFile || !cssFile) {
   throw new Error("Önce `npm run build` ile Vite çıktısı oluşturulmalıdır.");
@@ -57,7 +66,7 @@ if (unresolved.length > 0) {
 }
 
 const [{ value: sourceFingerprint }, builtFingerprint] = await Promise.all([
-  createSourceFingerprint(root),
+  createSourceFingerprint(root, { mode: modeArgument }),
   readFile(path.join(dist, ".source-fingerprint"), "utf8").catch(() => ""),
 ]);
 
@@ -69,19 +78,31 @@ const safeIcons = icons.replaceAll("</script", "<\\/script");
 const safeJavascript = javascript.replaceAll("</script", "<\\/script");
 const safeCss = css.replaceAll("</style", "<\\/style");
 const favicon = await encode(path.join(root, "public", "favicon-96x96.png"), "image/png");
+const connectPolicy = integrated ? "'self'" : "'none'";
+const contentSecurityPolicy = [
+  "default-src 'none'",
+  "script-src 'unsafe-inline'",
+  "style-src 'unsafe-inline'",
+  "img-src data:",
+  "font-src data:",
+  `connect-src ${connectPolicy}`,
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join("; ");
 
 const html = `<!doctype html>
-<html lang="tr">
+<html lang="tr" data-admin-mode="${modeArgument}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#031d39" />
     <meta name="robots" content="noindex,nofollow,noarchive" />
-    <meta http-equiv="Content-Security-Policy" content="connect-src 'none'" />
-    <meta name="description" content="NovaStore çok satıcılı yönetim konsolu etkileşimli önizlemesi" />
+    <meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy}" />
+    <meta name="description" content="${integrated ? "NovaStore tek satıcılı entegre yönetim konsolu" : "NovaStore çok satıcılı yönetim konsolu etkileşimli önizlemesi"}" />
     <link rel="icon" type="image/png" href="${favicon}" />
     <meta name="novastore-source-fingerprint" content="${sourceFingerprint}" />
-    <title>NovaStore Admin Commerce Pro — Önizleme</title>
+    <title>NovaStore Admin Commerce Pro — ${integrated ? "Entegre Veri" : "Önizleme"}</title>
     <style>${safeCss}</style>
   </head>
   <body>

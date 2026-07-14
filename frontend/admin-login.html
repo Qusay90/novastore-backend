@@ -87,6 +87,19 @@
     </div>
 
     <script>
+        const ADMIN_LOGIN_TARGETS = new Set(['admin.html', 'admin-commerce-pro-live.html']);
+
+        function getAdminLoginTarget(search = window.location.search) {
+            const requested = new URLSearchParams(search).get('next');
+            return ADMIN_LOGIN_TARGETS.has(requested) ? requested : 'admin.html';
+        }
+
+        if (new URLSearchParams(window.location.search).get('reason') === 'session-expired') {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.innerText = 'Yönetici oturumunuz sona erdi. Lütfen tekrar giriş yapın.';
+            errorDiv.style.display = 'block';
+        }
+
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
@@ -105,7 +118,7 @@
                 if (response.ok) {
                     // Token'ı tarayıcının dijital kasasına kaydet
                     localStorage.setItem('nova_admin_token', result.token);
-                    window.location.href = 'admin.html'; // Panele geç
+                    window.location.href = getAdminLoginTarget();
                 } else {
                     errorDiv.innerText = result.error;
                     errorDiv.style.display = 'block';

@@ -4,7 +4,9 @@ Tarih: 2026-07-14
 
 Hedef: `reference/admin-hybrid-target.png` (1487 × 1058)
 
-Entegrasyon çıktısı: `../frontend/admin-commerce-pro.html`
+Preview çıktısı: `../frontend/admin-commerce-pro.html`
+
+Tek-satıcı entegre çıktı: `../frontend/admin-commerce-pro-live.html`
 
 ## Bu turda uygulanan ve statik incelenen kontroller
 
@@ -20,7 +22,7 @@ Entegrasyon çıktısı: `../frontend/admin-commerce-pro.html`
 
 ## Deterministik doğrulama
 
-- `npm run verify`: geçti; Vite build, entegre artifact, model smoke ve preview smoke birlikte doğrulandı.
+- `npm run verify`: geçti; ayrı preview/entegre Vite buildleri, iki artifact, model smoke ve iki moda ait sözleşme testleri birlikte doğrulandı.
 - Standalone ve entegre HTML byte-byte aynı üretildi; standalone artifact üzerinde ikinci preview smoke geçti.
 - Eski `dist` ile doğrudan standalone üretme negatif testi beklenen biçimde reddedildi. Vite artık build-time kaynak parmak izi yazıyor; üretici bu parmak izi güncel değilse çıktı üretmiyor.
 - `adminCommerceProModelSmoke`: geçti; 28 sipariş/12 Bugün kaydı, sayfalama, Türkçe arama, mağaza kapsamı, sipariş durum/sahip geçişleri, müşteri segmenti, modül/bildirim geçişleri, ürün doğrulama, CSV güvenliği, fixture benzersizliği ve ana kayıt ilişkilerine ek olarak politika kuralları ve eksik girdide fail-closed davranış, otomatik yayın/istisna/satıcı aksiyonu, stok-yayın ayrımı, `offerId` kimliği, seller-scope SKU, kanonik içerik yayılımı, haricî teklif sahipliği, onboarding puan eşikleri/neden toplamı/eksik zorunlu belge/review yokluğu/onay engeli doğrulandı.
@@ -35,7 +37,7 @@ Entegrasyon çıktısı: `../frontend/admin-commerce-pro.html`
 - Policy/sahiplik düzeltmesinden önceki Vercel deployment: `dpl_FBRrohKcP239P63m7CYUfAi1eoMk`
 - URL: `https://novastore-commerce-pro-preview-n8chufjxk-qusay90s-projects.vercel.app`
 - Proje: `prj_MSmpmTD45qy8GUQ7ljDpXGQBuFON`; durum `READY`; target `null` (Preview); production alias/promosyon yapılmadı.
-- O deployment için authenticated fetch `HTTP 200` döndürdü; deployed kaynak parmak izi `490ca0562e0903ae1bbe17bb591a3201dffb73298092b54773faf283712d47ec` o andaki yerel artifact ile eşleşti. Bu commit'in güncel ve açıkça anonimleştirilmiş kaynak parmak izi `f977875f80b87f4e755432e6e5ed83ec5f1018d709852660c09ae8258c9cb6eb` olduğundan URL güncel düzeltmelerin QA kanıtı değildir ve yeniden deploy edilmeden güncel diye sunulmamalıdır.
+- O deployment için authenticated fetch `HTTP 200` döndürdü; deployed kaynak parmak izi `490ca0562e0903ae1bbe17bb591a3201dffb73298092b54773faf283712d47ec` o andaki yerel artifact ile eşleşti. PR #15 baseline’ının (`1954d4b`) preview parmak izi `f977875f80b87f4e755432e6e5ed83ec5f1018d709852660c09ae8258c9cb6eb` idi. Bu stacked entegrasyon dalında build altyapısı ayrıldığı için güncel preview parmak izi `f66ced739c9e7a2e857fd88ba28ab83bfe463fa369cde9c3c92b891af9473a07`, entegre artifact parmak izi ise `fb4d484fca8e07631bb7f0675a3cbc789941ee37bd7ac5b1596f6f2c1d9479bc` oldu. Eski URL bu iki güncel artifact için QA kanıtı değildir ve yeniden deploy edilmeden güncel diye sunulmamalıdır.
 - Dağıtım yalnız tek `index.html` artifact'ını içerir; sır, environment variable, remote DB, auth, API veya ödeme bağlantısı eklenmedi.
 - Vercel, dönen Preview HTML'ine kendi `https://vercel.live/_next-live/feedback/feedback.js` Toolbar scriptini enjekte ediyor. Bu script NovaStore kaynak artifact'ında yoktur ancak browser network/console temizliği ayrıca doğrulanmadan Preview response'u tam no-network kanıtı sayılamaz.
 

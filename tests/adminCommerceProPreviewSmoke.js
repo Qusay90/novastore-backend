@@ -57,11 +57,20 @@ const previewSource = fs.readFileSync(previewPath, 'utf8');
 const adminSource = fs.readFileSync(adminPath, 'utf8');
 const sourceModuleFiles = listSourceModules(sourceRoot);
 const sourceFiles = listSourceFiles(sourceRoot);
+const isPreviewSource = (relativePath) => (
+    relativePath !== 'src/IntegratedApp.jsx'
+    && relativePath !== 'src/integrated.css'
+    && relativePath !== 'src/main-integrated.jsx'
+    && !relativePath.startsWith('src/adapters/')
+    && !relativePath.startsWith('src/integration/')
+);
 const sourceModules = sourceModuleFiles.map((relativePath) => ({
     relativePath,
     source: fs.readFileSync(path.join(commerceProRoot, relativePath), 'utf8')
 }));
-const applicationSource = sourceModules
+const previewSourceModules = sourceModules.filter(({ relativePath }) => isPreviewSource(relativePath));
+const previewSourceFiles = sourceFiles.filter(isPreviewSource);
+const applicationSource = previewSourceModules
     .map(({ relativePath, source }) => `/* ${relativePath} */\n${source}`)
     .join('\n');
 const stylesSource = fs.readFileSync(stylesPath, 'utf8');
@@ -75,7 +84,7 @@ const fingerprintFiles = [
     'vite.config.mjs',
     'scripts/build-standalone.mjs',
     'scripts/source-fingerprint.mjs',
-    ...sourceFiles,
+    ...previewSourceFiles,
     'public/icons.js',
     'public/favicon-96x96.png',
     'public/assets/category-home.webp',
@@ -111,8 +120,8 @@ assert.match(
 );
 assert.match(
     viteConfigSource,
-    /buildStart\(\)[\s\S]{0,180}createSourceFingerprint\(root\)[\s\S]{0,260}writeFile\(path\.join\(root, "dist", "\.source-fingerprint"\), buildSourceFingerprint/,
-    'Vite build kendi kaynak parmak izini dist içine yazmalı'
+    /buildStart\(\)[\s\S]{0,220}createSourceFingerprint\(root, \{ mode \}\)[\s\S]{0,300}writeFile\(path\.join\(root, outputDirectory, "\.source-fingerprint"\), buildSourceFingerprint/,
+    'Vite build kendi kaynak parmak izini seçili çıktı dizinine yazmalı'
 );
 
 const fingerprint = createHash('sha256');
@@ -182,11 +191,11 @@ assert.doesNotMatch(previewSource, /(?:src|href)=["']\/src\//i, 'çözümlenmemi
 assert.doesNotMatch(previewSource, /(?:src|href)=["'][^"']*icons\.js/i, 'ikon paketi HTML içine gömülmeli');
 assert.match(previewSource, /data:image\/webp;base64,/i, 'ürün görselleri HTML içine gömülmeli');
 assert.match(previewSource, /data:font\/woff2;base64,/i, 'font dosyaları HTML içine gömülmeli');
-assert.match(
-    previewSource,
-    /<meta\b[^>]*\bhttp-equiv=["']Content-Security-Policy["'][^>]*\bcontent=["']connect-src 'none'["'][^>]*>/i,
-    'bağımsız önizleme runtime bağlantılarını CSP ile de kapatmalı'
-);
+const previewCspMeta = previewSource.match(/<meta\b[^>]*\bhttp-equiv=["']Content-Security-Policy["'][^>]*>/i)?.[0];
+assert.ok(previewCspMeta, 'bağımsız önizleme CSP meta etiketi içermeli');
+assert.ok(previewCspMeta.includes("connect-src 'none'"), 'bağımsız önizleme runtime bağlantılarını CSP ile kapatmalı');
+assert.ok(previewCspMeta.includes("default-src 'none'"), 'bağımsız önizleme varsayılan kaynakları kapatmalı');
+assert.ok(previewCspMeta.includes("base-uri 'none'"), 'bağımsız önizleme base URI enjeksiyonunu kapatmalı');
 
 const forbiddenRuntimePatterns = [
     [/\bfetch\s*\(/, 'fetch çağrısı'],
@@ -200,7 +209,7 @@ const forbiddenRuntimePatterns = [
     [/\biyzico\b/i, 'iyzico referansı']
 ];
 
-for (const { relativePath, source } of sourceModules) {
+for (const { relativePath, source } of previewSourceModules) {
     assert.doesNotMatch(
         source,
         /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bEventSource\b|\bsendBeacon\s*\(/,

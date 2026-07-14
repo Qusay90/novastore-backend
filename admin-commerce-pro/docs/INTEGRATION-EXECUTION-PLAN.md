@@ -20,9 +20,9 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 ## Değişmez teslim kuralları
 
 1. Her tur plan → uygulama → test → doğrulama → commit → push sırasıyla tamamlanır.
-2. Preview ve canlı veri uygulamaları ayrı build girişleridir. Preview hiçbir ağ isteği yapmaz; canlı uygulama hata halinde mock veriye düşmez.
-3. Canlı istemci yalnız aynı-origin `/api/...` yollarına JWT ekler.
-4. Backend’de olmayan müşteri, satıcı, finans veya operasyon verisi canlı panelde uydurulmaz.
+2. Preview ve entegre veri uygulamaları ayrı build girişleridir. Preview hiçbir ağ isteği yapmaz; entegre uygulama hata halinde mock veriye düşmez.
+3. Entegre istemci yalnız aynı-origin `/api/...` yollarına JWT ekler.
+4. Backend’de olmayan müşteri, satıcı, finans veya operasyon verisi entegre panelde uydurulmaz.
 5. Yetki/capability bilinmiyorsa kontrol kapalıdır. UI görünürlüğü güvenlik sınırı değildir; sunucu her isteği doğrular.
 6. Production, uzak veritabanı, gerçek ödeme, Cloudinary mutation, migration deploy ve production cutover ayrı açık onay kapılarıdır.
 7. PR #15 büyütülmez. Entegrasyon, PR #15 üzerine yığılan ayrı dal/PR olarak ilerler.
@@ -65,15 +65,15 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 
 | Kaynak | Endpoint | Yetki | Karar |
 |---|---|---|---|
-| Admin oturumu | `GET /api/admin/session` | Admin JWT | Tur 1’de eklenecek bootstrap sözleşmesi |
-| Dashboard | `GET /api/admin/stats` | Admin JWT | Tur 1 |
-| Siparişler | `GET /api/orders` | Admin JWT | Tur 1; client-side filtre geçici |
+| Admin oturumu | `GET /api/admin/session` | Admin JWT + güncel DB rolü | Tur 1’de eklendi; capability’ler fail-closed |
+| Dashboard | `GET /api/admin/stats` | Admin JWT + güncel DB rolü | Tur 1; `private, no-store` |
+| Siparişler | `GET /api/admin/orders/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 1; sınırlı ve PII azaltılmış özet DTO, client-side filtre geçici |
 | Ürünler | `GET /api/products` | Public, admin JWT ile ek alanlar | Tur 3; yalnız birinci taraf olarak eşlenir |
 | İadeler | `GET /api/returns/admin/all` | Admin JWT | Tur 2 |
 | Bildirimler | `GET /api/notifications/admin` | Admin JWT | Tur 2 |
 | Kategori/özellik/menü/koleksiyon | `/api/admin/...` | Admin JWT | Tur 3 |
 
-### Canlıda kapalı kalacak kapasite
+### Entegre arayüzde çağrılmayacak kapasite
 
 | Alan | Neden |
 |---|---|
@@ -100,7 +100,11 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 
 | Tur | Durum | Commit | QA notu |
 |---|---|---|---|
-| 0 | Tamamlandı | Commit sonrası işlenecek | Read-only repo audit; remote sistem kullanılmadı |
-| 1 | Devam ediyor | — | Browser QA yalnız izin verilen Work Mode browser ile yapılacak |
+| 0 | Tamamlandı | `faef1f2` | Read-only repo audit; remote sistem kullanılmadı |
+| 1 | Kod ve otomatik QA tamam; browser QA blokeli | Bu commit | Preview/entegre build, auth, mapper, CSP ve artifact testleri yeşil; Work Mode browser kanıtı eksik |
 
 PR #15’in `design-qa.md` sonucu, gerçek masaüstü/mobil browser kanıtı alınana kadar `blocked` kalır. Bu plan browser kısıtını atlatma yetkisi vermez.
+
+## Tur 1 geri alma sınırı
+
+Tur 1’in yeni artifact, session ve order-summary parçaları additive ilerler; `frontend/admin.html` cutover edilmez. Entegre Dashboard’un kullandığı mevcut `/api/admin/stats` yolu ayrıca `no-store` ve güncel DB admin-rolü kontrolüyle sıkılaştırılır; `/api/admin/behavior` zinciri değiştirilmez. Geri alma gerektiğinde entegre artifact, session/order-summary endpointleri, stats middleware sıkılaştırması, login allowlist hedefi ve Commerce Pro entegre kaynakları birlikte geri alınır. Preview artifact ve legacy admin çalışma yolu bağımsız kalır.

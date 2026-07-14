@@ -39,10 +39,26 @@ export async function listSourceFiles(root, directory = path.join(root, "src")) 
   return modules.sort(compareNames);
 }
 
-export async function createSourceFingerprint(root) {
-  const sourceFiles = await listSourceFiles(root);
+const sourceFilesForMode = (sourceFiles, mode) => sourceFiles.filter((relativePath) => {
+  const integratedOnly = relativePath === "src/IntegratedApp.jsx"
+    || relativePath === "src/integrated.css"
+    || relativePath === "src/main-integrated.jsx"
+    || relativePath.startsWith("src/adapters/")
+    || relativePath.startsWith("src/integration/");
+  const previewOnly = relativePath === "src/App.jsx"
+    || relativePath === "src/main.jsx"
+    || relativePath === "src/previewModel.js";
+
+  if (mode === "preview") return !integratedOnly;
+  if (mode === "integrated") return !previewOnly;
+  return true;
+});
+
+export async function createSourceFingerprint(root, { mode = "preview" } = {}) {
+  if (!["preview", "integrated"].includes(mode)) throw new Error(`Bilinmeyen fingerprint modu: ${mode}`);
+  const sourceFiles = sourceFilesForMode(await listSourceFiles(root), mode);
   const fingerprintFiles = [
-    "index.html",
+    mode === "integrated" ? "integrated.html" : "index.html",
     "package.json",
     "package-lock.json",
     "vite.config.mjs",
@@ -62,6 +78,7 @@ export async function createSourceFingerprint(root) {
   }
 
   return {
+    mode,
     fingerprintFiles,
     sourceFiles,
     value: fingerprint.digest("hex"),

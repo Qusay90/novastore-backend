@@ -6,13 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:live": "vite build --mode integrated",
     "build:standalone": "npm run build && node scripts/build-standalone.mjs",
     "build:integrated": "npm run build && node scripts/build-standalone.mjs --output ../frontend/admin-commerce-pro.html",
+    "build:live:integrated": "npm run build:live && node scripts/build-standalone.mjs --mode integrated --output ../frontend/admin-commerce-pro-live.html",
     "preview": "vite preview",
     "test:model": "node ../tests/adminCommerceProModelSmoke.mjs",
     "test:preview": "node ../tests/adminCommerceProPreviewSmoke.js",
-    "test": "npm run test:model && npm run test:preview",
-    "verify": "npm run build:integrated && npm test"
+    "test:live": "node ../tests/adminCommerceProHttpSmoke.mjs && node ../tests/adminCommerceProSessionContractSmoke.js && node ../tests/adminLoginNextSmoke.js && node ../tests/adminCommerceProLiveSmoke.mjs",
+    "test": "npm run test:model && npm run test:preview && npm run test:live",
+    "verify": "npm run build:integrated && npm run build:live:integrated && npm test"
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.0.4",

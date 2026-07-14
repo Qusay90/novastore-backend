@@ -1,12 +1,18 @@
-# NovaStore Admin Commerce Pro Preview
+# NovaStore Admin Commerce Pro
 
-NovaStore'un Commerce Pro görsel yönünü, yoğun operasyon masası yaklaşımını ve gelecekteki çok satıcılı yönetim bilgi mimarisini gerçek sistemlerden izole biçimde gösteren etkileşimli önizlemedir. Mevcut backend bugün tek satıcılıdır; pazaryeri kayıtları çalışan servisler değil, açıkça etiketlenmiş hedef model simülasyonudur.
+NovaStore'un Commerce Pro görsel yönünü ve gelecekteki çok satıcılı yönetim bilgi mimarisini taşıyan iki ayrı build içerir:
+
+- `admin-commerce-pro.html`: gerçek sistemlerden izole, sıfır ağ istekli etkileşimli tasarım önizlemesi.
+- `admin-commerce-pro-live.html`: admin oturumu ile yalnız aynı-origin API'den Dashboard ve Sipariş özeti okuyan, tek-satıcı sınırındaki entegrasyon yüzeyi.
+
+Mevcut backend bugün tek satıcılıdır; preview içindeki pazaryeri kayıtları çalışan servisler değil, açıkça etiketlenmiş hedef model simülasyonudur. Entegre build bu kayıtları hiçbir koşulda göstermez.
 
 ## Güvenlik ve entegrasyon sınırı
 
-- Mevcut `frontend/admin.html` çalışan/kabul edilen admin yüzeyi olarak kalır; bu proje onun yerine geçmez.
-- Arayüz yalnız yerel örnek veri kullanır. Değişiklikler sayfa yenilendiğinde sıfırlanır.
-- API, WebSocket, production veya remote veritabanı, PayTR/ödeme, kimlik doğrulama ya da sır/env bağlantısı yoktur.
+- Mevcut `frontend/admin.html` çalışan/kabul edilen admin yüzeyi olarak kalır; Commerce Pro entegre build henüz cutover değildir.
+- Preview yalnız yerel örnek veri kullanır. Değişiklikler sayfa yenilendiğinde sıfırlanır; API, WebSocket, production/remote veritabanı, ödeme, auth veya sır/env bağlantısı yoktur.
+- Entegre build `nova_admin_token` ile `/api/admin/session`, `/api/admin/stats` ve limitli `/api/admin/orders/summary` yollarını salt-okunur kullanır. Mutlak URL ve cross-origin API yolu reddedilir; hata halinde mock veriye düşülmez.
+- Entegre Commerce Pro arayüzü sipariş mutation'ı, ürün CRUD'u, satıcı, müşteri, hakediş, payout, ödeme veya Cloudinary isteği göndermez. Bu UI capability bayrakları genel backend yetkisi değildir; mevcut legacy admin mutation yolları bu turda değiştirilmemiştir.
 - Dinamik modül yükleme, migration, seller scope/RBAC enforcement ve çok satıcılı backend bu değişiklikte uygulanmaz.
 - Gerçek backend'de dış satıcının ürün yükleyebildiği bir portal, seller offer servisi veya ürün başvuru/onay akışı yoktur. Mevcut ürün CRUD'u admin tarafından yönetilen birinci taraf NovaStore kataloğudur.
 - `frontend/admin.html`, önizlemeyi yeni sekmede açan güvenli bir bağlantı içerir.
@@ -35,7 +41,7 @@ npm ci
 npm run dev
 ```
 
-Vite'ın verdiği yerel adreste arayüz açılır. Üretimden veya uzak servislerden veri çekilmez.
+Vite'ın verdiği yerel adreste preview açılır. Üretimden veya uzak servislerden veri çekilmez.
 
 ## Tek dosyalık entegrasyon çıktısı
 
@@ -45,6 +51,15 @@ npm run build:integrated
 ```
 
 Bu komut fontları, ürün görsellerini, ikonları, CSS'i ve JavaScript'i tek belgeye gömerek `frontend/admin-commerce-pro.html` üretir. Çıktı `noindex,nofollow,noarchive` etiketi taşır ve uygulamanın statik frontend sunucusundan `/admin-commerce-pro.html` yolunda açılabilir.
+
+Salt-okunur entegre artifact:
+
+```bash
+cd admin-commerce-pro
+npm run build:live:integrated
+```
+
+Bu komut `frontend/admin-commerce-pro-live.html` üretir. Artifact `connect-src 'self'` CSP'si taşır ve yalnız NovaStore backend ile aynı origin'de çalışır. Admin login dönüş hedefi allowlist ile bu dosyaya yönlendirilebilir. Bu build deployment veya production cutover yapmaz.
 
 ## Güvenli doğrulama
 
@@ -60,10 +75,14 @@ Repo kökünden bağımsız artifact kontrolleri:
 ```bash
 node tests/adminCommerceProModelSmoke.mjs
 node tests/adminCommerceProPreviewSmoke.js
+node tests/adminCommerceProHttpSmoke.mjs
+node tests/adminCommerceProSessionContractSmoke.js
+node tests/adminLoginNextSmoke.js
+node tests/adminCommerceProLiveSmoke.mjs
 COMMERCE_PRO_PREVIEW_PATH=admin-commerce-pro/standalone/index.html node tests/adminCommerceProPreviewSmoke.js
 ```
 
-Testler sayfalama/arama/mağaza kapsamı/ürün doğrulama/CSV güvenliği ve örnek veri ilişkilerine ek olarak gerçek politika kurallarını, eksik girdide fail-closed davranışı, otomatik yayın/istisna/satıcı aksiyonu ayrımını, yayın-stok eksenlerini, `offerId` kimliğini, seller-scope SKU'yu, kanonik içerik yayılımını, haricî teklif alanlarının değişmez sahiplik kimliğiyle korunmasını, açıklanabilir onboarding puanını, eksik belge fail-closed davranışını, eşikleri ve onay engellerini doğrular. Bağımsız çıktının kaynak parmak izi, CSP, önizleme uyarısı, ana admindeki bağlantı ve istemeden eklenebilecek API/ağ/ödeme çağrıları da kontrol edilir. Vite build, kendi kaynak parmak izini `dist` içine yazar; standalone üretici eski bir bundle'ı güncel kaynaklarla yeniden damgalamayı reddeder. Production DB veya ödeme testi çalıştırılmaz.
+Testler sayfalama/arama/mağaza kapsamı/ürün doğrulama/CSV güvenliği ve örnek veri ilişkilerine ek olarak gerçek politika kurallarını, eksik girdide fail-closed davranışı, otomatik yayın/istisna/satıcı aksiyonu ayrımını, yayın-stok eksenlerini, `offerId` kimliğini, seller-scope SKU'yu, kanonik içerik yayılımını, haricî teklif alanlarının değişmez sahiplik kimliğiyle korunmasını, açıklanabilir onboarding puanını, eksik belge fail-closed davranışını, eşikleri ve onay engellerini doğrular. Preview için kaynak parmak izi, `connect-src 'none'`, önizleme uyarısı ve sıfır ağ/ödeme çağrısı korunur. Entegre build için aynı-origin yol zorlaması, JWT ön kontrolü, 401/403 ayrımı, admin session capability sözleşmesi, DTO eşleme, login allowlist'i, `connect-src 'self'` ve mock fallback yasağı test edilir. Standalone üretici eski bundle'ı güncel kaynaklarla yeniden damgalamayı reddeder. Production DB veya ödeme testi çalıştırılmaz.
 
 ## Geçici mock önizlemesi
 
@@ -75,6 +94,6 @@ Dağıtım için ayrıca yetki verildiğinde bu dal, sır veya environment varia
 
 Preview production hedefi değildir; gerçek auth, veritabanı veya ödeme environment'ı bağlanmamalıdır. Geri alma; preview deployment'ını silmek ve gerekirse `frontend/admin.html` içindeki bağlantı ile önizleme artifact'ını kaldırmakla sınırlıdır.
 
-## Gelecek entegrasyon kapısı
+## Entegrasyon yürütme planı
 
-Gerçek sisteme bağlanmadan önce mevcut tek satıcılı ürünleri `NOVASTORE_FIRST_PARTY` yapısına güvenli backfill edecek kanonik ürün/seller offer ayrımı, mevcut auth/session sözleşmesi, seller-scope/RBAC enforcement, sürümlü yayın politikası, açıklanabilir reason code'lar, admin override audit'i, loading/error/empty durumları ve güvenli staging UAT ayrı plan/PR'lerle onaylanmalıdır. Önizlemedeki eşikler production politikası değildir. Çok satıcılı hedef model için `docs/MULTI-VENDOR-PLAN.md`, bilgi mimarisi ve modül sınırları için `docs/ADMIN-IA-AND-MODULES.md` temel alınır.
+Tur sırası, tahminler, değişmez güvenlik kapıları ve route/capability özeti `docs/INTEGRATION-EXECUTION-PLAN.md` içinde tutulur. Mevcut tek satıcılı ürünleri `NOVASTORE_FIRST_PARTY` yapısına güvenli backfill edecek kanonik ürün/seller offer ayrımı, seller-scope/RBAC enforcement, sürümlü yayın politikası, admin override audit'i ve staging UAT ayrı plan/PR'lerle ilerlemelidir. Önizlemedeki eşikler production politikası değildir. Çok satıcılı hedef model için `docs/MULTI-VENDOR-PLAN.md`, bilgi mimarisi ve modül sınırları için `docs/ADMIN-IA-AND-MODULES.md` temel alınır.
