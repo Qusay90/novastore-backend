@@ -220,4 +220,276 @@ export function isSellerDocumentComplete(key, value) {
 }
 
 const sellerReviewLabels = {
-  company: "
+  company: "Şirket / vergi kimliği",
+  bank: "Banka hesabı sahipliği",
+  documents: "Zorunlu belgeler",
+  permission: "Kategori / marka izni",
+  duplicate: "Yinelenen başvuru sinyali",
+};
+
+const sellerReviewMaxPoints = {
+  company: 30,
+  bank: 25,
+  documents: 20,
+  permission: 15,
+  duplicate: 10,
+};
+
+const sellerReviewStatusLabels = {
+  verified: "Doğrulandı",
+  pending: "Doğrulama bekliyor",
+  mismatch: "Uyuşmazlık",
+  complete: "Tam",
+  incomplete: "Eksik veya süresi geçmiş",
+  "not-required": "Gerekmiyor",
+  missing: "Eksik",
+  invalid: "Geçersiz",
+  clear: "Sinyal yok",
+  possible: "Olası eşleşme",
+  confirmed: "Doğrulanmış eşleşme",
+  unknown: "Eksik veri",
+};
+
+export function calculateSellerReviewPriority(record) {
+  const verification = record?.verification || {};
+  const knownCompany = ["verified", "pending", "mismatch"].includes(verification.company);
+  const knownBank = ["verified", "pending", "mismatch"].includes(verification.bank);
+  const documents = verification.documents && typeof verification.documents === "object" ? verification.documents : {};
+  const knownDocuments = sellerRequiredDocumentKeys.every((key) => (
+    Object.prototype.hasOwnProperty.call(documents, key) && isSellerDocumentStateValid(key, documents[key])
+  ));
+  const knownPermission = ["verified", "pending", "missing", "invalid", "not-required"].includes(verification.permission);
+  const knownDuplicate = ["clear", "possible", "confirmed"].includes(verification.duplicate);
+
+  const companyPoints = verification.company === "mismatch" ? 30 : verification.company === "pending" ? 12 : 0;
+  const bankPoints = verification.bank === "mismatch" ? 25 : verification.bank === "pending" ? 10 : 0;
+  const incompleteDocuments = sellerRequiredDocumentKeys.filter((key) => !isSellerDocumentComplete(key, documents[key])).length;
+  const documentPoints = incompleteDocuments >= 2 ? 20 : incompleteDocuments === 1 ? 10 : 0;
+  const permissionPoints = verification.permission === "missing" || verification.permission === "invalid"
+    ? 15
+    : verification.permission === "pending" ? 7 : 0;
+  const duplicatePoints = verification.duplicate === "confirmed" ? 10 : verification.duplicate === "possible" ? 5 : 0;
+
+  const dimensions = [
+    { code: "company", known: knownCompany, points: companyPoints, status: verification.company || "unknown" },
+    { code: "bank", known: knownBank, points: bankPoints, status: verification.bank || "unknown" },
+    { code: "documents", known: knownDocuments, points: documentPoints, status: knownDocuments ? (incompleteDocuments ? "incomplete" : "complete") : "unknown" },
+    { code: "permission", known: knownPermission, points: permissionPoints, status: verification.permission || "unknown" },
+    { code: "duplicate", known: knownDuplicate, points: duplicatePoints, status: verification.duplicate || "unknown" },
+  ];
+  const score = dimensions.reduce((total, dimension) => total + dimension.points, 0);
+  const completeness = Math.round(dimensions.filter((dimension) => dimension.known).length / dimensions.length * 100);
+  const level = completeness < 100 ? "Eksik veri" : score >= 50 ? "Öncelikli" : score >= 20 ? "İnceleme gerekli" : "Rutin";
+  const reasons = dimensions.map((dimension) => ({
+    code: dimension.code,
+    label: sellerReviewLabels[dimension.code],
+    points: dimension.points,
+    maxPoints: sellerReviewMaxPoints[dimension.code],
+    status: sellerReviewStatusLabels[dimension.status] || sellerReviewStatusLabels.unknown,
+  }));
+  const hardStops = [];
+  if (verification.company === "mismatch") hardStops.push("Şirket / vergi kimliği uyuşmazlığı çözülmeli");
+  if (verification.bank === "mismatch") hardStops.push("Banka hesabı sahipliği uyuşmazlığı çözülmeli");
+  if (["missing", "invalid"].includes(verification.permission)) hardStops.push("Zorunlu kategori veya marka izni tamamlanmalı");
+  if (verification.duplicate === "confirmed") hardStops.push("Yinelenen başvuru incelemesi tamamlanmalı");
+
+  const approvalBlockers = [];
+  if (!knownCompany || verification.company !== "verified") approvalBlockers.push("Şirket kimliği doğrulanmalı");
+  if (!knownBank || verification.bank !== "verified") approvalBlockers.push("Banka hesabı doğrulanmalı");
+  if (!knownDocuments || incompleteDocuments > 0) approvalBlockers.push("Zorunlu belgeler tamamlanmalı");
+  if (!knownPermission || !["verified", "not-required"].includes(verification.permission)) approvalBlockers.push("Kategori / marka izni netleşmeli");
+  if (!knownDuplicate || verification.duplicate !== "clear") approvalBlockers.push("Yinelenen başvuru kontrolü kapanmalı");
+
+  return {
+    score,
+    level,
+    completeness,
+    reasons,
+    hardStops,
+    approvalBlockers: [...new Set(approvalBlockers)],
+    approvalEligible: completeness === 100 && approvalBlockers.length === 0 && hardStops.length === 0,
+    ruleset: sellerReviewRuleset,
+  };
+}
+
+const sellerApplicationSeeds = [
+  { id: "SLR-208", name: "Demo Kozmetik", owner: "Demo Yetkili 01", category: "Kozmetik", products: 126, commission: "%14", status: "İncelemede", verification: { company: "verified", bank: "verified", documents: { tax: "verified", signature: "verified", agreement: "verified", license: "verified" }, permission: "verified", duplicate: "clear" } },
+  { id: "SLR-207", name: "Demo Outdoor", owner: "Demo Yetkili 02", category: "Spor & Outdoor", products: 84, commission: "%12", status: "Belge bekleniyor", verification: { company: "verified", bank: "pending", documents: { tax: "verified", signature: "missing", agreement: "verified", license: "not-required" }, permission: "not-required", duplicate: "clear" } },
+  { id: "SLR-206", name: "Demo Çocuk", owner: "Demo Yetkili 03", category: "Anne & Çocuk", products: 218, commission: "%16", status: "İncelemede", verification: { company: "pending", bank: "verified", documents: { tax: "verified", signature: "verified", agreement: "verified", license: "verified" }, permission: "pending", duplicate: "possible" } },
+  { id: "SLR-205", name: "Demo Mobil", owner: "Demo Yetkili 04", category: "Elektronik", products: 342, commission: "%10", status: "İncelemede", verification: { company: "mismatch", bank: "mismatch", documents: { tax: "verified", signature: "missing", agreement: "expired", license: "verified" }, permission: "missing", duplicate: "possible" } },
+];
+
+export const sellerApplicationRecords = sellerApplicationSeeds.map((record) => ({
+  ...record,
+  review: calculateSellerReviewPriority(record),
+}));
+
+export const settlementRecords = [
+  { id: "HKD-0726", seller: "Demo Teknoloji", period: "01–07 Tem 2026", gross: 482140, commission: 48214, returns: 12490, net: 421436, status: "Ödemeye hazır" },
+  { id: "HKD-0725", seller: "Demo Ev", period: "01–07 Tem 2026", gross: 214890, commission: 30085, returns: 7999, net: 176806, status: "Kontrol ediliyor" },
+  { id: "HKD-0724", seller: "Demo Kozmetik", period: "01–07 Tem 2026", gross: 118420, commission: 16579, returns: 2840, net: 99001, status: "Blokeli" },
+  { id: "HKD-0719", seller: "Demo Outdoor", period: "24–30 Haz 2026", gross: 97220, commission: 11666, returns: 0, net: 85554, status: "Ödendi" },
+];
+
+export const auditRecords = [
+  { time: "10:24", actor: "Demo Operatör A", action: "Sipariş durumunu güncelledi", target: "NS-10482 · Hazırlanıyor", source: "Web" },
+  { time: "10:18", actor: "Demo Operatör B", action: "Satıcı başvurusunu inceledi", target: "SLR-208 · Demo Kozmetik", source: "Web" },
+  { time: "09:56", actor: "Sistem", action: "Hakediş raporu oluşturdu", target: "HKD-0726 · Demo Teknoloji", source: "Otomasyon" },
+  { time: "09:41", actor: "Politika motoru", action: "Teklif otomatik yayına alındı", target: "TKL-4101 · NVS-IP15-128", source: "Örnek kural" },
+  { time: "09:12", actor: "Sistem", action: "Sipariş oluşturuldu", target: "NS-10482", source: "Entegrasyon" },
+];
+
+export const moduleRecords = [
+  { id: "live-orders", name: "Sipariş Akışı Önizlemesi", description: "Yerel sipariş SLA ve sahiplik simülasyonu", version: "demo-2.4", dependency: "Yerel örnek kayıtlar", health: "Yerel örnek", enabled: true },
+  { id: "seller-approvals", name: "Satıcı Onboarding", description: "Hedef başvuru ve belge kontrolü", version: "demo-1.8", dependency: "Kimlik ve roller · henüz yok", health: "Entegrasyonda", enabled: false },
+  { id: "catalog-health", name: "Katalog Sağlığı Önizlemesi", description: "Yerel stok, medya ve içerik tamlığı simülasyonu", version: "demo-3.1", dependency: "Yerel örnek katalog", health: "Yerel örnek", enabled: true },
+  { id: "settlement-radar", name: "Hakediş Radarı", description: "Hedef ödeme ve mutabakat görünümü", version: "demo-1.6", dependency: "Finansal ledger · henüz yok", health: "Entegrasyonda", enabled: false },
+  { id: "customer-voice", name: "Müşteri Sesi", description: "Hedef soru, iade ve memnuniyet özeti", version: "demo-1.2", dependency: "Müşteri entegrasyonu · henüz yok", health: "Entegrasyonda", enabled: false },
+  { id: "conversion-lab", name: "Dönüşüm Laboratuvarı", description: "Hedef ürün davranış içgörüleri", version: "demo-2.0", dependency: "Raporlama entegrasyonu · henüz yok", health: "Entegrasyonda", enabled: false },
+];
+
+export const initialWorkspaceSettings = {
+  name: "NovaStore Pazaryeri",
+  email: "demo-operasyon@example.invalid",
+  timezone: "Europe/Istanbul",
+  store: "Tüm Mağazalar · 24",
+  approval: true,
+  settlement: true,
+  digest: false,
+};
+
+export function normalizeText(value) {
+  return String(value ?? "").toLocaleLowerCase("tr-TR").replaceAll("\u0307", "").trim();
+}
+
+export function matchesQuery(record, query) {
+  const needle = normalizeText(query);
+  if (!needle) return true;
+  return Object.values(record).some((value) => normalizeText(value).includes(needle));
+}
+
+export function storeFilterValue(store) {
+  if (!store || store.startsWith("Tüm Mağazalar")) return "";
+  return normalizeText(String(store).split("·")[0]);
+}
+
+export function matchesStore(record, store) {
+  const needle = storeFilterValue(store);
+  if (!needle) return true;
+  return normalizeText(record.seller || record.store).includes(needle);
+}
+
+export function paginateRows(rows, requestedPage, requestedPageSize) {
+  const pageSize = Math.max(1, Number.parseInt(requestedPageSize, 10) || 10);
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const page = Math.min(Math.max(1, Number.parseInt(requestedPage, 10) || 1), pageCount);
+  const startIndex = (page - 1) * pageSize;
+  return {
+    page,
+    pageSize,
+    pageCount,
+    start: rows.length === 0 ? 0 : startIndex + 1,
+    end: Math.min(startIndex + pageSize, rows.length),
+    rows: rows.slice(startIndex, startIndex + pageSize),
+  };
+}
+
+export function setOrderStatuses(records, ids, status) {
+  const targetIds = ids instanceof Set ? ids : new Set(ids);
+  return records.map((record) => targetIds.has(record.id) ? { ...record, status } : record);
+}
+
+export function setOrderOwner(records, ids, owner) {
+  const targetIds = ids instanceof Set ? ids : new Set(ids);
+  return records.map((record) => targetIds.has(record.id) ? { ...record, owner } : record);
+}
+
+export function setCustomerSegment(records, id, segment) {
+  return records.map((record) => record.id === id ? { ...record, segment } : record);
+}
+
+export function setSellerDecision(records, id, status, reason = "") {
+  const normalizedReason = String(reason).trim();
+  return records.map((record) => record.id === id
+    ? ((!["Onaylandı", "Reddedildi"].includes(status))
+      || (status === "Onaylandı" && calculateSellerReviewPriority(record).approvalEligible !== true)
+      || (status === "Reddedildi" && normalizedReason.length < 5)
+      ? record
+      : { ...record, status, decisionReason: status === "Reddedildi" ? normalizedReason : "" })
+    : record);
+}
+
+export function toggleModuleAvailability(records, id) {
+  return records.map((record) => record.id === id ? { ...record, enabled: !record.enabled } : record);
+}
+
+export function markNotificationsRead(records, id = null) {
+  return records.map((record) => id === null || record.id === id ? { ...record, read: true } : record);
+}
+
+function csvCell(value) {
+  const raw = String(value ?? "");
+  const formulaSafe = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  return `"${formulaSafe.replaceAll('"', '""')}"`;
+}
+
+export function buildCsv(columns, rows) {
+  const header = columns.map((column) => csvCell(column.label)).join(";");
+  const body = rows.map((row) => columns.map((column) => csvCell(typeof column.value === "function" ? column.value(row) : row[column.value])).join(";")).join("\n");
+  return `\uFEFF${header}${body ? `\n${body}` : ""}`;
+}
+
+export function validateProductDraft(draft, products, editingOfferId = "") {
+  const name = String(draft.name || "").trim();
+  const sku = String(draft.sku || "").trim().toLocaleUpperCase("tr-TR");
+  const price = Number(draft.price);
+  const stock = Number(draft.stock);
+  if (name.length < 3) return "Ürün adı en az 3 karakter olmalıdır.";
+  if (!/^[A-Z0-9][A-Z0-9-]{2,31}$/.test(sku)) return "Stok kodu 3–32 karakter olmalı; yalnız harf, rakam ve tire içermelidir.";
+  const existingOffer = editingOfferId ? products.find((product) => product.offerId === editingOfferId) : null;
+  const sellerId = existingOffer?.sellerId || firstPartySellerId;
+  if (products.some((product) => product.sellerId === sellerId && product.sku === sku && product.offerId !== editingOfferId)) return "Bu stok kodu aynı satıcının başka bir örnek teklifinde kullanılıyor.";
+  if (!Number.isFinite(price) || price <= 0) return "Satış fiyatı sıfırdan büyük olmalıdır.";
+  if (!Number.isInteger(stock) || stock < 0) return "Başlangıç stoku sıfır veya pozitif tam sayı olmalıdır.";
+  return "";
+}
+
+export function productFromDraft(draft, previous = null) {
+  const externalOffer = Boolean(previous && !isFirstPartyOffer(previous));
+  const sku = externalOffer ? previous.sku : String(draft.sku || "").trim().toLocaleUpperCase("tr-TR");
+  const stock = externalOffer ? previous.stock : Number(draft.stock);
+  const base = {
+    ...previous,
+    canonicalId: previous?.canonicalId || `KAT-YEREL-${sku}`,
+    offerId: previous?.offerId || `TKL-YEREL-${sku}`,
+    sellerId: previous?.sellerId || firstPartySellerId,
+    ownershipType: previous?.ownershipType || "first_party",
+    sku,
+    name: String(draft.name || "").trim(),
+    seller: previous?.seller || "NovaStore",
+    category: String(draft.category || "Elektronik"),
+    stock,
+    price: externalOffer ? previous.price : Number(draft.price),
+    policyContext: previous?.policyContext || { sellerStatus: "active", categoryAllowed: true, requiredFieldsComplete: true, brandAuthorizationStatus: "not_required", canonicalMatchConfidence: 1, prohibitedContent: false, priceAnomaly: false },
+    image: previous?.image || "/assets/product-laptop.webp",
+  };
+  return withProductPolicy(base);
+}
+
+export function upsertProductOffer(records, nextProduct, editingOfferId = "") {
+  if (!editingOfferId) {
+    const normalized = productFromDraft(nextProduct);
+    const duplicate = records.some((record) => record.offerId === normalized.offerId || (record.sellerId === normalized.sellerId && record.sku === normalized.sku));
+    return duplicate ? records : [normalized, ...records];
+  }
+  const previous = records.find((record) => record.offerId === editingOfferId);
+  if (!previous) return records;
+  const normalized = productFromDraft({ ...previous, ...nextProduct }, previous);
+  const duplicate = records.some((record) => record.offerId !== editingOfferId && record.sellerId === normalized.sellerId && record.sku === normalized.sku);
+  if (duplicate) return records;
+  return records.map((record) => record.offerId === editingOfferId
+    ? normalized
+    : record.canonicalId === normalized.canonicalId
+      ? { ...record, name: normalized.name, category: normalized.category }
+      : record);
+}

@@ -188,4 +188,309 @@ Resmî doküman, transfer talebinin ödeme ile aynı gün verilemeyeceğini ve h
 
 Kaynak: https://dev.paytr.com/platform-transfer-talebi/transfer-talimatinin-verilmesi
 
-PayTR transfer sonucu hash doğrulanan server-side callback ile alınır. Handler oturum kullanmaz, idempotent çalışır ve başarılı 
+PayTR transfer sonucu hash doğrulanan server-side callback ile alınır. Handler oturum kullanmaz, idempotent çalışır ve başarılı işlemeden sonra yalnız OK döner. Aynı bildirim tekrar gelebilir.
+
+Kaynak: https://dev.paytr.com/platform-transfer-talebi/transfer-talimatinin-sonucunun-alinmasi
+
+Hatalı alıcı hesabı nedeniyle geri dönen transferler ayrı iş kuyruğunda ele alınır. IBAN düzeltme, tekrar onay ve yeniden gönderme geçmişi korunur.
+
+Kaynak: https://dev.paytr.com/platform-transfer-talebi/geri-donen-odemeleri-listele
+
+Pazaryeri durum sorgusundaki submerchant_payments ve returns verileri günlük reconciliation ile yerel ledger'a karşılaştırılır. Tam ve kısmi iadelerde NovaStore'un benzersiz reference_no değeri kullanılır.
+
+Kaynaklar:
+
+- https://dev.paytr.com/durum-sorgu
+- https://dev.paytr.com/iade-api
+
+Ortam kapıları:
+
+1. Unit/integration test: deterministik PayTR mock adapter; dış ağ yok.
+2. Local smoke: sahte hash, tekrar callback ve hata senaryoları; gerçek sır yok.
+3. Onaylı staging UAT: yalnız https://staging.novastore.tr, staging'e özel sırlar ve test modu.
+4. Production: ayrı migration, deploy ve ödeme yetkisi; runbook, mutabakat ve rollback kapısı.
+
+Otomatik transfer ilk yayınlarda settlement_auto_transfer feature flag'i arkasında kapalı kalır.
+
+## 6. İade ve anlaşmazlık
+
+Varlıklar:
+
+- return_requests / return_items
+- return_shipments
+- return_inspections
+- refunds
+- disputes / dispute_evidence
+- resolution_actions
+
+İade yaşam döngüsü:
+
+Talep edildi → Uygunluk kontrolü → Kargo bekleniyor → İncelemede → Onaylandı/Reddedildi → İade gönderildi → Mutabakat tamamlandı
+
+Anlaşmazlık açıldığında ilgili satırın settlement hold kaydı oluşturulur. Kanıt dosyaları özel depolamada, erişim kaydıyla tutulur. SLA aşımı ve müşteri iletişimi admin iş kuyruğuna düşer.
+
+İade onayında:
+
+1. Müşteri iade tutarı deterministik hesaplanır.
+2. Komisyon ve satıcı alacağı ters ledger kayıtları oluşturulur.
+3. PayTR iade isteği idempotency anahtarı ve reference_no ile hazırlanır.
+4. Sağlayıcı sonucu callback/sorgu ile doğrulanır.
+5. Reconciliation farkı yoksa vaka kapatılır.
+
+## 7. RBAC, satıcı kapsamı ve audit
+
+Platform rolleri:
+
+- Süper yönetici
+- Operasyon yöneticisi
+- Satıcı operasyonu
+- Katalog ve politika yöneticisi
+- Finans
+- İade/anlaşmazlık uzmanı
+- Destek
+- Denetçi (salt okunur)
+
+Satıcı rolleri:
+
+- Satıcı sahibi
+- Mağaza yöneticisi
+- Katalog
+- Sipariş operasyonu
+- Finans
+- Destek
+
+RBAC tek başına yeterli değildir. Her seller API sorgusu ve mutation, doğrulanmış seller scope içermelidir. Satıcı kullanıcısının istemciden gönderdiği seller_id güven kaynağı olamaz; kapsam sunucu tarafında üyelikten çözülür.
+
+Audit olayı:
+
+- audit_id, actor_user_id, actor_type
+- effective_seller_id veya platform kapsamı
+- action, resource_type, resource_id
+- güvenli önce/sonra farkı
+- reason_code ve insan tarafından yazılan gerekçe
+- IP, user agent, correlation_id, request_id
+- sonuç, hata kodu, occurred_at
+
+Kritik işlemler yeniden kimlik doğrulama ve dört göz onayı isteyebilir: IBAN değişikliği, yüksek tutarlı iade, manuel ledger düzeltmesi, komisyon değişikliği ve transfer serbest bırakma.
+
+## 8. Modül sınırları ve manifest
+
+Çekirdek modüller:
+
+1. identity-access
+2. seller-kyc
+3. catalog-policy-exceptions
+4. offers-pricing
+5. inventory
+6. checkout-orders
+7. payments-paytr
+8. fulfillment
+9. returns-disputes
+10. commission-ledger-settlement
+11. notifications
+12. analytics-read-models
+13. audit-risk
+14. admin-module-registry
+
+Her modül; kimlik, sürüm, sahip, durum, navigation katkısı, gereken izinler, feature flag, route namespace, API namespace, yayınladığı/tükettiği olaylar, health check ve migration listesini bildirir. Modül kapatma yalnız yeni girişi durdurmalı; geçmiş sipariş ve finans verisini erişilemez hâle getirmemelidir.
+
+## 9. API ve olay sözleşmeleri
+
+API alanları:
+
+- /api/admin/v1
+- /api/seller/v1
+- /api/storefront/v1
+- /api/integrations/paytr/v1
+
+Mutation isteklerinde Idempotency-Key; eşzamanlı admin düzenlemesinde If-Match/ETag veya row_version kullanılır. Sayfalama cursor tabanlıdır. Para alanlarında float kullanılmaz.
+
+Olay zarfı alanları:
+
+- event_id
+- event_type
+- event_version
+- aggregate_type / aggregate_id
+- seller_id veya null
+- occurred_at
+- correlation_id / causation_id
+- payload
+
+Başlıca olaylar:
+
+- SellerApplicationSubmitted
+- SellerApproved
+- SellerSuspended
+- CatalogPolicyEvaluated
+- CatalogPolicyExceptionOpened
+- CatalogPolicyExceptionResolved
+- SellerOfferPublished
+- InventoryAdjusted
+- CheckoutPrepared
+- PaymentSucceeded
+- OrderSplitCompleted
+- SellerOrderAccepted
+- ShipmentDispatched
+- DeliveryConfirmed
+- ReturnRequested
+- RefundSucceeded
+- CommissionAccrued
+- SettlementBecameEligible
+- SettlementInstructionSubmitted
+- SettlementSucceeded
+- SettlementFailed
+- DisputeOpened
+- DisputeResolved
+
+Consumer, event_id için işlem kaydı tutarak tekrar teslimata dayanıklı olur. Olaylar geriye uyumlu genişletilir; kırıcı değişiklik event_version artırır ve contract test gerektirir.
+
+## 10. Güvenli DB migration
+
+Expand → Backfill → Switch → Contract modeli uygulanır:
+
+1. Expand: yeni tablolar, nullable foreign key'ler ve geriye uyumlu kolonlar eklenir.
+2. First-party seed: NOVASTORE_FIRST_PARTY satıcısı güvenli migration ile oluşturulur.
+3. Backfill: ürünler kanonik ürün + NovaStore teklifi; siparişler ana sipariş + tek satıcı siparişi olarak checkpoint'li partilerle bağlanır.
+4. Reconcile: satır sayıları, stok toplamları, sipariş tutarları ve ledger denklemi karşılaştırılır.
+5. Dual write: eski ve yeni model birlikte yazılır; farklar alarm üretir.
+6. Shadow read: yeni model okunur fakat kullanıcı yanıtı eski modelden verilir; karşılaştırma kaydedilir.
+7. Switch: feature flag ile okuma yeni modele alınır.
+8. Validate: constraint ve indeksler gerçek veri doğrulandıktan sonra sıkılaştırılır.
+9. Contract: eski alanlar en az bir güvenli sürüm sonra ve ayrı yetkiyle kaldırılır.
+
+Backfill yeniden başlatılabilir, bounded batch ve checkpoint kullanır. Production migration ayrı deploy kapısıdır. Kayıplı down migration tercih edilmez; rollback geriye uyumlu şemada eski code path'e dönmekle yapılır.
+
+## 11. Turlara bölünmüş teslim
+
+### Tur 0 — Kanıt ve sözleşmeler
+
+Scope: Mevcut repo/şema, auth, kategori, sipariş ve PayTR akışının gerçek koddan çıkarılması; ADR, durum makineleri ve para tablosu.
+Exclusions: Kod, DB ve ödeme değişikliği yok.
+Acceptance: Ürün, operasyon, finans ve güvenlik sözleşme onayı.
+Commit: Yalnız dokümantasyon istenirse. Push/deploy yok.
+
+### Tur 1 — Satıcı temeli
+
+Scope: seller organization/member, RBAC + seller scope, audit, feature flag, admin Satıcılar alanı.
+Acceptance: Çapraz satıcı erişim testleri ve audit kanıtı.
+Risk: Yetki sızıntısı.
+Deploy: Önce local/staging; production ayrı yetki.
+
+### Tur 2 — Onboarding ve KYC
+
+Scope: Başvuru sihirbazı, belge inceleme, eksik belge, sözleşme ve banka hesabı durumları.
+Acceptance: Manuel onay/red/askı ve belge erişim izinleri.
+Exclusions: Otomatik canlı kimlik doğrulama ve gerçek belge testi.
+
+### Tur 3 — Katalog, teklif ve stok
+
+Scope: Kanonik ürün ve seller offer sahiplik sınırı, sürümlü otomatik yayın politikası, yalnız istisna moderasyonu, ayrı yayın/stok eksenleri, fiyat/stok ve CSV önizleme.
+Acceptance: Politika kontrollerini geçen teklif manuel onaysız yayınlanır; düzeltilebilir eksik satıcı aksiyonuna, yalnız tanımlı istisna insan kuyruğuna gider. Admin override audit ve süre sonu, kanonik içerik/offer alan ayrımı, derin kategori, kardeş tekrar, visible-product pruning, Tükendi ve concurrency regresyonları doğrulanır.
+
+### Tur 4 — Sipariş bölme
+
+Scope: Checkout reservation, ana sipariş, seller order, kargo ve durum makinesi.
+Acceptance: Tek ödeme, çok satıcı; bir satıcı hatasının diğerini etkilememesi; tekrar callback güvenliği.
+Exclusions: Gerçek PayTR.
+
+### Tur 5 — İade ve anlaşmazlık
+
+Scope: Satır bazlı iade, inceleme, evidence, SLA, settlement hold.
+Acceptance: Tam/kısmi iade ve transfer öncesi/sonrası muhasebe senaryoları.
+
+### Tur 6 — Komisyon ve ledger
+
+Scope: Sürümlü kurallar, immutable snapshot, çift taraflı ledger ve hakediş uygunluğu.
+Acceptance: Her fixture için finansal denklem sıfır fark; shadow settlement.
+Exclusions: Para transferi.
+
+### Tur 7 — PayTR platform transferi
+
+Scope: Mock adapter, idempotent transfer, hash callback, geri dönen ödeme ve reconciliation.
+Acceptance: Mock testlerinin tamamı; yetki verilirse aynı-origin staging UAT.
+Exclusions: Otomatik production transferi.
+
+### Tur 8 — Satıcı portalı ve analitik
+
+Scope: Sipariş, stok, ürün, iade, hakediş ekranları; bildirim tercihleri ve read model.
+Acceptance: Seller-scope E2E, erişilebilirlik ve büyük veri sayfalama testi.
+
+### Tur 9 — Kontrollü pilot
+
+Scope: Önce first-party satıcı, sonra davetli az sayıda satıcı ve sınırlı kategori.
+Acceptance: Günlük mutabakat sıfır açıklanamayan fark; operasyon runbook; destek SLA.
+Deploy: Her genişleme ayrı feature flag ve açık yetki.
+
+## 12. Test matrisi
+
+- Unit: komisyon, vergi politikası, indirim/kargo dağıtımı, yuvarlama, iade ters kayıtları.
+- Property-based: tüm satıcı netleri + kesintiler + platform payı = müşteri tahsilatı.
+- State machine: geçersiz onboarding, sipariş, iade ve settlement geçişleri.
+- Concurrency: son stok, çift callback, çift iade, çift transfer.
+- Contract: admin/seller/storefront API ve event sürümleri.
+- Integration: DB transaction + outbox + consumer idempotency.
+- Migration: temiz DB, mevcut snapshot, kesilen backfill ve tekrar çalışma.
+- Security: IDOR, seller scope, belge erişimi, rol yükseltme, hassas veri loglama.
+- Browser: admin kuyrukları ve satıcı portalı; klavye, odak, modal, 1024/1280/1440 taşma.
+- Performance: stok importu, sipariş bölme, liste sayfalama ve read model gecikmesi.
+- PayTR: deterministik hash, callback tekrarları, kısmi iade, başarısız IBAN ve reconciliation.
+
+PASS, FAIL ve SKIPPED/BLOCKED ayrı raporlanır. Çalıştırılmayan test geçmiş sayılmaz.
+
+## 13. Pilot, gözlem ve rollback
+
+Feature flag'ler:
+
+- marketplace_onboarding
+- seller_offer_publish
+- external_seller_checkout
+- seller_returns
+- settlement_shadow
+- settlement_auto_transfer
+
+Pilot sırası:
+
+1. Yalnız NOVASTORE_FIRST_PARTY ile yeni veri modelini shadow mode çalıştır.
+2. Staging'de davetli 1–3 test satıcısı ve tüm hata senaryoları.
+3. Açık production yetkisi sonrası sınırlı kategori, satıcı ve günlük sipariş/GMV tavanı.
+4. Manuel hakediş onayı ve günlük finance reconciliation.
+5. Açıklanamayan fark sıfır ve SLA hedefleri yeşil olduğunda kontrollü genişleme.
+
+Acil kapatma:
+
+1. Yeni satıcı başvurusunu durdur.
+2. Yeni teklif yayınını durdur.
+3. Haricî satıcı tekliflerini checkout'tan çıkar.
+4. Transfer kuyruğunu duraklat.
+5. Mevcut sipariş, iade, finans geçmişi ve destek erişimini açık tut.
+
+Rollback sırasında ürünler ve finansal kayıtlar silinmez. Haricî gerçekleşmiş transfer bir DB rollback ile ters çevrilmez; düzeltme, yeni ledger/operasyon kaydıyla yapılır.
+
+Yayın kapıları:
+
+- Ürün ve operasyon UAT onayı
+- Finans/muhasebe mutabakat onayı
+- Hukuk/KVKK/KYC saklama politikası onayı
+- Güvenlik ve seller-scope testi
+- Destek SLA ve runbook
+- İzleme/uyarı panoları
+- Rollback tatbikatı
+- Açık migration, push ve deploy yetkisi
+
+## 14. Açık kararlar
+
+Uygulamadan önce netleşmesi gerekenler:
+
+- Otomatik yayın politika sürümünü kim onaylayacak; kategori/marka bazlı istisna neden kodları ve eşikler nasıl değiştirilecek?
+- Hangi istisnalar insan incelemesi gerektirir, hangi deterministik ihlaller otomatik engellenir ve süreli admin override en fazla ne kadar yaşayabilir?
+- Satıcının önerdiği kanonik içerik düzeltmelerinde sahiplik, kaynak önceliği ve geri alma politikası nasıl işleyecek?
+- İlk sürümde aynı kanonik üründe birden fazla aktif satıcı teklifi gösterilecek mi?
+- Buy Box kuralı fiyat, teslimat, puan ve iade oranını nasıl ağırlıklandıracak?
+- Satıcı teslimat ve iade SLA değerleri kategoriye göre değişecek mi?
+- Hakediş bekleme süresi, rezerv oranı ve sürümlü finansal blokaj eşikleri nedir; her eşik hangi reason code ve itiraz akışını taşır?
+- Fatura sorumluluğu ve belge saklama süreci nasıl işletilecek?
+- Stopaj, KDV ve mahsup politikalarının muhasebe tarafından onaylı sürümleri nelerdir?
+- Hangi KYC belgeleri hangi satıcı tipi ve kategori için zorunlu?
+- İlk pilot kategorileri ve günlük işlem/hacim limitleri nelerdir; hangi sürümlü girdilerle uygulanır?
+
+Bu kararlar ayrı ADR ve sürümlü politika kayıtlarına dönüşmeden para hareketi otomatikleştirilmemelidir.

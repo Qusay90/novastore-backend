@@ -216,4 +216,107 @@ assert.equal(boundary50.score, 50);
 assert.equal(boundary50.level, "Öncelikli", "50 puan öncelikli sınırını açmalı");
 const incompleteReview = calculateSellerReviewPriority({ verification: { company: "verified" } });
 assert.equal(incompleteReview.level, "Eksik veri", "eksik sinyal düşük öncelik gibi gösterilmemeli");
-assert.equal(incompleteReview.approvalEligible, fal
+assert.equal(incompleteReview.approvalEligible, false);
+const partialDocumentReview = sellerReview("verified", "verified", { tax: "verified" }, "not-required", "clear");
+assert.equal(partialDocumentReview.level, "Eksik veri", "zorunlu belge anahtarı eksikse veri tam sayılmamalı");
+assert.equal(partialDocumentReview.approvalEligible, false, "kısmi belge nesnesi onboarding onayını açmamalı");
+const invalidWaiverReview = sellerReview("verified", "verified", { tax: "not-required", signature: "not-required", agreement: "not-required", license: "not-required" }, "not-required", "clear");
+assert.equal(invalidWaiverReview.level, "Eksik veri", "vergi, imza ve sözleşme belgeleri koşulsuz not-required sayılamamalı");
+assert.equal(invalidWaiverReview.approvalEligible, false);
+assert.equal(isSellerDocumentStateValid("tax", "not-required"), false);
+assert.equal(isSellerDocumentComplete("tax", "not-required"), false);
+assert.equal(isSellerDocumentStateValid("license", "not-required"), true);
+assert.equal(isSellerDocumentComplete("license", "not-required"), true);
+const possibleDuplicateReview = sellerReview("verified", "verified", verifiedDocuments, "verified", "possible");
+assert.equal(possibleDuplicateReview.approvalEligible, false, "olası yinelenen başvuru kapanmadan onboarding onayı açılmamalı");
+
+const csv = buildCsv([
+  { label: "Ürün", value: "name" },
+  { label: "Tutar", value: (row) => row.amount },
+], [{ name: "=HYPERLINK(\"https://example.invalid\")", amount: 42 }]);
+assert.ok(csv.startsWith("\uFEFF"), "Excel için UTF-8 BOM bulunmalı");
+assert.ok(csv.includes("'=HYPERLINK"), "CSV formül enjeksiyonu etkisizleştirilmeli");
+assert.equal(buildCsv([{ label: "Ad;Soyad", value: "name" }], []), '\uFEFF"Ad;Soyad"', "boş CSV yalnız başlık satırını üretmeli");
+const escapedCsv = buildCsv(
+  [{ label: "Değer", value: "value" }],
+  [{ value: 'Ayşe; "Nova"' }, { value: "+SUM(1;1)" }, { value: "-2+3" }, { value: "@cmd" }, { value: "\t=cmd" }, { value: "\r=cmd" }],
+);
+assert.ok(escapedCsv.includes('"Ayşe; ""Nova"""'), "ayraç ve tırnaklar CSV içinde kaçırılmalı");
+for (const formula of ["'+SUM", "'-2+3", "'@cmd", "'\t=cmd", "'\r=cmd"]) {
+  assert.ok(escapedCsv.includes(formula), `${formula.slice(1)} formülü etkisizleştirilmeli`);
+}
+
+for (const [label, records, idKey] of [
+  ["müşteri", customerRecords, "id"],
+  ["satıcı siparişi", sellerOrderRows, "id"],
+  ["iade", returnRows, "id"],
+  ["stok riski", stockRiskRows, "sku"],
+  ["bildirim", notificationRows, "id"],
+  ["kategori", categoryPreviewRows, "id"],
+  ["filtre şablonu", filterTemplateRows, "id"],
+  ["rol yerleşimi", roleLayoutSeed, "id"],
+  ["sipariş", orderRecords, "id"],
+  ["ürün teklifi", productRecords, "offerId"],
+  ["satıcı başvurusu", sellerApplicationRecords, "id"],
+  ["hakediş", settlementRecords, "id"],
+  ["modül", moduleRecords, "id"],
+]) {
+  assert.ok(records.length > 0, `${label} örnek verisi boş olmamalı`);
+  const identifiers = records.map((record) => record[idKey]);
+  assert.equal(new Set(identifiers).size, identifiers.length, `${label} tanımlayıcıları benzersiz olmalı`);
+  assert.ok(identifiers.every(Boolean), `${label} tanımlayıcıları dolu olmalı`);
+}
+
+assert.equal(orderRecords.length, 28, "gerçek sayfalama için 28 deterministik sipariş bulunmalı");
+assert.equal(orderRecords.filter((order) => order.today).length, 12, "Bugün görünümü 12 deterministik sipariş içermeli");
+assert.ok(
+  sellerOrderRows.every((sellerOrder) => orderRecords.some((order) => order.id === sellerOrder.parent)),
+  "satıcı siparişlerinin ana siparişleri örnek siparişlerde bulunmalı",
+);
+assert.ok(
+  stockRiskRows.every((stockRisk) => productRecords.some((product) => product.sku === stockRisk.sku)),
+  "stok risklerinin SKU kayıtları örnek katalogda bulunmalı",
+);
+assert.ok(productRecords.every((product) => product.price > 0 && product.stock >= 0), "ürün fiyat ve stokları güvenli aralıkta olmalı");
+assert.equal(productRecords.filter((product) => product.publicationStatus === "Otomatik yayında").length, 4, "normal teklifler otomatik yayınlanmalı");
+assert.equal(productRecords.filter((product) => product.publicationStatus === "İstisna incelemesi").length, 1, "yalnız politika istisnası insan kuyruğuna düşmeli");
+assert.equal(productRecords.filter((product) => product.publicationStatus === "Satıcı aksiyonu").length, 1, "düzeltilebilir eksik satıcıya dönmeli");
+assert.ok(productRecords.every((product) => product.policyVersion === catalogPolicyVersion), "her teklif politika sürümü taşımalı");
+assert.ok(productRecords.every((product) => product.canonicalId && product.offerId && product.sellerId && product.ownershipType), "kanonik ürün, teklif ve sahiplik kimlikleri ayrılmalı");
+assert.equal(new Set(productRecords.map((product) => product.offerId)).size, productRecords.length, "teklif kimliği global UI kimliği olarak benzersiz olmalı");
+assert.equal(new Set(productRecords.map((product) => `${product.sellerId}:${product.sku}`)).size, productRecords.length, "satıcı SKU benzersizliği seller-scope içinde uygulanmalı");
+assert.ok(productRecords.every((product) => product.reasons.length > 0 && product.evaluatedAt), "her politika sonucu reason code ve değerlendirme zamanı taşımalı");
+const outOfStockException = productRecords.find((product) => product.stock === 0);
+assert.equal(outOfStockException.inventoryStatus, "Stokta yok");
+assert.equal(outOfStockException.publicationStatus, "İstisna incelemesi", "stok ekseni politika ekseninden bağımsız kalmalı");
+
+assert.deepEqual(sellerApplicationRecords.map((seller) => seller.review.score), [0, 20, 24, 95], "örnek onboarding skorları deterministik olmalı");
+assert.deepEqual(sellerApplicationRecords.map((seller) => seller.review.level), ["Rutin", "İnceleme gerekli", "İnceleme gerekli", "Öncelikli"]);
+assert.deepEqual(sellerApplicationRecords.map((seller) => seller.review.approvalEligible), [true, false, false, false], "yalnız doğrulamaları tamamlanan başvuru onaya uygun olmalı");
+assert.ok(sellerApplicationRecords.every((seller) => seller.review.ruleset === sellerReviewRuleset), "her inceleme aynı sürümlü demo kural setini taşımalı");
+assert.ok(sellerApplicationRecords.every((seller) => seller.review.score === seller.review.reasons.reduce((total, reason) => total + reason.points, 0)), "puan nedenlerin toplamına eşit olmalı");
+assert.ok(sellerApplicationRecords.every((seller) => seller.review.reasons.reduce((total, reason) => total + reason.maxPoints, 0) === 100), "açıklanan boyut ağırlıkları toplam 100 olmalı");
+assert.ok(sellerApplicationRecords.every((seller) => !("risk" in seller)), "hardcode risk etiketi saklanmamalı");
+const protectedSignals = sellerApplicationRecords[2];
+assert.deepEqual(
+  calculateSellerReviewPriority({ ...protectedSignals, name: "Başka ad", owner: "Başka yetkili", products: 99999, commission: "%1" }),
+  protectedSignals.review,
+  "isim, yetkili, ürün sayısı ve komisyon inceleme puanını değiştirmemeli",
+);
+assert.ok(orderRecords.every((order) => Number.isFinite(order.amount) && order.amount > 0), "sipariş tutarları pozitif ve sayısal olmalı");
+assert.ok(settlementRecords.every((row) => [row.gross, row.commission, row.returns, row.net].every(Number.isFinite)), "hakediş alanları sayısal olmalı");
+assert.ok(settlementRecords.every((row) => row.net === row.gross - row.commission - row.returns), "hakediş aritmetiği tutarlı olmalı");
+assert.ok(moduleRecords.some((module) => module.enabled) && moduleRecords.some((module) => !module.enabled), "modül toggle senaryoları için iki durum da bulunmalı");
+assert.ok(moduleRecords.filter((module) => ["seller-approvals", "settlement-radar"].includes(module.id)).every((module) => module.health === "Entegrasyonda" && module.enabled === false), "uygulanmamış pazaryeri modülleri sağlıklı/etkin gösterilmemeli");
+assert.ok(moduleRecords.filter((module) => module.enabled).every((module) => module.health === "Yerel örnek" && module.version.startsWith("demo-")), "etkin önizleme modülleri gerçek runtime sağlığı veya sürümü iddia etmemeli");
+assert.ok(moduleRecords.filter((module) => !module.enabled).every((module) => module.health === "Entegrasyonda"), "uygulanmamış modüller Hazır veya Sağlıklı gösterilmemeli");
+assert.equal(initialWorkspaceSettings.store, "Tüm Mağazalar · 24");
+assert.equal(initialWorkspaceSettings.timezone, "Europe/Istanbul", "saat dilimi geçerli IANA kimliği kullanmalı");
+
+assert.deepEqual(Object.keys(analyticsPeriods), ["Son 7 gün", "Son 30 gün", "Bu yıl"]);
+assert.ok(
+  Object.values(analyticsPeriods).every((period) => Number.isFinite(period.multiplier) && period.multiplier > 0),
+  "analitik dönem çarpanları pozitif ve sayısal olmalı",
+);
+
+console.log("admin Commerce Pro model smoke passed");
