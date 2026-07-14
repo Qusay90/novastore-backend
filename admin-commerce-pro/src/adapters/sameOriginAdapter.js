@@ -1,4 +1,8 @@
-import { resolveCapabilities } from "../integration/capabilities.js";
+import { hasCapability, resolveCapabilities } from "../integration/capabilities.js";
+import {
+  buildCancelOrderMutation,
+  buildManualShipmentMutation,
+} from "../integration/orderMutations.js";
 import {
   normalizeAdminSession,
   normalizeDashboardStats,
@@ -34,5 +38,32 @@ export function createSameOriginAdapter(http) {
     await http.request("/api/admin/notifications/summary?limit=50", { signal }),
   );
 
-  return Object.freeze({ session, dashboard, notifications, orders, returns });
+  const mutationActions = (capabilities) => {
+    const actions = {};
+    if (hasCapability(capabilities, "orderCancelWrite")) {
+      actions.cancelOrder = async (input = {}) => {
+        const request = buildCancelOrderMutation(input);
+        return http.request(request.path, {
+          method: "POST",
+          headers: { "Idempotency-Key": request.idempotencyKey },
+          body: JSON.stringify(request.body),
+          signal: input.signal,
+        });
+      };
+    }
+    if (hasCapability(capabilities, "manualShipmentWrite")) {
+      actions.createManualShipment = async (input = {}) => {
+        const request = buildManualShipmentMutation(input);
+        return http.request(request.path, {
+          method: "POST",
+          headers: { "Idempotency-Key": request.idempotencyKey },
+          body: JSON.stringify(request.body),
+          signal: input.signal,
+        });
+      };
+    }
+    return Object.freeze(actions);
+  };
+
+  return Object.freeze({ session, dashboard, notifications, orders, returns, mutationActions });
 }

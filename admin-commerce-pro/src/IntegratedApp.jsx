@@ -1,7 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createSameOriginAdapter } from "./adapters/sameOriginAdapter.js";
 import { hasCapability } from "./integration/capabilities.js";
 import { ADMIN_TOKEN_KEY, createAdminHttp } from "./integration/adminHttp.js";
+import {
+  createMutationIdempotencyKey,
+  MANUAL_SHIPMENT_EXPECTED_STATUS,
+  ORDER_CANCEL_EXPECTED_STATUSES,
+  ORDER_CANCEL_NOTE_MAX_LENGTH,
+  ORDER_CANCEL_REASONS,
+} from "./integration/orderMutations.js";
 import { useResource } from "./integration/useResource.js";
 
 const money = (value, currency = "TRY") => new Intl.NumberFormat("tr-TR", {
@@ -44,6 +51,86 @@ const statusClass = (value) => String(value || "")
 function Icon({ name }) {
   const markup = window.NovaIcons?.icon?.(name, "icon") || "";
   return <span className="icon-wrap" aria-hidden="true" dangerouslySetInnerHTML={{ __html: markup }} />;
+}
+
+const focusableSelector = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+
+function trapDialogFocus(event, container, onClose) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    onClose();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = Array.from(container.querySelectorAll(focusableSelector))
+    .filter((node) => !node.hidden && node.getAttribute("aria-hidden") !== "true" && node.getClientRects().length > 0);
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (document.activeElement === container) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+  } else if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function OperationDialog({ title, busy, children, onClose }) {
+  const ref = useRef(null);
+  const triggerRef = useRef(null);
+  const titleId = useId();
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return undefined;
+    triggerRef.current = document.activeElement;
+    if (!node.open) node.showModal();
+    const frame = requestAnimationFrame(() => {
+      (node.querySelector("[data-autofocus]") || node.querySelector("button:not([disabled])"))?.focus();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (node.open) node.close();
+      requestAnimationFrame(() => triggerRef.current?.focus?.());
+    };
+  }, []);
+
+  const close = () => {
+    if (!busy) onClose();
+  };
+
+  return (
+    <dialog
+      ref={ref}
+      className="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      data-testid="order-operation-dialog"
+      onCancel={(event) => { event.preventDefault(); close(); }}
+      onClick={(event) => { if (event.target === ref.current) close(); }}
+      onKeyDown={(event) => trapDialogFocus(event, ref.current, close)}
+    >
+      <div className="modal-card live-operation-dialog" role="document" aria-busy={busy ? "true" : undefined}>
+        <header className="modal-header">
+          <div><span className="eyebrow">Commerce Pro · kontrollü operasyon</span><h2 id={titleId}>{title}</h2></div>
+          <button type="button" className="icon-button" onClick={close} disabled={busy} aria-label="Pencereyi kapat"><Icon name="close" /></button>
+        </header>
+        {children}
+      </div>
+    </dialog>
+  );
 }
 
 function StatePanel({ phase, error, onRetry }) {
@@ -90,7 +177,22 @@ function Kpi({ label, value, note }) {
   );
 }
 
-function OrdersTable({ orders, compact = false }) {
+const cancellableOrderStatuses = new Set(ORDER_CANCEL_EXPECTED_STATUSES);
+const noMutationActions = Object.freeze({});
+
+const orderMayBeCancelled = (order) => cancellableOrderStatuses.has(order.backendStatus)
+  && order.paymentStatus === "PAID"
+  && order.refundStatus === "NONE";
+
+const orderMayBeHandedOff = (order) => order.backendStatus === MANUAL_SHIPMENT_EXPECTED_STATUS
+  && order.paymentStatus === "PAID"
+  && order.refundStatus === "NONE"
+  && order.shipmentStatus === "NONE";
+
+function OrdersTable({ orders, compact = false, mutationActions = {}, onOpenOperation }) {
+  const cancelEnabled = typeof mutationActions.cancelOrder === "function";
+  const shipmentEnabled = typeof mutationActions.createManualShipment === "function";
+  const operationsEnabled = !compact && (cancelEnabled || shipmentEnabled);
   return (
     <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Sipariş özeti tablosu">
       <table className="data-table live-orders-table">
@@ -105,6 +207,7 @@ function OrdersTable({ orders, compact = false }) {
             <th scope="col">Satır</th>
             <th scope="col">Tutar</th>
             <th scope="col">Tarih</th>
+            {operationsEnabled && <th scope="col">Kontrollü işlem</th>}
           </tr>
         </thead>
         <tbody>
@@ -137,6 +240,32 @@ function OrdersTable({ orders, compact = false }) {
               <td>{order.itemCount}</td>
               <td><strong>{money(order.total, order.currency)}</strong></td>
               <td>{dateTime(order.createdAt)}</td>
+              {operationsEnabled && (
+                <td>
+                  <span className="live-operation-buttons">
+                    {cancelEnabled && (
+                      <button
+                        type="button"
+                        className="danger-button small"
+                        disabled={!orderMayBeCancelled(order)}
+                        title={orderMayBeCancelled(order) ? "İptal etkisini doğrula" : "Bu sipariş güvenli iptal koşullarında değil"}
+                        aria-label={orderMayBeCancelled(order) ? `${order.id} siparişini iptal etmeyi doğrula` : `${order.id} iptal işlemi kullanılamıyor; sipariş durumu, ödeme veya refund koşulu uygun değil`}
+                        onClick={() => onOpenOperation("cancel", order)}
+                      >İptal</button>
+                    )}
+                    {shipmentEnabled && (
+                      <button
+                        type="button"
+                        className="secondary-button small"
+                        disabled={!orderMayBeHandedOff(order)}
+                        title={orderMayBeHandedOff(order) ? "Manuel kargo devrini doğrula" : "Sipariş manuel kargo devri koşullarında değil"}
+                        aria-label={orderMayBeHandedOff(order) ? `${order.id} için manuel kargo devrini doğrula` : `${order.id} manuel kargo devri kullanılamıyor; hazırlık, ödeme, refund veya gönderi koşulu uygun değil`}
+                        onClick={() => onOpenOperation("shipment", order)}
+                      >Kargoya devret</button>
+                    )}
+                  </span>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -188,10 +317,165 @@ function Dashboard({ stats, orderPage, orderPhase, orderError, ordersEnabled, on
   );
 }
 
-function Orders({ orderPage, error, refreshing, onRefresh }) {
+function OrderOperationSummary({ order }) {
+  return (
+    <dl className="detail-list live-operation-summary">
+      <div><dt>Sipariş</dt><dd>{order.id}</dd></div>
+      <div><dt>Beklenen durum</dt><dd>{order.backendStatus}</dd></div>
+      <div><dt>Ödeme</dt><dd>{order.paymentStatus}</dd></div>
+      <div><dt>Yerel refund</dt><dd>{order.refundStatus}</dd></div>
+      <div><dt>Tutar</dt><dd>{money(order.total, order.currency)}</dd></div>
+    </dl>
+  );
+}
+
+function OperationError({ error }) {
+  if (!error) return null;
+  const message = typeof error === "string" ? error : error.message || "İşlem tamamlanamadı.";
+  return (
+    <p className="modal-error" id="order-operation-error" role="alert">
+      {message}{typeof error === "object" && error.requestId ? ` İstek kimliği: ${error.requestId}` : ""}
+    </p>
+  );
+}
+
+function CancelOrderDialog({ operation, action, onClose, onConflict, onUnavailable, onComplete }) {
+  const [reasonCode, setReasonCode] = useState(ORDER_CANCEL_REASONS[0].code);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const reason = ORDER_CANCEL_REASONS.find((item) => item.code === reasonCode);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setError(null);
+    if (reason?.noteRequired && !note.trim()) {
+      setError("Politika veya dolandırıcılık incelemesi için kısa bir açıklama zorunludur.");
+      return;
+    }
+    setAttempted(true);
+    setBusy(true);
+    try {
+      const result = await action({
+        orderId: operation.order.rawId,
+        expectedStatus: operation.order.backendStatus,
+        reasonCode,
+        note,
+        idempotencyKey: operation.idempotencyKey,
+      });
+      onComplete({ kind: "cancel", reused: result?.reused === true });
+    } catch (requestError) {
+      if (requestError?.status === 409) {
+        onConflict(requestError);
+        return;
+      }
+      if (requestError?.status === 403 || requestError?.status === 503) {
+        onUnavailable(requestError);
+        return;
+      }
+      setError(requestError);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <OperationDialog title={`${operation.order.id} iptalini doğrula`} busy={busy} onClose={onClose}>
+      <div className="confirmation-body">
+        <Icon name="warning" />
+        <p><strong>Sipariş iptal edilecek ve uygun stok rezervasyonu serbest bırakılacak.</strong> Ödeme sağlayıcısında otomatik refund yapılmaz; ödenmiş tutar varsa manuel finans incelemesi gerekir.</p>
+      </div>
+      <OrderOperationSummary order={operation.order} />
+      <form className="modal-form live-operation-form" onSubmit={submit} aria-describedby="order-operation-boundary">
+        <label><span>İptal nedeni</span><select value={reasonCode} onChange={(event) => { setReasonCode(event.target.value); setError(null); }} disabled={busy || attempted} data-autofocus>{ORDER_CANCEL_REASONS.map((item) => <option value={item.code} key={item.code}>{item.label}</option>)}</select></label>
+        <label>
+          <span>Operasyon notu {reason?.noteRequired ? "· zorunlu" : "· opsiyonel"}</span>
+          <textarea value={note} onChange={(event) => { setNote(event.target.value); setError(null); }} maxLength={ORDER_CANCEL_NOTE_MAX_LENGTH} required={reason?.noteRequired} disabled={busy || attempted} rows="4" />
+          <small className="live-character-count">{note.length} / {ORDER_CANCEL_NOTE_MAX_LENGTH}</small>
+        </label>
+        <p className="form-hint" id="order-operation-boundary">Bu onay yalnız NovaStore sipariş kaydını değiştirir. Sağlayıcı refund'u, para transferi veya taşıyıcı çağrısı yürütmez.</p>
+        <OperationError error={error} />
+        {attempted && error && <p className="form-hint">Güvenli tekrar için ilk isteğin alanları ve idempotency anahtarı korundu. Alanları değiştirmek için pencereyi kapatıp işlemi yeniden açın.</p>}
+        <footer><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Vazgeç</button><button type="submit" className="danger-button" disabled={busy}>{busy ? "İptal ediliyor…" : attempted ? "Aynı isteği tekrar dene" : "Siparişi iptal et"}</button></footer>
+      </form>
+    </OperationDialog>
+  );
+}
+
+function ManualShipmentDialog({ operation, action, onClose, onConflict, onUnavailable, onComplete }) {
+  const [provider, setProvider] = useState("");
+  const [trackingNo, setTrackingNo] = useState("");
+  const [handoffConfirmed, setHandoffConfirmed] = useState(false);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setError(null);
+    if (!handoffConfirmed) {
+      setError("Paketi fiziksel olarak taşıyıcıya teslim ettiğinizi doğrulamanız gerekir.");
+      return;
+    }
+    setAttempted(true);
+    setBusy(true);
+    try {
+      const result = await action({
+        orderId: operation.order.rawId,
+        expectedStatus: operation.order.backendStatus,
+        provider,
+        trackingNo,
+        handoffConfirmed,
+        idempotencyKey: operation.idempotencyKey,
+      });
+      onComplete({ kind: "shipment", reused: result?.reused === true });
+    } catch (requestError) {
+      if (requestError?.status === 409) {
+        onConflict(requestError);
+        return;
+      }
+      if (requestError?.status === 403 || requestError?.status === 503) {
+        onUnavailable(requestError);
+        return;
+      }
+      setError(requestError);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <OperationDialog title={`${operation.order.id} manuel kargo devrini doğrula`} busy={busy} onClose={onClose}>
+      <div className="confirmation-body">
+        <Icon name="package" />
+        <p><strong>Sipariş “Kargoya Verildi” durumuna geçirilecek.</strong> Bu kayıt taşıyıcı API doğrulaması, etiket üretimi veya takip bağlantısı oluşturmaz.</p>
+      </div>
+      <OrderOperationSummary order={operation.order} />
+      <form className="modal-form live-operation-form" onSubmit={submit} aria-describedby="order-operation-boundary">
+        <label><span>Kargo sağlayıcısı</span><input value={provider} onChange={(event) => { setProvider(event.target.value); setError(null); }} minLength="2" maxLength="80" required disabled={busy || attempted} data-autofocus autoComplete="off" placeholder="Örn. Yurtiçi Kargo" /></label>
+        <label><span>Takip numarası</span><input value={trackingNo} onChange={(event) => { setTrackingNo(event.target.value); setError(null); }} minLength="3" maxLength="120" required disabled={busy || attempted} autoComplete="off" placeholder="Taşıyıcının verdiği gerçek numara" /></label>
+        <label className="live-handoff-confirmation"><input type="checkbox" checked={handoffConfirmed} onChange={(event) => { setHandoffConfirmed(event.target.checked); setError(null); }} disabled={busy || attempted} /><span>Paketi fiziksel olarak taşıyıcıya teslim ettiğimi doğruluyorum.</span></label>
+        <p className="form-hint" id="order-operation-boundary">Girilen takip numarası doğrulanmış taşıyıcı verisi sayılmaz. Taşıyıcı onayı: hayır · etiket: yok · takip URL'si: yok.</p>
+        <OperationError error={error} />
+        {attempted && error && <p className="form-hint">Güvenli tekrar için ilk isteğin alanları ve idempotency anahtarı korundu. Alanları değiştirmek için pencereyi kapatıp işlemi yeniden açın.</p>}
+        <footer><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Vazgeç</button><button type="submit" className="primary-button" disabled={busy}>{busy ? "Kaydediliyor…" : attempted ? "Aynı isteği tekrar dene" : "Kargo devrini kaydet"}</button></footer>
+      </form>
+    </OperationDialog>
+  );
+}
+
+function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities, mutationActions }) {
   const orders = orderPage.items;
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Tümü");
+  const [operation, setOperation] = useState(null);
+  const [operationNotice, setOperationNotice] = useState(null);
+  const [suppressedMutationActions, setSuppressedMutationActions] = useState(null);
+  const writesSuppressed = suppressedMutationActions === mutationActions;
+  const visibleMutationActions = writesSuppressed ? noMutationActions : mutationActions;
+  const operationsEnabled = typeof visibleMutationActions.cancelOrder === "function"
+    || typeof visibleMutationActions.createManualShipment === "function";
   const statuses = useMemo(() => ["Tümü", ...new Set(orders.map((order) => order.status))], [orders]);
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("tr-TR");
@@ -202,13 +486,51 @@ function Orders({ orderPage, error, refreshing, onRefresh }) {
     });
   }, [orders, query, status]);
 
+  const openOperation = (kind, order) => {
+    setOperationNotice(null);
+    setOperation({ kind, order, idempotencyKey: createMutationIdempotencyKey(kind) });
+  };
+  const closeOperation = () => setOperation(null);
+  const handleConflict = (requestError) => {
+    const refetchRequired = requestError?.details?.refetchRequired === true;
+    setOperation(null);
+    if (!refetchRequired) setSuppressedMutationActions(mutationActions);
+    setOperationNotice({
+      tone: "warning",
+      message: refetchRequired
+        ? `Sipariş başka bir işlemle değişti. Liste yenileniyor; güncel durumu kontrol edin.${requestError?.requestId ? ` İstek kimliği: ${requestError.requestId}` : ""}`
+        : `İşlem güvenlik kontrolünde durduruldu: ${requestError?.message || "Sipariş bu işlem için güvenli durumda değil."} Kontrollü yazmalar bu görünümde kapatıldı.${requestError?.code ? ` Kod: ${requestError.code}.` : ""}${requestError?.requestId ? ` İstek kimliği: ${requestError.requestId}` : ""}`,
+    });
+    onRefresh();
+  };
+  const handleUnavailable = (requestError) => {
+    setOperation(null);
+    setSuppressedMutationActions(mutationActions);
+    setOperationNotice({
+      tone: "warning",
+      message: `İşlem capability'si sunucu tarafından kapatıldı veya admin yetkisi değişti. Oturum yetenekleri yeniden doğrulanıyor.${requestError?.code ? ` Kod: ${requestError.code}.` : ""}${requestError?.requestId ? ` İstek kimliği: ${requestError.requestId}` : ""}`,
+    });
+    onReloadCapabilities();
+    onRefresh();
+  };
+  const handleComplete = ({ kind, reused }) => {
+    setOperation(null);
+    setOperationNotice({
+      tone: "success",
+      message: kind === "cancel"
+        ? `Sipariş iptali ${reused ? "aynı güvenli isteğin tekrarı olarak doğrulandı" : "kaydedildi"}. Sağlayıcı refund'u otomatik çalıştırılmadı; finans incelemesini tamamlayın.`
+        : `Manuel kargo devri ${reused ? "aynı güvenli isteğin tekrarı olarak doğrulandı" : "kaydedildi"}. Taşıyıcı API/etiket işlemi yapılmadı.`,
+    });
+    onRefresh();
+  };
+
   return (
     <section className="workspace live-workspace" data-testid="live-orders">
       <header className="workspace-heading operations-heading">
         <div>
-          <span className="eyebrow">Entegre backend · salt okunur</span>
+          <span className="eyebrow">Entegre backend · {operationsEnabled ? "capability kontrollü" : "salt okunur"}</span>
           <h2 tabIndex="-1">Son sipariş özetleri</h2>
-          <p>En fazla son {orderPage.limit} kayıt gösterilir; bu arayüz durum, sahip, iptal veya toplu işlem yazma isteği göndermez.</p>
+          <p>En fazla son {orderPage.limit} kayıt gösterilir. Genel durum/toplu yazma kapalıdır; iptal ve manuel kargo yalnız açık sunucu capability'si ve işlem doğrulamasıyla sunulur.</p>
         </div>
         <button className="secondary-button" onClick={onRefresh} disabled={refreshing}>
           <Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}
@@ -216,6 +538,7 @@ function Orders({ orderPage, error, refreshing, onRefresh }) {
       </header>
 
       <ResourceWarning error={error} onRetry={onRefresh} />
+      {operationNotice && <section className={`notice-card live-operation-notice ${operationNotice.tone === "warning" ? "warning-card" : "success-card"}`} role="status"><Icon name={operationNotice.tone === "warning" ? "warning" : "check"} /><div><strong>{operationNotice.tone === "warning" ? "Güncel veri gerekli" : "İşlem kaydedildi"}</strong><p>{operationNotice.message}</p></div></section>}
       <section className="table-card">
         <div className="ledger-toolbar filter-toolbar live-filter-toolbar">
           <label className="table-search">
@@ -231,7 +554,7 @@ function Orders({ orderPage, error, refreshing, onRefresh }) {
           </label>
           <span className="live-result-count">{filtered.length} / {orders.length} kayıt{orderPage.hasMore ? " · daha eski kayıtlar bu turda gösterilmiyor" : ""}</span>
         </div>
-        {filtered.length > 0 ? <OrdersTable orders={filtered} /> : (
+        {filtered.length > 0 ? <OrdersTable orders={filtered} mutationActions={visibleMutationActions} onOpenOperation={openOperation} /> : (
           <div className="state-panel">
             <Icon name="search" />
             <h3>Eşleşen sipariş yok</h3>
@@ -240,6 +563,8 @@ function Orders({ orderPage, error, refreshing, onRefresh }) {
           </div>
         )}
       </section>
+      {operation?.kind === "cancel" && typeof visibleMutationActions.cancelOrder === "function" && <CancelOrderDialog operation={operation} action={visibleMutationActions.cancelOrder} onClose={closeOperation} onConflict={handleConflict} onUnavailable={handleUnavailable} onComplete={handleComplete} />}
+      {operation?.kind === "shipment" && typeof visibleMutationActions.createManualShipment === "function" && <ManualShipmentDialog operation={operation} action={visibleMutationActions.createManualShipment} onClose={closeOperation} onConflict={handleConflict} onUnavailable={handleUnavailable} onComplete={handleComplete} />}
     </section>
   );
 }
@@ -387,6 +712,9 @@ export function IntegratedApp() {
   const ordersEnabled = sessionLoaded && hasCapability(capabilities, "ordersRead");
   const returnsEnabled = sessionLoaded && hasCapability(capabilities, "returnsRead");
   const notificationsEnabled = sessionLoaded && hasCapability(capabilities, "notificationsRead");
+  const mutationActions = useMemo(() => adapter.mutationActions(capabilities), [adapter, capabilities]);
+  const cancelWriteEnabled = typeof mutationActions.cancelOrder === "function";
+  const shipmentWriteEnabled = typeof mutationActions.createManualShipment === "function";
   const statsResource = useResource(loadStats, { enabled: statsEnabled });
   const notificationsResource = useResource(loadNotifications, { enabled: notificationsEnabled });
   const ordersResource = useResource(loadOrders, { enabled: ordersEnabled });
@@ -482,7 +810,7 @@ export function IntegratedApp() {
     pageContent = !ordersEnabled
       ? <StatePanel phase="forbidden" error={ordersUnavailableError} onRetry={ordersResource.reload} />
       : ordersLoaded
-        ? <Orders orderPage={ordersResource.data} error={ordersResource.error} refreshing={ordersResource.refreshing} onRefresh={ordersResource.reload} />
+        ? <Orders orderPage={ordersResource.data} error={ordersResource.error} refreshing={ordersResource.refreshing} onRefresh={ordersResource.reload} onReloadCapabilities={sessionResource.reload} mutationActions={mutationActions} />
         : <StatePanel phase={ordersResource.phase} error={ordersResource.error} onRetry={ordersResource.reload} />;
   } else if (page === "returns") {
     pageContent = !returnsEnabled
@@ -559,7 +887,7 @@ export function IntegratedApp() {
         </main>
 
         <footer className="statusbar">
-          <div className="preview-banner live-banner" role="note" data-testid="live-banner"><Icon name="shield" /><strong>Entegre tek-satıcı modu</strong><span>Mock fallback yok · bu arayüz yazma isteği göndermez</span></div>
+          <div className="preview-banner live-banner" role="note" data-testid="live-banner"><Icon name="shield" /><strong>Entegre tek-satıcı modu</strong><span>Mock fallback yok · {cancelWriteEnabled || shipmentWriteEnabled ? "yazmalar capability ve doğrulamayla sınırlı" : "bu oturum yazma isteği göndermez"}</span></div>
           <span className={sessionLoaded ? "healthy" : ""}>{sessionLoaded ? "Oturum doğrulandı" : sessionResource.phase === "error" ? "Bağlantı hatası" : "Bağlantı bekleniyor"}</span>
           <span>{lastUpdatedAt ? `Son operasyon okuması ${dateTime(lastUpdatedAt)}` : "Operasyon verisi bekleniyor"}</span>
           <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing || returnsResource.refreshing || notificationsResource.refreshing}><Icon name="refresh" />Yenile</button>

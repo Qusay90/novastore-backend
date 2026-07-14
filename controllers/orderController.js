@@ -21,6 +21,13 @@ const {
     selectCancellationPayments,
     validateCancelledOrderIdempotency
 } = require('../services/orderLifecyclePolicy');
+const { isAdminCommerceCapabilityEnabled } = require('../services/adminCommerceCapabilityService');
+const {
+    createAdminOrderCancellationCommand,
+    toCancellationActor,
+    validateAdminOrderCancellationReplay
+} = require('../services/adminOrderCancellationPolicy');
+const { sendDisabledCapability } = require('../middlewares/adminCommerceCapability');
 
 const orderSelectSql = `
     SELECT o.*, s.tracking_url, s.eta_date
@@ -88,6 +95,26 @@ const fetchPaymentsForUpdate = async (client, order) => {
         [order.id]
     );
     return result.rows;
+};
+
+const fetchLatestCancellationEvent = async (client, orderId) => {
+    const result = await client.query(
+        `SELECT payload
+         FROM order_events
+         WHERE order_id = $1 AND event_type = 'ORDER_CANCELLED'
+         ORDER BY id DESC
+         LIMIT 1`,
+        [orderId]
+    );
+    return result.rows[0]?.payload || null;
+};
+
+const getIdempotencyKey = (req) => {
+    if (typeof req.get === 'function') {
+        const value = req.get('Idempotency-Key');
+        if (value !== undefined && value !== null) return value;
+    }
+    return req.headers?.['idempotency-key'] ?? req.headers?.['Idempotency-Key'];
 };
 
 const sendLifecycleError = (res, error) => res.status(error.statusCode || 409).json({
@@ -297,34 +324,58 @@ const updateOrderStatus = async (req, res) => {
 
 // 5. Siparis Iptali (Kullanici/Admin)
 const cancelOrder = async (req, res) => {
-    const client = await pool.connect();
+    const orderId = Number(req.params.id);
+    const isAdmin = req.user?.role === 'admin';
 
+    if (!Number.isInteger(orderId)) {
+        return res.status(400).json({ error: 'Geçersiz sipariş kimliği.' });
+    }
+    if (isAdmin && !isAdminCommerceCapabilityEnabled('orderCancelWrite')) {
+        return sendDisabledCapability(res, 'orderCancelWrite');
+    }
+
+    let reasonCode = String(req.body?.reason_code || '').trim();
+    let note = String(req.body?.note || '').trim();
+    let expectedStatus = req.body?.expected_status ?? req.body?.expectedStatus;
+    let adminCommand = null;
+    if (isAdmin) {
+        try {
+            const actor = toCancellationActor(req);
+            adminCommand = createAdminOrderCancellationCommand({
+                orderId,
+                body: req.body,
+                idempotencyKey: getIdempotencyKey(req),
+                actor
+            });
+            reasonCode = adminCommand.reasonCode;
+            note = adminCommand.note;
+            expectedStatus = adminCommand.expectedStatus;
+        } catch (error) {
+            if (error instanceof OrderLifecycleError) return sendLifecycleError(res, error);
+            throw error;
+        }
+    } else if (!reasonCode) {
+        return res.status(400).json({ error: 'reason_code zorunludur.' });
+    }
+
+    let client = null;
+    let transactionOpen = false;
     try {
-        const orderId = Number(req.params.id);
-        const reasonCode = String(req.body?.reason_code || '').trim();
-        const note = String(req.body?.note || '').trim();
-
-        if (!Number.isInteger(orderId)) {
-            return res.status(400).json({ error: 'Geçersiz sipariş kimliği.' });
-        }
-
-        if (!reasonCode) {
-            return res.status(400).json({ error: 'reason_code zorunludur.' });
-        }
-
+        client = await pool.connect();
         await client.query('BEGIN');
+        transactionOpen = true;
 
         const order = await fetchOrderById(client, orderId, { forUpdate: true });
         if (!order) {
             await client.query('ROLLBACK');
+            transactionOpen = false;
             return res.status(404).json({ error: 'Sipariş bulunamadı.' });
         }
 
         const isOwner = req.user && Number(order.user_id) === req.user.id;
-        const isAdmin = req.user && req.user.role === 'admin';
-
         if (!isOwner && !isAdmin) {
             await client.query('ROLLBACK');
+            transactionOpen = false;
             return res.status(403).json({ error: 'Bu siparişi iptal etme yetkiniz yok.' });
         }
 
@@ -332,19 +383,25 @@ const cancelOrder = async (req, res) => {
         const payments = selectCancellationPayments({ order, payments: lockedPayments });
         if (resolveOrderStatus(order.status) === ORDER_STATUS.IPTAL_EDILDI) {
             validateCancelledOrderIdempotency({ payments });
+            if (adminCommand) {
+                const cancellationEvent = await fetchLatestCancellationEvent(client, orderId);
+                validateAdminOrderCancellationReplay({ eventPayload: cancellationEvent, command: adminCommand });
+            }
             await client.query('COMMIT');
+            transactionOpen = false;
+            const refundStatus = order.refund_status || REFUND_STATUS.NONE;
             return res.status(200).json({
                 mesaj: 'Sipariş zaten iptal edilmiş.',
                 reused: true,
                 order,
                 refund: {
-                    status: order.refund_status || REFUND_STATUS.NONE,
-                    providerExecuted: false
+                    status: refundStatus,
+                    providerExecuted: false,
+                    manualReviewRequired: refundStatus === REFUND_STATUS.PENDING
                 }
             });
         }
 
-        const expectedStatus = req.body?.expected_status ?? req.body?.expectedStatus;
         if (expectedStatus !== undefined && expectedStatus !== null && String(expectedStatus).trim() !== '') {
             const expected = resolveOrderStatus(expectedStatus);
             if (!expected) {
@@ -354,9 +411,13 @@ const cancelOrder = async (req, res) => {
                 });
             }
             if (expected !== resolveOrderStatus(order.status)) {
-                throw new OrderLifecycleError('Sipariş durumu başka bir işlem tarafından değiştirildi.', {
+                throw new OrderLifecycleError('Sipariş durumu başka bir işlem tarafından değiştirildi; güncel kaydı yeniden yükleyin.', {
                     code: 'ORDER_STATUS_CONFLICT',
-                    details: { expectedStatus: expected, currentStatus: resolveOrderStatus(order.status) }
+                    details: {
+                        expectedStatus: expected,
+                        currentStatus: resolveOrderStatus(order.status),
+                        refetchRequired: true
+                    }
                 });
             }
         }
@@ -375,11 +436,15 @@ const cancelOrder = async (req, res) => {
             reasonCode,
             note,
             refundStatus: cancellationPlan.refundStatus,
-            stockRelease
+            stockRelease,
+            actor: adminCommand?.actor || toCancellationActor(req),
+            idempotencyKey: adminCommand?.idempotencyKey || null,
+            requestFingerprint: adminCommand?.requestFingerprint || null
         });
 
         const updatedOrder = await fetchOrderById(client, orderId);
         await client.query('COMMIT');
+        transactionOpen = false;
 
         if (order.user_id) {
             try {
@@ -407,12 +472,14 @@ const cancelOrder = async (req, res) => {
             }
         });
     } catch (err) {
-        await client.query('ROLLBACK');
+        if (client && transactionOpen) {
+            await client.query('ROLLBACK').catch(() => {});
+        }
         if (err instanceof OrderLifecycleError) return sendLifecycleError(res, err);
         console.error('Sipariş iptal hatası:', err.message);
         return res.status(500).json({ error: 'Sipariş iptal edilirken hata oluştu.' });
     } finally {
-        client.release();
+        if (client) client.release();
     }
 };
 
@@ -450,6 +517,7 @@ module.exports = {
     updateOrderStatus,
     cancelOrder,
     deleteOrder,
+    getIdempotencyKey,
     getOrderByIdInternal,
     normalizeOrderVisibility
 };

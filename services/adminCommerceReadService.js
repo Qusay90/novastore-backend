@@ -1,18 +1,9 @@
-const ADMIN_COMMERCE_CAPABILITIES = Object.freeze({
-    dashboardRead: true,
-    ordersRead: true,
-    returnsRead: true,
-    firstPartyCatalogRead: false,
-    notificationsRead: true,
-    orderStatusWrite: false,
-    orderBulkWrite: false,
-    orderOwnerWrite: false,
-    customerAdmin: false,
-    sellerAdmin: false,
-    sellerOffers: false,
-    settlements: false,
-    payouts: false
-});
+const {
+    ADMIN_COMMERCE_CAPABILITY_DEFAULTS,
+    getAdminCommerceCapabilities
+} = require('./adminCommerceCapabilityService');
+
+const ADMIN_COMMERCE_CAPABILITIES = ADMIN_COMMERCE_CAPABILITY_DEFAULTS;
 
 const parseOrderSummaryLimit = (rawValue) => {
     if (rawValue === undefined || rawValue === null || String(rawValue).trim() === '') return 50;
@@ -37,7 +28,7 @@ const getAdminSession = (req, res) => {
         user: { ...req.currentAdmin },
         commerceMode: 'single_vendor',
         apiVersion: '2026-07-14',
-        capabilities: { ...ADMIN_COMMERCE_CAPABILITIES }
+        capabilities: getAdminCommerceCapabilities()
     });
 };
 
@@ -146,6 +137,7 @@ module.exports = {
     createGetAdminNotificationSummaries,
     createGetAdminOrderSummaries,
     createGetAdminReturnSummaries,
+    getAdminCommerceCapabilities,
     getAdminSession,
     parseOrderSummaryLimit,
     toSummaryPage

@@ -15,12 +15,19 @@ process.env.DB_USER = 'novastore_test';
 process.env.DB_PASSWORD = 'novastore_test_only';
 process.env.DB_SSL = 'false';
 process.env.SUPABASE_USE_POOLER = 'false';
+process.env.NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED = 'true';
 
 const pool = require('../config/db');
 const { ORDER_STATUS, PAYMENT_STATUS, REFUND_STATUS } = require('../constants/orderStatus');
 const { cancelOrder, deleteOrder, updateOrderStatus } = require('../controllers/orderController');
 const { createShipment } = require('../controllers/shipmentController');
+const { requireAdminCommerceCapabilityIfClaimed } = require('../middlewares/adminCommerceCapability');
 const { requireCurrentAdminIfClaimed } = require('../middlewares/currentAdmin');
+const {
+    ADMIN_ORDER_CANCEL_NOTE_MAX_LENGTH,
+    ADMIN_ORDER_CANCEL_REASON_CODES,
+    validateAdminOrderCancellationRequest
+} = require('../services/adminOrderCancellationPolicy');
 
 const originalPoolConnect = pool.connect;
 const originalPoolQuery = pool.query;
@@ -66,6 +73,7 @@ const createLifecycleState = ({ order = {}, payment = {} } = {}) => ({
     paymentProofUpdates: 0,
     orderUpdates: 0,
     orderEvents: 0,
+    eventPayloads: [],
     releasedQuantity: 0
 });
 
@@ -83,6 +91,11 @@ const createLifecycleClient = (state) => ({
         if (/FROM payments/i.test(text) && /WHERE order_id = \$1/i.test(text)) {
             const payments = state.payments || (state.payment ? [state.payment] : []);
             return { rows: payments.map(cloneRow) };
+        }
+
+        if (/SELECT payload[\s\S]*FROM order_events/i.test(text)) {
+            const payload = state.eventPayloads.at(-1);
+            return { rows: payload ? [{ payload: cloneRow(payload) }] : [] };
         }
 
         if (/UPDATE products\s+SET stock = stock \+/i.test(text)) {
@@ -118,6 +131,7 @@ const createLifecycleClient = (state) => ({
 
         if (/INSERT INTO order_events/i.test(text)) {
             state.orderEvents += 1;
+            state.eventPayloads.push(params[3] ? JSON.parse(params[3]) : null);
             return { rows: [{ id: state.orderEvents }], rowCount: 1 };
         }
 
@@ -162,20 +176,49 @@ const runGenericStatus = async ({ currentStatus, requestedStatus, expectedStatus
     return { calls, response };
 };
 
-const runCancellation = async (state, body = {}) => {
+const runCancellation = async (state, body = {}, request = {}) => {
     const client = createLifecycleClient(state);
     pool.connect = async () => client;
     const response = createResponse();
     await cancelOrder({
         params: { id: String(state.order.id) },
-        body: { reason_code: 'ADMIN_REQUEST', ...body },
-        user: { id: 17, role: 'admin' }
+        body: {
+            reason_code: 'CUSTOMER_REQUEST',
+            expected_status: state.order.status,
+            ...body
+        },
+        headers: request.withoutIdempotencyKey
+            ? {}
+            : { 'idempotency-key': request.idempotencyKey || 'cancel-7001-attempt-1' },
+        user: request.user || { id: 17, role: 'admin' },
+        ...(request.currentAdmin ? { currentAdmin: request.currentAdmin } : {})
     }, response);
     return response;
 };
 
 (async () => {
     try {
+        assert.deepEqual(ADMIN_ORDER_CANCEL_REASON_CODES, [
+            'CUSTOMER_REQUEST',
+            'DUPLICATE_ORDER',
+            'INVENTORY_UNAVAILABLE',
+            'DELIVERY_ADDRESS_UNRESOLVED',
+            'POLICY_OR_FRAUD_REVIEW'
+        ]);
+        assert.equal(ADMIN_ORDER_CANCEL_NOTE_MAX_LENGTH, 300);
+        assert.deepEqual(
+            validateAdminOrderCancellationRequest({
+                expected_status: ORDER_STATUS.HAZIRLANIYOR,
+                reason_code: 'POLICY_OR_FRAUD_REVIEW',
+                note: 'İnsan incelemesi kaydı'
+            }),
+            {
+                expectedStatus: ORDER_STATUS.HAZIRLANIYOR,
+                reasonCode: 'POLICY_OR_FRAUD_REVIEW',
+                note: 'İnsan incelemesi kaydı'
+            }
+        );
+
         const sameState = await runGenericStatus({
             currentStatus: ORDER_STATUS.HAZIRLANIYOR,
             requestedStatus: ORDER_STATUS.HAZIRLANIYOR,
@@ -222,11 +265,126 @@ const runCancellation = async (state, body = {}) => {
         assert.equal(shipmentResponse.payload.code, 'SHIPMENT_CREATE_DISABLED');
         assert.equal(poolCalls, 0);
 
+        process.env.NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED = 'false';
+        const cancelCapabilityGate = requireAdminCommerceCapabilityIfClaimed('orderCancelWrite');
+        let disabledGateNextCalls = 0;
+        const disabledGateResponse = createResponse();
+        await cancelCapabilityGate(
+            { user: { id: 17, role: 'admin' } },
+            disabledGateResponse,
+            () => { disabledGateNextCalls += 1; }
+        );
+        assert.equal(disabledGateResponse.statusCode, 503);
+        assert.equal(disabledGateResponse.payload.code, 'ADMIN_ORDER_CANCEL_WRITE_DISABLED');
+        assert.equal(disabledGateNextCalls, 0, 'disabled capability must stop before current-admin DB guard');
+
+        let customerGateNextCalls = 0;
+        await cancelCapabilityGate(
+            { user: { id: 42, role: 'customer' } },
+            createResponse(),
+            () => { customerGateNextCalls += 1; }
+        );
+        assert.equal(customerGateNextCalls, 1, 'customer cancellation path must bypass the admin write flag');
+
+        const disabledAdminCancel = createResponse();
+        await cancelOrder({
+            params: { id: '7001' },
+            body: {
+                reason_code: 'CUSTOMER_REQUEST',
+                expected_status: ORDER_STATUS.HAZIRLANIYOR
+            },
+            user: { id: 17, role: 'admin' },
+            currentAdmin: { id: 17, role: 'admin' }
+        }, disabledAdminCancel);
+        assert.equal(disabledAdminCancel.statusCode, 503);
+        assert.equal(disabledAdminCancel.payload.code, 'ADMIN_ORDER_CANCEL_WRITE_DISABLED');
+        assert.equal(poolCalls, 0, 'disabled admin cancellation must not acquire an order database client');
+
+        process.env.NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED = 'true';
+        const invalidAdminBodies = [
+            {
+                body: { reason_code: 'CUSTOMER_REQUEST' },
+                code: 'ORDER_EXPECTED_STATUS_REQUIRED'
+            },
+            {
+                body: { reason_code: 'ADMIN_REQUEST', expected_status: ORDER_STATUS.HAZIRLANIYOR },
+                code: 'ORDER_CANCEL_REASON_INVALID'
+            },
+            {
+                body: {
+                    reason_code: 'POLICY_OR_FRAUD_REVIEW',
+                    expected_status: ORDER_STATUS.HAZIRLANIYOR
+                },
+                code: 'ORDER_CANCEL_NOTE_REQUIRED'
+            },
+            {
+                body: {
+                    reason_code: 'INVENTORY_UNAVAILABLE',
+                    expected_status: ORDER_STATUS.HAZIRLANIYOR,
+                    note: 'x'.repeat(301)
+                },
+                code: 'ORDER_CANCEL_NOTE_TOO_LONG'
+            }
+        ];
+        for (const { body, code } of invalidAdminBodies) {
+            const response = createResponse();
+            await cancelOrder({
+                params: { id: '7001' },
+                body,
+                user: { id: 17, role: 'admin' },
+                currentAdmin: { id: 17, role: 'admin' }
+            }, response);
+            assert.equal(response.statusCode, 400);
+            assert.equal(response.payload.code, code);
+        }
+        assert.equal(poolCalls, 0, 'invalid admin cancellation input must fail before database access');
+
+        const missingIdempotencyKey = createResponse();
+        await cancelOrder({
+            params: { id: '7001' },
+            body: {
+                reason_code: 'CUSTOMER_REQUEST',
+                expected_status: ORDER_STATUS.HAZIRLANIYOR
+            },
+            headers: {},
+            user: { id: 17, role: 'admin' },
+            currentAdmin: { id: 17, role: 'admin' }
+        }, missingIdempotencyKey);
+        assert.equal(missingIdempotencyKey.statusCode, 400);
+        assert.equal(missingIdempotencyKey.payload.code, 'ORDER_CANCEL_IDEMPOTENCY_KEY_REQUIRED');
+        assert.equal(poolCalls, 0, 'missing idempotency key must fail before database access');
+
+        process.env.NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED = 'false';
+        const customerCancellationState = createLifecycleState({ order: { user_id: 0 } });
+        const customerCancellation = await runCancellation(
+            customerCancellationState,
+            { expected_status: undefined },
+            { user: { id: 0, role: 'customer' } }
+        );
+        assert.equal(customerCancellation.statusCode, 200);
+        assert.equal(customerCancellation.payload.reused, false);
+        assert.equal(customerCancellationState.order.status, ORDER_STATUS.IPTAL_EDILDI);
+        assert.deepEqual(customerCancellationState.eventPayloads[0].actor, { id: 0, role: 'customer' });
+        process.env.NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED = 'true';
+
+        const staleAdminState = createLifecycleState();
+        const staleAdminCancellation = await runCancellation(staleAdminState, {
+            expected_status: ORDER_STATUS.ONAY_BEKLIYOR
+        });
+        assert.equal(staleAdminCancellation.statusCode, 409);
+        assert.equal(staleAdminCancellation.payload.code, 'ORDER_STATUS_CONFLICT');
+        assert.equal(staleAdminCancellation.payload.details.currentStatus, ORDER_STATUS.HAZIRLANIYOR);
+        assert.equal(staleAdminCancellation.payload.details.refetchRequired, true);
+        assert.equal(staleAdminState.stockReleaseCount, 0);
+        assert.equal(staleAdminState.orderUpdates, 0);
+        assert.equal(staleAdminState.orderEvents, 0);
+        assert.equal(staleAdminState.calls.at(-1).sql, 'ROLLBACK');
+
         const cancellationState = createLifecycleState();
         const firstCancellation = await runCancellation(cancellationState, {
             expected_status: ORDER_STATUS.HAZIRLANIYOR,
             note: 'Müşteri talebi'
-        });
+        }, { currentAdmin: { id: 17, role: 'admin' } });
         assert.equal(firstCancellation.statusCode, 200);
         assert.equal(firstCancellation.payload.reused, false);
         assert.equal(firstCancellation.payload.refund.status, REFUND_STATUS.PENDING);
@@ -239,10 +397,32 @@ const runCancellation = async (state, body = {}) => {
         assert.equal(cancellationState.orderEvents, 1);
         assert.equal(cancellationState.order.status, ORDER_STATUS.IPTAL_EDILDI);
         assert.equal(cancellationState.order.refund_status, REFUND_STATUS.PENDING);
+        assert.equal(cancellationState.order.cancel_reason, 'Müşteri talebi');
+        assert.doesNotMatch(cancellationState.order.cancel_reason, /Müşteri talebi -/);
+
+        const cancellationEvent = cancellationState.eventPayloads[0];
+        assert.equal(cancellationEvent.command, 'cancel');
+        assert.equal(cancellationEvent.idempotencyKey, 'cancel-7001-attempt-1');
+        assert.match(cancellationEvent.requestFingerprint, /^[a-f0-9]{64}$/);
+        assert.equal(cancellationEvent.reasonCode, 'CUSTOMER_REQUEST');
+        assert.equal(cancellationEvent.note, 'Müşteri talebi');
+        assert.deepEqual(cancellationEvent.actor, { id: 17, role: 'admin' });
+        assert.deepEqual(cancellationEvent.before, {
+            status: ORDER_STATUS.HAZIRLANIYOR,
+            refundStatus: REFUND_STATUS.NONE
+        });
+        assert.deepEqual(cancellationEvent.after, {
+            status: ORDER_STATUS.IPTAL_EDILDI,
+            refundStatus: REFUND_STATUS.PENDING
+        });
+        assert.deepEqual(cancellationEvent.providerRefund, {
+            executed: false,
+            manualReviewRequired: true
+        });
 
         const releaseProof = JSON.parse(cancellationState.payment.raw_request);
         assert.equal(releaseProof.stockReserved, false);
-        assert.equal(releaseProof.stockReleaseReason, 'ADMIN_REQUEST');
+        assert.equal(releaseProof.stockReleaseReason, 'CUSTOMER_REQUEST');
         assert.equal(releaseProof.stockReleaseCommand, 'cancel');
         assert.match(releaseProof.stockReleasedAt, /^\d{4}-\d{2}-\d{2}T/);
 
@@ -260,9 +440,14 @@ const runCancellation = async (state, body = {}) => {
         assert(firstCommitIndex > firstOrderWriteIndex, 'transaction commits only after all mutation writes');
 
         const callsBeforeReplay = cancellationState.calls.length;
-        const replayCancellation = await runCancellation(cancellationState);
+        const replayCancellation = await runCancellation(cancellationState, {
+            expected_status: ORDER_STATUS.HAZIRLANIYOR,
+            note: 'Müşteri talebi'
+        });
         assert.equal(replayCancellation.statusCode, 200);
         assert.equal(replayCancellation.payload.reused, true);
+        assert.equal(replayCancellation.payload.refund.providerExecuted, false);
+        assert.equal(replayCancellation.payload.refund.manualReviewRequired, true);
         assert.equal(cancellationState.stockReleaseCount, 1, 'repeated admin cancellation must not inflate stock');
         assert.equal(cancellationState.paymentProofUpdates, 1, 'repeated cancellation must not rewrite release proof');
         assert.equal(cancellationState.orderUpdates, 1, 'repeated cancellation must not rewrite the order');
@@ -275,6 +460,22 @@ const runCancellation = async (state, body = {}) => {
             ['BEGIN', 'COMMIT']
         );
         assert.equal(replayCalls.some(({ sql }) => /UPDATE products|UPDATE payments|UPDATE orders|INSERT INTO order_events/i.test(sql)), false);
+
+        const conflictingReplay = await runCancellation(
+            cancellationState,
+            {
+                expected_status: ORDER_STATUS.HAZIRLANIYOR,
+                note: 'Farklı içerik'
+            },
+            { idempotencyKey: 'cancel-7001-attempt-2' }
+        );
+        assert.equal(conflictingReplay.statusCode, 409);
+        assert.equal(conflictingReplay.payload.code, 'ORDER_CANCEL_IDEMPOTENCY_CONFLICT');
+        assert.equal(conflictingReplay.payload.details.refetchRequired, true);
+        assert.equal(cancellationState.stockReleaseCount, 1);
+        assert.equal(cancellationState.orderUpdates, 1);
+        assert.equal(cancellationState.orderEvents, 1);
+        assert.equal(cancellationState.calls.at(-1).sql, 'ROLLBACK');
 
         const pendingState = createLifecycleState({
             order: {
@@ -335,7 +536,10 @@ const runCancellation = async (state, body = {}) => {
         const notificationRouteSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'notificationRoutes.js'), 'utf8');
         assert.match(orderRouteSource, /router\.get\('\/',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*getAllOrders\)/);
         assert.match(orderRouteSource, /router\.get\('\/user\/:userId',\s*authenticate,\s*requireSelfOrAdmin\('userId'\),\s*requireCurrentAdminIfClaimed,\s*getUserOrders\)/);
-        assert.match(orderRouteSource, /router\.post\('\/:id\/cancel',\s*authenticate,\s*requireCurrentAdminIfClaimed,\s*cancelOrder\)/);
+        assert.match(
+            orderRouteSource,
+            /router\.post\(\s*'\/:id\/cancel',\s*authenticate,\s*requireAdminCommerceCapabilityIfClaimed\('orderCancelWrite'\),\s*requireCurrentAdminIfClaimed,\s*cancelOrder\s*\)/
+        );
         assert.match(orderRouteSource, /router\.put\('\/:id\/status',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*updateOrderStatus\)/);
         assert.match(orderRouteSource, /router\.delete\('\/:id',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*deleteOrder\)/);
         assert.match(shipmentRouteSource, /router\.post\('\/:orderId\/create',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*createShipment\)/);

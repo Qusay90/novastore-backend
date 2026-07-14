@@ -73,6 +73,7 @@ export function normalizeOrder(row) {
     customerName: toLegacyNullableText(row.customer_name, "order.customer_name", "Müşteri bilgisi yok"),
     email: String(row.email || ""),
     status,
+    backendStatus,
     statusNote: pendingPayment
       ? "Ödeme tamamlanmadan kesin siparişe dönüşmez."
       : paymentFailed

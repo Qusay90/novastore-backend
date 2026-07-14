@@ -10,6 +10,7 @@ const {
     createGetAdminNotificationSummaries,
     createGetAdminOrderSummaries,
     createGetAdminReturnSummaries,
+    getAdminCommerceCapabilities,
     getAdminSession,
     parseOrderSummaryLimit
 } = require('../services/adminCommerceReadService');
@@ -110,9 +111,26 @@ const chainFor = (rows, queries) => [
     assert.equal(validAdmin.payload.capabilities.firstPartyCatalogRead, false);
     assert.equal(validAdmin.payload.capabilities.notificationsRead, true);
     assert.equal(validAdmin.payload.capabilities.orderStatusWrite, false);
+    assert.equal(validAdmin.payload.capabilities.orderCancelWrite, false);
+    assert.equal(validAdmin.payload.capabilities.manualShipmentWrite, false);
     assert.equal(validAdmin.payload.capabilities.sellerAdmin, false);
     assert.equal(Object.isFrozen(ADMIN_COMMERCE_CAPABILITIES), true);
+    assert.equal(Object.isFrozen(validAdmin.payload.capabilities), true);
     assert.deepEqual(queries[0].params, [17]);
+
+    const enabledWriteCapabilities = getAdminCommerceCapabilities({
+        NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: 'true',
+        NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'true'
+    });
+    assert.equal(enabledWriteCapabilities.orderCancelWrite, true);
+    assert.equal(enabledWriteCapabilities.manualShipmentWrite, true);
+    assert.equal(enabledWriteCapabilities.orderStatusWrite, false);
+    const nonExplicitWriteCapabilities = getAdminCommerceCapabilities({
+        NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: '1',
+        NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'yes'
+    });
+    assert.equal(nonExplicitWriteCapabilities.orderCancelWrite, false);
+    assert.equal(nonExplicitWriteCapabilities.manualShipmentWrite, false);
 
     const guardFailure = await runChain([
         privateNoStore,

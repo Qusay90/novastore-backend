@@ -72,5 +72,10 @@ assert.doesNotMatch(profileSource, />\s*İade Talebi Oluştur\s*</, 'web profil 
 assert.match(profileSource, />\s*İade Talebi Yakında\s*</, 'web profil kapalı iade durumunu dürüstçe belirtmeli');
 assert.match(profileSource, /Yeni iade talepleri güvenli geri ödeme ve stok akışı tamamlanana kadar geçici olarak kapalıdır\./);
 assert.match(profileSource, /Canlı Destek üzerinden yardım alabilirsiniz\./);
+assert.match(
+    profileSource,
+    /escapeHtml\(order\.cancel_reason \|\| 'Sipariş bu kayıt için iptal edildi\.'\)/,
+    'müşteriye gösterilen iptal nedeni HTML olarak yorumlanmamalı'
+);
 
 console.log('order lifecycle client contract smoke passed');

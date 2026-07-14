@@ -14,7 +14,8 @@
     "test:model": "node ../tests/adminCommerceProModelSmoke.mjs",
     "test:preview": "node ../tests/adminCommerceProPreviewSmoke.js",
     "test:live": "node ../tests/adminCommerceProHttpSmoke.mjs && node ../tests/adminCommerceProSessionContractSmoke.js && node ../tests/adminLoginNextSmoke.js && node ../tests/adminCommerceProLiveSmoke.mjs",
-    "test": "npm run test:model && npm run test:preview && npm run test:live",
+    "test:mutations": "node scripts/order-mutations-smoke.mjs",
+    "test": "npm run test:model && npm run test:preview && npm run test:mutations && npm run test:live",
     "verify": "npm run build:integrated && npm run build:live:integrated && npm test"
   },
   "dependencies": {

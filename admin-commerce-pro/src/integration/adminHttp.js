@@ -2,12 +2,13 @@ export const ADMIN_TOKEN_KEY = "nova_admin_token";
 export const ADMIN_LOGIN_URL = "admin-login.html?reason=session-expired&next=admin-commerce-pro-live.html";
 
 export class AdminHttpError extends Error {
-  constructor(message, { status = 0, code = "ADMIN_HTTP_ERROR", requestId = "", cause } = {}) {
+  constructor(message, { status = 0, code = "ADMIN_HTTP_ERROR", requestId = "", details = null, cause } = {}) {
     super(message, cause ? { cause } : undefined);
     this.name = "AdminHttpError";
     this.status = status;
     this.code = code;
     this.requestId = requestId;
+    this.details = details && typeof details === "object" && !Array.isArray(details) ? details : null;
   }
 }
 
@@ -130,10 +131,14 @@ export function createAdminHttp({
         || (response.status === 403
           ? "Bu işlem için yönetici yetkiniz yok."
           : "İstek tamamlanamadı.");
+      const payloadCode = typeof payload?.code === "string" && /^[A-Z][A-Z0-9_]{1,79}$/.test(payload.code)
+        ? payload.code
+        : "";
       throw new AdminHttpError(message, {
         status: response.status,
-        code: response.status === 403 ? "ADMIN_FORBIDDEN" : "ADMIN_API_ERROR",
+        code: response.status === 403 ? "ADMIN_FORBIDDEN" : payloadCode || "ADMIN_API_ERROR",
         requestId,
+        details: payload?.details,
       });
     }
 

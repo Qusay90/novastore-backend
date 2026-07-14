@@ -3,7 +3,7 @@
 NovaStore'un Commerce Pro görsel yönünü ve gelecekteki çok satıcılı yönetim bilgi mimarisini taşıyan iki ayrı build içerir:
 
 - `admin-commerce-pro.html`: gerçek sistemlerden izole, sıfır ağ istekli etkileşimli tasarım önizlemesi.
-- `admin-commerce-pro-live.html`: admin oturumu ile yalnız aynı-origin API'den Dashboard, sipariş, iade ve admin bildirimi özetlerini okuyan, tek-satıcı sınırındaki entegrasyon yüzeyi.
+- `admin-commerce-pro-live.html`: admin oturumu ile yalnız aynı-origin API'den Dashboard, sipariş, iade ve admin bildirimi özetlerini okuyan; varsayılan kapalı iki kontrollü sipariş operasyonunu capability ile sunan tek-satıcı entegrasyon yüzeyi.
 
 Mevcut backend bugün tek satıcılıdır; preview içindeki pazaryeri kayıtları çalışan servisler değil, açıkça etiketlenmiş hedef model simülasyonudur. Entegre build bu kayıtları hiçbir koşulda göstermez.
 
@@ -11,9 +11,10 @@ Mevcut backend bugün tek satıcılıdır; preview içindeki pazaryeri kayıtlar
 
 - Mevcut `frontend/admin.html` çalışan/kabul edilen admin yüzeyi olarak kalır; Commerce Pro entegre build henüz cutover değildir.
 - Preview yalnız yerel örnek veri kullanır. Değişiklikler sayfa yenilendiğinde sıfırlanır; API, WebSocket, production/remote veritabanı, ödeme, auth veya sır/env bağlantısı yoktur.
-- Entegre build `nova_admin_token` ile `/api/admin/session`, `/api/admin/stats`, limitli `/api/admin/orders/summary`, `/api/admin/returns/summary` ve `/api/admin/notifications/summary` yollarını salt-okunur kullanır. Mutlak URL ve cross-origin API yolu reddedilir; hata halinde mock veriye düşülmez.
+- Entegre build `nova_admin_token` ile `/api/admin/session`, `/api/admin/stats`, limitli `/api/admin/orders/summary`, `/api/admin/returns/summary` ve `/api/admin/notifications/summary` yollarını okur. Mutlak URL ve cross-origin API yolu reddedilir; hata halinde mock veriye düşülmez.
 - Sipariş görünümündeki kargo bilgisi yalnız yerel NovaStore kaydıdır ve arayüzde taşıyıcı tarafından doğrulanmadığı açıkça belirtilir. İade görünümü talep edilen tutarı ve yerel refund durumunu gösterir; ödeme sağlayıcısına refund çağrısı yapıldığı anlamına gelmez.
-- Entegre Commerce Pro arayüzü sipariş/iade/bildirim mutation'ı, kargo oluşturma, ürün CRUD'u, satıcı, müşteri, hakediş, payout, ödeme veya Cloudinary isteği göndermez. Bu UI capability bayrakları genel backend yetkisi değildir; mevcut legacy admin mutation yolları Tur 2 yaşam döngüsü güvenlik çekirdeği tamamlanana kadar Commerce Pro'ya açılmaz.
+- Entegre Commerce Pro arayüzü yalnız sunucunun `orderCancelWrite` veya `manualShipmentWrite` capability'sini tam `true` döndürdüğü oturumlarda kontrollü iptal ve manuel kargo devri isteği sunar. Her istek beklenen durum, idempotency anahtarı ve erişilebilir etki onayı taşır; `409` sonrasında liste yeniden okunur. Bu capability'ler varsayılan kapalıdır ve UI görünürlüğü sunucu yetkilendirmesinin yerine geçmez.
+- İade/bildirim mutation'ı, genel sipariş durumu yazması, gerçek refund, taşıyıcı API/etiket, ürün CRUD'u, satıcı, müşteri, hakediş, payout, ödeme veya Cloudinary isteği Commerce Pro'dan gönderilmez. Manuel kargo kaydı taşıyıcı doğrulaması veya takip bağlantısı üretmez; admin iptali sağlayıcı refund'unu otomatik çalıştırmaz.
 - Mevcut backend yaşam döngüsü artık generic sipariş durum değişimini ve sipariş hard-delete işlemini kabul etmez. İptal yalnız özel endpoint üzerinden, kilitli payment geçmişi ve doğrulanmış stok rezervasyonu ile çalışır; kargoya çıkmış veya ödeme sonucu beklenen sipariş fail-closed kalır.
 - Taşıyıcı doğrulaması olmadan sahte takip üreten shipment create `410 SHIPMENT_CREATE_DISABLED`; yeni iade/iade durum yazmaları güvenli geri ödeme ve stok zinciri tamamlanana kadar `503 RETURN_WRITES_DISABLED` döndürür. Mevcut shipment/iade kayıtları owner/admin için salt okunur kalır.
 - PayTR/iyzico callback'leri kilitli payment durumunu finansal gerçek kabul eder. İptal/iade/fulfillment sonrasında gelen tahsilat sipariş durumunu ilerletmez; tekrar stok/kupon/sipariş satırı yazmaz, geri ödeme veya operasyon mutabakatı kaydı açar.
@@ -56,7 +57,7 @@ npm run build:integrated
 
 Bu komut fontları, ürün görsellerini, ikonları, CSS'i ve JavaScript'i tek belgeye gömerek `frontend/admin-commerce-pro.html` üretir. Çıktı `noindex,nofollow,noarchive` etiketi taşır ve uygulamanın statik frontend sunucusundan `/admin-commerce-pro.html` yolunda açılabilir.
 
-Salt-okunur entegre artifact:
+Capability kontrollü entegre artifact:
 
 ```bash
 cd admin-commerce-pro
@@ -86,7 +87,7 @@ node tests/adminCommerceProLiveSmoke.mjs
 COMMERCE_PRO_PREVIEW_PATH=admin-commerce-pro/standalone/index.html node tests/adminCommerceProPreviewSmoke.js
 ```
 
-Testler sayfalama/arama/mağaza kapsamı/ürün doğrulama/CSV güvenliği ve örnek veri ilişkilerine ek olarak gerçek politika kurallarını, eksik girdide fail-closed davranışı, otomatik yayın/istisna/satıcı aksiyonu ayrımını, yayın-stok eksenlerini, `offerId` kimliğini, seller-scope SKU'yu, kanonik içerik yayılımını, haricî teklif alanlarının değişmez sahiplik kimliğiyle korunmasını, açıklanabilir onboarding puanını, eksik belge fail-closed davranışını, eşikleri ve onay engellerini doğrular. Preview için kaynak parmak izi, `connect-src 'none'`, önizleme uyarısı ve sıfır ağ/ödeme çağrısı korunur. Entegre build için aynı-origin yol zorlaması, JWT ön kontrolü, 401/403 ayrımı, güncel DB admin rolü, bounded/PII-azaltılmış sipariş-iade-bildirim DTO'ları, bağımsız capability kapıları, login allowlist'i, `connect-src 'self'`, no-write artifact ve mock fallback yasağı test edilir. Standalone üretici eski bundle'ı güncel kaynaklarla yeniden damgalamayı reddeder. Production DB veya ödeme testi çalıştırılmaz.
+Testler sayfalama/arama/mağaza kapsamı/ürün doğrulama/CSV güvenliği ve örnek veri ilişkilerine ek olarak gerçek politika kurallarını, eksik girdide fail-closed davranışı, otomatik yayın/istisna/satıcı aksiyonu ayrımını, yayın-stok eksenlerini, `offerId` kimliğini, seller-scope SKU'yu, kanonik içerik yayılımını, haricî teklif alanlarının değişmez sahiplik kimliğiyle korunmasını, açıklanabilir onboarding puanını, eksik belge fail-closed davranışını, eşikleri ve onay engellerini doğrular. Preview için kaynak parmak izi, `connect-src 'none'`, önizleme uyarısı ve sıfır ağ/ödeme çağrısı korunur. Entegre build için aynı-origin yol zorlaması, JWT ön kontrolü, 401/403 ayrımı, güncel DB admin rolü, bounded/PII-azaltılmış sipariş-iade-bildirim DTO'ları, bağımsız capability kapıları, kapalı mutation'ların adapter/UI yüzeyinden düşmesi, idempotency/expected-status gövdeleri, login allowlist'i, `connect-src 'self'` ve mock fallback yasağı test edilir. Standalone üretici eski bundle'ı güncel kaynaklarla yeniden damgalamayı reddeder. Production DB, gerçek ödeme, refund veya taşıyıcı testi çalıştırılmaz.
 
 ## Geçici mock önizlemesi
 

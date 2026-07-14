@@ -97,8 +97,63 @@
 @keyframes live-spin { to { transform: rotate(360deg); } }
 
 .live-banner .icon-wrap { color: var(--green); }
-.live-orders-table { min-width: 1080px; }
+.live-orders-table { min-width: 1210px; }
 .live-returns-table { min-width: 1040px; }
+
+.danger-button.small {
+  min-height: 32px;
+  padding-inline: 9px;
+  font-size: 9px;
+}
+
+.live-operation-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-operation-buttons button:disabled,
+.live-operation-form button:disabled,
+.live-operation-dialog .icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.live-operation-dialog { overflow: auto; }
+.live-operation-summary { margin-inline: 18px; padding-inline: 0; }
+.live-operation-summary div:last-child { border-bottom: 0; }
+.live-operation-form { padding-top: 12px; }
+.live-operation-form textarea { min-height: 84px; }
+.live-operation-form .modal-error { margin: 0; }
+.live-character-count { justify-self: end; color: var(--muted); font-size: 9px; font-weight: 600; }
+
+.live-handoff-confirmation {
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  padding: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  line-height: 1.5;
+}
+
+.live-handoff-confirmation input {
+  width: 16px;
+  min-height: 16px;
+  margin: 1px 0 0;
+  accent-color: var(--orange-700);
+}
+
+.live-operation-notice {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+}
+
+.live-operation-notice > .icon-wrap { width: 28px; height: 28px; }
+.live-operation-notice strong { color: var(--ink); }
+.live-operation-notice p { margin: 3px 0 0; color: var(--ink-2); font-size: 9.5px; line-height: 1.5; }
+.live-operation-notice.success-card { color: var(--green); background: var(--green-bg); border-color: #90d2ad; }
 
 .live-notification-list {
   display: grid;
@@ -143,6 +198,10 @@
   .live-result-count { margin-left: 0; }
   .live-filter-toolbar .heading-select { width: 100%; }
   .operations-heading > .secondary-button { flex: 0 0 auto; width: 100%; min-height: 44px; }
+  .live-operation-buttons { align-items: stretch; flex-direction: column; }
+  .live-operation-buttons button { min-height: 44px; }
+  .live-operation-form footer { align-items: stretch; flex-direction: column-reverse; }
+  .live-operation-form footer button { width: 100%; min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

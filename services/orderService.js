@@ -8,6 +8,19 @@ const {
     getStockReservationState
 } = require('./orderLifecyclePolicy');
 
+const PUBLIC_CANCELLATION_REASONS = Object.freeze({
+    CUSTOMER_REQUEST: 'Müşteri talebi',
+    DUPLICATE_ORDER: 'Mükerrer sipariş',
+    INVENTORY_UNAVAILABLE: 'Stok veya tedarik engeli',
+    DELIVERY_ADDRESS_UNRESOLVED: 'Teslimat adresi çözülemedi',
+    POLICY_OR_FRAUD_REVIEW: 'Güvenlik veya politika incelemesi'
+});
+
+const getPublicCancellationReason = (reasonCode) => (
+    PUBLIC_CANCELLATION_REASONS[String(reasonCode || '').trim().toUpperCase()]
+    || 'Sipariş iptal edildi'
+);
+
 const extractAddressText = (address) => {
     if (!address) return '';
     if (typeof address === 'string') return address;
@@ -412,9 +425,20 @@ const markOrderCancelled = async ({
     reasonCode,
     note = '',
     refundStatus = REFUND_STATUS.PENDING,
-    stockRelease = null
+    stockRelease = null,
+    actor = null,
+    idempotencyKey = null,
+    requestFingerprint = null
 }) => {
     const cancelledStatus = ORDER_STATUS.IPTAL_EDILDI;
+    const beforeStatus = resolveOrderStatus(order?.status) || order?.status || null;
+    const beforeRefundStatus = order?.refund_status || REFUND_STATUS.NONE;
+    const normalizedActor = actor && typeof actor === 'object'
+        ? {
+            id: Number.isInteger(Number(actor.id)) ? Number(actor.id) : null,
+            role: String(actor.role || 'unknown')
+        }
+        : { id: null, role: 'unknown' };
 
     await client.query(
         `UPDATE orders
@@ -423,14 +447,30 @@ const markOrderCancelled = async ({
              refund_status = $3,
              updated_at = NOW()
          WHERE id = $4`,
-        [cancelledStatus, `${reasonCode}${note ? ` - ${note}` : ''}`, refundStatus, order.id]
+        [cancelledStatus, getPublicCancellationReason(reasonCode), refundStatus, order.id]
     );
 
     await appendOrderEvent(client, order.id, 'ORDER_CANCELLED', 'Sipariş iptal edildi.', {
         reasonCode,
         note,
         refundStatus,
-        stockRelease
+        stockRelease,
+        command: 'cancel',
+        idempotencyKey,
+        requestFingerprint,
+        actor: normalizedActor,
+        before: {
+            status: beforeStatus,
+            refundStatus: beforeRefundStatus
+        },
+        after: {
+            status: cancelledStatus,
+            refundStatus
+        },
+        providerRefund: {
+            executed: false,
+            manualReviewRequired: refundStatus === REFUND_STATUS.PENDING
+        }
     });
 
     return cancelledStatus;
@@ -438,6 +478,7 @@ const markOrderCancelled = async ({
 
 module.exports = {
     appendOrderEvent,
+    getPublicCancellationReason,
     parseItems,
     normalizeOrderItemSnapshots,
     syncOrderItemsForOrder,

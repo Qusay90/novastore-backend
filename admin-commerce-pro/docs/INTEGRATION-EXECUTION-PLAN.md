@@ -36,7 +36,7 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 | 1 | Preview/live build ayrımı, admin session gate, aynı-origin HTTP istemcisi, gerçek Dashboard + Siparişler salt-okunur | 2–3 gün | Auth/401/403, mapper, CSP, no-mock-fallback ve build testleri | Yok |
 | 2A | Salt-okunur iade ve admin bildirimi özetleri; yerel kargo kaydını taşıyıcı doğrulaması gibi göstermeyen sipariş görünümü | 1–2 gün | Auth/current-role/no-store, bounded DTO, PII azaltma, bağımsız hata/empty/loading ve no-write artifact testleri | Yok |
 | 2B | Yaşam döngüsü güvenlik çekirdeği: hard-delete kapısı, geçiş sahipliği, idempotency, stok rezervasyon kanıtı ve ödeme callback yarışları | 3–5 gün | İzinli/yasak geçiş, tekrar istek, stale admin, stock/event tekilliği ve karma payment/order state testleri | Fake pool + mümkünse disposable yerel PG |
-| 2C | Kontrollü fulfillment/iptal/iade operasyonları; gerçek refund, kargo etiketi ve taşıyıcı doğrulaması kapalı | 2–3 gün | Beklenen durum/409, atomik shipment-order güncellemesi, audit ve post-commit bildirim davranışı | Fake pool / disposable yerel PG |
+| 2C | Varsayılan kapalı capability ile admin iptali ve manuel fulfillment; iade yazımı, gerçek refund, kargo etiketi ve taşıyıcı doğrulaması kapalı | 2–3 gün | Beklenen durum/409, idempotency, atomik shipment-order güncellemesi, audit, XSS sınırı ve post-commit bildirim davranışı | Fake pool / disposable yerel PG |
 | 3 | Birinci taraf ürün, kategori, özellik, koleksiyon ve menü CRUD | 4–6 gün | Medya hariç tam DTO; hard-delete kapalı; audit izi | Fake pool / yerel PG; Cloudinary yok |
 | 4 | Admin müşteri özet API’si, sorular/yorumlar, kampanya, pagination ve gizlilik | 4–6 gün | Auth açığı kapanmış, PII kapsamı ve pagination testli | Fake pool / yerel PG |
 | 5 | Analytics, legacy parity, feature flag, rollback ve Commerce Pro cutover hazırlığı | 3–5 gün | Desktop/mobile UAT, console/network, güvenlik/perf | Production deploy yok |
@@ -106,7 +106,8 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 | 0 | Tamamlandı | `faef1f2` | Read-only repo audit; remote sistem kullanılmadı |
 | 1 | Kod ve otomatik QA tamam; browser QA blokeli | `989cbeb` | Preview/entegre build, auth, mapper, CSP ve artifact testleri yeşil; Work Mode browser kanıtı eksik |
 | 2A | Kod ve otomatik QA tamam; browser QA blokeli | `eea2b1c` | İade/bildirim salt-okunur bağlandı; yerel kargo/refund sınırları görünür; write capability'leri kapalı; full verify yeşil |
-| 2B | Kod ve otomatik QA tamam; browser QA blokeli | Bu commit | Hard-delete/generic geçiş/sahte shipment/iade yazmaları kapalı; iptal stok kanıtına, callback'ler payment state + kalıcı reconciliation görevine bağlandı; bağımsız P0/P1 incelemesi temiz |
+| 2B | Kod ve otomatik QA tamam; browser QA blokeli | `5cfe701` | Hard-delete/generic geçiş/sahte shipment/iade yazmaları kapalı; iptal stok kanıtına, callback'ler payment state + kalıcı reconciliation görevine bağlandı; bağımsız P0/P1 incelemesi temiz |
+| 2C | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | Bu commit | Admin iptali ve manuel kargo devri ayrı default-off capability; expected-state/idempotency/audit/XSS sınırları testli; gerçek refund, return write ve taşıyıcı çağrısı kapalı |
 
 ## Tur 2 güvenlik bölümü
 
@@ -131,6 +132,15 @@ Tur 2B güvenli davranış özeti:
 
 Bu çekirdek callback güvenliği gerçek ödeme bağlantısı anlamına gelmez. Mevcut PayTR initialize test tokenı, iyzico initialize mock yanıtı ve iyzico imza sözleşmesi satışa açılmadan önce provider staging dokümanıyla ayrı turda değiştirilip UAT edilmelidir; o zamana kadar ödeme alma go/no-go kapısı kapalıdır.
 
+Tur 2C kontrollü operasyon özeti:
+
+- `orderCancelWrite`, yalnız `NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED=true` iken session capability'si ve sunucu mutation kapısı olarak açılır. Admin isteği `expected_status`, izinli reason code ve `Idempotency-Key` taşır; aynı event fingerprint/aktörle tekrar güvenlidir. Müşteri iptali bu admin bayrağına bağlanmamıştır.
+- Admin iç notu müşteri görünür `cancel_reason` alanına yazılmaz; yalnız audit event payload'ında kalır. Müşteri profilindeki iptal ve takip alanları HTML escape uygular.
+- `manualShipmentWrite`, yalnız `NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED=true` iken açılır. Sipariş → shipment → bütün payment kayıtları kilitlenir; yalnız `Hazırlanıyor`, `PAID`, refund `NONE`, kanıtlı stok rezervasyonu ve kapalı reconciliation ile ilerler.
+- Manuel shipment; operatörün verdiği sağlayıcı/takip numarasını idempotent yerel kayıt olarak saklar, siparişi `Kargoya Verildi` yapar ve audit event üretir. Taşıyıcı API'si, label, doğrulanmış tracking URL, teslim teyidi veya provider refund çalıştırmaz.
+- Eski `POST /api/shipments/:orderId/create` yolu `410 SHIPMENT_CREATE_DISABLED`, return create/update yolları `503 RETURN_WRITES_DISABLED` kalır. İade yazımı migration, satır bazlı stok/refund ve reconciliation sözleşmesi onaylanmadan açılmaz.
+- İki capability tam boolean `true` dışında istemcide fail-closed; env değeri de yalnız tam `true` ile açılır. Bayrak kapalıyken admin write DB guard'ından önce durur.
+
 PR #15’in `design-qa.md` sonucu, gerçek masaüstü/mobil browser kanıtı alınana kadar `blocked` kalır. Bu plan browser kısıtını atlatma yetkisi vermez.
 
 ## Tur 1 geri alma sınırı
@@ -144,3 +154,7 @@ Tur 2A şema veya veri mutation'ı eklemez. Geri alma gerektiğinde return/notif
 ## Tur 2B geri alma sınırı
 
 Tur 2B migration veya production ayarı eklemez; mevcut tablo ve event kayıtlarını kullanır. Geri alma gerektiğinde yaşam döngüsü/callback policy servisleri, controller/route guard'ları, legacy istemci kapıları ve bunların sözleşme testleri birlikte geri alınır. Bu geri alma eski hard-delete, sahte shipment ve güvensiz return yollarını yeniden açacağı için yalnız ayrı olay incelemesi ve açık onayla yapılabilir. Gerçek ödeme veya taşıyıcı konfigürasyonu bu turda değiştirilmez.
+
+## Tur 2C geri alma sınırı
+
+Tur 2C şema/migration veya haricî sağlayıcı entegrasyonu eklemez. En hızlı operasyonel kapatma iki env bayrağını tanımsız/`false` tutmaktır; bu durumda session capability'leri ve sunucu mutation kapıları birlikte kapanır. Kod geri alma gerektiğinde capability service/middleware, admin cancel policy, manual shipment policy/service/controller/route, Commerce Pro mutation adapter/UI, üretilen live artifact ve ilgili testler birlikte geri alınır. Salt-okunur shipment/return görünümü, Tur 2B güvenlik çekirdeği ve eski `create`/return write kilitleri geri açılmaz.

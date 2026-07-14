@@ -1,4 +1,6 @@
-# NovaStore Go-Live Checklist (3 Mayis 2026 Hedefi)
+# NovaStore Go-Live Readiness Checklist (14 Temmuz 2026 durumu)
+
+Durum: **NO-GO**. Bu liste production, uzak DB, migration, gercek odeme veya deploy yetkisi vermez.
 
 ## A) Ticari Hazirlik
 - [ ] iyzico sozlesmesi imzali, production hesabı aktif.
@@ -6,10 +8,14 @@
 - [ ] e-Fatura/e-Arsiv test belgeleri basarili, mali musavir onayi alindi.
 
 ## B) Teknik Hazirlik
+- [x] Siparis/payment callback yasam dongusu fake-pool ve statik kontratlarla fail-closed hale getirildi.
+- [x] Admin iptali ve manuel kargo devri varsayilan kapali capability/kill-switch arkasinda eklendi.
+- [ ] Guncel masaustu/mobil browser, console ve network UAT'i tamamlandi.
+- [ ] Commerce Pro legacy parity, feature flag cutover ve rollback provasi tamamlandi.
 - [ ] Commerce schema migrationlari production veritabaninda uygulandi.
-- [ ] Odeme initialize + webhook testleri gecti.
-- [ ] `SHIPMENT_CREATE_DISABLED` kilidi kontrollu Tur 2C UAT'i ve onay sonrasinda kaldirildi; kargo olusturma + takip akislari gecti.
-- [ ] `RETURN_WRITES_DISABLED` kilidi kontrollu Tur 2C UAT'i ve onay sonrasinda kaldirildi; iade, geri odeme ve stok zinciri gecti.
+- [ ] Gercek odeme initialize + imzali webhook testleri onayli staging'de gecti; mock/test-token implementasyonlari kaldirildi.
+- [ ] Gercek tasiyici adapteri, label ve tracking callback staging UAT'i gecti. Manuel devir kaydi bu maddeyi karsilamaz.
+- [ ] `RETURN_WRITES_DISABLED` ancak iade, provider refund, stok hareketi ve reconciliation zinciri testlerinden sonra kontrollu yeni kontratla degistirildi.
 - [ ] Checkout kupon/kampanya hesaplamasi backend ile uyumlu.
 - [ ] Merchant feed (`/merchant/feed.xml`) dogrulandi.
 

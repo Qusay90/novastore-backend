@@ -15,14 +15,19 @@ Bu dokuman teknik ekip ile partner teknik ekiplerinin ortak UAT ve production cu
 ## 2) Kargo
 - Aktif endpoint:
   - `GET /api/shipments/:orderId` (owner/admin, salt okunur)
+- Kontrollu yerel operasyon:
+  - `POST /api/shipments/:orderId/manual` yalniz admin, guncel DB rolu ve `NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED=true` ile calisir.
+  - Idempotency, beklenen durum, fiziksel handoff onayi, kilitli payment/stok kaniti ve acik reconciliation olmamasi zorunludur.
+  - Bu endpoint tasiyici API'si, etiket veya dogrulanmis takip URL'si uretmez.
 - Guvenlik kilidi:
-  - `POST /api/shipments/:orderId/create` gecici olarak `410 SHIPMENT_CREATE_DISABLED` doner.
-  - Gercek kargo entegrasyonu, operator tarafindan girilen dogrulanmis takip numarasi ve durum gecisleri tamamlanmadan acilmaz.
+  - Eski `POST /api/shipments/:orderId/create` `410 SHIPMENT_CREATE_DISABLED` donmeye devam eder.
 - Mevcut UAT senaryolari:
   1. Owner/admin mevcut gonderi bilgisini gorebilir.
   2. Yetkisiz kullanici baska siparisin gonderisini goremez.
-  3. Gonderi olusturma denemesi veri yazmadan guvenlik koduyla reddedilir.
-- Acma kriteri: Tur 2C shipment mutation testleri tamamlandiktan sonra gonderi olusturma UAT'i ayrica kosulur.
+  3. Bayrak kapaliyken manuel devir current-admin/order DB sorgusundan once reddedilir.
+  4. Bayrak acik fake-pool testinde ayni key/payload tekrarinda tek kayit; farkli key/payload durumunda 409 uretilir.
+  5. Bildirim hatasi COMMIT edilmis shipment/order kaydini geri almaz.
+- Gercek tasiyici kriteri: Saglayici sozlesmesi, staging sirri, label/tracking callback adapteri ve ayri acik UAT onayi olmadan yoktur.
 
 ## 3) Iade
 - Aktif endpoint:
@@ -35,7 +40,7 @@ Bu dokuman teknik ekip ile partner teknik ekiplerinin ortak UAT ve production cu
   1. Kullanici yalniz kendi mevcut iade talebini gorebilir.
   2. Admin mevcut iade taleplerini salt okunur inceleyebilir.
   3. Yeni talep ve durum degisikligi veri yazmadan guvenlik koduyla reddedilir.
-- Acma kriteri: Tur 2C iade uygunluk ve geri odeme zinciri testleri tamamlandiktan sonra yazma UAT'i ayrica kosulur.
+- Acma kriteri: Tur 2C iade yazimini acmaz. Satir bazli iade, refund idempotency, stok hareketi, reconciliation ve migration tasarimi ayri onaylandiktan sonra yeni tur planlanir.
 
 ## 4) Kampanya Motoru
 - Endpoint: `POST /api/campaigns/quote`
