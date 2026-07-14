@@ -5,10 +5,16 @@ import {
   analyticsPeriods,
   auditRecords,
   buildCsv,
+  calculateSellerReviewPriority,
   categoryPreviewRows,
   customerRecords,
+  evaluateProductPublication,
   filterTemplateRows,
+  getInventoryStatus,
   initialWorkspaceSettings,
+  isFirstPartyOffer,
+  isSellerDocumentComplete,
+  isSellerDocumentStateValid,
   matchesQuery,
   matchesStore,
   moduleRecords,
@@ -22,6 +28,7 @@ import {
   roleLayoutSeed,
   sellerApplicationRecords,
   sellerOrderRows,
+  sellerRequiredDocumentKeys,
   setCustomerSegment,
   setOrderOwner,
   setOrderStatuses,
@@ -29,6 +36,7 @@ import {
   settlementRecords,
   stockRiskRows,
   toggleModuleAvailability,
+  upsertProductOffer,
   validateProductDraft,
 } from "./previewModel.js";
 
@@ -105,8 +113,9 @@ const contextByDomain = {
     { label: "Müşteri Soruları", disabled: true },
   ],
   catalog: [
-    { label: "Tüm Ürünler", count: "5" },
-    { label: "Onay Bekleyen", count: "1" },
+    { label: "Kanonik Katalog", count: "5" },
+    { label: "Satıcı Teklifleri", count: "4" },
+    { label: "Politika İstisnaları", count: "1" },
     { label: "Kategoriler", count: "5" },
     { label: "Filtre Şablonları", count: "3" },
   ],
@@ -119,7 +128,7 @@ const contextByDomain = {
   sellers: [
     { label: "Satıcı Başvuruları", count: "4" },
     { label: "Aktif Satıcılar", disabled: true },
-    { label: "Ürün Onayları", route: "catalog", routeItem: "Onay Bekleyen", count: "1" },
+    { label: "Politika İstisnaları", route: "catalog", routeItem: "Politika İstisnaları", count: "1" },
     { label: "Performans", disabled: true },
   ],
   finance: [
@@ -136,7 +145,7 @@ const contextByDomain = {
   ],
   modules: [
     { label: "Modül Merkezi" },
-    { label: "Etkin Modüller", count: "4" },
+    { label: "Etkin Modüller", count: "2" },
     { label: "Rol Düzenleri", count: "3" },
   ],
   audit: [
@@ -325,6 +334,18 @@ function PreviewBanner() {
       <strong>Commerce Pro önizlemesi</strong>
       <span>Örnek veriler kullanılır; hiçbir işlem kaydedilmez ve ödeme isteği gönderilmez.</span>
     </div>
+  );
+}
+
+function MarketplaceScopeNotice({ children }) {
+  return (
+    <section className="architecture-notice" role="note" data-testid="marketplace-scope-notice">
+      <Icon name="info" />
+      <div>
+        <strong>Mevcut backend tek satıcılıdır</strong>
+        <p>{children || "Bu alan, gelecekteki çok satıcılı hedef mimariyi yalnız yerel mock verilerle simüle eder; satıcı hesabı, teklif servisi veya yetkilendirme henüz bağlı değildir."}</p>
+      </div>
+    </section>
   );
 }
 
@@ -566,6 +587,78 @@ function ContextRail({
       id="context-navigation"
       data-testid="context-navigation"
       tabIndex="-1"
+  = false }) {
+  return (
+    <nav className="icon-rail" aria-label="Ana çalışma alanları" data-testid="admin-sidebar" inert={inactive ? true : undefined}>
+      <div className="rail-logo" aria-label="NovaStore">
+        <span className="nova-mark"><Icon name="star" /></span>
+        <span>NovaStore</span>
+      </div>
+      <div className="rail-nav">
+        {domains.slice(0, 8).map((item) => (
+          <button
+            key={item.id}
+            className={active === item.id ? "active" : ""}
+            aria-current={active === item.id ? "page" : undefined}
+            aria-label={item.label}
+            title={item.label}
+            onClick={() => setActive(item.id)}
+            data-testid={"nav-" + item.id}
+          >
+            <Icon name={item.icon} />
+          </button>
+        ))}
+      </div>
+      <div className="rail-bottom">
+        {domains.slice(8).map((item) => (
+          <button
+            key={item.id}
+            className={active === item.id ? "active" : ""}
+            aria-current={active === item.id ? "page" : undefined}
+            aria-label={item.label}
+            title={item.label}
+            onClick={() => setActive(item.id)}
+            data-testid={"nav-" + item.id}
+          >
+            <Icon name={item.icon} />
+          </button>
+        ))}
+        <button className="rail-profile" onClick={onProfile} aria-label="Profil ve rol önizlemesini aç" title="Profil">
+          <span className="avatar">AK</span>
+        </button>
+      </div>
+    </nav>
+  );
+}
+
+function ContextRail({
+  domain,
+  open,
+  mobile,
+  savedViews,
+  activeItem,
+  onItem,
+  onView,
+  onSaveView,
+  onNavigate,
+  onClose,
+  store,
+  onStoreChange,
+  dateRange,
+  onDateRangeChange,
+  panelRef,
+}) {
+  if (!open) return null;
+  const title = domains.find((item) => item.id === domain)?.label;
+  const items = contextByDomain[domain] || [];
+
+  return (
+    <aside
+      ref={panelRef}
+      className="context-rail"
+      id="context-navigation"
+      data-testid="context-navigation"
+      tabIndex="-1"
       role={mobile ? "dialog" : undefined}
       aria-modal={mobile ? "true" : undefined}
       aria-label={mobile ? title + " bağlamsal menüsü" : undefined}
@@ -582,8 +675,8 @@ function ContextRail({
         <select aria-label="Örnek kapsam" value={store} onChange={(event) => onStoreChange(event.target.value)}>
           <option>Tüm Mağazalar · 24</option>
           <option>NovaStore</option>
-          <option>TeknoPark · 2 mağaza</option>
-          <option>Eviva Home</option>
+          <option>Demo Teknoloji · 2 mağaza</option>
+          <option>Demo Ev</option>
         </select>
       </label>}
       {["dashboard", "operations"].includes(domain) && <label className="context-store context-date">
@@ -632,9 +725,9 @@ function ContextRail({
             Satıcı Başvuruları
             <b>4</b>
           </button>
-          <button onClick={() => onNavigate("catalog", "Onay Bekleyen")}>
+          <button onClick={() => onNavigate("catalog", "Politika İstisnaları")}>
             <Icon name="package" />
-            Ürün Onayları
+            Politika İstisnaları
             <b>1</b>
           </button>
         </section>
@@ -724,7 +817,7 @@ function OrderInspectorContent({ order, notes, setNotes, notify, updateStatus, o
           <span className="section-label">Müşteri</span>
           <div className="entity-line">
             <span className="avatar avatar-small">{order.customer.split(" ").map((word) => word[0]).join("")}</span>
-            <div><strong>{order.customer}</strong><small>{order.customer.toLocaleLowerCase("tr-TR").replace(" ", ".")}@email.com</small></div>
+            <div><strong>{order.customer}</strong><small>{`siparis-${order.id.toLocaleLowerCase("tr-TR")}@example.invalid`}</small></div>
           </div>
         </section>
         <section>
@@ -823,7 +916,7 @@ function Operations({
   const scopedOrderCount = allStores
     ? profile.orders
     : Math.round(6842 * scopedScale).toLocaleString("tr-TR");
-  const scopedApprovalCount = Math.round(2214 * storeRatio).toLocaleString("tr-TR");
+  const scopedOpenOrderCount = scopedOrders.filter((order) => !["Teslim Edildi", "İptal Edildi"].includes(order.status)).length.toLocaleString("tr-TR");
 
   useEffect(() => {
     if (!filtersMountedRef.current) {
@@ -884,1302 +977,11 @@ function Operations({
       <div className="workspace-heading operations-heading">
         <div>
           <span className="eyebrow">{profile.label} · örnek veri</span>
-          <h2 tabIndex="-1">Canlı Sipariş Operasyonu</h2>
+          <h2 tabIndex="-1">Sipariş Operasyonu Önizlemesi</h2>
         </div>
         <div className="heading-actions">
           <label className="heading-select">
             <Icon name="storefront" />
             <select aria-label="Mağaza kapsamı" value={store} onChange={(event) => setStore(event.target.value)} data-testid="store-scope">
-              <option>Tüm Mağazalar · 24</option><option>NovaStore</option><option>TeknoPark · 2 mağaza</option><option>Eviva Home</option>
-            </select>
-          </label>
-          <label className="heading-select">
-            <Icon name="bookmark" />
-            <select aria-label="Görünüm" value={activeView} onChange={(event) => onApplyView(savedViews.find((view) => view.name === event.target.value))}>
-              {activeView === "" && <option value="" disabled>Özel görünüm</option>}
-              {savedViews.map((view) => <option key={view.name}>{view.name}</option>)}
-            </select>
-          </label>
-          <button className={"secondary-button " + (editingLayout ? "active" : "")} onClick={() => setEditingLayout(!editingLayout)} data-testid="layout-edit">
-            <Icon name="grid" />{editingLayout ? "Düzenlemeyi bitir" : "Düzeni düzenle"}
-          </button>
-          <button className="secondary-button" onClick={onSaveView}><Icon name="bookmark" />Görünümü kaydet</button>
-        </div>
-      </div>
-      {editingLayout && (
-        <div className="edit-banner">
-          <Icon name="info" />
-          <span>Bu oturumda görünür analiz modüllerini seçin. Sıralama ve kalıcı rol düzeni entegrasyon aşamasındadır.</span>
-          <label><input type="checkbox" checked={visiblePanels.revenue} onChange={(event) => setVisiblePanels({ ...visiblePanels, revenue: event.target.checked })} /> Net Ciro</label>
-          <label><input type="checkbox" checked={visiblePanels.distribution} onChange={(event) => setVisiblePanels({ ...visiblePanels, distribution: event.target.checked })} /> Dağılım</label>
-          <button onClick={() => setEditingLayout(false)}>Bitti</button>
-        </div>
-      )}
-      <section className="kpi-grid" aria-label="Temel performans göstergeleri">
-        <Kpi label="Net Ciro" value={scopedRevenue} trend="↑ %14,6 · seçili mağaza ve dönem" />
-        <Kpi label="Sipariş" value={scopedOrderCount} trend="↑ %12,3 · seçili mağaza ve dönem" />
-        <Kpi label="Bekleyen Satıcı Onayı" value={scopedApprovalCount} trend="↑ %18,7 · seçili mağaza örneği" tone="warning" />
-        <Kpi label="İade Oranı" value="%4,28" trend="↓ 0,56 puan · iyileşme" />
-      </section>
-      {(visiblePanels.revenue || visiblePanels.distribution) && (
-        <section className="insight-grid">
-          {visiblePanels.revenue && (
-            <article className="module-card revenue-module">
-              <header>
-                <h3>Net Ciro</h3>
-                <details className="module-menu">
-                  <summary aria-label="Net ciro modülü açıklaması"><Icon name="menu" /></summary>
-                  <p>Seçili tarih aralığına göre yerel örnek seri yeniden hesaplanır.</p>
-                </details>
-              </header>
-              <div className="chart-legend" aria-hidden="true"><span className="current-line">Bu dönem</span><span className="previous-line">Önceki dönem</span></div>
-              <RevenueChart scale={scopedScale} labels={profile.days} />
-            </article>
-          )}
-          {visiblePanels.distribution && (
-            <article className="module-card distribution-module">
-              <header>
-                <h3>Sipariş Durum Dağılımı</h3>
-                <details className="module-menu">
-                  <summary aria-label="Sipariş dağılımı açıklaması"><Icon name="menu" /></summary>
-                  <p>Dağılım göstergeleri örnek dönem ölçeğini temsil eder.</p>
-                </details>
-              </header>
-              {[["Yeni", 32, "blue"], ["Hazırlanıyor", 27, "orange"], ["Kargoya Verildi", 24, "green"], ["Teslim Edildi", 13, "gray"], ["İptal / İade", 4, "red"]].map(([label, percent, tone]) => (
-                <div className={"distribution-row tone-" + tone} key={label}>
-                  <span>{label}</span><progress max="100" value={percent} aria-label={label + " yüzde " + percent} />
-                  <b>{Math.round(6842 * scopedScale * percent / 100).toLocaleString("tr-TR")}</b><small>%{percent}</small>
-                </div>
-              ))}
-            </article>
-          )}
-        </section>
-      )}
-      <section className="ledger-card">
-        <div className="ledger-tabs" role="tablist" aria-label="Operasyon kayıt türleri">
-          {[["orders", "Siparişler", filtered.length], ["seller-orders", "Satıcı Siparişleri", sellerOrderRows.length], ["returns", "İadeler", returnRows.length], ["stock", "Stok", stockRiskRows.length]].map(([id, label, count]) => (
-            <button
-              role="tab"
-              aria-selected={tab === id}
-              className={tab === id ? "active" : ""}
-              onClick={() => {
-                setTab(id);
-                if (id !== "orders") setCurrentId("");
-              }}
-              key={id}
-              data-testid={"ledger-tab-" + id}
-            >
-              {label}<b>{count}</b>
-            </button>
-          ))}
-        </div>
-        {tab !== "orders" ? (
-          <div role="tabpanel" aria-label={tab === "returns" ? "İadeler" : tab === "stock" ? "Stok" : "Satıcı Siparişleri"}>
-            <OperationsPreviewTable tab={tab} store={store} />
-          </div>
-        ) : (
-          <div role="tabpanel" aria-label="Siparişler">
-            <div className="ledger-toolbar">
-              {visibleSelected.length > 0 ? (
-                <div className="bulk-toolbar" data-testid="bulk-actions">
-                  <strong>{visibleSelected.length} görünür sipariş seçildi</strong>
-                  <button onClick={() => setSelected([])}>Seçimi temizle</button>
-                  <select aria-label="Toplu durum güncelle" defaultValue="" onChange={(event) => event.target.value && bulkStatus(event.target.value)}>
-                    <option value="">Durumu güncelle</option><option>Hazırlanıyor</option><option>Kargoya Verildi</option><option>İptal Edildi</option>
-                  </select>
-                  <button onClick={() => openDialog("assign-owner", { ids: visibleSelected.map((item) => item.id) })}>Sahip ata</button>
-                </div>
-              ) : (
-                <div className="filter-toolbar">
-                  <label className="table-search">
-                    <Icon name="search" />
-                    <input
-                      type="search"
-                      value={filter.query}
-                      onChange={(event) => {
-                        onCustomFilter();
-                        setFilter({ ...filter, query: event.target.value });
-                      }}
-                      placeholder="Sipariş, müşteri veya ürün ara"
-                      aria-label="Siparişlerde ara"
-                      data-testid="filter-search"
-                    />
-                  </label>
-                  <select
-                    aria-label="Sipariş durumu"
-                    value={filter.status}
-                    onChange={(event) => {
-                      onCustomFilter();
-                      setFilter({ ...filter, status: event.target.value });
-                    }}
-                    data-testid="status-filter"
-                  >
-                    <option>Tümü</option><option>Yeni</option><option>Hazırlanıyor</option><option>Kargoya Verildi</option><option>Teslim Edildi</option><option>İptal Edildi</option>
-                  </select>
-                  <button className="secondary-button" onClick={() => onApplyView(savedViews[0])}><Icon name="filter" />Filtreleri temizle</button>
-                </div>
-              )}
-            </div>
-            <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Sipariş tablosu, yatay kaydırılabilir">
-              <table className="data-table">
-                <caption className="sr-only">Filtrelenmiş örnek siparişler</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">
-                      <input
-                        ref={selectAllRef}
-                        type="checkbox"
-                        aria-label="Bu sayfadaki tüm siparişleri seç"
-                        checked={allSelected}
-                        onChange={(event) => {
-                          const pageIds = pagination.rows.map((order) => order.id);
-                          setSelected(event.target.checked
-                            ? Array.from(new Set(selected.concat(pageIds)))
-                            : selected.filter((id) => !pageIds.includes(id)));
-                        }}
-                      />
-                    </th>
-                    <th scope="col">Sipariş ID</th><th scope="col">Satıcı / Mağaza</th><th scope="col">Müşteri</th><th scope="col">Ürün</th>
-                    <th scope="col">Kanal</th><th scope="col">Tutar</th><th scope="col">Durum</th><th scope="col">SLA Yaşı</th><th scope="col">Sahip</th><th scope="col"><span className="sr-only">İşlem</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagination.rows.map((order) => (
-                    <tr
-                      key={order.id}
-                      className={current?.id === order.id ? "selected-row" : ""}
-                      onClick={(event) => openInspector(order.id, event.currentTarget.querySelector("button"))}
-                      data-testid="table-row"
-                      data-row-id={order.id}
-                    >
-                      <td onClick={(event) => event.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          aria-label={order.id + " satırını seç"}
-                          data-testid="row-select"
-                          checked={selected.includes(order.id)}
-                          onChange={(event) => setSelected(event.target.checked ? selected.concat(order.id) : selected.filter((id) => id !== order.id))}
-                        />
-                      </td>
-                      <td><strong>{order.id}</strong></td>
-                      <td><span className="seller-cell"><Icon name="storefront" />{order.seller}</span></td>
-                      <td>{order.customer}</td>
-                      <td><span className="product-cell"><img src={order.image} alt="" />{order.product}</span></td>
-                      <td>{order.channel}</td><td><strong>{money(order.amount)}</strong></td><td><Status>{order.status}</Status></td>
-                      <td className="sla">{order.age}</td><td>{order.owner}</td>
-                      <td><button className="icon-button small" aria-label={order.id + " siparişini incele"} onClick={(event) => { event.stopPropagation(); openInspector(order.id, event.currentTarget); }}><Icon name="menu" /></button></td>
-                    </tr>
-                  ))}
-                  {pagination.rows.length === 0 && (
-                    <EmptyTable
-                      colSpan={11}
-                      title="Sipariş bulunamadı"
-                      description="Arama, durum veya mağaza kapsamını değiştirin."
-                      onReset={() => onApplyView(savedViews[0])}
-                    />
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <footer className="table-footer">
-              <span>Toplam {filtered.length} kayıttan {pagination.start}–{pagination.end} arası gösteriliyor</span>
-              <nav aria-label="Sipariş sayfalama">
-                {Array.from({ length: pagination.pageCount }, (_item, index) => index + 1).map((item) => (
-                  <button key={item} aria-current={pagination.page === item ? "page" : undefined} onClick={() => { setPage(item); setSelected([]); setCurrentId(""); }}>{item}</button>
-                ))}
-              </nav>
-              <label>Satır <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}><option>5</option><option>10</option><option>20</option></select></label>
-            </footer>
-          </div>
-        )}
-      </section>
-      {current && compact && (
-        <Modal title={"Sipariş #" + current.id} onClose={closeInspector} testId="row-inspector" cardClass="order-inspector-modal">
-          <OrderInspectorContent order={current} notes={notes} setNotes={setNotes} notify={notify} updateStatus={updateStatus} openDialog={openDialog} />
-        </Modal>
-      )}
-      {current && !compact && (
-        <aside
-          ref={inspectorRef}
-          className="inspector"
-          role="complementary"
-          aria-labelledby={"inspector-title-" + current.id}
-          tabIndex="-1"
-          data-testid="row-inspector"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.stopPropagation();
-              closeInspector();
-            }
-          }}
-        >
-          <header>
-            <div><span className="eyebrow">Örnek sipariş ayrıntısı</span><h3 id={"inspector-title-" + current.id}>Sipariş #{current.id}</h3></div>
-            <button className="icon-button" onClick={closeInspector} aria-label="Denetçiyi kapat"><Icon name="close" /></button>
-          </header>
-          <OrderInspectorContent order={current} notes={notes} setNotes={setNotes} notify={notify} updateStatus={updateStatus} openDialog={openDialog} />
-        </aside>
-      )}
-    </div>
-  );
-}
-
-function Dashboard({ orders, onOpenOrders, onHealth, dateRange }) {
-  const urgent = orders.filter((order) => order.status === "Yeni" || order.status === "Hazırlanıyor");
-  const profile = dateProfiles[dateRange];
-  return (
-    <div className="workspace page-workspace dashboard-page">
-      <div className="workspace-heading">
-        <div><span className="eyebrow">{profile.label} · yönetici özeti</span><h2 tabIndex="-1">Genel Bakış</h2><p>Satış sağlığını, açık operasyon işlerini ve risk kuyruklarını tek ekranda izleyin.</p></div>
-        <button className="primary-button" onClick={onOpenOrders}><Icon name="orders" />Sipariş operasyonuna git</button>
-      </div>
-      <section className="kpi-grid">
-        <Kpi label="Net satış" value={profile.revenue} trend="↑ %14,6 · önceki dönem" />
-        <Kpi label="Açık operasyon işi" value={String(urgent.length + 21)} trend="12 kritik SLA" tone="warning" />
-        <Kpi label="Mutabakat farkı" value="₺99.001" trend="3 örnek kayıt" tone="warning" />
-        <Kpi label="Satıcı sağlığı" value="%96,4" trend="24 aktif mağaza" />
-      </section>
-      <section className="analytics-grid">
-        <article className="module-card">
-          <header><div><span className="eyebrow">Bugünün öncelikleri</span><h3>Operasyon kuyruğu</h3></div><button className="link-button" onClick={onOpenOrders}>Tümünü aç</button></header>
-          {[["Geciken siparişler", 12, 76], ["Kritik stok", 14, 58], ["Satıcı başvuruları", 4, 42], ["İade SLA riski", 3, 30]].map(([label, value, progress]) => (
-            <div className="metric-progress" key={label}><span>{label}</span><progress max="100" value={progress} aria-label={label + " yoğunluğu yüzde " + progress} /><strong>{value}</strong></div>
-          ))}
-        </article>
-        <article className="module-card">
-          <header><div><span className="eyebrow">Sistem durumu</span><h3>Bağlantı sözleşmesi</h3></div></header>
-          {[["Katalog", "Yerel örnek"], ["Sipariş akışı", "Yerel örnek"], ["Bildirim kuyruğu", "Önizleme"], ["Canlı tahsilat", "Entegrasyonda"]].map(([label, state]) => (
-            <div className="check-line" key={label}><Icon name={state === "Entegrasyonda" ? "warning" : "check"} /><span>{label}</span><small>{state}</small></div>
-          ))}
-          <button className="secondary-button small" onClick={onHealth}>Sağlık ayrıntısını önizle</button>
-        </article>
-      </section>
-    </div>
-  );
-}
-
-function Catalog({ products, store, contextItem, collectionDrafts, onCreate, onEdit }) {
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("Tümü");
-  const mode = contextItem === "Kategoriler" ? "categories" : contextItem === "Filtre Şablonları" ? "templates" : "products";
-  const forcedStatus = contextItem === "Onay Bekleyen" ? "Onay bekliyor" : status;
-  const scopedProducts = products.filter((product) => matchesStore(product, store));
-  const visible = scopedProducts.filter((product) => (
-    (forcedStatus === "Tümü" || product.status === forcedStatus)
-    && matchesQuery(product, query)
-  ));
-
-  if (mode === "categories") {
-    return (
-      <div className="workspace page-workspace">
-        <div className="workspace-heading"><div><span className="eyebrow">Katalog yapısı · yerel örnek</span><h2 tabIndex="-1">Kategoriler</h2><p>Ürün taksonomisini ve yayın durumlarını entegrasyondan önce inceleyin.</p></div></div>
-        <section className="table-card">
-          <header className="card-header"><div><h3>Kategori ağacı önizlemesi</h3><p>Salt okunur örnek yapı</p></div></header>
-          <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Kategori tablosu, yatay kaydırılabilir"><table className="data-table"><caption className="sr-only">Örnek kategoriler</caption><thead><tr><th scope="col">Kategori</th><th scope="col">Yol</th><th scope="col">Seviye</th><th scope="col">Ürün</th><th scope="col">Durum</th></tr></thead><tbody>{categoryPreviewRows.map((row) => <tr key={row.id}><td><strong>{row.name}</strong></td><td>{row.path}</td><td>{row.depth}</td><td>{row.products.toLocaleString("tr-TR")}</td><td><Status>{row.state}</Status></td></tr>)}</tbody></table></div>
-        </section>
-      </div>
-    );
-  }
-
-  if (mode === "templates") {
-    return (
-      <div className="workspace page-workspace">
-        <div className="workspace-heading"><div><span className="eyebrow">Filtre anatomisi · yerel örnek</span><h2 tabIndex="-1">Filtre Şablonları</h2><p>Kategori özelliklerinin sayısal ve zorunlu alan sözleşmesini inceleyin.</p></div></div>
-        <section className="table-card">
-          <header className="card-header"><div><h3>Şablon önizlemeleri</h3><p>Düzenleme gerçek kategori servisiyle etkinleşecek</p></div></header>
-          <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Filtre şablonları tablosu, yatay kaydırılabilir"><table className="data-table"><caption className="sr-only">Örnek filtre şablonları</caption><thead><tr><th scope="col">Şablon</th><th scope="col">Kategori</th><th scope="col">Özellik</th><th scope="col">Zorunlu</th><th scope="col">Durum</th></tr></thead><tbody>{filterTemplateRows.map((row) => <tr key={row.id}><td><strong>{row.name}</strong><small className="block-note">{row.id}</small></td><td>{row.category}</td><td>{row.attributes}</td><td>{row.required}</td><td><Status>{row.state}</Status></td></tr>)}</tbody></table></div>
-        </section>
-      </div>
-    );
-  }
-
-  return (
-    <div className="workspace page-workspace">
-      <div className="workspace-heading">
-        <div><span className="eyebrow">Çoklu satıcı kataloğu · yerel CRUD</span><h2 tabIndex="-1">Ürün ve Katalog Yönetimi</h2><p>Kanonik ürün içeriğini, satıcı teklifini, fiyatı ve stoku bu oturumda düzenleyin.{collectionDrafts.length > 0 ? " " + collectionDrafts.length + " yerel koleksiyon taslağı bulunuyor." : ""}</p></div>
-        <button className="primary-button" onClick={onCreate}><Icon name="plus" />Yeni ürün</button>
-      </div>
-      <section className="kpi-grid compact">
-        <Kpi label="Kapsamdaki ürün" value={String(scopedProducts.length)} trend="Oturum içi kayıt" />
-        <Kpi label="Onay bekleyen" value={String(scopedProducts.filter((item) => item.status === "Onay bekliyor").length)} trend="İnceleme kuyruğu" tone="warning" />
-        <Kpi label="Düşük stok" value={String(scopedProducts.filter((item) => item.stock < 10).length)} trend="Aksiyon gerekli" tone="warning" />
-        <Kpi label="İçerik tamlığı" value="%94" trend="Örnek gösterge" />
-      </section>
-      <section className="table-card">
-        <header className="card-header">
-          <div><h3>{contextItem === "Onay Bekleyen" ? "Onay bekleyen ürünler" : "Tüm ürünler"}</h3><p>Arama, durum filtresi, oluşturma ve düzenleme yerel olarak çalışır</p></div>
-          <div className="filter-toolbar">
-            <label className="table-search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ürün veya SKU ara" aria-label="Ürün veya SKU ara" data-testid="catalog-search" /></label>
-            {contextItem !== "Onay Bekleyen" && (
-              <select aria-label="Ürün durumu" value={status} onChange={(event) => setStatus(event.target.value)} data-testid="catalog-filter">
-                <option>Tümü</option><option>Yayında</option><option>Düşük stok</option><option>Stokta yok</option><option>Onay bekliyor</option>
-              </select>
-            )}
-          </div>
-        </header>
-        <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Ürün tablosu, yatay kaydırılabilir">
-          <table className="data-table">
-            <caption className="sr-only">Filtrelenmiş örnek ürünler</caption>
-            <thead><tr><th scope="col">Ürün</th><th scope="col">SKU</th><th scope="col">Satıcı teklifi</th><th scope="col">Kategori</th><th scope="col">Stok</th><th scope="col">Fiyat</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
-            <tbody>
-              {visible.map((product) => (
-                <tr key={product.sku} data-testid={"catalog-row-" + product.sku}>
-                  <td><span className="product-cell"><img src={product.image} alt="" /><strong>{product.name}</strong></span></td>
-                  <td>{product.sku}</td><td>{product.seller}</td><td>{product.category}</td>
-                  <td><strong className={product.stock < 10 ? "negative" : ""}>{product.stock}</strong></td>
-                  <td>{money(product.price)}</td><td><Status>{product.status}</Status></td>
-                  <td><button className="secondary-button small" onClick={() => onEdit(product)}>Düzenle</button></td>
-                </tr>
-              ))}
-              {visible.length === 0 && <EmptyTable colSpan={8} title="Ürün bulunamadı" onReset={() => { setQuery(""); setStatus("Tümü"); }} />}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function CustomerDetail({ customer, onClose, onSegment }) {
-  return (
-    <Modal title={customer.name} onClose={onClose} wide testId="customer-detail">
-      <div className="detail-modal-body">
-        <div className="detail-hero"><span className="avatar">{customer.name.split(" ").map((word) => word[0]).join("")}</span><div><strong>{customer.email}</strong><small>{customer.id} · {customer.city}</small></div></div>
-        <dl className="detail-list detail-grid"><div><dt>Sipariş</dt><dd>{customer.orders}</dd></div><div><dt>Yaşam boyu değer</dt><dd>{money(customer.lifetimeValue)}</dd></div><div><dt>İzin</dt><dd>{customer.consent}</dd></div><div><dt>Son aktivite</dt><dd>{customer.lastActivity}</dd></div></dl>
-        <section className="notice-card"><Icon name="info" /><div><strong>Destek özeti</strong><p>{customer.support}</p></div></section>
-        <label className="form-field"><span>Yerel segment</span><select value={customer.segment} onChange={(event) => onSegment(event.target.value)}><option>Yeni</option><option>Sadık</option><option>VIP</option></select></label>
-      </div>
-      <footer className="modal-actions"><button className="primary-button" onClick={onClose}>Tamam</button></footer>
-    </Modal>
-  );
-}
-
-function Customers({ customers, setCustomers, contextItem, initialCustomerId, notify }) {
-  const [query, setQuery] = useState("");
-  const [segment, setSegment] = useState("Tümü");
-  const [activeId, setActiveId] = useState(initialCustomerId || "");
-  const visible = customers.filter((customer) => (
-    (segment === "Tümü" || customer.segment === segment)
-    && matchesQuery(customer, query)
-  ));
-  const active = customers.find((customer) => customer.id === activeId);
-  const segmentSummaries = ["Yeni", "Sadık", "VIP"].map((name) => {
-    const members = customers.filter((customer) => customer.segment === name);
-    return {
-      name,
-      count: members.length,
-      value: members.reduce((sum, customer) => sum + customer.lifetimeValue, 0),
-    };
-  });
-
-  useEffect(() => {
-    if (initialCustomerId) setActiveId(initialCustomerId);
-  }, [initialCustomerId]);
-
-  const exportRows = () => {
-    downloadCsv("novastore-musteri-onizleme.csv", [
-      { label: "Müşteri", value: "name" },
-      { label: "E-posta", value: "email" },
-      { label: "Sipariş", value: "orders" },
-      { label: "Yaşam boyu değer", value: "lifetimeValue" },
-      { label: "Segment", value: "segment" },
-    ], visible);
-    notify(visible.length + " örnek müşteri CSV olarak indirildi.");
-  };
-
-  return (
-    <div className="workspace page-workspace">
-      <div className="workspace-heading">
-        <div><span className="eyebrow">Müşteri merkezi · örnek veri</span><h2 tabIndex="-1">{contextItem === "Segmentler" ? "Müşteri Segmentleri" : "Müşteriler"}</h2><p>Arama, segment, müşteri ayrıntısı ve güvenli CSV önizlemesini inceleyin.</p></div>
-        <button className="secondary-button" onClick={exportRows}><Icon name="download" />CSV indir</button>
-      </div>
-      <section className="kpi-grid compact"><Kpi label="Örnek müşteri" value={String(customers.length)} trend="Yerel kayıt" /><Kpi label="Tekrar satın alma" value="%31,8" trend="Örnek gösterge" /><Kpi label="Açık soru" value="9" trend="Entegrasyonda" tone="warning" /><Kpi label="Ortalama değer" value={money(Math.round(customers.reduce((sum, item) => sum + item.lifetimeValue, 0) / customers.length))} trend="Örnek ortalama" /></section>
-      {contextItem === "Segmentler" && (
-        <section className="segment-grid" aria-label="Yerel müşteri segmentleri">
-          {segmentSummaries.map((item) => (
-            <button key={item.name} className={segment === item.name ? "active" : ""} aria-pressed={segment === item.name} onClick={() => setSegment(segment === item.name ? "Tümü" : item.name)}>
-              <span className="eyebrow">Yerel segment</span>
-              <strong>{item.name}</strong>
-              <span>{item.count} müşteri · {money(item.value)}</span>
-            </button>
-          ))}
-        </section>
-      )}
-      <section className="table-card">
-        <header className="card-header">
-          <div><h3>Örnek müşteri listesi</h3><p>Detay ve segment değişiklikleri bu oturumda korunur</p></div>
-          <div className="filter-toolbar">
-            <label className="table-search"><Icon name="search" /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Müşteri veya e-posta ara" aria-label="Müşterilerde ara" /></label>
-            <select aria-label="Müşteri segmenti" value={segment} onChange={(event) => setSegment(event.target.value)}><option>Tümü</option><option>Yeni</option><option>Sadık</option><option>VIP</option></select>
-          </div>
-        </header>
-        <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Müşteri tablosu, yatay kaydırılabilir">
-          <table className="data-table">
-            <caption className="sr-only">Filtrelenmiş örnek müşteriler</caption>
-            <thead><tr><th scope="col">Müşteri</th><th scope="col">E-posta</th><th scope="col">Sipariş</th><th scope="col">Yaşam boyu değer</th><th scope="col">Segment</th><th scope="col">Son aktivite</th><th scope="col">İşlem</th></tr></thead>
-            <tbody>
-              {visible.map((customer) => <tr key={customer.id}><td><strong>{customer.name}</strong><small className="block-note">{customer.id}</small></td><td>{customer.email}</td><td>{customer.orders}</td><td><strong>{money(customer.lifetimeValue)}</strong></td><td><Status>{customer.segment}</Status></td><td>{customer.lastActivity}</td><td><button className="secondary-button small" onClick={() => setActiveId(customer.id)}>İncele</button></td></tr>)}
-              {visible.length === 0 && <EmptyTable colSpan={7} title="Müşteri bulunamadı" onReset={() => { setQuery(""); setSegment("Tümü"); }} />}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      {active && <CustomerDetail customer={active} onClose={() => setActiveId("")} onSegment={(value) => { setCustomers((rows) => setCustomerSegment(rows, active.id, value)); notify(active.name + " segmenti bu oturumda güncellendi."); }} />}
-    </div>
-  );
-}
-
-function SellerDetailContent({ seller, note, setNote, onDecision, onClose }) {
-  return (
-    <>
-      <header className="detail-panel-header">
-        <div><span className="eyebrow">{seller.id}</span><h3>{seller.name}</h3></div>
-        <div className="detail-heading-actions"><Status>{seller.status}</Status>{onClose && <button className="icon-button" onClick={onClose} aria-label="Satıcı ayrıntısını kapat"><Icon name="close" /></button>}</div>
-      </header>
-      <div className="detail-panel-body">
-        <div className="detail-hero"><span className="avatar">{seller.name.split(" ").map((word) => word[0]).join("")}</span><div><strong>{seller.owner}</strong><small>Örnek şirket yetkilisi · doğrulama simülasyonu</small></div></div>
-        <dl className="detail-list"><div><dt>Kategori</dt><dd>{seller.category}</dd></div><div><dt>Planlanan ürün</dt><dd>{seller.products}</dd></div><div><dt>Komisyon teklifi</dt><dd>{seller.commission}</dd></div><div><dt>Risk seviyesi</dt><dd><Status>{seller.risk}</Status></dd></div></dl>
-        {seller.decisionReason && <section className="notice-card"><Icon name="info" /><div><strong>Son karar gerekçesi</strong><p>{seller.decisionReason}</p></div></section>}
-        <section><h4>Örnek belge kontrolü</h4>{["Vergi levhası", "İmza sirküleri", "Banka hesabı", "Mesafeli satış sözleşmesi"].map((label, index) => <div className="check-line" key={label}><Icon name={index === 2 && seller.risk === "Yüksek" ? "warning" : "check"} /><span>{label}</span><small>{index === 2 && seller.risk === "Yüksek" ? "İncelenmeli" : "Örnek doğrulandı"}</small></div>)}</section>
-        <label className="note-field"><span>İnceleme notu</span><textarea value={note || ""} onChange={(event) => setNote(event.target.value)} placeholder="Önizleme için bir not ekleyin…" /><small>Yalnız bu oturumda korunur.</small></label>
-      </div>
-      <footer>
-        <button className="danger-button" onClick={() => onDecision("Reddedildi")} disabled={seller.status === "Reddedildi"} data-testid="seller-reject">Red akışı</button>
-        <button className="primary-button" onClick={() => onDecision("Onaylandı")} disabled={seller.status === "Onaylandı"} data-testid="seller-approve">Onay akışı</button>
-      </footer>
-    </>
-  );
-}
-
-function Sellers({ sellers, setSellers, notes, setNotes, mobile, initialSellerId, draftInvites, notify }) {
-  const [activeId, setActiveId] = useState(initialSellerId || (mobile ? "" : sellers[0]?.id || ""));
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [filters, setFilters] = useState({ risk: "Tümü", category: "Tümü", status: "Tümü" });
-  const [pendingDecision, setPendingDecision] = useState(null);
-  const [reason, setReason] = useState("");
-  const [decisionError, setDecisionError] = useState("");
-  const seller = sellers.find((item) => item.id === activeId);
-  const decisionSeller = sellers.find((item) => item.id === pendingDecision?.sellerId);
-  const visible = sellers.filter((item) => (
-    (filters.risk === "Tümü" || item.risk === filters.risk)
-    && (filters.category === "Tümü" || item.category === filters.category)
-    && (filters.status === "Tümü" || item.status === filters.status)
-  ));
-
-  useEffect(() => {
-    setActiveId(initialSellerId || (mobile ? "" : sellerApplicationRecords[0]?.id || ""));
-  }, [mobile, initialSellerId]);
-
-  useEffect(() => {
-    if (activeId && !visible.some((item) => item.id === activeId)) {
-      setActiveId(mobile ? "" : visible[0]?.id || "");
-    }
-  }, [activeId, filters.risk, filters.category, filters.status, mobile, sellers]);
-
-  const decide = () => {
-    if (!pendingDecision || !decisionSeller) {
-      setPendingDecision(null);
-      return;
-    }
-    if (pendingDecision.status === "Reddedildi" && reason.trim().length < 5) {
-      setDecisionError("Red gerekçesi en az 5 karakter olmalıdır.");
-      return;
-    }
-    setSellers((rows) => setSellerDecision(rows, decisionSeller.id, pendingDecision.status, reason));
-    notify(decisionSeller.name + " durumu önizlemede “" + pendingDecision.status + "” oldu.");
-    setPendingDecision(null);
-    setReason("");
-    setDecisionError("");
-  };
-
-  const detailContent = seller && (
-    <SellerDetailContent
-      seller={seller}
-      note={notes[seller.id]}
-      setNote={(value) => setNotes({ ...notes, [seller.id]: value })}
-      onDecision={(value) => { setPendingDecision({ sellerId: seller.id, status: value }); setReason(""); setDecisionError(""); }}
-      onClose={null}
-    />
-  );
-
-  return (
-    <div className="workspace split-workspace">
-      <div className="split-main">
-        <div className="workspace-heading">
-          <div><span className="eyebrow">Çoklu satıcı kabulü · güvenli simülasyon</span><h2 tabIndex="-1">Satıcı Başvuruları</h2><p>Belge, risk ve komisyon kararını gerçek erişim açmadan inceleyin.{draftInvites.length > 0 ? " " + draftInvites.length + " gönderilmemiş yerel davet taslağı bulunuyor." : ""}</p></div>
-          <button className="secondary-button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}><Icon name="filter" />Gelişmiş filtre</button>
-        </div>
-        {filtersOpen && (
-          <section className="filter-panel" aria-label="Satıcı filtreleri">
-            <label>Risk<select value={filters.risk} onChange={(event) => setFilters({ ...filters, risk: event.target.value })}><option>Tümü</option><option>Düşük</option><option>Orta</option><option>Yüksek</option></select></label>
-            <label>Kategori<select value={filters.category} onChange={(event) => setFilters({ ...filters, category: event.target.value })}><option>Tümü</option>{Array.from(new Set(sellers.map((item) => item.category))).map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label>Durum<select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option>Tümü</option>{Array.from(new Set(sellers.map((item) => item.status))).map((item) => <option key={item}>{item}</option>)}</select></label>
-            <button className="secondary-button small" onClick={() => setFilters({ risk: "Tümü", category: "Tümü", status: "Tümü" })}>Temizle</button>
-          </section>
-        )}
-        <section className="table-card">
-          <header className="card-header"><div><h3>Örnek inceleme kuyruğu</h3><p>Risk ve belge durumuna göre filtrelenir</p></div></header>
-          <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Satıcı başvuruları tablosu, yatay kaydırılabilir">
-            <table className="data-table">
-              <caption className="sr-only">Filtrelenmiş örnek satıcı başvuruları</caption>
-              <thead><tr><th scope="col">Başvuru</th><th scope="col">Yetkili</th><th scope="col">Kategori</th><th scope="col">Ürün</th><th scope="col">Komisyon</th><th scope="col">Risk</th><th scope="col">Durum</th></tr></thead>
-              <tbody>
-                {visible.map((item) => (
-                  <tr key={item.id} className={activeId === item.id ? "selected-row" : ""} onClick={() => setActiveId(item.id)} data-testid={"seller-row-" + item.id}>
-                    <td><button className="row-entity-button" onClick={(event) => { event.stopPropagation(); setActiveId(item.id); }} aria-label={item.name + " başvurusunu incele"}><strong>{item.name}</strong><small>{item.id}</small></button></td>
-                    <td>{item.owner}</td><td>{item.category}</td><td>{item.products}</td><td>{item.commission}</td><td><Status>{item.risk}</Status></td><td><Status>{item.status}</Status></td>
-                  </tr>
-                ))}
-                {visible.length === 0 && <EmptyTable colSpan={7} title="Satıcı başvurusu bulunamadı" onReset={() => setFilters({ risk: "Tümü", category: "Tümü", status: "Tümü" })} />}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </div>
-      {!mobile && seller && <aside className="detail-panel" role="complementary" aria-label={seller.name + " ayrıntısı"} data-testid="seller-detail">{detailContent}</aside>}
-      {mobile && seller && <Modal title="Satıcı başvurusu" onClose={() => setActiveId("")} wide testId="seller-detail" cardClass="seller-detail-modal">{detailContent}</Modal>}
-      {pendingDecision && decisionSeller && (
-        <Modal title={pendingDecision.status === "Onaylandı" ? "Onay etkisini doğrula" : "Red etkisini doğrula"} onClose={() => setPendingDecision(null)} testId="confirmation-dialog">
-          <div className="confirmation-body"><Icon name={pendingDecision.status === "Onaylandı" ? "check" : "warning"} /><p><strong>{decisionSeller.name}</strong> için “{pendingDecision.status}” durumu yalnız yerel örnek kaydı değiştirir. Canlı satıcı erişimi açılmaz.</p></div>
-          {pendingDecision.status === "Reddedildi" && <label className="form-field"><span>Red gerekçesi</span><textarea value={reason} onChange={(event) => { setReason(event.target.value); setDecisionError(""); }} aria-invalid={decisionError ? "true" : undefined} aria-describedby={decisionError ? "seller-decision-error" : undefined} data-autofocus />{decisionError && <small className="modal-error" id="seller-decision-error" role="alert">{decisionError}</small>}</label>}
-          <footer className="modal-actions"><button className="secondary-button" onClick={() => setPendingDecision(null)}>İptal</button><button className={pendingDecision.status === "Onaylandı" ? "primary-button" : "danger-button"} onClick={decide}>Önizlemede uygula</button></footer>
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-function SettlementDetail({ row, onClose, onPreview }) {
-  return (
-    <Modal title={"Hakediş " + row.id} onClose={onClose} wide testId="settlement-detail">
-      <div className="detail-modal-body">
-        <div className="detail-hero"><span className="avatar">{row.seller.split(" ").map((word) => word[0]).join("")}</span><div><strong>{row.seller}</strong><small>{row.period} · yerel örnek ledger</small></div></div>
-        <dl className="detail-list detail-grid"><div><dt>Brüt satış</dt><dd>{money(row.gross)}</dd></div><div><dt>Komisyon</dt><dd>−{money(row.commission)}</dd></div><div><dt>İade</dt><dd>−{money(row.returns)}</dd></div><div><dt>Net hakediş</dt><dd><strong>{money(row.net)}</strong></dd></div></dl>
-        <section className="notice-card"><Icon name="shield" /><div><strong>Güvenli önizleme sınırı</strong><p>Bu yüzey para transferi, banka talimatı veya canlı muhasebe kaydı üretmez.</p></div></section>
-      </div>
-      <footer className="modal-actions"><button className="secondary-button" onClick={onClose}>Kapat</button>{row.status === "Ödemeye hazır" && <button className="primary-button" onClick={onPreview}>Akışı önizle</button>}</footer>
-    </Modal>
-  );
-}
-
-function Finance({ rows, setRows, store, contextItem, notify }) {
-  const [status, setStatus] = useState("Tüm durumlar");
-  const [detailId, setDetailId] = useState("");
-  const [confirmId, setConfirmId] = useState("");
-  const scopedRows = rows.filter((row) => matchesStore(row, store));
-  const visible = scopedRows.filter((row) => status === "Tüm durumlar" || row.status === status);
-  const detail = rows.find((row) => row.id === detailId);
-  const confirming = rows.find((row) => row.id === confirmId);
-
-  const exportRows = () => {
-    downloadCsv("novastore-hakedis-onizleme.csv", [
-      { label: "Hakediş", value: "id" }, { label: "Satıcı", value: "seller" }, { label: "Dönem", value: "period" },
-      { label: "Brüt", value: "gross" }, { label: "Komisyon", value: "commission" }, { label: "İade", value: "returns" },
-      { label: "Net", value: "net" }, { label: "Durum", value: "status" },
-    ], visible);
-    notify(visible.length + " örnek hakediş CSV olarak indirildi.");
-  };
-
-  const previewSettlement = () => {
-    setRows((all) => all.map((row) => row.id === confirmId ? { ...row, status: "Akış önizlendi" } : row));
-    notify(confirmId + " için yalnız arayüz durumu değişti; finansal talep gönderilmedi.");
-    setConfirmId("");
-    setDetailId("");
-  };
-
-  return (
-    <div className="workspace page-workspace">
-      <div className="workspace-heading">
-        <div><span className="eyebrow">Finans ve mutabakat · güvenli örnek</span><h2 tabIndex="-1">{contextItem === "Genel Bakış" ? "Finans Genel Bakış" : "Satıcı Hakedişleri"}</h2><p>Komisyon, iade ve durum anatomisini finansal işlem üretmeden inceleyin.</p></div>
-        <button className="secondary-button" onClick={exportRows}><Icon name="download" />CSV indir</button>
-      </div>
-      <section className="kpi-grid compact"><Kpi label="Ödenecek net tutar" value={money(scopedRows.filter((row) => row.status === "Ödemeye hazır").reduce((sum, row) => sum + row.net, 0))} trend="Kapsamdaki örnek" /><Kpi label="Platform komisyonu" value={money(scopedRows.reduce((sum, row) => sum + row.commission, 0))} trend="Kapsamdaki toplam" /><Kpi label="Blokeli tutar" value={money(scopedRows.filter((row) => row.status === "Blokeli").reduce((sum, row) => sum + row.net, 0))} trend="İnceleme gerekli" tone="warning" /><Kpi label="Ödenmiş örnek" value={String(scopedRows.filter((row) => row.status === "Ödendi").length)} trend="Canlı veri değil" /></section>
-      <section className="table-card" data-testid="finance-ledger">
-        <header className="card-header"><div><h3>Hakediş takvimi</h3><p>Hiçbir finansal işlem kaydedilmez</p></div><div className="filter-toolbar"><select aria-label="Hakediş durumu" value={status} data-testid="finance-filter" onChange={(event) => setStatus(event.target.value)}><option>Tüm durumlar</option><option>Ödemeye hazır</option><option>Kontrol ediliyor</option><option>Blokeli</option><option>Ödendi</option><option>Akış önizlendi</option></select></div></header>
-        <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Hakediş tablosu, yatay kaydırılabilir">
-          <table className="data-table">
-            <caption className="sr-only">Filtrelenmiş örnek hakedişler</caption>
-            <thead><tr><th scope="col">Hakediş</th><th scope="col">Satıcı</th><th scope="col">Dönem</th><th scope="col">Brüt satış</th><th scope="col">Komisyon</th><th scope="col">İade</th><th scope="col">Net hakediş</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
-            <tbody>
-              {visible.map((row) => <tr key={row.id} data-testid={"finance-row-" + row.id}><td><strong>{row.id}</strong></td><td>{row.seller}</td><td>{row.period}</td><td>{money(row.gross)}</td><td className="negative">−{money(row.commission)}</td><td className="negative">−{money(row.returns)}</td><td><strong>{money(row.net)}</strong></td><td><Status>{row.status}</Status></td><td><button className={row.status === "Ödemeye hazır" ? "primary-button small" : "secondary-button small"} onClick={() => row.status === "Ödemeye hazır" ? setConfirmId(row.id) : setDetailId(row.id)} data-testid={row.status === "Ödemeye hazır" ? "finance-settle" : undefined}>{row.status === "Ödemeye hazır" ? "Akışı önizle" : "İncele"}</button></td></tr>)}
-              {visible.length === 0 && <EmptyTable colSpan={9} title="Bu filtrede hakediş yok" onReset={() => setStatus("Tüm durumlar")} />}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      {detail && <SettlementDetail row={detail} onClose={() => setDetailId("")} onPreview={() => { setDetailId(""); setConfirmId(detail.id); }} />}
-      {confirming && (
-        <Modal title="Hakediş akışını doğrula" onClose={() => setConfirmId("")} testId="confirmation-dialog">
-          <div className="confirmation-body"><Icon name="warning" /><p><strong>{confirming.id}</strong> yalnız “Akış önizlendi” durumuna geçecek. Para transferi veya dış sistem çağrısı yapılmayacak.</p></div>
-          <footer className="modal-actions"><button className="secondary-button" onClick={() => setConfirmId("")}>İptal</button><button className="primary-button" onClick={previewSettlement}>Yerelde uygula</button></footer>
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-function Analytics({ contextItem, notify }) {
-  const [period, setPeriod] = useState("Son 30 gün");
-  const metrics = analyticsPeriods[period];
-  const top = [["Apple iPhone 15 128 GB", 1248, 64884000, 82], ["NovaTech AeroBook 14", 864, 16415136, 64], ["NovaHome S10 Robot Süpürge", 622, 4975378, 48], ["Smartix Watch 2", 518, 1812482, 38]];
-  const scaled = top.map(([name, orders, revenue, score]) => [name, Math.round(orders * metrics.multiplier), Math.round(revenue * metrics.multiplier), score]);
-  const channelRows = [["NovaStore Web", 48, 6200000], ["NovaStore Mobil", 28, 3600000], ["Trendyol", 14, 1800000], ["Hepsiburada", 10, 1200000]];
-  const funnelRows = [["Ürün görüntüleme", 412840, 100], ["Sepete ekleme", 46218, 68], ["Ödeme başlangıcı", 18664, 44], ["Sipariş", 15782, 36]];
-  const exportRows = () => {
-    downloadCsv("novastore-rapor-" + period.toLocaleLowerCase("tr-TR").replaceAll(" ", "-") + ".csv", [
-      { label: "Ürün", value: (row) => row[0] }, { label: "Sipariş", value: (row) => row[1] },
-      { label: "Net ciro", value: (row) => row[2] }, { label: "Katalog skoru", value: (row) => row[3] },
-    ], scaled);
-    notify(period + " örnek raporu CSV olarak indirildi.");
-  };
-  return (
-    <div className="workspace page-workspace">
-      <div className="workspace-heading">
-        <div><span className="eyebrow">{contextItem} · örnek veri</span><h2 tabIndex="-1">Satış ve Dönüşüm</h2><p>Mağaza, satıcı ve ürün performansını seçili dönemle yeniden hesaplayın.</p></div>
-        <div className="heading-actions"><select aria-label="Rapor dönemi" value={period} onChange={(event) => setPeriod(event.target.value)}>{Object.keys(analyticsPeriods).map((item) => <option key={item}>{item}</option>)}</select><button className="secondary-button" onClick={exportRows}><Icon name="download" />CSV indir</button></div>
-      </div>
-      <section className="kpi-grid"><Kpi label="Brüt ürün hacmi" value={metrics.gross} trend={period + " · örnek"} /><Kpi label="Net ciro" value={metrics.net} trend="Yerel hesaplama" /><Kpi label="Dönüşüm" value={metrics.conversion} trend="Örnek oran" /><Kpi label="Ort. sepet" value={metrics.basket} trend="Örnek değer" /></section>
-      <section className="analytics-grid">
-        <article className="module-card analytics-main"><header><div><span className="eyebrow">Kanal karşılaştırması</span><h3>Gelir katkısı</h3></div></header>{channelRows.map(([label, value, amount]) => <div className="metric-progress" key={label}><span>{label}</span><progress max="100" value={value} aria-label={label + " katkısı yüzde " + value} /><strong>{money(Math.round(amount * metrics.multiplier))}</strong></div>)}</article>
-        <article className="module-card"><header><h3>Dönüşüm hunisi</h3></header>{funnelRows.map(([label, value, progress]) => <div className="funnel-row" key={label}><span>{label}</span><progress max="100" value={progress} aria-label={label + " yüzde " + progress} /><strong>{Math.round(value * metrics.multiplier).toLocaleString("tr-TR")}</strong></div>)}</article>
-      </section>
-      <section className="table-card">
-        <header className="card-header"><div><h3>Ürün performansı</h3><p>{period} · ölçeklenmiş örnek veriler</p></div></header>
-        <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Ürün performansı tablosu, yatay kaydırılabilir"><table className="data-table"><caption className="sr-only">Örnek ürün performansı</caption><thead><tr><th scope="col">Ürün</th><th scope="col">Sipariş</th><th scope="col">Net ciro</th><th scope="col">Katalog skoru</th></tr></thead><tbody>{scaled.map(([name, orders, revenue, score]) => <tr key={name}><td><strong>{name}</strong></td><td>{orders.toLocaleString("tr-TR")}</td><td>{money(revenue)}</td><td><span className="score"><progress max="100" value={score} aria-label={name + " katalog skoru yüzde " + score} />%{score}</span></td></tr>)}</tbody></table></div>
-      </section>
-    </div>
-  );
-}
-
-function Modules({ modules, setModules, roles, setRoles, contextItem, notify }) {
-  const [activeRole, setActiveRole] = useState(roles[0]?.id || "");
-  const [pendingModule, setPendingModule] = useState("");
-  const [creatingRole, setCreatingRole] = useState(false);
-  const currentRole = roles.find((role) => role.id === activeRole) || roles[0];
-  const visibleModules = modules.filter((item) => contextItem !== "Etkin Modüller" || item.enabled);
-  const roleModules = modules.filter((item) => currentRole?.moduleIds.includes(item.id));
-  const target = modules.find((item) => item.id === pendingModule);
-
-  const createRole = (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const label = String(new FormData(form).get("label") || "").trim();
-    if (!label) return;
-    const id = "role-" + Date.now();
-    const initials = label.split(" ").map((part) => part[0]).join("").slice(0, 2).toLocaleUpperCase("tr-TR");
-    const role = { id, initials, label, detail: "Yeni · oturum içi", moduleIds: modules.filter((item) => item.enabled).map((item) => item.id) };
-    setRoles(roles.concat(role));
-    setActiveRole(id);
-    setCreatingRole(false);
-    notify("“" + label + "” rol düzeni bu oturumda oluşturuldu.");
-  };
-
-  const applyToggle = () => {
-    setModules((all) => toggleModuleAvailability(all, pendingModule));
-    notify(target.name + " önizleme durumu değiştirildi.");
-    setPendingModule("");
-  };
-
-  return (
-    <div className="workspace page-workspace">
-      <div className="workspace-heading">
-        <div><span className="eyebrow">Kişiselleştirilebilir çalışma alanı · önizleme</span><h2 tabIndex="-1">{contextItem}</h2><p>{contextItem === "Rol Düzenleri" ? "Rol bazında görünür modül bileşimini inceleyin ve oturum içi bir düzen oluşturun." : "Modül bağımlılıklarını ve çalışma alanı genelindeki yerel kullanılabilirlik durumunu inceleyin."}</p></div>
-        {contextItem === "Rol Düzenleri" && <button className="primary-button" onClick={() => setCreatingRole(true)}><Icon name="plus" />Rol düzeni oluştur</button>}
-      </div>
-      {contextItem === "Rol Düzenleri" ? (
-        <>
-          <section className="role-layouts" aria-label="Rol düzenleri">
-            {roles.map((role) => <button key={role.id} className={activeRole === role.id ? "active" : ""} aria-pressed={activeRole === role.id} onClick={() => setActiveRole(role.id)}><span className="avatar">{role.initials}</span><span><strong>{role.label}</strong><small>{role.detail}</small></span></button>)}
-          </section>
-          <section className="table-card role-module-summary">
-            <header className="card-header"><div><h3>{currentRole?.label} modül görünürlüğü</h3><p>Bu sözleşme rol bileşimini gösterir; gerçek RBAC yetkisi veya özellik bayrağı uygulanmaz.</p></div></header>
-            <div className="role-module-list">
-              {roleModules.map((item) => <div key={item.id}><span><strong>{item.name}</strong><small>{item.description}</small></span><Status>{item.enabled ? "Kullanılabilir" : "Genel olarak kapalı"}</Status></div>)}
-            </div>
-          </section>
-        </>
-      ) : (
-        <>
-          <section className="notice-card workspace-notice"><Icon name="info" /><div><strong>Çalışma alanı genelinde yerel durum</strong><p>Aşağıdaki anahtarlar seçili role üyelik eklemez; yalnız modülün bu önizleme oturumundaki genel kullanılabilirliğini değiştirir.</p></div></section>
-          <section className="module-grid">
-            {visibleModules.map((item) => (
-              <article className={"module-option " + (item.enabled ? "enabled" : "")} key={item.id} data-testid={"module-" + item.id}>
-                <div className="module-preview" data-testid="module-card"><Icon name={item.id.includes("seller") ? "user" : item.id.includes("settlement") ? "card" : "chart"} /></div>
-                <div><h3>{item.name}</h3><p>{item.description}</p><dl className="module-meta"><div><dt>Sürüm</dt><dd>{item.version}</dd></div><div><dt>Bağımlılık</dt><dd>{item.dependency}</dd></div><div><dt>Sağlık</dt><dd>{item.health}</dd></div></dl></div>
-                <label className="switch" data-testid="module-toggle"><input type="checkbox" checked={item.enabled} onChange={() => setPendingModule(item.id)} aria-label={item.name + " modülünün genel önizleme durumunu " + (item.enabled ? "devre dışı bırak" : "etkinleştir")} data-testid={"module-toggle-" + item.id} /><span>{item.enabled ? "Etkin" : "Devre dışı"}</span></label>
-              </article>
-            ))}
-            {visibleModules.length === 0 && <EmptyState title="Bu görünümde etkin modül yok" description="Modül Merkezi görünümünden bir modülü etkinleştirin." />}
-          </section>
-        </>
-      )}
-      {target && <Modal title="Modül etkisini doğrula" onClose={() => setPendingModule("")} testId="confirmation-dialog"><div className="confirmation-body"><Icon name="warning" /><p><strong>{target.name}</strong> yalnız bu önizleme oturumunda çalışma alanı genelinde {target.enabled ? "devre dışı" : "etkin"} görünecek. Rol üyeliği, gerçek özellik bayrağı veya veri dönüşümü değişmez.</p></div><dl className="detail-list"><div><dt>Bağımlılık</dt><dd>{target.dependency}</dd></div><div><dt>Sürüm</dt><dd>{target.version}</dd></div></dl><footer className="modal-actions"><button className="secondary-button" onClick={() => setPendingModule("")}>İptal</button><button className="primary-button" onClick={applyToggle}>Yerelde uygula</button></footer></Modal>}
-      {creatingRole && <Modal title="Rol düzeni oluştur" onClose={() => setCreatingRole(false)}><form className="modal-form" onSubmit={createRole}><label><span>Rol adı</span><input name="label" required minLength="3" data-autofocus placeholder="Örn. Müşteri Deneyimi" /></label><p className="form-hint">Yeni düzen, şu anda etkin modüllerle yalnız bu oturumda oluşturulur.</p><footer><button type="button" className="secondary-button" onClick={() => setCreatingRole(false)}>İptal</button><button className="primary-button">Önizlemede oluştur</button></footer></form></Modal>}
-    </div>
-  );
-}
-
-function Audit({ contextItem, notify }) {
-  const [query, setQuery] = useState("");
-  const [source, setSource] = useState("Tümü");
-  const visible = auditRecords.filter((row) => (source === "Tümü" || row.source === source) && matchesQuery(row, query));
-  const exportRows = () => {
-    downloadCsv("novastore-denetim-onizleme.csv", [
-      { label: "Saat", value: "time" }, { label: "Aktör", value: "actor" }, { label: "İşlem", value: "action" },
-      { label: "Hedef", value: "target" }, { label: "Kaynak", value: "source" },
-    ], visible);
-    notify(visible.length + " örnek denetim kaydı CSV olarak indirildi.");
-  };
-
-  if (contextItem === "Dışa Aktarımlar") {
-    return (
-      <div className="workspace page-workspace">
-        <div className="workspace-heading"><div><span className="eyebrow">Yerel çıktı geçmişi</span><h2 tabIndex="-1">Dışa Aktarım Önizlemeleri</h2><p>Bu liste örnek çıktı sözleşmesini gösterir; sunucuda dosya tutulmaz.</p></div></div>
-        <section className="table-card"><header className="card-header"><div><h3>Örnek çıktılar</h3><p>Gerçek arşiv entegrasyonda etkinleşir</p></div></header><div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Dışa aktarım tablosu, yatay kaydırılabilir"><table className="data-table"><caption className="sr-only">Örnek dışa aktarımlar</caption><thead><tr><th scope="col">Dosya</th><th scope="col">Alan</th><th scope="col">Kayıt</th><th scope="col">Oluşturan</th><th scope="col">Durum</th></tr></thead><tbody><tr><td><strong>siparis-onizleme.csv</strong></td><td>Operasyon</td><td>28</td><td>Ayşe Kara</td><td><Status>Örnek</Status></td></tr><tr><td><strong>musteri-onizleme.csv</strong></td><td>Müşteri</td><td>5</td><td>Mehmet Akın</td><td><Status>Örnek</Status></td></tr></tbody></table></div></section>
-      </div>
-    );
-  }
-
-  return (
-    <div className="workspace page-workspace">
-      <div className="workspace-heading"><div><span className="eyebrow">İzlenebilirlik · örnek veri</span><h2 tabIndex="-1">Denetim Kayıtları</h2><p>Gelecekteki yönetici ve sistem işlemlerinin kayıt anatomisini inceleyin.</p></div><button className="secondary-button" onClick={exportRows}><Icon name="download" />CSV indir</button></div>
-      <section className="notice-card"><Icon name="shield" /><div><strong>Denetim tasarım sözleşmesi hazır</strong><p>Bu kayıtlar örnektir; canlı bütünlük veya entegrasyon durumu bildirmez.</p></div></section>
-      <section className="table-card">
-        <header className="card-header"><div><h3>Örnek işlem geçmişi</h3><p>Arama ve kaynak filtresi etkileşimlidir</p></div><div className="filter-toolbar"><label className="table-search"><Icon name="search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Kullanıcı, kayıt veya işlem ara" aria-label="Denetim kayıtlarında ara" /></label><select aria-label="Denetim kaynağı" value={source} onChange={(event) => setSource(event.target.value)}><option>Tümü</option>{Array.from(new Set(auditRecords.map((row) => row.source))).map((item) => <option key={item}>{item}</option>)}</select></div></header>
-        <div className="table-scroll table-scroll-hint" tabIndex="0" aria-label="Denetim kayıtları tablosu, yatay kaydırılabilir"><table className="data-table"><caption className="sr-only">Filtrelenmiş örnek denetim kayıtları</caption><thead><tr><th scope="col">Saat</th><th scope="col">Aktör</th><th scope="col">İşlem</th><th scope="col">Hedef</th><th scope="col">Kaynak</th><th scope="col">Sonuç</th></tr></thead><tbody>{visible.map((row) => <tr key={row.time + row.target}><td>{row.time}</td><td><strong>{row.actor}</strong></td><td>{row.action}</td><td>{row.target}</td><td>{row.source}</td><td><Status>Örnek</Status></td></tr>)}{visible.length === 0 && <EmptyTable colSpan={6} title="Denetim kaydı bulunamadı" onReset={() => { setQuery(""); setSource("Tümü"); }} />}</tbody></table></div>
-      </section>
-    </div>
-  );
-}
-
-function Settings({ saved, setSaved, contextItem, notify }) {
-  const [form, setForm] = useState(saved);
-  const [error, setError] = useState("");
-  const notificationRef = useRef(null);
-  const dirty = JSON.stringify(form) !== JSON.stringify(saved);
-  const field = (key, value) => setForm({ ...form, [key]: value });
-
-  useEffect(() => {
-    setForm(saved);
-  }, [saved]);
-
-  useEffect(() => {
-    if (contextItem === "Bildirimler") notificationRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [contextItem]);
-
-  const submit = (event) => {
-    event.preventDefault();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      setError("Geçerli bir operasyon e-postası girin.");
-      return;
-    }
-    setSaved(form);
-    setError("");
-    notify("Ayar snapshot’ı yalnız bu önizleme oturumunda kaydedildi.");
-  };
-
-  return (
-    <div className="workspace page-workspace settings-page">
-      <div className="workspace-heading"><div><span className="eyebrow">Çalışma alanı ayarları · önizleme</span><h2 tabIndex="-1">Genel Ayarlar</h2><p>Marka, kapsam ve bildirim varsayılanlarının kontrollü form davranışını inceleyin.</p></div>{dirty && <Status>Kaydedilmemiş</Status>}</div>
-      <form onSubmit={submit}>
-        <section className="form-card">
-          <header><h3>Mağaza bilgileri</h3><p>Bu alanlar canlı sisteme gönderilmez.</p></header>
-          <div className="form-grid">
-            <label><span>Çalışma alanı adı</span><input value={form.name} onChange={(event) => field("name", event.target.value)} required minLength="3" /></label>
-            <label><span>Operasyon e-postası</span><input type="email" value={form.email} onChange={(event) => { field("email", event.target.value); setError(""); }} aria-invalid={error ? "true" : undefined} aria-describedby={error ? "settings-email-error" : undefined} />{error && <small className="modal-error" id="settings-email-error" role="alert">{error}</small>}</label>
-            <label><span>Saat dilimi</span><select value={form.timezone} onChange={(event) => field("timezone", event.target.value)}><option>Europe/Istanbul</option><option>Europe/Berlin</option></select></label>
-            <label><span>Varsayılan mağaza kapsamı</span><select value={form.store} onChange={(event) => field("store", event.target.value)}><option>Tüm Mağazalar · 24</option><option>NovaStore</option><option>TeknoPark · 2 mağaza</option><option>Eviva Home</option></select></label>
-          </div>
-        </section>
-        <section className="form-card" ref={notificationRef}>
-          <header><h3>İş akışı bildirimleri</h3><p>Yalnızca yerel form durumu değişir.</p></header>
-          {[["approval", "Yeni satıcı başvuruları", "Başvuru ve belge değişikliklerini bildir"], ["settlement", "Hakediş riskleri", "Bloke ve mutabakat kayıtlarını bildir"], ["digest", "Günlük yönetici özeti", "Her gün saat 09:00’da özet göster"]].map(([key, title, description]) => <label className="setting-toggle" key={key}><span><strong>{title}</strong><small>{description}</small></span><input type="checkbox" checked={form[key]} onChange={(event) => field(key, event.target.checked)} /></label>)}
-        </section>
-        <footer className="form-actions"><span className="form-hint">{dirty ? "Yerel değişiklikler henüz kaydedilmedi." : "Kaydedilen yerel snapshot gösteriliyor."}</span><button type="button" className="secondary-button" disabled={!dirty} onClick={() => { setForm(saved); setError(""); notify("Değişiklikler son kaydedilen snapshot’a döndürüldü."); }}>Değişiklikleri iptal et</button><button className="primary-button" disabled={!dirty}>Önizlemede kaydet</button></footer>
-      </form>
-    </div>
-  );
-}
-
-function CommandPalette({ onClose, run, orders, products, sellers, customers }) {
-  const [query, setQuery] = useState("");
-  const [activeIndex, setActiveIndex] = useState(0);
-  const listId = useId();
-  const commands = useMemo(() => [
-    ...domains.map((item) => ({ id: "domain-" + item.id, label: item.label + " çalışma alanına git", section: item.id, icon: item.icon, kind: "navigate" })),
-    { id: "create-product", label: "Yeni ürün oluştur", section: "catalog", icon: "plus", kind: "product-create" },
-    ...orders.map((item) => ({ id: "order-" + item.id, label: item.id + " · " + item.customer, section: "operations", icon: "orders", kind: "order", entityId: item.id })),
-    ...products.map((item) => ({ id: "product-" + item.sku, label: item.sku + " · " + item.name, section: "catalog", icon: "package", kind: "product", entityId: item.sku })),
-    ...sellers.map((item) => ({ id: "seller-" + item.id, label: item.id + " · " + item.name, section: "sellers", icon: "user", kind: "seller", entityId: item.id })),
-    ...customers.map((item) => ({ id: "customer-" + item.id, label: item.id + " · " + item.name, section: "customers", icon: "user", kind: "customer", entityId: item.id })),
-  ], [orders, products, sellers, customers]);
-  const filtered = commands.filter((item) => matchesQuery(item, query)).slice(0, 12);
-  const safeIndex = Math.min(activeIndex, Math.max(0, filtered.length - 1));
-
-  const execute = (item) => {
-    if (!item) return;
-    run(item);
-  };
-
-  return (
-    <Modal title="Komut paleti" onClose={onClose} wide>
-      <div className="command-input">
-        <Icon name="search" />
-        <label className="sr-only" htmlFor={listId + "-input"}>Sayfa, kayıt veya komut ara</label>
-        <input
-          id={listId + "-input"}
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded="true"
-          aria-controls={listId}
-          aria-activedescendant={filtered[safeIndex] ? listId + "-" + filtered[safeIndex].id : undefined}
-          value={query}
-          onChange={(event) => { setQuery(event.target.value); setActiveIndex(0); }}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowDown") { event.preventDefault(); setActiveIndex(Math.min(safeIndex + 1, filtered.length - 1)); }
-            if (event.key === "ArrowUp") { event.preventDefault(); setActiveIndex(Math.max(safeIndex - 1, 0)); }
-            if (event.key === "Enter") { event.preventDefault(); execute(filtered[safeIndex]); }
-          }}
-          placeholder="Sayfa, kayıt veya komut ara…"
-          data-autofocus
-        />
-      </div>
-      <div className="command-count" role="status">{filtered.length} sonuç</div>
-      <div className="command-results" id={listId} role="listbox">
-        {filtered.map((item, index) => <button id={listId + "-" + item.id} role="option" aria-selected={safeIndex === index} className={safeIndex === index ? "active" : ""} key={item.id} onMouseEnter={() => setActiveIndex(index)} onClick={() => execute(item)}><Icon name={item.icon} /><span>{item.label}</span><kbd>↵</kbd></button>)}
-        {filtered.length === 0 && <div className="empty-inline">Eşleşen komut bulunamadı.</div>}
-      </div>
-    </Modal>
-  );
-}
-
-function ProductDialog({ product, products, onClose, onSave }) {
-  const [draft, setDraft] = useState(product || { name: "", seller: "NovaStore", category: "Elektronik", sku: "NVS-", price: "", stock: "", status: "" });
-  const [error, setError] = useState("");
-  const field = (key, value) => setDraft({ ...draft, [key]: value });
-  const submit = (event) => {
-    event.preventDefault();
-    const issue = validateProductDraft(draft, products, product?.sku || "");
-    if (issue) {
-      setError(issue);
-      return;
-    }
-    onSave(productFromDraft(draft, product), product?.sku || "");
-  };
-  return (
-    <Modal title={product ? "Ürünü düzenle" : "Yeni ürün taslağı"} onClose={onClose} wide testId="product-dialog">
-      <form className="modal-form two-column" onSubmit={submit}>
-        <label><span>Ürün adı</span><input value={draft.name} onChange={(event) => { field("name", event.target.value); setError(""); }} required minLength="3" data-autofocus /></label>
-        <label><span>Satıcı</span><select value={draft.seller} onChange={(event) => field("seller", event.target.value)}><option>NovaStore</option><option>TeknoPark</option><option>Eviva Home</option></select></label>
-        <label><span>Kategori</span><select value={draft.category} onChange={(event) => field("category", event.target.value)}><option>Elektronik</option><option>Cep Telefonu</option><option>Dizüstü Bilgisayar</option><option>Elektrikli Ev Aleti</option><option>Akıllı Saat</option><option>Ev & Yaşam</option><option>Ev Tekstili</option></select></label>
-        <label><span>Stok kodu</span><input value={draft.sku} onChange={(event) => { field("sku", event.target.value); setError(""); }} required aria-invalid={error ? "true" : undefined} aria-describedby={error ? "product-error" : undefined} /></label>
-        <label><span>Satış fiyatı</span><input type="number" min="1" value={draft.price} onChange={(event) => { field("price", event.target.value); setError(""); }} required /></label>
-        <label><span>Başlangıç stoku</span><input type="number" min="0" step="1" value={draft.stock} onChange={(event) => {
-          const stock = event.target.value;
-          const derivedStatus = stock === "" ? "" : Number(stock) === 0 ? "Stokta yok" : Number(stock) < 10 ? "Düşük stok" : "Yayında";
-          setDraft({ ...draft, stock, status: draft.status === "Onay bekliyor" ? draft.status : derivedStatus });
-          setError("");
-        }} required /></label>
-        <label><span>Durum</span><select value={draft.status || ""} onChange={(event) => field("status", event.target.value)}><option value="">Stoka göre belirle</option><option>Yayında</option><option>Düşük stok</option><option>Onay bekliyor</option><option>Stokta yok</option></select></label>
-        {error && <p className="modal-error form-span" id="product-error" role="alert">{error}</p>}
-        <footer><button type="button" className="secondary-button" onClick={onClose}>İptal</button><button className="primary-button">{product ? "Değişiklikleri uygula" : "Önizlemede oluştur"}</button></footer>
-      </form>
-    </Modal>
-  );
-}
-
-function SimpleFormDialog({ type, onClose, onSave }) {
-  const isInvite = type === "seller-invite";
-  return (
-    <Modal title={isInvite ? "Satıcı daveti taslağı" : "Koleksiyon taslağı"} onClose={onClose}>
-      <form className="modal-form" onSubmit={(event) => {
-        event.preventDefault();
-        const values = Object.fromEntries(new FormData(event.currentTarget).entries());
-        onSave(values);
-      }}>
-        {isInvite ? (
-          <>
-            <label><span>Mağaza adı</span><input name="store" required minLength="3" data-autofocus /></label>
-            <label><span>Yetkili e-postası</span><input name="email" type="email" required /></label>
-            <p className="form-hint">Gerçek davet e-postası entegrasyon aşamasında etkinleşir.</p>
-          </>
-        ) : (
-          <>
-            <label><span>Koleksiyon adı</span><input name="name" required minLength="3" data-autofocus /></label>
-            <label><span>Vitrin konumu</span><select name="placement"><option>Ana sayfa</option><option>Kategori vitrini</option></select></label>
-            <p className="form-hint">Taslak bu sayfa yenilendiğinde sıfırlanır.</p>
-          </>
-        )}
-        <footer><button type="button" className="secondary-button" onClick={onClose}>İptal</button><button className="primary-button">Yerel taslak oluştur</button></footer>
-      </form>
-    </Modal>
-  );
-}
-
-export function App() {
-  const [generation, setGeneration] = useState(0);
-  const [mobile, setMobile] = useState(() => window.innerWidth <= 760);
-  const [compact, setCompact] = useState(() => window.innerWidth <= 1279);
-  const [domain, setDomain] = useState("operations");
-  const [contextOpen, setContextOpen] = useState(() => window.innerWidth > 760);
-  const [store, setStore] = useState("Tüm Mağazalar · 24");
-  const [dateRange, setDateRange] = useState("7 Tem 2026 – 13 Tem 2026");
-  const [orders, setOrders] = useState(() => orderRecords.map((item) => ({ ...item })));
-  const [products, setProducts] = useState(() => productRecords.map((item) => ({ ...item })));
-  const [customers, setCustomers] = useState(() => customerRecords.map((item) => ({ ...item })));
-  const [sellers, setSellers] = useState(() => sellerApplicationRecords.map((item) => ({ ...item })));
-  const [sellerNotes, setSellerNotes] = useState({});
-  const [settlements, setSettlements] = useState(() => settlementRecords.map((item) => ({ ...item })));
-  const [modules, setModules] = useState(() => moduleRecords.map((item) => ({ ...item })));
-  const [roles, setRoles] = useState(() => roleSeed.map((item) => ({ ...item, moduleIds: item.moduleIds.slice() })));
-  const [settings, setSettings] = useState({ ...initialWorkspaceSettings });
-  const [notifications, setNotifications] = useState(() => notificationRows.map((item) => ({ ...item })));
-  const [quickDrafts, setQuickDrafts] = useState({ sellerInvites: [], collections: [] });
-  const [selected, setSelected] = useState([]);
-  const [currentId, setCurrentId] = useState("");
-  const [filter, setFilter] = useState({ status: "Tümü", query: "" });
-  const [tab, setTab] = useState("orders");
-  const [editingLayout, setEditingLayout] = useState(false);
-  const [orderNotes, setOrderNotes] = useState({});
-  const [operationPanels, setOperationPanels] = useState({ revenue: true, distribution: true });
-  const [savedViews, setSavedViews] = useState(() => savedViewSeed.map((item) => ({ ...item })));
-  const [activeView, setActiveView] = useState("Tüm siparişler");
-  const [contextItem, setContextItem] = useState("Siparişler");
-  const [entityFocus, setEntityFocus] = useState(null);
-  const [dialog, setDialog] = useState(null);
-  const [saveViewError, setSaveViewError] = useState("");
-  const [toast, setToast] = useState("");
-  const toastTimerRef = useRef(null);
-  const returnFocus = useRef(null);
-  const contextPanelRef = useRef(null);
-  const contextToggleRef = useRef(null);
-  const headingRef = useRef(null);
-
-  const notify = (message) => {
-    setToast(message);
-    window.clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = window.setTimeout(() => setToast(""), 5500);
-  };
-
-  const openDialog = (type, data = {}) => {
-    returnFocus.current = document.activeElement;
-    if (type === "save-view") setSaveViewError("");
-    setDialog({ type, data });
-  };
-
-  const closeDialog = () => {
-    setDialog(null);
-    setSaveViewError("");
-    requestAnimationFrame(() => returnFocus.current?.focus?.());
-  };
-
-  const navigate = (next, requestedItem) => {
-    setDomain(next);
-    const defaultItem = requestedItem || (next === "operations" ? "Siparişler" : contextByDomain[next]?.find((item) => !item.disabled)?.label || "");
-    setContextItem(defaultItem);
-    setEntityFocus(null);
-    setSelected([]);
-    setCurrentId("");
-    if (next === "operations") setTab(defaultItem === "İadeler" ? "returns" : "orders");
-    if (mobile) setContextOpen(false);
-    requestAnimationFrame(() => headingRef.current?.querySelector("h2")?.focus());
-  };
-
-  const closeContext = () => {
-    setContextOpen(false);
-    requestAnimationFrame(() => contextToggleRef.current?.focus?.());
-  };
-
-  const toggleContext = () => {
-    if (contextOpen) {
-      closeContext();
-    } else {
-      setCurrentId("");
-      setContextOpen(true);
-      requestAnimationFrame(() => contextPanelRef.current?.focus?.());
-    }
-  };
-
-  const setStoreScope = (next) => {
-    setStore(next);
-    setSelected([]);
-    setCurrentId("");
-    notify("“" + next + "” mağaza kapsamı yerel veriye uygulandı.");
-  };
-
-  const applyView = (view) => {
-    if (!view) return;
-    setActiveView(view.name);
-    setFilter({ status: view.status, query: view.query || "" });
-    setTab("orders");
-    setDomain("operations");
-    setContextItem("Siparişler");
-    setCurrentId("");
-    setSelected([]);
-    if (mobile) {
-      setContextOpen(false);
-      requestAnimationFrame(() => headingRef.current?.querySelector("h2")?.focus());
-    }
-    notify("“" + view.name + "” örnek görünümü uygulandı.");
-  };
-
-  const saveView = (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const name = String(formData.get("name") || "").trim();
-    const scope = String(formData.get("scope") || "Yalnızca ben");
-    const nameInput = form.elements.namedItem("name");
-    if (!name) {
-      setSaveViewError("Görünüm adı boş bırakılamaz.");
-      nameInput?.focus();
-      return;
-    }
-    const normalizedName = name.toLocaleLowerCase("tr-TR");
-    if (savedViews.some((view) => view.name.toLocaleLowerCase("tr-TR") === normalizedName)) {
-      setSaveViewError("Bu adla bir görünüm zaten var.");
-      nameInput?.focus();
-      return;
-    }
-    setSavedViews(savedViews.concat({ name, status: filter.status, query: filter.query, scope }));
-    setActiveView(name);
-    closeDialog();
-    notify("“" + name + "” görünümü yalnız bu önizleme oturumunda kaydedildi.");
-  };
-
-  const selectContextItem = (item) => {
-    if (item.disabled) return;
-    if (item.route) {
-      navigate(item.route, item.routeItem);
-      return;
-    }
-    setContextItem(item.label);
-    const opensHealth = domain === "dashboard" && item.label === "Mağaza Sağlığı";
-    if (domain === "operations") {
-      if (item.label === "Bugün") {
-        setFilter({ status: "Tümü", query: "" });
-        setActiveView("");
-        setTab("orders");
-        setSelected([]);
-        setCurrentId("");
-      } else if (item.label === "Siparişler") {
-        setTab("orders");
-      } else if (item.label === "İadeler") {
-        setTab("returns");
-      }
-    }
-    if (mobile) {
-      setContextOpen(false);
-      requestAnimationFrame(() => {
-        headingRef.current?.querySelector("h2")?.focus();
-        if (opensHealth) openDialog("health");
-      });
-    } else if (opensHealth) {
-      openDialog("health");
-    }
-  };
-
-  const runCommand = (command) => {
-    closeDialog();
-    if (["order", "seller", "customer"].includes(command.kind)) {
-      setGeneration((value) => value + 1);
-    }
-    if (command.kind === "product-create") {
-      navigate("catalog", "Tüm Ürünler");
-      requestAnimationFrame(() => openDialog("product", {}));
-      return;
-    }
-    navigate(command.section);
-    if (command.kind === "order") {
-      setStore("Tüm Mağazalar · 24");
-      setFilter({ status: "Tümü", query: "" });
-      setActiveView("");
-      setContextItem("Siparişler");
-      setTab("orders");
-      setEntityFocus({ kind: "order", id: command.entityId });
-    } else if (command.kind === "product") {
-      setStore("Tüm Mağazalar · 24");
-      const product = products.find((item) => item.sku === command.entityId);
-      requestAnimationFrame(() => openDialog("product", { product }));
-    } else if (command.kind === "seller" || command.kind === "customer") {
-      setEntityFocus({ kind: command.kind, id: command.entityId });
-    }
-  };
-
-  const saveProduct = (nextProduct, editingSku) => {
-    setProducts((rows) => editingSku
-      ? rows.map((item) => item.sku === editingSku ? nextProduct : item)
-      : [nextProduct].concat(rows));
-    closeDialog();
-    notify(nextProduct.name + (editingSku ? " güncellendi." : " yerel kataloğa eklendi."));
-  };
-
-  const assignOwner = (event) => {
-    event.preventDefault();
-    const owner = String(new FormData(event.currentTarget).get("owner") || "");
-    const ids = new Set(dialog.data.ids || []);
-    setOrders((rows) => setOrderOwner(rows, ids, owner));
-    setSelected([]);
-    closeDialog();
-    notify(ids.size + " görünür sipariş “" + owner + "” sahibine atandı.");
-  };
-
-  const resetPreview = () => {
-    setDomain("operations");
-    setContextItem("Siparişler");
-    setStore("Tüm Mağazalar · 24");
-    setDateRange("7 Tem 2026 – 13 Tem 2026");
-    setOrders(orderRecords.map((item) => ({ ...item })));
-    setProducts(productRecords.map((item) => ({ ...item })));
-    setCustomers(customerRecords.map((item) => ({ ...item })));
-    setSellers(sellerApplicationRecords.map((item) => ({ ...item })));
-    setSellerNotes({});
-    setSettlements(settlementRecords.map((item) => ({ ...item })));
-    setModules(moduleRecords.map((item) => ({ ...item })));
-    setRoles(roleSeed.map((item) => ({ ...item, moduleIds: item.moduleIds.slice() })));
-    setSettings({ ...initialWorkspaceSettings });
-    setNotifications(notificationRows.map((item) => ({ ...item })));
-    setQuickDrafts({ sellerInvites: [], collections: [] });
-    setSelected([]);
-    setCurrentId("");
-    setFilter({ status: "Tümü", query: "" });
-    setTab("orders");
-    setEditingLayout(false);
-    setOrderNotes({});
-    setOperationPanels({ revenue: true, distribution: true });
-    setSavedViews(savedViewSeed.map((item) => ({ ...item })));
-    setActiveView("Tüm siparişler");
-    setEntityFocus(null);
-    setGeneration((value) => value + 1);
-    closeDialog();
-    notify("Tüm yerel örnek durumları başlangıç değerlerine döndürüldü.");
-  };
-
-  useEffect(() => {
-    const onKey = (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === "k") {
-        event.preventDefault();
-        if (!dialog && !document.querySelector("dialog[open]")) openDialog("command");
-      }
-      if (event.key === "Escape" && contextOpen && !dialog && !document.querySelector("dialog[open]")) closeContext();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [contextOpen, dialog]);
-
-  useEffect(() => {
-    const onResize = () => {
-      const isMobile = window.innerWidth <= 760;
-      setCompact(window.innerWidth <= 1279);
-      setMobile(isMobile);
-      if (isMobile) {
-        setContextOpen(false);
-        setCurrentId("");
-      }
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  useEffect(() => () => window.clearTimeout(toastTimerRef.current), []);
-
-  const title = domains.find((item) => item.id === domain)?.label || "Operasyon";
-  const section = { operations: "Operasyon", sellers: "Pazaryeri", finance: "Pazaryeri", modules: "Yönetim", audit: "Yönetim", settings: "Yönetim" }[domain];
-  const pageKey = domain + "-" + generation;
-  const body = {
-    dashboard: <Dashboard key={pageKey} orders={orders} onOpenOrders={() => navigate("operations", "Siparişler")} onHealth={() => openDialog("health")} dateRange={dateRange} />,
-    operations: <Operations key={pageKey} orders={orders} setOrders={setOrders} selected={selected} setSelected={setSelected} currentId={currentId} setCurrentId={setCurrentId} filter={filter} setFilter={setFilter} tab={tab} setTab={(next) => { setTab(next); setContextItem(next === "returns" ? "İadeler" : "Siparişler"); }} editingLayout={editingLayout} setEditingLayout={setEditingLayout} savedViews={savedViews} activeView={activeView} onCustomFilter={() => { setActiveView(""); setCurrentId(""); setSelected([]); }} onApplyView={applyView} onSaveView={() => openDialog("save-view")} store={store} setStore={setStoreScope} dateRange={dateRange} notify={notify} openDialog={openDialog} notes={orderNotes} setNotes={setOrderNotes} visiblePanels={operationPanels} setVisiblePanels={setOperationPanels} compact={compact} contextItem={contextItem} initialOrderId={entityFocus?.kind === "order" ? entityFocus.id : ""} />,
-    catalog: <Catalog key={pageKey + contextItem} products={products} store={store} contextItem={contextItem} collectionDrafts={quickDrafts.collections} onCreate={() => openDialog("product")} onEdit={(product) => openDialog("product", { product })} />,
-    customers: <Customers key={pageKey} customers={customers} setCustomers={setCustomers} contextItem={contextItem} initialCustomerId={entityFocus?.kind === "customer" ? entityFocus.id : ""} notify={notify} />,
-    sellers: <Sellers key={pageKey} sellers={sellers} setSellers={setSellers} notes={sellerNotes} setNotes={setSellerNotes} mobile={mobile} initialSellerId={entityFocus?.kind === "seller" ? entityFocus.id : ""} draftInvites={quickDrafts.sellerInvites} notify={notify} />,
-    finance: <Finance key={pageKey} rows={settlements} setRows={setSettlements} store={store} contextItem={contextItem} notify={notify} />,
-    reports: <Analytics key={pageKey} contextItem={contextItem} notify={notify} />,
-    modules: <Modules key={pageKey} modules={modules} setModules={setModules} roles={roles} setRoles={setRoles} contextItem={contextItem} notify={notify} />,
-    audit: <Audit key={pageKey + contextItem} contextItem={contextItem} notify={notify} />,
-    settings: <Settings key={pageKey} saved={settings} setSaved={setSettings} contextItem={contextItem} notify={notify} />,
-  }[domain];
-
-  return (
-    <div className={"admin-shell " + (contextOpen ? "context-open" : "context-closed")} data-testid="admin-shell">
-      <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
-      <IconRail active={domain} setActive={navigate} onProfile={() => openDialog("profile")} inactive={mobile && contextOpen} />
-      <ContextRail domain={domain} open={contextOpen} mobile={mobile} savedViews={savedViews} activeItem={contextItem} onItem={selectContextItem} onView={applyView} onSaveView={() => openDialog("save-view")} onNavigate={navigate} onClose={closeContext} store={store} onStoreChange={setStoreScope} dateRange={dateRange} onDateRangeChange={(next) => { setDateRange(next); notify("“" + next + "” dönemi örnek göstergelere uygulandı."); }} panelRef={contextPanelRef} />
-      {contextOpen && <button className="context-scrim" aria-label="Bağlamsal menüyü kapat" onClick={closeContext} data-testid="context-scrim" />}
-      <div className="admin-main" inert={mobile && contextOpen ? true : undefined}>
-        <AppHeader title={title} section={section} contextOpen={contextOpen} onToggleContext={toggleContext} contextToggleRef={contextToggleRef} onCommand={() => openDialog("command")} onQuickCreate={() => openDialog("quick-create")} onNotifications={() => openDialog("notifications")} onProfile={() => openDialog("profile")} notifications={notifications} dateRange={dateRange} setDateRange={(next) => { setDateRange(next); notify("“" + next + "” dönemi örnek göstergelere uygulandı."); }} showDate={domain === "dashboard" || domain === "operations"} toast={toast} clearToast={() => setToast("")} />
-        <main className="content-area" id="main-content" ref={headingRef} tabIndex="-1">{body}</main>
-        <footer className="statusbar"><PreviewBanner /><span>Örnek veri · kalıcı kayıt yok</span><span>API ve ödeme bağlantıları kapalı</span><button aria-label="Önizlemeyi başlangıç değerlerine döndür" onClick={() => openDialog("reset")}><Icon name="refresh" />Önizlemeyi yenile</button></footer>
-      </div>
-
-      {dialog?.type === "command" && <CommandPalette onClose={closeDialog} run={runCommand} orders={orders} products={products} sellers={sellers} customers={customers} />}
-      {dialog?.type === "quick-create" && (
-        <Modal title="Hızlı oluştur" onClose={closeDialog}>
-          <div className="quick-grid">
-            <button onClick={() => { closeDialog(); navigate("catalog", "Tüm Ürünler"); requestAnimationFrame(() => openDialog("product")); }}><Icon name="package" /><strong>Yeni ürün</strong><small>Yerel katalog kaydı oluştur</small></button>
-            <button onClick={() => { closeDialog(); requestAnimationFrame(() => openDialog("seller-invite")); }}><Icon name="user" /><strong>Satıcı daveti</strong><small>Gönderimsiz taslak oluştur · {quickDrafts.sellerInvites.length} taslak</small></button>
-            <button onClick={() => { closeDialog(); navigate("finance", "Hakedişler"); requestAnimationFrame(() => openDialog("settlement-summary")); }}><Icon name="card" /><strong>Mutabakat</strong><small>Finans özetini incele</small></button>
-            <button onClick={() => { closeDialog(); requestAnimationFrame(() => openDialog("collection")); }}><Icon name="grid" /><strong>Koleksiyon</strong><small>Yerel vitrin taslağı oluştur · {quickDrafts.collections.length} taslak</small></button>
-          </div>
-        </Modal>
-      )}
-      {dialog?.type === "save-view" && (
-        <Modal title="Görünümü kaydet" onClose={closeDialog}>
-          <form className="modal-form" onSubmit={saveView}>
-            <label><span>Görünüm adı</span><input name="name" required placeholder="Örn. Bugünkü öncelikler" data-autofocus aria-invalid={saveViewError ? "true" : undefined} aria-describedby={saveViewError ? "save-view-error" : undefined} onChange={() => saveViewError && setSaveViewError("")} /></label>
-            {saveViewError && <p className="modal-error" id="save-view-error" role="alert">{saveViewError}</p>}
-            <label><span>Örnek ekip erişimi</span><select name="scope"><option>Yalnızca ben</option><option>Operasyon ekibi</option><option>Tüm yöneticiler</option></select></label>
-            <p className="form-hint">Erişim etiketi kayda eklenir; gerçek yetkilendirme entegrasyonda uygulanır.</p>
-            <footer><button type="button" className="secondary-button" onClick={closeDialog}>İptal</button><button className="primary-button">Önizlemede kaydet</button></footer>
-          </form>
-        </Modal>
-      )}
-      {dialog?.type === "product" && <ProductDialog product={dialog.data.product} products={products} onClose={closeDialog} onSave={saveProduct} />}
-      {(dialog?.type === "seller-invite" || dialog?.type === "collection") && <SimpleFormDialog type={dialog.type} onClose={closeDialog} onSave={(values) => {
-        const isInvite = dialog.type === "seller-invite";
-        const key = isInvite ? "sellerInvites" : "collections";
-        setQuickDrafts((current) => ({ ...current, [key]: current[key].concat({ ...values, id: key + "-" + (current[key].length + 1) }) }));
-        closeDialog();
-        notify((isInvite ? "Satıcı daveti" : "Koleksiyon") + " yalnız bu oturumda taslak olarak kaydedildi; dış ileti gönderilmedi.");
-      }} />}
-      {dialog?.type === "assign-owner" && (
-        <Modal title="Sipariş sahibi ata" onClose={closeDialog}>
-          <form className="modal-form" onSubmit={assignOwner}><p>{dialog.data.ids.length} görünür sipariş için yerel sahiplik değişecek.</p><label><span>Operasyon sahibi</span><select name="owner" data-autofocus><option>Mehmet A.</option><option>Ece T.</option><option>Ayşe K.</option></select></label><footer><button type="button" className="secondary-button" onClick={closeDialog}>İptal</button><button className="primary-button">Yerelde ata</button></footer></form>
-        </Modal>
-      )}
-      {dialog?.type === "store-detail" && (
-        <Modal title={dialog.data.seller + " mağaza özeti"} onClose={closeDialog} wide>
-          <div className="detail-modal-body"><div className="detail-hero"><span className="avatar">{dialog.data.seller.split(" ").map((word) => word[0]).join("").slice(0, 2)}</span><div><strong>{dialog.data.seller}</strong><small>Yerel mağaza kartı · canlı satıcı profili değil</small></div></div><dl className="detail-list detail-grid"><div><dt>Örnek puan</dt><dd>4,8 / 5</dd></div><div><dt>SLA uyumu</dt><dd>%96,4</dd></div><div><dt>Açık sipariş</dt><dd>{orders.filter((row) => row.seller.includes(dialog.data.seller.split(" ")[0])).length}</dd></div><div><dt>Risk</dt><dd><Status>Düşük</Status></dd></div></dl></div>
-          <footer className="modal-actions"><button className="primary-button" onClick={closeDialog}>Tamam</button></footer>
-        </Modal>
-      )}
-      {dialog?.type === "notifications" && (
-        <Modal title="Örnek bildirimler" onClose={closeDialog} wide>
-          <div className="notification-list">{notifications.map((item) => <article key={item.id} className={item.read ? "read" : ""}><span className={"notification-tone " + item.tone} /><div><strong>{item.title}</strong><small>{item.detail}</small></div><button className="secondary-button small" disabled={item.read} onClick={() => setNotifications((rows) => markNotificationsRead(rows, item.id))}>{item.read ? "Okundu" : "Okundu işaretle"}</button></article>)}</div>
-          <footer className="modal-actions"><button className="secondary-button" onClick={() => setNotifications((rows) => markNotificationsRead(rows))}>Tümünü okundu işaretle</button><button className="primary-button" onClick={closeDialog}>Kapat</button></footer>
-        </Modal>
-      )}
-      {dialog?.type === "profile" && (
-        <Modal title="Profil ve rol önizlemesi" onClose={closeDialog}>
-          <div className="profile-summary"><span className="avatar">AK</span><div><strong>Ayşe Kara</strong><small>operasyon@novastore.tr</small></div></div><dl className="detail-list"><div><dt>Etkin rol</dt><dd>Operasyon Yöneticisi</dd></div><div><dt>Kapsam</dt><dd>{store}</dd></div><div><dt>Oturum</dt><dd>Yerel önizleme</dd></div></dl><p className="form-hint">Gerçek rol değişimi, oturum ve yetki denetimi entegrasyon aşamasında etkinleşir.</p>
-          <footer className="modal-actions"><button className="primary-button" onClick={closeDialog}>Tamam</button></footer>
-        </Modal>
-      )}
-      {dialog?.type === "health" && (
-        <Modal title="Mağaza sağlığı önizlemesi" onClose={closeDialog} wide>
-          <div className="health-grid">{[["Katalog örneği", "Sağlıklı", "14 Tem 2026 · 10:24"], ["Sipariş örneği", "Sağlıklı", "14 Tem 2026 · 10:22"], ["Bildirim örneği", "Önizleme", "Canlı kuyruk kapalı"], ["Tahsilat bağlantısı", "Entegrasyonda", "Hiçbir istek gönderilmez"]].map(([name, status, detail]) => <article key={name}><Icon name={status === "Entegrasyonda" ? "warning" : "check"} /><div><strong>{name}</strong><small>{detail}</small></div><Status>{status}</Status></article>)}</div>
-          <footer className="modal-actions"><button className="primary-button" onClick={closeDialog}>Tamam</button></footer>
-        </Modal>
-      )}
-      {dialog?.type === "settlement-summary" && (
-        <Modal title="Mutabakat özeti" onClose={closeDialog} wide>
-          <div className="detail-modal-body"><p>Yerel hakediş kayıtlarında <strong>{settlements.filter((row) => row.status === "Blokeli").length} blokeli</strong> ve <strong>{settlements.filter((row) => row.status === "Ödemeye hazır").length} hazır</strong> örnek bulunuyor.</p><section className="notice-card"><Icon name="shield" /><div><strong>Finansal işlem kapalı</strong><p>Bu özet yalnız arayüz akışını gösterir; transfer veya mutabakat kaydı üretmez.</p></div></section></div><footer className="modal-actions"><button className="secondary-button" onClick={closeDialog}>Kapat</button><button className="primary-button" onClick={() => { closeDialog(); navigate("finance", "Hakedişler"); }}>Hakedişlere git</button></footer>
-        </Modal>
-      )}
-      {dialog?.type === "reset" && (
-        <Modal title="Önizlemeyi başlangıca döndür" onClose={closeDialog} testId="confirmation-dialog">
-          <div className="confirmation-body"><Icon name="warning" /><p>Ürün, sipariş, satıcı, müşteri, modül ve ayarlarda yaptığınız tüm yerel değişiklikler sıfırlanacak.</p></div><footer className="modal-actions"><button className="secondary-button" onClick={closeDialog}>Vazgeç</button><button className="danger-button" onClick={resetPreview}>Tüm yerel durumu sıfırla</button></footer>
-        </Modal>
-      )}
-    </div>
-  );
-}
+              <option>Tüm Mağazalar · 24</option><option>NovaStore</option><option>Demo Teknoloji · 2 mağaza</option><option>Demo Ev</option>
+         

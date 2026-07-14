@@ -301,7 +301,20 @@ for (const [pattern, label] of [
     [/\bpaginateRows\(filtered, page, pageSize\)/, 'gerçek sipariş sayfalama modeli'],
     [/function OperationsPreviewTable\(/, 'satıcı siparişi, iade ve stok tablo yüzeyi'],
     [/function ProductDialog\(/, 'yerel ürün oluşturma ve düzenleme yüzeyi'],
-    [/\bvalidateProductDraft\(draft, products, product\?\.sku \|\| ""\)/, 'ürün doğrulama sözleşmesi'],
+    [/function MarketplaceScopeNotice\(/, 'mevcut tek satıcılı backend ile hedef pazaryeri ayrımı'],
+    [/\bvalidateProductDraft\(draft, products, product\?\.offerId \|\| ""\)/, 'offer kimlikli ürün doğrulama sözleşmesi'],
+    [/product\.publicationStatus === "İstisna incelemesi"/, 'yalnız politika istisnasına özgü ürün aksiyonu'],
+    [/readOnly=\{externalOffer\}/, 'haricî satıcı teklif alanlarının admin düzenlemesine kapatılması'],
+    [/!isFirstPartyOffer\(product\)/, 'teklif sahipliğinin gösterim adından bağımsız korunması'],
+    [/record\.offerId === editingOfferId/, 'teklif güncellemesinin global offer kimliğiyle yapılması'],
+    [/record\.canonicalId === normalized\.canonicalId/, 'kanonik içeriğin bağlı tekliflere yayılması'],
+    [/requiredPolicySignals/, 'politika motorunun zorunlu girdileri fail-closed doğrulaması'],
+    [/SELLER_NOT_ACTIVE/, 'aktif olmayan satıcı teklifini engelleyen politika kuralı'],
+    [/POLICY_CHECKS_PASSED/, 'başarılı otomatik yayın reason code kaydı'],
+    [/review\.reasons\.map/, 'açıklanabilir onboarding inceleme nedenleri'],
+    [/itemReview\.level/, 'türetilmiş satıcı inceleme önceliği'],
+    [/isSellerDocumentComplete\(key, value\)/, 'belge muafiyetinin modele bağlı görsel doğrulaması'],
+    [/Bantlar: 0–19 Rutin · 20–49 İnceleme gerekli · 50–100 Öncelikli/, 'inceleme önceliği eşik açıklaması'],
     [/function downloadCsv\(/, 'güvenli yerel CSV üretimi'],
     [/disabled=\{item\.disabled\}/, 'entegrasyona ertelenen bağlam kontrolleri'],
     [/role="combobox"[\s\S]{0,240}aria-activedescendant=/, 'klavye erişilebilir komut paleti'],
@@ -311,6 +324,37 @@ for (const [pattern, label] of [
 ]) {
     assert.match(applicationSource, pattern, 'uygulama ' + label + ' içermeli');
 }
+
+assert.doesNotMatch(
+    applicationSource,
+    /Ürün Onayları|Onay Bekleyen|Bekleyen Satıcı Onayı|Canlı Sipariş Operasyonu|seller\.risk|item\.risk|filters\.risk/,
+    'ürün bazlı manuel onay ve hardcode satıcı risk sözleşmesi kalmamalı'
+);
+assert.match(
+    applicationSource,
+    /Otomatik karar değildir[\s\S]{0,900}İsim, yetkili, komisyon ve ürün sayısı puana girmez/,
+    'inceleme skoru otomatik karar olmadığını ve puan dışı alanları açıklamalı'
+);
+assert.match(
+    applicationSource,
+    /Mevcut backend tek satıcılıdır/,
+    'hedef pazaryeri ekranı mevcut backend sınırını görünür kılmalı'
+);
+assert.match(
+    applicationSource,
+    /seller-scope henüz uygulanmamıştır/,
+    'katalog hedef mimariyi çalışan backend gibi sunmamalı'
+);
+assert.match(
+    applicationSource,
+    /aria-disabled=\{seller\.status === "Onaylandı" \|\| !review\.approvalEligible\}[\s\S]{0,180}aria-describedby=/,
+    'onboarding onay kapısı açıklamasını klavye ve yardımcı teknolojiye bağlamalı'
+);
+assert.match(
+    applicationSource,
+    /sellerRequiredDocumentKeys\.map[\s\S]{0,420}Kaynak verisi eksik/,
+    'eksik doğrulama kaydı detay ekranını çökertmeden görünür açıklanmalı'
+);
 
 for (const [pattern, label] of [
     [/current && compact && \([\s\S]{0,220}<Modal[^>]+testId="row-inspector"/, 'compact sipariş modalı'],
@@ -351,6 +395,16 @@ const previewLink = adminSource.match(
 assert.ok(previewLink, 'frontend/admin.html Commerce Pro önizlemesine bağlantı vermeli');
 assert.match(previewLink, /\btarget=["']_blank["']/i, 'önizleme bağlantısı yeni sekmede açılmalı');
 assert.match(previewLink, /\brel=["'][^"']*noopener[^"']*["']/i, 'yeni sekme bağlantısı noopener kullanmalı');
+assert.match(
+    adminSource,
+    /<option\s+value=["']pending_approval["']>Yayın İncelemesinde<\/option>[\s\S]{0,520}satıcı ürün izni değildir\./,
+    'kabul edilen admin pending_approval durumunu satıcı onayı gibi göstermemeli'
+);
+assert.match(
+    adminSource,
+    /pending_approval:\s*["']Yayın İncelemesinde["']/,
+    'ürün listesi iç yayın durumunu açıklayıcı etiketle göstermeli'
+);
 
 const designQaFinalResults = Array.from(
     designQaSource.matchAll(/^final result:\s*(\S+)\s*$/gim),

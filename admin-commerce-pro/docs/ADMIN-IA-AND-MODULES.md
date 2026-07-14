@@ -2,7 +2,7 @@
 
 Bu belge Commerce Pro görsel diliyle tasarlanan NovaStore admin panelinin bilgi mimarisini, çok satıcılı genişleme noktalarını ve modül çalışma sözleşmesini tanımlar.
 
-> Uygulama sınırı: Bu belge mevcut çalışan altyapıyı değil, hedef bilgi mimarisini ve gelecekte değerlendirilecek sözleşmeleri tarif eder. Bu PR yalnız kalıcılıksız örnek verilerle çalışan statik bir önizleme ekler; dinamik modül yükleme, API, migration, RBAC, veritabanı veya ödeme entegrasyonu uygulamaz.
+> Uygulama sınırı: Bu belge mevcut çalışan altyapıyı değil, hedef bilgi mimarisini ve gelecekte değerlendirilecek sözleşmeleri tarif eder. Bugünkü backend/storefront tek satıcılıdır; seller organization, seller offer, seller scope ve pazaryeri yayın politikası henüz çalışan sistem davranışı değildir. Bu PR yalnız kalıcılıksız örnek verilerle çalışan statik bir önizleme ekler; dinamik modül yükleme, API, migration, RBAC, veritabanı veya ödeme entegrasyonu uygulamaz. Çok satıcılı örnekler, ilgili güvenli geçiş ve pilot kapıları tamamlanmadan canlı satıcı yetkisi veya ürün sahipliği olarak yorumlanmamalıdır.
 
 ## 1. Ürün ilkeleri
 
@@ -64,7 +64,8 @@ Navigasyon grupları modül manifestlerinden katkı alabilir; ancak sıra ve isi
 
 - Geciken siparişler
 - Kritik stok
-- Onay bekleyen ürünler
+- Politika istisnası incelemeleri
+- Satıcı aksiyonu bekleyen katalog kayıtları
 - İncelenecek satıcı başvuruları
 - İade/anlaşmazlık SLA ihlali
 - Başarısız/geri dönen transfer
@@ -162,13 +163,36 @@ Filtreler:
 
 ## 7. Ürünler ve kategoriler
 
+Mevcut tek satıcılı backend'de ürün, fiyat ve stok NovaStore'un birinci taraf kaydıdır. Hedef pazaryeri modelinde bu kayıt güvenli backfill ile kanonik ürün + `NOVASTORE_FIRST_PARTY` teklifi olarak ayrılır. Bu geçiş yapılmadan admin arayüzü birinci taraf ürünü dış satıcı teklifi gibi göstermemeli; statik Commerce Pro örnekleri de gelecekteki modeli açıkça `önizleme` olarak etiketlemelidir.
+
 Ürünler alt alanları:
 
 - Kanonik katalog
 - Satıcı teklifleri
-- Onay kuyruğu
+- Politika istisnaları
+- Satıcı aksiyonu bekleyenler
 - Marka izinleri
 - Toplu içe aktarma
+
+Sahiplik sınırı:
+
+| Alan | Sahibi | Yönetici davranışı |
+| --- | --- | --- |
+| Başlık, marka, kategori, ortak açıklama, varyant yapısı ve ortak medya | Kanonik katalog/platform | Yetkili katalog rolü sürümlü olarak düzenler; satıcı düzeltme önerebilir. |
+| Satıcı SKU, fiyat, stok kaynağı, teslimat ve garanti koşulu | Seller offer/satıcı | Satıcı kendi kapsamında günceller; platform yöneticisi sessizce değiştirmez. |
+| Kategori/marka izni ve yayın politikası | Platform | Sürümlü kural olarak uygular; sonuç ve neden kodlarını görünür kılar. |
+
+Yayın, stok ve içerik aynı `durum` alanında birleştirilmez:
+
+| Eksen | Görünür durumlar |
+| --- | --- |
+| Kanonik içerik | Taslak, Doğrulanıyor, Etkin, Veri gerekli, Kısıtlı, Arşivli |
+| Teklif yayını | Taslak, Doğrulanıyor, Otomatik yayında, Satıcı aksiyonu, İstisna incelemesi, Yayından kaldırıldı, Arşivli |
+| Stok sağlığı | Stokta, Düşük stok, Stokta yok |
+
+`Stokta yok` bir yayın veya moderasyon kararı değildir. Teklif politikasını geçmeye devam eder, storefront'ta satın alınamaz gösterilir ve stok geri geldiğinde başka ihlal yoksa manuel onay beklemeden tekrar satılabilir.
+
+Varsayılan yayın akışı otomatik olmalıdır. Yeni kanonik aday zorunlu içerik ve eşleşme kontrollerini geçtiğinde otomatik olarak `Etkin` olur. Aktif ve yetkili satıcının teklifi; kanonik eşleşme, zorunlu alan/medya, yasak içerik, kategori/marka izni ve açıklanabilir fiyat kurallarını geçerse insan onayı olmadan `Otomatik yayında` olur. Düzeltilebilir eksik `Satıcı aksiyonu`na gider. Yalnız düşük eşleşme güveni, kısıtlı kategori/marka, sahte ürün sinyali veya sürümlü politikada açıkça tanımlanmış başka istisna `Politika istisnaları` kuyruğuna girer. Aktif olmayan satıcı, kesin yasak veya eksik zorunlu politika girdisi `Yayından kaldırıldı` ile fail-closed kalır; bütün ürünleri sırayla onaylayan bir kuyruk oluşturulmaz.
 
 Kanonik ürün inceleyici:
 
@@ -176,15 +200,27 @@ Kanonik ürün inceleyici:
 - Kategori yolu
 - Bağlı teklifler
 - İçerik sürümleri
-- Moderasyon geçmişi
+- Politika değerlendirme ve içerik değişikliği geçmişi
 
 Teklif inceleyici:
 
 - Satıcı ve satıcı SKU
 - Fiyat, stok, depo
 - Teslimat/garanti koşulu
-- Politika ve risk işaretleri
-- Yayın durumu
+- Politika sürümü, açıklanabilir neden kodları ve son kontrol zamanı
+- Ayrı yayın durumu ve stok sağlığı
+
+Teklif listesi ve komut hedefleri global `offer_id` kullanır. Satıcı SKU yalnız `(seller_id, seller_sku)` kapsamında benzersizdir; aynı SKU farklı satıcılarda geçerli olabilir. Birinci taraf/haricî teklif yetkisi görünen mağaza adına göre değil değişmez `seller_id + ownership_type` alanlarına göre belirlenir. Kanonik içerik değişikliği aynı `canonical_product_id` altındaki bütün teklif görünümlerine yayılır; satıcıya ait fiyat, stok ve SKU alanlarına taşınmaz.
+
+Politika istisnası inceleyici:
+
+- İstisnayı oluşturan kural, kanıt ve çözüm sahibi
+- Satıcıdan düzeltme isteme
+- Politika gereği askıya alma veya yeniden değerlendirme
+- Yetkiye bağlı, süreli ve gerekçeli override
+- Önce/sonra farkı ve tam audit izi
+
+Admin override tek tıkla ve gerekçesiz tamamlanmaz. Politika sürümü, neden kodu, serbest metin gerekçesi, aktör, zaman, correlation ID, sona erme zamanı ve sonraki otomatik değerlendirme kaydedilir. Override satıcı fiyatı/stoku üzerinde düzenleme yetkisi oluşturmaz.
 
 Kategori ağacı sınırsız derinliği destekler. Aynı isim farklı parent altında serbest, kardeş duplicate yasaktır. Admin yolu, storefront canonical route ve breadcrumb aynı kaynaktan üretilir.
 
@@ -195,7 +231,7 @@ Alt alanlar:
 - Başvurular
 - Aktif satıcılar
 - Eksik belgeler
-- Askı/risk
+- Askı ve açıklanabilir operasyon sinyalleri
 - Marka ve kategori izinleri
 - Satıcı kullanıcıları
 - Performans/SLA
@@ -206,7 +242,7 @@ Başvuru inceleyici:
 - KYC kontrol listesi
 - Sözleşme sürümü
 - Maskeli banka hesabı
-- Risk sinyalleri
+- Açıklanabilir onboarding doğrulama sinyalleri ve inceleme önceliği
 - İnceleme notları
 - Onay, eksik belge, red
 
@@ -217,6 +253,8 @@ Onay işlemi:
 3. Etki özeti
 4. Gerekçe/not
 5. Yetki ve gerekiyorsa dört göz kontrolü
+
+Onboarding inceleme önceliği otomatik karar veya fraud skoru değildir. Liste ve ayrıntı; kural seti sürümü, 0–100 içindeki toplam, her boyutun azami ağırlığı ve gerçek katkısı, 0–19 / 20–49 / 50–100 bantları, veri tamlığı, reason code ve zorunlu onay engellerini birlikte gösterir. İsim, yetkili, ürün sayısı ve komisyon puana girmez. Olası yinelenen başvuru dahi kontrol kapanana kadar onayı fail-closed tutar. Gelecekteki SLA/iptal/iade gibi operasyon sinyalleri ve ledger temelli finansal blokajlar bu onboarding önceliğinden ayrı modül, veri kaynağı ve sürümlü politika kullanır; açıklamasız `Düşük/Orta/Yüksek` etiketi gösterilmez.
 6. Audit + SellerApproved olayı
 
 Askıya alma yeni satış ve yeni teklif yayınını durdurur; mevcut sipariş, iade ve finans geçmişi açık kalır.
@@ -341,7 +379,7 @@ Manifest kuralları:
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Pano | Tam | Operasyon | Katalog | Finans | Destek | Salt okunur | Kendi özeti |
 | Sipariş | Tam | Düzenle | Salt okunur | Finans alanı | Destek alanı | Salt okunur | Kendi seller order |
-| Katalog | Tam | Salt okunur | Düzenle/onay | Salt okunur | Salt okunur | Salt okunur | Kendi teklif/talep |
+| Katalog | Tam | Salt okunur | Kanonik içerik/politika istisnası | Salt okunur | Salt okunur | Salt okunur | Kendi teklifi/içerik önerisi |
 | Satıcı KYC | Tam | İncele | Sınırlı | Banka durumu | Yok | Maskeli | Kendi başvuru |
 | Finans/ledger | Tam | Özet | Yok | Tam | İade özeti | Salt okunur | Kendi hakediş |
 | Modüller | Tam | Sağlık | Yok | Sağlık | Yok | Salt okunur | Yok |
@@ -362,7 +400,7 @@ Global arama şu varlıkları bulur:
 
 Sonuçlar role ve seller scope'a göre sunucuda filtrelenir. Arama sonucu hassas alanı snippet olarak sızdırmaz.
 
-Komut alanı yalnız güvenli navigasyon ve taslak başlatma aksiyonlarını açar. Satıcı onayı, iade veya transfer gibi riskli işlem komut alanından tek adımda tamamlanmaz.
+Komut alanı yalnız güvenli navigasyon ve taslak başlatma aksiyonlarını açar. Satıcı onayı, katalog politika override'ı, iade veya transfer gibi riskli işlem komut alanından tek adımda tamamlanmaz.
 
 ## 13. Bildirim merkezi
 
@@ -370,7 +408,7 @@ Komut alanı yalnız güvenli navigasyon ve taslak başlatma aksiyonlarını aç
 
 - Kritik: ödeme/transfer uyumsuzluğu, veri erişim riski, yüksek hacimli sipariş hatası
 - Yüksek: SLA ihlali, başarısız transfer, kritik stok
-- Normal: onay kuyruğu, içe aktarma tamamlandı
+- Normal: katalog politika istisnası, satıcı aksiyonu, içe aktarma tamamlandı
 - Bilgi: rapor hazır, modül health iyileşti
 
 Bildirim; neden, kapsam, oluşma zamanı, sahip, SLA ve doğrudan aksiyon bağlantısı içerir. Aynı correlation ID'ye ait tekrarlar gruplanır.
@@ -382,7 +420,7 @@ Operasyon:
 - Sipariş kabul ve sevk süresi
 - Gecikme oranı
 - İptal/iade oranı
-- Onay kuyruğu yaşı
+- Politika istisnası kuyruk yaşı ve otomatik yayın oranı
 
 Satıcı:
 
@@ -452,7 +490,7 @@ Test kimlikleri stil veya erişilebilir isim yerine kullanılmaz; yalnız otomas
 2. Pano ve mevcut NovaStore yönetim alanları
 3. Satır inceleyici, filtre, toplu işlem ve audit primitive'leri
 4. Satıcı başvuru/KYC modülü
-5. Kanonik katalog ve teklif moderasyonu
+5. Kanonik katalog, otomatik teklif yayın politikası ve istisna yönetimi
 6. Seller order görünümü
 7. Komisyon, ledger ve settlement shadow ekranları
 8. Modül kayıt sistemi
