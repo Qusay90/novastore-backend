@@ -1,6 +1,7 @@
 package com.novastore.app.data.repository
 
 import com.novastore.app.core.network.NovaStoreApi
+import com.novastore.app.data.model.CancelOrderRequestBody
 import com.novastore.app.data.model.ChangePasswordRequest
 import com.novastore.app.data.model.ForgotPasswordRequest
 import com.novastore.app.data.model.PhoneCodeRequest
@@ -18,8 +19,15 @@ class AccountRepository @Inject constructor(
         api.getUserOrders(userId)
     }
 
-    suspend fun cancelOrder(orderId: Int) = runCatching {
-        api.cancelOrder(orderId)
+    suspend fun cancelOrder(
+        orderId: Int,
+        reasonCode: String = "CUSTOMER_REQUEST",
+        note: String? = null
+    ) = runCatching {
+        api.cancelOrder(
+            orderId,
+            CancelOrderRequestBody(reasonCode = reasonCode, note = note)
+        )
     }
 
     suspend fun getCoupons() = runCatching {

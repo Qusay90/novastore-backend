@@ -3,7 +3,7 @@ const express = require('express');
 const http = require('http');
 const Module = require('module');
 const pool = require('../config/db');
-const { ORDER_STATUS, PAYMENT_STATUS } = require('../constants/orderStatus');
+const { ORDER_STATUS, PAYMENT_STATUS, REFUND_STATUS } = require('../constants/orderStatus');
 const { getPaymentStatus, initializePayment } = require('../controllers/paymentController');
 const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
 
@@ -203,6 +203,7 @@ const createCallbackState = (overrides = {}) => ({
     paymentStatus: PAYMENT_STATUS.REQUIRES_ACTION,
     orderPaymentStatus: PAYMENT_STATUS.REQUIRES_ACTION,
     orderStatus: ORDER_STATUS.ODEME_BEKLIYOR,
+    orderRefundStatus: REFUND_STATUS.NONE,
     amount: '1049.90',
     orderTotalAmount: '1049.90',
     stockDecrements: 0,
@@ -214,6 +215,9 @@ const createCallbackState = (overrides = {}) => ({
     orderEvents: 0,
     paymentSuccessEvents: 0,
     paymentFailedEvents: 0,
+    reconciliationRequiredEvents: 0,
+    reconciliationMetadataWrites: 0,
+    durableReconciliationNotifications: 0,
     orderItemWrites: 0,
     paymentPaidUpdates: 0,
     paymentFailedUpdates: 0,
@@ -242,6 +246,7 @@ const makePaymentRow = (state) => ({
     customer_name: 'Test Kullanici',
     order_status: state.orderStatus,
     order_payment_status: state.orderPaymentStatus,
+    order_refund_status: state.orderRefundStatus,
     order_total_amount: state.orderTotalAmount
 });
 
@@ -290,6 +295,16 @@ const createCallbackClient = (state) => ({
                 state.paymentFailedUpdates += 1;
                 state.paymentStatus = PAYMENT_STATUS.FAILED;
             }
+            for (const value of params) {
+                if (typeof value !== 'string' || !value.startsWith('{')) continue;
+                let metadata = null;
+                try {
+                    metadata = JSON.parse(value);
+                } catch (_) {}
+                if (metadata?.reconciliationTask?.status === 'OPEN') {
+                    state.reconciliationMetadataWrites += 1;
+                }
+            }
             return { rows: [] };
         }
 
@@ -297,12 +312,14 @@ const createCallbackClient = (state) => ({
             if (params[0] === PAYMENT_STATUS.PAID) {
                 state.orderPaidUpdates += 1;
                 state.orderPaymentStatus = PAYMENT_STATUS.PAID;
-                state.orderStatus = ORDER_STATUS.HAZIRLANIYOR;
+                if (/\bstatus\s*=\s*\$2/i.test(sql)) state.orderStatus = params[1];
+                if (/refund_status\s*=\s*\$2/i.test(sql)) state.orderRefundStatus = params[1];
             }
             if (params[0] === PAYMENT_STATUS.FAILED) {
                 state.orderFailedUpdates += 1;
                 state.orderPaymentStatus = PAYMENT_STATUS.FAILED;
-                state.orderStatus = ORDER_STATUS.IPTAL_EDILDI;
+                if (/\bstatus\s*=\s*\$2/i.test(sql)) state.orderStatus = params[1];
+                if (/refund_status\s*=\s*\$4/i.test(sql)) state.orderRefundStatus = params[3];
             }
             return { rows: [] };
         }
@@ -311,7 +328,13 @@ const createCallbackClient = (state) => ({
             state.orderEvents += 1;
             if (params[1] === 'PAYMENT_SUCCESS') state.paymentSuccessEvents += 1;
             if (params[1] === 'PAYMENT_FAILED') state.paymentFailedEvents += 1;
+            if (params[1] === 'PAYMENT_RECONCILIATION_REQUIRED') state.reconciliationRequiredEvents += 1;
             return { rows: [] };
+        }
+
+        if (/INSERT INTO notifications/i.test(sql)) {
+            state.durableReconciliationNotifications += 1;
+            return { rows: [{ id: state.durableReconciliationNotifications }] };
         }
 
         if (/INSERT INTO order_items/i.test(sql)) {
@@ -408,14 +431,14 @@ const assertNoSecrets = (value) => {
     assert.strictEqual(text.includes('merchant-salt-secret'), false);
 };
 
-const assertNoFinalization = (state) => {
+const assertNoFinalization = (state, { auditEvents = 0 } = {}) => {
     assert.strictEqual(state.stockDecrements, 0);
     assert.strictEqual(state.stockRestocks, 0);
     assert.strictEqual(state.couponIncrements, 0);
     assert.strictEqual(state.couponDecrements, 0);
     assert.strictEqual(state.successNotifications, 0);
     assert.strictEqual(state.failedNotifications, 0);
-    assert.strictEqual(state.orderEvents, 0);
+    assert.strictEqual(state.orderEvents, auditEvents);
     assert.strictEqual(state.paymentPaidUpdates, 0);
     assert.strictEqual(state.paymentFailedUpdates, 0);
     assert.strictEqual(state.orderPaidUpdates, 0);
@@ -563,7 +586,10 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
             assert.strictEqual(response.text, 'OK');
             assert.strictEqual(successThenFailed.paymentStatus, PAYMENT_STATUS.PAID);
             assert.strictEqual(successThenFailed.orderStatus, ORDER_STATUS.HAZIRLANIYOR);
-            assertNoFinalization(successThenFailed);
+            assertNoFinalization(successThenFailed, { auditEvents: 2 });
+            assert.strictEqual(successThenFailed.reconciliationMetadataWrites, 1);
+            assert.strictEqual(successThenFailed.reconciliationRequiredEvents, 1);
+            assert.strictEqual(successThenFailed.durableReconciliationNotifications, 1);
         });
 
         const failedThenSuccess = createCallbackState({
@@ -575,9 +601,21 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
             const response = await postForm(server, buildPayload({ status: 'success' }));
             assert.strictEqual(response.statusCode, 200);
             assert.strictEqual(response.text, 'OK');
-            assert.strictEqual(failedThenSuccess.paymentStatus, PAYMENT_STATUS.FAILED);
+            assert.strictEqual(failedThenSuccess.paymentStatus, PAYMENT_STATUS.PAID);
+            assert.strictEqual(failedThenSuccess.orderPaymentStatus, PAYMENT_STATUS.PAID);
             assert.strictEqual(failedThenSuccess.orderStatus, ORDER_STATUS.IPTAL_EDILDI);
-            assertNoFinalization(failedThenSuccess);
+            assert.strictEqual(failedThenSuccess.orderRefundStatus, REFUND_STATUS.PENDING);
+            assert.strictEqual(failedThenSuccess.paymentPaidUpdates, 1);
+            assert.strictEqual(failedThenSuccess.orderPaidUpdates, 1);
+            assert.strictEqual(failedThenSuccess.orderEvents, 2);
+            assert.strictEqual(failedThenSuccess.reconciliationMetadataWrites, 1);
+            assert.strictEqual(failedThenSuccess.reconciliationRequiredEvents, 1);
+            assert.strictEqual(failedThenSuccess.durableReconciliationNotifications, 1);
+            assert.strictEqual(failedThenSuccess.stockDecrements, 0);
+            assert.strictEqual(failedThenSuccess.stockRestocks, 0);
+            assert.strictEqual(failedThenSuccess.couponIncrements, 0);
+            assert.strictEqual(failedThenSuccess.orderItemWrites, 0);
+            assert.strictEqual(failedThenSuccess.successNotifications, 0);
         });
 
         for (const state of [
@@ -636,8 +674,89 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
         });
         assert.strictEqual(paidStatus.res.code, 200);
         assert.strictEqual(paidStatus.res.body.finalized, true);
+        assert.strictEqual(paidStatus.res.body.providerFinalized, true);
+        assert.strictEqual(paidStatus.res.body.commerceFinalized, true);
         assert.strictEqual(paidStatus.res.body.paymentStatus, PAYMENT_STATUS.PAID);
         assert.strictEqual(paidStatus.calls.length, 1);
+        assert.match(paidStatus.calls[0].sql, /p\.raw_request/);
+        assert.match(paidStatus.calls[0].sql, /o\.refund_status/);
+
+        const refundReviewStatus = await callStatus({
+            row: {
+                payment_ref: 'PAYTR-REFUND-REVIEW',
+                payment_status: PAYMENT_STATUS.PAID,
+                provider: 'paytr',
+                raw_request: JSON.stringify({ reconciliationRequired: true }),
+                order_id: 9001,
+                order_status: ORDER_STATUS.IPTAL_EDILDI,
+                refund_status: REFUND_STATUS.PENDING,
+                order_user_id: 10
+            }
+        });
+        assert.strictEqual(refundReviewStatus.res.code, 200);
+        assert.strictEqual(refundReviewStatus.res.body.nextAction, 'WAIT_REFUND_REVIEW');
+        assert.strictEqual(refundReviewStatus.res.body.refundStatus, REFUND_STATUS.PENDING);
+        assert.strictEqual(refundReviewStatus.res.body.reconciliationRequired, true);
+        assert.strictEqual(refundReviewStatus.res.body.commerceFinalized, false);
+
+        const manualReconciliationStatus = await callStatus({
+            row: {
+                payment_ref: 'PAYTR-MANUAL-RECONCILIATION',
+                payment_status: PAYMENT_STATUS.PAID,
+                provider: 'paytr',
+                raw_request: JSON.stringify({ reconciliationRequired: true }),
+                order_id: 9001,
+                order_status: ORDER_STATUS.KARGOYA_VERILDI,
+                refund_status: REFUND_STATUS.NONE,
+                order_user_id: 10
+            }
+        });
+        assert.strictEqual(manualReconciliationStatus.res.code, 200);
+        assert.strictEqual(manualReconciliationStatus.res.body.nextAction, 'WAIT_RECONCILIATION');
+        assert.strictEqual(manualReconciliationStatus.res.body.reconciliationRequired, true);
+        assert.strictEqual(manualReconciliationStatus.res.body.providerFinalized, true);
+        assert.strictEqual(manualReconciliationStatus.res.body.commerceFinalized, false);
+
+        const refundedReconciliationStatus = await callStatus({
+            row: {
+                payment_ref: 'PAYTR-REFUNDED',
+                payment_status: PAYMENT_STATUS.REFUNDED,
+                provider: 'paytr',
+                raw_request: JSON.stringify({ reconciliationRequired: true }),
+                order_id: 9001,
+                order_status: ORDER_STATUS.IADE_EDILDI,
+                refund_status: REFUND_STATUS.COMPLETED,
+                order_user_id: 10
+            }
+        });
+        assert.strictEqual(refundedReconciliationStatus.res.code, 200);
+        assert.strictEqual(refundedReconciliationStatus.res.body.nextAction, 'WAIT_RECONCILIATION');
+        assert.strictEqual(refundedReconciliationStatus.res.body.paymentStatus, PAYMENT_STATUS.REFUNDED);
+        assert.strictEqual(refundedReconciliationStatus.res.body.reconciliationRequired, true);
+        assert.strictEqual(refundedReconciliationStatus.res.body.commerceFinalized, false);
+
+        const failedReconciliationStatus = await callStatus({
+            row: {
+                payment_ref: 'PAYTR-FAILED-RECONCILIATION',
+                payment_status: PAYMENT_STATUS.FAILED,
+                provider: 'paytr',
+                raw_request: JSON.stringify({
+                    reconciliationRequired: true,
+                    reconciliationTask: {
+                        status: 'OPEN',
+                        reasonCode: 'FAILURE_STOCK_RESERVATION_UNKNOWN'
+                    }
+                }),
+                order_id: 9001,
+                order_status: ORDER_STATUS.IPTAL_EDILDI,
+                refund_status: REFUND_STATUS.NONE,
+                order_user_id: 10
+            }
+        });
+        assert.strictEqual(failedReconciliationStatus.res.code, 200);
+        assert.strictEqual(failedReconciliationStatus.res.body.providerFinalized, true);
+        assert.strictEqual(failedReconciliationStatus.res.body.commerceFinalized, false);
+        assert.strictEqual(failedReconciliationStatus.res.body.nextAction, 'WAIT_RECONCILIATION');
 
         const failedStatus = await callStatus({
             row: {

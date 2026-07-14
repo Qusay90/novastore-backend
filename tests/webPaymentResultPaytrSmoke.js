@@ -136,6 +136,8 @@ const runPaymentResult = async ({ href, statusPayload, responseFactory = null })
             orderStatus: 'Hazırlanıyor',
             provider: 'paytr',
             finalized: true,
+            providerFinalized: true,
+            commerceFinalized: true,
             message: 'Ödemeniz onaylandı. Siparişiniz hazırlanıyor.'
         }
     });
@@ -160,6 +162,8 @@ const runPaymentResult = async ({ href, statusPayload, responseFactory = null })
             orderStatus: 'İptal Edildi',
             provider: 'paytr',
             finalized: true,
+            providerFinalized: true,
+            commerceFinalized: true,
             message: 'Ödeme tamamlanamadı. Sepetiniz korunur, dilerseniz tekrar deneyebilirsiniz.'
         }
     });
@@ -175,6 +179,27 @@ const runPaymentResult = async ({ href, statusPayload, responseFactory = null })
     assert.strictEqual(failed.local.has('novastore_pending_checkout_10'), true);
     assert.strictEqual(failed.session.has('novastore.paytrCheckout.NST-PAYTR-RESULT-1'), false);
     assert.strictEqual(failed.elements.title.innerText.includes('Başarılı'), false);
+
+    const failedReconciliation = await runPaymentResult({
+        href: `${baseHref}&status=failed`,
+        statusPayload: {
+            orderId: 9001,
+            paymentRef: 'NST-PAYTR-RESULT-1',
+            paymentStatus: 'FAILED',
+            orderStatus: 'İptal Edildi',
+            provider: 'paytr',
+            finalized: true,
+            providerFinalized: true,
+            commerceFinalized: false,
+            reconciliationRequired: true,
+            nextAction: 'WAIT_RECONCILIATION',
+            message: 'Ödeme ve sipariş kayıtları manuel mutabakat bekliyor. Sepetiniz korunur.'
+        }
+    });
+    assert.strictEqual(failedReconciliation.elements.title.innerText, 'Ödeme Mutabakatı Bekleniyor');
+    assert.strictEqual(failedReconciliation.elements['retry-btn'].style.display, 'none');
+    assert.strictEqual(failedReconciliation.local.has('novastore_pending_checkout_10'), true);
+    assert.strictEqual(failedReconciliation.session.has('novastore.paytrCheckout.NST-PAYTR-RESULT-1'), true);
 
     const pendingFromSuccessUrl = await runPaymentResult({
         href: `${baseHref}&status=success`,
@@ -204,11 +229,36 @@ const runPaymentResult = async ({ href, statusPayload, responseFactory = null })
             orderStatus: 'Hazırlanıyor',
             provider: 'paytr',
             finalized: true,
+            providerFinalized: true,
+            commerceFinalized: true,
             message: 'Ödemeniz onaylandı.'
         }
     });
     assert.strictEqual(paidFromFailedUrl.elements.title.innerText, 'Ödeme Başarılı');
     assert.deepStrictEqual(JSON.parse(paidFromFailedUrl.local.get('novastore_cart_10')), [{ id: 102, name: 'Kablo', quantity: 1 }]);
+
+    const paidReconciliation = await runPaymentResult({
+        href: `${baseHref}&status=success`,
+        statusPayload: {
+            orderId: 9001,
+            paymentRef: 'NST-PAYTR-RESULT-1',
+            paymentStatus: 'PAID',
+            orderStatus: 'Kargoya Verildi',
+            provider: 'paytr',
+            finalized: true,
+            providerFinalized: true,
+            commerceFinalized: false,
+            reconciliationRequired: true,
+            nextAction: 'WAIT_RECONCILIATION',
+            message: 'Ödemeniz alındı; sipariş kaydı operasyonel mutabakat bekliyor. Aynı ödemeyi tekrar denemeyin.'
+        }
+    });
+    assert.strictEqual(paidReconciliation.elements.title.innerText, 'Ödeme Mutabakatı Bekleniyor');
+    assert.deepStrictEqual(JSON.parse(paidReconciliation.local.get('novastore_cart_10')), [
+        { id: 102, name: 'Kablo', quantity: 1 }
+    ]);
+    assert.strictEqual(paidReconciliation.local.has('novastore_pending_checkout_10'), false);
+    assert.strictEqual(paidReconciliation.session.has('novastore.paytrCheckout.NST-PAYTR-RESULT-1'), false);
 
     const paidButNotFinalized = await runPaymentResult({
         href: `${baseHref}&status=success`,

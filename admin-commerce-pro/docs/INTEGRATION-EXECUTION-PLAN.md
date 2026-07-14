@@ -10,12 +10,12 @@ Yığın tabanı: `codex/admin-commerce-pro-preview` (`1954d4b`)
 
 Commerce Pro tasarım prototipi tamamlandı; tek-satıcı salt-okunur entegrasyon katmanı Dashboard, sipariş, iade ve admin bildirimlerine kadar ilerledi. Mevcut backend hâlâ tek satıcılıdır; satıcı organizasyonu, satıcı kapsamlı yetkilendirme, teklif, seller-order, değişmez finansal kayıt, hakediş ve payout modelleri henüz yoktur.
 
-- Gerçek tek-satıcı Commerce Pro cutover için kalan: **yaklaşık 2,5–4 hafta**.
-- Dar kapsamlı, login zorunlu ilk satış pilotu için kalan: **yaklaşık 4,5–7,5 hafta**.
+- Gerçek tek-satıcı Commerce Pro cutover için kalan: **yaklaşık 2–3,5 hafta**.
+- Dar kapsamlı, login zorunlu ilk satış pilotu için kalan: **yaklaşık 4–7 hafta**.
 - Kontrollü 1–3 satıcılı ödeme pilotu: bugünden itibaren **5–7 ay**.
 - Güvenilir halka açık pazaryeri: **8–12 ay**.
 
-Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapasitesini varsayar. Mevcut tek geliştirici + Codex çalışma düzeninde gerçekçi takvim yaklaşık **5–9 hafta tek-satıcı cutover**, **8–17 hafta dar satış pilotu**, **9–16 ay kontrollü çok-satıcı ödeme pilotu** ve **15–28 ay güvenilir halka açık pazaryeri** düzeyindedir. Ödeme, KYC, kargo ve e-fatura sağlayıcılarının sözleşme/onay süreleri tahmine dahil değildir.
+Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapasitesini varsayar. Mevcut tek geliştirici + Codex çalışma düzeninde gerçekçi kalan takvim yaklaşık **4–8 hafta tek-satıcı cutover**, **7–15 hafta dar satış pilotu**, **9–16 ay kontrollü çok-satıcı ödeme pilotu** ve **15–28 ay güvenilir halka açık pazaryeri** düzeyindedir. Ödeme, KYC, kargo ve e-fatura sağlayıcılarının sözleşme/onay süreleri tahmine dahil değildir.
 
 ## Değişmez teslim kuralları
 
@@ -96,7 +96,8 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 - Order/return için sunucu tarafı geçiş matrisi ve idempotency eklenmeli.
 - Payment–stock yarışında rezervasyon ve compensation doğrulanmalı.
 - İptal/return stok geri yükleme ve gerçek refund birbirinden tutarlı olmalı.
-- Liste endpoint’lerine ortak pagination/filter/sort ve hata zarfı eklenmeli.
+- Liste endpoint'lerine ortak pagination/filter/sort ve hata zarfı eklenmeli.
+- Satış pilotundan önce PayTR token/iyzico initialize mock implementasyonları gerçek provider adapterlarıyla değiştirilmeli; iyzico webhook imzası sağlayıcının belgelenmiş raw-body sözleşmesiyle doğrulanmalıdır. Bu işler açık staging/sağlayıcı onayı olmadan etkinleştirilmez.
 
 ## Tur kapatma kaydı
 
@@ -104,7 +105,8 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 |---|---|---|---|
 | 0 | Tamamlandı | `faef1f2` | Read-only repo audit; remote sistem kullanılmadı |
 | 1 | Kod ve otomatik QA tamam; browser QA blokeli | `989cbeb` | Preview/entegre build, auth, mapper, CSP ve artifact testleri yeşil; Work Mode browser kanıtı eksik |
-| 2A | Kod ve otomatik QA tamam; browser QA blokeli | Bu commit | İade/bildirim salt-okunur bağlandı; yerel kargo/refund sınırları görünür; write capability'leri kapalı; full verify yeşil |
+| 2A | Kod ve otomatik QA tamam; browser QA blokeli | `eea2b1c` | İade/bildirim salt-okunur bağlandı; yerel kargo/refund sınırları görünür; write capability'leri kapalı; full verify yeşil |
+| 2B | Kod ve otomatik QA tamam; browser QA blokeli | Bu commit | Hard-delete/generic geçiş/sahte shipment/iade yazmaları kapalı; iptal stok kanıtına, callback'ler payment state + kalıcı reconciliation görevine bağlandı; bağımsız P0/P1 incelemesi temiz |
 
 ## Tur 2 güvenlik bölümü
 
@@ -119,6 +121,16 @@ Tur 2B'nin P0 kabul kapıları:
 5. Admin mutation'ları JWT'deki eski role değil güncel DB admin rolüne dayanır.
 6. Gerçek taşıyıcı, refund ve ödeme çağrıları ayrıca açık onay verilene kadar çalıştırılmaz.
 
+Tur 2B güvenli davranış özeti:
+
+- Sipariş hard-delete `410 ORDER_HARD_DELETE_DISABLED`; genel durum yolu yalnız aynı durum tekrarını kabul eder ve gerçek değişiklik için ilgili komutu zorunlu kılar.
+- İptal, sipariş ile siparişe bağlı bütün ödeme kayıtlarını kilitler. Aktif ödeme geçmişi, provider-pending durumu ve stok rezervasyon kanıtı tutarlı değilse veri yazmadan `409` ile durur.
+- PayTR/iyzico callback kararı sipariş görünümünden değil kilitli `payments.status` kaydından türetilir. Geç/karşıt callback finansal gerçeği korur; stok/kupon/sipariş satırı yan etkisini tekrar çalıştırmaz ve mutabakat kaydı üretir.
+- Sahte takip numarası üreten shipment create `410 SHIPMENT_CREATE_DISABLED`; yeni iade ve iade durum yazmaları `503 RETURN_WRITES_DISABLED` ile kapalıdır. Mevcut kayıtların owner/admin salt-okunur görünümü korunur.
+- Legacy admin, web profil ve Android istemcileri kapalı işlemleri etkin CTA gibi göstermez. Android iptal CTA'sı yalnız backend'in iptal edilebilir hazırlık durumlarında görünür.
+
+Bu çekirdek callback güvenliği gerçek ödeme bağlantısı anlamına gelmez. Mevcut PayTR initialize test tokenı, iyzico initialize mock yanıtı ve iyzico imza sözleşmesi satışa açılmadan önce provider staging dokümanıyla ayrı turda değiştirilip UAT edilmelidir; o zamana kadar ödeme alma go/no-go kapısı kapalıdır.
+
 PR #15’in `design-qa.md` sonucu, gerçek masaüstü/mobil browser kanıtı alınana kadar `blocked` kalır. Bu plan browser kısıtını atlatma yetkisi vermez.
 
 ## Tur 1 geri alma sınırı
@@ -128,3 +140,7 @@ Tur 1’in yeni artifact, session ve order-summary parçaları additive ilerler;
 ## Tur 2A geri alma sınırı
 
 Tur 2A şema veya veri mutation'ı eklemez. Geri alma gerektiğinde return/notification summary handler ve rotaları, iki read capability'si, mapper/adapter kaynakları, entegre iade-bildirim-kargo görünümü ve yeniden üretilen live artifact birlikte geri alınır. Legacy admin, mevcut return/notification yolları, preview artifact ve veritabanı şeması değişmeden kalır.
+
+## Tur 2B geri alma sınırı
+
+Tur 2B migration veya production ayarı eklemez; mevcut tablo ve event kayıtlarını kullanır. Geri alma gerektiğinde yaşam döngüsü/callback policy servisleri, controller/route guard'ları, legacy istemci kapıları ve bunların sözleşme testleri birlikte geri alınır. Bu geri alma eski hard-delete, sahte shipment ve güvensiz return yollarını yeniden açacağı için yalnız ayrı olay incelemesi ve açık onayla yapılabilir. Gerçek ödeme veya taşıyıcı konfigürasyonu bu turda değiştirilmez.

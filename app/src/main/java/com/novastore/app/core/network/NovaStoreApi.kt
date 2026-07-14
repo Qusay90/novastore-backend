@@ -76,7 +76,10 @@ interface NovaStoreApi {
     suspend fun getUserOrders(@Path("userId") userId: Int): List<AccountOrder>
 
     @POST("api/orders/{id}/cancel")
-    suspend fun cancelOrder(@Path("id") orderId: Int): BasicMessageResponse
+    suspend fun cancelOrder(
+        @Path("id") orderId: Int,
+        @Body body: CancelOrderRequestBody
+    ): BasicMessageResponse
 
     @GET("api/campaigns/coupons/active")
     suspend fun getActiveCoupons(): List<AccountCoupon>

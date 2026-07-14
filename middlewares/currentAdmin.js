@@ -3,4 +3,9 @@ const { createRequireCurrentAdmin } = require('../services/currentAdminGuard');
 
 const requireCurrentAdmin = createRequireCurrentAdmin(pool);
 
-module.exports = { createRequireCurrentAdmin, requireCurrentAdmin };
+const requireCurrentAdminIfClaimed = (req, res, next) => {
+    if (req.user?.role !== 'admin') return next();
+    return requireCurrentAdmin(req, res, next);
+};
+
+module.exports = { createRequireCurrentAdmin, requireCurrentAdmin, requireCurrentAdminIfClaimed };

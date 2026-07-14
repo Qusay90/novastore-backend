@@ -82,6 +82,11 @@ data class ReturnRequestBody(
     val note: String?
 )
 
+data class CancelOrderRequestBody(
+    @SerializedName("reason_code") val reasonCode: String,
+    val note: String? = null
+)
+
 data class BasicMessageResponse(
     val mesaj: String?,
     val error: String?,

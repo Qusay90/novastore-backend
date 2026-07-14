@@ -8,8 +8,8 @@
 ## B) Teknik Hazirlik
 - [ ] Commerce schema migrationlari production veritabaninda uygulandi.
 - [ ] Odeme initialize + webhook testleri gecti.
-- [ ] Kargo olusturma + takip/ETA akislari gecti.
-- [ ] Iade talepleri kullanici ve admin yetki kontrolleri gecti.
+- [ ] `SHIPMENT_CREATE_DISABLED` kilidi kontrollu Tur 2C UAT'i ve onay sonrasinda kaldirildi; kargo olusturma + takip akislari gecti.
+- [ ] `RETURN_WRITES_DISABLED` kilidi kontrollu Tur 2C UAT'i ve onay sonrasinda kaldirildi; iade, geri odeme ve stok zinciri gecti.
 - [ ] Checkout kupon/kampanya hesaplamasi backend ile uyumlu.
 - [ ] Merchant feed (`/merchant/feed.xml`) dogrulandi.
 

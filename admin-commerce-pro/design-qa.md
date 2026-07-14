@@ -21,6 +21,8 @@ Tek-satıcı entegre çıktı: `../frontend/admin-commerce-pro-live.html`
 - Komut paleti sipariş, ürün, müşteri ve satıcı hedeflerini doğru kapsama açıyor; CSV formül enjeksiyonu `=`, `+`, `-`, `@`, tab ve carriage-return başlangıçları için etkisizleştiriliyor.
 - Tek-satıcı entegre yüzeyine bounded/PII-azaltılmış iade ve admin bildirimi özetleri eklendi. Her kaynak kendi capability, loading/error/empty ve yenileme durumuna sahip; 401/403 veya capability kaybında hassas stale veri temizleniyor.
 - Sipariş tablosundaki fulfillment bilgisi `Yerel` olarak etiketlendi ve taşıyıcı doğrulaması olmadığı açıkça gösterildi. İade ekranı `Talep tutarı` dilini kullanıyor; gerçek refund, iade onayı, kargo oluşturma ve bildirim okundu mutation'ları artifact'a eklenmedi.
+- Tur 2B yaşam döngüsü çekirdeğinde sipariş hard-delete ve generic durum mutation'ı kapatıldı. İptal yalnız kilitli payment geçmişi ve doğrulanmış stok rezervasyonu ile çalışıyor; kargoya çıkmış siparişte Android iptal CTA'sı görünmüyor. Sahte takip üreten shipment create ile güvenli refund/stok zinciri olmayan iade yazmaları açık hata kodlarıyla kapalı tutuluyor.
+- PayTR/iyzico callback yarışları kilitli payment durumuna bağlandı. Geç/karşıt callback commerce yan etkisini tekrarlamıyor; gerekli hallerde aynı transaction içinde payment satırına `OPEN` mutabakat görevi, order event ve kalıcı admin bildirimi yazılıyor. Status API provider sonucu ile commerce tamamlanmasını ayırıyor; tahsil edilmiş mutabakatta tekrar ödeme engelleniyor, başarısız-belirsiz mutabakatta sepet korunurken retry gizleniyor.
 
 ## Deterministik doğrulama
 
@@ -31,8 +33,12 @@ Tek-satıcı entegre çıktı: `../frontend/admin-commerce-pro-live.html`
 - Sekiz mevcut admin UI/auth/XSS smoke testi ile `startupSafetySmoke` ve `serverStartupSafetySmoke`: geçti. Server startup testi remote DB'ye bağlanmadı; yalnız `127.0.0.1` test hedeflerini kullandı ve `55432` dalını yerel veritabanı bulunmadığı için atladı.
 - Root ve Commerce Pro `npm ls --depth=0`: geçti. Root ve Commerce Pro production audit: `0 vulnerabilities`.
 - Script sözdizimi kontrolleri ve `git diff --check`: geçti.
+- Tur 2B final root suite: 74 test dosyası çalıştırıldı; 61 tam geçti, `serverStartupSafetySmoke` ana kontrolü geçti ve yalnız yerel DB alt dalını atladı, 12 test `127.0.0.1:55432` üzerinde disposable PostgreSQL bulunmadığı için açıkça `SKIP` oldu. Gerçek hata ve timeout yok. Değişen/yeni 23 JavaScript dosyasının `node --check` sonucu 23/23 geçti.
+- Tur 2B ödeme odaklı 14 smoke testi; yaşam döngüsü policy/mutation/client, iade yazma kilidi, current-admin ve legacy UI sözleşme testleri geçti. İki bağımsız final incelemede kapsam içi açık P0/P1 kalmadı.
+- `npm run verify`: Tur 2B kaynaklarıyla yeniden geçti; preview/live Vite buildleri, iki entegre artifact ve model/HTTP/session/live sözleşme testleri yeşil. Üretilen Commerce Pro artifact'larında içerik farkı oluşmadı.
 - Kaynak/artifact statik kontrollerinde `fetch`, XHR, WebSocket, EventSource, `sendBeacon`, `/api`, PayTR veya iyzico çağrısı yok. Standalone kaynak artifact'ında CSP `connect-src 'none'`; haricî aktif script, stylesheet, font veya görsel kaynağı yok.
 - Dedicated disposable PostgreSQL gerektiren ve şema silen migration smoke çalıştırılmadı; remote/production veritabanına hiçbir bağlantı kurulmadı.
+- Android Gradle dağıtımı/cache'i ortamda bulunmadığı ve kullanıcıya ait dirty PNG derleme worktree'sinde bozuk olduğu için Android compile kanıtı üretilemedi. Kotlin istemci değişiklikleri statik kontrat ve web/backend smoke testleriyle doğrulandı; bu sınırlama compile geçmiş gibi sunulmadı.
 
 ## Önceki doğrulanmış mock Preview kaydı
 

@@ -13,14 +13,18 @@
   - Body: `reason_code` (zorunlu), `note` (opsiyonel)
 
 ## Shipments
-- `POST /api/shipments/:orderId/create` (admin)
 - `GET /api/shipments/:orderId` (owner/admin)
+- `POST /api/shipments/:orderId/create` (admin)
+  - Gecici guvenlik kilidi: `410 SHIPMENT_CREATE_DISABLED`
+  - Kilit acilana kadar gonderi, takip numarasi veya tahmini teslim tarihi uretmez ve veri yazmaz.
 
 ## Returns
 - `POST /api/returns`
-  - Auth gerekli
-  - Body: `order_id, reason_code, note?`
+  - Gecici guvenlik kilidi: `503 RETURN_WRITES_DISABLED`
+- `PATCH /api/returns/:id/status`
+  - Gecici guvenlik kilidi: `503 RETURN_WRITES_DISABLED`
 - `GET /api/returns/:id`
+  - Owner/admin icin salt okunur
 
 ## Campaigns
 - `POST /api/campaigns/quote`

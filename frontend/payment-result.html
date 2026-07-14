@@ -109,13 +109,42 @@
                     throw new Error(result.error || 'Ödeme durumu kontrol edilemedi.');
                 }
 
-                if (result.finalized === true && result.paymentStatus === 'PAID') {
+                const providerFinalized = result.providerFinalized === true || (
+                    result.providerFinalized == null && result.finalized === true
+                );
+                const commerceFinalized = result.commerceFinalized === true || (
+                    result.commerceFinalized == null &&
+                    providerFinalized &&
+                    result.reconciliationRequired !== true &&
+                    !['WAIT_RECONCILIATION', 'WAIT_REFUND_REVIEW'].includes(result.nextAction)
+                );
+
+                if (result.nextAction === 'WAIT_REFUND_REVIEW') {
+                    title.innerText = 'İade İncelemesi Bekleniyor';
+                    title.className = '';
+                    desc.innerText = `${result.message || 'Ödeme alındı; geri ödeme incelemesi bekleniyor.'} (Ödeme Referansı: ${paymentRef})`;
+                    if (providerFinalized && result.paymentStatus === 'PAID') {
+                        clearFinalizedCheckoutItems(result.orderId || orderId, paymentRef);
+                        clearPaytrCheckoutSession(paymentRef);
+                    }
+                } else if (result.nextAction === 'WAIT_RECONCILIATION' || result.reconciliationRequired === true) {
+                    title.innerText = 'Ödeme Mutabakatı Bekleniyor';
+                    title.className = '';
+                    const reconciliationMessage = providerFinalized && result.paymentStatus === 'PAID'
+                        ? 'Ödemeniz alındı; sipariş kaydı manuel kontrol bekliyor. Aynı ödemeyi tekrar denemeyin.'
+                        : 'Ödeme ve sipariş kayıtları manuel kontrol bekliyor. Sepetiniz korunur.';
+                    desc.innerText = `${result.message || reconciliationMessage} (Ödeme Referansı: ${paymentRef})`;
+                    if (providerFinalized && result.paymentStatus === 'PAID') {
+                        clearFinalizedCheckoutItems(result.orderId || orderId, paymentRef);
+                        clearPaytrCheckoutSession(paymentRef);
+                    }
+                } else if (providerFinalized && commerceFinalized && result.paymentStatus === 'PAID') {
                     title.innerText = 'Ödeme Başarılı';
                     title.className = 'ok';
                     desc.innerText = `${result.message} (Ödeme Referansı: ${paymentRef})`;
                     clearFinalizedCheckoutItems(result.orderId || orderId, paymentRef);
                     clearPaytrCheckoutSession(paymentRef);
-                } else if (result.finalized === true && result.paymentStatus === 'FAILED') {
+                } else if (providerFinalized && commerceFinalized && result.paymentStatus === 'FAILED') {
                     title.innerText = 'Ödeme Başarısız';
                     title.className = 'bad';
                     desc.innerText = result.message || 'Ödeme tamamlanamadı. Dilerseniz tekrar deneyebilirsiniz.';

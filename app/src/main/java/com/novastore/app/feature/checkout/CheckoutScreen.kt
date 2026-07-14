@@ -212,6 +212,7 @@ fun CheckoutScreen(
                     isCheckingStatus = uiState.isCheckingPaymentStatus,
                     statusMessage = uiState.paymentStatusMessage,
                     paymentStatus = uiState.paymentStatus,
+                    paymentNextAction = uiState.paymentNextAction,
                     paymentStatusFinalized = uiState.paymentStatusFinalized,
                     paymentFinalized = uiState.paymentFinalized,
                     onRefreshStatus = viewModel::refreshPaymentStatus,
@@ -874,6 +875,7 @@ private fun SuccessState(
     isCheckingStatus: Boolean,
     statusMessage: String?,
     paymentStatus: String?,
+    paymentNextAction: String?,
     paymentStatusFinalized: Boolean,
     paymentFinalized: Boolean,
     onRefreshStatus: () -> Unit,
@@ -881,8 +883,12 @@ private fun SuccessState(
 ) {
     val isBankTransfer = response.provider == "bank_transfer" || response.paymentStatus == "WAITING_TRANSFER"
     val normalizedPaymentStatus = paymentStatus?.uppercase(Locale.ROOT)
+    val reconciliationPending = paymentNextAction == "WAIT_RECONCILIATION"
+    val refundReviewPending = paymentNextAction == "WAIT_REFUND_REVIEW"
     val paymentFailed = paymentStatusFinalized && normalizedPaymentStatus == "FAILED"
     val statusTitle = when {
+        reconciliationPending -> "\u00D6deme Mutabakat\u0131 Bekleniyor"
+        refundReviewPending -> "\u0130ade \u0130ncelemesi Bekleniyor"
         paymentFinalized -> "\u00D6deme Onayland\u0131"
         paymentFailed -> "\u00D6deme Ba\u015Far\u0131s\u0131z"
         !paymentStatusFinalized -> "\u00D6deme Bekleniyor"
@@ -890,6 +896,9 @@ private fun SuccessState(
         else -> "\u00D6deme Ba\u015Flat\u0131ld\u0131"
     }
     val defaultStatusMessage = when {
+        reconciliationPending && normalizedPaymentStatus == "PAID" -> "\u00D6demeniz al\u0131nd\u0131; sipari\u015F kayd\u0131 manuel kontrol bekliyor. Ayn\u0131 \u00F6demeyi tekrar denemeyin."
+        reconciliationPending -> "\u00D6deme ve sipari\u015F kay\u0131tlar\u0131 manuel kontrol bekliyor. Sepetiniz korunur."
+        refundReviewPending -> "\u00D6deme al\u0131nd\u0131; geri \u00F6deme incelemesi bekleniyor."
         paymentFinalized -> "\u00D6deme onayland\u0131. Sepetiniz g\u00FCncellendi."
         paymentFailed -> "\u00D6deme ba\u015Far\u0131s\u0131z veya iptal edildi. Sepetiniz korunur; tekrar deneyebilirsiniz."
         isBankTransfer -> "\u00D6deme onayland\u0131\u011F\u0131nda sipari\u015Finiz i\u015Fleme al\u0131nacak. Sepetiniz \u00F6deme kesinle\u015Fene kadar korunur."
@@ -898,11 +907,17 @@ private fun SuccessState(
     }
     val visibleStatusMessage = statusMessage ?: defaultStatusMessage
     val actionTitle = when {
+        reconciliationPending -> "Manuel kontrol bekleniyor"
+        refundReviewPending -> "\u0130ade kontrol\u00FC bekleniyor"
         paymentFinalized -> "\u00D6deme tamamland\u0131"
         paymentFailed -> "\u00D6deme tamamlanamad\u0131"
         else -> "\u00D6deme onay\u0131 bekleniyor"
     }
-    val statusAccentColor = if (paymentFailed) Error else DiscountGreen
+    val statusAccentColor = when {
+        paymentFailed -> Error
+        reconciliationPending || refundReviewPending -> Orange
+        else -> DiscountGreen
+    }
 
     Box(
         modifier = Modifier

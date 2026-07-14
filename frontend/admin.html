@@ -4444,7 +4444,7 @@
             <span class="pending-name">${o.customer_name} - ${o.total_amount} TL</span>
         </div>
         <button class="btn-action"
-            onclick="switchTab('orders', document.querySelectorAll('.nav-link')[1]); setTimeout(() => openOrderModal(${o.id}), 300)">Kargola</button>
+            onclick="switchTab('orders', document.querySelectorAll('.nav-link')[1]); setTimeout(() => openOrderModal(${o.id}), 300)">İncele</button>
     </li>
     `;
                     });
@@ -4496,22 +4496,6 @@
             return `<span style="display:inline-flex; align-items:center; padding:6px 10px; border-radius:999px; background:${meta.bg}; color:${meta.color}; font-weight:700; font-size:0.82rem;">${meta.label}</span>`;
         }
 
-        function getReturnStatusOptionsHtml(currentStatus) {
-            const normalized = String(currentStatus || '').trim().toUpperCase();
-            const options = [
-                ['REQUESTED', 'Talep Alındı'],
-                ['IN_REVIEW', 'İnceleniyor'],
-                ['APPROVED', 'Onaylandı'],
-                ['COMPLETED', 'Tamamlandı / İade Edildi'],
-                ['REJECTED', 'Reddedildi'],
-                ['FAILED', 'Başarısız']
-            ];
-
-            return options.map(([value, label]) => `
-                <option value="${value}" ${normalized === value ? 'selected' : ''}>${label}</option>
-            `).join('');
-        }
-
         function truncateReturnText(value, maxLength = 80) {
             const text = String(value || '').trim();
             if (!text) return '-';
@@ -4545,30 +4529,6 @@
             };
 
             window.setTimeout(tryFocus, 180);
-        }
-
-        async function updateReturnStatus(returnId) {
-            const select = document.getElementById(`return-status-select-${returnId}`);
-            if (!select) return;
-
-            const newStatus = select.value;
-
-            try {
-                const response = await adminApiFetch(`/api/returns/${returnId}/status`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus })
-                });
-                await adminReadJson(response, 'İade durumu güncellenemedi.');
-                alert('✅ İade durumu güncellendi.');
-                fetchReturnRequests();
-                fetchReturnsForDashboard();
-                fetchOrders();
-                fetchOrdersForDashboard();
-                fetchStats();
-            } catch (e) {
-                alert(e.message || 'İade durumu güncellenemedi.');
-            }
         }
 
         async function fetchReturnRequests() {
@@ -4606,11 +4566,9 @@
                             <td>${getReturnStatusBadge(request.status)}</td>
                             <td>${createdAt}</td>
                             <td>
-                                <div style="display:grid; gap:8px; min-width:220px;">
-                                    <select id="return-status-select-${request.id}" class="form-control">
-                                        ${getReturnStatusOptionsHtml(request.status)}
-                                    </select>
-                                    <button onclick="updateReturnStatus(${request.id})" class="btn-inspect">İade Durumunu Güncelle</button>
+                                <div style="display:grid; gap:6px; min-width:220px; color:#64748B; font-size:0.82rem; line-height:1.4;">
+                                    <strong style="color:var(--text);">Salt okunur</strong>
+                                    <span>İade durum değişiklikleri güvenli geri ödeme ve stok akışı tamamlanana kadar kapalıdır.</span>
                                 </div>
                             </td>
                         </tr>
@@ -4654,7 +4612,7 @@
                                 <span class="pending-id">İade #IR-${request.id} · Sipariş #${request.order_id}</span>
                                 <span class="pending-name">${customerName} - ${reasonLabel}</span>
                             </div>
-                            <button class="btn-action" onclick="focusReturnRequest(${request.id})">İadeyi Yönet</button>
+                            <button class="btn-action" onclick="focusReturnRequest(${request.id})">İadeyi İncele</button>
                         </li>
                     `;
                 });
@@ -5419,7 +5377,6 @@
         <td><span class="status-badge ${getStatusClass(displayStatus)}">${escapeAdminHtml(displayStatus)}</span>${statusNoteHtml}</td>
         <td>
             <button onclick="openOrderModal(${order.id})" class="btn-inspect">İncele</button>
-            <button onclick="deleteOrder(${order.id})" class="btn-delete" style="margin-left:5px;">Sil</button>
         </td>
     </tr>
     `;
@@ -5622,6 +5579,7 @@
             const safeCustomerName = escapeAdminHtml(order.customer_name || 'Bilinmiyor');
             const safeCustomerPhone = escapeAdminHtml(order.phone || '');
             const safeCustomerAddress = escapeAdminHtml(order.address || '');
+            const safeDisplayStatus = escapeAdminHtml(displayStatus || 'Durum bilinmiyor');
 
             document.getElementById('order-modal-body').innerHTML = `
     <div
@@ -5633,60 +5591,17 @@
     <h4>Sipariş İçeriği</h4>
     ${itemsHtml}
     ${statusNoteHtml}
-    <div style="margin-top: 25px; display: flex; justify-content: space-between; align-items: center;">
-        <select id="status-select" class="form-control" style="width: 200px;">
-            <option value="Ödeme Bekliyor" ${displayStatus === 'Ödeme Bekliyor' ? 'selected' : ''}>Ödeme Bekliyor</option>
-            <option value="Onay Bekliyor" ${order.status === 'Onay Bekliyor' ? 'selected' : ''}>Onay Bekliyor</option>
-            <option value="Hazırlanıyor" ${order.status === 'Hazırlanıyor' ? 'selected' : ''}>Hazırlanıyor</option>
-            <option value="Kargoya Verildi" ${order.status === 'Kargoya Verildi' ? 'selected' : ''}>Kargoya Verildi
-            </option>
-            <option value="Teslim Edildi" ${order.status === 'Teslim Edildi' ? 'selected' : ''}>Teslim Edildi</option>
-            <option value="İptal Edildi" ${order.status === 'İptal Edildi' ? 'selected' : ''}>İptal Edildi</option>
-            <option value="İade Edildi" ${order.status === 'İade Edildi' ? 'selected' : ''}>İade Edildi</option>
-        </select>
-        <button onclick="updateOrderStatus(${order.id})" class="btn-submit"
-            style="width:auto; padding: 12px 25px;">Güncelle</button>
+    <div style="margin-top:25px; padding:14px 16px; border:1px solid var(--border); border-radius:8px; background:var(--table-hover);">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+            <strong>Sipariş durumu</strong>
+            <span class="status-badge status-default">${safeDisplayStatus}</span>
+        </div>
+        <p style="margin:10px 0 0; color:#64748B; font-size:0.84rem; line-height:1.45;">
+            Bu alan salt okunurdur. Ödeme, iptal, kargo, teslimat ve iade değişiklikleri kendi doğrulanmış operasyon akışlarından yürütülür.
+        </p>
     </div>
     `;
             document.getElementById('order-modal').style.display = 'flex';
-        }
-
-        async function updateOrderStatus(orderId) {
-            const newStatus = document.getElementById('status-select').value;
-            try {
-                const response = await adminApiFetch('/api/orders/' + orderId + '/status', {
-                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus })
-                });
-                await adminReadJson(response, 'Sipariş durumu güncellenemedi.');
-                alert("✅ Güncellendi!");
-                closeModal('order-modal');
-                fetchOrders();
-                fetchOrdersForDashboard();
-                fetchReturnRequests();
-                fetchReturnsForDashboard();
-                fetchStats();
-                fetchBehaviorAnalytics();
-            } catch (e) {
-                alert(e.message || 'Sipariş durumu güncellenemedi.');
-            }
-        }
-
-        async function deleteOrder(orderId) {
-            if (!confirm("Bu siparişi silmek istediğinize emin misiniz? Bu işlem geri alınamaz!")) return;
-            try {
-                const response = await adminApiFetch('/api/orders/' + orderId, { method: 'DELETE' });
-                if (response.ok) {
-                    alert("🗑️ Sipariş silindi!");
-                    fetchOrders();
-                    fetchOrdersForDashboard();
-                    fetchReturnRequests();
-                    fetchReturnsForDashboard();
-                    fetchStats();
-                    fetchBehaviorAnalytics();
-                } else {
-                    alert("Silme işlemi başarısız.");
-                }
-            } catch (e) { console.error("Sipariş silme hatası:", e); }
         }
 
         document.getElementById('add-product-form').addEventListener('submit', async (e) => {

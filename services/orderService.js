@@ -2,6 +2,11 @@ const pool = require('../config/db');
 const { calculatePricing, round2 } = require('./pricingService');
 const { syncCategoryStatsForProducts } = require('./categoryStatsService');
 const { ORDER_STATUS, PAYMENT_STATUS, REFUND_STATUS, SHIPMENT_STATUS, resolveOrderStatus } = require('../constants/orderStatus');
+const {
+    STOCK_RESERVATION_STATE,
+    OrderLifecycleError,
+    getStockReservationState
+} = require('./orderLifecyclePolicy');
 
 const extractAddressText = (address) => {
     if (!address) return '';
@@ -56,6 +61,83 @@ const restockItems = async (client, items) => {
         changedProductIds.push(productId);
     }
     await syncCategoryStatsForProducts(client, changedProductIds);
+};
+
+const releaseStockReservation = async ({ client = pool, payment, items, reasonCode }) => {
+    if (!payment || !Number.isInteger(Number(payment.id))) {
+        throw new OrderLifecycleError('Stok rezervasyonuna bağlı ödeme kaydı geçersiz.', {
+            code: 'ORDER_STOCK_RESERVATION_PAYMENT_INVALID'
+        });
+    }
+    if (getStockReservationState(payment) !== STOCK_RESERVATION_STATE.RESERVED) {
+        throw new OrderLifecycleError('Aktif stok rezervasyonu doğrulanamadı.', {
+            code: 'ORDER_STOCK_RESERVATION_NOT_ACTIVE'
+        });
+    }
+
+    const parsedItems = Array.isArray(items) ? items : [];
+    if (parsedItems.length === 0) {
+        throw new OrderLifecycleError('Stok serbest bırakma için sipariş satırı bulunamadı.', {
+            code: 'ORDER_STOCK_RELEASE_ITEMS_INVALID'
+        });
+    }
+
+    const normalizedItems = parsedItems.map((item) => ({
+        productId: Number(item?.id ?? item?.product_id ?? item?.productId),
+        quantity: Number(item?.quantity)
+    }));
+    if (normalizedItems.some(({ productId, quantity }) => (
+        !Number.isInteger(productId) || productId <= 0 || !Number.isInteger(quantity) || quantity <= 0
+    ))) {
+        throw new OrderLifecycleError('Sipariş satırları stok serbest bırakma için güvenli değil.', {
+            code: 'ORDER_STOCK_RELEASE_ITEMS_INVALID'
+        });
+    }
+
+    const changedProductIds = [];
+    for (const item of normalizedItems) {
+        const result = await client.query(
+            `UPDATE products
+             SET stock = stock + $1
+             WHERE id = $2
+             RETURNING id, stock`,
+            [item.quantity, item.productId]
+        );
+        if (result.rows.length !== 1) {
+            throw new OrderLifecycleError('Stok serbest bırakılacak ürün bulunamadı.', {
+                code: 'ORDER_STOCK_RELEASE_PRODUCT_MISSING',
+                details: { productId: item.productId }
+            });
+        }
+        changedProductIds.push(item.productId);
+    }
+    await syncCategoryStatsForProducts(client, changedProductIds);
+
+    const releaseMetadata = {
+        stockReserved: false,
+        stockReleasedAt: new Date().toISOString(),
+        stockReleaseReason: String(reasonCode || 'ORDER_CANCELLED'),
+        stockReleaseCommand: 'cancel'
+    };
+    const paymentUpdate = await client.query(
+        `UPDATE payments
+         SET raw_request = COALESCE(raw_request, '{}'::jsonb) || $1::jsonb,
+             updated_at = NOW()
+         WHERE id = $2
+         RETURNING id`,
+        [JSON.stringify(releaseMetadata), Number(payment.id)]
+    );
+    if (paymentUpdate.rows.length !== 1) {
+        throw new OrderLifecycleError('Stok rezervasyonu ödeme kaydına işlenemedi.', {
+            code: 'ORDER_STOCK_RELEASE_PAYMENT_UPDATE_FAILED'
+        });
+    }
+
+    return Object.freeze({
+        paymentId: Number(payment.id),
+        productCount: changedProductIds.length,
+        releasedAt: releaseMetadata.stockReleasedAt
+    });
 };
 
 const parseItems = (orderRow) => {
@@ -329,10 +411,10 @@ const markOrderCancelled = async ({
     order,
     reasonCode,
     note = '',
-    refundStatus = REFUND_STATUS.PENDING
+    refundStatus = REFUND_STATUS.PENDING,
+    stockRelease = null
 }) => {
     const cancelledStatus = ORDER_STATUS.IPTAL_EDILDI;
-    const parsedItems = parseItems(order);
 
     await client.query(
         `UPDATE orders
@@ -344,43 +426,14 @@ const markOrderCancelled = async ({
         [cancelledStatus, `${reasonCode}${note ? ` - ${note}` : ''}`, refundStatus, order.id]
     );
 
-    await restockItems(client, parsedItems);
-
     await appendOrderEvent(client, order.id, 'ORDER_CANCELLED', 'Sipariş iptal edildi.', {
         reasonCode,
         note,
-        refundStatus
+        refundStatus,
+        stockRelease
     });
 
     return cancelledStatus;
-};
-
-const updateOrderStatus = async ({ client = pool, orderId, status, shipmentStatus = null }) => {
-    const resolvedStatus = resolveOrderStatus(status);
-    if (!resolvedStatus) {
-        throw new Error('Geçersiz sipariş durumu.');
-    }
-
-    const updateResult = await client.query(
-        `UPDATE orders
-         SET status = $1,
-             shipment_status = COALESCE($2, shipment_status),
-             updated_at = NOW()
-         WHERE id = $3
-         RETURNING *`,
-        [resolvedStatus, shipmentStatus, orderId]
-    );
-
-    if (updateResult.rows.length === 0) {
-        throw new Error('Sipariş bulunamadı.');
-    }
-
-    await appendOrderEvent(client, orderId, 'ORDER_STATUS_UPDATED', `Sipariş durumu güncellendi: ${resolvedStatus}`, {
-        status: resolvedStatus,
-        shipmentStatus
-    });
-
-    return updateResult.rows[0];
 };
 
 module.exports = {
@@ -391,8 +444,8 @@ module.exports = {
     reconcileOrderItemsForOrder,
     reserveStock,
     restockItems,
+    releaseStockReservation,
     createPendingPaymentOrder,
     createOrderWithReservation,
-    markOrderCancelled,
-    updateOrderStatus
+    markOrderCancelled
 };

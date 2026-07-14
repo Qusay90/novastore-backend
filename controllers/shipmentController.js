@@ -1,20 +1,6 @@
 const pool = require('../config/db');
-const { createNotification } = require('./notificationController');
-const { ORDER_STATUS, SHIPMENT_STATUS } = require('../constants/orderStatus');
-const { appendOrderEvent } = require('../services/orderService');
-const { createInvoice } = require('../services/invoiceService');
 
 const defaultProvider = process.env.DEFAULT_SHIPMENT_PROVIDER || 'Yurtici Kargo';
-
-const addDays = (baseDate, days) => {
-    const d = new Date(baseDate);
-    d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 10);
-};
-
-const buildTrackingNo = (orderId) => {
-    return `NS${orderId}${Date.now().toString().slice(-6)}`;
-};
 
 const buildTrackingUrl = (provider, trackingNo) => {
     const providerKey = String(provider || '').toLowerCase();
@@ -25,117 +11,14 @@ const buildTrackingUrl = (provider, trackingNo) => {
 };
 
 const createShipment = async (req, res) => {
-    const client = await pool.connect();
-
-    try {
-        const orderId = Number(req.params.orderId);
-        if (!Number.isInteger(orderId)) {
-            return res.status(400).json({ error: 'Geçersiz sipariş kimliği.' });
-        }
-
-        const {
-            provider = defaultProvider,
-            trackingNo,
-            etaDate,
-            labelUrl = null,
-            shipmentStatus = SHIPMENT_STATUS.IN_TRANSIT
-        } = req.body;
-
-        await client.query('BEGIN');
-
-        const orderResult = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
-        if (orderResult.rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Sipariş bulunamadı.' });
-        }
-
-        const order = orderResult.rows[0];
-
-        if (order.status === ORDER_STATUS.IPTAL_EDILDI) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'İptal edilen sipariş için gönderi oluşturulamaz.' });
-        }
-
-        const finalTrackingNo = trackingNo || buildTrackingNo(orderId);
-        const finalEta = etaDate || addDays(new Date(), 2);
-        const trackingUrl = buildTrackingUrl(provider, finalTrackingNo);
-
-        const shipmentResult = await client.query(
-            `INSERT INTO shipments
-                (order_id, provider, tracking_no, tracking_url, shipment_status, eta_date, label_url, raw_payload, updated_at)
-             VALUES
-                ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW())
-             ON CONFLICT (order_id)
-             DO UPDATE SET
-                provider = EXCLUDED.provider,
-                tracking_no = EXCLUDED.tracking_no,
-                tracking_url = EXCLUDED.tracking_url,
-                shipment_status = EXCLUDED.shipment_status,
-                eta_date = EXCLUDED.eta_date,
-                label_url = EXCLUDED.label_url,
-                raw_payload = EXCLUDED.raw_payload,
-                updated_at = NOW()
-             RETURNING *`,
-            [
-                orderId,
-                provider,
-                finalTrackingNo,
-                trackingUrl,
-                shipmentStatus,
-                finalEta,
-                labelUrl,
-                JSON.stringify({ source: 'admin_create_shipment', createdBy: req.user.id })
-            ]
-        );
-
-        await client.query(
-            `UPDATE orders
-             SET shipment_provider = $1,
-                 tracking_no = $2,
-                 shipment_status = $3,
-                 estimated_delivery_date = $4,
-                 status = $5,
-                 updated_at = NOW()
-             WHERE id = $6`,
-            [provider, finalTrackingNo, shipmentStatus, finalEta, ORDER_STATUS.KARGOYA_VERILDI, orderId]
-        );
-
-        await appendOrderEvent(client, orderId, 'SHIPMENT_CREATED', 'Gönderi kaydı oluşturuldu.', {
-            provider,
-            trackingNo: finalTrackingNo,
-            trackingUrl,
-            etaDate: finalEta
-        });
-
-        try {
-            await createInvoice({ client, orderId, type: 'INVOICE', amount: Number(order.total_amount || 0) });
-        } catch (invoiceErr) {
-            console.error('Fatura oluşturma hatası (kargo):', invoiceErr.message);
-        }
-
-        await client.query('COMMIT');
-
-        if (order.user_id) {
-            const { io } = require('../server');
-            await createNotification(
-                order.user_id,
-                'order_update',
-                `Sipariş #${orderId} kargoya verildi. Takip No: ${finalTrackingNo}`,
-                io
-            );
-        }
-
-        res.status(201).json({
-            message: 'Gönderi kaydı oluşturuldu.',
-            shipment: shipmentResult.rows[0]
-        });
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error('Gönderi oluşturma hatası:', err.message);
-        res.status(500).json({ error: err.message || 'Gönderi oluşturulamadı.' });
-    } finally {
-        client.release();
+    const orderId = Number(req.params.orderId);
+    if (!Number.isInteger(orderId)) {
+        return res.status(400).json({ error: 'Geçersiz sipariş kimliği.' });
     }
+    return res.status(410).json({
+        code: 'SHIPMENT_CREATE_DISABLED',
+        error: 'Doğrulanmış taşıyıcı entegrasyonu olmadan gönderi ve takip numarası oluşturma kapalıdır.'
+    });
 };
 
 const getShipment = async (req, res) => {

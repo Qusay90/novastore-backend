@@ -169,7 +169,10 @@ assert.strictEqual(hostRejected['paytr-frame'].src, '');
 assert.strictEqual(hostRejected['paytr-error'].style.display, 'block');
 
 assert.match(paymentResultHtml, /fetch\(`\$\{API_BASE\}\/api\/payments\/status\?\$\{params\.toString\(\)\}`/);
-assert.match(paymentResultHtml, /result\.finalized === true && result\.paymentStatus === 'PAID'/);
+assert.match(paymentResultHtml, /const providerFinalized = result\.providerFinalized === true/);
+assert.match(paymentResultHtml, /const commerceFinalized = result\.commerceFinalized === true/);
+assert.match(paymentResultHtml, /providerFinalized && commerceFinalized && result\.paymentStatus === 'PAID'/);
+assert.match(paymentResultHtml, /result\.nextAction === 'WAIT_RECONCILIATION' \|\| result\.reconciliationRequired === true/);
 assert.match(paymentResultHtml, /clearFinalizedCheckoutItems\(result\.orderId \|\| orderId, paymentRef\)/);
 
 console.log('web PayTR checkout smoke passed');
