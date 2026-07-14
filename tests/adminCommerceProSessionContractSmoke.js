@@ -109,6 +109,7 @@ const chainFor = (rows, queries) => [
     assert.equal(validAdmin.payload.capabilities.ordersRead, true);
     assert.equal(validAdmin.payload.capabilities.returnsRead, true);
     assert.equal(validAdmin.payload.capabilities.firstPartyCatalogRead, true);
+    assert.equal(validAdmin.payload.capabilities.catalogStructureRead, true);
     assert.equal(validAdmin.payload.capabilities.notificationsRead, true);
     assert.equal(validAdmin.payload.capabilities.orderStatusWrite, false);
     assert.equal(validAdmin.payload.capabilities.orderCancelWrite, false);
@@ -255,6 +256,7 @@ const chainFor = (rows, queries) => [
     assert.match(routeSource, /router\.get\('\/session', \.\.\.integratedAdminRead, getAdminSession\)/);
     assert.match(routeSource, /router\.get\('\/orders\/summary', \.\.\.integratedAdminRead, getAdminOrderSummaries\)/);
     assert.match(routeSource, /router\.get\('\/catalog\/products\/summary', \.\.\.integratedAdminRead, getAdminProductSummaries\)/);
+    assert.match(routeSource, /router\.get\('\/catalog\/structure\/summary', \.\.\.integratedAdminRead, getAdminCatalogStructureSummary\)/);
     assert.match(routeSource, /router\.get\('\/returns\/summary', \.\.\.integratedAdminRead, getAdminReturnSummaries\)/);
     assert.match(routeSource, /router\.get\('\/notifications\/summary', \.\.\.integratedAdminRead, getAdminNotificationSummaries\)/);
     assert.match(routeSource, /router\.get\('\/stats', \.\.\.integratedAdminRead, getDashboardStats\)/);

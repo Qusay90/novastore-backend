@@ -12,6 +12,11 @@ import {
   resolveCatalogPublicationStatus,
 } from "../admin-commerce-pro/src/integration/catalogRead.js";
 import {
+  filterCatalogStructureItems,
+  isCatalogStructureItemActive,
+  normalizeCatalogStructureSummary,
+} from "../admin-commerce-pro/src/integration/catalogStructureRead.js";
+import {
   normalizeAdminSession,
   normalizeDashboardStats,
   normalizeFirstPartyCatalogPage,
@@ -120,6 +125,8 @@ const capabilities = resolveCapabilities({ dashboardRead: true, sellerAdmin: "tr
 assert.equal(hasCapability(capabilities, "dashboardRead"), true);
 assert.equal(hasCapability(capabilities, "sellerAdmin"), false, "boolean olmayan yetki fail-closed olmalı");
 assert.equal(hasCapability(capabilities, "unknown"), false, "bilinmeyen yetki fail-closed olmalı");
+assert.equal(hasCapability(resolveCapabilities({ catalogStructureRead: true }), "catalogStructureRead"), true);
+assert.equal(hasCapability(resolveCapabilities({ catalogStructureRead: "true" }), "catalogStructureRead"), false);
 assert.equal(currentErrorMayPreserveData({ status: 403 }), false, "403 sonrası hassas stale veri korunmamalı");
 assert.equal(currentErrorMayPreserveData({ status: 401 }), false, "401 sonrası hassas stale veri korunmamalı");
 assert.equal(currentErrorMayPreserveData({ status: 500 }), true, "geçici sunucu hatasında son başarılı veri korunabilmeli");
@@ -285,6 +292,66 @@ assert.throws(() => normalizeFirstPartyCatalogPage({
   hasMore: false,
 }), /kategori yolu/);
 
+const catalogStructurePayload = {
+  catalogMode: "first_party",
+  structureScope: "shared_catalog",
+  categories: { items: [{
+    id: 1, name: "Elektronik", slug: "elektronik", path: "elektronik", depth: 0, parent_id: null,
+    sort_order: 0, is_active: true, is_customer_visible: true, show_in_menu: true, show_on_home: false,
+    hide_when_empty: true, deleted_at: null, child_count: 2, first_party_product_count: 8,
+    attribute_template_count: 1,
+  }], limit: 100, hasMore: false },
+  attributeDefinitions: { items: [{
+    id: 2, code: "renk", name: "Renk", type: "option", unit: null, is_filterable: true,
+    is_required: false, is_variant_relevant: true, sort_order: 0, is_active: true, option_count: 4,
+    template_count: 1, first_party_value_count: 5,
+  }], limit: 100, hasMore: false },
+  attributeTemplates: { items: [{
+    id: 3, name: "Telefon özellikleri", category_id: 1, category_name: "Elektronik",
+    category_path: "elektronik", sort_order: 0, is_active: true, attribute_count: 4,
+    required_count: 2, filterable_count: 3,
+  }], limit: 100, hasMore: false },
+  collections: { items: [{
+    id: 4, name: "Yeni gelenler", slug: "yeni-gelenler", collection_type: "dynamic",
+    rule_code: "new_arrivals", sort_order: 0, is_active: true, show_on_home: true, deleted_at: null,
+    rule_count: 1, first_party_manual_product_count: 0,
+  }], limit: 100, hasMore: false },
+  menus: { items: [{
+    id: 5, code: "main", name: "Ana menü", is_active: true, item_count: 2,
+    active_item_count: 2, root_item_count: 1,
+  }], limit: 100, hasMore: false },
+  menuItems: { items: [{
+    id: 6, menu_id: 5, menu_code: "main", parent_id: null, title: "Elektronik",
+    target_type: "category", category_id: 1, collection_id: null, has_internal_url: false,
+    sort_order: 0, is_active: true,
+  }], limit: 100, hasMore: false },
+};
+const catalogStructure = normalizeCatalogStructureSummary(catalogStructurePayload);
+assert.equal(catalogStructure.categories.items[0].firstPartyProductCount, 8);
+assert.equal(catalogStructure.attributeDefinitions.items[0].variantRelevant, true);
+assert.equal(catalogStructure.attributeTemplates.items[0].requiredCount, 2);
+assert.equal(catalogStructure.collections.items[0].ruleCode, "new_arrivals");
+assert.equal(catalogStructure.menuItems.items[0].categoryId, 1);
+assert.equal(isCatalogStructureItemActive(catalogStructure.categories.items[0]), true);
+assert.deepEqual(
+  filterCatalogStructureItems(catalogStructure.attributeDefinitions.items, "RENK", ["name", "code"]).map((item) => item.id),
+  [2],
+);
+assert.throws(() => normalizeCatalogStructureSummary({ ...catalogStructurePayload, catalogMode: "marketplace" }), /first_party/);
+assert.throws(() => normalizeCatalogStructureSummary({ ...catalogStructurePayload, structureScope: "seller" }), /shared_catalog/);
+assert.throws(() => normalizeCatalogStructureSummary({
+  ...catalogStructurePayload,
+  collections: { ...catalogStructurePayload.collections, items: [{ ...catalogStructurePayload.collections.items[0], collection_type: "manual" }] },
+}), /tutarsız/);
+assert.throws(() => normalizeCatalogStructureSummary({
+  ...catalogStructurePayload,
+  attributeTemplates: { ...catalogStructurePayload.attributeTemplates, items: [{ ...catalogStructurePayload.attributeTemplates.items[0], required_count: 5 }] },
+}), /sayaçları/);
+assert.throws(() => normalizeCatalogStructureSummary({
+  ...catalogStructurePayload,
+  menuItems: { ...catalogStructurePayload.menuItems, items: [{ ...catalogStructurePayload.menuItems.items[0], has_internal_url: true }] },
+}), /hedef alanları/);
+
 const session = normalizeAdminSession({
   user: { id: 7, role: "admin" },
   commerceMode: "single_vendor",
@@ -299,7 +366,7 @@ const fixtureRequests = [];
 const fixtureHttp = {
   async request(path) {
     fixtureRequests.push(path);
-    if (path === "/api/admin/session") return { user: { id: 7, role: "admin" }, commerceMode: "single_vendor", capabilities: { dashboardRead: true, ordersRead: true, returnsRead: true, notificationsRead: true, firstPartyCatalogRead: true } };
+    if (path === "/api/admin/session") return { user: { id: 7, role: "admin" }, commerceMode: "single_vendor", capabilities: { dashboardRead: true, ordersRead: true, returnsRead: true, notificationsRead: true, firstPartyCatalogRead: true, catalogStructureRead: true } };
     if (path === "/api/admin/stats") return { totalRevenue: "10", totalOrders: 1, totalProducts: 2, totalUsers: 3 };
     if (path === "/api/admin/orders/summary?limit=100") return { items: [{ id: 1, customer_name: "Müşteri", total_amount: "10", status: "Onay Bekliyor", payment_status: "PAID", item_count: 1, created_at: "2026-07-14T10:00:00.000Z" }], limit: 100, hasMore: false };
     if (path === "/api/admin/returns/summary?limit=100") return { items: [{ id: 1, order_id: 1, reason_code: "DİĞER", status: "REQUESTED", refund_amount: "10", currency: "TRY", payment_status: "PAID" }], limit: 100, hasMore: false };
@@ -315,6 +382,7 @@ const fixtureHttp = {
       limit: 100,
       hasMore: false,
     };
+    if (path === "/api/admin/catalog/structure/summary?limit=100") return catalogStructurePayload;
     throw new Error("unexpected path");
   },
 };
@@ -325,7 +393,8 @@ assert.equal((await adapter.orders()).items[0].id, "NS-000001");
 assert.equal((await adapter.returns()).items[0].id, "RT-000001");
 assert.equal((await adapter.notifications()).items[0].id, "NT-000001");
 assert.equal((await adapter.catalog()).items[0].id, "PR-000001");
-assert.equal(fixtureRequests.at(-1), "/api/admin/catalog/products/summary?limit=100");
+assert.equal((await adapter.catalogStructure()).categories.items[0].id, 1);
+assert.equal(fixtureRequests.at(-1), "/api/admin/catalog/structure/summary?limit=100");
 assert.equal(fixtureRequests.some((path) => /^https?:|^\/\//.test(path)), false, "adapter yalnız same-origin mutlak API yolu kullanmalı");
 
 console.log("admin Commerce Pro HTTP and mapper smoke passed");

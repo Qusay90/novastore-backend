@@ -1,4 +1,5 @@
 import { hasCapability, resolveCapabilities } from "../integration/capabilities.js";
+import { normalizeCatalogStructureSummary } from "../integration/catalogStructureRead.js";
 import {
   buildCancelOrderMutation,
   buildManualShipmentMutation,
@@ -43,6 +44,10 @@ export function createSameOriginAdapter(http) {
     await http.request("/api/admin/catalog/products/summary?limit=100", { signal }),
   );
 
+  const catalogStructure = async ({ signal } = {}) => normalizeCatalogStructureSummary(
+    await http.request("/api/admin/catalog/structure/summary?limit=100", { signal }),
+  );
+
   const mutationActions = (capabilities) => {
     const actions = {};
     if (hasCapability(capabilities, "orderCancelWrite")) {
@@ -70,5 +75,5 @@ export function createSameOriginAdapter(http) {
     return Object.freeze(actions);
   };
 
-  return Object.freeze({ catalog, session, dashboard, notifications, orders, returns, mutationActions });
+  return Object.freeze({ catalog, catalogStructure, session, dashboard, notifications, orders, returns, mutationActions });
 }

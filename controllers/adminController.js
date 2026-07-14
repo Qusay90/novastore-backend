@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const { ORDER_STATUS } = require('../constants/orderStatus');
 const {
     ADMIN_COMMERCE_CAPABILITIES,
+    createGetAdminCatalogStructureSummary,
     createGetAdminNotificationSummaries,
     createGetAdminOrderSummaries,
     createGetAdminProductSummaries,
@@ -13,6 +14,7 @@ const CONVERSION_EXCLUDED_STATUSES = [ORDER_STATUS.IPTAL_EDILDI, ORDER_STATUS.OD
 const SALES_EXCLUDED_STATUSES = [ORDER_STATUS.IPTAL_EDILDI, ORDER_STATUS.IADE_EDILDI, ORDER_STATUS.ODEME_BEKLIYOR];
 
 const getAdminNotificationSummaries = createGetAdminNotificationSummaries(pool);
+const getAdminCatalogStructureSummary = createGetAdminCatalogStructureSummary(pool);
 const getAdminOrderSummaries = createGetAdminOrderSummaries(pool);
 const getAdminProductSummaries = createGetAdminProductSummaries(pool);
 const getAdminReturnSummaries = createGetAdminReturnSummaries(pool);
@@ -651,6 +653,7 @@ const getBehaviorAnalytics = async (req, res) => {
 
 module.exports = {
     ADMIN_COMMERCE_CAPABILITIES,
+    getAdminCatalogStructureSummary,
     getAdminNotificationSummaries,
     getAdminOrderSummaries,
     getAdminProductSummaries,

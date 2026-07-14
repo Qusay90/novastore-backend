@@ -8,7 +8,7 @@ Yığın tabanı: `codex/admin-commerce-pro-preview` (`1954d4b`)
 
 ## Sonuç
 
-Commerce Pro tasarım prototipi tamamlandı; tek-satıcı salt-okunur entegrasyon katmanı Dashboard, sipariş, iade, admin bildirimi ve NovaStore birinci taraf ürün özetine kadar ilerledi. Mevcut backend hâlâ tek satıcılıdır; satıcı organizasyonu, satıcı kapsamlı yetkilendirme, teklif, seller-order, değişmez finansal kayıt, hakediş ve payout modelleri henüz yoktur.
+Commerce Pro tasarım prototipi tamamlandı; tek-satıcı salt-okunur entegrasyon katmanı Dashboard, sipariş, iade, admin bildirimi, NovaStore birinci taraf ürün özeti ve ortak katalog yapısına kadar ilerledi. Mevcut backend hâlâ tek satıcılıdır; satıcı organizasyonu, satıcı kapsamlı yetkilendirme, teklif, seller-order, değişmez finansal kayıt, hakediş ve payout modelleri henüz yoktur.
 
 - Gerçek tek-satıcı Commerce Pro cutover için kalan: **yaklaşık 2–3,5 hafta**.
 - Dar kapsamlı, login zorunlu ilk satış pilotu için kalan: **yaklaşık 4–7 hafta**.
@@ -71,9 +71,9 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 | Dashboard | `GET /api/admin/stats` | Admin JWT + güncel DB rolü | Tur 1; `private, no-store` |
 | Siparişler | `GET /api/admin/orders/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 1; sınırlı ve PII azaltılmış özet DTO, client-side filtre geçici |
 | Ürünler | `GET /api/admin/catalog/products/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 3A; active/non-deleted `novastore-platform` store scope, bounded ve salt-okunur DTO |
+| Katalog yapısı | `GET /api/admin/catalog/structure/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 3B; kategori/özellik/şablon/koleksiyon/menü ve menü öğesi ayrı bounded sayfalar; yazma yok |
 | İadeler | `GET /api/admin/returns/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 2A; sınırlı, PII azaltılmış ve salt-okunur |
 | Bildirimler | `GET /api/admin/notifications/summary?limit=50` | Admin JWT + güncel DB rolü | Tur 2A; yalnız admin kayıtları, sınırlı ve salt-okunur |
-| Kategori/özellik/menü/koleksiyon | `/api/admin/...` | Admin JWT | Tur 3 |
 
 ### Entegre arayüzde çağrılmayacak kapasite
 
@@ -108,7 +108,8 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 | 2A | Kod ve otomatik QA tamam; browser QA blokeli | `eea2b1c` | İade/bildirim salt-okunur bağlandı; yerel kargo/refund sınırları görünür; write capability'leri kapalı; full verify yeşil |
 | 2B | Kod ve otomatik QA tamam; browser QA blokeli | `5cfe701` | Hard-delete/generic geçiş/sahte shipment/iade yazmaları kapalı; iptal stok kanıtına, callback'ler payment state + kalıcı reconciliation görevine bağlandı; bağımsız P0/P1 incelemesi temiz |
 | 2C | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | `756cc96` | Admin iptali ve manuel kargo devri ayrı default-off capability; expected-state/idempotency/audit/XSS sınırları testli; gerçek refund, return write ve taşıyıcı çağrısı kapalı |
-| 3A | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | Bu commit | Bounded/current-admin birinci taraf ürün özeti ve salt-okunur Commerce Pro ekranı; ürün/medya yazmaları kapalı |
+| 3A | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | `2358238` | Bounded/current-admin birinci taraf ürün özeti ve salt-okunur Commerce Pro ekranı; ürün/medya yazmaları kapalı |
+| 3B | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | Bu commit | Altı bounded/current-admin katalog yapı sayfası ve salt-okunur sekmeli Commerce Pro ekranı; ham URL/medya/yazma yok |
 
 ## Tur 2 güvenlik bölümü
 
@@ -152,6 +153,8 @@ Tur 2C kontrollü operasyon özeti:
 6. **3F — geniş doğrulama:** disposable yerel PostgreSQL, legacy parity, artifact ve browser kanıtı. Seçili Work Mode browser engeli sürdüğü sürece görsel/etkileşimli kapı blokeli kalır.
 
 Tur 3A, mevcut sınırsız `GET /api/products` yolunu yeniden kullanmaz. Entegre istemci yalnız yeni bounded admin DTO'suna bağlanır; kaynak satır active/non-deleted `novastore-platform` mağaza kimliğiyle fail-closed doğrulanır. Açıklama, medya URL'si, `store_id`, satıcı, teklif, risk veya manuel ürün onayı alanı uydurulmaz.
+
+Tur 3B, mevcut unbounded legacy admin kategori/attribute/koleksiyon/menü yollarını Commerce Pro'ya açmaz. Tek current-admin/no-store endpoint altı ayrı 1–100 sayfa döndürür. Ürün bağlantılı sayaçlar yalnız active/non-deleted `novastore-platform` store ve silinmemiş ürün kapsamındadır; menü item iç URL'si yalnız var/yok sinyaline indirgenir. Endpoint ve UI hiçbir mutation, medya URL'si, seller/offer, risk veya ürün onay alanı taşımaz.
 
 PR #15’in `design-qa.md` sonucu, gerçek masaüstü/mobil browser kanıtı alınana kadar `blocked` kalır. Bu plan browser kısıtını atlatma yetkisi vermez.
 

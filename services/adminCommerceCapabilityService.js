@@ -3,6 +3,7 @@ const ADMIN_COMMERCE_CAPABILITY_DEFAULTS = Object.freeze({
     ordersRead: true,
     returnsRead: true,
     firstPartyCatalogRead: true,
+    catalogStructureRead: true,
     notificationsRead: true,
     orderStatusWrite: false,
     orderCancelWrite: false,

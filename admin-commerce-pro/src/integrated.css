@@ -132,6 +132,31 @@
 .live-catalog-filters .heading-select { min-width: 154px; }
 .live-catalog-filters .heading-select:nth-of-type(2) { min-width: 174px; }
 
+.live-structure-card { display: grid; }
+.live-structure-tabs { overflow-x: auto; scrollbar-width: thin; }
+.live-structure-tabs button { flex: 0 0 auto; min-height: 42px; }
+.live-structure-filters .table-search { flex: 1 1 280px; }
+.live-structure-filters .heading-select { min-width: 168px; }
+.live-structure-table { min-width: 930px; }
+.live-structure-table td { vertical-align: top; }
+
+.live-flag-list {
+  display: grid;
+  gap: 3px;
+  min-width: 110px;
+  color: var(--muted);
+  font-size: 9px;
+  white-space: normal;
+}
+
+.live-structure-menu-stack {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+
+.live-structure-menu-stack .table-scroll + .table-scroll { border-top: 1px solid var(--line); }
+
 .danger-button.small {
   min-height: 32px;
   padding-inline: 9px;
@@ -230,8 +255,12 @@
   .live-result-count { margin-left: 0; }
   .live-filter-toolbar .heading-select { width: 100%; }
   .live-catalog-filters .heading-select,
-  .live-catalog-filters .table-search { min-width: 0; min-height: 44px; height: 44px; }
-  [data-testid="live-catalog"] .state-panel button { min-height: 44px; }
+  .live-catalog-filters .table-search,
+  .live-structure-filters .heading-select,
+  .live-structure-filters .table-search { min-width: 0; min-height: 44px; height: 44px; }
+  .live-structure-tabs button { min-height: 44px; }
+  [data-testid="live-catalog"] .state-panel button,
+  [data-testid="live-catalog-structure"] .state-panel button { min-height: 44px; }
   .operations-heading > .secondary-button { flex: 0 0 auto; width: 100%; min-height: 44px; }
   .live-operation-buttons { align-items: stretch; flex-direction: column; }
   .live-operation-buttons button { min-height: 44px; }

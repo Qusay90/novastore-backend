@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
+    getAdminCatalogStructureSummary,
     getAdminNotificationSummaries,
     getAdminOrderSummaries,
     getAdminProductSummaries,
@@ -19,6 +20,7 @@ router.get('/session', ...integratedAdminRead, getAdminSession);
 router.get('/notifications/summary', ...integratedAdminRead, getAdminNotificationSummaries);
 router.get('/orders/summary', ...integratedAdminRead, getAdminOrderSummaries);
 router.get('/catalog/products/summary', ...integratedAdminRead, getAdminProductSummaries);
+router.get('/catalog/structure/summary', ...integratedAdminRead, getAdminCatalogStructureSummary);
 router.get('/returns/summary', ...integratedAdminRead, getAdminReturnSummaries);
 router.get('/stats', ...integratedAdminRead, getDashboardStats);
 router.get('/behavior', authenticate, requireAdmin, getBehaviorAnalytics);

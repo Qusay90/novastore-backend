@@ -8,6 +8,10 @@ import {
   isCatalogProductEffectivelyVisible,
   resolveCatalogPublicationStatus,
 } from "./integration/catalogRead.js";
+import {
+  filterCatalogStructureItems,
+  isCatalogStructureItemActive,
+} from "./integration/catalogStructureRead.js";
 import { ADMIN_TOKEN_KEY, createAdminHttp } from "./integration/adminHttp.js";
 import {
   createMutationIdempotencyKey,
@@ -693,6 +697,192 @@ function Catalog({ catalogPage, error, refreshing, onRefresh }) {
   );
 }
 
+const catalogStructureTabs = Object.freeze([
+  ["categories", "Kategoriler"],
+  ["attributes", "Özellikler"],
+  ["templates", "Şablonlar"],
+  ["collections", "Koleksiyonlar"],
+  ["menus", "Menüler"],
+]);
+
+const attributeTypeLabels = Object.freeze({
+  text: "Metin",
+  number: "Sayı",
+  boolean: "Evet / hayır",
+  option: "Tek seçenek",
+  multi_option: "Çoklu seçenek",
+  range: "Aralık",
+});
+
+const collectionRuleLabels = Object.freeze({
+  new_arrivals: "Yeni gelenler",
+  discount: "İndirim",
+  best_sellers: "Çok satanlar",
+});
+
+const menuTargetLabels = Object.freeze({
+  category: "Kategori",
+  collection: "Koleksiyon",
+  internal_url: "İç bağlantı",
+});
+
+const catalogStructureSearchFields = Object.freeze({
+  categories: ["id", "name", "slug", "path", "parentId"],
+  attributes: ["id", "name", "code", "type", "unit"],
+  templates: ["id", "name", "categoryId", "categoryName", "categoryPath"],
+  collections: ["id", "name", "slug", "type", "ruleCode"],
+  menus: ["id", "name", "code"],
+  menuItems: ["id", "title", "menuCode", "targetType", "categoryId", "collectionId"],
+});
+
+const filterStructureActivity = (items, activity) => items.filter((item) => {
+  if (activity === "all") return true;
+  const active = isCatalogStructureItemActive(item);
+  return activity === "active" ? active : !active;
+});
+
+function CatalogStructure({ structure, error, refreshing, onRefresh }) {
+  const [view, setView] = useState("categories");
+  const [query, setQuery] = useState("");
+  const [activity, setActivity] = useState("all");
+  const sourceByView = {
+    categories: structure.categories,
+    attributes: structure.attributeDefinitions,
+    templates: structure.attributeTemplates,
+    collections: structure.collections,
+    menus: structure.menus,
+  };
+  const currentPage = sourceByView[view];
+  const filtered = useMemo(() => filterStructureActivity(
+    filterCatalogStructureItems(currentPage.items, query, catalogStructureSearchFields[view]),
+    activity,
+  ), [activity, currentPage.items, query, view]);
+  const filteredMenuItems = useMemo(() => filterStructureActivity(
+    filterCatalogStructureItems(structure.menuItems.items, query, catalogStructureSearchFields.menuItems),
+    activity,
+  ), [activity, query, structure.menuItems.items]);
+  const counts = {
+    categories: structure.categories.items.length,
+    attributes: structure.attributeDefinitions.items.length,
+    templates: structure.attributeTemplates.items.length,
+    collections: structure.collections.items.length,
+    menus: structure.menus.items.length,
+  };
+  const currentHasMore = currentPage.hasMore || (view === "menus" && structure.menuItems.hasMore);
+
+  const resetFilters = () => {
+    setQuery("");
+    setActivity("all");
+  };
+
+  const empty = (
+    <div className="state-panel">
+      <Icon name="search" />
+      <h3>Eşleşen yapı kaydı yok</h3>
+      <p>Arama veya etkinlik filtresini değiştirin.</p>
+      <button className="secondary-button" onClick={resetFilters}>Filtreleri temizle</button>
+    </div>
+  );
+
+  let table;
+  if (view === "categories") {
+    table = filtered.length ? (
+      <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Kategori yapı özeti tablosu">
+        <table className="data-table live-structure-table"><caption className="sr-only">Salt okunur kategori yapı özetleri</caption>
+          <thead><tr><th scope="col">Kategori</th><th scope="col">Hiyerarşi</th><th scope="col">NovaStore ürünü</th><th scope="col">Şablon</th><th scope="col">Yayın yüzeyleri</th><th scope="col">Durum</th></tr></thead>
+          <tbody>{filtered.map((item) => <tr key={item.id}>
+            <td><span className="live-customer-cell"><strong>{item.name}</strong><small>#{item.id} · {item.slug || "slug bekliyor"}</small></span></td>
+            <td><span className="live-customer-cell"><strong>{item.path || "Yol bekliyor"}</strong><small>Derinlik {item.depth ?? "?"} · üst #{item.parentId || "kök"} · {item.childCount} alt kategori</small></span></td>
+            <td>{item.firstPartyProductCount}</td><td>{item.attributeTemplateCount}</td>
+            <td><span className="live-flag-list"><small>Vitrin {item.customerVisible ? "açık" : "kapalı"}</small><small>Menü {item.showInMenu ? "açık" : "kapalı"}</small><small>Ana sayfa {item.showOnHome ? "açık" : "kapalı"}</small></span></td>
+            <td><span className={`status ${isCatalogStructureItemActive(item) ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.deletedAt ? "Arşivli" : item.active ? "Etkin" : "Pasif"}</span></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    ) : empty;
+  } else if (view === "attributes") {
+    table = filtered.length ? (
+      <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Özellik tanımı özeti tablosu">
+        <table className="data-table live-structure-table"><caption className="sr-only">Salt okunur özellik tanımı özetleri</caption>
+          <thead><tr><th scope="col">Özellik</th><th scope="col">Tür</th><th scope="col">Seçenek</th><th scope="col">Şablon</th><th scope="col">NovaStore değeri</th><th scope="col">Davranış</th><th scope="col">Durum</th></tr></thead>
+          <tbody>{filtered.map((item) => <tr key={item.id}>
+            <td><span className="live-customer-cell"><strong>{item.name}</strong><small>#{item.id} · {item.code}</small></span></td>
+            <td>{attributeTypeLabels[item.type]}{item.unit && <small>{item.unit}</small>}</td><td>{item.optionCount}</td><td>{item.templateCount}</td><td>{item.firstPartyValueCount}</td>
+            <td><span className="live-flag-list"><small>{item.filterable ? "Filtrelenir" : "Filtrelenmez"}</small><small>{item.required ? "Zorunlu" : "İsteğe bağlı"}</small><small>{item.variantRelevant ? "Varyantla ilgili" : "Varyant dışı"}</small></span></td>
+            <td><span className={`status ${item.active ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.active ? "Etkin" : "Pasif"}</span></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    ) : empty;
+  } else if (view === "templates") {
+    table = filtered.length ? (
+      <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Özellik şablonu özeti tablosu">
+        <table className="data-table live-structure-table"><caption className="sr-only">Salt okunur özellik şablonu özetleri</caption>
+          <thead><tr><th scope="col">Şablon</th><th scope="col">Kategori</th><th scope="col">Özellik</th><th scope="col">Zorunlu</th><th scope="col">Filtrelenebilir</th><th scope="col">Durum</th></tr></thead>
+          <tbody>{filtered.map((item) => <tr key={item.id}>
+            <td><span className="live-customer-cell"><strong>{item.name}</strong><small>#{item.id}</small></span></td>
+            <td><span className="live-customer-cell"><strong>{item.categoryName}</strong><small>#{item.categoryId} · {item.categoryPath || "Yol bekliyor"}</small></span></td>
+            <td>{item.attributeCount}</td><td>{item.requiredCount}</td><td>{item.filterableCount}</td>
+            <td><span className={`status ${item.active ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.active ? "Etkin" : "Pasif"}</span></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    ) : empty;
+  } else if (view === "collections") {
+    table = filtered.length ? (
+      <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Koleksiyon özeti tablosu">
+        <table className="data-table live-structure-table"><caption className="sr-only">Salt okunur koleksiyon özetleri</caption>
+          <thead><tr><th scope="col">Koleksiyon</th><th scope="col">Tür</th><th scope="col">Kural</th><th scope="col">Manuel NovaStore ürünü</th><th scope="col">Ana sayfa</th><th scope="col">Durum</th></tr></thead>
+          <tbody>{filtered.map((item) => <tr key={item.id}>
+            <td><span className="live-customer-cell"><strong>{item.name}</strong><small>#{item.id} · {item.slug}</small></span></td>
+            <td>{item.type === "manual" ? "Manuel" : "Dinamik"}</td><td>{item.ruleCode ? collectionRuleLabels[item.ruleCode] : `${item.ruleCount} kural`}</td><td>{item.type === "manual" ? item.firstPartyManualProductCount : "Kural tabanlı"}</td><td>{item.showOnHome ? "Gösteriliyor" : "Gizli"}</td>
+            <td><span className={`status ${isCatalogStructureItemActive(item) ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.deletedAt ? "Arşivli" : item.active ? "Etkin" : "Pasif"}</span></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    ) : empty;
+  } else {
+    table = filtered.length || filteredMenuItems.length ? (
+      <div className="live-structure-menu-stack">
+        <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Menü özeti tablosu">
+          <table className="data-table live-structure-table"><caption className="sr-only">Salt okunur menü özetleri</caption>
+            <thead><tr><th scope="col">Menü</th><th scope="col">Toplam öğe</th><th scope="col">Etkin öğe</th><th scope="col">Kök öğe</th><th scope="col">Durum</th></tr></thead>
+            <tbody>{filtered.map((item) => <tr key={item.id}><td><span className="live-customer-cell"><strong>{item.name}</strong><small>#{item.id} · {item.code}</small></span></td><td>{item.itemCount}</td><td>{item.activeItemCount}</td><td>{item.rootItemCount}</td><td><span className={`status ${item.active ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.active ? "Etkin" : "Pasif"}</span></td></tr>)}</tbody>
+          </table>
+        </div>
+        <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Menü öğesi özeti tablosu">
+          <table className="data-table live-structure-table"><caption className="sr-only">Salt okunur menü öğesi özetleri; iç URL değerleri gösterilmez</caption>
+            <thead><tr><th scope="col">Öğe</th><th scope="col">Menü</th><th scope="col">Üst öğe</th><th scope="col">Hedef türü</th><th scope="col">Hedef kaydı</th><th scope="col">Durum</th></tr></thead>
+            <tbody>{filteredMenuItems.map((item) => <tr key={item.id}><td><span className="live-customer-cell"><strong>{item.title}</strong><small>#{item.id} · sıra {item.sortOrder}</small></span></td><td>{item.menuCode}</td><td>{item.parentId ? `#${item.parentId}` : "Kök"}</td><td>{item.targetType ? menuTargetLabels[item.targetType] : "Başlık"}</td><td>{item.categoryId ? `Kategori #${item.categoryId}` : item.collectionId ? `Koleksiyon #${item.collectionId}` : item.hasInternalUrl ? "İç bağlantı mevcut" : "Hedef yok"}</td><td><span className={`status ${item.active ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.active ? "Etkin" : "Pasif"}</span></td></tr>)}</tbody>
+          </table>
+        </div>
+      </div>
+    ) : empty;
+  }
+
+  return (
+    <section className="workspace live-workspace" data-testid="live-catalog-structure">
+      <header className="workspace-heading operations-heading">
+        <div><span className="eyebrow">Entegre backend · ortak yapı · salt okunur</span><h2 tabIndex="-1">Katalog yapısı</h2><p>Kategori, özellik, şablon, koleksiyon ve menü kayıtları aynı bounded yönetim sözleşmesinden okunur.</p></div>
+        <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
+      </header>
+      <ResourceWarning error={error} onRetry={onRefresh} />
+      <section className="notice-card live-boundary-notice" role="note"><Icon name="shield" /><div><strong>Satıcı portalı veya ürün izin kuyruğu değildir</strong><p>Bu ekran bugünkü tek satıcılı NovaStore'un ortak katalog yapısını okur. Satıcı, teklif, risk puanı, onay aksiyonu, medya URL'si veya yazma isteği taşımaz; menülerin iç URL değerleri de DTO'ya alınmaz.</p></div></section>
+      <section className="table-card live-structure-card">
+        <nav className="ledger-tabs live-structure-tabs" aria-label="Katalog yapı bölümleri">
+          {catalogStructureTabs.map(([id, label]) => <button type="button" key={id} className={view === id ? "active" : ""} aria-current={view === id ? "page" : undefined} onClick={() => setView(id)}>{label} <b>{counts[id]}</b></button>)}
+        </nav>
+        <div className="ledger-toolbar filter-toolbar live-filter-toolbar live-structure-filters">
+          <label className="table-search"><Icon name="search" /><span className="sr-only">Yapı kaydı ara</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ad, kod, yol veya kayıt ara" /></label>
+          <label className="heading-select"><span className="sr-only">Etkinlik durumuna göre filtrele</span><select value={activity} onChange={(event) => setActivity(event.target.value)}><option value="all">Tüm durumlar</option><option value="active">Etkin</option><option value="inactive">Pasif / arşivli</option></select></label>
+          <span className="live-result-count">{view === "menus" ? `${filtered.length} menü · ${filteredMenuItems.length} öğe` : `${filtered.length} / ${currentPage.items.length} kayıt`}{currentHasMore ? " · liste sınırının dışında kayıt var" : ""}</span>
+        </div>
+        {table}
+      </section>
+    </section>
+  );
+}
+
 function Returns({ returnPage, error, refreshing, onRefresh }) {
   const returns = returnPage.items;
   const [query, setQuery] = useState("");
@@ -788,6 +978,7 @@ const railItems = [
   { id: "returns", label: "İadeler", icon: "refresh", capability: "returnsRead", implemented: true },
   { id: "notifications", label: "Bildirimler", icon: "bell", capability: "notificationsRead", implemented: true },
   { id: "catalog", label: "Ürünler", icon: "package", capability: "firstPartyCatalogRead", implemented: true },
+  { id: "catalogStructure", label: "Katalog yapısı", icon: "grid", capability: "catalogStructureRead", implemented: true },
   { id: "customers", label: "Müşteriler · endpoint yok", icon: "user", capability: "customerAdmin", implemented: false },
   { id: "sellers", label: "Satıcılar · altyapı yok", icon: "storefront", capability: "sellerAdmin", implemented: false },
   { id: "finance", label: "Finans · ledger yok", icon: "card", capability: "settlements", implemented: false },
@@ -799,8 +990,9 @@ const pageCapabilities = Object.freeze({
   returns: "returnsRead",
   notifications: "notificationsRead",
   catalog: "firstPartyCatalogRead",
+  catalogStructure: "catalogStructureRead",
 });
-const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler", catalog: "Ürünler" });
+const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler", catalog: "Ürünler", catalogStructure: "Katalog yapısı" });
 const noSupportedModuleError = Object.freeze({
   message: "Bu admin oturumunda Commerce Pro'nun entegre salt-okunur modülleri açık değil.",
 });
@@ -819,6 +1011,9 @@ const notificationsUnavailableError = Object.freeze({
 const catalogUnavailableError = Object.freeze({
   message: "Birinci taraf katalog okuma yeteneği bu admin oturumunda açık değil.",
 });
+const catalogStructureUnavailableError = Object.freeze({
+  message: "Katalog yapısı okuma yeteneği bu admin oturumunda açık değil.",
+});
 
 export function IntegratedApp() {
   const [page, setPage] = useState("dashboard");
@@ -834,6 +1029,7 @@ export function IntegratedApp() {
   const loadOrders = useCallback(({ signal }) => adapter.orders({ signal }), [adapter]);
   const loadReturns = useCallback(({ signal }) => adapter.returns({ signal }), [adapter]);
   const loadCatalog = useCallback(({ signal }) => adapter.catalog({ signal }), [adapter]);
+  const loadCatalogStructure = useCallback(({ signal }) => adapter.catalogStructure({ signal }), [adapter]);
   const sessionResource = useResource(loadSession, { preserveDataOnError: false });
   const sessionLoaded = sessionResource.phase === "ready";
   const capabilities = sessionResource.data?.capabilities || {};
@@ -842,6 +1038,7 @@ export function IntegratedApp() {
   const returnsEnabled = sessionLoaded && hasCapability(capabilities, "returnsRead");
   const notificationsEnabled = sessionLoaded && hasCapability(capabilities, "notificationsRead");
   const catalogEnabled = sessionLoaded && hasCapability(capabilities, "firstPartyCatalogRead");
+  const catalogStructureEnabled = sessionLoaded && hasCapability(capabilities, "catalogStructureRead");
   const mutationActions = useMemo(() => adapter.mutationActions(capabilities), [adapter, capabilities]);
   const cancelWriteEnabled = typeof mutationActions.cancelOrder === "function";
   const shipmentWriteEnabled = typeof mutationActions.createManualShipment === "function";
@@ -850,15 +1047,17 @@ export function IntegratedApp() {
   const ordersResource = useResource(loadOrders, { enabled: ordersEnabled });
   const returnsResource = useResource(loadReturns, { enabled: returnsEnabled });
   const catalogResource = useResource(loadCatalog, { enabled: catalogEnabled });
+  const catalogStructureResource = useResource(loadCatalogStructure, { enabled: catalogStructureEnabled });
   const statsLoaded = statsResource.phase === "ready";
   const ordersLoaded = ordersResource.phase === "ready" || ordersResource.phase === "empty";
   const returnsLoaded = returnsResource.phase === "ready" || returnsResource.phase === "empty";
   const notificationsLoaded = notificationsResource.phase === "ready" || notificationsResource.phase === "empty";
   const catalogLoaded = catalogResource.phase === "ready" || catalogResource.phase === "empty";
+  const catalogStructureLoaded = catalogStructureResource.phase === "ready" || catalogStructureResource.phase === "empty";
   const enabledPages = useMemo(() => Object.keys(pageCapabilities).filter((pageId) => (
     hasCapability(capabilities, pageCapabilities[pageId])
   )), [capabilities]);
-  const lastUpdatedAt = [ordersResource.updatedAt, returnsResource.updatedAt, notificationsResource.updatedAt, catalogResource.updatedAt]
+  const lastUpdatedAt = [ordersResource.updatedAt, returnsResource.updatedAt, notificationsResource.updatedAt, catalogResource.updatedAt, catalogStructureResource.updatedAt]
     .filter(Boolean)
     .sort((left, right) => right.getTime() - left.getTime())[0] || null;
 
@@ -922,6 +1121,7 @@ export function IntegratedApp() {
     if (ordersEnabled) ordersResource.reload();
     if (returnsEnabled) returnsResource.reload();
     if (catalogEnabled) catalogResource.reload();
+    if (catalogStructureEnabled) catalogStructureResource.reload();
   };
   const logout = () => {
     localStorage.removeItem(ADMIN_TOKEN_KEY);
@@ -963,6 +1163,12 @@ export function IntegratedApp() {
       : catalogLoaded
         ? <Catalog catalogPage={catalogResource.data} error={catalogResource.error} refreshing={catalogResource.refreshing} onRefresh={catalogResource.reload} />
         : <StatePanel phase={catalogResource.phase} error={catalogResource.error} onRetry={catalogResource.reload} />;
+  } else if (page === "catalogStructure") {
+    pageContent = !catalogStructureEnabled
+      ? <StatePanel phase="forbidden" error={catalogStructureUnavailableError} onRetry={catalogStructureResource.reload} />
+      : catalogStructureLoaded
+        ? <CatalogStructure structure={catalogStructureResource.data} error={catalogStructureResource.error} refreshing={catalogStructureResource.refreshing} onRefresh={catalogStructureResource.reload} />
+        : <StatePanel phase={catalogStructureResource.phase} error={catalogStructureResource.error} onRetry={catalogStructureResource.reload} />;
   } else {
     pageContent = <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={sessionResource.reload} />;
   }
@@ -975,7 +1181,7 @@ export function IntegratedApp() {
         <nav className="rail-nav">
           {railItems.map((item) => {
             const enabled = item.implemented && hasCapability(capabilities, item.capability);
-            if (item.id === "catalog" && !enabled) return null;
+            if (["catalog", "catalogStructure"].includes(item.id) && !enabled) return null;
             return (
               <button
                 key={item.id}
@@ -1000,6 +1206,7 @@ export function IntegratedApp() {
             <button className={page === "returns" ? "active" : ""} onClick={() => navigate("returns")} disabled={!hasCapability(capabilities, "returnsRead")}><Icon name="refresh" /><span>İadeler</span><b>{returnsResource.data?.items.length || 0}</b></button>
             <button className={page === "notifications" ? "active" : ""} onClick={() => navigate("notifications")} disabled={!hasCapability(capabilities, "notificationsRead")}><Icon name="bell" /><span>Bildirimler</span><b>{notificationsResource.data?.items.filter((item) => !item.isRead).length || 0}</b></button>
             {catalogEnabled && <button className={page === "catalog" ? "active" : ""} onClick={() => navigate("catalog")}><Icon name="package" /><span>Ürünler</span><b>{catalogResource.data?.items.length || 0}</b></button>}
+            {catalogStructureEnabled && <button className={page === "catalogStructure" ? "active" : ""} onClick={() => navigate("catalogStructure")}><Icon name="grid" /><span>Katalog yapısı</span><b>{catalogStructureResource.data?.categories.items.length || 0}</b></button>}
           </section>
           <section className="marketplace-links">
             <strong>Planlanan modüller</strong>
@@ -1030,7 +1237,7 @@ export function IntegratedApp() {
           <div className="preview-banner live-banner" role="note" data-testid="live-banner"><Icon name="shield" /><strong>Entegre tek-satıcı modu</strong><span>Mock fallback yok · {cancelWriteEnabled || shipmentWriteEnabled ? "yazmalar capability ve doğrulamayla sınırlı" : "bu oturum yazma isteği göndermez"}</span></div>
           <span className={sessionLoaded ? "healthy" : ""}>{sessionLoaded ? "Oturum doğrulandı" : sessionResource.phase === "error" ? "Bağlantı hatası" : "Bağlantı bekleniyor"}</span>
           <span>{lastUpdatedAt ? `Son veri okuması ${dateTime(lastUpdatedAt)}` : "Entegre veri bekleniyor"}</span>
-          <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing || returnsResource.refreshing || notificationsResource.refreshing || catalogResource.refreshing}><Icon name="refresh" />Yenile</button>
+          <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing || returnsResource.refreshing || notificationsResource.refreshing || catalogResource.refreshing || catalogStructureResource.refreshing}><Icon name="refresh" />Yenile</button>
         </footer>
       </div>
     </div>
