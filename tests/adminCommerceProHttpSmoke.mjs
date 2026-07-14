@@ -17,6 +17,10 @@ import {
   normalizeCatalogStructureSummary,
 } from "../admin-commerce-pro/src/integration/catalogStructureRead.js";
 import {
+  buildArchiveCatalogProductMutation,
+  buildUpdateCatalogProductMutation,
+} from "../admin-commerce-pro/src/integration/catalogMutations.js";
+import {
   normalizeAdminSession,
   normalizeDashboardStats,
   normalizeFirstPartyCatalogPage,
@@ -130,6 +134,16 @@ assert.equal(hasCapability(resolveCapabilities({ catalogStructureRead: "true" })
 assert.equal(hasCapability(resolveCapabilities({ firstPartyCatalogWrite: true }), "firstPartyCatalogWrite"), true);
 assert.equal(hasCapability(resolveCapabilities({ firstPartyCatalogWrite: "true" }), "firstPartyCatalogWrite"), false);
 assert.equal(hasCapability(resolveCapabilities({ catalogStructureWrite: true }), "catalogStructureWrite"), true);
+assert.deepEqual(buildArchiveCatalogProductMutation({ productId: 12, expectedRevision: 4 }), {
+  path: "/api/admin/catalog/products/12/archive",
+  method: "PATCH",
+  body: { expected_revision: 4 },
+});
+assert.throws(
+  () => buildUpdateCatalogProductMutation({ productId: 12, expectedRevision: 4, changes: { imageUrl: "https://cdn.example/image.jpg" } }),
+  (error) => error.code === "CATALOG_PRODUCT_INPUT_INVALID" && /imageUrl/.test(error.message),
+  "katalog mutation builder medya alanını ağ isteğinden önce reddetmeli",
+);
 assert.equal(currentErrorMayPreserveData({ status: 403 }), false, "403 sonrası hassas stale veri korunmamalı");
 assert.equal(currentErrorMayPreserveData({ status: 401 }), false, "401 sonrası hassas stale veri korunmamalı");
 assert.equal(currentErrorMayPreserveData({ status: 500 }), true, "geçici sunucu hatasında son başarılı veri korunabilmeli");

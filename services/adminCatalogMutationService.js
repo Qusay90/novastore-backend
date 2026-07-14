@@ -44,6 +44,7 @@ const executeAdminCatalogMutation = async ({
     changedFields = [],
     requestId = null,
     metadata = {},
+    authorizeLockedTarget = null,
     applyMutation
 }) => {
     if (!database || typeof database.connect !== 'function') {
@@ -51,6 +52,9 @@ const executeAdminCatalogMutation = async ({
     }
     if (typeof applyMutation !== 'function') {
         throw new TypeError('Catalog mutation executor requires applyMutation.');
+    }
+    if (authorizeLockedTarget !== null && typeof authorizeLockedTarget !== 'function') {
+        throw new TypeError('Catalog mutation target authorizer must be a function.');
     }
 
     // Validate the complete audit/mutation envelope before opening a transaction or
@@ -109,13 +113,17 @@ const executeAdminCatalogMutation = async ({
                     field: 'current_revision'
                 })
             });
+        const targetScope = !isCreate && authorizeLockedTarget
+            ? await authorizeLockedTarget(client, current)
+            : null;
         const previousRevision = isCreate
             ? null
             : assertCatalogRevisionMatches(current.revision, context.expectedRevision);
         const mutationResult = await applyMutation(client, Object.freeze({
             actor: context.actor,
             current,
-            expectedRevision: context.expectedRevision
+            expectedRevision: context.expectedRevision,
+            targetScope
         }));
         if (!mutationResult || Array.isArray(mutationResult) || typeof mutationResult !== 'object') {
             throw new AdminCatalogMutationError('Katalog mutation sonucu nesne olmalıdır.', {

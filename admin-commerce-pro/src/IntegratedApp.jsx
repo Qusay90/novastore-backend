@@ -12,6 +12,10 @@ import {
   filterCatalogStructureItems,
   isCatalogStructureItemActive,
 } from "./integration/catalogStructureRead.js";
+import {
+  catalogAttributesToMutationMap,
+  CATALOG_PRODUCT_PUBLICATION_STATUSES,
+} from "./integration/catalogMutations.js";
 import { ADMIN_TOKEN_KEY, createAdminHttp } from "./integration/adminHttp.js";
 import {
   createMutationIdempotencyKey,
@@ -97,7 +101,7 @@ function trapDialogFocus(event, container, onClose) {
   }
 }
 
-function OperationDialog({ title, busy, children, onClose }) {
+function OperationDialog({ title, busy, children, onClose, eyebrow = "Commerce Pro · kontrollü operasyon", testId = "order-operation-dialog", wide = false }) {
   const ref = useRef(null);
   const triggerRef = useRef(null);
   const titleId = useId();
@@ -124,18 +128,18 @@ function OperationDialog({ title, busy, children, onClose }) {
   return (
     <dialog
       ref={ref}
-      className="modal"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      data-testid="order-operation-dialog"
+      data-testid={testId}
+      className={`modal${wide ? " modal-wide" : ""}`}
       onCancel={(event) => { event.preventDefault(); close(); }}
       onClick={(event) => { if (event.target === ref.current) close(); }}
       onKeyDown={(event) => trapDialogFocus(event, ref.current, close)}
     >
       <div className="modal-card live-operation-dialog" role="document" aria-busy={busy ? "true" : undefined}>
         <header className="modal-header">
-          <div><span className="eyebrow">Commerce Pro · kontrollü operasyon</span><h2 id={titleId}>{title}</h2></div>
+          <div><span className="eyebrow">{eyebrow}</span><h2 id={titleId}>{title}</h2></div>
           <button type="button" className="icon-button" onClick={close} disabled={busy} aria-label="Pencereyi kapat"><Icon name="close" /></button>
         </header>
         {children}
@@ -340,11 +344,11 @@ function OrderOperationSummary({ order }) {
   );
 }
 
-function OperationError({ error }) {
+function OperationError({ error, id = "order-operation-error" }) {
   if (!error) return null;
   const message = typeof error === "string" ? error : error.message || "İşlem tamamlanamadı.";
   return (
-    <p className="modal-error" id="order-operation-error" role="alert">
+    <p className="modal-error" id={id} role="alert">
       {message}{typeof error === "object" && error.requestId ? ` İstek kimliği: ${error.requestId}` : ""}
     </p>
   );
@@ -580,18 +584,243 @@ function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities,
   );
 }
 
-function Catalog({ catalogPage, error, refreshing, onRefresh }) {
+const catalogEditablePublicationStatuses = CATALOG_PRODUCT_PUBLICATION_STATUSES
+  .filter((status) => status !== "archived");
+
+const emptyCatalogProductForm = Object.freeze({
+  name: "",
+  description: "",
+  price: "0.00",
+  oldPrice: "",
+  stock: "0",
+  publicationStatus: "draft",
+  customerVisible: false,
+  categoryIds: "",
+  primaryCategoryId: "",
+  attributes: "{}",
+});
+
+const catalogProductFormFromDetail = (product) => ({
+  name: product.name,
+  description: product.description,
+  price: String(product.price),
+  oldPrice: product.oldPrice === null ? "" : String(product.oldPrice),
+  stock: String(product.stock),
+  publicationStatus: product.publicationStatus,
+  customerVisible: product.customerVisible,
+  categoryIds: product.categoryIds.join(", "),
+  primaryCategoryId: product.primaryCategoryId === null ? "" : String(product.primaryCategoryId),
+  attributes: JSON.stringify(catalogAttributesToMutationMap(product.attributes), null, 2),
+});
+
+const parseCatalogCategoryIds = (value) => {
+  const tokens = String(value || "").trim().split(/[\s,]+/).filter(Boolean);
+  return tokens.map((token) => {
+    const parsed = Number(token);
+    if (!Number.isInteger(parsed) || parsed < 1) throw new TypeError("Kategori kimlikleri pozitif tam sayı olmalıdır.");
+    return parsed;
+  });
+};
+
+const parseCatalogAttributes = (value) => {
+  let parsed;
+  try {
+    parsed = JSON.parse(String(value || "{}"));
+  } catch (_error) {
+    throw new TypeError("Özellik değerleri geçerli bir JSON nesnesi olmalıdır.");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new TypeError("Özellik değerleri JSON nesnesi olmalıdır.");
+  }
+  return parsed;
+};
+
+const parseCatalogProductForm = (form) => ({
+  name: form.name,
+  description: form.description,
+  price: Number(form.price),
+  oldPrice: form.oldPrice === "" ? null : Number(form.oldPrice),
+  stock: Number(form.stock),
+  publicationStatus: form.publicationStatus,
+  customerVisible: form.customerVisible,
+  categoryIds: parseCatalogCategoryIds(form.categoryIds),
+  primaryCategoryId: form.primaryCategoryId === "" ? null : Number(form.primaryCategoryId),
+  attributes: parseCatalogAttributes(form.attributes),
+});
+
+const canonicalJson = (value) => {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+};
+
+const buildCatalogProductChanges = (product, parsed) => {
+  const changes = {};
+  if (parsed.name.trim() !== product.name) changes.name = parsed.name;
+  if (parsed.description.trim() !== product.description) changes.description = parsed.description;
+  if (parsed.price !== product.price) changes.price = parsed.price;
+  if (parsed.oldPrice !== product.oldPrice) changes.oldPrice = parsed.oldPrice;
+  if (parsed.stock !== product.stock) changes.stock = parsed.stock;
+  if (parsed.publicationStatus !== product.publicationStatus) changes.publicationStatus = parsed.publicationStatus;
+  if (parsed.customerVisible !== product.customerVisible) changes.customerVisible = parsed.customerVisible;
+
+  const currentCategoryIds = [...product.categoryIds].sort((left, right) => left - right);
+  const nextCategoryIds = [...parsed.categoryIds].sort((left, right) => left - right);
+  if (canonicalJson(nextCategoryIds) !== canonicalJson(currentCategoryIds)
+    || parsed.primaryCategoryId !== product.primaryCategoryId) {
+    changes.categoryIds = parsed.categoryIds;
+    changes.primaryCategoryId = parsed.primaryCategoryId;
+  }
+
+  const currentAttributes = catalogAttributesToMutationMap(product.attributes);
+  if (canonicalJson(parsed.attributes) !== canonicalJson(currentAttributes)) changes.attributes = parsed.attributes;
+  return changes;
+};
+
+function CatalogProductFormDialog({ mode, product, action, onClose, onComplete, onRequestError }) {
+  const [form, setForm] = useState(() => product
+    ? catalogProductFormFromDetail(product)
+    : { ...emptyCatalogProductForm });
+  const [busy, setBusy] = useState(false);
+  const [requestError, setRequestError] = useState(null);
+  const editing = mode === "edit";
+  const update = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setRequestError(null);
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setRequestError(null);
+    setBusy(true);
+    let parsed;
+    let changes;
+    try {
+      parsed = parseCatalogProductForm(form);
+      changes = editing ? buildCatalogProductChanges(product, parsed) : null;
+    } catch (error) {
+      setRequestError(error);
+      setBusy(false);
+      return;
+    }
+    try {
+      const result = editing
+        ? await action({
+            productId: product.rawId,
+            expectedRevision: product.revision,
+            changes,
+          })
+        : await action(parsed);
+      onComplete({ kind: editing ? "edit" : "create", product: result });
+    } catch (error) {
+      if (onRequestError(error)) return;
+      setRequestError(error);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <OperationDialog
+      title={editing ? `${product.id} ürününü düzenle` : "Yeni NovaStore ürünü"}
+      busy={busy}
+      onClose={onClose}
+      eyebrow="Commerce Pro · medyasız ürün JSON CRUD"
+      testId="catalog-product-form-dialog"
+      wide
+    >
+      <form className="modal-form two-column live-catalog-product-form" onSubmit={submit} aria-describedby="catalog-product-form-boundary catalog-product-form-error">
+        <label className="live-catalog-form-wide"><span>Ürün adı</span><input value={form.name} onChange={(event) => update("name", event.target.value)} minLength="1" maxLength="255" required disabled={busy} data-autofocus autoComplete="off" /></label>
+        <label className="live-catalog-form-wide"><span>Açıklama</span><textarea value={form.description} onChange={(event) => update("description", event.target.value)} maxLength="20000" rows="5" disabled={busy} /></label>
+        <label><span>Fiyat · TRY</span><input type="number" value={form.price} onChange={(event) => update("price", event.target.value)} min="0" max="99999999.99" step="0.01" required disabled={busy} inputMode="decimal" /></label>
+        <label><span>Önceki fiyat · opsiyonel</span><input type="number" value={form.oldPrice} onChange={(event) => update("oldPrice", event.target.value)} min="0" max="99999999.99" step="0.01" disabled={busy} inputMode="decimal" /></label>
+        <label><span>Stok</span><input type="number" value={form.stock} onChange={(event) => update("stock", event.target.value)} min="0" max="2147483647" step="1" required disabled={busy} inputMode="numeric" /></label>
+        <label><span>Yayın durumu</span><select value={form.publicationStatus} onChange={(event) => update("publicationStatus", event.target.value)} disabled={busy}>{catalogEditablePublicationStatuses.map((status) => <option key={status} value={status}>{CATALOG_PUBLICATION_STATUS_LABELS[status]}</option>)}</select></label>
+        <label className="live-catalog-visibility-toggle"><input type="checkbox" checked={form.customerVisible} onChange={(event) => update("customerVisible", event.target.checked)} disabled={busy} /><span>Müşteri görünürlük bayrağını aç</span></label>
+        <span className="form-hint live-catalog-field-hint">Vitrinde etkin görünürlük için ürünün ayrıca “Yayında” olması gerekir.</span>
+        <label><span>Kategori kimlikleri · virgülle</span><input value={form.categoryIds} onChange={(event) => update("categoryIds", event.target.value)} disabled={busy} autoComplete="off" placeholder="Örn. 12, 18" /></label>
+        <label><span>Birincil kategori kimliği</span><input type="number" value={form.primaryCategoryId} onChange={(event) => update("primaryCategoryId", event.target.value)} min="1" step="1" disabled={busy} inputMode="numeric" placeholder="Kategori yoksa boş" /></label>
+        <label className="live-catalog-form-wide"><span>Özellik değerleri · JSON nesnesi</span><textarea value={form.attributes} onChange={(event) => update("attributes", event.target.value)} rows="7" spellCheck="false" disabled={busy} className="live-json-field" /></label>
+        <p className="form-hint live-catalog-form-wide" id="catalog-product-form-boundary">Yalnız ürün JSON alanları kaydedilir. Medya, görsel URL'si, dosya yükleme, Cloudinary, mağaza veya satıcı alanı bu sözleşmeye alınmaz.{editing ? ` Güncelleme revision ${product.revision} üzerinde karşılaştırmalı olarak yürütülür.` : " Yeni kayıt güvenli varsayılan olarak Taslak ve müşteri görünürlüğü kapalı başlar."}</p>
+        {editing && product.hasMedia && <p className="form-hint live-catalog-form-wide">Bu üründe mevcut medya kaydı var; bu form medyayı göstermez, değiştirmez veya silmez.</p>}
+        <OperationError error={requestError} id="catalog-product-form-error" />
+        <footer><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Vazgeç</button><button type="submit" className="primary-button" disabled={busy}>{busy ? "Kaydediliyor…" : editing ? "Değişiklikleri kaydet" : "Ürünü oluştur"}</button></footer>
+      </form>
+    </OperationDialog>
+  );
+}
+
+function CatalogProductArchiveDialog({ product, action, onClose, onComplete, onRequestError }) {
+  const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [requestError, setRequestError] = useState(null);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setRequestError(null);
+    if (!confirmed) {
+      setRequestError("Ürünün vitrine kapatılıp arşivleneceğini doğrulayın.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await action({ productId: product.rawId, expectedRevision: product.revision });
+      onComplete({ kind: "archive", product: result });
+    } catch (error) {
+      if (onRequestError(error)) return;
+      setRequestError(error);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <OperationDialog title={`${product.id} ürününü arşivle`} busy={busy} onClose={onClose} eyebrow="Commerce Pro · geri döndürülemez Tur 3D sınırı" testId="catalog-product-archive-dialog">
+      <div className="confirmation-body"><Icon name="warning" /><p><strong>{product.name} yayından ve vitrinden kaldırılarak arşivlenecek.</strong> Bu işlem hard-delete yapmaz; mevcut medya kaydına, Cloudinary'ye veya başka bir dış sisteme dokunmaz.</p></div>
+      <dl className="detail-list live-operation-summary"><div><dt>Ürün</dt><dd>{product.id}</dd></div><div><dt>Beklenen revision</dt><dd>{product.revision}</dd></div><div><dt>Mevcut yayın</dt><dd>{CATALOG_PUBLICATION_STATUS_LABELS[product.publicationStatus]}</dd></div></dl>
+      <form className="modal-form live-operation-form" onSubmit={submit} aria-describedby="catalog-archive-boundary catalog-archive-error">
+        <label className="live-handoff-confirmation"><input type="checkbox" checked={confirmed} onChange={(event) => { setConfirmed(event.target.checked); setRequestError(null); }} disabled={busy} data-autofocus /><span>Ürünün müşteri görünürlüğünün kapanacağını ve Tur 3D içinde geri yükleme aksiyonu olmadığını doğruluyorum.</span></label>
+        <p className="form-hint" id="catalog-archive-boundary">Arşivleme yalnız first-party ürün kaydını değiştirir; hard-delete, medya silme veya dış servis çağrısı yapmaz.</p>
+        <OperationError error={requestError} id="catalog-archive-error" />
+        <footer><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Vazgeç</button><button type="submit" className="danger-button" disabled={busy || !confirmed}>{busy ? "Arşivleniyor…" : "Ürünü arşivle"}</button></footer>
+      </form>
+    </OperationDialog>
+  );
+}
+
+function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh, onReloadCapabilities, mutationActions }) {
   const products = catalogPage.items;
   const [query, setQuery] = useState("");
   const [publication, setPublication] = useState("all");
   const [stock, setStock] = useState("all");
   const [visibility, setVisibility] = useState("all");
+  const [operation, setOperation] = useState(null);
+  const [openingProductId, setOpeningProductId] = useState(null);
+  const [operationNotice, setOperationNotice] = useState(null);
+  const [suppressedMutationActions, setSuppressedMutationActions] = useState(null);
+  const writesSuppressed = suppressedMutationActions === mutationActions;
+  const writeCapabilityEnabled = typeof mutationActions.getCatalogProduct === "function"
+    && typeof mutationActions.createCatalogProduct === "function"
+    && typeof mutationActions.updateCatalogProduct === "function"
+    && typeof mutationActions.archiveCatalogProduct === "function";
+  const writesBlocked = !writeCapabilityEnabled || writesSuppressed || Boolean(error) || refreshing || sessionRefreshing;
   const filtered = useMemo(() => filterFirstPartyCatalogProducts(products, {
     publication,
     query,
     stock,
     visibility,
   }), [products, publication, query, stock, visibility]);
+
+  useEffect(() => {
+    if (!writesBlocked || !operation) return;
+    setOperation(null);
+    setOperationNotice((current) => current || {
+      tone: "warning",
+      message: "Katalog veya admin oturumu değiştiği için açık ürün işlemi kapatıldı. Güncel veri doğrulanmadan yazma yapılmadı.",
+    });
+  }, [operation, writesBlocked]);
 
   const resetFilters = () => {
     setQuery("");
@@ -600,25 +829,116 @@ function Catalog({ catalogPage, error, refreshing, onRefresh }) {
     setVisibility("all");
   };
 
+  const requestContext = (requestError) => `${requestError?.code ? ` Kod: ${requestError.code}.` : ""}${requestError?.requestId ? ` İstek kimliği: ${requestError.requestId}` : ""}`;
+  const suppressCatalogWrites = (requestError) => {
+    setOperation(null);
+    setSuppressedMutationActions(mutationActions);
+    setOperationNotice({
+      tone: "warning",
+      message: `Ürün yazma capability'si sunucu tarafından kapatıldı veya admin yetkisi değişti. Oturum ve katalog yeniden doğrulanıyor.${requestContext(requestError)}`,
+    });
+    onReloadCapabilities();
+    onRefresh();
+  };
+  const handleMutationError = (requestError) => {
+    if (requestError?.code === "CATALOG_PRODUCT_INPUT_INVALID" || requestError?.status === 400 || requestError?.status === 422) return false;
+    if (requestError?.status === 403 || requestError?.status === 503) {
+      suppressCatalogWrites(requestError);
+      return true;
+    }
+    setOperation(null);
+    const stale = requestError?.status === 409
+      || requestError?.status === 428
+      || requestError?.details?.refetchRequired === true;
+    const missing = requestError?.status === 404;
+    setOperationNotice({
+      tone: "warning",
+      message: stale
+        ? `Ürün başka bir işlemle değişti veya revision önkoşulu geçersiz kaldı. Liste yenileniyor; güncel kaydı yeniden açın.${requestContext(requestError)}`
+        : missing
+          ? `Ürün artık bulunamadı. Liste güncel kayıtlarla yenileniyor.${requestContext(requestError)}`
+          : `İsteğin sonucu güvenle doğrulanamadı. Yinelenen yazmayı önlemek için pencere kapatıldı ve katalog yenileniyor.${requestContext(requestError)}`,
+    });
+    onRefresh();
+    return true;
+  };
+  const openCreate = () => {
+    if (writesBlocked || openingProductId !== null) return;
+    setOperationNotice(null);
+    setOperation({ kind: "create" });
+  };
+  const openExactProductOperation = async (kind, summary) => {
+    if (writesBlocked || openingProductId !== null) return;
+    setOperationNotice(null);
+    setOpeningProductId(summary.rawId);
+    try {
+      const product = await mutationActions.getCatalogProduct({ productId: summary.rawId });
+      if (product.deletedAt || product.publicationStatus === "archived") {
+        setOperationNotice({ tone: "warning", message: "Ürün bu sırada arşivlendi. Arşivli kayıtlar düzenlenemez veya yeniden arşivlenemez; liste yenileniyor." });
+        onRefresh();
+        return;
+      }
+      setOperation({ kind, product });
+    } catch (requestError) {
+      if (requestError?.status === 403 || requestError?.status === 503) {
+        suppressCatalogWrites(requestError);
+      } else {
+        setOperationNotice({
+          tone: "warning",
+          message: requestError?.status === 404
+            ? `Ürün artık bulunamadı; liste yenileniyor.${requestContext(requestError)}`
+            : `Düzenleme için gerekli tam ürün DTO'su alınamadı; özet veriden alan tahmin edilmedi.${requestContext(requestError)}`,
+        });
+        if ([404, 409, 428].includes(requestError?.status) || requestError?.details?.refetchRequired === true) onRefresh();
+      }
+    } finally {
+      setOpeningProductId(null);
+    }
+  };
+  const handleComplete = ({ kind, product }) => {
+    setOperation(null);
+    setOperationNotice({
+      tone: "success",
+      message: kind === "create"
+        ? `${product.id} ürünü ${CATALOG_PUBLICATION_STATUS_LABELS[product.publicationStatus]} durumunda oluşturuldu. Medya eklenmedi; liste sunucudan yenileniyor.`
+        : kind === "edit"
+          ? `${product.id} ürün değişiklikleri revision ${product.revision} olarak kaydedildi. Liste sunucudan yenileniyor.`
+          : `${product.id} hard-delete yapılmadan arşivlendi ve müşteri görünürlüğü kapatıldı.`,
+    });
+    onRefresh();
+  };
+  const archivedProduct = (product) => Boolean(product.deletedAt) || product.publicationStatus === "archived";
+  const writeBoundaryMessage = !writeCapabilityEnabled
+    ? "Bu oturum ürün özetlerini salt okunur gösterir; ürün yazma capability'si sunulmadı."
+    : writesSuppressed
+      ? "Sunucu yazmayı reddettiği için bu görünümdeki ürün aksiyonları oturum yeniden doğrulanana kadar kapatıldı."
+      : error
+        ? "Son katalog yenilemesi başarısız olduğu için eski revision üzerinde yazma yapılmaz."
+        : refreshing || sessionRefreshing
+          ? "Katalog veya admin oturumu yenilenirken ürün yazmaları geçici olarak kapalıdır."
+          : "Oluşturma, güncelleme ve arşivleme yalnız first-party ürün JSON sözleşmesi ve güncel revision ile açıktır.";
+
   return (
     <section className="workspace live-workspace" data-testid="live-catalog">
       <header className="workspace-heading operations-heading">
         <div>
-          <span className="eyebrow">Entegre backend · birinci taraf · salt okunur</span>
+          <span className="eyebrow">Entegre backend · birinci taraf · {writeCapabilityEnabled ? "capability kontrollü JSON CRUD" : "salt okunur"}</span>
           <h2 tabIndex="-1">Ürünler</h2>
           <p>En fazla son {catalogPage.limit} NovaStore ürün kaydı, ürün kimliği azalan sırada gösterilir.</p>
         </div>
-        <button className="secondary-button" onClick={onRefresh} disabled={refreshing}>
-          <Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}
-        </button>
+        <div className="heading-actions live-catalog-heading-actions">
+          {writeCapabilityEnabled && <button className="primary-button" onClick={openCreate} disabled={writesBlocked || openingProductId !== null}><Icon name="package" />Yeni ürün</button>}
+          <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
+        </div>
       </header>
 
       <ResourceWarning error={error} onRetry={onRefresh} />
+      {operationNotice && <section className={`notice-card live-operation-notice ${operationNotice.tone === "warning" ? "warning-card" : "success-card"}`} role="status"><Icon name={operationNotice.tone === "warning" ? "warning" : "check"} /><div><strong>{operationNotice.tone === "warning" ? "Güncel veri gerekli" : "Ürün işlemi kaydedildi"}</strong><p>{operationNotice.message}</p></div></section>}
       <section className="notice-card live-boundary-notice" role="note">
         <Icon name="shield" />
         <div>
-          <strong>Tek satıcılı, salt okunur katalog</strong>
-          <p>Bu liste yalnız NovaStore'un mevcut birinci taraf ürün kayıtlarını gösterir. “İç yayın incelemesi” satıcı izni değildir; satıcı, teklif, risk veya manuel ürün onay kuyruğu oluşturulmaz. Ürün ve medya yazmaları bu turda kapalıdır.</p>
+          <strong>Tek satıcılı first-party katalog · medya sınırı kapalı</strong>
+          <p>Bu liste yalnız NovaStore ürün kayıtlarını işler. “İç yayın incelemesi” satıcı izni değildir; satıcı, teklif, risk veya manuel ürün onay kuyruğu oluşturulmaz. Ürün JSON yazmaları capability ile açılabilir ancak medya/görsel/Cloudinary yazması, hard-delete ve arşivden geri yükleme bu turda yoktur.</p>
         </div>
       </section>
 
@@ -664,8 +984,8 @@ function Catalog({ catalogPage, error, refreshing, onRefresh }) {
         ) : filtered.length > 0 ? (
           <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Birinci taraf ürün özeti tablosu">
             <table className="data-table live-catalog-table">
-              <caption className="sr-only">Entegre backend'den okunan salt okunur birinci taraf ürün özetleri</caption>
-              <thead><tr><th scope="col">Ürün</th><th scope="col">Birincil kategori</th><th scope="col">Fiyat</th><th scope="col">Stok</th><th scope="col">Yayın</th><th scope="col">Etkin vitrin</th><th scope="col">Medya</th><th scope="col">Güncellendi</th></tr></thead>
+              <caption className="sr-only">Entegre backend'den okunan {writeCapabilityEnabled ? "capability kontrollü" : "salt okunur"} birinci taraf ürün özetleri</caption>
+              <thead><tr><th scope="col">Ürün</th><th scope="col">Birincil kategori</th><th scope="col">Fiyat</th><th scope="col">Stok</th><th scope="col">Yayın</th><th scope="col">Etkin vitrin</th><th scope="col">Medya</th><th scope="col">Güncellendi</th>{writeCapabilityEnabled && <th scope="col">Ürün işlemi</th>}</tr></thead>
               <tbody>{filtered.map((product) => {
                 const publicationStatus = resolveCatalogPublicationStatus(product);
                 const customerVisible = isCatalogProductEffectivelyVisible(product);
@@ -679,6 +999,7 @@ function Catalog({ catalogPage, error, refreshing, onRefresh }) {
                     <td><span className={`status ${customerVisible ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{customerVisible ? "Görünür" : "Görünmez"}</span>{!customerVisible && product.customerVisible && <small className="live-status-note">Ham bayrak açık; yayın veya arşiv durumu vitrine kapatır.</small>}</td>
                     <td><span className={`live-media-presence ${product.hasMedia ? "has-media" : "no-media"}`}><Icon name={product.hasMedia ? "check" : "warning"} />{product.hasMedia ? "Mevcut" : "Yok"}</span></td>
                     <td><span className="live-customer-cell"><strong>{dateTime(product.updatedAt || product.createdAt)}</strong><small>{product.updatedAt ? "Son güncelleme" : product.createdAt ? "Oluşturulma" : "Tarih bilgisi yok"}</small></span></td>
+                    {writeCapabilityEnabled && <td>{archivedProduct(product) ? <span className="live-archived-lock"><Icon name="shield" />Arşivli · kilitli</span> : <span className="live-operation-buttons"><button type="button" className="secondary-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("edit", product)}>{openingProductId === product.rawId ? "Tam DTO alınıyor…" : "Düzenle"}</button><button type="button" className="danger-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("archive", product)}>Arşivle</button></span>}</td>}
                   </tr>
                 );
               })}</tbody>
@@ -692,7 +1013,11 @@ function Catalog({ catalogPage, error, refreshing, onRefresh }) {
             <button className="secondary-button" onClick={resetFilters}>Filtreleri temizle</button>
           </div>
         )}
+        <footer className={`table-footer live-catalog-write-footer ${writesBlocked ? "is-blocked" : "is-ready"}`} role="note"><span><Icon name={writesBlocked ? "shield" : "check"} />{writeBoundaryMessage}</span><strong>{writeCapabilityEnabled ? "Medya hariç JSON CRUD" : "Salt okunur"}</strong></footer>
       </section>
+      {operation?.kind === "create" && typeof mutationActions.createCatalogProduct === "function" && <CatalogProductFormDialog mode="create" action={mutationActions.createCatalogProduct} onClose={() => setOperation(null)} onComplete={handleComplete} onRequestError={handleMutationError} />}
+      {operation?.kind === "edit" && typeof mutationActions.updateCatalogProduct === "function" && <CatalogProductFormDialog mode="edit" product={operation.product} action={mutationActions.updateCatalogProduct} onClose={() => setOperation(null)} onComplete={handleComplete} onRequestError={handleMutationError} />}
+      {operation?.kind === "archive" && typeof mutationActions.archiveCatalogProduct === "function" && <CatalogProductArchiveDialog product={operation.product} action={mutationActions.archiveCatalogProduct} onClose={() => setOperation(null)} onComplete={handleComplete} onRequestError={handleMutationError} />}
     </section>
   );
 }
@@ -1042,6 +1367,10 @@ export function IntegratedApp() {
   const mutationActions = useMemo(() => adapter.mutationActions(capabilities), [adapter, capabilities]);
   const cancelWriteEnabled = typeof mutationActions.cancelOrder === "function";
   const shipmentWriteEnabled = typeof mutationActions.createManualShipment === "function";
+  const catalogWriteEnabled = catalogEnabled
+    && typeof mutationActions.createCatalogProduct === "function"
+    && typeof mutationActions.updateCatalogProduct === "function"
+    && typeof mutationActions.archiveCatalogProduct === "function";
   const statsResource = useResource(loadStats, { enabled: statsEnabled });
   const notificationsResource = useResource(loadNotifications, { enabled: notificationsEnabled });
   const ordersResource = useResource(loadOrders, { enabled: ordersEnabled });
@@ -1161,7 +1490,7 @@ export function IntegratedApp() {
     pageContent = !catalogEnabled
       ? <StatePanel phase="forbidden" error={catalogUnavailableError} onRetry={catalogResource.reload} />
       : catalogLoaded
-        ? <Catalog catalogPage={catalogResource.data} error={catalogResource.error} refreshing={catalogResource.refreshing} onRefresh={catalogResource.reload} />
+        ? <Catalog catalogPage={catalogResource.data} error={catalogResource.error} refreshing={catalogResource.refreshing} sessionRefreshing={sessionResource.refreshing} onRefresh={catalogResource.reload} onReloadCapabilities={sessionResource.reload} mutationActions={mutationActions} />
         : <StatePanel phase={catalogResource.phase} error={catalogResource.error} onRetry={catalogResource.reload} />;
   } else if (page === "catalogStructure") {
     pageContent = !catalogStructureEnabled
@@ -1234,7 +1563,7 @@ export function IntegratedApp() {
         </main>
 
         <footer className="statusbar">
-          <div className="preview-banner live-banner" role="note" data-testid="live-banner"><Icon name="shield" /><strong>Entegre tek-satıcı modu</strong><span>Mock fallback yok · {cancelWriteEnabled || shipmentWriteEnabled ? "yazmalar capability ve doğrulamayla sınırlı" : "bu oturum yazma isteği göndermez"}</span></div>
+          <div className="preview-banner live-banner" role="note" data-testid="live-banner"><Icon name="shield" /><strong>Entegre tek-satıcı modu</strong><span>Mock fallback yok · {cancelWriteEnabled || shipmentWriteEnabled || catalogWriteEnabled ? "yazmalar capability ve doğrulamayla sınırlı" : "bu oturum yazma isteği göndermez"}</span></div>
           <span className={sessionLoaded ? "healthy" : ""}>{sessionLoaded ? "Oturum doğrulandı" : sessionResource.phase === "error" ? "Bağlantı hatası" : "Bağlantı bekleniyor"}</span>
           <span>{lastUpdatedAt ? `Son veri okuması ${dateTime(lastUpdatedAt)}` : "Entegre veri bekleniyor"}</span>
           <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing || returnsResource.refreshing || notificationsResource.refreshing || catalogResource.refreshing || catalogStructureResource.refreshing}><Icon name="refresh" />Yenile</button>

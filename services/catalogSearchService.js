@@ -1,6 +1,7 @@
 ﻿const pool = require('../config/db');
 
 const { getAppBaseUrl } = require('../config/appConfig');
+const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 
 const APP_BASE_URL = getAppBaseUrl();
 
@@ -68,6 +69,7 @@ const runCatalogQuery = async () => {
             CAST(COUNT(r.id) AS INTEGER) AS review_count
         FROM products p
         LEFT JOIN reviews r ON r.product_id = p.id
+        WHERE ${buildPublicProductSqlPredicate('p')}
         GROUP BY p.id
         ORDER BY p.created_at DESC
     `;
@@ -87,6 +89,7 @@ const runCatalogQuery = async () => {
             CAST(COUNT(r.id) AS INTEGER) AS review_count
         FROM products p
         LEFT JOIN reviews r ON r.product_id = p.id
+        WHERE ${buildPublicProductSqlPredicate('p')}
         GROUP BY p.id
         ORDER BY p.created_at DESC
     `;
@@ -96,7 +99,8 @@ const runCatalogQuery = async () => {
         return result.rows;
     } catch (err) {
         const message = String(err.message || '');
-        const isSchemaMismatch = String(err.code || '').startsWith('42') && /(category|old_price)/i.test(message);
+        const isSchemaMismatch = String(err.code || '').startsWith('42')
+            && /(categor(?:y|ies)|old_price)/i.test(message);
         if (!isSchemaMismatch) throw err;
         const fallbackResult = await pool.query(fallbackQuery);
         return fallbackResult.rows;

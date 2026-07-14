@@ -2,32 +2,54 @@ const pool = require('../config/db');
 const { createNotification } = require('./notificationController');
 const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
 const { ORDER_STATUS } = require('../constants/orderStatus');
+const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 const { maskFullName } = require('../services/privacyService');
 const { reviewUpload, uploadReviewMediaFiles, cleanupCloudinaryAssets } = require('../config/cloudinary');
 
 const MAX_REVIEW_MEDIA_COUNT = 4;
 const MAX_REVIEW_COMMENT_LENGTH = 2000;
 
-const findEligibleDeliveredOrder = async (userId, productId) => {
-    return pool.query(
-        `SELECT o.id
-         FROM orders o
-         JOIN LATERAL jsonb_array_elements(
-            CASE
-                WHEN jsonb_typeof(COALESCE(o.items, '[]'::jsonb)) = 'array' THEN COALESCE(o.items, '[]'::jsonb)
-                ELSE '[]'::jsonb
-            END
-         ) AS item(value) ON TRUE
-         WHERE o.user_id = $1
-           AND o.status = $2
-           AND (
-                ((item.value->>'id') ~ '^[0-9]+$' AND (item.value->>'id')::int = $3)
-                OR
-                ((item.value->>'product_id') ~ '^[0-9]+$' AND (item.value->>'product_id')::int = $3)
-           )
-         LIMIT 1`,
+const getPublicProductReviewEligibility = async (userId, productId) => {
+    const result = await pool.query(
+        `SELECT
+            EXISTS (
+                SELECT 1
+                FROM products
+                WHERE products.id = $3
+                  AND ${buildPublicProductSqlPredicate('products')}
+            ) AS public_product_exists,
+            EXISTS (
+                SELECT 1
+                FROM orders o
+                JOIN LATERAL jsonb_array_elements(
+                    CASE
+                        WHEN jsonb_typeof(COALESCE(o.items, '[]'::jsonb)) = 'array' THEN COALESCE(o.items, '[]'::jsonb)
+                        ELSE '[]'::jsonb
+                    END
+                ) AS item(value) ON TRUE
+                WHERE o.user_id = $1
+                  AND o.status = $2
+                  AND (
+                        ((item.value->>'id') ~ '^[0-9]+$' AND (item.value->>'id')::int = $3)
+                        OR
+                        ((item.value->>'product_id') ~ '^[0-9]+$' AND (item.value->>'product_id')::int = $3)
+                  )
+            ) AS has_delivered_order`,
         [userId, ORDER_STATUS.TESLIM_EDILDI, productId]
     );
+
+    const row = result.rows?.[0];
+    if (typeof row?.public_product_exists !== 'boolean'
+        || typeof row?.has_delivered_order !== 'boolean') {
+        const error = new Error('Yorum uygunluk sorgusu geçersiz sonuç döndürdü.');
+        error.code = 'REVIEW_ELIGIBILITY_RESULT_INVALID';
+        throw error;
+    }
+
+    return {
+        publicProductExists: row.public_product_exists,
+        hasDeliveredOrder: row.has_delivered_order
+    };
 };
 
 const getReviewPermission = async (userId, productId) => {
@@ -37,6 +59,16 @@ const getReviewPermission = async (userId, productId) => {
             requiresAuth: true,
             code: 'AUTH_REQUIRED',
             message: 'Değerlendirme yapabilmek için giriş yapmalısınız.'
+        };
+    }
+
+    const eligibility = await getPublicProductReviewEligibility(userId, productId);
+    if (!eligibility.publicProductExists) {
+        return {
+            canReview: false,
+            requiresAuth: false,
+            code: 'PRODUCT_NOT_FOUND',
+            message: 'Ürün bulunamadı.'
         };
     }
 
@@ -54,8 +86,7 @@ const getReviewPermission = async (userId, productId) => {
         };
     }
 
-    const deliveredOrder = await findEligibleDeliveredOrder(userId, productId);
-    if (deliveredOrder.rows.length === 0) {
+    if (!eligibility.hasDeliveredOrder) {
         return {
             canReview: false,
             requiresAuth: false,
@@ -177,8 +208,16 @@ const sendReviewUploadError = (res, err) => {
 };
 
 const sendReviewPermissionError = (res, permission) => {
-    const statusCode = permission.code === 'ALREADY_REVIEWED' ? 400 : 403;
+    const statusCode = permission.code === 'PRODUCT_NOT_FOUND'
+        ? 404
+        : permission.code === 'ALREADY_REVIEWED' ? 400 : 403;
     return res.status(statusCode).json({ error: permission.message, code: permission.code });
+};
+
+const createPublicProductNotFoundError = () => {
+    const error = new Error('Ürün bulunamadı.');
+    error.code = 'PRODUCT_NOT_FOUND';
+    return error;
 };
 
 // 1. Ürüne yorum ekleme
@@ -274,10 +313,17 @@ const addReview = async (req, res) => {
 
         const reviewResult = await client.query(
             `INSERT INTO reviews (product_id, user_id, rating, comment)
-             VALUES ($1, $2, $3, $4)
+             SELECT products.id, $2, $3, $4
+             FROM products
+             WHERE products.id = $1
+               AND ${buildPublicProductSqlPredicate('products')}
              RETURNING id`,
             [numericProductId, userId, numericRating, normalizedComment]
         );
+
+        if (reviewResult.rows.length === 0) {
+            throw createPublicProductNotFoundError();
+        }
 
         const reviewId = reviewResult.rows[0].id;
 
@@ -314,7 +360,15 @@ const addReview = async (req, res) => {
         }
 
         if (uploadedReviewFiles.length > 0) {
-            await cleanupCloudinaryAssets(uploadedReviewFiles);
+            try {
+                await cleanupCloudinaryAssets(uploadedReviewFiles);
+            } catch (cleanupError) {
+                console.error('Yorum medyası temizleme hatası:', cleanupError.message);
+            }
+        }
+
+        if (err.code === 'PRODUCT_NOT_FOUND') {
+            return res.status(404).json({ error: 'Ürün bulunamadı.', code: 'PRODUCT_NOT_FOUND' });
         }
 
         console.error('Yorum ekleme hatası:', err.message);
@@ -335,31 +389,43 @@ const getProductReviews = async (req, res) => {
         const authUser = getUserFromRequestIfAny(req);
 
         const reviewResult = await pool.query(
-            `SELECT r.id, r.rating, r.comment, r.created_at, COALESCE(u.full_name, u.name) AS full_name
-             FROM reviews r
-             JOIN users u ON r.user_id = u.id
-             WHERE r.product_id = $1
+            `SELECT products.id AS public_product_id,
+                    r.id, r.rating, r.comment, r.created_at,
+                    COALESCE(u.full_name, u.name) AS full_name,
+                    AVG(r.rating) OVER () AS average,
+                    COUNT(r.id) OVER () AS total
+             FROM products
+             LEFT JOIN reviews r ON r.product_id = products.id
+             LEFT JOIN users u ON r.user_id = u.id
+             WHERE products.id = $1
+               AND ${buildPublicProductSqlPredicate('products')}
              ORDER BY r.created_at DESC`,
             [productId]
         );
 
-        const mediaMap = await loadReviewMediaMap(reviewResult.rows.map((review) => review.id));
+        if (reviewResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Ürün bulunamadı.', code: 'PRODUCT_NOT_FOUND' });
+        }
 
-        const avgResult = await pool.query(
-            'SELECT AVG(rating) as average, COUNT(id) as total FROM reviews WHERE product_id = $1',
-            [productId]
-        );
+        const reviewRows = reviewResult.rows.filter((review) => review.id !== null);
+
+        const mediaMap = await loadReviewMediaMap(reviewRows.map((review) => review.id));
 
         const reviewPermission = await getReviewPermission(authUser ? authUser.id : null, productId);
+        if (reviewPermission.code === 'PRODUCT_NOT_FOUND') {
+            return sendReviewPermissionError(res, reviewPermission);
+        }
+
+        const aggregateRow = reviewResult.rows[0];
 
         res.status(200).json({
-            reviews: reviewResult.rows.map((review) => ({
+            reviews: reviewRows.map(({ public_product_id: _productId, average: _average, total: _total, ...review }) => ({
                 ...review,
                 full_name: maskFullName(review.full_name),
                 media: mediaMap.get(review.id) || []
             })),
-            average: avgResult.rows[0].average ? parseFloat(avgResult.rows[0].average).toFixed(1) : 0,
-            totalReviews: parseInt(avgResult.rows[0].total, 10) || 0,
+            average: aggregateRow.average ? parseFloat(aggregateRow.average).toFixed(1) : 0,
+            totalReviews: parseInt(aggregateRow.total, 10) || 0,
             reviewPermission
         });
     } catch (err) {

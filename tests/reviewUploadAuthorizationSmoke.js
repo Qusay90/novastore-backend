@@ -44,6 +44,7 @@ const originalUploadStream = cloudinary.uploader.upload_stream;
 const originalDestroy = cloudinary.uploader.destroy;
 
 let deliveredRows = [];
+let malformedEligibilityResult = false;
 let reviewUploadParserCalls = 0;
 let cloudinaryUploadCalls = 0;
 let destroyCalls = 0;
@@ -180,9 +181,15 @@ pool.query = async (sql, params = []) => {
         return { rows: [] };
     }
 
-    if (/FROM orders o/i.test(text)) {
+    if (/AS public_product_exists/i.test(text)) {
         assert.deepEqual([params[0], params[2]], [42, 101]);
-        return { rows: deliveredRows };
+        if (malformedEligibilityResult) return { rows: [] };
+        return {
+            rows: [{
+                public_product_exists: true,
+                has_delivered_order: deliveredRows.length > 0
+            }]
+        };
     }
 
     if (/INSERT INTO notifications/i.test(text)) {
@@ -237,6 +244,13 @@ pool.connect = async () => {
         assert.equal(missingPreflight.status, 400);
         assert.equal(reviewUploadParserCalls, 0, 'multipart review without preflight product id must not invoke multer');
         assert.equal(cloudinaryUploadCalls, 0);
+
+        malformedEligibilityResult = true;
+        const malformedEligibility = await postMultipart(server, '/api/reviews?productId=101', reviewRequest);
+        assert.equal(malformedEligibility.status, 500);
+        assert.equal(reviewUploadParserCalls, 0, 'malformed eligibility result must fail closed before multer');
+        assert.equal(cloudinaryUploadCalls, 0, 'malformed eligibility result must fail closed before Cloudinary');
+        malformedEligibilityResult = false;
 
         deliveredRows = [];
         const unauthorized = await postMultipart(server, '/api/reviews?productId=101', reviewRequest);

@@ -1,6 +1,13 @@
 import { hasCapability, resolveCapabilities } from "../integration/capabilities.js";
 import { normalizeCatalogStructureSummary } from "../integration/catalogStructureRead.js";
 import {
+  buildArchiveCatalogProductMutation,
+  buildCatalogProductDetailRequest,
+  buildCreateCatalogProductMutation,
+  buildUpdateCatalogProductMutation,
+  normalizeAdminCatalogProductDetail,
+} from "../integration/catalogMutations.js";
+import {
   buildCancelOrderMutation,
   buildManualShipmentMutation,
 } from "../integration/orderMutations.js";
@@ -50,6 +57,40 @@ export function createSameOriginAdapter(http) {
 
   const mutationActions = (capabilities) => {
     const actions = {};
+    if (hasCapability(capabilities, "firstPartyCatalogRead")
+      && hasCapability(capabilities, "firstPartyCatalogWrite")) {
+      actions.getCatalogProduct = async (input = {}) => {
+        const request = buildCatalogProductDetailRequest({ productId: input.productId });
+        return normalizeAdminCatalogProductDetail(await http.request(request.path, { signal: input.signal }));
+      };
+      actions.createCatalogProduct = async (input = {}) => {
+        const { signal, ...requestInput } = input;
+        const request = buildCreateCatalogProductMutation(requestInput);
+        return normalizeAdminCatalogProductDetail(await http.request(request.path, {
+          method: request.method,
+          body: JSON.stringify(request.body),
+          signal,
+        }));
+      };
+      actions.updateCatalogProduct = async (input = {}) => {
+        const { signal, ...requestInput } = input;
+        const request = buildUpdateCatalogProductMutation(requestInput);
+        return normalizeAdminCatalogProductDetail(await http.request(request.path, {
+          method: request.method,
+          body: JSON.stringify(request.body),
+          signal,
+        }));
+      };
+      actions.archiveCatalogProduct = async (input = {}) => {
+        const { signal, ...requestInput } = input;
+        const request = buildArchiveCatalogProductMutation(requestInput);
+        return normalizeAdminCatalogProductDetail(await http.request(request.path, {
+          method: request.method,
+          body: JSON.stringify(request.body),
+          signal,
+        }));
+      };
+    }
     if (hasCapability(capabilities, "orderCancelWrite")) {
       actions.cancelOrder = async (input = {}) => {
         const request = buildCancelOrderMutation(input);

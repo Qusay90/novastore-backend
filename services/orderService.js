@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const { calculatePricing, round2 } = require('./pricingService');
 const { syncCategoryStatsForProducts } = require('./categoryStatsService');
+const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 const { ORDER_STATUS, PAYMENT_STATUS, REFUND_STATUS, SHIPMENT_STATUS, resolveOrderStatus } = require('../constants/orderStatus');
 const {
     STOCK_RESERVATION_STATE,
@@ -46,7 +47,9 @@ const reserveStock = async (client, pricedItems) => {
              SET stock = stock - $1,
                  revision = revision + 1,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE id = $2 AND stock >= $1
+             WHERE id = $2
+               AND stock >= $1
+               AND ${buildPublicProductSqlPredicate('products')}
              RETURNING id, stock`,
             [item.quantity, item.id]
         );

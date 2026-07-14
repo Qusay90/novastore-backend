@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { getAppBaseUrl } = require('../config/appConfig');
+const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 
 const xmlEscape = (value = '') =>
     String(value)
@@ -23,6 +24,7 @@ const getMerchantFeed = async (req, res) => {
         const productsResult = await pool.query(
             `SELECT id, name, description, price, stock, category, image_url, created_at
              FROM products
+             WHERE ${buildPublicProductSqlPredicate('products')}
              ORDER BY created_at DESC`
         );
 
