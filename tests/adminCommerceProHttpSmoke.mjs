@@ -9,7 +9,9 @@ import { resolveCapabilities, hasCapability } from "../admin-commerce-pro/src/in
 import {
   normalizeAdminSession,
   normalizeDashboardStats,
+  normalizeNotificationSummaryPage,
   normalizeOrderSummaryPage,
+  normalizeReturnSummaryPage,
 } from "../admin-commerce-pro/src/integration/legacyMappers.js";
 import { createSameOriginAdapter } from "../admin-commerce-pro/src/adapters/sameOriginAdapter.js";
 import { currentErrorMayPreserveData } from "../admin-commerce-pro/src/integration/useResource.js";
@@ -146,6 +148,9 @@ assert.equal(normalizedOrder.rawId, 42);
 assert.equal(normalizedOrder.status, "Ödeme Bekliyor");
 assert.equal(normalizedOrder.itemCount, 2);
 assert.equal(normalizedOrder.pendingPayment, true);
+assert.equal(normalizedOrder.shipmentStatus, "NONE");
+assert.equal(normalizedOrder.carrierConfirmed, false);
+assert.equal(normalizedOrder.currency, "TRY");
 assert.equal("sellerId" in normalizedOrder, false, "tek-satıcı siparişe sahte satıcı eklenmemeli");
 assert.throws(() => normalizeOrderSummaryPage({ rows: [] }), /items/);
 assert.throws(() => normalizeOrderSummaryPage({ items: [{ id: 1 }], limit: 100, hasMore: false }), /created_at|payment_status|total_amount/);
@@ -164,6 +169,26 @@ assert.throws(
   /customer_name/,
 );
 
+const returnPage = normalizeReturnSummaryPage({
+  items: [{ id: 3, order_id: 42, customer_name: "Müşteri", reason_code: "HASARLI", status: "REQUESTED", refund_amount: "149.90", currency: "try", order_status: "Teslim Edildi", refund_status: "REQUESTED", payment_status: "PAID", created_at: null, updated_at: null }],
+  limit: 100,
+  hasMore: false,
+});
+assert.equal(returnPage.items[0].id, "RT-000003");
+assert.equal(returnPage.items[0].orderId, "NS-000042");
+assert.equal(returnPage.items[0].refundAmount, 149.9);
+assert.equal(returnPage.items[0].currency, "TRY");
+assert.throws(() => normalizeReturnSummaryPage({ items: [{ id: 1, order_id: 2, refund_amount: -1 }], limit: 100, hasMore: false }), /refund_amount/);
+
+const notificationPage = normalizeNotificationSummaryPage({
+  items: [{ id: 5, type: "new_order", message: "Yeni sipariş", is_read: false, created_at: "2026-07-14T10:00:00.000Z" }],
+  limit: 50,
+  hasMore: false,
+});
+assert.equal(notificationPage.items[0].id, "NT-000005");
+assert.equal(notificationPage.items[0].isRead, false);
+assert.throws(() => normalizeNotificationSummaryPage({ items: [{ id: 5, is_read: 0 }], limit: 50, hasMore: false }), /boolean/);
+
 const session = normalizeAdminSession({
   user: { id: 7, role: "admin" },
   commerceMode: "single_vendor",
@@ -176,9 +201,11 @@ assert.throws(() => normalizeAdminSession({ user: { id: 8, role: "admin" }, comm
 
 const fixtureHttp = {
   async request(path) {
-    if (path === "/api/admin/session") return { user: { id: 7, role: "admin" }, commerceMode: "single_vendor", capabilities: { dashboardRead: true, ordersRead: true } };
+    if (path === "/api/admin/session") return { user: { id: 7, role: "admin" }, commerceMode: "single_vendor", capabilities: { dashboardRead: true, ordersRead: true, returnsRead: true, notificationsRead: true } };
     if (path === "/api/admin/stats") return { totalRevenue: "10", totalOrders: 1, totalProducts: 2, totalUsers: 3 };
     if (path === "/api/admin/orders/summary?limit=100") return { items: [{ id: 1, customer_name: "Müşteri", total_amount: "10", status: "Onay Bekliyor", payment_status: "PAID", item_count: 1, created_at: "2026-07-14T10:00:00.000Z" }], limit: 100, hasMore: false };
+    if (path === "/api/admin/returns/summary?limit=100") return { items: [{ id: 1, order_id: 1, reason_code: "DİĞER", status: "REQUESTED", refund_amount: "10", currency: "TRY", payment_status: "PAID" }], limit: 100, hasMore: false };
+    if (path === "/api/admin/notifications/summary?limit=50") return { items: [{ id: 1, type: "new_order", message: "Yeni sipariş", is_read: false }], limit: 50, hasMore: false };
     throw new Error("unexpected path");
   },
 };
@@ -186,5 +213,7 @@ const adapter = createSameOriginAdapter(fixtureHttp);
 assert.equal((await adapter.session()).capabilities.ordersRead, true);
 assert.equal((await adapter.dashboard()).totalRevenue, 10);
 assert.equal((await adapter.orders()).items[0].id, "NS-000001");
+assert.equal((await adapter.returns()).items[0].id, "RT-000001");
+assert.equal((await adapter.notifications()).items[0].id, "NT-000001");
 
 console.log("admin Commerce Pro HTTP and mapper smoke passed");

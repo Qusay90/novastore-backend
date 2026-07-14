@@ -8,14 +8,14 @@ Yığın tabanı: `codex/admin-commerce-pro-preview` (`1954d4b`)
 
 ## Sonuç
 
-Commerce Pro tasarım prototipi tamamlanmış olsa da gerçek backend entegrasyonu yeni başlıyor. Mevcut backend tek satıcılıdır; satıcı organizasyonu, satıcı kapsamlı yetkilendirme, teklif, seller-order, değişmez finansal kayıt, hakediş ve payout modelleri henüz yoktur.
+Commerce Pro tasarım prototipi tamamlandı; tek-satıcı salt-okunur entegrasyon katmanı Dashboard, sipariş, iade ve admin bildirimlerine kadar ilerledi. Mevcut backend hâlâ tek satıcılıdır; satıcı organizasyonu, satıcı kapsamlı yetkilendirme, teklif, seller-order, değişmez finansal kayıt, hakediş ve payout modelleri henüz yoktur.
 
-- Gerçek tek-satıcı Commerce Pro cutover: **3–5 hafta**.
-- Dar kapsamlı, login zorunlu ilk satış pilotu: **5–8 hafta**.
+- Gerçek tek-satıcı Commerce Pro cutover için kalan: **yaklaşık 2,5–4 hafta**.
+- Dar kapsamlı, login zorunlu ilk satış pilotu için kalan: **yaklaşık 4,5–7,5 hafta**.
 - Kontrollü 1–3 satıcılı ödeme pilotu: bugünden itibaren **5–7 ay**.
 - Güvenilir halka açık pazaryeri: **8–12 ay**.
 
-Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapasitesini varsayar. Tek geliştirici ve Codex ile süre yaklaşık 1,8–2,3 katına çıkabilir. Ödeme, KYC, kargo ve e-fatura sağlayıcılarının sözleşme/onay süreleri tahmine dahil değildir.
+Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapasitesini varsayar. Mevcut tek geliştirici + Codex çalışma düzeninde gerçekçi takvim yaklaşık **5–9 hafta tek-satıcı cutover**, **8–17 hafta dar satış pilotu**, **9–16 ay kontrollü çok-satıcı ödeme pilotu** ve **15–28 ay güvenilir halka açık pazaryeri** düzeyindedir. Ödeme, KYC, kargo ve e-fatura sağlayıcılarının sözleşme/onay süreleri tahmine dahil değildir.
 
 ## Değişmez teslim kuralları
 
@@ -34,7 +34,9 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 |---|---|---:|---|---|
 | 0 | Route/DTO/capability haritası, bağımlılık sırası, bu yürütme planı | 0,5–1 gün | Sözleşme ve risk listesi gözden geçirilmiş | Yok |
 | 1 | Preview/live build ayrımı, admin session gate, aynı-origin HTTP istemcisi, gerçek Dashboard + Siparişler salt-okunur | 2–3 gün | Auth/401/403, mapper, CSP, no-mock-fallback ve build testleri | Yok |
-| 2 | Sipariş geçiş matrisi, iptal/iade/kargo/bildirim akışları; gerçek olmayan owner/not/bulk kontrolleri kapalı | 3–4 gün | Idempotency, izinli geçiş, hata/empty/loading testleri | Fake pool / opsiyonel yerel PG |
+| 2A | Salt-okunur iade ve admin bildirimi özetleri; yerel kargo kaydını taşıyıcı doğrulaması gibi göstermeyen sipariş görünümü | 1–2 gün | Auth/current-role/no-store, bounded DTO, PII azaltma, bağımsız hata/empty/loading ve no-write artifact testleri | Yok |
+| 2B | Yaşam döngüsü güvenlik çekirdeği: hard-delete kapısı, geçiş sahipliği, idempotency, stok rezervasyon kanıtı ve ödeme callback yarışları | 3–5 gün | İzinli/yasak geçiş, tekrar istek, stale admin, stock/event tekilliği ve karma payment/order state testleri | Fake pool + mümkünse disposable yerel PG |
+| 2C | Kontrollü fulfillment/iptal/iade operasyonları; gerçek refund, kargo etiketi ve taşıyıcı doğrulaması kapalı | 2–3 gün | Beklenen durum/409, atomik shipment-order güncellemesi, audit ve post-commit bildirim davranışı | Fake pool / disposable yerel PG |
 | 3 | Birinci taraf ürün, kategori, özellik, koleksiyon ve menü CRUD | 4–6 gün | Medya hariç tam DTO; hard-delete kapalı; audit izi | Fake pool / yerel PG; Cloudinary yok |
 | 4 | Admin müşteri özet API’si, sorular/yorumlar, kampanya, pagination ve gizlilik | 4–6 gün | Auth açığı kapanmış, PII kapsamı ve pagination testli | Fake pool / yerel PG |
 | 5 | Analytics, legacy parity, feature flag, rollback ve Commerce Pro cutover hazırlığı | 3–5 gün | Desktop/mobile UAT, console/network, güvenlik/perf | Production deploy yok |
@@ -69,8 +71,8 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 | Dashboard | `GET /api/admin/stats` | Admin JWT + güncel DB rolü | Tur 1; `private, no-store` |
 | Siparişler | `GET /api/admin/orders/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 1; sınırlı ve PII azaltılmış özet DTO, client-side filtre geçici |
 | Ürünler | `GET /api/products` | Public, admin JWT ile ek alanlar | Tur 3; yalnız birinci taraf olarak eşlenir |
-| İadeler | `GET /api/returns/admin/all` | Admin JWT | Tur 2 |
-| Bildirimler | `GET /api/notifications/admin` | Admin JWT | Tur 2 |
+| İadeler | `GET /api/admin/returns/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 2A; sınırlı, PII azaltılmış ve salt-okunur |
+| Bildirimler | `GET /api/admin/notifications/summary?limit=50` | Admin JWT + güncel DB rolü | Tur 2A; yalnız admin kayıtları, sınırlı ve salt-okunur |
 | Kategori/özellik/menü/koleksiyon | `/api/admin/...` | Admin JWT | Tur 3 |
 
 ### Entegre arayüzde çağrılmayacak kapasite
@@ -101,10 +103,28 @@ Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapa
 | Tur | Durum | Commit | QA notu |
 |---|---|---|---|
 | 0 | Tamamlandı | `faef1f2` | Read-only repo audit; remote sistem kullanılmadı |
-| 1 | Kod ve otomatik QA tamam; browser QA blokeli | Bu commit | Preview/entegre build, auth, mapper, CSP ve artifact testleri yeşil; Work Mode browser kanıtı eksik |
+| 1 | Kod ve otomatik QA tamam; browser QA blokeli | `989cbeb` | Preview/entegre build, auth, mapper, CSP ve artifact testleri yeşil; Work Mode browser kanıtı eksik |
+| 2A | Kod ve otomatik QA tamam; browser QA blokeli | Bu commit | İade/bildirim salt-okunur bağlandı; yerel kargo/refund sınırları görünür; write capability'leri kapalı; full verify yeşil |
+
+## Tur 2 güvenlik bölümü
+
+Tur 2A yalnız gözlem yüzeyidir ve mevcut riskli mutation yollarını Commerce Pro'ya açmaz. Tur 2B tamamlanmadan `orderStatusWrite`, iade yazmaları, hard-delete, shipment create, notification acknowledge ve gerçek refund capability'leri `false` kalır.
+
+Tur 2B'nin P0 kabul kapıları:
+
+1. Tekrarlanan veya eşzamanlı iptal stok miktarını birden fazla artıramaz; rezervasyon kanıtı olmayan kayıt fail-closed/manual-review olur.
+2. Ödeme callback sonucu arbitrary sipariş durumundan değil payment terminal durumundan türetilir; iptal/status yarışı gerçek tahsilatı sessiz duplicate sayamaz.
+3. Finans ve audit kaydını cascade ile silebilen sipariş hard-delete yolu kapatılır.
+4. Generic status endpoint'i payment/cancel/return/shipment sahipliğindeki hedefleri atlayamaz.
+5. Admin mutation'ları JWT'deki eski role değil güncel DB admin rolüne dayanır.
+6. Gerçek taşıyıcı, refund ve ödeme çağrıları ayrıca açık onay verilene kadar çalıştırılmaz.
 
 PR #15’in `design-qa.md` sonucu, gerçek masaüstü/mobil browser kanıtı alınana kadar `blocked` kalır. Bu plan browser kısıtını atlatma yetkisi vermez.
 
 ## Tur 1 geri alma sınırı
 
 Tur 1’in yeni artifact, session ve order-summary parçaları additive ilerler; `frontend/admin.html` cutover edilmez. Entegre Dashboard’un kullandığı mevcut `/api/admin/stats` yolu ayrıca `no-store` ve güncel DB admin-rolü kontrolüyle sıkılaştırılır; `/api/admin/behavior` zinciri değiştirilmez. Geri alma gerektiğinde entegre artifact, session/order-summary endpointleri, stats middleware sıkılaştırması, login allowlist hedefi ve Commerce Pro entegre kaynakları birlikte geri alınır. Preview artifact ve legacy admin çalışma yolu bağımsız kalır.
+
+## Tur 2A geri alma sınırı
+
+Tur 2A şema veya veri mutation'ı eklemez. Geri alma gerektiğinde return/notification summary handler ve rotaları, iki read capability'si, mapper/adapter kaynakları, entegre iade-bildirim-kargo görünümü ve yeniden üretilen live artifact birlikte geri alınır. Legacy admin, mevcut return/notification yolları, preview artifact ve veritabanı şeması değişmeden kalır.

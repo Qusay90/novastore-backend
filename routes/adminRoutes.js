@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const {
+    getAdminNotificationSummaries,
     getAdminOrderSummaries,
+    getAdminReturnSummaries,
     getAdminSession,
     getDashboardStats,
     getBehaviorAnalytics
@@ -13,7 +15,9 @@ const { privateNoStore } = require('../middlewares/privateNoStore');
 const integratedAdminRead = [privateNoStore, authenticate, requireAdmin, requireCurrentAdmin];
 
 router.get('/session', ...integratedAdminRead, getAdminSession);
+router.get('/notifications/summary', ...integratedAdminRead, getAdminNotificationSummaries);
 router.get('/orders/summary', ...integratedAdminRead, getAdminOrderSummaries);
+router.get('/returns/summary', ...integratedAdminRead, getAdminReturnSummaries);
 router.get('/stats', ...integratedAdminRead, getDashboardStats);
 router.get('/behavior', authenticate, requireAdmin, getBehaviorAnalytics);
 

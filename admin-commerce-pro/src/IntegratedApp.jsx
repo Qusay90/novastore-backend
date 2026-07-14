@@ -4,9 +4,9 @@ import { hasCapability } from "./integration/capabilities.js";
 import { ADMIN_TOKEN_KEY, createAdminHttp } from "./integration/adminHttp.js";
 import { useResource } from "./integration/useResource.js";
 
-const money = (value) => new Intl.NumberFormat("tr-TR", {
+const money = (value, currency = "TRY") => new Intl.NumberFormat("tr-TR", {
   style: "currency",
-  currency: "TRY",
+  currency,
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 }).format(value);
@@ -14,6 +14,27 @@ const money = (value) => new Intl.NumberFormat("tr-TR", {
 const dateTime = (value) => value instanceof Date
   ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(value)
   : "Tarih bilgisi yok";
+
+const dateOnly = (value) => value instanceof Date
+  ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "short" }).format(value)
+  : "Tarih bilgisi yok";
+
+const returnStatusLabels = Object.freeze({
+  REQUESTED: "Talep alındı",
+  IN_REVIEW: "İnceleniyor",
+  APPROVED: "Onaylandı",
+  COMPLETED: "Tamamlandı",
+  FAILED: "Başarısız",
+  REJECTED: "Reddedildi",
+});
+
+const shipmentStatusLabels = Object.freeze({
+  NONE: "Gönderi yok",
+  CREATED: "Kayıt oluşturuldu",
+  IN_TRANSIT: "Taşımada",
+  DELIVERED: "Teslim edildi",
+  RETURNED: "Geri döndü",
+});
 
 const statusClass = (value) => String(value || "")
   .toLocaleLowerCase("tr-TR")
@@ -80,6 +101,7 @@ function OrdersTable({ orders, compact = false }) {
             <th scope="col">Müşteri</th>
             <th scope="col">Durum</th>
             <th scope="col">Ödeme</th>
+            <th scope="col">Kargo</th>
             <th scope="col">Satır</th>
             <th scope="col">Tutar</th>
             <th scope="col">Tarih</th>
@@ -104,8 +126,16 @@ function OrdersTable({ orders, compact = false }) {
                   {order.paymentStatus}
                 </span>
               </td>
+              <td>
+                <span className="live-customer-cell">
+                  <strong>Yerel: {shipmentStatusLabels[order.shipmentStatus] || order.shipmentStatus}</strong>
+                  {!compact && order.shipmentProvider && <small>{order.shipmentProvider}</small>}
+                  {!order.carrierConfirmed && <small>Taşıyıcı doğrulanmadı</small>}
+                  {!compact && order.estimatedDeliveryAt && <small>Tahmini {dateOnly(order.estimatedDeliveryAt)}</small>}
+                </span>
+              </td>
               <td>{order.itemCount}</td>
-              <td><strong>{money(order.total)}</strong></td>
+              <td><strong>{money(order.total, order.currency)}</strong></td>
               <td>{dateTime(order.createdAt)}</td>
             </tr>
           ))}
@@ -214,24 +244,127 @@ function Orders({ orderPage, error, refreshing, onRefresh }) {
   );
 }
 
+function Returns({ returnPage, error, refreshing, onRefresh }) {
+  const returns = returnPage.items;
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("Tümü");
+  const statuses = useMemo(() => ["Tümü", ...new Set(returns.map((item) => item.status))], [returns]);
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase("tr-TR");
+    return returns.filter((item) => {
+      const matchesStatus = status === "Tümü" || item.status === status;
+      const haystack = `${item.id} ${item.orderId} ${item.customerName} ${item.reasonCode}`.toLocaleLowerCase("tr-TR");
+      return matchesStatus && (!normalized || haystack.includes(normalized));
+    });
+  }, [query, returns, status]);
+
+  return (
+    <section className="workspace live-workspace" data-testid="live-returns">
+      <header className="workspace-heading operations-heading">
+        <div>
+          <span className="eyebrow">Entegre backend · salt okunur</span>
+          <h2 tabIndex="-1">İade özetleri</h2>
+          <p>En fazla {returnPage.limit} operasyon kaydı gösterilir; onay, red, durum güncelleme veya gerçek refund isteği gönderilmez.</p>
+        </div>
+        <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
+      </header>
+
+      <ResourceWarning error={error} onRetry={onRefresh} />
+      <section className="notice-card live-boundary-notice" role="note">
+        <Icon name="shield" />
+        <div><strong>Finansal işlem kapalı</strong><p>Bu görünüm mevcut yerel iade ve refund durumlarını okur. “Tamamlandı” durumu dahil hiçbir değer sağlayıcı refund'u veya para hareketini kanıtlamaz.</p></div>
+      </section>
+      <section className="table-card">
+        <div className="ledger-toolbar filter-toolbar live-filter-toolbar">
+          <label className="table-search"><Icon name="search" /><span className="sr-only">İade ara</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="İade, sipariş, müşteri veya neden ara" /></label>
+          <label className="heading-select"><span className="sr-only">İade durumuna göre filtrele</span><select value={status} onChange={(event) => setStatus(event.target.value)}>{statuses.map((value) => <option key={value} value={value}>{value === "Tümü" ? value : returnStatusLabels[value] || value}</option>)}</select></label>
+          <span className="live-result-count">{filtered.length} / {returns.length} kayıt{returnPage.hasMore ? " · liste sınırının dışındaki kayıtlar bu turda gösterilmiyor" : ""}</span>
+        </div>
+        {returns.length === 0 ? <div className="state-panel"><Icon name="refresh" /><h3>Henüz iade kaydı yok</h3><p>Backend boş bir iade özeti döndürdü.</p></div> : filtered.length > 0 ? (
+          <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="İade özeti tablosu">
+            <table className="data-table live-returns-table">
+              <caption className="sr-only">Entegre backend’den okunan salt-okunur iade özetleri</caption>
+              <thead><tr><th scope="col">İade</th><th scope="col">Sipariş</th><th scope="col">Müşteri</th><th scope="col">İade durumu</th><th scope="col">Neden</th><th scope="col">Talep tutarı</th><th scope="col">Sipariş durumu</th><th scope="col">Tarih</th></tr></thead>
+              <tbody>{filtered.map((item) => <tr key={item.id}>
+                <td><strong>{item.id}</strong></td><td>{item.orderId}</td><td>{item.customerName}</td>
+                <td><span className={`status status-${statusClass(returnStatusLabels[item.status] || item.status)}`}>{returnStatusLabels[item.status] || item.status}</span></td>
+                <td>{item.reasonCode}</td><td><span className="live-customer-cell"><strong>{item.refundAmount === null ? "Belirtilmedi" : money(item.refundAmount, item.currency)}</strong><small>{item.currency} · ödeme {item.paymentStatus}</small><small>Yerel refund: {item.refundStatus} · sağlayıcı/para hareketi doğrulanmadı</small></span></td>
+                <td><span className={`status status-${statusClass(item.orderStatus)}`}>{item.orderStatus}</span></td><td>{dateTime(item.createdAt)}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        ) : <div className="state-panel"><Icon name="refresh" /><h3>Eşleşen iade yok</h3><p>Arama veya durum filtresini değiştirin.</p><button className="secondary-button" onClick={() => { setQuery(""); setStatus("Tümü"); }}>Filtreleri temizle</button></div>}
+      </section>
+    </section>
+  );
+}
+
+function Notifications({ notificationPage, error, refreshing, onRefresh }) {
+  const notifications = notificationPage.items;
+  const [query, setQuery] = useState("");
+  const [readFilter, setReadFilter] = useState("Tümü");
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase("tr-TR");
+    return notifications.filter((item) => {
+      const matchesRead = readFilter === "Tümü" || (readFilter === "Okunmadı" ? !item.isRead : item.isRead);
+      const haystack = `${item.id} ${item.type} ${item.message}`.toLocaleLowerCase("tr-TR");
+      return matchesRead && (!normalized || haystack.includes(normalized));
+    });
+  }, [notifications, query, readFilter]);
+
+  return (
+    <section className="workspace live-workspace" data-testid="live-notifications">
+      <header className="workspace-heading operations-heading">
+        <div><span className="eyebrow">Entegre backend · salt okunur</span><h2 tabIndex="-1">Admin bildirimleri</h2><p>En fazla son {notificationPage.limit} admin bildirimi gösterilir; okundu durumu bu turda değiştirilmez.</p></div>
+        <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
+      </header>
+      <ResourceWarning error={error} onRetry={onRefresh} />
+      <section className="table-card">
+        <div className="ledger-toolbar filter-toolbar live-filter-toolbar">
+          <label className="table-search"><Icon name="search" /><span className="sr-only">Bildirim ara</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Bildirim türü veya içerik ara" /></label>
+          <label className="heading-select"><span className="sr-only">Okunma durumuna göre filtrele</span><select value={readFilter} onChange={(event) => setReadFilter(event.target.value)}><option>Tümü</option><option>Okunmadı</option><option>Okundu</option></select></label>
+          <span className="live-result-count">{filtered.length} / {notifications.length} kayıt{notificationPage.hasMore ? " · daha eski kayıtlar bu turda gösterilmiyor" : ""}</span>
+        </div>
+        {notifications.length === 0 ? <div className="state-panel"><Icon name="bell" /><h3>Henüz admin bildirimi yok</h3><p>Backend boş bir admin bildirimi özeti döndürdü.</p></div> : filtered.length > 0 ? <div className="live-notification-list">{filtered.map((item) => <article className={`live-notification-card ${item.isRead ? "is-read" : "is-unread"}`} key={item.id}>
+          <Icon name="bell" /><div><header><strong>{item.type.replaceAll("_", " ")}</strong><span>{item.isRead ? "Okundu" : "Okunmadı"}</span></header><p>{item.message}</p><small>{item.id} · {dateTime(item.createdAt)}</small></div>
+        </article>)}</div> : <div className="state-panel"><Icon name="bell" /><h3>Eşleşen bildirim yok</h3><p>Arama veya okunma filtresini değiştirin.</p><button className="secondary-button" onClick={() => { setQuery(""); setReadFilter("Tümü"); }}>Filtreleri temizle</button></div>}
+      </section>
+    </section>
+  );
+}
+
 const railItems = [
   { id: "dashboard", label: "Pano", icon: "house", capability: "dashboardRead", implemented: true },
   { id: "orders", label: "Siparişler", icon: "orders", capability: "ordersRead", implemented: true },
+  { id: "returns", label: "İadeler", icon: "refresh", capability: "returnsRead", implemented: true },
+  { id: "notifications", label: "Bildirimler", icon: "bell", capability: "notificationsRead", implemented: true },
   { id: "catalog", label: "Ürünler · sonraki tur", icon: "package", capability: "firstPartyCatalogRead", implemented: false },
   { id: "customers", label: "Müşteriler · endpoint yok", icon: "user", capability: "customerAdmin", implemented: false },
   { id: "sellers", label: "Satıcılar · altyapı yok", icon: "storefront", capability: "sellerAdmin", implemented: false },
   { id: "finance", label: "Finans · ledger yok", icon: "card", capability: "settlements", implemented: false },
 ];
 
-const pageCapabilities = Object.freeze({ dashboard: "dashboardRead", orders: "ordersRead" });
+const pageCapabilities = Object.freeze({
+  dashboard: "dashboardRead",
+  orders: "ordersRead",
+  returns: "returnsRead",
+  notifications: "notificationsRead",
+});
+const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler" });
 const noSupportedModuleError = Object.freeze({
-  message: "Bu admin oturumunda Commerce Pro'nun mevcut Dashboard veya Sipariş modülü açık değil.",
+  message: "Bu admin oturumunda Commerce Pro'nun entegre salt-okunur modülleri açık değil.",
 });
 const ordersUnavailableError = Object.freeze({
   message: "Sipariş özeti okuma yeteneği bu admin oturumunda açık değil.",
 });
 const dashboardUnavailableError = Object.freeze({
   message: "Dashboard okuma yeteneği bu admin oturumunda açık değil.",
+});
+const returnsUnavailableError = Object.freeze({
+  message: "İade özeti okuma yeteneği bu admin oturumunda açık değil.",
+});
+const notificationsUnavailableError = Object.freeze({
+  message: "Bildirim özeti okuma yeteneği bu admin oturumunda açık değil.",
 });
 
 export function IntegratedApp() {
@@ -244,16 +377,30 @@ export function IntegratedApp() {
   const adapter = useMemo(() => createSameOriginAdapter(http), [http]);
   const loadSession = useCallback(({ signal }) => adapter.session({ signal }), [adapter]);
   const loadStats = useCallback(({ signal }) => adapter.dashboard({ signal }), [adapter]);
+  const loadNotifications = useCallback(({ signal }) => adapter.notifications({ signal }), [adapter]);
   const loadOrders = useCallback(({ signal }) => adapter.orders({ signal }), [adapter]);
+  const loadReturns = useCallback(({ signal }) => adapter.returns({ signal }), [adapter]);
   const sessionResource = useResource(loadSession, { preserveDataOnError: false });
   const sessionLoaded = sessionResource.phase === "ready";
   const capabilities = sessionResource.data?.capabilities || {};
   const statsEnabled = sessionLoaded && hasCapability(capabilities, "dashboardRead");
   const ordersEnabled = sessionLoaded && hasCapability(capabilities, "ordersRead");
+  const returnsEnabled = sessionLoaded && hasCapability(capabilities, "returnsRead");
+  const notificationsEnabled = sessionLoaded && hasCapability(capabilities, "notificationsRead");
   const statsResource = useResource(loadStats, { enabled: statsEnabled });
+  const notificationsResource = useResource(loadNotifications, { enabled: notificationsEnabled });
   const ordersResource = useResource(loadOrders, { enabled: ordersEnabled });
+  const returnsResource = useResource(loadReturns, { enabled: returnsEnabled });
   const statsLoaded = statsResource.phase === "ready";
   const ordersLoaded = ordersResource.phase === "ready" || ordersResource.phase === "empty";
+  const returnsLoaded = returnsResource.phase === "ready" || returnsResource.phase === "empty";
+  const notificationsLoaded = notificationsResource.phase === "ready" || notificationsResource.phase === "empty";
+  const enabledPages = useMemo(() => Object.keys(pageCapabilities).filter((pageId) => (
+    hasCapability(capabilities, pageCapabilities[pageId])
+  )), [capabilities]);
+  const lastUpdatedAt = [ordersResource.updatedAt, returnsResource.updatedAt, notificationsResource.updatedAt]
+    .filter(Boolean)
+    .sort((left, right) => right.getTime() - left.getTime())[0] || null;
 
   useEffect(() => {
     const onResize = () => {
@@ -267,9 +414,8 @@ export function IntegratedApp() {
 
   useEffect(() => {
     if (!sessionLoaded) return;
-    if (page === "dashboard" && !statsEnabled && ordersEnabled) setPage("orders");
-    if (page === "orders" && !ordersEnabled && statsEnabled) setPage("dashboard");
-  }, [ordersEnabled, page, sessionLoaded, statsEnabled]);
+    if (!enabledPages.includes(page) && enabledPages[0]) setPage(enabledPages[0]);
+  }, [enabledPages, page, sessionLoaded]);
 
   useEffect(() => {
     if (!mobile || !contextOpen) return undefined;
@@ -312,12 +458,47 @@ export function IntegratedApp() {
   const reloadAll = () => {
     sessionResource.reload();
     if (statsEnabled) statsResource.reload();
+    if (notificationsEnabled) notificationsResource.reload();
     if (ordersEnabled) ordersResource.reload();
+    if (returnsEnabled) returnsResource.reload();
   };
   const logout = () => {
     localStorage.removeItem(ADMIN_TOKEN_KEY);
     window.location.href = "admin-login.html?next=admin-commerce-pro-live.html";
   };
+
+  let pageContent;
+  if (!sessionLoaded) {
+    pageContent = <StatePanel phase={sessionResource.phase} error={sessionResource.error} onRetry={sessionResource.reload} />;
+  } else if (enabledPages.length === 0) {
+    pageContent = <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={sessionResource.reload} />;
+  } else if (page === "dashboard") {
+    pageContent = !statsEnabled
+      ? <StatePanel phase="forbidden" error={dashboardUnavailableError} onRetry={statsResource.reload} />
+      : statsLoaded
+        ? <><ResourceWarning error={statsResource.error} onRetry={statsResource.reload} /><Dashboard stats={statsResource.data} orderPage={ordersResource.data} orderPhase={ordersResource.phase} orderError={ordersResource.error} ordersEnabled={ordersEnabled} onRetryOrders={ordersResource.reload} onOpenOrders={() => navigate("orders")} /></>
+        : <StatePanel phase={statsResource.phase} error={statsResource.error} onRetry={statsResource.reload} />;
+  } else if (page === "orders") {
+    pageContent = !ordersEnabled
+      ? <StatePanel phase="forbidden" error={ordersUnavailableError} onRetry={ordersResource.reload} />
+      : ordersLoaded
+        ? <Orders orderPage={ordersResource.data} error={ordersResource.error} refreshing={ordersResource.refreshing} onRefresh={ordersResource.reload} />
+        : <StatePanel phase={ordersResource.phase} error={ordersResource.error} onRetry={ordersResource.reload} />;
+  } else if (page === "returns") {
+    pageContent = !returnsEnabled
+      ? <StatePanel phase="forbidden" error={returnsUnavailableError} onRetry={returnsResource.reload} />
+      : returnsLoaded
+        ? <Returns returnPage={returnsResource.data} error={returnsResource.error} refreshing={returnsResource.refreshing} onRefresh={returnsResource.reload} />
+        : <StatePanel phase={returnsResource.phase} error={returnsResource.error} onRetry={returnsResource.reload} />;
+  } else if (page === "notifications") {
+    pageContent = !notificationsEnabled
+      ? <StatePanel phase="forbidden" error={notificationsUnavailableError} onRetry={notificationsResource.reload} />
+      : notificationsLoaded
+        ? <Notifications notificationPage={notificationsResource.data} error={notificationsResource.error} refreshing={notificationsResource.refreshing} onRefresh={notificationsResource.reload} />
+        : <StatePanel phase={notificationsResource.phase} error={notificationsResource.error} onRetry={notificationsResource.reload} />;
+  } else {
+    pageContent = <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={sessionResource.reload} />;
+  }
 
   return (
     <div className={`admin-shell ${contextOpen ? "context-open" : "context-closed"}`} data-testid="integrated-admin-shell">
@@ -348,7 +529,8 @@ export function IntegratedApp() {
           <section className="context-nav">
             <button className={page === "dashboard" ? "active" : ""} onClick={() => navigate("dashboard")} disabled={!hasCapability(capabilities, "dashboardRead")}><Icon name="house" /><span>Genel Bakış</span></button>
             <button className={page === "orders" ? "active" : ""} onClick={() => navigate("orders")} disabled={!hasCapability(capabilities, "ordersRead")}><Icon name="orders" /><span>Siparişler</span><b>{ordersResource.data?.items.length || 0}</b></button>
-            <button disabled><Icon name="refresh" /><span>İadeler</span><small>Tur 2</small></button>
+            <button className={page === "returns" ? "active" : ""} onClick={() => navigate("returns")} disabled={!hasCapability(capabilities, "returnsRead")}><Icon name="refresh" /><span>İadeler</span><b>{returnsResource.data?.items.length || 0}</b></button>
+            <button className={page === "notifications" ? "active" : ""} onClick={() => navigate("notifications")} disabled={!hasCapability(capabilities, "notificationsRead")}><Icon name="bell" /><span>Bildirimler</span><b>{notificationsResource.data?.items.filter((item) => !item.isRead).length || 0}</b></button>
           </section>
           <section className="marketplace-links">
             <strong>Planlanan modüller</strong>
@@ -365,7 +547,7 @@ export function IntegratedApp() {
         <header className="topbar">
           <div className="topbar-leading">
             <button ref={contextToggleRef} className="icon-button rail-toggle" onClick={() => setContextOpen((value) => !value)} aria-label={contextOpen ? "Menüyü daralt" : "Menüyü aç"} aria-expanded={contextOpen}><Icon name={contextOpen ? "back" : "menu"} /></button>
-            <div className="breadcrumb"><span>Entegre yönetim</span><Icon name="right" /><strong>{page === "dashboard" ? "Pano" : "Siparişler"}</strong></div>
+            <div className="breadcrumb"><span>Entegre yönetim</span><Icon name="right" /><strong>{pageLabels[page] || "Modül"}</strong></div>
           </div>
           <div className="command-trigger live-command-status" role="status"><Icon name="shield" /><span>{sessionLoaded ? "Admin oturumu doğrulandı" : "Admin oturumu doğrulanıyor"}</span></div>
           <button className="secondary-button live-refresh" onClick={reloadAll} disabled={sessionResource.refreshing || sessionResource.phase === "loading"}><Icon name="refresh" /><span>Veriyi yenile</span></button>
@@ -373,26 +555,14 @@ export function IntegratedApp() {
         </header>
 
         <main className="content-area" id="main-content">
-          {!sessionLoaded ? <StatePanel phase={sessionResource.phase} error={sessionResource.error} onRetry={sessionResource.reload} /> : !statsEnabled && !ordersEnabled ? (
-            <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={sessionResource.reload} />
-          ) : page === "dashboard" ? (
-            !statsEnabled
-              ? <StatePanel phase="forbidden" error={dashboardUnavailableError} onRetry={statsResource.reload} />
-              : statsLoaded
-              ? <><ResourceWarning error={statsResource.error} onRetry={statsResource.reload} /><Dashboard stats={statsResource.data} orderPage={ordersResource.data} orderPhase={ordersResource.phase} orderError={ordersResource.error} ordersEnabled={ordersEnabled} onRetryOrders={ordersResource.reload} onOpenOrders={() => navigate("orders")} /></>
-              : <StatePanel phase={statsResource.phase} error={statsResource.error} onRetry={statsResource.reload} />
-          ) : !ordersEnabled ? (
-            <StatePanel phase="forbidden" error={ordersUnavailableError} onRetry={ordersResource.reload} />
-          ) : ordersLoaded ? (
-            <Orders orderPage={ordersResource.data} error={ordersResource.error} refreshing={ordersResource.refreshing} onRefresh={ordersResource.reload} />
-          ) : <StatePanel phase={ordersResource.phase} error={ordersResource.error} onRetry={ordersResource.reload} />}
+          {pageContent}
         </main>
 
         <footer className="statusbar">
           <div className="preview-banner live-banner" role="note" data-testid="live-banner"><Icon name="shield" /><strong>Entegre tek-satıcı modu</strong><span>Mock fallback yok · bu arayüz yazma isteği göndermez</span></div>
           <span className={sessionLoaded ? "healthy" : ""}>{sessionLoaded ? "Oturum doğrulandı" : sessionResource.phase === "error" ? "Bağlantı hatası" : "Bağlantı bekleniyor"}</span>
-          <span>{ordersResource.updatedAt ? `Son sipariş okuması ${dateTime(ordersResource.updatedAt)}` : "Sipariş verisi bekleniyor"}</span>
-          <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing}><Icon name="refresh" />Yenile</button>
+          <span>{lastUpdatedAt ? `Son operasyon okuması ${dateTime(lastUpdatedAt)}` : "Operasyon verisi bekleniyor"}</span>
+          <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing || returnsResource.refreshing || notificationsResource.refreshing}><Icon name="refresh" />Yenile</button>
         </footer>
       </div>
     </div>

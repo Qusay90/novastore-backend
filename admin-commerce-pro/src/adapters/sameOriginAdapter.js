@@ -2,7 +2,9 @@ import { resolveCapabilities } from "../integration/capabilities.js";
 import {
   normalizeAdminSession,
   normalizeDashboardStats,
+  normalizeNotificationSummaryPage,
   normalizeOrderSummaryPage,
+  normalizeReturnSummaryPage,
 } from "../integration/legacyMappers.js";
 
 export function createSameOriginAdapter(http) {
@@ -24,5 +26,13 @@ export function createSameOriginAdapter(http) {
     await http.request("/api/admin/orders/summary?limit=100", { signal }),
   );
 
-  return Object.freeze({ session, dashboard, orders });
+  const returns = async ({ signal } = {}) => normalizeReturnSummaryPage(
+    await http.request("/api/admin/returns/summary?limit=100", { signal }),
+  );
+
+  const notifications = async ({ signal } = {}) => normalizeNotificationSummaryPage(
+    await http.request("/api/admin/notifications/summary?limit=50", { signal }),
+  );
+
+  return Object.freeze({ session, dashboard, notifications, orders, returns });
 }

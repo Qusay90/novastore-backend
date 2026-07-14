@@ -7,7 +7,9 @@ const { privateNoStore } = require('../middlewares/privateNoStore');
 const { createRequireCurrentAdmin } = require('../services/currentAdminGuard');
 const {
     ADMIN_COMMERCE_CAPABILITIES,
+    createGetAdminNotificationSummaries,
     createGetAdminOrderSummaries,
+    createGetAdminReturnSummaries,
     getAdminSession,
     parseOrderSummaryLimit
 } = require('../services/adminCommerceReadService');
@@ -104,9 +106,9 @@ const chainFor = (rows, queries) => [
     assert.equal(validAdmin.payload.commerceMode, 'single_vendor');
     assert.equal(validAdmin.payload.capabilities.dashboardRead, true);
     assert.equal(validAdmin.payload.capabilities.ordersRead, true);
-    assert.equal(validAdmin.payload.capabilities.returnsRead, false);
+    assert.equal(validAdmin.payload.capabilities.returnsRead, true);
     assert.equal(validAdmin.payload.capabilities.firstPartyCatalogRead, false);
-    assert.equal(validAdmin.payload.capabilities.notificationsRead, false);
+    assert.equal(validAdmin.payload.capabilities.notificationsRead, true);
     assert.equal(validAdmin.payload.capabilities.orderStatusWrite, false);
     assert.equal(validAdmin.payload.capabilities.sellerAdmin, false);
     assert.equal(Object.isFrozen(ADMIN_COMMERCE_CAPABILITIES), true);
@@ -197,10 +199,45 @@ const chainFor = (rows, queries) => [
     assert.equal(failedSummary.statusCode, 500);
     assert.equal(failedSummary.headers['cache-control'], 'private, no-store, max-age=0');
 
+    const returnQueries = [];
+    const returnSummaryHandler = createGetAdminReturnSummaries({
+        async query(sql, params) {
+            returnQueries.push({ sql, params });
+            return { rows: [{ id: 1, order_id: 7 }] };
+        }
+    });
+    const returnSummaryResponse = createResponse();
+    await returnSummaryHandler({ query: { limit: '50' } }, returnSummaryResponse);
+    assert.equal(returnSummaryResponse.statusCode, 200);
+    assert.deepEqual(returnQueries[0].params, [51]);
+    assert.equal(returnSummaryResponse.payload.hasMore, false);
+    const returnProjection = returnQueries[0].sql.match(/SELECT([\s\S]*?)FROM returns/i)?.[1] || '';
+    assert.doesNotMatch(returnProjection, /r\.\*|o\.\*|\bemail\b|\bphone\b|\baddress\b|\br\.note\b|\br\.user_id\b/i, 'iade özeti ham satır veya gereksiz PII seçmemeli');
+    assert.match(returnQueries[0].sql, /ORDER BY[\s\S]+r\.created_at DESC NULLS LAST[\s\S]+r\.id DESC/);
+
+    const notificationQueries = [];
+    const notificationSummaryHandler = createGetAdminNotificationSummaries({
+        async query(sql, params) {
+            notificationQueries.push({ sql, params });
+            return { rows: Array.from({ length: 51 }, (_, index) => ({ id: index + 1 })) };
+        }
+    });
+    const notificationSummaryResponse = createResponse();
+    await notificationSummaryHandler({ query: { limit: '50' } }, notificationSummaryResponse);
+    assert.equal(notificationSummaryResponse.statusCode, 200);
+    assert.equal(notificationSummaryResponse.payload.items.length, 50);
+    assert.equal(notificationSummaryResponse.payload.hasMore, true);
+    assert.deepEqual(notificationQueries[0].params, [51]);
+    assert.match(notificationQueries[0].sql, /WHERE user_id IS NULL/);
+    assert.match(notificationQueries[0].sql, /COALESCE\(is_read, FALSE\) AS is_read/);
+    assert.doesNotMatch(notificationQueries[0].sql, /SELECT \*/i);
+
     const routeSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'adminRoutes.js'), 'utf8');
     assert.match(routeSource, /integratedAdminRead = \[privateNoStore, authenticate, requireAdmin, requireCurrentAdmin\]/);
     assert.match(routeSource, /router\.get\('\/session', \.\.\.integratedAdminRead, getAdminSession\)/);
     assert.match(routeSource, /router\.get\('\/orders\/summary', \.\.\.integratedAdminRead, getAdminOrderSummaries\)/);
+    assert.match(routeSource, /router\.get\('\/returns\/summary', \.\.\.integratedAdminRead, getAdminReturnSummaries\)/);
+    assert.match(routeSource, /router\.get\('\/notifications\/summary', \.\.\.integratedAdminRead, getAdminNotificationSummaries\)/);
     assert.match(routeSource, /router\.get\('\/stats', \.\.\.integratedAdminRead, getDashboardStats\)/);
     assert.match(routeSource, /router\.get\('\/behavior', authenticate, requireAdmin, getBehaviorAnalytics\)/);
 
