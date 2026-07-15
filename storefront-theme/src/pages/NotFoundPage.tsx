@@ -1,0 +1,1 @@
+export function NotFoundPage() { return <section className="resource-state"><span className="eyebrow">404</span><h1>Bu sayfa bulunamadı</h1><p>Tema önizleme ana sayfasına dönebilirsin.</p><a className="button primary" href="/theme-preview">Ana Sayfa</a></section>; }

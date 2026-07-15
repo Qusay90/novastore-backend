@@ -116,6 +116,12 @@ app.use(express.static(path.join(__dirname, 'frontend'), {
     }
 }));
 
+const sendThemePreview = (res) => res.sendFile(
+    path.join(__dirname, 'frontend', 'theme-preview', 'index.html')
+);
+
+app.get(/^\/theme-preview(?:\/.*)?$/, (_req, res) => sendThemePreview(res));
+
 const sendCategoryPage = (res, statusCode = 200) => {
     res.status(statusCode);
     return res.sendFile(path.join(__dirname, 'frontend', 'categories.html'));
