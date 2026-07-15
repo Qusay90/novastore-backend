@@ -11,6 +11,11 @@ function cartStorageKey(): string {
   return `novastore_cart_${session.userId ?? "guest"}`;
 }
 
+function checkoutStorageKey(): string {
+  const session = readCustomerSession();
+  return `novastore_checkout_${session.userId ?? "guest"}`;
+}
+
 function readLocalCart(): CartItem[] {
   try {
     const raw = JSON.parse(localStorage.getItem(cartStorageKey()) || "[]") as CartItem[];
@@ -39,6 +44,7 @@ export async function handoffCheckout(items: CartItem[]): Promise<void> {
   const sharedState = sharedStateContract();
   const normalized = sharedState.writeCartLocal(items.filter((item) => item.selected));
   if (sharedState.isAuthenticated()) await sharedState.saveCheckout({ items: normalized });
+  localStorage.setItem(checkoutStorageKey(), JSON.stringify(normalized));
 }
 
 export function productToCartItem(product: Product, quantity = 1): CartItem {
