@@ -923,45 +923,13 @@ const getProductById = async (req, res) => {
 };
 
 const deleteProduct = async (req, res) => {
-    const client = await pool.connect();
-
-    try {
-        const id = parseProductId(req.params.id);
-        if (!id) {
-            return res.status(400).json({ error: 'Geçersiz ürün kimliği.' });
-        }
-
-        await client.query('BEGIN');
-        const previousLinks = await getProductCategoryLinks(client, id);
-
-        await client.query('DELETE FROM product_media WHERE product_id = $1', [id]);
-        await client.query('DELETE FROM reviews WHERE product_id = $1', [id]);
-        await client.query('DELETE FROM product_questions WHERE product_id = $1', [id]);
-
-        const deleteResult = await client.query(
-            'DELETE FROM products WHERE id = $1 RETURNING id',
-            [id]
-        );
-
-        if (deleteResult.rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Ürün bulunamadı.' });
-        }
-
-        await syncCategoryStatsForProducts(
-            client,
-            [id],
-            previousLinks.map((item) => item.categoryId)
-        );
-        await client.query('COMMIT');
-        res.status(200).json({ mesaj: 'Ürün başarıyla silindi.' });
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error('Ürün silme hatası:', err.message);
-        res.status(500).json({ error: err.message || 'Ürün silinirken hata oluştu.' });
-    } finally {
-        client.release();
+    if (!parseProductId(req.params.id)) {
+        return res.status(400).json({ error: 'Geçersiz ürün kimliği.' });
     }
+    return res.status(410).json({
+        code: 'PRODUCT_HARD_DELETE_DISABLED',
+        error: 'Ürünler kalıcı olarak silinemez. Yayından kaldırma veya arşivleme akışını kullanın.'
+    });
 };
 
 const previewProductMediaBackgroundRemoval = async (req, res) => {
@@ -1089,8 +1057,17 @@ const applyExistingProductMediaBackgroundRemoval = async (req, res) => {
 
         if (mediaRow.is_main || mediaRow.image_url === mediaRow.media_url) {
             await client.query(
-                'UPDATE products SET image_url = $1 WHERE id = $2',
+                `UPDATE products
+                 SET image_url = $1, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $2`,
                 [nextMediaUrl, mediaRow.product_id]
+            );
+        } else {
+            await client.query(
+                `UPDATE products
+                 SET revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $1`,
+                [mediaRow.product_id]
             );
         }
 
@@ -1195,6 +1172,7 @@ const updateProduct = async (req, res) => {
                  publication_status = $9,
                  is_customer_visible = $10,
                  deleted_at = $11,
+                 revision = revision + 1,
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $12
              RETURNING *`,
@@ -1303,6 +1281,12 @@ const deleteProductMedia = async (req, res) => {
         if (removedMedia.is_main || currentProductImage === removedMedia.media_url) {
             await syncMainMediaFromDatabase(client, removedMedia.product_id);
         }
+        await client.query(
+            `UPDATE products
+             SET revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [removedMedia.product_id]
+        );
 
         await client.query('COMMIT');
         res.status(200).json({ mesaj: 'Medya başarıyla silindi.' });

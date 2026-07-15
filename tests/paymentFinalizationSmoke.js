@@ -42,7 +42,7 @@ const createFakeClient = () => {
                 return { rows: [{ id: params[1], stock: 4 }] };
             }
 
-            if (/UPDATE products SET stock = stock \+/i.test(sql)) {
+            if (/UPDATE products\s+SET stock = stock \+/i.test(sql)) {
                 return { rows: [] };
             }
 
@@ -82,7 +82,7 @@ const createFakeClient = () => {
 
     await restockItems(client, [{ productId: 101, quantity: 1 }]);
     assert.strictEqual(
-        client.calls.some((call) => /UPDATE products SET stock = stock \+/i.test(call.sql)),
+        client.calls.some((call) => /UPDATE products\s+SET stock = stock \+/i.test(call.sql)),
         true,
         'legacy reserved failure path can restock productId payloads'
     );
@@ -95,6 +95,8 @@ const createFakeClient = () => {
         provider: 'iyzico'
     });
     assert.strictEqual(waitingCardStatus.finalized, false);
+    assert.strictEqual(waitingCardStatus.providerFinalized, false);
+    assert.strictEqual(waitingCardStatus.commerceFinalized, false);
     assert.strictEqual(waitingCardStatus.nextAction, 'WAIT_PROVIDER_CONFIRMATION');
 
     const waitingTransferStatus = buildPaymentStatusResponse({
@@ -115,6 +117,8 @@ const createFakeClient = () => {
         provider: 'iyzico'
     });
     assert.strictEqual(paidStatus.finalized, true);
+    assert.strictEqual(paidStatus.providerFinalized, true);
+    assert.strictEqual(paidStatus.commerceFinalized, true);
     assert.strictEqual(paidStatus.nextAction, 'VIEW_ORDER');
 
     const failedStatus = buildPaymentStatusResponse({
@@ -125,7 +129,28 @@ const createFakeClient = () => {
         provider: 'iyzico'
     });
     assert.strictEqual(failedStatus.finalized, true);
+    assert.strictEqual(failedStatus.providerFinalized, true);
+    assert.strictEqual(failedStatus.commerceFinalized, true);
     assert.strictEqual(failedStatus.nextAction, 'RETRY_PAYMENT');
+
+    const failedReconciliationStatus = buildPaymentStatusResponse({
+        order_id: 7001,
+        payment_ref: 'PAY-7001',
+        payment_status: PAYMENT_STATUS.FAILED,
+        order_status: ORDER_STATUS.IPTAL_EDILDI,
+        provider: 'iyzico',
+        raw_request: JSON.stringify({
+            reconciliationRequired: true,
+            reconciliationTask: {
+                status: 'OPEN',
+                reasonCode: 'FAILURE_STOCK_RESERVATION_UNKNOWN'
+            }
+        })
+    });
+    assert.strictEqual(failedReconciliationStatus.providerFinalized, true);
+    assert.strictEqual(failedReconciliationStatus.commerceFinalized, false);
+    assert.strictEqual(failedReconciliationStatus.nextAction, 'WAIT_RECONCILIATION');
+    assert.strictEqual(failedReconciliationStatus.reconciliationRequired, true);
 
     console.log('payment finalization smoke passed');
 })().catch((err) => {

@@ -11,6 +11,24 @@ class AttributeValidationError extends Error {
     }
 }
 
+const withOptionalTransaction = async (queryable, operation) => {
+    if (typeof queryable.connect !== 'function' || typeof queryable.release === 'function') {
+        return operation(queryable);
+    }
+    const client = await queryable.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await operation(client);
+        await client.query('COMMIT');
+        return result;
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
 const toId = (value, field = 'id') => {
     const id = Number(value);
     if (!Number.isInteger(id) || id <= 0) {
@@ -175,7 +193,7 @@ const updateAttribute = async (rawId, body = {}) => {
         `UPDATE attribute_definitions SET
             code=$1, name=$2, type=$3, unit=$4, is_filterable=$5, is_required=$6,
             is_variant_relevant=$7, sort_order=$8, validation_metadata=$9,
-            is_active=$10, updated_at=CURRENT_TIMESTAMP
+            is_active=$10, revision=revision + 1, updated_at=CURRENT_TIMESTAMP
          WHERE id=$11 RETURNING *`,
         [
             code,
@@ -244,6 +262,7 @@ const updateAttributeOption = async (rawId, body = {}) => {
     try {
         const result = await pool.query(
             `UPDATE attribute_options SET value=$1,label=$2,sort_order=$3,is_active=$4,
+                    revision=revision + 1,
                     updated_at=CURRENT_TIMESTAMP
              WHERE id=$5 RETURNING *`,
             [
@@ -337,6 +356,7 @@ const updateTemplate = async (rawId, body = {}) => {
     try {
         const result = await pool.query(
             `UPDATE attribute_templates SET name=$1,category_id=$2,sort_order=$3,is_active=$4,
+                    revision=revision + 1,
                     updated_at=CURRENT_TIMESTAMP
              WHERE id=$5 RETURNING *`,
             [
@@ -356,41 +376,71 @@ const updateTemplate = async (rawId, body = {}) => {
     }
 };
 
-const addTemplateAttribute = async (rawTemplateId, body = {}) => {
+const addTemplateAttribute = async (
+    rawTemplateId,
+    body = {},
+    { queryable = pool, bumpRevision = true } = {}
+) => {
     const templateId = toId(rawTemplateId, 'template_id');
     const attributeId = toId(body.attribute_id ?? body.attributeId, 'attribute_id');
-    const result = await pool.query(
-        `INSERT INTO template_attributes (
-            template_id,attribute_id,is_required,is_filterable,sort_order
-         ) VALUES ($1,$2,$3,$4,$5)
-         ON CONFLICT (template_id,attribute_id) DO UPDATE SET
-            is_required=EXCLUDED.is_required,
-            is_filterable=EXCLUDED.is_filterable,
-            sort_order=EXCLUDED.sort_order
-         RETURNING *`,
-        [
-            templateId,
-            attributeId,
-            body.is_required === undefined ? null : normalizeBoolean(body.is_required),
-            body.is_filterable === undefined ? null : normalizeBoolean(body.is_filterable),
-            normalizeSortOrder(body.sort_order)
-        ]
-    );
-    return result.rows[0];
+    return withOptionalTransaction(queryable, async (client) => {
+        const result = await client.query(
+            `INSERT INTO template_attributes (
+                template_id,attribute_id,is_required,is_filterable,sort_order
+             ) VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT (template_id,attribute_id) DO UPDATE SET
+                is_required=EXCLUDED.is_required,
+                is_filterable=EXCLUDED.is_filterable,
+                sort_order=EXCLUDED.sort_order
+             RETURNING *`,
+            [
+                templateId,
+                attributeId,
+                body.is_required === undefined ? null : normalizeBoolean(body.is_required),
+                body.is_filterable === undefined ? null : normalizeBoolean(body.is_filterable),
+                normalizeSortOrder(body.sort_order)
+            ]
+        );
+        if (bumpRevision !== false) {
+            await client.query(
+                `UPDATE attribute_templates
+                 SET revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $1`,
+                [templateId]
+            );
+        }
+        return result.rows[0];
+    });
 };
 
-const removeTemplateAttribute = async (rawTemplateId, rawAttributeId) => {
-    const result = await pool.query(
-        `DELETE FROM template_attributes
-         WHERE template_id=$1 AND attribute_id=$2 RETURNING *`,
-        [toId(rawTemplateId, 'template_id'), toId(rawAttributeId, 'attribute_id')]
-    );
-    if (!result.rows.length) {
-        const error = new AttributeValidationError('Template attribute bağlantısı bulunamadı.');
-        error.statusCode = 404;
-        throw error;
-    }
-    return result.rows[0];
+const removeTemplateAttribute = async (
+    rawTemplateId,
+    rawAttributeId,
+    { queryable = pool, bumpRevision = true } = {}
+) => {
+    const templateId = toId(rawTemplateId, 'template_id');
+    const attributeId = toId(rawAttributeId, 'attribute_id');
+    return withOptionalTransaction(queryable, async (client) => {
+        const result = await client.query(
+            `DELETE FROM template_attributes
+             WHERE template_id=$1 AND attribute_id=$2 RETURNING *`,
+            [templateId, attributeId]
+        );
+        if (!result.rows.length) {
+            const error = new AttributeValidationError('Template attribute bağlantısı bulunamadı.');
+            error.statusCode = 404;
+            throw error;
+        }
+        if (bumpRevision !== false) {
+            await client.query(
+                `UPDATE attribute_templates
+                 SET revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $1`,
+                [templateId]
+            );
+        }
+        return result.rows[0];
+    });
 };
 
 const resolveTemplateAttributes = async (queryable, categoryIds = []) => {

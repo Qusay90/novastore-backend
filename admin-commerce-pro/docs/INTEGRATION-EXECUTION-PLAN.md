@@ -1,0 +1,202 @@
+# Commerce Pro entegrasyon yürütme planı
+
+Tarih: 14 Temmuz 2026
+
+Çalışma dalı: `codex/admin-commerce-pro-integration`
+
+Yığın tabanı: `codex/admin-commerce-pro-preview` (`1954d4b`)
+
+## Sonuç
+
+Commerce Pro tasarım prototipi tamamlandı; tek-satıcı entegrasyon katmanı Dashboard, sipariş, iade, admin bildirimi, NovaStore birinci taraf ürün özeti ve ortak katalog yapısından Tur 3D medyasız ürün detail/create/update/archive akışına kadar ilerledi. Katalog yazma capability'si varsayılan kapalıdır; gerçek medya ve sağlayıcı mutation'ları açılmadı. Sıradaki dilim Tur 3E katalog yapısı CRUD'udur. Mevcut backend hâlâ tek satıcılıdır; satıcı organizasyonu, satıcı kapsamlı yetkilendirme, teklif, seller-order, değişmez finansal kayıt, hakediş ve payout modelleri henüz yoktur.
+
+- Gerçek tek-satıcı Commerce Pro cutover için kalan: **yaklaşık 2–3,5 hafta**.
+- Dar kapsamlı, login zorunlu ilk satış pilotu için kalan: **yaklaşık 4–7 hafta**.
+- Kontrollü 1–3 satıcılı ödeme pilotu: bugünden itibaren **5–7 ay**.
+- Güvenilir halka açık pazaryeri: **8–12 ay**.
+
+Bu tahmin iki kıdemli full-stack geliştirici ile yarı zamanlı QA/DevOps kapasitesini varsayar. Mevcut tek geliştirici + Codex çalışma düzeninde gerçekçi kalan takvim yaklaşık **4–8 hafta tek-satıcı cutover**, **7–15 hafta dar satış pilotu**, **9–16 ay kontrollü çok-satıcı ödeme pilotu** ve **15–28 ay güvenilir halka açık pazaryeri** düzeyindedir. Ödeme, KYC, kargo ve e-fatura sağlayıcılarının sözleşme/onay süreleri tahmine dahil değildir.
+
+## Değişmez teslim kuralları
+
+1. Her tur plan → uygulama → test → doğrulama → commit → push sırasıyla tamamlanır.
+2. Preview ve entegre veri uygulamaları ayrı build girişleridir. Preview hiçbir ağ isteği yapmaz; entegre uygulama hata halinde mock veriye düşmez.
+3. Entegre istemci yalnız aynı-origin `/api/...` yollarına JWT ekler.
+4. Backend’de olmayan müşteri, satıcı, finans veya operasyon verisi entegre panelde uydurulmaz.
+5. Yetki/capability bilinmiyorsa kontrol kapalıdır. UI görünürlüğü güvenlik sınırı değildir; sunucu her isteği doğrular.
+6. Production, uzak veritabanı, gerçek ödeme, Cloudinary mutation, migration deploy ve production cutover ayrı açık onay kapılarıdır.
+7. PR #15 büyütülmez. Entegrasyon, PR #15 üzerine yığılan ayrı dal/PR olarak ilerler.
+8. Kullanıcının alakasız `support_novastore.png` değişikliği stage veya commit edilmez.
+
+## Tur planı
+
+| Tur | Teslim | Tahmin | Kabul kapısı | Uzak/gerçek sistem |
+|---|---|---:|---|---|
+| 0 | Route/DTO/capability haritası, bağımlılık sırası, bu yürütme planı | 0,5–1 gün | Sözleşme ve risk listesi gözden geçirilmiş | Yok |
+| 1 | Preview/live build ayrımı, admin session gate, aynı-origin HTTP istemcisi, gerçek Dashboard + Siparişler salt-okunur | 2–3 gün | Auth/401/403, mapper, CSP, no-mock-fallback ve build testleri | Yok |
+| 2A | Salt-okunur iade ve admin bildirimi özetleri; yerel kargo kaydını taşıyıcı doğrulaması gibi göstermeyen sipariş görünümü | 1–2 gün | Auth/current-role/no-store, bounded DTO, PII azaltma, bağımsız hata/empty/loading ve no-write artifact testleri | Yok |
+| 2B | Yaşam döngüsü güvenlik çekirdeği: hard-delete kapısı, geçiş sahipliği, idempotency, stok rezervasyon kanıtı ve ödeme callback yarışları | 3–5 gün | İzinli/yasak geçiş, tekrar istek, stale admin, stock/event tekilliği ve karma payment/order state testleri | Fake pool + mümkünse disposable yerel PG |
+| 2C | Varsayılan kapalı capability ile admin iptali ve manuel fulfillment; iade yazımı, gerçek refund, kargo etiketi ve taşıyıcı doğrulaması kapalı | 2–3 gün | Beklenen durum/409, idempotency, atomik shipment-order güncellemesi, audit, XSS sınırı ve post-commit bildirim davranışı | Fake pool / disposable yerel PG |
+| 3 | Birinci taraf ürün, kategori, özellik, koleksiyon ve menü CRUD | 4–6 gün | Medya hariç tam DTO; hard-delete kapalı; audit izi | Fake pool / yerel PG; Cloudinary yok |
+| 4 | Admin müşteri özet API’si, sorular/yorumlar, kampanya, pagination ve gizlilik | 4–6 gün | Auth açığı kapanmış, PII kapsamı ve pagination testli | Fake pool / yerel PG |
+| 5 | Analytics, legacy parity, feature flag, rollback ve Commerce Pro cutover hazırlığı | 3–5 gün | Desktop/mobile UAT, console/network, güvenlik/perf | Production deploy yok |
+| 6 | Seller organization/member, seller-scope RBAC ve onboarding temeli | 6–10 gün | Tenant isolation ve rol matrisi | Disposable yerel PG zorunlu |
+| 7A | Kanonik katalog + seller offers; first-party backfill/dual-write/shadow-read | 8–12 gün | Veri mutabakatı ve geri alma planı | Yerel migration |
+| 7B | Depo, inventory movement ve eşzamanlı stok rezervasyonu | 7–10 gün | Concurrency ve compensation testleri | Yerel PG |
+| 8A | Ana sipariş/seller-order ayrımı, değişmez satır ve finans snapshot’ı | 7–10 gün | Split/return/shipping izolasyonu | Yerel PG |
+| 8B | Komisyon, çift taraflı ledger, ters kayıtlar ve settlement eligibility | 10–15 gün | Kuruş bazlı invariant/reconciliation testleri | Yerel PG |
+| 8C | PayTR transfer/refund/reconciliation adapterı ve staging UAT | 7–12 gün + sağlayıcı | Idempotency, webhook imzası ve finans mutabakatı | Gerçek çağrı için açık onay |
+| 9 | Seller portal, operasyon runbook’u, pilot UAT ve kontrollü rollout | 10–15 gün | Go/no-go kontrol listesi ve rollback provası | Staging/production ayrı onay |
+
+## Bağımlılık sırası
+
+1. Admin oturum ve veri kontratı.
+2. Mevcut tek-satıcı modüllerinin Commerce Pro’ya bağlanması.
+3. Seller identity ve sunucu tarafı scope.
+4. Kanonik katalog ve satıcı teklifleri.
+5. Stok hareketi ve rezervasyon.
+6. Seller-order ayrımı.
+7. Finansal snapshot ve append-only ledger.
+8. Settlement, refund ve reconciliation.
+9. Onaylı PayTR staging UAT.
+10. Kontrollü production rollout.
+
+## Tur 0 sözleşme özeti
+
+### Şimdi bağlanabilen salt-okunur kaynaklar
+
+| Kaynak | Endpoint | Yetki | Karar |
+|---|---|---|---|
+| Admin oturumu | `GET /api/admin/session` | Admin JWT + güncel DB rolü | Tur 1’de eklendi; capability’ler fail-closed |
+| Dashboard | `GET /api/admin/stats` | Admin JWT + güncel DB rolü | Tur 1; `private, no-store` |
+| Siparişler | `GET /api/admin/orders/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 1; sınırlı ve PII azaltılmış özet DTO, client-side filtre geçici |
+| Ürünler | `GET /api/admin/catalog/products/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 3A; active/non-deleted `novastore-platform` store scope, bounded ve salt-okunur DTO |
+| Ürün detayı | `GET /api/admin/catalog/products/:id` | Admin JWT + güncel DB rolü | Tur 3D; active/non-deleted `novastore-platform` store scope, medyasız ve bounded düzenleme DTO'su |
+| Katalog yapısı | `GET /api/admin/catalog/structure/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 3B; kategori/özellik/şablon/koleksiyon/menü ve menü öğesi ayrı bounded sayfalar; yazma yok |
+| İadeler | `GET /api/admin/returns/summary?limit=100` | Admin JWT + güncel DB rolü | Tur 2A; sınırlı, PII azaltılmış ve salt-okunur |
+| Bildirimler | `GET /api/admin/notifications/summary?limit=50` | Admin JWT + güncel DB rolü | Tur 2A; yalnız admin kayıtları, sınırlı ve salt-okunur |
+
+### Tur 3D kontrollü ürün yazma kaynakları
+
+| İşlem | Endpoint | Yetki ve önkoşul | Karar |
+|---|---|---|---|
+| Oluştur | `POST /api/admin/catalog/products` | Admin JWT + güncel DB rolü + `firstPartyCatalogWrite=true` | Strict JSON allowlist; server-owned active `novastore-platform` store; kategori/özellik/audit aynı transaction; medya yok |
+| Güncelle | `PATCH /api/admin/catalog/products/:id` | Admin JWT + güncel DB rolü + `firstPartyCatalogWrite=true` + `expected_revision` | Store scope revision karşılaştırmasından önce doğrulanır; stale revision `409`; kategori/özellik/sayaç/audit atomik |
+| Arşivle | `PATCH /api/admin/catalog/products/:id/archive` | Admin JWT + güncel DB rolü + `firstPartyCatalogWrite=true` + `expected_revision` | Soft archive; medya ve ilişkiler korunur, hard-delete ve sağlayıcı çağrısı yok |
+
+### Entegre arayüzde çağrılmayacak kapasite
+
+| Alan | Neden |
+|---|---|
+| Satıcılar / satıcı teklifleri | Seller organization, membership, scope ve offer modeli yok |
+| Hakediş / payout / komisyon | Ledger, settlement ve payout modeli yok |
+| Müşteri tablosu ve segment mutasyonu | Admin customer list/detail endpoint’i yok |
+| Sipariş owner atama / toplu mutation | Endpoint, geçiş matrisi ve optimistic concurrency yok |
+| Gerçek refund | Mevcut cancel/return yalnız DB durumunu değiştiriyor |
+| Kargo etiketi ve takip webhook’u | Sağlayıcı adapterı yok |
+| Fatura | HTTP API yok; iç servis `mock` provider kullanıyor |
+| Ürün soruları | Admin route’larında auth middleware eksik |
+
+## P0 güvenlik ve doğruluk işleri
+
+- Public merchant feed görünürlük/yayın/arşiv filtreleri olmadan ürün yayımlamamalı.
+- Public analitik body içindeki `userId` güvenilir kimlik sayılmamalı.
+- Product/order hard-delete finans ve audit alanında kapatılmalı.
+- Order/return için sunucu tarafı geçiş matrisi ve idempotency eklenmeli.
+- Payment–stock yarışında rezervasyon ve compensation doğrulanmalı.
+- İptal/return stok geri yükleme ve gerçek refund birbirinden tutarlı olmalı.
+- Liste endpoint'lerine ortak pagination/filter/sort ve hata zarfı eklenmeli.
+- Satış pilotundan önce PayTR token/iyzico initialize mock implementasyonları gerçek provider adapterlarıyla değiştirilmeli; iyzico webhook imzası sağlayıcının belgelenmiş raw-body sözleşmesiyle doğrulanmalıdır. Bu işler açık staging/sağlayıcı onayı olmadan etkinleştirilmez.
+
+## Tur kapatma kaydı
+
+| Tur | Durum | Commit | QA notu |
+|---|---|---|---|
+| 0 | Tamamlandı | `faef1f2` | Read-only repo audit; remote sistem kullanılmadı |
+| 1 | Kod ve otomatik QA tamam; browser QA blokeli | `989cbeb` | Preview/entegre build, auth, mapper, CSP ve artifact testleri yeşil; Work Mode browser kanıtı eksik |
+| 2A | Kod ve otomatik QA tamam; browser QA blokeli | `eea2b1c` | İade/bildirim salt-okunur bağlandı; yerel kargo/refund sınırları görünür; write capability'leri kapalı; full verify yeşil |
+| 2B | Kod ve otomatik QA tamam; browser QA blokeli | `5cfe701` | Hard-delete/generic geçiş/sahte shipment/iade yazmaları kapalı; iptal stok kanıtına, callback'ler payment state + kalıcı reconciliation görevine bağlandı; bağımsız P0/P1 incelemesi temiz |
+| 2C | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | `756cc96` | Admin iptali ve manuel kargo devri ayrı default-off capability; expected-state/idempotency/audit/XSS sınırları testli; gerçek refund, return write ve taşıyıcı çağrısı kapalı |
+| 3A | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | `2358238` | Bounded/current-admin birinci taraf ürün özeti ve salt-okunur Commerce Pro ekranı; ürün/medya yazmaları kapalı |
+| 3B | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | `927bc7b` | Altı bounded/current-admin katalog yapı sayfası ve salt-okunur sekmeli Commerce Pro ekranı; ham URL/medya/yazma yok |
+| 3C | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | `2b9c6a1` | Ürün hard-delete global kapalı; katalog mutation rotaları güncel DB admin rolüne bağlı; default-off write capability, revision ve append-only audit/atomik executor temeli hazır; yeni CRUD/UI veya sağlayıcı mutation'ı yok |
+| 3D | Kod ve otomatik QA tamam; runtime DB/browser QA blokeli | Bu commit | Medyasız first-party ürün detail/create/update/archive ve canlı UI tamam; strict JSON, store-before-revision, atomik ilişki/sayaç/audit ve public arşiv güvenliği testli; hard-delete/medya/sağlayıcı mutation'ları kapalı |
+
+## Tur 2 güvenlik bölümü
+
+Tur 2A yalnız gözlem yüzeyidir ve mevcut riskli mutation yollarını Commerce Pro'ya açmaz. Tur 2B tamamlanmadan `orderStatusWrite`, iade yazmaları, hard-delete, shipment create, notification acknowledge ve gerçek refund capability'leri `false` kalır.
+
+Tur 2B'nin P0 kabul kapıları:
+
+1. Tekrarlanan veya eşzamanlı iptal stok miktarını birden fazla artıramaz; rezervasyon kanıtı olmayan kayıt fail-closed/manual-review olur.
+2. Ödeme callback sonucu arbitrary sipariş durumundan değil payment terminal durumundan türetilir; iptal/status yarışı gerçek tahsilatı sessiz duplicate sayamaz.
+3. Finans ve audit kaydını cascade ile silebilen sipariş hard-delete yolu kapatılır.
+4. Generic status endpoint'i payment/cancel/return/shipment sahipliğindeki hedefleri atlayamaz.
+5. Admin mutation'ları JWT'deki eski role değil güncel DB admin rolüne dayanır.
+6. Gerçek taşıyıcı, refund ve ödeme çağrıları ayrıca açık onay verilene kadar çalıştırılmaz.
+
+Tur 2B güvenli davranış özeti:
+
+- Sipariş hard-delete `410 ORDER_HARD_DELETE_DISABLED`; genel durum yolu yalnız aynı durum tekrarını kabul eder ve gerçek değişiklik için ilgili komutu zorunlu kılar.
+- İptal, sipariş ile siparişe bağlı bütün ödeme kayıtlarını kilitler. Aktif ödeme geçmişi, provider-pending durumu ve stok rezervasyon kanıtı tutarlı değilse veri yazmadan `409` ile durur.
+- PayTR/iyzico callback kararı sipariş görünümünden değil kilitli `payments.status` kaydından türetilir. Geç/karşıt callback finansal gerçeği korur; stok/kupon/sipariş satırı yan etkisini tekrar çalıştırmaz ve mutabakat kaydı üretir.
+- Sahte takip numarası üreten shipment create `410 SHIPMENT_CREATE_DISABLED`; yeni iade ve iade durum yazmaları `503 RETURN_WRITES_DISABLED` ile kapalıdır. Mevcut kayıtların owner/admin salt-okunur görünümü korunur.
+- Legacy admin, web profil ve Android istemcileri kapalı işlemleri etkin CTA gibi göstermez. Android iptal CTA'sı yalnız backend'in iptal edilebilir hazırlık durumlarında görünür.
+
+Bu çekirdek callback güvenliği gerçek ödeme bağlantısı anlamına gelmez. Mevcut PayTR initialize test tokenı, iyzico initialize mock yanıtı ve iyzico imza sözleşmesi satışa açılmadan önce provider staging dokümanıyla ayrı turda değiştirilip UAT edilmelidir; o zamana kadar ödeme alma go/no-go kapısı kapalıdır.
+
+Tur 2C kontrollü operasyon özeti:
+
+- `orderCancelWrite`, yalnız `NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED=true` iken session capability'si ve sunucu mutation kapısı olarak açılır. Admin isteği `expected_status`, izinli reason code ve `Idempotency-Key` taşır; aynı event fingerprint/aktörle tekrar güvenlidir. Müşteri iptali bu admin bayrağına bağlanmamıştır.
+- Admin iç notu müşteri görünür `cancel_reason` alanına yazılmaz; yalnız audit event payload'ında kalır. Müşteri profilindeki iptal ve takip alanları HTML escape uygular.
+- `manualShipmentWrite`, yalnız `NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED=true` iken açılır. Sipariş → shipment → bütün payment kayıtları kilitlenir; yalnız `Hazırlanıyor`, `PAID`, refund `NONE`, kanıtlı stok rezervasyonu ve kapalı reconciliation ile ilerler.
+- Manuel shipment; operatörün verdiği sağlayıcı/takip numarasını idempotent yerel kayıt olarak saklar, siparişi `Kargoya Verildi` yapar ve audit event üretir. Taşıyıcı API'si, label, doğrulanmış tracking URL, teslim teyidi veya provider refund çalıştırmaz.
+- Eski `POST /api/shipments/:orderId/create` yolu `410 SHIPMENT_CREATE_DISABLED`, return create/update yolları `503 RETURN_WRITES_DISABLED` kalır. İade yazımı migration, satır bazlı stok/refund ve reconciliation sözleşmesi onaylanmadan açılmaz.
+- İki capability tam boolean `true` dışında istemcide fail-closed; env değeri de yalnız tam `true` ile açılır. Bayrak kapalıyken admin write DB guard'ından önce durur.
+
+## Tur 3 yürütme dilimleri
+
+1. **3A — ürün salt-okunur:** bounded/current-admin ürün özet API'si; gerçek NovaStore birinci taraf kayıtları; seller/offer/risk/onay ve medya URL'si yok.
+2. **3B — yapı salt-okunur:** derin kategori, özellik şablonu, koleksiyon ve menü özetleri.
+3. **3C — yazma güvenlik temeli:** ürün hard-delete kilidi, güncel DB admin rolü, default-off capability, optimistic concurrency ve audit sözleşmesi.
+4. **3D — medyasız ürün JSON CRUD:** create/update/archive; Cloudinary middleware ve gerçek medya mutation'ı yok.
+5. **3E — kategori/özellik/koleksiyon/menü CRUD:** arşivleme, strict doğrulama, audit ve stale-state kontrolü.
+6. **3F — geniş doğrulama:** disposable yerel PostgreSQL, legacy parity, artifact ve browser kanıtı. Seçili Work Mode browser engeli sürdüğü sürece görsel/etkileşimli kapı blokeli kalır.
+
+Tur 3A, mevcut sınırsız `GET /api/products` yolunu yeniden kullanmaz. Entegre istemci yalnız yeni bounded admin DTO'suna bağlanır; kaynak satır active/non-deleted `novastore-platform` mağaza kimliğiyle fail-closed doğrulanır. Açıklama, medya URL'si, `store_id`, satıcı, teklif, risk veya manuel ürün onayı alanı uydurulmaz.
+
+Tur 3B, mevcut unbounded legacy admin kategori/attribute/koleksiyon/menü yollarını Commerce Pro'ya açmaz. Tek current-admin/no-store endpoint altı ayrı 1–100 sayfa döndürür. Ürün bağlantılı sayaçlar yalnız active/non-deleted `novastore-platform` store ve silinmemiş ürün kapsamındadır; menü item iç URL'si yalnız var/yok sinyaline indirgenir. Endpoint ve UI hiçbir mutation, medya URL'si, seller/offer, risk veya ürün onay alanı taşımaz.
+
+Tur 3C, geçerli ürün kimliğinde kalıcı silmeyi veritabanına veya Cloudinary'ye dokunmadan `410 PRODUCT_HARD_DELETE_DISABLED` ile kapatır; legacy admin ürün listesindeki silme aksiyonu kaldırılmış, arşiv yayın durumu görünür hale getirilmiştir. Ürün/medya ile kategori/özellik/koleksiyon/menü mutation rotaları JWT'deki eski role ek olarak güncel DB admin rolünü doğrular; medya yükleme middleware'i bu kontrolden sonra çalışır.
+
+`firstPartyCatalogWrite` ve `catalogStructureWrite` capability'leri sırasıyla `NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED` ve `NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED` ile varsayılan kapalıdır. Sekiz katalog tablosuna pozitif `revision BIGINT` ve ayrı append-only `admin_catalog_audit_events` şeması eklenmiştir. Gelecek JSON mutation executor'ı eksik revision'da `428 ADMIN_CATALOG_PRECONDITION_REQUIRED`, stale revision'da `409 ADMIN_CATALOG_REVISION_CONFLICT` üretir; hedef satırı kendisi kilitler, revision artışını CAS ile sahiplenir ve mutation + audit aynı transaction içinde tamamlanmadan commit etmez. Create audit anahtarı eklenen satırın gerçek kimliğinden türetilir. `revision` doğrudan satır mutation tokenıdır; DTO'daki ilişkisel sayaçların bütünü için değişmez snapshot iddiası taşımaz. Bu tur capability/policy/migration temelidir: yeni Commerce Pro yazma endpoint'i veya UI kontrolü açmaz ve mevcut legacy mutation yollarının tamamının audit executor'ına bağlandığı iddia edilmez.
+
+Tur 3D, `GET /api/admin/catalog/products/:id`, `POST /api/admin/catalog/products`, `PATCH /api/admin/catalog/products/:id` ve `PATCH /api/admin/catalog/products/:id/archive` yollarını medyasız first-party ürün sözleşmesiyle ekler. Yazmalar yalnız `firstPartyCatalogWrite` tam boolean `true` ve güncel DB rolü admin olduğunda açılır; JSON dışı veya allowlist dışı alanlar reddedilir, `store_id` istemciden alınmaz ve active/non-deleted `novastore-platform` kapsamı revision bilgisinden önce doğrulanır. Update/archive `expected_revision` taşır; eksik önkoşul `428`, stale hedef `409` üretir. Ürün, kategori bağları, birincil kategori, güncel özellik değerleri, ilişkisel sayaçlar ve append-only audit aynı transaction içinde tamamlanır. Response DTO'su medya URL'si, `store_id`, seller/offer veya risk alanı taşımaz.
+
+Arşivleme hard-delete değildir: ürün görünmez ve arşivli hale gelirken mevcut medya, kategori ve özellik ilişkileri korunur. Arşivli/pasif/görünmez/silinmiş ürünler public fiyatlama-satış, arama, merchant feed, favori, soru ve yorum yollarında ortak görünürlük sınırıyla fail-closed kalır. Canlı Commerce Pro ekranı düzenleme veya arşivleme öncesi exact detail okur; capability/session kaybında yazmayı bastırır, `409/428` stale durumda ve belirsiz mutation sonucunda listeyi yeniden okur, istemci listesini optimistic splice ile değiştirmez. Cloudinary/FormData, gerçek medya mutation'ı, hard-delete ve haricî sağlayıcı entegrasyonu bu dilimin dışındadır.
+
+PR #15’in `design-qa.md` sonucu, gerçek masaüstü/mobil browser kanıtı alınana kadar `blocked` kalır. Bu plan browser kısıtını atlatma yetkisi vermez.
+
+## Tur 1 geri alma sınırı
+
+Tur 1’in yeni artifact, session ve order-summary parçaları additive ilerler; `frontend/admin.html` cutover edilmez. Entegre Dashboard’un kullandığı mevcut `/api/admin/stats` yolu ayrıca `no-store` ve güncel DB admin-rolü kontrolüyle sıkılaştırılır; `/api/admin/behavior` zinciri değiştirilmez. Geri alma gerektiğinde entegre artifact, session/order-summary endpointleri, stats middleware sıkılaştırması, login allowlist hedefi ve Commerce Pro entegre kaynakları birlikte geri alınır. Preview artifact ve legacy admin çalışma yolu bağımsız kalır.
+
+## Tur 2A geri alma sınırı
+
+Tur 2A şema veya veri mutation'ı eklemez. Geri alma gerektiğinde return/notification summary handler ve rotaları, iki read capability'si, mapper/adapter kaynakları, entegre iade-bildirim-kargo görünümü ve yeniden üretilen live artifact birlikte geri alınır. Legacy admin, mevcut return/notification yolları, preview artifact ve veritabanı şeması değişmeden kalır.
+
+## Tur 2B geri alma sınırı
+
+Tur 2B migration veya production ayarı eklemez; mevcut tablo ve event kayıtlarını kullanır. Geri alma gerektiğinde yaşam döngüsü/callback policy servisleri, controller/route guard'ları, legacy istemci kapıları ve bunların sözleşme testleri birlikte geri alınır. Bu geri alma eski hard-delete, sahte shipment ve güvensiz return yollarını yeniden açacağı için yalnız ayrı olay incelemesi ve açık onayla yapılabilir. Gerçek ödeme veya taşıyıcı konfigürasyonu bu turda değiştirilmez.
+
+## Tur 2C geri alma sınırı
+
+Tur 2C şema/migration veya haricî sağlayıcı entegrasyonu eklemez. En hızlı operasyonel kapatma iki env bayrağını tanımsız/`false` tutmaktır; bu durumda session capability'leri ve sunucu mutation kapıları birlikte kapanır. Kod geri alma gerektiğinde capability service/middleware, admin cancel policy, manual shipment policy/service/controller/route, Commerce Pro mutation adapter/UI, üretilen live artifact ve ilgili testler birlikte geri alınır. Salt-okunur shipment/return görünümü, Tur 2B güvenlik çekirdeği ve eski `create`/return write kilitleri geri açılmaz.
+
+## Tur 3C geri alma sınırı
+
+Tur 3C migration artifact'ı additive'dir ancak production veya uzak veritabanında çalıştırılmamıştır. En hızlı operasyonel kapatma iki katalog write env bayrağını tanımsız/`false` tutmaktır. Kod geri alınacaksa capability/policy/executor, revision projection/artışları, current-admin route guard'ları, hard-delete kilidi, legacy UI düzeltmesi ve testler birlikte değerlendirilir. Şema uygulanmış bir ortamda revision kolonları veya audit tablosu veri incelemesi olmadan düşürülmez; ürün hard-delete kilidini geri açmak ayrıca açık güvenlik onayı gerektirir.
+
+## Tur 3D geri alma sınırı
+
+En hızlı operasyonel kapatma `NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED` değerini tanımsız/`false` tutmaktır; session capability'si ve sunucu yazma kapısı birlikte kapanır, salt-okunur ürün/katalog görünümü çalışmaya devam eder. Kod geri alınacaksa ürün detail/create/update/archive controller-service-policy katmanı, JSON guard'ı, mutation rotaları, Commerce Pro ürün mutation adapter/UI'si, üretilen live artifact ve Tur 3D testleri birlikte geri alınır. Append-only audit kayıtları ve revision şeması veri incelemesi olmadan silinmez; önceden arşivlenmiş ürünler otomatik olarak tekrar yayımlanmaz. Public satış/arama/feed/favori/soru/yorum görünürlük filtreleri güvenlik sınırıdır ve ürün yazma özelliğinin geri alınması gerekçesiyle kaldırılmaz. Bu geri alma medya, Cloudinary, ödeme, taşıyıcı veya başka sağlayıcı ayarı gerektirmez.

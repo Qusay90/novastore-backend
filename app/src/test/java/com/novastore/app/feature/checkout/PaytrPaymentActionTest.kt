@@ -28,6 +28,34 @@ class PaytrPaymentActionTest {
         assertFalse(paymentStatus(paymentStatus = "WAITING", finalized = true).shouldClearCartAfterStatusRefresh())
         assertFalse(paymentStatus(paymentStatus = "UNKNOWN", finalized = true).shouldClearCartAfterStatusRefresh())
         assertFalse(paymentStatus(paymentStatus = "PAID", finalized = false).shouldClearCartAfterStatusRefresh())
+        assertTrue(
+            paymentStatus(
+                paymentStatus = "PAID",
+                finalized = true,
+                providerFinalized = true,
+                commerceFinalized = false,
+                reconciliationRequired = true,
+                nextAction = "WAIT_RECONCILIATION"
+            ).shouldClearCartAfterStatusRefresh()
+        )
+        assertFalse(
+            paymentStatus(
+                paymentStatus = "FAILED",
+                finalized = true,
+                providerFinalized = true,
+                commerceFinalized = false,
+                reconciliationRequired = true,
+                nextAction = "WAIT_RECONCILIATION"
+            ).shouldClearCartAfterStatusRefresh()
+        )
+        assertTrue(
+            paymentStatus(
+                paymentStatus = "PAID",
+                finalized = true,
+                providerFinalized = true,
+                commerceFinalized = true
+            ).shouldClearCartAfterStatusRefresh()
+        )
         assertFalse(missingStatus.shouldClearCartAfterStatusRefresh())
     }
 
@@ -175,7 +203,14 @@ class PaytrPaymentActionTest {
         assertFalse(nestedRedirectAction.isPaytrIframeAction())
     }
 
-    private fun paymentStatus(paymentStatus: String, finalized: Boolean): PaymentStatusResponse =
+    private fun paymentStatus(
+        paymentStatus: String,
+        finalized: Boolean,
+        providerFinalized: Boolean? = null,
+        commerceFinalized: Boolean? = null,
+        reconciliationRequired: Boolean = false,
+        nextAction: String? = null
+    ): PaymentStatusResponse =
         PaymentStatusResponse(
             orderId = 101,
             paymentRef = "NST-PAYTR-101-test",
@@ -183,6 +218,10 @@ class PaytrPaymentActionTest {
             orderStatus = null,
             provider = "paytr",
             finalized = finalized,
-            message = "status"
+            providerFinalized = providerFinalized,
+            commerceFinalized = commerceFinalized,
+            reconciliationRequired = reconciliationRequired,
+            message = "status",
+            nextAction = nextAction
         )
 }

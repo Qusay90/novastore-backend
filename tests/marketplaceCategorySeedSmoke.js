@@ -10,6 +10,7 @@ const { resolveStartupSafety } = require('../config/startupSafety');
 const { flattenTree, planOrApplySeed, runMarketplaceCategorySeed } =
     require('../services/marketplaceCategorySeedService');
 const { buildLocalServerEnv } = require('./helpers/localServerProcess');
+const { seedCurrentAdminUsers } = require('./helpers/seedCurrentAdminUsers');
 const adminRoutes = require('../routes/adminCategoryRoutes');
 const publicRoutes = require('../routes/publicCategoryRoutes');
 
@@ -83,6 +84,7 @@ const runChild = (args, env, timeoutMs = 30000) => new Promise((resolve, reject)
 
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await createCoreSchema();
+    await seedCurrentAdminUsers(pool);
 
     const seedUpgradeClient = await pool.connect();
     try {

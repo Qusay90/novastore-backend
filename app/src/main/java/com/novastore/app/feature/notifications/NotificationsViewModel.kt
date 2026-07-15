@@ -421,14 +421,6 @@ class NotificationsViewModel @Inject constructor(
         }
     }
 
-    fun requestReturn(orderId: Int) {
-        viewModelScope.launch {
-            val result = accountRepository.requestReturn(orderId, "Hesabım ekranından iade talebi oluşturuldu.")
-            _uiState.update { it.copy(actionMessage = if (result.isSuccess) "İade talebiniz alındı." else "İade talebi oluşturulamadı.") }
-            if (result.isSuccess) loadOrders()
-        }
-    }
-
     fun updateProfile(fullName: String, phone: String?) {
         viewModelScope.launch {
             val normalizedName = fullName.trim().ifBlank { authRepository.currentUserName.orEmpty() }

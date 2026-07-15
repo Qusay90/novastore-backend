@@ -1,9 +1,48 @@
 const express = require('express');
 const router = express.Router();
-const { getDashboardStats, getBehaviorAnalytics } = require('../controllers/adminController');
+const {
+    getAdminCatalogStructureSummary,
+    getAdminNotificationSummaries,
+    getAdminOrderSummaries,
+    getAdminProductSummaries,
+    getAdminReturnSummaries,
+    getAdminSession,
+    getDashboardStats,
+    getBehaviorAnalytics
+} = require('../controllers/adminController');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
+const { requireCurrentAdmin } = require('../middlewares/currentAdmin');
+const { privateNoStore } = require('../middlewares/privateNoStore');
+const { requireAdminCommerceCapability } = require('../middlewares/adminCommerceCapability');
+const { requireAdminCatalogJson } = require('../middlewares/adminCatalogJson');
+const {
+    getAdminCatalogProduct,
+    createAdminCatalogProduct,
+    updateAdminCatalogProduct,
+    archiveAdminCatalogProduct
+} = require('../controllers/adminCatalogProductController');
 
-router.get('/stats', authenticate, requireAdmin, getDashboardStats);
+const integratedAdminRead = [privateNoStore, authenticate, requireAdmin, requireCurrentAdmin];
+const integratedAdminProductWrite = [
+    privateNoStore,
+    authenticate,
+    requireAdmin,
+    requireAdminCommerceCapability('firstPartyCatalogWrite'),
+    requireCurrentAdmin,
+    requireAdminCatalogJson
+];
+
+router.get('/session', ...integratedAdminRead, getAdminSession);
+router.get('/notifications/summary', ...integratedAdminRead, getAdminNotificationSummaries);
+router.get('/orders/summary', ...integratedAdminRead, getAdminOrderSummaries);
+router.get('/catalog/products/summary', ...integratedAdminRead, getAdminProductSummaries);
+router.get('/catalog/products/:id', ...integratedAdminRead, getAdminCatalogProduct);
+router.post('/catalog/products', ...integratedAdminProductWrite, createAdminCatalogProduct);
+router.patch('/catalog/products/:id/archive', ...integratedAdminProductWrite, archiveAdminCatalogProduct);
+router.patch('/catalog/products/:id', ...integratedAdminProductWrite, updateAdminCatalogProduct);
+router.get('/catalog/structure/summary', ...integratedAdminRead, getAdminCatalogStructureSummary);
+router.get('/returns/summary', ...integratedAdminRead, getAdminReturnSummaries);
+router.get('/stats', ...integratedAdminRead, getDashboardStats);
 router.get('/behavior', authenticate, requireAdmin, getBehaviorAnalytics);
 
 module.exports = router;

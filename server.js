@@ -100,6 +100,10 @@ app.get('/favicon.ico', (req, res) => {
     res.type('image/png');
     res.sendFile(path.join(__dirname, 'frontend', 'favicon-96x96.png'));
 });
+const ADMIN_COMMERCE_PRO_HTML_FILES = new Set([
+    'admin-commerce-pro.html',
+    'admin-commerce-pro-live.html'
+]);
 app.use(express.static(path.join(__dirname, 'frontend'), {
     setHeaders: (res, filePath) => {
         const ext = path.extname(filePath).toLowerCase();
@@ -108,6 +112,10 @@ app.use(express.static(path.join(__dirname, 'frontend'), {
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
+            if (ADMIN_COMMERCE_PRO_HTML_FILES.has(path.basename(filePath).toLowerCase())) {
+                res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+                res.setHeader('X-Frame-Options', 'DENY');
+            }
         } else if (ext === '.css') {
             res.setHeader('Content-Type', 'text/css; charset=UTF-8');
         } else if (ext === '.js') {

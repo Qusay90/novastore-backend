@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
+const { requireCurrentAdmin } = require('../middlewares/currentAdmin');
 const {
     getCollections,
     postCollection,
@@ -11,7 +12,7 @@ const {
 } = require('../controllers/adminCollectionController');
 
 const router = express.Router();
-router.use(authenticate, requireAdmin);
+router.use(authenticate, requireAdmin, requireCurrentAdmin);
 router.get('/collections', getCollections);
 router.post('/collections', postCollection);
 router.patch('/collections/:id', patchCollection);

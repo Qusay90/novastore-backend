@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const jwt = require('jsonwebtoken');
 const { maskFullName } = require('../services/privacyService');
+const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 
 // --- Musteri Islemleri ---
 
@@ -28,9 +29,18 @@ exports.askQuestion = async (req, res) => {
         }
 
         const newQuestion = await pool.query(
-            'INSERT INTO product_questions (product_id, user_id, question) VALUES ($1, $2, $3) RETURNING *',
+            `INSERT INTO product_questions (product_id, user_id, question)
+             SELECT products.id, $2, $3
+             FROM products
+             WHERE products.id = $1
+               AND ${buildPublicProductSqlPredicate('products')}
+             RETURNING *`,
             [product_id, user_id, question]
         );
+
+        if (newQuestion.rows.length === 0) {
+            return res.status(404).json({ error: 'Ürün bulunamadı.', code: 'PRODUCT_NOT_FOUND' });
+        }
 
         // Bildirim gonder (Admine)
         try {
@@ -54,24 +64,37 @@ exports.getProductQuestions = async (req, res) => {
         const { productId } = req.params;
 
         const questions = await pool.query(
-            `SELECT pq.id, pq.product_id, pq.user_id, pq.question, pq.answer, pq.created_at, pq.answered_at,
+            `WITH public_product AS (
+                SELECT products.id
+                FROM products
+                WHERE products.id = $1
+                  AND ${buildPublicProductSqlPredicate('products')}
+             )
+             SELECT public_product.id AS public_product_id,
+                    pq.id, pq.product_id, pq.user_id, pq.question, pq.answer, pq.created_at, pq.answered_at,
                     COALESCE(u.full_name, u.name) as user_name
-             FROM product_questions pq
-             JOIN users u ON pq.user_id = u.id
-             WHERE pq.product_id = $1
+             FROM public_product
+             LEFT JOIN product_questions pq ON pq.product_id = public_product.id
+             LEFT JOIN users u ON pq.user_id = u.id
              ORDER BY
                 CASE WHEN pq.answer IS NULL THEN 0 ELSE 1 END ASC,
                 COALESCE(pq.answered_at, pq.created_at) DESC`,
             [productId]
         );
 
+        if (questions.rows.length === 0) {
+            return res.status(404).json({ error: 'Ürün bulunamadı.', code: 'PRODUCT_NOT_FOUND' });
+        }
+
         res.status(200).json(
-            questions.rows.map((questionRow) => ({
-                ...questionRow,
-                user_name: maskFullName(questionRow.user_name),
-                status: questionRow.answer ? 'answered' : 'pending',
-                is_answered: Boolean(questionRow.answer)
-            }))
+            questions.rows
+                .filter((questionRow) => questionRow.id !== null)
+                .map(({ public_product_id: _publicProductId, ...questionRow }) => ({
+                    ...questionRow,
+                    user_name: maskFullName(questionRow.user_name),
+                    status: questionRow.answer ? 'answered' : 'pending',
+                    is_answered: Boolean(questionRow.answer)
+                }))
         );
     } catch (error) {
         console.error('Soruları getirme hatası:', error);

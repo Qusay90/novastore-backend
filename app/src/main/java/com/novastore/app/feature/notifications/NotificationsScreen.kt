@@ -171,7 +171,7 @@ private enum class HelpArticle(
     ),
     Returns(
         title = "İade ve iptal",
-        summary = "Teslim edilen siparişten iade talebi aç veya hazırlanan siparişi iptal et.",
+        summary = "Mevcut iade kayıtlarını incele; yeni iade talebi için geçici olarak destek kanalını kullan.",
         icon = Icons.Default.AssignmentReturn
     ),
     Tickets(
@@ -312,7 +312,6 @@ fun NotificationsScreen(
                     order = selectedOrder ?: uiState.orders.firstOrNull(),
                     onRepeat = viewModel::repeatOrder,
                     onCancel = { viewModel.cancelOrder(it.id) },
-                    onReturn = { viewModel.requestReturn(it.id) },
                     onSupport = onNavigateSupport,
                     onReview = { page = AccountPage.Reviews }
                 )
@@ -783,7 +782,6 @@ private fun OrderDetailPage(
     order: AccountOrder?,
     onRepeat: (AccountOrder) -> Unit,
     onCancel: (AccountOrder) -> Unit,
-    onReturn: (AccountOrder) -> Unit,
     onSupport: () -> Unit,
     onReview: () -> Unit
 ) {
@@ -837,9 +835,10 @@ private fun OrderDetailPage(
             }
         }
         if (order.isDelivered()) {
-            OutlinedButton(onClick = { onReturn(order) }, border = BorderStroke(1.dp, OrangeAccent), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().height(44.dp)) {
-                Text("İade Talebi Oluştur", color = OrangeAccent, fontWeight = FontWeight.Bold)
+            OutlinedButton(onClick = {}, enabled = false, border = BorderStroke(1.dp, BorderColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().height(44.dp)) {
+                Text("İade Talebi Yakında", color = MutedText, fontWeight = FontWeight.Bold)
             }
+            Text("Yeni iade akışı güvenlik doğrulamaları tamamlanana kadar kapalıdır. Bu sırada Destek Al seçeneğini kullanabilirsin.", color = MutedText, fontSize = 12.sp)
         }
         OutlinedButton(onClick = onSupport, border = BorderStroke(1.dp, PrimaryBlue), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().height(44.dp)) {
             Text("Destek Al", color = PrimaryBlue, fontWeight = FontWeight.Bold)
@@ -1796,7 +1795,7 @@ private fun ArticlePage(
         when (article) {
             HelpArticle.Orders -> {
                 HelpStepCard("1", "Siparişlerim ekranında siparişini seç.", "Kargo, ödeme, fatura ve ürün kalemlerini aynı detay ekranında görürsün.")
-                HelpStepCard("2", "Detaydan işlem başlat.", "Hazırlanan siparişi iptal edebilir, teslim edilen siparişi değerlendirebilir veya iade talebi açabilirsin.")
+                HelpStepCard("2", "Detaydan işlem başlat.", "Hazırlanan siparişi iptal edebilir, teslim edilen siparişi değerlendirebilir veya iade kayıtlarını inceleyebilirsin.")
                 latestOrder?.let { order ->
                     InfoCard(
                         title = "Son siparişi aç: ${order.displayNo()}",
@@ -1808,11 +1807,11 @@ private fun ArticlePage(
                 HelpPrimaryButton("Siparişlerime Git", Icons.Default.Inventory2, onOrders)
             }
             HelpArticle.Returns -> {
-                HelpStepCard("1", "Teslim edilen siparişi aç.", "İade talebi butonu yalnızca teslim edilen siparişlerde görünür.")
-                HelpStepCard("2", "İade talebini gönder.", "Talep oluşturulduğunda durumunu İadeler ve Sipariş Detayı ekranlarında takip edebilirsin.")
+                HelpStepCard("1", "Mevcut iade kayıtlarını incele.", "İadeler ekranı daha önce açılmış kayıtları salt okunur gösterir.")
+                HelpStepCard("2", "Yeni talep için destek al.", "Güvenli geri ödeme ve stok akışı tamamlanana kadar yeni iade talebi destek kanalı üzerinden değerlendirilir.")
                 HelpPrimaryButton("İade Ekranını Aç", Icons.Default.AssignmentReturn, onReturns)
                 latestOrder?.takeIf { it.isDelivered() }?.let { order ->
-                    InfoCard("İadeye uygun sipariş: ${order.displayNo()}", order.displayStatus(), Icons.Default.AssignmentReturn, onClick = { onOrderClick(order) })
+                    InfoCard("Teslim edilen sipariş: ${order.displayNo()}", order.displayStatus(), Icons.Default.AssignmentReturn, onClick = { onOrderClick(order) })
                 }
             }
             HelpArticle.Tickets -> {
@@ -1944,7 +1943,7 @@ private fun ReturnsPage(orders: List<AccountOrder>, onOrderClick: (AccountOrder)
     val returnOrders = orders.filter { it.refundStatus != null && it.refundStatus != "NONE" || it.displayStatus().contains("İade", true) }
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (returnOrders.isEmpty()) {
-            StateCard(Icons.Default.AssignmentReturn, "Aktif iade yok", "Teslim edilen sipariş detayından iade talebi oluşturabilirsin.")
+            StateCard(Icons.Default.AssignmentReturn, "Aktif iade yok", "Yeni iade talebi güvenli geri ödeme ve stok akışı tamamlanana kadar geçici olarak kapalıdır; destek kanalını kullanabilirsin.")
         } else {
             returnOrders.forEach { order -> OrderCard(order, onClick = { onOrderClick(order) }) }
         }
@@ -2138,7 +2137,11 @@ private fun AccountOrder.isActiveOrder(): Boolean {
 
 private fun AccountOrder.canCancel(): Boolean {
     val normalized = displayStatus().lowercase(Locale("tr", "TR"))
-    return !isPendingPaymentOrder() && !isFailedPaymentOrder() && !normalized.contains("iptal") && !normalized.contains("iade") && !normalized.contains("teslim")
+    if (isPendingPaymentOrder() || isFailedPaymentOrder()) return false
+
+    return normalized.contains("onay bekliyor") ||
+        normalized.contains("hazırlanıyor") ||
+        normalized.contains("hazirlaniyor")
 }
 
 private fun AccountOrder.statusColor(): Color {

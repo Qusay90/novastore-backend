@@ -1,0 +1,28 @@
+{
+  "name": "novastore-admin-commerce-pro-preview",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:live": "vite build --mode integrated",
+    "build:standalone": "npm run build && node scripts/build-standalone.mjs",
+    "build:integrated": "npm run build && node scripts/build-standalone.mjs --output ../frontend/admin-commerce-pro.html",
+    "build:live:integrated": "npm run build:live && node scripts/build-standalone.mjs --mode integrated --output ../frontend/admin-commerce-pro-live.html",
+    "preview": "vite preview",
+    "test:model": "node ../tests/adminCommerceProModelSmoke.mjs",
+    "test:preview": "node ../tests/adminCommerceProPreviewSmoke.js",
+    "test:live": "node ../tests/adminCommerceProHttpSmoke.mjs && node ../tests/adminCommerceProSessionContractSmoke.js && node ../tests/adminCatalogMutationFoundationSmoke.js && node ../tests/adminLoginNextSmoke.js && node ../tests/adminCommerceProLiveSmoke.mjs",
+    "test:mutations": "node scripts/order-mutations-smoke.mjs",
+    "test": "npm run test:model && npm run test:preview && npm run test:mutations && npm run test:live",
+    "verify": "npm run build:integrated && npm run build:live:integrated && npm test"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "5.0.4",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "uplot": "1.6.32",
+    "vite": "6.4.3"
+  }
+}

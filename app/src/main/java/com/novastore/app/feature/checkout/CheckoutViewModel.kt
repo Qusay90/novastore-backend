@@ -29,6 +29,7 @@ data class CheckoutUiState(
     val isCheckingPaymentStatus: Boolean = false,
     val paymentStatusMessage: String? = null,
     val paymentStatus: String? = null,
+    val paymentNextAction: String? = null,
     val paymentStatusFinalized: Boolean = false,
     val paymentFinalized: Boolean = false
 )
@@ -47,6 +48,7 @@ class CheckoutViewModel @Inject constructor(
     private val _checkoutDraft = MutableStateFlow<SharedCheckoutPayload?>(null)
     val checkoutDraft: StateFlow<SharedCheckoutPayload?> = _checkoutDraft.asStateFlow()
     private var clearCartWhenPaymentFinalized: Boolean = false
+    private var pendingPaymentCartProductIds: Set<Int> = emptySet()
 
     val cartItems: StateFlow<List<CartItem>> = cartRepository.cartItems
         .stateIn(
@@ -121,6 +123,11 @@ class CheckoutViewModel @Inject constructor(
 
         _uiState.update { it.copy(isLoading = true, error = null) }
         clearCartWhenPaymentFinalized = clearCartWhenFinalized
+        pendingPaymentCartProductIds = if (clearCartWhenFinalized) {
+            itemsToPay.map { it.productId }.toSet()
+        } else {
+            emptySet()
+        }
         viewModelScope.launch {
             val normalizedCouponCode = couponCode.normalizedCouponCode()
             val request = buildPaymentRequest(
@@ -207,17 +214,19 @@ class CheckoutViewModel @Inject constructor(
             val result = paymentRepository.getPaymentStatus(paymentRef = paymentRef, orderId = response.orderId)
             if (result.isSuccess) {
                 val status = result.getOrThrow()
-                val paidAndFinalized = status.shouldClearCartAfterStatusRefresh()
-                if (paidAndFinalized && clearCartWhenPaymentFinalized) {
-                    cartRepository.clearCart()
+                val providerCaptured = status.shouldClearCartAfterStatusRefresh()
+                if (providerCaptured && clearCartWhenPaymentFinalized) {
+                    removeCapturedCheckoutItems()
                 }
+                val paidAndCommerceFinalized = providerCaptured && status.isCommerceFinalizedAfterStatusRefresh()
                 _uiState.update {
                     it.copy(
                         isCheckingPaymentStatus = false,
                         paymentStatusMessage = status.message,
                         paymentStatus = status.paymentStatus,
-                        paymentStatusFinalized = status.finalized,
-                        paymentFinalized = paidAndFinalized
+                        paymentNextAction = status.nextAction,
+                        paymentStatusFinalized = status.isCommerceFinalizedAfterStatusRefresh(),
+                        paymentFinalized = paidAndCommerceFinalized
                     )
                 }
             } else {
@@ -225,6 +234,21 @@ class CheckoutViewModel @Inject constructor(
                 _uiState.update { it.copy(isCheckingPaymentStatus = false, error = errorMsg) }
             }
         }
+    }
+
+    private suspend fun removeCapturedCheckoutItems() {
+        if (pendingPaymentCartProductIds.isEmpty()) return
+
+        val itemsForCapturedOrder = cartItems.value.filter { item ->
+            item.productId in pendingPaymentCartProductIds
+        }
+        val failedProductIds = mutableSetOf<Int>()
+        for (item in itemsForCapturedOrder) {
+            if (cartRepository.removeFromCart(item).isFailure) {
+                failedProductIds += item.productId
+            }
+        }
+        pendingPaymentCartProductIds = failedProductIds
     }
 }
 
@@ -261,7 +285,17 @@ internal fun PaymentAction?.isPaytrIframeAction(): Boolean =
     this?.type.equals(PAYTR_IFRAME_TYPE, ignoreCase = true)
 
 internal fun PaymentStatusResponse?.shouldClearCartAfterStatusRefresh(): Boolean =
-    this != null && finalized && paymentStatus.equals(PAYMENT_STATUS_PAID, ignoreCase = true)
+    this != null &&
+        (providerFinalized ?: finalized) &&
+        paymentStatus.equals(PAYMENT_STATUS_PAID, ignoreCase = true)
+
+internal fun PaymentStatusResponse.isCommerceFinalizedAfterStatusRefresh(): Boolean =
+    commerceFinalized ?: (
+        finalized &&
+            !reconciliationRequired &&
+            nextAction != "WAIT_RECONCILIATION" &&
+            nextAction != "WAIT_REFUND_REVIEW"
+        )
 
 internal fun PaymentAction?.resolveSafePaytrIframeUrl(): String? {
     if (!isPaytrIframeAction()) return null

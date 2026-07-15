@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 const FAVORITES_SCHEMA_ERROR = '42P01';
 
 const sendFavoritesError = (res, error, fallbackMessage) => {
@@ -61,6 +62,7 @@ const fetchFavoriteRows = async (userId, queryable = pool) => {
     const result = await queryable.query(
         `${FAVORITE_SELECT}
          WHERE f.user_id = $1
+           AND ${buildPublicProductSqlPredicate('p')}
          ORDER BY f.created_at DESC, f.product_id DESC`,
         [userId]
     );
@@ -68,7 +70,11 @@ const fetchFavoriteRows = async (userId, queryable = pool) => {
 };
 
 const productExists = async (productId, queryable = pool) => {
-    const result = await queryable.query('SELECT id FROM products WHERE id = $1', [productId]);
+    const result = await queryable.query(
+        `SELECT id FROM products WHERE id = $1
+           AND ${buildPublicProductSqlPredicate('products')}`,
+        [productId]
+    );
     return result.rowCount > 0;
 };
 
@@ -149,7 +155,8 @@ const syncFavorites = async (req, res) => {
 
         if (productIds.length > 0) {
             const existingResult = await client.query(
-                'SELECT id FROM products WHERE id = ANY($1::int[])',
+                `SELECT id FROM products WHERE id = ANY($1::int[])
+                   AND ${buildPublicProductSqlPredicate('products')}`,
                 [productIds]
             );
             const existingIds = new Set(existingResult.rows.map((row) => Number(row.id)));

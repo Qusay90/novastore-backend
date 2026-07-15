@@ -43,8 +43,13 @@ data class PaymentStatusResponse(
     val paymentRef: String?,
     val paymentStatus: String,
     val orderStatus: String?,
+    val refundStatus: String? = null,
     val provider: String?,
     val finalized: Boolean = false,
+    val providerFinalized: Boolean? = null,
+    val commerceFinalized: Boolean? = null,
+    val reconciliationRequired: Boolean = false,
+    val reconciliationReason: String? = null,
     val message: String,
     val nextAction: String? = null
 )

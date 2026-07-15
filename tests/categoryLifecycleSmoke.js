@@ -331,8 +331,13 @@ const statsFor = async (categoryId) => {
     assert.strictEqual((await statsFor(rootId)).subtree_visible_product_count, 1);
 
     const deleted = await invoke(deleteProduct, { params: { id: productId } });
-    assert.strictEqual(deleted.statusCode, 200);
-    assert.strictEqual((await statsFor(rootId)).subtree_visible_product_count, 0);
+    assert.strictEqual(deleted.statusCode, 410);
+    assert.strictEqual(deleted.body.code, 'PRODUCT_HARD_DELETE_DISABLED');
+    assert.strictEqual((await statsFor(rootId)).subtree_visible_product_count, 1);
+    assert.strictEqual(
+        Number((await pool.query('SELECT COUNT(*) AS count FROM products WHERE id=$1', [productId])).rows[0].count),
+        1
+    );
 
     console.log(`category lifecycle smoke passed against ${safety.target.label}`);
     await pool.end();

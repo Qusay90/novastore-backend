@@ -269,7 +269,8 @@ const planOrApplySeed = async (queryable, { apply = false, tree = MARKETPLACE_CA
                             is_active=$7, is_customer_visible=$8,
                             show_in_menu=$9, show_on_home=$10, hide_when_empty=$11,
                             description=$12, seo_title=$13, seo_description=$14,
-                            icon=$15, accent_color=$16, updated_at=CURRENT_TIMESTAMP
+                            icon=$15, accent_color=$16, revision=revision + 1,
+                            updated_at=CURRENT_TIMESTAMP
                         WHERE id=$1
                     `, [
                         matched.id,

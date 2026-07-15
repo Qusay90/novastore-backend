@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
+const { requireCurrentAdmin } = require('../middlewares/currentAdmin');
 const {
     getAdminCategories,
     createAdminCategory,
@@ -10,10 +11,10 @@ const {
 
 const router = express.Router();
 
-router.get('/', authenticate, requireAdmin, getAdminCategories);
-router.post('/', authenticate, requireAdmin, createAdminCategory);
-router.patch('/:id', authenticate, requireAdmin, updateAdminCategory);
-router.patch('/:id/move', authenticate, requireAdmin, moveAdminCategory);
-router.patch('/:id/archive', authenticate, requireAdmin, archiveAdminCategory);
+router.get('/', authenticate, requireAdmin, requireCurrentAdmin, getAdminCategories);
+router.post('/', authenticate, requireAdmin, requireCurrentAdmin, createAdminCategory);
+router.patch('/:id', authenticate, requireAdmin, requireCurrentAdmin, updateAdminCategory);
+router.patch('/:id/move', authenticate, requireAdmin, requireCurrentAdmin, moveAdminCategory);
+router.patch('/:id/archive', authenticate, requireAdmin, requireCurrentAdmin, archiveAdminCategory);
 
 module.exports = router;

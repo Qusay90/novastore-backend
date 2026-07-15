@@ -6,6 +6,7 @@ const pool = require('../config/db');
 const createCoreSchema = require('../models/createCoreDb');
 const { applyAttributeSchema } = require('../models/attributeSchema');
 const { resolveStartupSafety } = require('../config/startupSafety');
+const { seedCurrentAdminUsers } = require('./helpers/seedCurrentAdminUsers');
 
 const root = path.join(__dirname, '..');
 const port = 5203;
@@ -48,6 +49,7 @@ const request = async (pathname, { method = 'GET', token = null, body } = {}) =>
 
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await createCoreSchema();
+    await seedCurrentAdminUsers(pool);
     const legacyProduct = await pool.query(`
         INSERT INTO products (name,price,stock,category,categories,publication_status,is_customer_visible)
         VALUES ('Korunan Legacy',10,1,'Kategorisiz',ARRAY['Kategorisiz']::TEXT[],'draft',TRUE)

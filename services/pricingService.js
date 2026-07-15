@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 
 const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
@@ -65,7 +66,8 @@ const loadProductsForCart = async (cartItems, client = pool) => {
     const result = await client.query(
         `SELECT id, name, price, old_price, stock, image_url
          FROM products
-         WHERE id = ANY($1::int[])`,
+         WHERE id = ANY($1::int[])
+           AND ${buildPublicProductSqlPredicate('products')}`,
         [ids]
     );
 

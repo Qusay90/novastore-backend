@@ -22,6 +22,24 @@ class CollectionDomainError extends Error {
     }
 }
 
+const withOptionalTransaction = async (queryable, operation) => {
+    if (typeof queryable.connect !== 'function' || typeof queryable.release === 'function') {
+        return operation(queryable);
+    }
+    const client = await queryable.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await operation(client);
+        await client.query('COMMIT');
+        return result;
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
 const asInteger = (value, field, { nullable = false, min = 0 } = {}) => {
     if (nullable && (value === null || value === undefined || value === '')) return null;
     const parsed = Number(value);
@@ -130,46 +148,43 @@ const getAdminCollection = async (id, queryable = pool) => {
 
 const createCollection = async (body, { queryable = pool } = {}) => {
     const input = normalizeCollectionInput(body);
-    const client = typeof queryable.connect === 'function' ? await queryable.connect() : queryable;
-    const shouldRelease = client !== queryable;
     try {
-        await client.query('BEGIN');
-        const result = await client.query(`
-            INSERT INTO collections (
-                name, slug, collection_type, rule_code, description,
-                image_url, banner_url, accent_color, seo_title, seo_description,
-                sort_order, show_on_home, is_active
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-            RETURNING *
-        `, [
-            input.name,
-            input.slug,
-            input.collection_type,
-            input.rule_code,
-            input.description,
-            input.image_url,
-            input.banner_url,
-            input.accent_color,
-            input.seo_title,
-            input.seo_description,
-            input.sort_order,
-            Boolean(input.show_on_home),
-            Boolean(input.is_active)
-        ]);
-        const collection = normalizeCollection(result.rows[0]);
-        if (collection.rule_code) {
-            await client.query(`
-                INSERT INTO collection_rules (collection_id, rule_type, config)
-                VALUES ($1, $2, $3::jsonb)
-                ON CONFLICT (collection_id, rule_type) DO UPDATE
-                SET config = EXCLUDED.config, updated_at = CURRENT_TIMESTAMP
-            `, [collection.id, collection.rule_code, JSON.stringify(body.rule_config || body.ruleConfig || {})]);
-        }
-        await client.query('COMMIT');
-        return collection;
+        return await withOptionalTransaction(queryable, async (client) => {
+            const result = await client.query(`
+                INSERT INTO collections (
+                    name, slug, collection_type, rule_code, description,
+                    image_url, banner_url, accent_color, seo_title, seo_description,
+                    sort_order, show_on_home, is_active
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                RETURNING *
+            `, [
+                input.name,
+                input.slug,
+                input.collection_type,
+                input.rule_code,
+                input.description,
+                input.image_url,
+                input.banner_url,
+                input.accent_color,
+                input.seo_title,
+                input.seo_description,
+                input.sort_order,
+                Boolean(input.show_on_home),
+                Boolean(input.is_active)
+            ]);
+            const collection = normalizeCollection(result.rows[0]);
+            if (collection.rule_code) {
+                await client.query(`
+                    INSERT INTO collection_rules (collection_id, rule_type, config)
+                    VALUES ($1, $2, $3::jsonb)
+                    ON CONFLICT (collection_id, rule_type) DO UPDATE
+                    SET config = EXCLUDED.config, updated_at = CURRENT_TIMESTAMP
+                `, [collection.id, collection.rule_code, JSON.stringify(body.rule_config || body.ruleConfig || {})]);
+            }
+            return collection;
+        });
     } catch (error) {
-        await client.query('ROLLBACK').catch(() => {});
         if (error.code === '23505') {
             throw new CollectionDomainError('Koleksiyon slug değeri zaten kullanılıyor.', {
                 code: 'COLLECTION_SLUG_CONFLICT',
@@ -177,63 +192,60 @@ const createCollection = async (body, { queryable = pool } = {}) => {
             });
         }
         throw error;
-    } finally {
-        if (shouldRelease) client.release();
     }
 };
 
-const updateCollection = async (id, body, { queryable = pool } = {}) => {
+const updateCollection = async (id, body, { queryable = pool, bumpRevision = true } = {}) => {
     const existing = await getAdminCollection(id, queryable);
     const input = normalizeCollectionInput(body, existing);
-    const client = typeof queryable.connect === 'function' ? await queryable.connect() : queryable;
-    const shouldRelease = client !== queryable;
     try {
-        await client.query('BEGIN');
-        const result = await client.query(`
-            UPDATE collections
-            SET name = $1,
-                slug = $2,
-                collection_type = $3,
-                rule_code = $4,
-                description = $5,
-                image_url = $6,
-                banner_url = $7,
-                accent_color = $8,
-                seo_title = $9,
-                seo_description = $10,
-                sort_order = $11,
-                show_on_home = $12,
-                is_active = $13,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $14
-            RETURNING *
-        `, [
-            input.name,
-            input.slug,
-            input.collection_type,
-            input.rule_code,
-            input.description,
-            input.image_url,
-            input.banner_url,
-            input.accent_color,
-            input.seo_title,
-            input.seo_description,
-            input.sort_order,
-            Boolean(input.show_on_home),
-            Boolean(input.is_active),
-            existing.id
-        ]);
-        await client.query('DELETE FROM collection_rules WHERE collection_id = $1', [existing.id]);
-        if (input.rule_code) {
-            await client.query(`
-                INSERT INTO collection_rules (collection_id, rule_type, config)
-                VALUES ($1, $2, $3::jsonb)
-            `, [existing.id, input.rule_code, JSON.stringify(body.rule_config || body.ruleConfig || {})]);
-        }
-        await client.query('COMMIT');
-        return normalizeCollection(result.rows[0]);
+        return await withOptionalTransaction(queryable, async (client) => {
+            const result = await client.query(`
+                UPDATE collections
+                SET name = $1,
+                    slug = $2,
+                    collection_type = $3,
+                    rule_code = $4,
+                    description = $5,
+                    image_url = $6,
+                    banner_url = $7,
+                    accent_color = $8,
+                    seo_title = $9,
+                    seo_description = $10,
+                    sort_order = $11,
+                    show_on_home = $12,
+                    is_active = $13,
+                    revision = revision + CASE WHEN $15::BOOLEAN THEN 1 ELSE 0 END,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $14
+                RETURNING *
+            `, [
+                input.name,
+                input.slug,
+                input.collection_type,
+                input.rule_code,
+                input.description,
+                input.image_url,
+                input.banner_url,
+                input.accent_color,
+                input.seo_title,
+                input.seo_description,
+                input.sort_order,
+                Boolean(input.show_on_home),
+                Boolean(input.is_active),
+                existing.id,
+                bumpRevision !== false
+            ]);
+            await client.query('DELETE FROM collection_rules WHERE collection_id = $1', [existing.id]);
+            if (input.rule_code) {
+                await client.query(`
+                    INSERT INTO collection_rules (collection_id, rule_type, config)
+                    VALUES ($1, $2, $3::jsonb)
+                `, [existing.id, input.rule_code, JSON.stringify(body.rule_config || body.ruleConfig || {})]);
+            }
+            return normalizeCollection(result.rows[0]);
+        });
     } catch (error) {
-        await client.query('ROLLBACK').catch(() => {});
         if (error.code === '23505') {
             throw new CollectionDomainError('Koleksiyon slug değeri zaten kullanılıyor.', {
                 code: 'COLLECTION_SLUG_CONFLICT',
@@ -241,21 +253,24 @@ const updateCollection = async (id, body, { queryable = pool } = {}) => {
             });
         }
         throw error;
-    } finally {
-        if (shouldRelease) client.release();
     }
 };
 
-const archiveCollection = async (id, archived = true, { queryable = pool } = {}) => {
+const archiveCollection = async (
+    id,
+    archived = true,
+    { queryable = pool, bumpRevision = true } = {}
+) => {
     const existing = await getAdminCollection(id, queryable);
     const result = await queryable.query(`
         UPDATE collections
         SET is_active = $1,
             deleted_at = $2,
+            revision = revision + CASE WHEN $4::BOOLEAN THEN 1 ELSE 0 END,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = $3
         RETURNING *
-    `, [!archived, archived ? new Date() : null, existing.id]);
+    `, [!archived, archived ? new Date() : null, existing.id, bumpRevision !== false]);
     return normalizeCollection(result.rows[0]);
 };
 
@@ -274,53 +289,73 @@ const addManualCollectionProduct = async (
     collectionId,
     productId,
     sortOrder = 0,
-    { queryable = pool } = {}
+    { queryable = pool, bumpRevision = true } = {}
 ) => {
-    const collection = await assertManualCollection(collectionId, queryable);
     const parsedProductId = asInteger(productId, 'product_id', { min: 1 });
     const parsedSortOrder = asInteger(sortOrder, 'sort_order');
-    const result = await queryable.query(`
-        INSERT INTO collection_products (collection_id, product_id, sort_order)
-        SELECT $1, product.id, $3
-        FROM products product
-        WHERE product.id = $2
-        ON CONFLICT (collection_id, product_id) DO UPDATE
-        SET sort_order = EXCLUDED.sort_order
-        RETURNING collection_id, product_id, sort_order
-    `, [collection.id, parsedProductId, parsedSortOrder]);
-    if (result.rows.length === 0) {
-        throw new CollectionDomainError('Ürün bulunamadı.', {
-            code: 'PRODUCT_NOT_FOUND',
-            statusCode: 404
-        });
-    }
-    return {
-        collection_id: Number(result.rows[0].collection_id),
-        product_id: Number(result.rows[0].product_id),
-        sort_order: Number(result.rows[0].sort_order)
-    };
+    return withOptionalTransaction(queryable, async (client) => {
+        const collection = await assertManualCollection(collectionId, client);
+        const result = await client.query(`
+            INSERT INTO collection_products (collection_id, product_id, sort_order)
+            SELECT $1, product.id, $3
+            FROM products product
+            WHERE product.id = $2
+            ON CONFLICT (collection_id, product_id) DO UPDATE
+            SET sort_order = EXCLUDED.sort_order
+            RETURNING collection_id, product_id, sort_order
+        `, [collection.id, parsedProductId, parsedSortOrder]);
+        if (result.rows.length === 0) {
+            throw new CollectionDomainError('Ürün bulunamadı.', {
+                code: 'PRODUCT_NOT_FOUND',
+                statusCode: 404
+            });
+        }
+        if (bumpRevision !== false) {
+            await client.query(
+                `UPDATE collections
+                 SET revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $1`,
+                [collection.id]
+            );
+        }
+        return {
+            collection_id: Number(result.rows[0].collection_id),
+            product_id: Number(result.rows[0].product_id),
+            sort_order: Number(result.rows[0].sort_order)
+        };
+    });
 };
 
 const removeManualCollectionProduct = async (
     collectionId,
     productId,
-    { queryable = pool } = {}
+    { queryable = pool, bumpRevision = true } = {}
 ) => {
-    const collection = await assertManualCollection(collectionId, queryable);
     const parsedProductId = asInteger(productId, 'product_id', { min: 1 });
-    const result = await queryable.query(
-        `DELETE FROM collection_products
-         WHERE collection_id = $1 AND product_id = $2
-         RETURNING product_id`,
-        [collection.id, parsedProductId]
-    );
-    if (result.rows.length === 0) {
-        throw new CollectionDomainError('Koleksiyon ürünü bulunamadı.', {
-            code: 'COLLECTION_PRODUCT_NOT_FOUND',
-            statusCode: 404
-        });
-    }
-    return { removed: true, product_id: parsedProductId };
+    return withOptionalTransaction(queryable, async (client) => {
+        const collection = await assertManualCollection(collectionId, client);
+        const result = await client.query(
+            `DELETE FROM collection_products
+             WHERE collection_id = $1 AND product_id = $2
+             RETURNING product_id`,
+            [collection.id, parsedProductId]
+        );
+        if (result.rows.length === 0) {
+            throw new CollectionDomainError('Koleksiyon ürünü bulunamadı.', {
+                code: 'COLLECTION_PRODUCT_NOT_FOUND',
+                statusCode: 404
+            });
+        }
+        if (bumpRevision !== false) {
+            await client.query(
+                `UPDATE collections
+                 SET revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $1`,
+                [collection.id]
+            );
+        }
+        return { removed: true, product_id: parsedProductId };
+    });
 };
 
 const listAdminCollectionProducts = async (collectionId, { queryable = pool } = {}) => {
