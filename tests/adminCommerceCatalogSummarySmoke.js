@@ -50,6 +50,9 @@ const runChain = async (handlers, req) => {
 const productRow = (id) => ({
     id,
     name: `Ürün ${id}`,
+    sku: `SKU-${id}`,
+    brand: 'Nova',
+    product_type: 'Test',
     price: '149.90',
     old_price: null,
     currency: 'TRY',
@@ -93,6 +96,7 @@ const productRow = (id) => ({
     assert.equal(catalogResponse.payload.hasMore, true);
     assert.deepEqual(catalogQueries[0].params, ['novastore-platform', 101]);
     assert.deepEqual(Object.keys(catalogResponse.payload.items[0]).sort(), [
+        'brand',
         'category_count',
         'created_at',
         'currency',
@@ -106,8 +110,10 @@ const productRow = (id) => ({
         'primary_category_id',
         'primary_category_name',
         'primary_category_path',
+        'product_type',
         'publication_status',
         'revision',
+        'sku',
         'stock',
         'updated_at'
     ]);
@@ -129,6 +135,9 @@ const productRow = (id) => ({
     for (const column of [
         'p.id',
         'p.name',
+        'p.sku',
+        'p.brand',
+        'p.product_type',
         'p.price',
         'p.old_price',
         'p.stock',

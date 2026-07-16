@@ -48,6 +48,17 @@ const alreadyArchived = () => new AdminCatalogMutationError('Ürün zaten arşiv
 
 const toNumberOrNull = (value) => value === null || value === undefined ? null : Number(value);
 
+const translateProductDbError = (error) => {
+    if (error?.code === '23505' && error?.constraint === 'idx_products_normalized_sku_unique') {
+        throw new AdminCatalogMutationError('SKU başka bir aktif katalog ürününde kullanılıyor.', {
+            code: 'ADMIN_CATALOG_PRODUCT_SKU_CONFLICT',
+            statusCode: 409,
+            details: Object.freeze({ refetchRequired: true })
+        });
+    }
+    throw error;
+};
+
 const toProductDetail = (row, categoryRows, attributes) => Object.freeze({
     id: Number(row.id),
     name: row.name,
@@ -56,6 +67,15 @@ const toProductDetail = (row, categoryRows, attributes) => Object.freeze({
     old_price: toNumberOrNull(row.old_price),
     currency: CURRENCY,
     stock: Number(row.stock || 0),
+    sku: row.sku ?? null,
+    brand: row.brand ?? null,
+    product_type: row.product_type ?? null,
+    vat_rate: toNumberOrNull(row.vat_rate),
+    vat_rate_source: row.vat_rate_source ?? null,
+    weight_grams: row.weight_grams === null || row.weight_grams === undefined
+        ? null
+        : Number(row.weight_grams),
+    desi: toNumberOrNull(row.desi),
     publication_status: row.publication_status,
     is_customer_visible: row.is_customer_visible === true,
     deleted_at: row.deleted_at ?? null,
@@ -97,6 +117,13 @@ const readAdminCatalogProductDetail = async (database, rawId) => {
              product.price,
              product.old_price,
              product.stock,
+             product.sku,
+             product.brand,
+             product.product_type,
+             product.vat_rate,
+             product.vat_rate_source,
+             product.weight_grams,
+             product.desi,
              product.publication_status,
              product.is_customer_visible,
              product.deleted_at,
@@ -162,7 +189,9 @@ const loadPlatformStore = async (client, { unavailableAsNotFound = false } = {})
 
 const loadFirstPartyProduct = async (client, id, storeId) => {
     const result = await client.query(
-        `SELECT id, name, description, price, old_price, stock, category, categories,
+        `SELECT id, name, description, price, old_price, stock, sku, normalized_sku,
+                brand, product_type, vat_rate, vat_rate_source, weight_grams, desi,
+                category, categories,
                 publication_status, is_customer_visible, deleted_at, revision
          FROM products
          WHERE id = $1 AND store_id = $2`,
@@ -280,10 +309,12 @@ const hasMaterialProductChange = (current, changes) => {
     if (Object.prototype.hasOwnProperty.call(changes, 'category_ids')
         || Object.prototype.hasOwnProperty.call(changes, 'attributes')) return true;
     return Object.entries(changes).some(([field, value]) => {
-        if (field === 'price' || field === 'old_price') {
+        if (field === 'price' || field === 'old_price' || field === 'vat_rate' || field === 'desi') {
             return toNumberOrNull(current[field]) !== toNumberOrNull(value);
         }
-        if (field === 'stock') return Number(current.stock) !== value;
+        if (field === 'stock' || field === 'weight_grams') {
+            return toNumberOrNull(current[field]) !== toNumberOrNull(value);
+        }
         if (field === 'description') return (current.description ?? null) !== value;
         return current[field] !== value;
     });
@@ -297,10 +328,9 @@ const createAdminCatalogProduct = async (database, { actor, body, requestId = nu
         entityType: 'product',
         entityKey: null,
         action: 'create',
-        changedFields: [
-            'attributes', 'category_ids', 'description', 'is_customer_visible', 'name',
-            'old_price', 'price', 'primary_category_id', 'publication_status', 'stock'
-        ],
+        changedFields: Object.keys(payload)
+            .filter((field) => field !== 'normalized_sku')
+            .sort(),
         requestId,
         metadata: AUDIT_METADATA,
         applyMutation: async (client) => {
@@ -313,10 +343,14 @@ const createAdminCatalogProduct = async (database, { actor, body, requestId = nu
             await validateEffectiveCategories(client, payload.publication_status, resolution.assignments);
             const categoryNames = resolution.categoryNames;
             const insertResult = await client.query(
-                `INSERT INTO products (
-                     name, description, price, old_price, stock, category, categories,
+                 `INSERT INTO products (
+                     name, description, price, old_price, stock,
+                     sku, normalized_sku, brand, product_type, vat_rate, vat_rate_source,
+                     weight_grams, desi, category, categories,
                      publication_status, is_customer_visible, deleted_at, store_id
-                 ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,$10)
+                 ) VALUES (
+                     $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NULL,$18
+                 )
                  RETURNING id, revision`,
                 [
                     payload.name,
@@ -324,6 +358,14 @@ const createAdminCatalogProduct = async (database, { actor, body, requestId = nu
                     payload.price,
                     payload.old_price,
                     payload.stock,
+                    payload.sku,
+                    payload.normalized_sku,
+                    payload.brand,
+                    payload.product_type,
+                    payload.vat_rate,
+                    payload.vat_rate_source,
+                    payload.weight_grams,
+                    payload.desi,
                     categoryNames[0] || 'Kategorisiz',
                     categoryNames.length ? categoryNames : ['Kategorisiz'],
                     payload.publication_status,
@@ -362,7 +404,7 @@ const createAdminCatalogProduct = async (database, { actor, body, requestId = nu
                 product: detail.product
             };
         }
-    });
+    }).catch(translateProductDbError);
     return toMutationEnvelope(executed);
 };
 
@@ -411,12 +453,20 @@ const updateAdminCatalogProduct = async (database, rawId, { actor, body, request
                      price = $3,
                      old_price = $4,
                      stock = $5,
-                     category = $6,
-                     categories = $7,
-                     publication_status = $8,
-                     is_customer_visible = $9,
+                     sku = $6,
+                     normalized_sku = $7,
+                     brand = $8,
+                     product_type = $9,
+                     vat_rate = $10,
+                     vat_rate_source = $11,
+                     weight_grams = $12,
+                     desi = $13,
+                     category = $14,
+                     categories = $15,
+                     publication_status = $16,
+                     is_customer_visible = $17,
                      updated_at = CURRENT_TIMESTAMP
-                 WHERE id = $10 AND store_id = $11
+                 WHERE id = $18 AND store_id = $19
                  RETURNING id`,
                 [
                     payload.changes.name ?? current.name,
@@ -428,6 +478,30 @@ const updateAdminCatalogProduct = async (database, rawId, { actor, body, request
                         ? payload.changes.old_price
                         : current.old_price,
                     payload.changes.stock ?? current.stock,
+                    Object.prototype.hasOwnProperty.call(payload.changes, 'sku')
+                        ? payload.changes.sku
+                        : current.sku,
+                    Object.prototype.hasOwnProperty.call(payload.changes, 'normalized_sku')
+                        ? payload.changes.normalized_sku
+                        : current.normalized_sku,
+                    Object.prototype.hasOwnProperty.call(payload.changes, 'brand')
+                        ? payload.changes.brand
+                        : current.brand,
+                    Object.prototype.hasOwnProperty.call(payload.changes, 'product_type')
+                        ? payload.changes.product_type
+                        : current.product_type,
+                    Object.prototype.hasOwnProperty.call(payload.changes, 'vat_rate')
+                        ? payload.changes.vat_rate
+                        : current.vat_rate,
+                    Object.prototype.hasOwnProperty.call(payload.changes, 'vat_rate_source')
+                        ? payload.changes.vat_rate_source
+                        : current.vat_rate_source,
+                    Object.prototype.hasOwnProperty.call(payload.changes, 'weight_grams')
+                        ? payload.changes.weight_grams
+                        : current.weight_grams,
+                    Object.prototype.hasOwnProperty.call(payload.changes, 'desi')
+                        ? payload.changes.desi
+                        : current.desi,
                     categoryNames[0] || 'Kategorisiz',
                     categoryNames.length ? categoryNames : ['Kategorisiz'],
                     effectiveStatus,
@@ -460,7 +534,7 @@ const updateAdminCatalogProduct = async (database, rawId, { actor, body, request
             const detail = await readAdminCatalogProductDetail(client, id);
             return { id, product: detail.product };
         }
-    });
+    }).catch(translateProductDbError);
     return toMutationEnvelope(executed);
 };
 
