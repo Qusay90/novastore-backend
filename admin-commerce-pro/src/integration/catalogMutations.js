@@ -35,6 +35,13 @@ const productResponseFields = new Set([
   "old_price",
   "currency",
   "stock",
+  "sku",
+  "brand",
+  "product_type",
+  "vat_rate",
+  "vat_rate_source",
+  "weight_grams",
+  "desi",
   "publication_status",
   "is_customer_visible",
   "deleted_at",
@@ -65,6 +72,13 @@ const createInputFields = new Set([
   "price",
   "oldPrice",
   "stock",
+  "sku",
+  "brand",
+  "productType",
+  "vatRate",
+  "vatRateSource",
+  "weightGrams",
+  "desi",
   "publicationStatus",
   "customerVisible",
   "categoryIds",
@@ -114,6 +128,55 @@ const requireMoney = (value, field, { nullable = false } = {}) => {
   }
   const scaled = value * 100;
   if (Math.abs(Math.round(scaled) - scaled) > 1e-7) throw new TypeError(`${field} en fazla iki ondalık basamak içermelidir.`);
+  return value;
+};
+
+const requireSku = (value, field, { nullable = false } = {}) => {
+  if (nullable && value === null) return null;
+  const sku = requireText(value, field, { max: 120 });
+  if (!/^[A-Za-z0-9][A-Za-z0-9._/ -]{0,119}$/.test(sku)) {
+    throw new TypeError(`${field} desteklenmeyen karakter içeriyor.`);
+  }
+  return sku;
+};
+
+const requireVatRate = (value, field, { nullable = false } = {}) => {
+  if (nullable && value === null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 100) {
+    throw new TypeError(`${field} 0–100 aralığında sonlu bir sayı olmalıdır.`);
+  }
+  const scaled = value * 100;
+  if (Math.abs(Math.round(scaled) - scaled) > 1e-7) {
+    throw new TypeError(`${field} en fazla iki ondalık basamak içermelidir.`);
+  }
+  return value;
+};
+
+const requireVatRateSource = (value, field, { nullable = false } = {}) => {
+  if (nullable && value === null) return null;
+  if (value !== "USER_SUPPLIED_TAX_VALUE") {
+    throw new TypeError(`${field} yalnız USER_SUPPLIED_TAX_VALUE olabilir.`);
+  }
+  return value;
+};
+
+const requireNullablePositiveInteger = (value, field) => {
+  if (value === null) return null;
+  if (!Number.isInteger(value) || value < 1 || value > 2147483647) {
+    throw new TypeError(`${field} null veya pozitif tam sayı olmalıdır.`);
+  }
+  return value;
+};
+
+const requireDesi = (value, field, { nullable = false } = {}) => {
+  if (nullable && value === null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value > 9999999.999) {
+    throw new TypeError(`${field} pozitif ve en fazla 9999999.999 olmalıdır.`);
+  }
+  const scaled = value * 1000;
+  if (Math.abs(Math.round(scaled) - scaled) > 1e-7) {
+    throw new TypeError(`${field} en fazla üç ondalık basamak içermelidir.`);
+  }
   return value;
 };
 
@@ -275,6 +338,15 @@ export function normalizeAdminCatalogProductDetail(payload) {
   }
 
   const rawId = requirePositiveInteger(product.id, "product.id");
+  const vatRate = requireVatRate(product.vat_rate, "product.vat_rate", { nullable: true });
+  const vatRateSource = requireVatRateSource(
+    product.vat_rate_source,
+    "product.vat_rate_source",
+    { nullable: true },
+  );
+  if ((vatRate === null) !== (vatRateSource === null)) {
+    throw new TypeError("product.vat_rate ve product.vat_rate_source birlikte null veya dolu olmalıdır.");
+  }
   return Object.freeze({
     id: `PR-${String(rawId).padStart(6, "0")}`,
     rawId,
@@ -284,6 +356,13 @@ export function normalizeAdminCatalogProductDetail(payload) {
     oldPrice: requireMoney(product.old_price, "product.old_price", { nullable: true }),
     currency: "TRY",
     stock: requireNonNegativeInteger(product.stock, "product.stock"),
+    sku: requireSku(product.sku, "product.sku", { nullable: true }),
+    brand: requireText(product.brand, "product.brand", { max: 160, nullable: true }),
+    productType: requireText(product.product_type, "product.product_type", { max: 160, nullable: true }),
+    vatRate,
+    vatRateSource,
+    weightGrams: requireNullablePositiveInteger(product.weight_grams, "product.weight_grams"),
+    desi: requireDesi(product.desi, "product.desi", { nullable: true }),
     publicationStatus: requirePublicationStatus(product.publication_status, "product.publication_status"),
     customerVisible: requireBoolean(product.is_customer_visible, "product.is_customer_visible"),
     deletedAt: requireNullableDate(product.deleted_at, "product.deleted_at"),
@@ -359,6 +438,27 @@ const normalizeProductInputFields = (source, { partial }) => {
   put("price", "price", (value) => requireMoney(value, "price"));
   put("oldPrice", "old_price", (value) => requireMoney(value, "oldPrice", { nullable: true }));
   put("stock", "stock", (value) => requireNonNegativeInteger(value, "stock"));
+  if (has("sku")) result.sku = requireSku(source.sku, "sku", { nullable: true });
+  if (has("brand")) result.brand = requireText(source.brand, "brand", { max: 160, nullable: true });
+  if (has("productType")) {
+    result.product_type = requireText(source.productType, "productType", { max: 160, nullable: true });
+  }
+  const hasVatRate = has("vatRate");
+  const hasVatRateSource = has("vatRateSource");
+  if (hasVatRate !== hasVatRateSource) {
+    throw new TypeError("vatRate ve vatRateSource birlikte gönderilmelidir.");
+  }
+  if (hasVatRate) {
+    result.vat_rate = requireVatRate(source.vatRate, "vatRate", { nullable: true });
+    result.vat_rate_source = requireVatRateSource(source.vatRateSource, "vatRateSource", { nullable: true });
+    if ((result.vat_rate === null) !== (result.vat_rate_source === null)) {
+      throw new TypeError("vatRate ve vatRateSource birlikte null veya dolu olmalıdır.");
+    }
+  }
+  if (has("weightGrams")) {
+    result.weight_grams = requireNullablePositiveInteger(source.weightGrams, "weightGrams");
+  }
+  if (has("desi")) result.desi = requireDesi(source.desi, "desi", { nullable: true });
   put("publicationStatus", "publication_status", (value) => requireMutablePublicationStatus(value, "publicationStatus"));
   put("customerVisible", "is_customer_visible", (value) => requireBoolean(value, "customerVisible"));
 

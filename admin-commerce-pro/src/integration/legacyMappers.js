@@ -208,6 +208,11 @@ export function normalizeFirstPartyCatalogProduct(row) {
     oldPrice: toStrictNullableFiniteNumber(row.old_price, "product.old_price"),
     currency: "TRY",
     stock: toInteger(row.stock, "product.stock"),
+    sku: row.sku === undefined ? null : toStrictNullableText(row.sku, "product.sku"),
+    brand: row.brand === undefined ? null : toStrictNullableText(row.brand, "product.brand"),
+    productType: row.product_type === undefined
+      ? null
+      : toStrictNullableText(row.product_type, "product.product_type"),
     publicationStatus,
     customerVisible: toBoolean(row.is_customer_visible, "product.is_customer_visible"),
     createdAt: toStrictNullableDate(row.created_at, "product.created_at"),

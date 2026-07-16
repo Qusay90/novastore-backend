@@ -236,6 +236,9 @@ const statsFor = async (categoryId) => {
     const publicDetail = await invoke(getProductById, { params: { id: productId } });
     assert.strictEqual(publicDetail.statusCode, 200);
     assert.strictEqual(publicDetail.body.is_purchasable, false);
+    for (const field of ['sku', 'normalized_sku', 'vat_rate', 'vat_rate_source', 'weight_grams', 'desi']) {
+        assert(!Object.hasOwn(publicDetail.body, field), `public detail ${field} alanını taşımamalı`);
+    }
 
     const restockClient = await pool.connect();
     try {
@@ -266,6 +269,9 @@ const statsFor = async (categoryId) => {
     assert.strictEqual(publicList.body.at(-1).is_purchasable, false);
     assert(!Object.hasOwn(publicList.body[0], 'categoryIds'));
     assert(!Object.hasOwn(publicList.body[0], 'primaryCategoryId'));
+    for (const field of ['sku', 'normalized_sku', 'vat_rate', 'vat_rate_source', 'weight_grams', 'desi']) {
+        assert(!Object.hasOwn(publicList.body[0], field), `public list ${field} alanını taşımamalı`);
+    }
 
     const rootCategoryProducts = await invoke(getAllProducts, {
         query: { categorySlug: 'lifecycle-root' }
@@ -314,6 +320,7 @@ const statsFor = async (categoryId) => {
     const adminLinkedProduct = adminList.body.find((product) => Number(product.id) === productId);
     assert.deepStrictEqual(adminLinkedProduct.categoryIds, [leafB]);
     assert.strictEqual(adminLinkedProduct.primaryCategoryId, leafB);
+    assert(!Object.hasOwn(adminLinkedProduct, 'normalized_sku'));
 
     const preservedLegacyFields = await pool.query(
         'SELECT category, categories FROM products WHERE id = $1',
