@@ -78,6 +78,9 @@ const createGetAdminProductSummaries = (database) => async (req, res) => {
                 SELECT
                     p.id,
                     p.name,
+                    p.sku,
+                    p.brand,
+                    p.product_type,
                     p.price,
                     p.old_price,
                     'TRY'::TEXT AS currency,

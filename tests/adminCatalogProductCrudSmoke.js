@@ -12,7 +12,6 @@ process.env.DB_HOST = '127.0.0.1';
 process.env.DB_PORT = '55432';
 process.env.DB_NAME = 'novastore_catalog_product_crud_test';
 process.env.DB_USER = 'novastore_test';
-process.env.DB_PASSWORD = 'novastore_test_only';
 process.env.DB_SSL = 'false';
 process.env.JWT_SECRET = 'admin-catalog-product-crud-smoke-secret';
 
@@ -28,6 +27,13 @@ const validCreate = {
     price: 1299.9,
     old_price: null,
     stock: 8,
+    sku: 'NV-101',
+    brand: 'Nova',
+    product_type: 'Test Ürünü',
+    vat_rate: 20,
+    vat_rate_source: 'USER_SUPPLIED_TAX_VALUE',
+    weight_grams: 500,
+    desi: 1.25,
     category_ids: [5],
     primary_category_id: 5,
     attributes: {}
@@ -36,6 +42,7 @@ const normalizedCreate = normalizeCreateProductPayload(validCreate);
 assert.equal(normalizedCreate.publication_status, 'draft');
 assert.equal(normalizedCreate.is_customer_visible, false);
 assert.deepEqual(normalizedCreate.category_ids, [5]);
+assert.equal(normalizedCreate.normalized_sku, 'NV-101');
 assert.throws(
     () => normalizeCreateProductPayload({ ...validCreate, image_url: 'https://example.invalid/private.jpg' }),
     (error) => error.code === 'ADMIN_CATALOG_PRODUCT_FIELD_NOT_ALLOWED'
@@ -92,6 +99,14 @@ const state = {
             price: '10.00',
             old_price: null,
             stock: 1,
+            sku: null,
+            normalized_sku: null,
+            brand: null,
+            product_type: null,
+            vat_rate: null,
+            vat_rate_source: null,
+            weight_grams: null,
+            desi: null,
             category: 'Kategorisiz',
             categories: ['Kategorisiz'],
             publication_status: 'draft',
@@ -175,6 +190,17 @@ const runQuery = async (sql, params = [], { transaction = false } = {}) => {
         };
     }
     if (/^INSERT INTO products/i.test(text)) {
+        const skuConflict = [...state.products.values()].some((product) =>
+            product.deleted_at === null
+            && product.normalized_sku !== null
+            && product.normalized_sku === params[6]
+        );
+        if (skuConflict) {
+            throw Object.assign(new Error('duplicate key value violates unique constraint'), {
+                code: '23505',
+                constraint: 'idx_products_normalized_sku_unique'
+            });
+        }
         const id = state.nextProductId++;
         const product = {
             id,
@@ -183,15 +209,23 @@ const runQuery = async (sql, params = [], { transaction = false } = {}) => {
             price: Number(params[2]).toFixed(2),
             old_price: params[3] === null ? null : Number(params[3]).toFixed(2),
             stock: params[4],
-            category: params[5],
-            categories: [...params[6]],
-            publication_status: params[7],
-            is_customer_visible: params[8],
+            sku: params[5],
+            normalized_sku: params[6],
+            brand: params[7],
+            product_type: params[8],
+            vat_rate: params[9] === null ? null : Number(params[9]).toFixed(2),
+            vat_rate_source: params[10],
+            weight_grams: params[11],
+            desi: params[12] === null ? null : Number(params[12]).toFixed(3),
+            category: params[13],
+            categories: [...params[14]],
+            publication_status: params[15],
+            is_customer_visible: params[16],
             deleted_at: null,
             created_at: now,
             updated_at: now,
             revision: 1,
-            store_id: Number(params[9]),
+            store_id: Number(params[17]),
             has_media: true
         };
         state.products.set(id, product);
@@ -227,18 +261,26 @@ const runQuery = async (sql, params = [], { transaction = false } = {}) => {
         return { rows: [] };
     }
     if (/^UPDATE products SET name = \$1/i.test(text)) {
-        const product = state.products.get(Number(params[9]));
-        assert.equal(product.store_id, Number(params[10]));
+        const product = state.products.get(Number(params[17]));
+        assert.equal(product.store_id, Number(params[18]));
         Object.assign(product, {
             name: params[0],
             description: params[1],
             price: Number(params[2]).toFixed(2),
             old_price: params[3] === null ? null : Number(params[3]).toFixed(2),
             stock: params[4],
-            category: params[5],
-            categories: [...params[6]],
-            publication_status: params[7],
-            is_customer_visible: params[8]
+            sku: params[5],
+            normalized_sku: params[6],
+            brand: params[7],
+            product_type: params[8],
+            vat_rate: params[9] === null ? null : Number(params[9]).toFixed(2),
+            vat_rate_source: params[10],
+            weight_grams: params[11],
+            desi: params[12] === null ? null : Number(params[12]).toFixed(3),
+            category: params[13],
+            categories: [...params[14]],
+            publication_status: params[15],
+            is_customer_visible: params[16]
         });
         return { rows: [{ id: product.id }], rowCount: 1 };
     }
@@ -361,9 +403,10 @@ const request = (server, method, path, { body, token, contentType = 'application
 const assertBoundedProduct = (payload) => {
     assert.equal(payload.catalogMode, 'first_party');
     assert.deepEqual(Object.keys(payload.product).sort(), [
-        'attributes', 'categories', 'category_ids', 'created_at', 'currency', 'deleted_at',
-        'description', 'has_media', 'id', 'is_customer_visible', 'name', 'old_price',
-        'price', 'primary_category_id', 'publication_status', 'revision', 'stock', 'updated_at'
+        'attributes', 'brand', 'categories', 'category_ids', 'created_at', 'currency', 'deleted_at',
+        'description', 'desi', 'has_media', 'id', 'is_customer_visible', 'name', 'old_price',
+        'price', 'primary_category_id', 'product_type', 'publication_status', 'revision', 'sku',
+        'stock', 'updated_at', 'vat_rate', 'vat_rate_source', 'weight_grams'
     ]);
     assert.equal(payload.product.currency, 'TRY');
     assert.equal(typeof payload.product.description, 'string');
@@ -470,11 +513,25 @@ const assertBoundedProduct = (payload) => {
         assert.equal(created.status, 201);
         assertBoundedProduct(created.body);
         assert.equal(created.body.product.id, 101);
+        assert.equal(created.body.product.sku, 'NV-101');
+        assert.equal(created.body.product.brand, 'Nova');
+        assert.equal(created.body.product.product_type, 'Test Ürünü');
+        assert.equal(created.body.product.vat_rate, 20);
+        assert.equal(created.body.product.vat_rate_source, 'USER_SUPPLIED_TAX_VALUE');
+        assert.equal(created.body.product.weight_grams, 500);
+        assert.equal(created.body.product.desi, 1.25);
         assert.equal(created.body.product.publication_status, 'draft');
         assert.equal(created.body.product.is_customer_visible, false);
         assert.equal(created.body.product.has_media, true, 'medya yalnızca boolean olarak görünmeli');
         assert.deepEqual(created.body.product.category_ids, [5]);
         assert.equal(created.body.product.categories[0].path, 'Elektronik / Telefon');
+        const skuConflict = await request(server, 'POST', '/api/admin/catalog/products', {
+            token,
+            body: { ...validCreate, sku: 'nv-101' }
+        });
+        assert.equal(skuConflict.status, 409);
+        assert.equal(skuConflict.body.code, 'ADMIN_CATALOG_PRODUCT_SKU_CONFLICT');
+        assert.equal(skuConflict.body.details.refetchRequired, true);
         assert.equal(state.products.get(101).store_id, 10, 'store_id yalnızca sunucu tarafından atanmalı');
         const createCalls = state.calls.slice(beforeCreateCallIndex);
         assert.equal(createCalls.some((call) =>

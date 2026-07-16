@@ -142,7 +142,7 @@ const parseProductCategories = (body = {}, existingProduct = null) => {
     return categories.length > 0 ? categories : [DEFAULT_PRODUCT_CATEGORY];
 };
 
-const normalizeProductRow = (product = {}) => {
+const normalizeProductRow = (product = {}, { includeCommerceOps = false } = {}) => {
     const categories = dedupeCategories(
         Array.isArray(product.categories) && product.categories.length > 0
             ? product.categories
@@ -150,7 +150,7 @@ const normalizeProductRow = (product = {}) => {
     );
     const primaryCategory = categories[0] || String(product.category || '').trim() || DEFAULT_PRODUCT_CATEGORY;
 
-    return {
+    const normalized = {
         ...product,
         category: primaryCategory,
         categories: categories.length > 0 ? categories : [primaryCategory],
@@ -160,6 +160,15 @@ const normalizeProductRow = (product = {}) => {
             !product.deleted_at &&
             Number(product.stock || 0) > 0
     };
+    delete normalized.normalized_sku;
+    if (!includeCommerceOps) {
+        delete normalized.sku;
+        delete normalized.vat_rate;
+        delete normalized.vat_rate_source;
+        delete normalized.weight_grams;
+        delete normalized.desi;
+    }
+    return normalized;
 };
 
 const normalizeMediaUrl = (file) => {
@@ -755,7 +764,7 @@ const getAllProducts = async (req, res) => {
         const products = productsResult.rows.map((product) => {
             const links = categoriesByProductId.get(Number(product.id)) || [];
             return {
-                ...normalizeProductRow(product),
+                ...normalizeProductRow(product, { includeCommerceOps: isAdmin }),
                 media: mediaByProductId.get(Number(product.id)) || [],
                 ...(isAdmin ? {
                     categoryIds: links.map((item) => item.categoryId),
@@ -856,7 +865,7 @@ const createProduct = async (req, res) => {
             mesaj: 'Ürün başarıyla vitrine eklendi.',
             warnings: [...payload.warnings, ...categoryResolution.warnings],
             product: {
-                ...normalizeProductRow(product),
+                ...normalizeProductRow(product, { includeCommerceOps: true }),
                 categoryIds: categorySync.current.map((item) => item.categoryId),
                 primaryCategoryId: categorySync.current.find((item) => item.isPrimary)?.categoryId || null,
                 attributes: productAttributes
@@ -908,7 +917,7 @@ const getProductById = async (req, res) => {
             [id]
         );
 
-        const product = normalizeProductRow(result.rows[0]);
+        const product = normalizeProductRow(result.rows[0], { includeCommerceOps: isAdmin });
         product.media = mediaResult.rows;
         const categoryLinks = await getProductCategoryLinks(pool, id);
         product.categoryIds = categoryLinks.map((item) => item.categoryId);
@@ -1228,7 +1237,7 @@ const updateProduct = async (req, res) => {
             mesaj: 'Ürün bilgileri güncellendi.',
             warnings: [...payload.warnings, ...categoryResolution.warnings],
             product: {
-                ...normalizeProductRow(updateResult.rows[0]),
+                ...normalizeProductRow(updateResult.rows[0], { includeCommerceOps: true }),
                 categoryIds: categorySync.current.map((item) => item.categoryId),
                 primaryCategoryId: categorySync.current.find((item) => item.isPrimary)?.categoryId || null,
                 attributes: productAttributes
