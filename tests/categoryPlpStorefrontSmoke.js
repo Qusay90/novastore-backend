@@ -127,6 +127,23 @@ assert.strictEqual(
     plp.categoryQueryUrl('kadin/giyim/pantolon'),
     '/kategori/kadin/giyim/pantolon'
 );
+assert.strictEqual(plp.productDetailUrl(36), '/product.html?id=36');
+assert.strictEqual(plp.productDetailUrl('37'), '/product.html?id=37');
+assert.strictEqual(plp.productDetailUrl(38), '/product.html?id=38');
+[
+    null,
+    undefined,
+    '',
+    0,
+    -1,
+    1.5,
+    Number.MAX_SAFE_INTEGER + 1,
+    '../38',
+    '38/../admin'
+].forEach((invalidId) => {
+    assert.strictEqual(plp.productDetailUrl(invalidId), '');
+    assert.strictEqual(plp.buildProductCardHtml({ id: invalidId, name: 'Geçersiz Ürün' }), '');
+});
 
 const publicTree = [{
     id: 1,
@@ -173,6 +190,35 @@ const productCard = plp.buildProductCardHtml({
 assert(productCard.includes('data-plp-favorite="7"'));
 assert(productCard.includes('data-plp-add-to-cart="7"'));
 assert(productCard.includes('btn-favorite active'));
+assert(productCard.includes('href="/product.html?id=7"'));
+assert(!productCard.includes('href="product.html?id=7"'));
+assert(!productCard.includes('href="//product.html'));
+
+const nestedCategoryUrl = new URL(
+    '/kategori/ev-yasam/mutfak/sofra-ve-mutfak-gerecleri/caydanlik',
+    'https://novastore.test'
+);
+[36, 37, 38].forEach((productId) => {
+    const markup = plp.buildProductCardHtml({
+        id: productId,
+        name: `Ürün ${productId}`,
+        price: 100,
+        stock: 1
+    });
+    const href = markup.match(/class="category-plp-product-link" href="([^"]+)"/)?.[1];
+    assert.strictEqual(href, `/product.html?id=${productId}`);
+    assert.strictEqual(
+        new URL(href, nestedCategoryUrl).toString(),
+        `https://novastore.test/product.html?id=${productId}`
+    );
+});
+
+const searchedProducts = plp.filterProducts([
+    { id: 38, name: 'Karaca Çaydanlık' },
+    { id: 37, name: 'Lenovo Laptop' }
+], 'çaydanlık');
+assert.strictEqual(searchedProducts.length, 1);
+assert(plp.buildProductsHtml(searchedProducts).includes('href="/product.html?id=38"'));
 assert(plp.buildProductsHtml([], new Set(), 'categoryEmpty').includes('Bu kategoride henüz ürün yok.'));
 assert(plp.buildProductsHtml([], new Set(), 'filterEmpty').includes('Seçili filtrelere uygun ürün bulunamadı.'));
 assert(plp.buildEmptyStateHtml('notFound').includes('Kategori bulunamadı.'));
