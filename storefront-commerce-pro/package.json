@@ -1,0 +1,32 @@
+{
+  "name": "novastore-storefront-commerce-pro",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync:canonical": "node scripts/sync-canonical.mjs",
+    "dev": "npm run sync:canonical && vite",
+    "build": "npm run sync:canonical && vite build --outDir ../frontend/commerce-pro-preview --emptyOutDir && node scripts/verify-preview.mjs",
+    "build:integration": "npm run sync:canonical && vite build --config vite.integration.config.mjs && node scripts/finalize-integration-preview.mjs",
+    "build:fixture": "npm run sync:canonical && vite build --config vite.fixture.config.mjs",
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.mjs",
+    "test:integration": "node --test tests/integration-boundary.test.mjs",
+    "verify": "npm run build && npm test",
+    "verify:integration": "npm run build:integration && npm run test:integration",
+    "verify:all": "npm run build && npm run build:integration && npm test"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@sparticuz/chromium": "^138.0.2",
+    "@vitejs/plugin-react": "5.0.4",
+    "axe-core": "^4.12.1",
+    "puppeteer-core": "^24.11.1",
+    "vite": "6.4.3",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}
