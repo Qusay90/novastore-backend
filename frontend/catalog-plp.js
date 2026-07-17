@@ -69,6 +69,12 @@
         return `${PRODUCTS_ENDPOINT}?${params.toString()}`;
     }
 
+    function productDetailUrl(productId) {
+        const id = Number(productId);
+        if (!Number.isSafeInteger(id) || id <= 0) return '';
+        return `/product.html?id=${encodeURIComponent(String(id))}`;
+    }
+
     async function fetchJson(fetcher, url) {
         const response = await fetcher(url);
         const text = response && typeof response.text === 'function'
@@ -288,6 +294,8 @@
     }
 
     function buildProductCardHtml(product = {}, favoriteIds = new Set()) {
+        const productHref = productDetailUrl(product.id);
+        if (!productHref) return '';
         const id = Number(product.id || 0);
         const name = String(product.name || 'Ürün').trim() || 'Ürün';
         const image = productImageUrl(product);
@@ -300,7 +308,7 @@
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                     </svg>
                 </button>
-                <a class="category-plp-product-link" href="product.html?id=${id}">
+                <a class="category-plp-product-link" href="${escapeHtml(productHref)}">
                     <div class="category-plp-product-media">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(name)}" loading="lazy">` : ''}</div>
                     <h2 class="product-title">${escapeHtml(name)}</h2>
                 </a>
@@ -537,6 +545,7 @@
         normalizeProductsPayload,
         normalizePublicTree,
         parseCategoryPath,
+        productDetailUrl,
         replaceCanonicalHistory,
         updateSeo
     };
