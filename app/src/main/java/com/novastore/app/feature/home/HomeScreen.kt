@@ -75,6 +75,7 @@ import com.novastore.app.R
 import coil3.compose.AsyncImage
 import coil3.imageLoader
 import coil3.request.ImageRequest
+import com.novastore.app.core.format.turkishPriceParts
 import com.novastore.app.core.theme.NavyDark
 import com.novastore.app.core.theme.NavyMid
 import com.novastore.app.core.theme.Orange
@@ -1148,17 +1149,20 @@ private fun ProductCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val priceWhole = product.price.toInt()
-                    val priceDecimal = ((product.price - priceWhole) * 100).toInt()
+                    val priceParts = turkishPriceParts(product.price)
                     val isDiscounted = product.oldPrice != null && product.oldPrice > product.price
                     
                     Text(
                         text = androidx.compose.ui.text.buildAnnotatedString {
-                            append("$priceWhole,")
-                            withStyle(androidx.compose.ui.text.SpanStyle(fontSize = 11.sp)) {
-                                append(priceDecimal.toString().padStart(2, '0'))
+                            if (priceParts == null) {
+                                append("—")
+                            } else {
+                                append("${priceParts.whole},")
+                                withStyle(androidx.compose.ui.text.SpanStyle(fontSize = 11.sp)) {
+                                    append(priceParts.fraction)
+                                }
+                                append(" TL")
                             }
-                            append(" TL")
                         },
                         style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
                         fontWeight = FontWeight.ExtraBold,
