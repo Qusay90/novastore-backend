@@ -15,7 +15,26 @@ const catalogReadSource = fs.readFileSync(path.join(commerceRoot, "src", "integr
 const catalogStructureSource = fs.readFileSync(path.join(commerceRoot, "src", "integration", "catalogStructureRead.js"), "utf8");
 const catalogMutationsSource = fs.readFileSync(path.join(commerceRoot, "src", "integration", "catalogMutations.js"), "utf8");
 const resourceHookSource = fs.readFileSync(path.join(commerceRoot, "src", "integration", "useResource.js"), "utf8");
-const { value: expectedFingerprint } = await createSourceFingerprint(commerceRoot, { mode: "integrated" });
+const {
+  value: expectedFingerprint,
+  fingerprintFiles,
+} = await createSourceFingerprint(commerceRoot, { mode: "integrated" });
+
+assert.deepEqual(
+  fingerprintFiles,
+  [...fingerprintFiles].sort(),
+  "live fingerprint girdileri deterministik sırada olmalı",
+);
+assert.ok(
+  fingerprintFiles.every((relativePath) => (
+    !relativePath.includes("\\")
+    && !relativePath.startsWith("/")
+    && !/^[A-Za-z]:\//.test(relativePath)
+  )),
+  "live fingerprint makine yolundan bağımsız canonical göreli yollar kullanmalı",
+);
+assert.ok(fingerprintFiles.includes("src/IntegratedApp.jsx"));
+assert.ok(!fingerprintFiles.includes("src/App.jsx"));
 
 assert.match(source, /<html\b[^>]*data-admin-mode="integrated"/i);
 assert.match(source, /<meta\b[^>]*Content-Security-Policy[^>]*connect-src 'self'/i);
