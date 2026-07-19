@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/Qusay90/novastore-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/Qusay90/novastore-backend/actions/workflows/ci.yml)
 [![Live storefront](https://img.shields.io/badge/live-novastore.tr-0f2a43)](https://novastore.tr)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 NovaStore is an actively developed, production-oriented commerce platform that combines a Node.js API, a web storefront, a modular administration interface, a PostgreSQL-compatible data layer, and a native Android application in one repository.
 
@@ -52,6 +53,7 @@ The demo shows the customer-facing storefront and catalog experience. Administra
 ├── scripts/                # Maintenance, migration, verification, and CI helpers
 ├── services/               # Business logic and integrations
 ├── tests/                  # Node-based contract and smoke tests
+├── LICENSE                 # MIT license
 ├── ROADMAP.md              # Public development direction
 └── CONTRIBUTING.md         # Contributor workflow
 ```
@@ -218,6 +220,10 @@ Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), open a
 ## Security
 
 Please do not publish exploitable vulnerability details in a public issue. Follow [SECURITY.md](SECURITY.md) for responsible reporting guidance.
+
+## License
+
+NovaStore is licensed under the [MIT License](LICENSE).
 
 ## Maintainer
 
