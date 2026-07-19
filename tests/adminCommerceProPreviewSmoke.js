@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const vm = require('node:vm');
 
 const repositoryRoot = path.join(__dirname, '..');
@@ -14,6 +15,7 @@ const sourceRoot = path.join(commerceProRoot, 'src');
 const stylesPath = path.join(repositoryRoot, 'admin-commerce-pro', 'src', 'styles.css');
 const designQaPath = path.join(repositoryRoot, 'admin-commerce-pro', 'design-qa.md');
 const standaloneBuilderPath = path.join(commerceProRoot, 'scripts', 'build-standalone.mjs');
+const sourceFingerprintPath = path.join(commerceProRoot, 'scripts', 'source-fingerprint.mjs');
 const viteConfigPath = path.join(commerceProRoot, 'vite.config.mjs');
 
 const compareNames = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
@@ -41,6 +43,14 @@ function listSourceFiles(directory) {
         return [path.relative(commerceProRoot, entryPath).split(path.sep).join('/')];
     }).sort(compareNames);
 }
+
+async function run() {
+const {
+    canonicalizeFingerprintContent,
+    canonicalizeFingerprintPath,
+    createSourceFingerprint,
+    updateSourceFingerprint
+} = await import(pathToFileURL(sourceFingerprintPath).href);
 
 assert.ok(
     fs.existsSync(previewPath),
@@ -77,29 +87,10 @@ const stylesSource = fs.readFileSync(stylesPath, 'utf8');
 const designQaSource = fs.readFileSync(designQaPath, 'utf8');
 const standaloneBuilderSource = fs.readFileSync(standaloneBuilderPath, 'utf8');
 const viteConfigSource = fs.readFileSync(viteConfigPath, 'utf8');
-const fingerprintFiles = [
-    'index.html',
-    'package.json',
-    'package-lock.json',
-    'vite.config.mjs',
-    'scripts/build-standalone.mjs',
-    'scripts/source-fingerprint.mjs',
-    ...previewSourceFiles,
-    'public/icons.js',
-    'public/favicon-96x96.png',
-    'public/assets/category-home.webp',
-    'public/assets/phone-iphone.webp',
-    'public/assets/phone-samsung.webp',
-    'public/assets/product-bedding.webp',
-    'public/assets/product-headphones.webp',
-    'public/assets/product-laptop.webp',
-    'public/assets/product-vacuum.webp',
-    'public/assets/product-watch.webp',
-    'public/assets/fonts/inter-latin-ext-400-normal.woff2',
-    'public/assets/fonts/inter-latin-ext-600-normal.woff2',
-    'public/assets/fonts/inter-latin-ext-700-normal.woff2',
-    'public/assets/fonts/inter-latin-ext-800-normal.woff2'
-].sort(compareNames);
+const { value: expectedFingerprint, fingerprintFiles } = await createSourceFingerprint(
+    commerceProRoot,
+    { mode: 'preview' }
+);
 
 assert.ok(sourceModuleFiles.length > 0, 'src altında en az bir JavaScript modülü bulunmalı');
 assert.ok(sourceFiles.includes('src/styles.css'), 'tüm src girdileri fingerprint kapsamına alınmalı');
@@ -123,13 +114,77 @@ assert.match(
     /buildStart\(\)[\s\S]{0,220}createSourceFingerprint\(root, \{ mode \}\)[\s\S]{0,300}writeFile\(path\.join\(root, outputDirectory, "\.source-fingerprint"\), buildSourceFingerprint/,
     'Vite build kendi kaynak parmak izini seçili çıktı dizinine yazmalı'
 );
+assert.deepEqual(
+    fingerprintFiles,
+    [...fingerprintFiles].sort(compareNames),
+    'fingerprint girdileri deterministik sırada olmalı'
+);
+assert.ok(
+    fingerprintFiles.every((relativePath) => !relativePath.includes('\\') && !path.isAbsolute(relativePath)),
+    'fingerprint yalnız canonical repository-relative yollar içermeli'
+);
 
-const fingerprint = createHash('sha256');
-for (const relativePath of fingerprintFiles) {
-    fingerprint.update(relativePath);
-    fingerprint.update(fs.readFileSync(path.join(commerceProRoot, relativePath)));
-}
-const expectedFingerprint = fingerprint.digest('hex');
+const digestEntry = (relativePath, content) => {
+    const fingerprint = createHash('sha256');
+    updateSourceFingerprint(fingerprint, relativePath, content);
+    return fingerprint.digest('hex');
+};
+const lfText = Buffer.from('birinci\nikinci\nson\n', 'utf8');
+const crlfText = Buffer.from('birinci\r\nikinci\r\nson\r\n', 'utf8');
+const loneCrText = Buffer.from('birinci\rikinci\rson\r', 'utf8');
+
+assert.equal(
+    digestEntry('src/example.js', lfText),
+    digestEntry('src/example.js', crlfText),
+    'LF ve CRLF metin temsilleri aynı fingerprint değerini üretmeli'
+);
+assert.equal(
+    digestEntry('src/example.js', lfText),
+    digestEntry('src/example.js', loneCrText),
+    'lone CR satır sonları LF olarak canonicalize edilmeli'
+);
+assert.deepEqual(
+    canonicalizeFingerprintContent('src/example.js', loneCrText),
+    lfText,
+    'metin canonicalization yalnız satır sonlarını LF yapmalı'
+);
+
+const binaryFixture = Buffer.from([0x00, 0x0d, 0x0a, 0x7f, 0xff]);
+const changedBinaryFixture = Buffer.from(binaryFixture);
+changedBinaryFixture[3] ^= 0x01;
+assert.deepEqual(
+    canonicalizeFingerprintContent('public/example.png', binaryFixture),
+    binaryFixture,
+    'binary fingerprint girdisi byte-birebir korunmalı'
+);
+assert.notEqual(
+    digestEntry('public/example.png', binaryFixture),
+    digestEntry('public/example.png', changedBinaryFixture),
+    'binary girdide tek byte değişikliği fingerprint değerini değiştirmeli'
+);
+assert.equal(
+    digestEntry('src/example.js', lfText),
+    digestEntry('src\\example.js', lfText),
+    'Windows ve POSIX path separator temsilleri aynı fingerprint değerini üretmeli'
+);
+assert.equal(canonicalizeFingerprintPath('src\\example.js'), 'src/example.js');
+const windowsMachinePath = ['X:', 'machine-root', 'source.js'].join('\\');
+const posixMachinePath = ['', 'machine-root', 'source.js'].join('/');
+assert.throws(
+    () => canonicalizeFingerprintPath(windowsMachinePath),
+    /repository-relative/,
+    'Windows makine yolu fingerprint girdisi olamamalı'
+);
+assert.throws(
+    () => canonicalizeFingerprintPath(posixMachinePath),
+    /repository-relative/,
+    'POSIX makine yolu fingerprint girdisi olamamalı'
+);
+assert.throws(
+    () => canonicalizeFingerprintContent('public/example.bin', binaryFixture),
+    /Desteklenmeyen fingerprint girdisi/,
+    'tanımsız uzantı geniş text varsayımına düşmemeli'
+);
 
 assert.match(previewSource, /<!doctype html>/i, 'önizleme geçerli bir HTML belgesi olmalı');
 assert.match(previewSource, /<html\b[^>]*\blang=["']tr["']/i, 'önizleme Türkçe belge dili tanımlamalı');
@@ -436,3 +491,9 @@ assert.match(
 );
 
 console.log('admin Commerce Pro preview smoke passed');
+}
+
+run().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});
