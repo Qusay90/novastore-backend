@@ -10,15 +10,27 @@ const smokeTests = [
     'tests/categoryPlpStorefrontSmoke.js'
 ];
 
+const smokeEnv = {
+    ...process.env,
+    NODE_ENV: 'test',
+    DATABASE_URL: 'postgresql://novastore_ci:novastore_ci_only@127.0.0.1:55432/novastore_ci',
+    DB_SSL: 'false',
+    NOVASTORE_SAFE_LOCAL_BACKEND: 'true',
+    NOVASTORE_ALLOW_REMOTE_DB: 'false',
+    SKIP_SCHEMA_INIT: 'true',
+    NOVASTORE_ALLOW_SCHEMA_INIT: 'false',
+    SUPABASE_USE_POOLER: 'false',
+    SUPABASE_POOLER_HOST: '',
+    SUPABASE_REGION: '',
+    SUPABASE_PROJECT_REF: ''
+};
+
 for (const relativePath of smokeTests) {
     console.log(`\n[ci-smoke] Running ${relativePath}`);
 
     const result = spawnSync(process.execPath, [path.join(rootDir, relativePath)], {
         cwd: rootDir,
-        env: {
-            ...process.env,
-            NODE_ENV: 'test'
-        },
+        env: smokeEnv,
         stdio: 'inherit'
     });
 
