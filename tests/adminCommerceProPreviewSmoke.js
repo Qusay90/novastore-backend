@@ -19,6 +19,21 @@ const designQaPath = path.join(repositoryRoot, 'admin-commerce-pro', 'design-qa.
 const standaloneBuilderPath = path.join(commerceProRoot, 'scripts', 'build-standalone.mjs');
 const sourceFingerprintPath = path.join(commerceProRoot, 'scripts', 'source-fingerprint.mjs');
 const viteConfigPath = path.join(commerceProRoot, 'vite.config.mjs');
+const gitAttributesPath = path.join(repositoryRoot, '.gitattributes');
+
+const preservedGitAttributeRules = [
+    '/frontend/assets/fonts/inter/OFL-1.1.txt text eol=lf',
+    '/frontend/assets/vendor/fontawesome/LICENSE.txt text eol=lf',
+    '/storefront-commerce-pro/canonical/NovaStore-Commerce-Pro.html text eol=lf',
+    '/storefront-commerce-pro/src/App.jsx text eol=lf',
+    '/storefront-commerce-pro/src/catalog.js text eol=lf',
+    '/storefront-commerce-pro/index.html text eol=lf',
+    '/storefront-commerce-pro/src/CanonicalRuntimePresentation.jsx text eol=lf'
+];
+const generatedArtifactAttributeRules = new Map([
+    ['frontend/admin-commerce-pro.html', 'frontend/admin-commerce-pro.html text eol=lf'],
+    ['frontend/admin-commerce-pro-live.html', 'frontend/admin-commerce-pro-live.html text eol=lf']
+]);
 
 const compareNames = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 
@@ -67,6 +82,51 @@ function assertDeterministicStandaloneArtifact() {
     }
 }
 
+function assertGeneratedArtifactGitAttributes() {
+    assert.ok(fs.existsSync(gitAttributesPath), '.gitattributes bulunmalı');
+    const attributeLines = fs.readFileSync(gitAttributesPath, 'utf8').split(/\r?\n/);
+
+    for (const rule of preservedGitAttributeRules) {
+        assert.equal(
+            attributeLines.filter((line) => line === rule).length,
+            1,
+            `mevcut .gitattributes kuralı korunmalı: ${rule}`
+        );
+    }
+    for (const rule of generatedArtifactAttributeRules.values()) {
+        assert.equal(
+            attributeLines.filter((line) => line === rule).length,
+            1,
+            `generated artifact LF kuralı exact bir kez bulunmalı: ${rule}`
+        );
+    }
+
+    const checkAttributeOutput = execFileSync(
+        'git',
+        ['check-attr', '-z', 'text', 'eol', '--', ...generatedArtifactAttributeRules.keys()],
+        { cwd: repositoryRoot }
+    ).toString('utf8');
+    const fields = checkAttributeOutput.split('\0');
+    if (fields.at(-1) === '') fields.pop();
+    assert.equal(fields.length, generatedArtifactAttributeRules.size * 2 * 3, 'git check-attr -z tam sonuç dönmeli');
+
+    const effectiveAttributes = new Map();
+    for (let index = 0; index < fields.length; index += 3) {
+        const [filePath, attribute, value] = fields.slice(index, index + 3);
+        assert.ok(generatedArtifactAttributeRules.has(filePath), `beklenmeyen git check-attr yolu: ${filePath}`);
+        assert.ok(attribute === 'text' || attribute === 'eol', `beklenmeyen git attribute: ${attribute}`);
+        const fileAttributes = effectiveAttributes.get(filePath) || new Map();
+        assert.equal(fileAttributes.has(attribute), false, `${filePath} için ${attribute} bir kez dönmeli`);
+        fileAttributes.set(attribute, value);
+        effectiveAttributes.set(filePath, fileAttributes);
+    }
+
+    for (const filePath of generatedArtifactAttributeRules.keys()) {
+        assert.equal(effectiveAttributes.get(filePath)?.get('text'), 'set', `${filePath} text attribute set olmalı`);
+        assert.equal(effectiveAttributes.get(filePath)?.get('eol'), 'lf', `${filePath} eol attribute lf olmalı`);
+    }
+}
+
 async function run() {
 const {
     canonicalizeFingerprintContent,
@@ -74,6 +134,8 @@ const {
     createSourceFingerprint,
     updateSourceFingerprint
 } = await import(pathToFileURL(sourceFingerprintPath).href);
+
+assertGeneratedArtifactGitAttributes();
 
 assert.ok(
     fs.existsSync(previewPath),
