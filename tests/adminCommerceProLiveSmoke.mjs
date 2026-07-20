@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
@@ -8,7 +11,10 @@ import { createSourceFingerprint } from "../admin-commerce-pro/scripts/source-fi
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const commerceRoot = path.join(repositoryRoot, "admin-commerce-pro");
 const livePath = path.join(repositoryRoot, "frontend", "admin-commerce-pro-live.html");
-const source = fs.readFileSync(livePath, "utf8");
+const standaloneBuilderPath = path.join(commerceRoot, "scripts", "build-standalone.mjs");
+const sourceBytes = fs.readFileSync(livePath);
+assert.equal(sourceBytes.includes(0x0d), false, "live artifact CR byte içermemeli");
+const source = sourceBytes.toString("utf8");
 const integratedAppSource = fs.readFileSync(path.join(commerceRoot, "src", "IntegratedApp.jsx"), "utf8");
 const adapterSource = fs.readFileSync(path.join(commerceRoot, "src", "adapters", "sameOriginAdapter.js"), "utf8");
 const catalogReadSource = fs.readFileSync(path.join(commerceRoot, "src", "integration", "catalogRead.js"), "utf8");
@@ -19,6 +25,25 @@ const {
   value: expectedFingerprint,
   fingerprintFiles,
 } = await createSourceFingerprint(commerceRoot, { mode: "integrated" });
+
+const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "novastore-admin-live-"));
+const temporaryOutput = path.join(temporaryDirectory, "admin-commerce-pro-live.html");
+const buildArguments = [standaloneBuilderPath, "--mode", "integrated", "--output", temporaryOutput];
+
+try {
+  execFileSync(process.execPath, buildArguments, { cwd: commerceRoot, stdio: "pipe" });
+  const firstBuild = fs.readFileSync(temporaryOutput);
+  const firstHash = createHash("sha256").update(firstBuild).digest("hex");
+  assert.equal(firstBuild.includes(0x0d), false, "ilk live artifact üretiminde CR byte kalmamalı");
+
+  execFileSync(process.execPath, buildArguments, { cwd: commerceRoot, stdio: "pipe" });
+  const secondBuild = fs.readFileSync(temporaryOutput);
+  const secondHash = createHash("sha256").update(secondBuild).digest("hex");
+  assert.equal(secondBuild.includes(0x0d), false, "ikinci live artifact üretiminde CR byte kalmamalı");
+  assert.equal(secondHash, firstHash, "arka arkaya live artifact üretimleri aynı SHA-256 değerini vermeli");
+} finally {
+  fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+}
 
 assert.deepEqual(
   fingerprintFiles,
