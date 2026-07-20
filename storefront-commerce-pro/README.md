@@ -98,3 +98,49 @@ Generated preview dosyaları doğrulama çıktısıdır ve commit edilmez:
 Visual UAT kabulü cutover veya yayın yetkisi değildir. Henüz storefront cutover,
 commit, push, PR, merge, deploy, production/uzak DB işlemi ya da gerçek ödeme
 yapılmamıştır. Bu işlemlerin her biri ayrı ve açık kullanıcı onayı gerektirir.
+
+## Deterministik production artifact adayı
+
+Resmi müşteri rotalarını değiştirmeyen production artifact adayı şu zincirden
+üretilir:
+
+```text
+cutover.html
+→ src/main-integrated.jsx
+→ src/IntegratedApp.jsx
+→ src/integration/useCommerceRuntime.js
+→ src/integration/createCommerceRuntime.js
+```
+
+Bu zincir gerçek catalog, customer, favorites, shared cart ve checkout
+adapterlarını kullanır. `fixture-integrated.html`, `src/main-integrated-fixture.jsx`
+ve `createCanonicalFixtureRuntime()` production artifact girdisi değildir.
+
+Artifactı üretmek ve doğrulamak için:
+
+```bash
+npm run build:cutover
+npm run test:cutover
+# veya iki adımı birlikte
+npm run verify:cutover
+```
+
+Build, Vite ara çıktısını yalnız işletim sistemi temp alanında oluşturur, gerekli
+JS/CSS/assets içeriğini tek HTML içine gömer ve doğrulanan sonucu
+`frontend/commerce-pro/index.html` yoluna taşır. Artifact elle düzenlenmez;
+`scripts/finalize-cutover.mjs` ile yeniden üretilir. Aynı kaynaklarla tekrarlanan
+build raw-byte olarak aynı sonucu vermelidir.
+
+`frontend/` statik sunulduğu için aday artifact doğrudan `/commerce-pro/`
+adresinden açılabilir. Bu opt-in URL, resmi `/`, kategori, PDP, favoriler, sepet,
+auth veya checkout rotalarının Commerce Pro'ya geçirildiği anlamına gelmez.
+`server.js` ve legacy route sahipliği bu artifact turunda değişmez.
+
+Rollback sınırı olarak `frontend/index.html`, `categories.html`,
+`collections.html`, `product.html`, `login.html`, `forgot-password.html`,
+`reset-password.html`, `profile.html`, `checkout.html`, `paytr-checkout.html` ve
+`payment-result.html` korunur. Resmi aktivasyon ve rollback routing/entrypoint
+seviyesinde, ayrı rezervasyon ve onayla yapılmalıdır.
+
+Bu artifact üretiminde production/uzak DB kullanılmaz ve gerçek ödeme isteği
+gönderilmez. Commit, push, PR, merge ve deploy ayrı yetki kapılarıdır.
