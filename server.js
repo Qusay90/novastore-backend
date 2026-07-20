@@ -100,6 +100,79 @@ app.get('/favicon.ico', (req, res) => {
     res.type('image/png');
     res.sendFile(path.join(__dirname, 'frontend', 'favicon-96x96.png'));
 });
+
+const COMMERCE_PRO_STOREFRONT_ARTIFACT = path.join(
+    __dirname,
+    'frontend',
+    'commerce-pro',
+    'index.html'
+);
+const storefrontMode = String(process.env.NOVASTORE_STOREFRONT_MODE || '').trim().toLowerCase();
+const commerceProStorefrontEnabled = storefrontMode !== 'legacy';
+
+if (storefrontMode && !['commerce-pro', 'legacy'].includes(storefrontMode)) {
+    console.warn(
+        `Bilinmeyen NOVASTORE_STOREFRONT_MODE=${storefrontMode}; ` +
+        'varsayilan Commerce Pro storefront kullanilacak.'
+    );
+}
+
+const COMMERCE_PRO_DOCUMENT_ALIASES = new Set([
+    '/',
+    '/index.html',
+    '/login.html',
+    '/forgot-password.html',
+    '/reset-password.html',
+    '/checkout.html',
+    '/profile.html',
+    '/product.html'
+]);
+const COMMERCE_PRO_HASH_ROUTES = [
+    /^\/urun-id\/\d+\/?$/,
+    /^\/arama\/?$/,
+    /^\/favoriler\/?$/,
+    /^\/sepet\/?$/,
+    /^\/hesabim(?:\/(?:adresler|kuponlar|bildirimler|guvenlik|siparisler(?:\/[^/]+)?))?\/?$/,
+    /^\/(?:giris|kayit|sifremi-unuttum|sifre-sifirla)\/?$/,
+    /^\/odeme\/(?:teslimat|odeme|onay)\/?$/,
+    /^\/(?:yardim|siparis-takibi|iletisim)\/?$/
+];
+const COMMERCE_PRO_DOCUMENT_ROUTES = /^\/(?:kategori|urun|koleksiyon)\/(?:[^/]+(?:\/[^/]+)*)\/?$/;
+
+const requestSearch = (req) => {
+    const queryIndex = req.originalUrl.indexOf('?');
+    return queryIndex === -1 ? '' : req.originalUrl.slice(queryIndex);
+};
+
+app.use((req, res, next) => {
+    if (!commerceProStorefrontEnabled || !['GET', 'HEAD'].includes(req.method)) return next();
+
+    if (/^\/category\/(?:[^/]+(?:\/[^/]+)*)\/?$/.test(req.path)) {
+        const requestedPath = req.path.slice('/category/'.length).replace(/^\/+|\/+$/g, '');
+        let canonicalPath;
+        try {
+            canonicalPath = requestedPath
+                .split('/')
+                .map((segment) => encodeURIComponent(decodeURIComponent(segment)))
+                .join('/');
+        } catch (_) {
+            return next();
+        }
+        return res.redirect(301, `/kategori/${canonicalPath}${requestSearch(req)}`);
+    }
+
+    if (COMMERCE_PRO_DOCUMENT_ALIASES.has(req.path) || COMMERCE_PRO_DOCUMENT_ROUTES.test(req.path)) {
+        return res.sendFile(COMMERCE_PRO_STOREFRONT_ARTIFACT);
+    }
+
+    if (COMMERCE_PRO_HASH_ROUTES.some((pattern) => pattern.test(req.path))) {
+        const canonicalHashPath = req.path.replace(/\/+$/g, '');
+        return res.redirect(302, `/#${canonicalHashPath}${requestSearch(req)}`);
+    }
+
+    return next();
+});
+
 const ADMIN_COMMERCE_PRO_HTML_FILES = new Set([
     'admin-commerce-pro.html',
     'admin-commerce-pro-live.html'
