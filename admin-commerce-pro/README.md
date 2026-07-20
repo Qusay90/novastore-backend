@@ -72,6 +72,8 @@ Bu komut `frontend/admin-commerce-pro-live.html` üretir. Artifact `connect-src 
 
 ## Deterministik artifact ve fingerprint sözleşmesi
 
+Standalone üretici, nihai preview ve live HTML çıktılarını platformdan bağımsız LF byte'larıyla yazar. Artifact smoke kapıları CR byte kalmadığını ve aynı girdilerle arka arkaya iki üretimin birebir aynı SHA-256 değerini verdiğini doğrular.
+
 Canonical kaynak fingerprint'i açık bir dosya türü allowlist'i kullanır: metin girdilerinde `CRLF` ve lone `CR` satır sonları hash öncesinde `LF` olur; PNG, WebP ve WOFF2 girdileri ise ham byte olarak kalır. Yalnız repository-relative POSIX yollar hash'e girer. Bu sözleşme Windows `core.autocrlf=true` checkout'larını destekler; mutlak makine yolu fingerprint'e eklenmez.
 
 Preview ve live artifact'leri yalnız mevcut build scriptleriyle üretin; generated HTML'i elle düzenlemeyin:

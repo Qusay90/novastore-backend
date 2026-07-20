@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const vm = require('node:vm');
@@ -44,6 +46,27 @@ function listSourceFiles(directory) {
     }).sort(compareNames);
 }
 
+function assertDeterministicStandaloneArtifact() {
+    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'novastore-admin-preview-'));
+    const temporaryOutput = path.join(temporaryDirectory, 'admin-commerce-pro.html');
+    const buildArguments = [standaloneBuilderPath, '--output', temporaryOutput];
+
+    try {
+        execFileSync(process.execPath, buildArguments, { cwd: commerceProRoot, stdio: 'pipe' });
+        const firstBuild = fs.readFileSync(temporaryOutput);
+        const firstHash = createHash('sha256').update(firstBuild).digest('hex');
+        assert.equal(firstBuild.includes(0x0d), false, 'ilk preview artifact üretiminde CR byte kalmamalı');
+
+        execFileSync(process.execPath, buildArguments, { cwd: commerceProRoot, stdio: 'pipe' });
+        const secondBuild = fs.readFileSync(temporaryOutput);
+        const secondHash = createHash('sha256').update(secondBuild).digest('hex');
+        assert.equal(secondBuild.includes(0x0d), false, 'ikinci preview artifact üretiminde CR byte kalmamalı');
+        assert.equal(secondHash, firstHash, 'arka arkaya preview artifact üretimleri aynı SHA-256 değerini vermeli');
+    } finally {
+        fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
+}
+
 async function run() {
 const {
     canonicalizeFingerprintContent,
@@ -63,7 +86,9 @@ assert.ok(
 
 assert.ok(fs.existsSync(adminPath), 'frontend/admin.html bulunamadı');
 
-const previewSource = fs.readFileSync(previewPath, 'utf8');
+const previewBytes = fs.readFileSync(previewPath);
+assert.equal(previewBytes.includes(0x0d), false, 'preview artifact CR byte içermemeli');
+const previewSource = previewBytes.toString('utf8');
 const adminSource = fs.readFileSync(adminPath, 'utf8');
 const sourceModuleFiles = listSourceModules(sourceRoot);
 const sourceFiles = listSourceFiles(sourceRoot);
@@ -119,6 +144,7 @@ assert.deepEqual(
     [...fingerprintFiles].sort(compareNames),
     'fingerprint girdileri deterministik sırada olmalı'
 );
+assertDeterministicStandaloneArtifact();
 assert.ok(
     fingerprintFiles.every((relativePath) => !relativePath.includes('\\') && !path.isAbsolute(relativePath)),
     'fingerprint yalnız canonical repository-relative yollar içermeli'
@@ -314,6 +340,16 @@ assert.match(
     stylesSource,
     /@media \(max-width: 760px\)[\s\S]*?\.command-trigger \{ display: grid;/,
     'mobil görünüm komut paleti için dokunmatik tetikleyiciyi korumalı'
+);
+assert.equal(
+    (stylesSource.match(/\.command-trigger > span:not\(\.icon-wrap\),\s*\.command-trigger kbd \{ display: none; \}/g) || []).length,
+    2,
+    'iki mobil breakpoint de yalnız komut etiketini gizleyip span.icon-wrap ikonunu korumalı'
+);
+assert.doesNotMatch(
+    stylesSource,
+    /\.command-trigger span,\s*\.command-trigger kbd \{ display: none; \}/,
+    'mobil komut etiketi selectorü span.icon-wrap ikonunu gizlememeli'
 );
 assert.match(
     applicationSource,
