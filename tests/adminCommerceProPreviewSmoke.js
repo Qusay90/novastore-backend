@@ -34,6 +34,13 @@ const generatedArtifactAttributeRules = new Map([
     ['frontend/admin-commerce-pro.html', 'frontend/admin-commerce-pro.html text eol=lf'],
     ['frontend/admin-commerce-pro-live.html', 'frontend/admin-commerce-pro-live.html text eol=lf']
 ]);
+const rawByteMatrixArtifactKeys = ['preview', 'live'];
+const rawByteMatrixStageKeys = ['blob', 'checkout', 'build1', 'build2'];
+const rawByteArtifactDefinitions = {
+    preview: { relativePath: 'frontend/admin-commerce-pro.html' },
+    live: { relativePath: 'frontend/admin-commerce-pro-live.html' }
+};
+const childProcessMaxBuffer = 32 * 1024 * 1024;
 
 const compareNames = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 
@@ -61,24 +68,249 @@ function listSourceFiles(directory) {
     }).sort(compareNames);
 }
 
-function assertDeterministicStandaloneArtifact() {
-    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'novastore-admin-preview-'));
-    const temporaryOutput = path.join(temporaryDirectory, 'admin-commerce-pro.html');
-    const buildArguments = [standaloneBuilderPath, '--output', temporaryOutput];
+function executeBuffer(command, args, cwd = repositoryRoot) {
+    const output = execFileSync(command, args, {
+        cwd,
+        encoding: null,
+        maxBuffer: childProcessMaxBuffer,
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+    assert.ok(Buffer.isBuffer(output), `${command} stdout Buffer olmalı`);
+    return output;
+}
+
+function executeText(command, args, cwd = repositoryRoot) {
+    return executeBuffer(command, args, cwd).toString('utf8');
+}
+
+function executeNpmScript(scriptName) {
+    if (process.platform === 'win32') {
+        executeBuffer(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm.cmd', 'run', scriptName], commerceProRoot);
+        return;
+    }
+    executeBuffer('npm', ['run', scriptName], commerceProRoot);
+}
+
+function sha256(buffer) {
+    assert.ok(Buffer.isBuffer(buffer), 'SHA-256 girdisi Buffer olmalı');
+    return createHash('sha256').update(buffer).digest('hex');
+}
+
+function countCrBytes(buffer) {
+    assert.ok(Buffer.isBuffer(buffer), 'CR sayımı girdisi Buffer olmalı');
+    let count = 0;
+    for (const byte of buffer) {
+        if (byte === 0x0d) count += 1;
+    }
+    return count;
+}
+
+function parseNullDelimitedGitAttributes(output, expectedPaths) {
+    assert.ok(Buffer.isBuffer(output), 'git check-attr çıktısı Buffer olmalı');
+    const fields = output.toString('utf8').split('\0');
+    if (fields.at(-1) === '') fields.pop();
+    assert.equal(fields.length, expectedPaths.length * 2 * 3, 'git check-attr -z tam sonuç dönmeli');
+
+    const parsed = new Map();
+    for (let index = 0; index < fields.length; index += 3) {
+        const [filePath, attribute, value] = fields.slice(index, index + 3);
+        assert.ok(expectedPaths.includes(filePath), `beklenmeyen git check-attr yolu: ${filePath}`);
+        assert.ok(attribute === 'text' || attribute === 'eol', `beklenmeyen git attribute: ${attribute}`);
+        const attributes = parsed.get(filePath) || new Map();
+        assert.equal(attributes.has(attribute), false, `${filePath} için ${attribute} bir kez dönmeli`);
+        attributes.set(attribute, value);
+        parsed.set(filePath, attributes);
+    }
+
+    for (const filePath of expectedPaths) {
+        assert.equal(parsed.get(filePath)?.get('text'), 'set', `${filePath} text attribute set olmalı`);
+        assert.equal(parsed.get(filePath)?.get('eol'), 'lf', `${filePath} eol attribute lf olmalı`);
+    }
+    return parsed;
+}
+
+function buildRawByteOutputs(temporaryDirectory, buildLabel) {
+    const previewOutput = path.join(temporaryDirectory, `${buildLabel}-preview.html`);
+    const liveOutput = path.join(temporaryDirectory, `${buildLabel}-live.html`);
+
+    executeNpmScript('build');
+    executeBuffer(process.execPath, [standaloneBuilderPath, '--output', previewOutput], commerceProRoot);
+    const preview = fs.readFileSync(previewOutput);
+
+    executeNpmScript('build:live');
+    executeBuffer(
+        process.execPath,
+        [standaloneBuilderPath, '--mode', 'integrated', '--output', liveOutput],
+        commerceProRoot
+    );
+    const live = fs.readFileSync(liveOutput);
+
+    assert.ok(Buffer.isBuffer(preview) && preview.length > 0, `${buildLabel} preview output Buffer olmalı`);
+    assert.ok(Buffer.isBuffer(live) && live.length > 0, `${buildLabel} live output Buffer olmalı`);
+    return { preview, live };
+}
+
+function assertRawByteMatrices(matrices, { emitDiagnostics = false } = {}) {
+    assert.deepEqual(Object.keys(matrices), rawByteMatrixArtifactKeys, 'matrix artifact anahtarları exact preview + live olmalı');
+    const diagnostics = {};
+
+    for (const artifactKey of rawByteMatrixArtifactKeys) {
+        const matrix = matrices[artifactKey];
+        assert.deepEqual(
+            Object.keys(matrix),
+            rawByteMatrixStageKeys,
+            `${artifactKey} matrix stage anahtarları exact blob + checkout + build1 + build2 olmalı`
+        );
+        assert.equal(Object.entries(matrix).length, 4, `${artifactKey} matrix tam dört entry içermeli`);
+        const blob = matrix.blob;
+        assert.ok(Buffer.isBuffer(blob) && blob.length > 0, `${artifactKey} blob gerçek ve dolu Buffer olmalı`);
+        const blobSha = sha256(blob);
+        diagnostics[artifactKey] = {};
+
+        for (const stageKey of rawByteMatrixStageKeys) {
+            const buffer = matrix[stageKey];
+            assert.ok(Buffer.isBuffer(buffer), `${artifactKey} ${stageKey} gerçek Buffer olmalı`);
+            assert.ok(buffer.length > 0, `${artifactKey} ${stageKey} Buffer boş olmamalı`);
+            const crBytes = countCrBytes(buffer);
+            const stageSha = sha256(buffer);
+            assert.equal(crBytes, 0, `${artifactKey} ${stageKey} CR byte sayısı 0 olmalı`);
+            assert.equal(buffer.equals(blob), true, `${artifactKey} ${stageKey} blob ile byte-for-byte eşit olmalı`);
+            assert.equal(stageSha, blobSha, `${artifactKey} ${stageKey} SHA-256 blob SHA ile eşit olmalı`);
+            diagnostics[artifactKey][stageKey] = { sha256: stageSha, crBytes };
+            if (emitDiagnostics) {
+                console.log(`${artifactKey} ${stageKey} sha256=${stageSha} cr=${crBytes}`);
+            }
+        }
+    }
+    return diagnostics;
+}
+
+function removeOwnedMatrixDirectory(temporaryDirectory) {
+    const resolvedTemporaryDirectory = path.resolve(temporaryDirectory);
+    const resolvedTempRoot = path.resolve(os.tmpdir());
+    const normalizeCase = (value) => (process.platform === 'win32' ? value.toLocaleLowerCase('en-US') : value);
+    assert.equal(
+        normalizeCase(path.dirname(resolvedTemporaryDirectory)),
+        normalizeCase(resolvedTempRoot),
+        'matrix cleanup yalnız os.tmpdir() altındaki doğrudan görev dizinini kaldırmalı'
+    );
+    assert.match(
+        path.basename(resolvedTemporaryDirectory),
+        /^novastore-admin-raw-byte-matrix-[A-Za-z0-9_-]+$/,
+        'matrix cleanup görev prefixini doğrulamalı'
+    );
+    assert.equal(fs.existsSync(resolvedTemporaryDirectory), true, 'matrix cleanup hedefi mevcut olmalı');
+    fs.rmSync(resolvedTemporaryDirectory, { recursive: true, force: false, maxRetries: 3, retryDelay: 100 });
+    assert.equal(fs.existsSync(resolvedTemporaryDirectory), false, 'matrix disposable dizini tamamen kaldırılmalı');
+}
+
+function assertRawByteArtifactMatrix() {
+    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'novastore-admin-raw-byte-matrix-'));
+    const checkoutRoot = path.join(temporaryDirectory, 'checkout');
+    const artifactPaths = Object.values(rawByteArtifactDefinitions).map(({ relativePath }) => relativePath);
+    const primaryBefore = Object.fromEntries(Object.entries(rawByteArtifactDefinitions).map(([artifactKey, definition]) => [
+        artifactKey,
+        fs.readFileSync(path.join(repositoryRoot, ...definition.relativePath.split('/')))
+    ]));
+    let operationError;
 
     try {
-        execFileSync(process.execPath, buildArguments, { cwd: commerceProRoot, stdio: 'pipe' });
-        const firstBuild = fs.readFileSync(temporaryOutput);
-        const firstHash = createHash('sha256').update(firstBuild).digest('hex');
-        assert.equal(firstBuild.includes(0x0d), false, 'ilk preview artifact üretiminde CR byte kalmamalı');
+        const headCommit = executeText('git', ['rev-parse', 'HEAD']).trim();
+        assert.match(headCommit, /^[0-9a-f]{40,64}$/, 'HEAD tam commit kimliği olmalı');
+        const blobs = Object.fromEntries(Object.entries(rawByteArtifactDefinitions).map(([artifactKey, definition]) => [
+            artifactKey,
+            executeBuffer('git', ['cat-file', 'blob', `HEAD:${definition.relativePath}`])
+        ]));
 
-        execFileSync(process.execPath, buildArguments, { cwd: commerceProRoot, stdio: 'pipe' });
-        const secondBuild = fs.readFileSync(temporaryOutput);
-        const secondHash = createHash('sha256').update(secondBuild).digest('hex');
-        assert.equal(secondBuild.includes(0x0d), false, 'ikinci preview artifact üretiminde CR byte kalmamalı');
-        assert.equal(secondHash, firstHash, 'arka arkaya preview artifact üretimleri aynı SHA-256 değerini vermeli');
+        executeBuffer(
+            'git',
+            ['clone', '--local', '--no-hardlinks', '--no-checkout', '--no-tags', '--', repositoryRoot, checkoutRoot],
+            temporaryDirectory
+        );
+        executeBuffer('git', ['config', 'core.autocrlf', 'true'], checkoutRoot);
+        assert.equal(executeText('git', ['config', '--get', 'core.autocrlf'], checkoutRoot).trim(), 'true');
+        executeBuffer('git', ['checkout', '--detach', headCommit], checkoutRoot);
+        assert.equal(executeText('git', ['rev-parse', 'HEAD'], checkoutRoot).trim(), headCommit, 'checkout exact HEAD commit olmalı');
+        assert.equal(
+            executeText('git', ['status', '--porcelain=v1', '--untracked-files=all'], checkoutRoot),
+            '',
+            'clean Windows checkout status temiz olmalı'
+        );
+
+        const checkoutAttributes = parseNullDelimitedGitAttributes(
+            executeBuffer('git', ['check-attr', '-z', 'text', 'eol', '--', ...artifactPaths], checkoutRoot),
+            artifactPaths
+        );
+        const checkouts = Object.fromEntries(Object.entries(rawByteArtifactDefinitions).map(([artifactKey, definition]) => [
+            artifactKey,
+            fs.readFileSync(path.join(checkoutRoot, ...definition.relativePath.split('/')))
+        ]));
+        const build1 = buildRawByteOutputs(temporaryDirectory, 'build1');
+        const build2 = buildRawByteOutputs(temporaryDirectory, 'build2');
+        const matrices = {
+            preview: { blob: blobs.preview, checkout: checkouts.preview, build1: build1.preview, build2: build2.preview },
+            live: { blob: blobs.live, checkout: checkouts.live, build1: build1.live, build2: build2.live }
+        };
+
+        assertRawByteMatrices(matrices, { emitDiagnostics: true });
+        for (const [artifactKey, definition] of Object.entries(rawByteArtifactDefinitions)) {
+            assert.equal(
+                fs.readFileSync(path.join(repositoryRoot, ...definition.relativePath.split('/'))).equals(primaryBefore[artifactKey]),
+                true,
+                `${artifactKey} primary tracked artifact test sırasında değişmemeli`
+            );
+            console.log(
+                `check-attr ${artifactKey} text=${checkoutAttributes.get(definition.relativePath).get('text')} `
+                + `eol=${checkoutAttributes.get(definition.relativePath).get('eol')}`
+            );
+        }
+        assert.equal(
+            executeText('git', ['status', '--porcelain=v1', '--untracked-files=all'], checkoutRoot),
+            '',
+            'matrix sonunda disposable checkout temiz kalmalı'
+        );
+
+        const missingEntryMatrix = {
+            preview: {
+                blob: matrices.preview.blob,
+                checkout: matrices.preview.checkout,
+                build1: matrices.preview.build1
+            },
+            live: matrices.live
+        };
+        assert.throws(
+            () => assertRawByteMatrices(missingEntryMatrix),
+            /matrix stage anahtarları/,
+            'eksik matrix entry fail-closed assertion üretmeli'
+        );
+        const crMismatchMatrix = {
+            preview: {
+                ...matrices.preview,
+                checkout: Buffer.concat([matrices.preview.checkout, Buffer.from([0x0d])])
+            },
+            live: matrices.live
+        };
+        assert.throws(
+            () => assertRawByteMatrices(crMismatchMatrix),
+            /CR byte sayısı 0 olmalı/,
+            'checkout CR uyuşmazlığı fail-closed assertion üretmeli'
+        );
+        console.log('CLEAN_WINDOWS_CORE_AUTOCRLF=true');
+        console.log('MISSING_MATRIX_ENTRY_FAIL_CLOSED=PASS');
+        console.log('CR_MISMATCH_FAIL_CLOSED=PASS');
+        console.log('RAW_BYTE_MATRIX=PASS');
+    } catch (error) {
+        operationError = error;
+        throw error;
     } finally {
-        fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+        try {
+            removeOwnedMatrixDirectory(temporaryDirectory);
+        } catch (cleanupError) {
+            if (operationError) {
+                throw new AggregateError([operationError, cleanupError], 'matrix işlemi ve disposable cleanup başarısız oldu');
+            }
+            throw cleanupError;
+        }
     }
 }
 
@@ -206,7 +438,7 @@ assert.deepEqual(
     [...fingerprintFiles].sort(compareNames),
     'fingerprint girdileri deterministik sırada olmalı'
 );
-assertDeterministicStandaloneArtifact();
+assertRawByteArtifactMatrix();
 assert.ok(
     fingerprintFiles.every((relativePath) => !relativePath.includes('\\') && !path.isAbsolute(relativePath)),
     'fingerprint yalnız canonical repository-relative yollar içermeli'
