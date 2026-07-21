@@ -1,0 +1,245 @@
+/*
+ * NovaStore Commerce Pro v3 foundation.
+ * Loaded after the legacy storefront styles so later turns can build on a
+ * stable token, typography, focus, and product-media contract.
+ */
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 400;
+    src: url("/assets/fonts/inter/inter-latin-ext-400-normal.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 400;
+    src: url("/assets/fonts/inter/inter-latin-400-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 500;
+    src: url("/assets/fonts/inter/inter-latin-ext-500-normal.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 500;
+    src: url("/assets/fonts/inter/inter-latin-500-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 600;
+    src: url("/assets/fonts/inter/inter-latin-ext-600-normal.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 600;
+    src: url("/assets/fonts/inter/inter-latin-600-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 700;
+    src: url("/assets/fonts/inter/inter-latin-ext-700-normal.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 700;
+    src: url("/assets/fonts/inter/inter-latin-700-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 800;
+    src: url("/assets/fonts/inter/inter-latin-ext-800-normal.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 800;
+    src: url("/assets/fonts/inter/inter-latin-800-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+    --commerce-navy-950: #031D39;
+    --commerce-navy-900: #04203B;
+    --commerce-navy-800: #0B3F63;
+    --commerce-navy-700: #1F587D;
+    --commerce-orange-bright: #FF7A00;
+    --commerce-orange-600: #9B3E00;
+    --commerce-orange-500: #C45100;
+    --commerce-orange-100: #FFF2E7;
+    --commerce-page: #F5F7F9;
+    --commerce-surface: #FFFFFF;
+    --commerce-ink: #0B2238;
+    --commerce-muted: #52697A;
+    --commerce-line: #DCE4E9;
+    --commerce-line-dark: #BDCBD4;
+    --commerce-success: #087A5E;
+    --commerce-success-soft: #E6F6F1;
+    --commerce-danger: #B82E2E;
+    --commerce-space-1: 4px;
+    --commerce-space-2: 8px;
+    --commerce-space-3: 12px;
+    --commerce-space-4: 16px;
+    --commerce-space-5: 20px;
+    --commerce-space-6: 24px;
+    --commerce-space-8: 32px;
+    --commerce-radius-sm: 6px;
+    --commerce-radius-md: 8px;
+    --commerce-radius-lg: 12px;
+    --commerce-radius-xl: 16px;
+    --commerce-radius-pill: 999px;
+    --commerce-shadow-sm: 0 9px 24px rgba(3, 29, 57, 0.08);
+    --commerce-shadow-md: 0 28px 72px rgba(3, 20, 38, 0.2);
+    --commerce-focus-color: #1976D2;
+    --commerce-font-family: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --commerce-shell: 1448px;
+
+    /* Compatibility aliases for the existing storefront foundation. */
+    --primary-dark: var(--commerce-navy-900);
+    --primary-mid: var(--commerce-navy-800);
+    --accent-orange: var(--commerce-orange-500);
+    --bg-color: var(--commerce-page);
+    --white: var(--commerce-surface);
+    --text-dark: var(--commerce-ink);
+    --text-gray: var(--commerce-muted);
+    --shadow-soft: var(--commerce-shadow-sm);
+    --shadow-hover: var(--commerce-shadow-md);
+    --radius-lg: var(--commerce-radius-xl);
+    --radius-md: var(--commerce-radius-lg);
+}
+
+html:has(body.commerce-pro-v3) {
+    font-family: var(--commerce-font-family);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+}
+
+body.commerce-pro-v3 {
+    min-width: 320px;
+    color: var(--commerce-ink);
+    font-family: var(--commerce-font-family);
+    font-synthesis: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+.commerce-pro-v3 button,
+.commerce-pro-v3 input,
+.commerce-pro-v3 select,
+.commerce-pro-v3 textarea {
+    font-family: inherit;
+}
+
+.commerce-pro-v3 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid var(--commerce-focus-color) !important;
+    outline-offset: 2px !important;
+}
+
+.commerce-pro-v3 main[tabindex="-1"]:focus:not(:focus-visible) {
+    outline: 0;
+}
+
+/* Shared product-media frame: stable card height for portrait, square, and landscape assets. */
+.commerce-pro-v3 :where(
+    .commerce-product-media-frame,
+    .product-image,
+    .product-media-frame,
+    .category-plp-product-media,
+    .catalog-product-image,
+    .main-media-container,
+    .compact-image-box
+) {
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: var(--commerce-surface);
+}
+
+.commerce-pro-v3 :where(
+    .product-image,
+    .product-media-frame,
+    .main-media-container
+) {
+    height: auto !important;
+    min-height: 0 !important;
+}
+
+.commerce-pro-v3 .product-media-frame > .product-media-track,
+.commerce-pro-v3 .product-media-frame .product-media-slide {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+}
+
+.commerce-pro-v3 .product-media-frame .product-media-slide {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.commerce-pro-v3 :where(
+    .product-image,
+    .product-media-frame,
+    .category-plp-product-media,
+    .catalog-product-image,
+    .main-media-container,
+    .compact-image-box
+) :where(img, video),
+.commerce-pro-v3 #cart-items-container .cart-item > img,
+.commerce-pro-v3 #orders-container .item-row img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    object-position: center !important;
+    display: block;
+}
+
+.commerce-pro-v3 #cart-items-container .cart-item > img,
+.commerce-pro-v3 #orders-container .item-row img,
+.commerce-pro-v3 #favorites-container .product-card .product-img,
+.commerce-pro-v3 #reviews-container img[alt]:not([alt^="Yorum medyası"]) {
+    aspect-ratio: 1 / 1;
+    object-fit: contain !important;
+    object-position: center !important;
+    background: var(--commerce-surface);
+}
+
+.commerce-pro-v3 #favorites-container .product-card .product-img {
+    width: 100% !important;
+    height: auto !important;
+}

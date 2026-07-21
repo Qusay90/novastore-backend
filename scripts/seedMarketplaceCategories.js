@@ -3,11 +3,22 @@ require('dotenv').config({ quiet: true });
 const { resolveStartupSafety } = require('../config/startupSafety');
 
 const EXPECTED_TARGET = Object.freeze({
+    protocol: 'postgresql:',
     host: '127.0.0.1',
-    port: '55432',
-    database: 'novastore_category_v2_test',
-    user: 'novastore_test'
+    database: 'novastore_category_v2_test'
 });
+const MIN_TEST_PORT = 1024;
+const MAX_TEST_PORT = 65535;
+
+const decodeUrlCredential = (value) => {
+    try {
+        return decodeURIComponent(value || '');
+    } catch (_) {
+        return null;
+    }
+};
+
+const isBlank = (value) => String(value || '').trim() === '';
 
 const parseMode = (args = []) => {
     const supported = new Set(['--apply', '--dry-run']);
@@ -29,25 +40,48 @@ const assertSafeSeedTarget = (env = process.env) => {
     } catch (_) {
         databaseUrl = null;
     }
+    const urlPort = databaseUrl?.port || '';
+    const parsedPort = Number(urlPort);
+    const urlDatabase = String(databaseUrl?.pathname || '').replace(/^\/+/, '');
+    const urlUser = decodeUrlCredential(databaseUrl?.username);
+    const urlPassword = decodeUrlCredential(databaseUrl?.password);
+    const hasValidExplicitPort =
+        /^\d+$/.test(urlPort) &&
+        Number.isInteger(parsedPort) &&
+        parsedPort >= MIN_TEST_PORT &&
+        parsedPort <= MAX_TEST_PORT;
     const exactTarget =
+        databaseUrl?.protocol === EXPECTED_TARGET.protocol &&
         safety.target.host === EXPECTED_TARGET.host &&
-        String(safety.target.port) === EXPECTED_TARGET.port &&
-        safety.target.database === EXPECTED_TARGET.database &&
-        env.DB_HOST === EXPECTED_TARGET.host &&
-        String(env.DB_PORT) === EXPECTED_TARGET.port &&
-        env.DB_NAME === EXPECTED_TARGET.database &&
-        env.DB_USER === EXPECTED_TARGET.user &&
-        env.DB_PASSWORD === 'novastore_test_only' &&
-        String(env.DB_SSL).toLowerCase() === 'false' &&
         databaseUrl?.hostname === EXPECTED_TARGET.host &&
-        databaseUrl?.port === EXPECTED_TARGET.port &&
-        databaseUrl?.pathname === `/${EXPECTED_TARGET.database}` &&
-        decodeURIComponent(databaseUrl?.username || '') === EXPECTED_TARGET.user &&
-        decodeURIComponent(databaseUrl?.password || '') === 'novastore_test_only' &&
+        env.DB_HOST === EXPECTED_TARGET.host &&
+        hasValidExplicitPort &&
+        String(safety.target.port) === urlPort &&
+        String(env.DB_PORT || '') === urlPort &&
+        safety.target.database === EXPECTED_TARGET.database &&
+        env.DB_NAME === EXPECTED_TARGET.database &&
+        urlDatabase === EXPECTED_TARGET.database &&
+        urlUser !== null &&
+        urlPassword !== null &&
+        urlUser.length > 0 &&
+        urlPassword.length > 0 &&
+        env.DB_USER === urlUser &&
+        env.DB_PASSWORD === urlPassword &&
+        String(env.NODE_ENV || '').trim().toLowerCase() === 'test' &&
+        String(env.NOVASTORE_SAFE_LOCAL_BACKEND || '').trim().toLowerCase() === 'true' &&
+        String(env.NOVASTORE_ALLOW_REMOTE_DB || '').trim().toLowerCase() === 'false' &&
+        String(env.DB_SSL).toLowerCase() === 'false' &&
         String(env.SUPABASE_USE_POOLER || '').toLowerCase() === 'false' &&
-        !env.SUPABASE_POOLER_HOST &&
-        !env.SUPABASE_REGION &&
-        !env.SUPABASE_PROJECT_REF;
+        isBlank(env.SUPABASE_POOLER_HOST) &&
+        isBlank(env.SUPABASE_REGION) &&
+        isBlank(env.SUPABASE_PROJECT_REF) &&
+        isBlank(env.PGHOST) &&
+        isBlank(env.PGPORT) &&
+        isBlank(env.PGDATABASE) &&
+        isBlank(env.PGUSER) &&
+        isBlank(env.PGPASSWORD) &&
+        String(env.SKIP_SCHEMA_INIT || '').trim().toLowerCase() === 'true' &&
+        String(env.NOVASTORE_ALLOW_SCHEMA_INIT || '').trim().toLowerCase() === 'false';
 
     if (
         !safety.canStart ||
@@ -96,6 +130,8 @@ if (require.main === module) {
 
 module.exports = {
     EXPECTED_TARGET,
+    MIN_TEST_PORT,
+    MAX_TEST_PORT,
     parseMode,
     assertSafeSeedTarget,
     main

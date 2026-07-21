@@ -7,6 +7,7 @@ const { spawn } = require('child_process');
 const pool = require('../config/db');
 const createCoreSchema = require('../models/createCoreDb');
 const { resolveStartupSafety } = require('../config/startupSafety');
+const { assertSafeSeedTarget } = require('../scripts/seedMarketplaceCategories');
 const { flattenTree, planOrApplySeed, runMarketplaceCategorySeed } =
     require('../services/marketplaceCategorySeedService');
 const { buildLocalServerEnv } = require('./helpers/localServerProcess');
@@ -17,6 +18,37 @@ const publicRoutes = require('../routes/publicCategoryRoutes');
 const root = path.join(__dirname, '..');
 const records = flattenTree();
 process.env.JWT_SECRET = 'marketplace-category-seed-smoke-secret';
+
+const parseRequiredDatabaseUrl = (value) => {
+    assert(String(value || '').trim(), 'An explicit guarded DATABASE_URL is required.');
+    try {
+        return new URL(value);
+    } catch (_) {
+        assert.fail('The guarded DATABASE_URL must be a valid URL.');
+    }
+};
+
+const decodeUrlCredential = (value, label) => {
+    try {
+        return decodeURIComponent(value || '');
+    } catch (_) {
+        assert.fail(`The guarded database ${label} must be valid URL encoding.`);
+    }
+};
+
+const withDatabaseUrl = (databaseUrl, mutate) => {
+    const candidate = new URL(databaseUrl.href);
+    mutate(candidate);
+    return candidate.toString();
+};
+
+const assertSeedGuardRejects = (baseEnv, overrides, scenario) => {
+    assert.throws(
+        () => assertSafeSeedTarget({ ...baseEnv, ...overrides }),
+        /Marketplace category seed refused unsafe target/,
+        `Seed CLI guard must reject ${scenario}.`
+    );
+};
 
 const adminHeaders = {
     Authorization: `Bearer ${jwt.sign(
@@ -64,11 +96,92 @@ const runChild = (args, env, timeoutMs = 30000) => new Promise((resolve, reject)
 
 (async () => {
     const safety = resolveStartupSafety(process.env);
+    const databaseUrl = parseRequiredDatabaseUrl(process.env.DATABASE_URL);
+    const explicitPort = databaseUrl.port;
+    const numericPort = Number(explicitPort);
+    const urlUser = decodeUrlCredential(databaseUrl.username, 'username');
+    const urlPassword = decodeUrlCredential(databaseUrl.password, 'password');
+
+    assert.strictEqual(safety.canStart, true);
     assert.strictEqual(safety.safeLocalDatabase, true);
     assert.strictEqual(safety.shouldRunSchemaInit, true);
+    assert.strictEqual(databaseUrl.protocol, 'postgresql:');
+    assert.strictEqual(databaseUrl.hostname, '127.0.0.1');
     assert.strictEqual(safety.target.host, '127.0.0.1');
-    assert.strictEqual(String(safety.target.port), '55432');
     assert.strictEqual(safety.target.database, 'novastore_category_v2_test');
+    assert(/^\d+$/.test(explicitPort), 'The guarded database port must be explicit and numeric.');
+    assert(
+        Number.isInteger(numericPort) && numericPort >= 1024 && numericPort <= 65535,
+        'The guarded database port must be in the high-port range.'
+    );
+    assert.notStrictEqual(explicitPort, '55432');
+    assert.strictEqual(String(safety.target.port), explicitPort);
+    assert.strictEqual(String(process.env.DB_PORT || ''), explicitPort);
+    assert.strictEqual(process.env.DB_HOST, databaseUrl.hostname);
+    assert.strictEqual(process.env.DB_NAME, databaseUrl.pathname.replace(/^\/+/, ''));
+    assert(urlUser && process.env.DB_USER === urlUser, 'Database username parity check failed.');
+    assert(urlPassword && process.env.DB_PASSWORD === urlPassword, 'Database password parity check failed.');
+    assert.strictEqual(String(process.env.DB_SSL || '').toLowerCase(), 'false');
+
+    const guardedChildOverrides = Object.freeze({
+        DATABASE_URL: process.env.DATABASE_URL,
+        DB_HOST: process.env.DB_HOST,
+        DB_PORT: process.env.DB_PORT,
+        DB_NAME: process.env.DB_NAME,
+        DB_USER: process.env.DB_USER,
+        DB_PASSWORD: process.env.DB_PASSWORD,
+        DB_SSL: process.env.DB_SSL
+    });
+    assert.deepStrictEqual(
+        Object.keys(guardedChildOverrides).sort(),
+        ['DATABASE_URL', 'DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_SSL'].sort()
+    );
+
+    const guardedChildEnv = buildLocalServerEnv(guardedChildOverrides);
+    assert.strictEqual(guardedChildEnv.SKIP_SCHEMA_INIT, 'true');
+    assert.strictEqual(guardedChildEnv.NOVASTORE_ALLOW_SCHEMA_INIT, 'false');
+    const childSafety = assertSafeSeedTarget(guardedChildEnv);
+    assert.strictEqual(childSafety.target.label, safety.target.label);
+
+    const alternatePort = explicitPort === '65535'
+        ? '65534'
+        : String(numericPort + 1);
+    assertSeedGuardRejects(guardedChildEnv, {
+        DATABASE_URL: withDatabaseUrl(databaseUrl, (candidate) => {
+            candidate.hostname = 'remote.invalid';
+        }),
+        DB_HOST: 'remote.invalid'
+    }, 'a remote hostname');
+    assertSeedGuardRejects(guardedChildEnv, {
+        DATABASE_URL: withDatabaseUrl(databaseUrl, (candidate) => {
+            candidate.hostname = 'localhost';
+        }),
+        DB_HOST: 'localhost'
+    }, 'a non-exact loopback hostname');
+    assertSeedGuardRejects(guardedChildEnv, {
+        DATABASE_URL: withDatabaseUrl(databaseUrl, (candidate) => {
+            candidate.pathname = '/wrong_test_database';
+        }),
+        DB_NAME: 'wrong_test_database'
+    }, 'the wrong database');
+    assertSeedGuardRejects(guardedChildEnv, {
+        DB_PORT: alternatePort
+    }, 'URL and DB_PORT mismatch');
+    assertSeedGuardRejects(guardedChildEnv, {
+        DB_USER: `${urlUser}_mismatch`
+    }, 'URL and DB_USER mismatch');
+    assertSeedGuardRejects(guardedChildEnv, {
+        DB_PASSWORD: `${urlPassword}_mismatch`
+    }, 'URL and DB_PASSWORD mismatch');
+    assertSeedGuardRejects(guardedChildEnv, {
+        DATABASE_URL: withDatabaseUrl(databaseUrl, (candidate) => {
+            candidate.port = '';
+        }),
+        DB_PORT: ''
+    }, 'a missing explicit port');
+    assertSeedGuardRejects(guardedChildEnv, {
+        DB_PORT: 'not-a-port'
+    }, 'an invalid explicit port');
 
     assert.strictEqual(records.length, 279);
     assert.strictEqual(records.filter((record) => record.depth === 0).length, 10);
@@ -218,11 +331,15 @@ const runChild = (args, env, timeoutMs = 30000) => new Promise((resolve, reject)
 
     const defaultCli = await runChild(
         ['scripts/seedMarketplaceCategories.js'],
-        buildLocalServerEnv()
+        buildLocalServerEnv(guardedChildOverrides)
     );
     assert.strictEqual(defaultCli.code, 0, defaultCli.output);
     assert.match(defaultCli.output, /"mode": "dry-run"/);
     assert.match(defaultCli.output, /"total_seed_categories": 279/);
+    assert(
+        defaultCli.output.includes(`"target": "${safety.target.label}"`),
+        'Seed child must report the exact parent database target.'
+    );
     assert.deepStrictEqual(
         (await pool.query('SELECT COUNT(*)::INTEGER AS count FROM categories')).rows[0],
         { count: 1 }

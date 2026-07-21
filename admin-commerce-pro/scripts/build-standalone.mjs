@@ -3,7 +3,12 @@
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createSourceFingerprint, fontNames, imageNames } from "./source-fingerprint.mjs";
+import {
+  createSourceFingerprint,
+  fontNames,
+  imageNames,
+  normalizeTextLineEndings,
+} from "./source-fingerprint.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const modeFlag = process.argv.indexOf("--mode");
@@ -112,8 +117,9 @@ const html = `<!doctype html>
   </body>
 </html>
 `;
+const canonicalHtml = normalizeTextLineEndings(Buffer.from(html, "utf8"));
 
 await mkdir(outputDirectory, { recursive: true });
-await writeFile(output, html, "utf8");
+await writeFile(output, canonicalHtml);
 
-process.stdout.write(`${output}\n${Buffer.byteLength(html)} bytes\n`);
+process.stdout.write(`${output}\n${canonicalHtml.byteLength} bytes\n`);
