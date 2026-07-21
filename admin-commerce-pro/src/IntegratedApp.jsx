@@ -16,7 +16,7 @@ import {
   catalogAttributesToMutationMap,
   CATALOG_PRODUCT_PUBLICATION_STATUSES,
 } from "./integration/catalogMutations.js";
-import { ADMIN_TOKEN_KEY, createAdminHttp } from "./integration/adminHttp.js";
+import { createAdminHttp } from "./integration/adminHttp.js";
 import {
   createMutationIdempotencyKey,
   MANUAL_SHIPMENT_EXPECTED_STATUS,
@@ -1452,8 +1452,9 @@ export function IntegratedApp() {
     if (catalogEnabled) catalogResource.reload();
     if (catalogStructureEnabled) catalogStructureResource.reload();
   };
-  const logout = () => {
-    localStorage.removeItem(ADMIN_TOKEN_KEY);
+  const logout = async () => {
+    const result = await http.logout();
+    if (!result.serverRevocationVerified) window.alert?.(result.warning);
     window.location.href = "admin-login.html?next=admin-commerce-pro-live.html";
   };
 

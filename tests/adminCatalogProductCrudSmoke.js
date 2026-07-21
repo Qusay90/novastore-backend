@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const express = require('express');
 const http = require('node:http');
-const jwt = require('jsonwebtoken');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 process.env.NODE_ENV = 'test';
 process.env.NOVASTORE_SAFE_LOCAL_BACKEND = 'true';
@@ -14,6 +14,9 @@ process.env.DB_NAME = 'novastore_catalog_product_crud_test';
 process.env.DB_USER = 'novastore_test';
 process.env.DB_SSL = 'false';
 process.env.JWT_SECRET = 'admin-catalog-product-crud-smoke-secret';
+
+const authFixture = createAuthSessionFixture();
+authFixture.install();
 
 const {
     normalizeCreateProductPayload,
@@ -324,9 +327,9 @@ const runQuery = async (sql, params = [], { transaction = false } = {}) => {
     if (/FROM product_categories category_link JOIN categories category/i.test(text)) {
         return { rows: categoryDetailRows(Number(params[0])) };
     }
-    if (/SELECT id, role FROM users WHERE id = \$1/i.test(text)) {
+    if (/SELECT id, role, auth_enabled FROM users WHERE id = \$1/i.test(text)) {
         state.currentAdminQueries += 1;
-        return { rows: [{ id: 17, role: 'admin' }] };
+        return { rows: [{ id: 17, role: 'admin', auth_enabled: true }] };
     }
     throw new Error(`Unexpected admin catalog fake query: ${text}`);
 };
@@ -423,8 +426,8 @@ const assertBoundedProduct = (payload) => {
     const server = await new Promise((resolve) => {
         const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
     });
-    const token = jwt.sign({ id: 17, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    const customerToken = jwt.sign({ id: 18, role: 'customer' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = authFixture.issue({ userId: 17, role: 'admin', principal: 'admin' }).token;
+    const customerToken = authFixture.issue({ userId: 18, role: 'customer', principal: 'customer' }).token;
 
     try {
         delete process.env.NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED;
@@ -450,7 +453,7 @@ const assertBoundedProduct = (payload) => {
             token: customerToken,
             body: validCreate
         });
-        assert.equal(customer.status, 403);
+        assert.equal(customer.status, 401);
         assert.equal(state.transactionConnects, customerConnects);
         assert.equal(state.currentAdminQueries, customerAdminReads);
 

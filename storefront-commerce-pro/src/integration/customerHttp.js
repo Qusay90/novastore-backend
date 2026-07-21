@@ -2,6 +2,7 @@ const CUSTOMER_TOKEN_KEY = "nova_user_token";
 
 const RULES = Object.freeze([
   { methods: ["POST"], pattern: /^\/api\/users\/(?:login|register)$/, authenticated: false },
+  { methods: ["POST"], pattern: /^\/api\/users\/logout$/, authenticated: true },
   { methods: ["POST"], pattern: /^\/api\/auth\/(?:forgot-password|reset-password)$/, authenticated: false },
   { methods: ["GET", "PATCH"], pattern: /^\/api\/users\/me$/, authenticated: true },
   { methods: ["GET"], pattern: /^\/api\/users\/security-status$/, authenticated: true },
@@ -214,7 +215,14 @@ export function createCustomerHttp({
           payload,
           path: normalized.path,
         },
-      );
+        );
+    }
+    if (normalized.path === "/api/users/logout" && response.status !== 204) {
+      throw new CustomerHttpError("Sunucu oturumunun kapatıldığı doğrulanamadı.", {
+        status: response.status,
+        code: "CUSTOMER_LOGOUT_UNVERIFIED",
+        path: normalized.path,
+      });
     }
     return payload;
   };

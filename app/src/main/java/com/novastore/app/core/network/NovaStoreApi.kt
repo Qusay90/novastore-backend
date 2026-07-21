@@ -1,6 +1,7 @@
 package com.novastore.app.core.network
 
 import com.novastore.app.data.model.*
+import retrofit2.Response
 import retrofit2.http.*
 
 interface NovaStoreApi {
@@ -33,6 +34,9 @@ interface NovaStoreApi {
 
     @POST("api/users/register")
     suspend fun register(@Body body: RegisterRequest): RegisterResponse
+
+    @POST("api/users/logout")
+    suspend fun logout(): Response<Unit>
 
     @PATCH("api/users/me")
     suspend fun updateProfile(@Body body: UpdateProfileRequest): UpdateProfileResponse

@@ -1,5 +1,4 @@
 const pool = require('../config/db');
-const jwt = require('jsonwebtoken');
 const { maskFullName } = require('../services/privacyService');
 const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 
@@ -9,20 +8,7 @@ const { buildPublicProductSqlPredicate } = require('../constants/productVisibili
 exports.askQuestion = async (req, res) => {
     try {
         const { product_id, question } = req.body;
-
-        // Token'i header'dan alip manuel cozuyoruz (middleware olmadigi icin)
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Lütfen giriş yapın.' });
-        }
-        const token = authHeader.split(' ')[1];
-        let user_id;
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            user_id = decoded.id;
-        } catch (err) {
-            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
-        }
+        const user_id = req.user.id;
 
         if (!product_id || !question) {
             return res.status(400).json({ error: 'Ürün ID ve soru içeriği gereklidir.' });
@@ -105,18 +91,7 @@ exports.getProductQuestions = async (req, res) => {
 // 3. Kullanıcının Kendi Sorduğu Soruları Getir
 exports.getUserQuestions = async (req, res) => {
     try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Lütfen giriş yapın.' });
-        }
-        const token = authHeader.split(' ')[1];
-        let user_id;
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            user_id = decoded.id;
-        } catch (err) {
-            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
-        }
+        const user_id = req.user.id;
 
         const questions = await pool.query(
             `SELECT pq.id, pq.question, pq.answer, pq.created_at, pq.answered_at,
@@ -144,25 +119,6 @@ exports.getUserQuestions = async (req, res) => {
 // Admin: Tüm Soruları Getir (Cevaplanmamışlar üstte olsun)
 exports.getAllQuestionsAdmin = async (req, res) => {
     try {
-        console.log('[ADMIN YETKI KONTROLU] Baslatiliyor...');
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            console.log('[ADMIN YETKİ KONTROLÜ] Token bulunamadı.');
-            return res.status(401).json({ error: 'Lütfen giriş yapın.' });
-        }
-        const token = authHeader.split(' ')[1];
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            if (decoded.role !== 'admin') {
-                console.log('[ADMIN YETKI KONTROLU] Yetkisiz rol:', decoded.role);
-                return res.status(403).json({ error: 'Sadece yoneticiler bu islemi yapabilir.' });
-            }
-            console.log('[ADMIN YETKI KONTROLU] Basarili.');
-        } catch (err) {
-            console.log('[ADMIN YETKI KONTROLU] Token dogrulanamadi:', err.message);
-            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
-        }
-
         console.log('[VERITABANI] Sorular cekiliyor...');
         const questions = await pool.query(
             `SELECT pq.id, pq.product_id, pq.user_id, pq.question, pq.answer, pq.created_at, pq.answered_at,
@@ -187,20 +143,6 @@ exports.getAllQuestionsAdmin = async (req, res) => {
 // Admin: Ürün bazlı soru özetleri
 exports.getProductQuestionSummaryAdmin = async (req, res) => {
     try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Lütfen giriş yapın.' });
-        }
-        const token = authHeader.split(' ')[1];
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            if (decoded.role !== 'admin') {
-                return res.status(403).json({ error: 'Sadece yöneticiler bu işlemi yapabilir.' });
-            }
-        } catch (err) {
-            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
-        }
-
         const result = await pool.query(
             `SELECT
                 p.id AS product_id,
@@ -228,20 +170,6 @@ exports.getProductQuestionSummaryAdmin = async (req, res) => {
 // Admin: Soruya Cevap Ver
 exports.answerQuestion = async (req, res) => {
     try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Lütfen giriş yapın.' });
-        }
-        const token = authHeader.split(' ')[1];
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            if (decoded.role !== 'admin') {
-                return res.status(403).json({ error: 'Sadece yoneticiler bu islemi yapabilir.' });
-            }
-        } catch (err) {
-            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
-        }
-
         const { id } = req.params;
         const { answer } = req.body;
 

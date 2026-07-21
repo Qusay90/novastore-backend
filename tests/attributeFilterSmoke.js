@@ -1,8 +1,8 @@
 const assert = require('assert');
 const path = require('path');
 const { spawnLocalServer, stopServerProcess } = require('./helpers/localServerProcess');
-const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const authSessionService = require('../services/authSessionService');
 const createCoreSchema = require('../models/createCoreDb');
 const { applyAttributeSchema } = require('../models/attributeSchema');
 const { resolveStartupSafety } = require('../config/startupSafety');
@@ -11,6 +11,7 @@ const { seedCurrentAdminUsers } = require('./helpers/seedCurrentAdminUsers');
 const root = path.join(__dirname, '..');
 const port = 5203;
 const jwtSecret = 'attribute-filter-smoke-only';
+process.env.JWT_SECRET = jwtSecret;
 let child;
 
 const waitForServer = () => new Promise((resolve, reject) => {
@@ -74,6 +75,19 @@ const request = async (pathname, { method = 'GET', token = null, body } = {}) =>
         categoryBySlug.get('telefonlar'), 'akilli-telefon', 'is-telefonu'
     ]);
 
+    const adminToken = (await authSessionService.issueAccessSession({
+        userId: 1,
+        role: 'admin',
+        principal: 'admin',
+        queryable: pool
+    })).token;
+    const customerToken = (await authSessionService.issueAccessSession({
+        userId: 2,
+        role: 'customer',
+        principal: 'customer',
+        queryable: pool
+    })).token;
+
     child = spawnLocalServer({
         root,
         port,
@@ -83,10 +97,8 @@ const request = async (pathname, { method = 'GET', token = null, body } = {}) =>
     });
     await waitForServer();
 
-    const adminToken = jwt.sign({ id: 1, role: 'admin' }, jwtSecret);
-    const customerToken = jwt.sign({ id: 2, role: 'customer' }, jwtSecret);
     assert.strictEqual((await request('/api/admin/attributes')).response.status, 401);
-    assert.strictEqual((await request('/api/admin/attributes', { token: customerToken })).response.status, 403);
+    assert.strictEqual((await request('/api/admin/attributes', { token: customerToken })).response.status, 401);
 
     const createAttribute = async (body) => {
         const result = await request('/api/admin/attributes', {

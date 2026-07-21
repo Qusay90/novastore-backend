@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 const { createNotification } = require('./notificationController');
-const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
+const { getUserFromRequestIfAny, sendAuthError } = require('../middlewares/authMiddleware');
 const {
     ORDER_STATUS,
     PAYMENT_STATUS,
@@ -179,7 +179,7 @@ const createReservedLegacyOrder = async (req, res) => {
             return res.status(400).json({ error: 'Müşteri bilgileri eksik.' });
         }
 
-        const authUser = getUserFromRequestIfAny(req);
+        const authUser = await getUserFromRequestIfAny(req);
         const userId = authUser ? authUser.id : null;
 
         await client.query('BEGIN');
@@ -235,6 +235,7 @@ const createReservedLegacyOrder = async (req, res) => {
         });
     } catch (err) {
         await client.query('ROLLBACK');
+        if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
         console.error('Sipariş hatası:', err.message);
         res.status(500).json({ error: err.message || 'Sipariş oluşturulurken bir hata meydana geldi.' });
     } finally {

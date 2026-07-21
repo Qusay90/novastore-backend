@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 const { cloudinary } = require('../config/cloudinary');
-const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
+const { getUserFromRequestIfAny, sendAuthError } = require('../middlewares/authMiddleware');
 const {
     resolveProductCategoryAssignment,
     getProductCategoryLinks,
@@ -687,7 +687,7 @@ const resolvePublicProductCategorySelection = async (query = {}) => {
 
 const getAllProducts = async (req, res) => {
     try {
-        const isAdmin = getUserFromRequestIfAny(req)?.role === 'admin';
+        const isAdmin = (await getUserFromRequestIfAny(req))?.role === 'admin';
         const selectedCategory = isAdmin ? null : await resolvePublicProductCategorySelection(req.query || {});
         let visibilityWhere = isAdmin
             ? ''
@@ -775,6 +775,7 @@ const getAllProducts = async (req, res) => {
 
         res.status(200).json(products);
     } catch (err) {
+        if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
         if (!err.statusCode || err.statusCode >= 500) {
             console.error('Ürün listeleme hatası:', err.message);
         }
@@ -899,7 +900,7 @@ const getProductById = async (req, res) => {
             return res.status(400).json({ error: 'Geçersiz ürün kimliği.' });
         }
 
-        const isAdmin = getUserFromRequestIfAny(req)?.role === 'admin';
+        const isAdmin = (await getUserFromRequestIfAny(req))?.role === 'admin';
         const result = await pool.query(
             `SELECT * FROM products
              WHERE id = $1
@@ -926,6 +927,7 @@ const getProductById = async (req, res) => {
 
         res.status(200).json(product);
     } catch (err) {
+        if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
         console.error('Ürün detay hatası:', err.message);
         res.status(500).json({ error: 'Ürün detayları getirilemedi.' });
     }

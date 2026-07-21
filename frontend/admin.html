@@ -2910,8 +2910,26 @@
             if (tabId === 'chat') { loadAdminQuestions(); loadAiHandoffs(); }
         }
 
-        function adminLogout() {
-            localStorage.removeItem('nova_admin_token');
+        async function adminLogout() {
+            const token = localStorage.getItem('nova_admin_token');
+            let serverRevocationVerified = false;
+            try {
+                if (token) {
+                    const response = await _nativeFetch('/api/auth/logout', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    serverRevocationVerified = response.status === 204;
+                }
+            } catch (_) {
+                serverRevocationVerified = false;
+            } finally {
+                localStorage.removeItem('nova_admin_token');
+            }
+            if (token && !serverRevocationVerified) {
+                alert('Bu cihazdaki oturum kapatıldı; sunucu oturumunun kapatıldığı doğrulanamadı.');
+            }
             window.location.href = 'admin-login.html';
         }
 

@@ -1,12 +1,6 @@
 ﻿const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-
-const ensureJwtSecret = () => {
-    if (!process.env.JWT_SECRET) {
-        throw new Error('Server JWT config missing');
-    }
-};
+const { AuthSessionError, issueAccessSession } = require('../services/authSessionService');
 
 const insertUserWithSchemaFallback = async (fullName, email, hashedPassword) => {
     try {
@@ -139,31 +133,44 @@ const registerUser = async (req, res) => {
 
 // 2. Müşteri giriş yapma
 const loginUser = async (req, res) => {
+    let client;
+    let transactionOpen = false;
     try {
-        ensureJwtSecret();
         const { email, password } = req.body;
+        client = await pool.connect();
+        await client.query('BEGIN');
+        transactionOpen = true;
 
-        const user = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const user = await client.query(
+            'SELECT * FROM users WHERE email = $1 FOR UPDATE',
+            [email]
+        );
         if (user.rows.length === 0) {
+            await client.query('ROLLBACK');
+            transactionOpen = false;
             return res.status(400).json({ error: 'E-posta veya şifre hatalı.' });
         }
 
         const currentUser = user.rows[0];
-
         const isMatch = await bcrypt.compare(password, currentUser.password);
-        if (!isMatch) {
+        if (!isMatch || currentUser.role !== 'customer' || currentUser.auth_enabled !== true) {
+            await client.query('ROLLBACK');
+            transactionOpen = false;
             return res.status(400).json({ error: 'E-posta veya şifre hatalı.' });
         }
 
-        const token = jwt.sign(
-            { id: currentUser.id, role: currentUser.role },
-            process.env.JWT_SECRET,
-            { expiresIn: '30d' }
-        );
+        const session = await issueAccessSession({
+            userId: currentUser.id,
+            role: currentUser.role,
+            principal: 'customer',
+            queryable: client
+        });
+        await client.query('COMMIT');
+        transactionOpen = false;
 
-        res.status(200).json({
+        return res.status(200).json({
             mesaj: 'Giriş başarılı! Yönlendiriliyorsunuz...',
-            token,
+            token: session.token,
             user: {
                 id: currentUser.id,
                 fullName: currentUser.full_name || currentUser.name,
@@ -173,11 +180,16 @@ const loginUser = async (req, res) => {
             }
         });
     } catch (err) {
+        if (transactionOpen && client) {
+            try { await client.query('ROLLBACK'); } catch (_) { /* best effort */ }
+        }
         console.error('Giriş hatası:', err.message);
-        if (String(err.message).includes('JWT config')) {
+        if (err instanceof AuthSessionError && err.statusCode === 500) {
             return res.status(500).json({ error: 'Sunucu güvenlik ayarı eksik.' });
         }
-        res.status(500).json({ error: 'Giriş yaparken sunucu hatası oluştu.' });
+        return res.status(500).json({ error: 'Giriş yaparken sunucu hatası oluştu.' });
+    } finally {
+        client?.release?.();
     }
 };
 

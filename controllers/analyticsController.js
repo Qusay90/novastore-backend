@@ -60,8 +60,8 @@ const normalizeActionType = (value) => {
     return normalized;
 };
 
-const resolveUserId = (req, body) => {
-    const authUser = getUserFromRequestIfAny(req);
+const resolveUserId = async (req, body) => {
+    const authUser = await getUserFromRequestIfAny(req);
     if (authUser && Number.isInteger(authUser.id)) {
         return authUser.id;
     }
@@ -121,7 +121,7 @@ const upsertPageVisit = async ({
     );
 };
 
-const readTrackingPayload = (req) => {
+const readTrackingPayload = async (req) => {
     const body = req.body || {};
     return {
         sessionKey: normalizeIdentifier(body.sessionId, 'sessionId'),
@@ -133,12 +133,12 @@ const readTrackingPayload = (req) => {
         productId: normalizeProductId(body.productId),
         referrer: normalizeText(body.referrer, MAX_TEXT_LENGTH),
         durationSeconds: normalizeDurationSeconds(body.durationMs),
-        userId: resolveUserId(req, body)
+        userId: await resolveUserId(req, body)
     };
 };
 
-const readProductActionPayload = (req) => {
-    const trackingPayload = readTrackingPayload(req);
+const readProductActionPayload = async (req) => {
+    const trackingPayload = await readTrackingPayload(req);
     const body = req.body || {};
 
     return {
@@ -151,7 +151,7 @@ const readProductActionPayload = (req) => {
 
 const trackPageEnter = async (req, res) => {
     try {
-        const payload = readTrackingPayload(req);
+        const payload = await readTrackingPayload(req);
         const userAgent = normalizeText(req.headers['user-agent'], MAX_TEXT_LENGTH);
 
         await upsertSession({
@@ -169,7 +169,7 @@ const trackPageEnter = async (req, res) => {
         res.status(202).json({ ok: true });
     } catch (err) {
         const statusCode = Number(err && err.statusCode) || 500;
-        const message = statusCode === 500 ? 'Analytics kaydı oluşturulamadı.' : err.message;
+        const message = statusCode === 500 ? 'Analytics kaydı oluşturulamadı.' : (err.publicMessage || err.message);
         console.error('Analytics enter hatası:', err.message);
         res.status(statusCode).json({ error: message });
     }
@@ -177,7 +177,7 @@ const trackPageEnter = async (req, res) => {
 
 const trackPageHeartbeat = async (req, res) => {
     try {
-        const payload = readTrackingPayload(req);
+        const payload = await readTrackingPayload(req);
         const userAgent = normalizeText(req.headers['user-agent'], MAX_TEXT_LENGTH);
 
         await upsertSession({
@@ -207,7 +207,7 @@ const trackPageHeartbeat = async (req, res) => {
         res.status(202).json({ ok: true });
     } catch (err) {
         const statusCode = Number(err && err.statusCode) || 500;
-        const message = statusCode === 500 ? 'Analytics heartbeat kaydedilemedi.' : err.message;
+        const message = statusCode === 500 ? 'Analytics heartbeat kaydedilemedi.' : (err.publicMessage || err.message);
         console.error('Analytics heartbeat hatası:', err.message);
         res.status(statusCode).json({ error: message });
     }
@@ -215,7 +215,7 @@ const trackPageHeartbeat = async (req, res) => {
 
 const trackPageLeave = async (req, res) => {
     try {
-        const payload = readTrackingPayload(req);
+        const payload = await readTrackingPayload(req);
         const userAgent = normalizeText(req.headers['user-agent'], MAX_TEXT_LENGTH);
 
         await upsertSession({
@@ -261,7 +261,7 @@ const trackPageLeave = async (req, res) => {
         res.status(202).json({ ok: true });
     } catch (err) {
         const statusCode = Number(err && err.statusCode) || 500;
-        const message = statusCode === 500 ? 'Analytics cikis kaydedilemedi.' : err.message;
+        const message = statusCode === 500 ? 'Analytics cikis kaydedilemedi.' : (err.publicMessage || err.message);
         console.error('Analytics leave hatası:', err.message);
         res.status(statusCode).json({ error: message });
     }
@@ -269,7 +269,7 @@ const trackPageLeave = async (req, res) => {
 
 const trackProductAction = async (req, res) => {
     try {
-        const payload = readProductActionPayload(req);
+        const payload = await readProductActionPayload(req);
         const userAgent = normalizeText(req.headers['user-agent'], MAX_TEXT_LENGTH);
 
         await upsertSession({
@@ -303,7 +303,7 @@ const trackProductAction = async (req, res) => {
         res.status(202).json({ ok: true });
     } catch (err) {
         const statusCode = Number(err && err.statusCode) || 500;
-        const message = statusCode === 500 ? 'Ürün aksiyonu kaydedilemedi.' : err.message;
+        const message = statusCode === 500 ? 'Ürün aksiyonu kaydedilemedi.' : (err.publicMessage || err.message);
         console.error('Analytics ürün aksiyonu hatası:', err.message);
         res.status(statusCode).json({ error: message });
     }
