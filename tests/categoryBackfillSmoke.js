@@ -1,10 +1,8 @@
 const assert = require('assert');
 const pool = require('../config/db');
 const { resolveStartupSafety } = require('../config/startupSafety');
-const {
-    applyCategoryV2Schema,
-    applyCategoryV2BackfillConstraints
-} = require('../models/categoryV2Schema');
+const createCoreSchema = require('../models/createCoreDb');
+const { applyCategoryV2BackfillConstraints } = require('../models/categoryV2Schema');
 const {
     normalizeLegacyCategoryName,
     slugifyCategoryName,
@@ -27,8 +25,7 @@ const assertSafeDisposableTarget = () => {
 
 const resetSchema = async (client) => {
     await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-    await applyCategoryV2Schema(client);
-    await applyCategoryV2BackfillConstraints(client);
+    await createCoreSchema();
     await applyCategoryV2BackfillConstraints(client);
 };
 
