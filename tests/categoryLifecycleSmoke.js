@@ -1,6 +1,6 @@
 const assert = require('assert');
-const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 const createCoreSchema = require('../models/createCoreDb');
 const { resolveStartupSafety } = require('../config/startupSafety');
 const {
@@ -18,6 +18,9 @@ const {
 const { listPublicCategories } = require('../services/categoryService');
 
 process.env.JWT_SECRET = 'category-lifecycle-smoke-secret';
+
+const authFixture = createAuthSessionFixture();
+authFixture.install();
 
 const createResponse = () => ({
     statusCode: 200,
@@ -309,11 +312,11 @@ const statsFor = async (categoryId) => {
     assert(!filteredList.body.some((product) => Number(product.id) === secondProductId));
     const adminList = await invoke(getAllProducts, {
         headers: {
-            authorization: `Bearer ${jwt.sign(
-                { id: 1, role: 'admin' },
-                process.env.JWT_SECRET,
-                { expiresIn: '1h' }
-            )}`
+            authorization: `Bearer ${authFixture.issue({
+                userId: 1,
+                role: 'admin',
+                principal: 'admin'
+            }).token}`
         }
     });
     assert(adminList.body.some((product) => Number(product.id) === secondProductId));

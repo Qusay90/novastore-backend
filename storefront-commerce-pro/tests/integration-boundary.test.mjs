@@ -812,6 +812,7 @@ test("customer hesap adapterı gerçek oturum, sipariş, adres ve çıkış söz
         isDefault: true,
       }];
       if (path === "/api/orders/91/cancel") return { mesaj: "Sipariş iptal edildi." };
+      if (path === "/api/users/logout") return {};
       throw new Error(`Beklenmeyen hesap yolu: ${path}`);
     },
   };
@@ -830,7 +831,10 @@ test("customer hesap adapterı gerçek oturum, sipariş, adres ve çıkış söz
   await adapter.cancelOrder(orders[0], { reasonCode: "CUSTOMER_REQUEST" });
   const cancelCall = calls.find((call) => call.path === "/api/orders/91/cancel");
   assert.equal(cancelCall.options.body.expected_status, "Hazırlanıyor");
-  adapter.logout();
+  const logout = await adapter.logout();
+  assert.equal(logout.serverRevocationVerified, true);
+  const logoutCall = calls.find((call) => call.path === "/api/users/logout");
+  assert.equal(logoutCall.options.method, "POST");
   assert.equal(storage.getItem("nova_user_token"), null);
   assert.equal(storage.getItem("nova_admin_token"), "must-remain");
 });

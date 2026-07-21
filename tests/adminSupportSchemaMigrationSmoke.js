@@ -3,7 +3,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const express = require('express');
-const jwt = require('jsonwebtoken');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 const DEFAULT_LOCAL_DATABASE_URL =
     'postgresql://novastore_test:novastore_test_only@127.0.0.1:55433/novastore_admin_support_test';
@@ -87,6 +87,9 @@ process.env.SUPABASE_REGION = '';
 process.env.SUPABASE_PROJECT_REF = '';
 process.env.JWT_SECRET = 'admin-support-local-smoke-secret';
 
+const authFixture = createAuthSessionFixture();
+authFixture.install();
+
 const pool = require('../config/db');
 const createCoreSchema = require('../models/createCoreDb');
 const returnRoutes = require('../routes/returnRoutes');
@@ -139,6 +142,11 @@ const getJson = async (baseUrl, pathname, token) => {
         await createCoreSchema();
         await applyMigrations(client);
         await applyMigrations(client);
+        await client.query(
+            `INSERT INTO users (id, full_name, email, password, role)
+             VALUES (1, 'Admin Support Smoke', 'admin-support@example.test', 'not-used', 'admin')
+             ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role, auth_enabled = TRUE`
+        );
 
         const tableResult = await client.query(
             `SELECT table_name
@@ -192,7 +200,7 @@ const getJson = async (baseUrl, pathname, token) => {
         );
 
         api = await startApi();
-        const adminToken = jwt.sign({ id: 1, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '5m' });
+        const adminToken = authFixture.issue({ userId: 1, role: 'admin', principal: 'admin' }).token;
 
         const returnsResponse = await getJson(api.baseUrl, '/api/returns/admin/all', adminToken);
         assert.strictEqual(returnsResponse.status, 200);

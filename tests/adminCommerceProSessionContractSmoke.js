@@ -1,10 +1,10 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const jwt = require('jsonwebtoken');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 const { privateNoStore } = require('../middlewares/privateNoStore');
 const { createRequireCurrentAdmin } = require('../services/currentAdminGuard');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 const {
     ADMIN_COMMERCE_CAPABILITIES,
     createGetAdminNotificationSummaries,
@@ -17,7 +17,13 @@ const {
 
 process.env.JWT_SECRET = 'commerce-pro-session-smoke-secret';
 
-const tokenFor = (payload) => jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+const authFixture = createAuthSessionFixture();
+authFixture.install();
+const tokenFor = ({ id, role }) => authFixture.issue({
+    userId: id,
+    role,
+    principal: role === 'admin' ? 'admin' : 'customer'
+}).token;
 
 const createResponse = () => ({
     statusCode: 200,
@@ -75,10 +81,10 @@ const chainFor = (rows, queries) => [
     const customer = await runChain(chainFor([]), {
         headers: { authorization: `Bearer ${tokenFor({ id: 9, role: 'customer' })}` }
     });
-    assert.equal(customer.statusCode, 403);
+    assert.equal(customer.statusCode, 401);
 
     const expired = await runChain(chainFor([]), {
-        headers: { authorization: `Bearer ${jwt.sign({ id: 9, role: 'admin', exp: Math.floor(Date.now() / 1000) - 1 }, process.env.JWT_SECRET)}` }
+        headers: { authorization: `Bearer ${authFixture.issue({ userId: 9, role: 'admin', principal: 'admin', expiresIn: -1 }).token}` }
     });
     assert.equal(expired.statusCode, 401);
 
@@ -92,13 +98,13 @@ const chainFor = (rows, queries) => [
     });
     assert.equal(missingAdmin.statusCode, 401);
 
-    const demotedAdmin = await runChain(chainFor([{ id: 17, role: 'customer' }]), {
+    const demotedAdmin = await runChain(chainFor([{ id: 17, role: 'customer', auth_enabled: true }]), {
         headers: { authorization: `Bearer ${tokenFor({ id: 17, role: 'admin' })}` }
     });
     assert.equal(demotedAdmin.statusCode, 403);
 
     const queries = [];
-    const validAdmin = await runChain(chainFor([{ id: 17, role: 'admin' }], queries), {
+    const validAdmin = await runChain(chainFor([{ id: 17, role: 'admin', auth_enabled: true }], queries), {
         headers: { authorization: `Bearer ${tokenFor({ id: 17, role: 'admin' })}` }
     });
     assert.equal(validAdmin.statusCode, 200);
@@ -150,7 +156,7 @@ const chainFor = (rows, queries) => [
         createRequireCurrentAdmin({ async query() { throw new Error('db unavailable'); } }),
         getAdminSession
     ], { headers: { authorization: `Bearer ${tokenFor({ id: 17, role: 'admin' })}` } });
-    assert.equal(guardFailure.statusCode, 500);
+    assert.equal(guardFailure.statusCode, 503);
     assert.equal(guardFailure.headers['cache-control'], 'private, no-store, max-age=0');
 
     assert.equal(parseOrderSummaryLimit(undefined), 50);
@@ -190,7 +196,7 @@ const chainFor = (rows, queries) => [
         privateNoStore,
         authenticate,
         requireAdmin,
-        guardForRows([{ id: 17, role: 'customer' }]),
+        guardForRows([{ id: 17, role: 'customer', auth_enabled: true }]),
         fullSummaryHandler
     ], {
         headers: { authorization: `Bearer ${tokenFor({ id: 17, role: 'admin' })}` },
@@ -203,7 +209,7 @@ const chainFor = (rows, queries) => [
         privateNoStore,
         authenticate,
         requireAdmin,
-        guardForRows([{ id: 17, role: 'admin' }]),
+        guardForRows([{ id: 17, role: 'admin', auth_enabled: true }]),
         summaryHandler
     ], {
         headers: { authorization: `Bearer ${tokenFor({ id: 17, role: 'admin' })}` },
@@ -219,7 +225,7 @@ const chainFor = (rows, queries) => [
         privateNoStore,
         authenticate,
         requireAdmin,
-        guardForRows([{ id: 17, role: 'admin' }]),
+        guardForRows([{ id: 17, role: 'admin', auth_enabled: true }]),
         failingSummaryHandler
     ], {
         headers: { authorization: `Bearer ${tokenFor({ id: 17, role: 'admin' })}` },

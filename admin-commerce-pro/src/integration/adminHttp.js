@@ -145,5 +145,30 @@ export function createAdminHttp({
     return payload;
   };
 
-  return { request };
+  const logout = async () => {
+    const token = storage?.getItem?.(ADMIN_TOKEN_KEY) || "";
+    let serverRevocationVerified = false;
+    try {
+      if (token) {
+        const response = await fetchImpl("/api/auth/logout", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        serverRevocationVerified = response.status === 204;
+      }
+    } catch (_error) {
+      serverRevocationVerified = false;
+    } finally {
+      storage?.removeItem?.(ADMIN_TOKEN_KEY);
+    }
+    return Object.freeze({
+      serverRevocationVerified,
+      warning: serverRevocationVerified
+        ? null
+        : "Bu cihazdaki oturum kapatıldı; sunucu oturumunun kapatıldığı doğrulanamadı.",
+    });
+  };
+
+  return { logout, request };
 }

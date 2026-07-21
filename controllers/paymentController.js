@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
-const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
+const { getUserFromRequestIfAny, sendAuthError } = require('../middlewares/authMiddleware');
 const { createNotification } = require('./notificationController');
 const { initializeIyzicoPayment, verifyWebhookSignature } = require('../services/paymentProviderService');
 const {
@@ -791,7 +791,7 @@ const initializePayment = async (req, res) => {
             return res.status(400).json({ error: 'Sepet bo\u015F olamaz.' });
         }
 
-        const user = getUserFromRequestIfAny(req);
+        const user = await getUserFromRequestIfAny(req);
         const userId = user ? user.id : null;
 
         const idempotencyKey = readIdempotencyKey(req) || createDeterministicKeyFromBody(req.body);
@@ -991,6 +991,7 @@ const initializePayment = async (req, res) => {
         });
     } catch (err) {
         await client.query('ROLLBACK');
+        if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
         const statusCode = err instanceof PaymentProviderConfigError ? err.statusCode : (err.statusCode || 500);
         console.error('\u00D6deme initialize hatas\u0131:', err.message);
         res.status(statusCode).json({

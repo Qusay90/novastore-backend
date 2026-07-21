@@ -1,5 +1,4 @@
 const assert = require('node:assert/strict');
-const jwt = require('jsonwebtoken');
 
 process.env.NODE_ENV = 'test';
 process.env.NOVASTORE_SAFE_LOCAL_BACKEND = 'true';
@@ -326,10 +325,9 @@ const testPublicQuestions = async () => {
         throw new Error(`Unhandled public question safety SQL: ${text}`);
     };
 
-    const token = jwt.sign({ id: 7, role: 'customer' }, process.env.JWT_SECRET, { expiresIn: '1h' });
     const archivedAsk = await invoke(questionController.askQuestion, {
         body: { product_id: ARCHIVED_PRODUCT.id, question: 'Arsiv urune soru' },
-        headers: { authorization: `Bearer ${token}` }
+        user: { id: 7, role: 'customer', principal: 'customer' }
     });
     assert.strictEqual(archivedAsk.statusCode, 404);
     assert.strictEqual(archivedAsk.body.code, 'PRODUCT_NOT_FOUND');
@@ -524,9 +522,8 @@ const testAuthenticatedHistoryRemainsAvailable = async () => {
         throw new Error(`Unhandled history safety SQL: ${text}`);
     };
 
-    const customerToken = jwt.sign({ id: 7, role: 'customer' }, process.env.JWT_SECRET, { expiresIn: '1h' });
     const ownQuestions = await invoke(questionController.getUserQuestions, {
-        headers: { authorization: `Bearer ${customerToken}` }
+        user: { id: 7, role: 'customer', principal: 'customer' }
     });
     assert.strictEqual(ownQuestions.statusCode, 200);
     assert.strictEqual(ownQuestions.body[0].product_id, ARCHIVED_PRODUCT.id);
@@ -537,9 +534,8 @@ const testAuthenticatedHistoryRemainsAvailable = async () => {
     assert.strictEqual(ownReviews.statusCode, 200);
     assert.strictEqual(ownReviews.body[0].product_id, ARCHIVED_PRODUCT.id);
 
-    const adminToken = jwt.sign({ id: 1, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
     const adminQuestions = await invoke(questionController.getAllQuestionsAdmin, {
-        headers: { authorization: `Bearer ${adminToken}` }
+        user: { id: 1, role: 'admin', principal: 'admin' }
     });
     assert.strictEqual(adminQuestions.statusCode, 200);
     assert.strictEqual(adminQuestions.body[0].product_id, ARCHIVED_PRODUCT.id);

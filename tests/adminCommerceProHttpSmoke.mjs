@@ -69,6 +69,39 @@ assert.equal(requests[0].input, "/api/admin/session");
 assert.equal(requests[0].init.credentials, "same-origin");
 assert.equal(requests[0].init.headers.get("Authorization"), `Bearer ${validToken}`);
 
+const logoutStorage = new FakeStorage(validToken);
+const logoutRequests = [];
+const logoutHttp = createAdminHttp({
+  storage: logoutStorage,
+  location: { href: "admin-commerce-pro-live.html" },
+  now: () => now,
+  decodeBase64,
+  fetchImpl: async (input, init) => {
+    logoutRequests.push({ input, init });
+    return new Response(null, { status: 204 });
+  },
+});
+assert.deepEqual(await logoutHttp.logout(), { serverRevocationVerified: true, warning: null });
+assert.equal(logoutStorage.getItem(ADMIN_TOKEN_KEY), null);
+assert.equal(logoutRequests[0].input, "/api/auth/logout");
+assert.equal(logoutRequests[0].init.method, "POST");
+assert.equal(logoutRequests[0].init.credentials, "same-origin");
+assert.equal(logoutRequests[0].init.headers.Authorization, `Bearer ${validToken}`);
+
+const failedLogoutStorage = new FakeStorage(validToken);
+const failedLogoutHttp = createAdminHttp({
+  storage: failedLogoutStorage,
+  location: { href: "admin-commerce-pro-live.html" },
+  now: () => now,
+  decodeBase64,
+  fetchImpl: async () => { throw new Error("synthetic offline"); },
+});
+const failedLogout = await failedLogoutHttp.logout();
+assert.equal(failedLogout.serverRevocationVerified, false);
+assert.match(failedLogout.warning, /sunucu oturumunun kapatıldığı doğrulanamadı/);
+assert.equal(failedLogout.warning.includes(validToken), false);
+assert.equal(failedLogoutStorage.getItem(ADMIN_TOKEN_KEY), null);
+
 for (const invalidPath of [
   "https://evil.example/api/orders",
   "//evil.example/api/orders",

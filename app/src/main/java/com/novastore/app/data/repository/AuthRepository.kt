@@ -7,6 +7,11 @@ import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class LogoutResult(
+    val serverRevocationVerified: Boolean,
+    val warning: String? = null
+)
+
 @Singleton
 class AuthRepository @Inject constructor(
     private val api: NovaStoreApi,
@@ -57,8 +62,20 @@ class AuthRepository @Inject constructor(
         api.forgotPassword(ForgotPasswordRequest(email))
     }
 
-    fun logout() {
-        sessionManager.clearSession()
+    suspend fun logout(): LogoutResult {
+        var serverRevocationVerified = false
+        try {
+            serverRevocationVerified = api.logout().code() == 204
+        } catch (_: Exception) {
+            serverRevocationVerified = false
+        } finally {
+            sessionManager.clearSession()
+        }
+        return LogoutResult(
+            serverRevocationVerified = serverRevocationVerified,
+            warning = if (serverRevocationVerified) null
+            else "Bu cihazdaki oturum kapatıldı; sunucu oturumunun kapatıldığı doğrulanamadı."
+        )
     }
 
     fun updateCachedProfile(fullName: String, phone: String?) {

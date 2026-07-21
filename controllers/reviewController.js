@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 const { createNotification } = require('./notificationController');
-const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
+const { getUserFromRequestIfAny, sendAuthError } = require('../middlewares/authMiddleware');
 const { ORDER_STATUS } = require('../constants/orderStatus');
 const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 const { maskFullName } = require('../services/privacyService');
@@ -386,7 +386,7 @@ const getProductReviews = async (req, res) => {
             return res.status(400).json({ error: 'Geçersiz ürün kimliği.' });
         }
 
-        const authUser = getUserFromRequestIfAny(req);
+        const authUser = await getUserFromRequestIfAny(req);
 
         const reviewResult = await pool.query(
             `SELECT products.id AS public_product_id,
@@ -429,6 +429,7 @@ const getProductReviews = async (req, res) => {
             reviewPermission
         });
     } catch (err) {
+        if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
         console.error('Yorumları getirme hatası:', err.message);
         res.status(500).json({ error: 'Yorumlar getirilemedi.' });
     }

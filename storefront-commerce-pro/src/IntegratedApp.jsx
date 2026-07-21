@@ -1453,8 +1453,9 @@ export function CommerceProRuntimeApp({ runtime }) {
   };
   const authReturn = (path) => <CustomerAuthPage account={runtime.customer} returnPath={path} onAuthenticated={handleAuthenticated} />;
   const handleSessionUpdated = (user) => setSession((current) => Object.freeze({ ...current, status: "authenticated", user, warning: null }));
-  const handleLogout = () => {
-    runtime.customer.logout();
+  const handleLogout = async () => {
+    const result = await runtime.customer.logout();
+    if (!result.serverRevocationVerified) window.alert?.(result.warning);
     window.location.hash = "#/";
     window.location.reload();
   };

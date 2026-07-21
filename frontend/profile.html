@@ -1004,11 +1004,29 @@
         }
 
 
-        function userLogout() {
+        async function userLogout() {
             const uid = _getUserId();
-            localStorage.removeItem(`novastore_checkout_${uid}`);
-            localStorage.removeItem('nova_user_token');
-            localStorage.removeItem('nova_user_info');
+            const token = localStorage.getItem('nova_user_token');
+            let serverRevocationVerified = false;
+            try {
+                if (token) {
+                    const response = await fetch('/api/users/logout', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    serverRevocationVerified = response.status === 204;
+                }
+            } catch (_) {
+                serverRevocationVerified = false;
+            } finally {
+                localStorage.removeItem(`novastore_checkout_${uid}`);
+                localStorage.removeItem('nova_user_token');
+                localStorage.removeItem('nova_user_info');
+            }
+            if (token && !serverRevocationVerified) {
+                alert('Bu cihazdaki oturum kapatıldı; sunucu oturumunun kapatıldığı doğrulanamadı.');
+            }
             window.location.href = appUrl("index.html");
         }
 

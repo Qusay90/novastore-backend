@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const express = require('express');
 const http = require('node:http');
-const jwt = require('jsonwebtoken');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 process.env.NODE_ENV = 'test';
 process.env.NOVASTORE_SAFE_LOCAL_BACKEND = 'true';
@@ -17,6 +17,9 @@ process.env.DB_PASSWORD = 'novastore_test_only';
 process.env.DB_SSL = 'false';
 process.env.SUPABASE_USE_POOLER = 'false';
 process.env.JWT_SECRET = 'manual-shipment-route-smoke-secret';
+
+const authFixture = createAuthSessionFixture();
+authFixture.install();
 
 const pool = require('../config/db');
 const { ORDER_STATUS, PAYMENT_STATUS, REFUND_STATUS, SHIPMENT_STATUS } = require('../constants/orderStatus');
@@ -143,11 +146,7 @@ const body = {
     });
 
     try {
-        const token = jwt.sign(
-            { id: 17, role: 'admin' },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-        );
+        const token = authFixture.issue({ userId: 17, role: 'admin', principal: 'admin' }).token;
         const authHeaders = {
             Authorization: `Bearer ${token}`,
             'Idempotency-Key': 'shipment-route-7201-attempt-1'
@@ -177,10 +176,10 @@ const body = {
 
         process.env.NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED = 'true';
         pool.query = async (sql, params) => {
-            assert.match(String(sql), /SELECT id, role FROM users WHERE id = \$1/);
+            assert.match(String(sql), /SELECT id, role, auth_enabled FROM users WHERE id = \$1/);
             assert.deepEqual(params, [17]);
             state.currentAdminQueries += 1;
-            return { rows: [{ id: 17, role: 'admin' }] };
+            return { rows: [{ id: 17, role: 'admin', auth_enabled: true }] };
         };
         pool.connect = async () => {
             state.transactionConnects += 1;
