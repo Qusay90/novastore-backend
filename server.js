@@ -121,6 +121,10 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(sanitizeBody);
 app.use(simpleRateLimit({ windowMs: 60 * 1000, max: 240 }));
+
+const runtimeMetaRoutes = require('./routes/runtimeMetaRoutes');
+app.use('/api', runtimeMetaRoutes);
+
 app.get('/favicon.ico', (req, res) => {
     res.type('image/png');
     res.sendFile(path.join(__dirname, 'frontend', 'favicon-96x96.png'));
