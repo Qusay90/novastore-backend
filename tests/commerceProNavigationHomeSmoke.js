@@ -7,6 +7,14 @@ const repositoryRoot = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
 
 const integratedSource = read('storefront-commerce-pro/src/IntegratedApp.jsx');
+const canonicalApp = read('storefront-commerce-pro/src/App.jsx');
+const runtimePresentation = read('storefront-commerce-pro/src/CanonicalRuntimePresentation.jsx');
+const syncCanonicalPath = path.join(
+    repositoryRoot,
+    'storefront-commerce-pro',
+    'scripts',
+    'sync-canonical.mjs'
+);
 const runtimeCatalogPath = path.join(
     repositoryRoot,
     'storefront-commerce-pro',
@@ -16,6 +24,11 @@ const runtimeCatalogPath = path.join(
 );
 const artifact = read('frontend/commerce-pro/index.html');
 const serverSource = read('server.js');
+const countExact = (source, token) => source.split(token).length - 1;
+const canonicalHomeHref = 'href="#/"';
+const runtimeHomeHref = 'href="/"';
+const canonicalMobileHome = '[House,"Ana Sayfa","#/","home"]';
+const runtimeMobileHome = '[House,"Ana Sayfa","/","home"]';
 
 for (const documentRoute of ['kategori', 'urun', 'koleksiyon']) {
     assert(
@@ -56,7 +69,36 @@ assert(integratedSource.includes('function Breadcrumbs({ category, productName }
 assert(integratedSource.includes('href={`#/kategori/${item.canonicalPath}`}'));
 assert(integratedSource.includes('getVisibleChildren(category.id)'));
 assert(integratedSource.includes('category.descendantVisibleProductCount === 0'));
-assert(integratedSource.includes('href="#/"'), 'home navigation must remain hash-stable');
+assert.equal(countExact(canonicalApp, canonicalHomeHref), 5, 'canonical App must retain five exact home href owners');
+assert.equal(countExact(canonicalApp, canonicalMobileHome), 1, 'canonical App must retain one mobile home item');
+assert.equal(countExact(runtimePresentation, canonicalHomeHref), 0, 'runtime home href owners must not be hash-only');
+assert.equal(countExact(runtimePresentation, canonicalMobileHome), 0, 'runtime mobile home must not be hash-only');
+assert.equal(
+    countExact(runtimePresentation, runtimeHomeHref),
+    countExact(canonicalApp, runtimeHomeHref) + 5,
+    'runtime presentation must transform exactly five home href owners to document root'
+);
+assert.equal(
+    countExact(runtimePresentation, runtimeMobileHome),
+    countExact(canonicalApp, runtimeMobileHome) + 1,
+    'runtime presentation must transform exactly one mobile home item to document root'
+);
+for (const route of [
+    '#/kategori/',
+    '#/urun/',
+    '#/favoriler',
+    '#/sepet',
+    '#/odeme/teslimat',
+    '#/hesabim',
+    '#/siparis-takibi',
+    '#/yardim'
+]) {
+    assert.equal(
+        countExact(runtimePresentation, route),
+        countExact(canonicalApp, route),
+        `non-home hash route must remain unchanged: ${route}`
+    );
+}
 
 assert(artifact.includes('novastore-artifact-kind'));
 assert(artifact.includes('production-candidate'));
@@ -68,6 +110,23 @@ assert(!/createCanonicalFixtureRuntime|main-integrated-fixture|fixture-integrate
 assert(!/commerce-pro-(?:preview|integration-preview)|noindex|nofollow/i.test(artifact));
 
 (async () => {
+    const generator = await import(pathToFileURL(syncCanonicalPath).href);
+    assert.equal(generator.EXPECTED_CANONICAL_HOME_HREF_COUNT, 5);
+    assert.equal(generator.EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT, 1);
+    assert.equal(generator.createRuntimePresentation(canonicalApp), runtimePresentation);
+    assert.throws(
+        () => generator.createRuntimePresentation(canonicalApp.replace(canonicalHomeHref, 'href="#/drift"')),
+        /expected 5 exact occurrence\(s\), found 4/,
+        'generator must fail closed when the canonical home href owner count drifts'
+    );
+    assert.throws(
+        () => generator.createRuntimePresentation(
+            canonicalApp.replace(canonicalMobileHome, '[House,"Ana Sayfa","#/drift","home"]')
+        ),
+        /expected 1 exact occurrence\(s\), found 0/,
+        'generator must fail closed when the canonical mobile home literal drifts'
+    );
+
     const runtimeCatalog = await import(pathToFileURL(runtimeCatalogPath).href);
     runtimeCatalog.configureRuntimeCatalog({
         categories: [
