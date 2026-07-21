@@ -1,15 +1,21 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const jwt = require('jsonwebtoken');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 const { privateNoStore } = require('../middlewares/privateNoStore');
 const { createRequireCurrentAdmin } = require('../services/currentAdminGuard');
 const { createGetAdminCatalogStructureSummary } = require('../services/adminCommerceReadService');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 process.env.JWT_SECRET = 'commerce-pro-catalog-structure-smoke-secret';
 
-const tokenFor = (payload) => jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+const authFixture = createAuthSessionFixture();
+authFixture.install();
+const tokenFor = ({ id, role }) => authFixture.issue({
+    userId: id,
+    role,
+    principal: role === 'admin' ? 'admin' : 'customer'
+}).token;
 
 const createResponse = () => ({
     statusCode: 200,
@@ -234,7 +240,7 @@ const expectedKeys = Object.freeze({
     });
     const currentAdminGuard = createRequireCurrentAdmin({
         async query() {
-            return { rows: [{ id: 17, role: 'admin' }] };
+            return { rows: [{ id: 17, role: 'admin', auth_enabled: true }] };
         }
     });
     const chain = [privateNoStore, authenticate, requireAdmin, currentAdminGuard, guardedHandler];
@@ -245,10 +251,10 @@ const expectedKeys = Object.freeze({
     assert.equal(structureQueryCount, 0);
 
     const customer = await runChain(chain, {
-        headers: { authorization: `Bearer ${tokenFor({ id: 17, role: 'customer' })}` },
+        headers: { authorization: `Bearer ${tokenFor({ id: 9, role: 'customer' })}` },
         query: { limit: '100' }
     });
-    assert.equal(customer.statusCode, 403);
+    assert.equal(customer.statusCode, 401);
     assert.equal(structureQueryCount, 0);
 
     const validAdmin = await runChain(chain, {

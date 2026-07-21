@@ -3,13 +3,14 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 const { resolveStartupSafety } = require('../config/startupSafety');
 const {
     applyCategoryV2Schema,
     applyCategoryV2BackfillConstraints
 } = require('../models/categoryV2Schema');
+const { applyAuthSessionSchema } = require('../models/authSessionSchema');
 const { recalculateCategoryStats } = require('../services/categoryV2BackfillService');
 const {
     assertCategoryMoveAllowed,
@@ -18,6 +19,9 @@ const {
 const { seedCurrentAdminUsers } = require('./helpers/seedCurrentAdminUsers');
 
 process.env.JWT_SECRET = 'category-api-smoke-secret';
+
+const authFixture = createAuthSessionFixture();
+authFixture.install();
 
 const adminCategoryRoutes = require('../routes/adminCategoryRoutes');
 const publicCategoryRoutes = require('../routes/publicCategoryRoutes');
@@ -66,9 +70,11 @@ const requestJson = async (baseUrl, url, options = {}) => {
 };
 
 const bearer = (role) => ({
-    Authorization: `Bearer ${jwt.sign({ id: role === 'admin' ? 1 : 2, role }, process.env.JWT_SECRET, {
-        expiresIn: '1h'
-    })}`
+    Authorization: `Bearer ${authFixture.issue({
+        userId: role === 'admin' ? 1 : 2,
+        role,
+        principal: role === 'admin' ? 'admin' : 'customer'
+    }).token}`
 });
 
 (async () => {
@@ -81,6 +87,7 @@ const bearer = (role) => ({
         await applyCategoryV2Schema(client);
         await applyCategoryV2BackfillConstraints(client);
         await seedCurrentAdminUsers(client);
+        await applyAuthSessionSchema(client);
 
         const categoryResult = await client.query(`
             INSERT INTO categories (
@@ -175,7 +182,7 @@ const bearer = (role) => ({
         const customer = await requestJson(api.baseUrl, '/api/admin/categories', {
             headers: bearer('customer')
         });
-        assert.strictEqual(customer.status, 403);
+        assert.strictEqual(customer.status, 401);
 
         const adminTree = await requestJson(api.baseUrl, '/api/admin/categories', {
             headers: bearer('admin')

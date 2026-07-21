@@ -558,7 +558,13 @@ const runCancellation = async (state, body = {}, request = {}) => {
         let storedRole = 'customer';
         pool.query = async (_sql, params) => {
             currentAdminQueries += 1;
-            return { rows: [{ id: params[0], role: storedRole }] };
+            return {
+                rows: [{
+                    id: params[0],
+                    role: storedRole,
+                    auth_enabled: true
+                }]
+            };
         };
         let customerNextCalls = 0;
         await requireCurrentAdminIfClaimed(

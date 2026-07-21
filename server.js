@@ -36,8 +36,10 @@ const {
     autoJoinAllowedRooms,
     buildMessageTargetRoom,
     buildSafeMessagePayload,
-    handleJoinRoom
+    handleJoinRoom,
+    revalidateSocketSession
 } = require('./services/socketAuthService');
+const { socketRevocationService } = require('./services/socketRevocationService');
 
 const app = express();
 const server = http.createServer(app);
@@ -60,30 +62,53 @@ io.use(authenticateSocket);
 
 io.on('connection', (socket) => {
     const joinedRooms = autoJoinAllowedRooms(socket);
+    socketRevocationService.register(socket);
     console.log(`Socket baglantisi kuruldu: ${socket.id} user=${socket.user.id} role=${socket.user.role}`);
 
-    socket.on('join_room', (room, ack) => {
-        const result = handleJoinRoom(socket, room, ack);
-        if (result.ok) {
-            console.log(`Socket ${socket.id} -> ${result.room} odasina katildi`);
-        }
-    });
-
-    socket.on('send_message', (data = {}, ack) => {
-        const targetRoom = buildMessageTargetRoom(socket.user, data);
-        if (!targetRoom) {
+    socket.on('join_room', async (room, ack) => {
+        try {
+            await revalidateSocketSession(socket);
+            const result = handleJoinRoom(socket, room, ack);
+            if (result.ok) console.log(`Socket ${socket.id} -> ${result.room} odasina katildi`);
+        } catch (error) {
             const payload = {
                 ok: false,
-                code: 'MESSAGE_FORBIDDEN',
-                message: 'Bu mesaj hedefi için yetkiniz yok.'
+                code: error.data?.code || 'SOCKET_SESSION_REVOKED',
+                message: 'Socket session is not active.'
             };
             if (typeof ack === 'function') ack(payload);
             socket.emit('socket_error', payload);
-            return;
+            socket.disconnect(true);
         }
+    });
 
-        io.to(targetRoom).emit('receive_message', buildSafeMessagePayload(socket.user, data));
-        if (typeof ack === 'function') ack({ ok: true, room: targetRoom });
+    socket.on('send_message', async (data = {}, ack) => {
+        try {
+            await revalidateSocketSession(socket);
+            const targetRoom = buildMessageTargetRoom(socket.user, data);
+            if (!targetRoom) {
+                const payload = {
+                    ok: false,
+                    code: 'MESSAGE_FORBIDDEN',
+                    message: 'Bu mesaj hedefi için yetkiniz yok.'
+                };
+                if (typeof ack === 'function') ack(payload);
+                socket.emit('socket_error', payload);
+                return;
+            }
+
+            io.to(targetRoom).emit('receive_message', buildSafeMessagePayload(socket.user, data));
+            if (typeof ack === 'function') ack({ ok: true, room: targetRoom });
+        } catch (error) {
+            const payload = {
+                ok: false,
+                code: error.data?.code || 'SOCKET_SESSION_REVOKED',
+                message: 'Socket session is not active.'
+            };
+            if (typeof ack === 'function') ack(payload);
+            socket.emit('socket_error', payload);
+            socket.disconnect(true);
+        }
     });
 
     socket.on('disconnect', () => {
@@ -96,6 +121,10 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(sanitizeBody);
 app.use(simpleRateLimit({ windowMs: 60 * 1000, max: 240 }));
+
+const runtimeMetaRoutes = require('./routes/runtimeMetaRoutes');
+app.use('/api', runtimeMetaRoutes);
+
 app.get('/favicon.ico', (req, res) => {
     res.type('image/png');
     res.sendFile(path.join(__dirname, 'frontend', 'favicon-96x96.png'));
@@ -378,6 +407,7 @@ const start = async () => {
     try {
         console.log(`Veritabani hedefi: ${startupSafety.target.label}`);
         await prepareDatabase(startupSafety);
+        if (startupSafety.shouldVerifyDbConnection) await socketRevocationService.start();
     } catch (err) {
         console.error('Veritabani hazirlama hatasi:', pool.formatError(err));
         process.exitCode = 1;

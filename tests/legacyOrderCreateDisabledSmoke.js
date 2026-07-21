@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const express = require('express');
 const http = require('node:http');
-const jwt = require('jsonwebtoken');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 process.env.NODE_ENV = 'test';
 process.env.NOVASTORE_SAFE_LOCAL_BACKEND = 'true';
@@ -17,6 +17,9 @@ process.env.DB_PASSWORD = 'novastore_test_only';
 process.env.DB_SSL = 'false';
 process.env.SUPABASE_USE_POOLER = 'false';
 process.env.JWT_SECRET = 'legacy-order-create-disabled-smoke-secret';
+
+const authFixture = createAuthSessionFixture();
+authFixture.install();
 
 const pool = require('../config/db');
 const orderRoutes = require('../routes/orderRoutes');
@@ -83,11 +86,11 @@ const payload = {
         assert.equal(guestResponse.body.code, 'LEGACY_ORDER_CREATE_DISABLED');
         assert.match(guestResponse.body.error, /payments\/initialize/);
 
-        const customerToken = jwt.sign(
-            { id: 42, role: 'customer' },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-        );
+        const customerToken = authFixture.issue({
+            userId: 42,
+            role: 'customer',
+            principal: 'customer'
+        }).token;
         const authedResponse = await postJson(server, '/api/orders', payload, {
             Authorization: `Bearer ${customerToken}`
         });

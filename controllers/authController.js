@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { Resend } = require('resend');
 const { getAppBaseUrl, getMailFrom } = require('../config/appConfig');
+const { AuthSessionError, issueAccessSession } = require('../services/authSessionService');
 
 const PASSWORD_RESET_TOKEN_PURPOSE = 'password_reset';
 const PASSWORD_RESET_TOKEN_TTL_SECONDS = 60 * 60;
@@ -41,39 +42,53 @@ const verifyPasswordResetToken = (token) => {
 };
 
 const login = async (req, res) => {
+    let client;
+    let transactionOpen = false;
     try {
         ensureJwtSecret();
         const { email, password } = req.body;
-
-        const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-
+        client = await pool.connect();
+        await client.query('BEGIN');
+        transactionOpen = true;
+        const userResult = await client.query(
+            'SELECT * FROM users WHERE email = $1 FOR UPDATE',
+            [email]
+        );
         if (userResult.rows.length === 0) {
-            return res.status(401).json({ error: 'Bu e-posta adresine ait bir hesap bulunamadı.' });
+            await client.query('ROLLBACK');
+            transactionOpen = false;
+            return res.status(401).json({ error: 'E-posta veya şifre hatalı.' });
         }
 
         const user = userResult.rows[0];
         const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) {
-            return res.status(401).json({ error: 'Hatalı şifre girdiniz.' });
+        if (!validPassword || user.role !== 'admin' || user.auth_enabled !== true) {
+            await client.query('ROLLBACK');
+            transactionOpen = false;
+            return res.status(401).json({ error: 'E-posta veya şifre hatalı.' });
         }
 
-        if (user.role !== 'admin') {
-            return res.status(403).json({ error: 'Bu panele sadece yöneticiler girebilir!' });
-        }
+        const session = await issueAccessSession({
+            userId: user.id,
+            role: user.role,
+            principal: 'admin',
+            queryable: client
+        });
+        await client.query('COMMIT');
+        transactionOpen = false;
 
-        const token = jwt.sign(
-            { id: user.id, role: user.role },
-            process.env.JWT_SECRET,
-            { expiresIn: '1d' }
-        );
-
-        res.json({ mesaj: 'Giriş başarılı, panele yönlendiriliyorsunuz...', token });
+        return res.json({ mesaj: 'Giriş başarılı, panele yönlendiriliyorsunuz...', token: session.token });
     } catch (err) {
-        console.error('Giriş hatası:', err);
-        if (String(err.message).includes('JWT config')) {
+        if (transactionOpen && client) {
+            try { await client.query('ROLLBACK'); } catch (_) { /* best effort */ }
+        }
+        console.error('Giriş hatası:', err.message);
+        if (err instanceof AuthSessionError || String(err.message).includes('JWT config')) {
             return res.status(500).json({ error: 'Sunucu güvenlik ayarı eksik.' });
         }
-        res.status(500).json({ error: 'Sunucu hatası meydana geldi.' });
+        return res.status(500).json({ error: 'Sunucu hatası meydana geldi.' });
+    } finally {
+        client?.release?.();
     }
 };
 

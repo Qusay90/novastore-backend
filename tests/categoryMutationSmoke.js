@@ -1,8 +1,8 @@
 const assert = require('assert');
 const http = require('http');
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 const createCoreSchema = require('../models/createCoreDb');
 const { resolveStartupSafety } = require('../config/startupSafety');
 const { recalculateAllCategoryStats, reconcileCategoryStats } = require('../services/categoryStatsService');
@@ -12,9 +12,11 @@ const publicRoutes = require('../routes/publicCategoryRoutes');
 const legacyRoutes = require('../routes/categoryRoutes');
 
 process.env.JWT_SECRET = 'category-mutation-smoke-secret';
+const authFixture = createAuthSessionFixture();
+authFixture.install();
 const adminHeaders = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${jwt.sign({ id: 1, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' })}`
+    Authorization: `Bearer ${authFixture.issue({ userId: 1, role: 'admin', principal: 'admin' }).token}`
 };
 
 const startApi = async () => {

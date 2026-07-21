@@ -1,8 +1,8 @@
 const assert = require('assert');
 const path = require('path');
 const { spawnLocalServer, stopServerProcess } = require('./helpers/localServerProcess');
-const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const authSessionService = require('../services/authSessionService');
 const createCoreSchema = require('../models/createCoreDb');
 const createCommerceSchema = require('../models/createCommerceDb');
 const createNotificationsTable = require('../models/createNotificationDb');
@@ -15,6 +15,7 @@ const { seedCurrentAdminUsers } = require('./helpers/seedCurrentAdminUsers');
 const root = path.join(__dirname, '..');
 const port = 5199;
 const jwtSecret = 'menu-collection-smoke-only';
+process.env.JWT_SECRET = jwtSecret;
 let child;
 
 const waitForServer = () => new Promise((resolve, reject) => {
@@ -139,6 +140,19 @@ const request = async (pathname, {
     const preservedAfter = await pool.query('SELECT COUNT(*)::INTEGER AS count FROM products');
     assert.strictEqual(preservedAfter.rows[0].count, preservedBefore.rows[0].count);
 
+    const adminToken = (await authSessionService.issueAccessSession({
+        userId: 1,
+        role: 'admin',
+        principal: 'admin',
+        queryable: pool
+    })).token;
+    const customerToken = (await authSessionService.issueAccessSession({
+        userId: 2,
+        role: 'customer',
+        principal: 'customer',
+        queryable: pool
+    })).token;
+
     child = spawnLocalServer({
         root,
         port,
@@ -148,13 +162,10 @@ const request = async (pathname, {
     });
     await waitForServer();
 
-    const adminToken = jwt.sign({ id: 1, role: 'admin' }, jwtSecret);
-    const customerToken = jwt.sign({ id: 2, role: 'customer' }, jwtSecret);
-
     const unauthenticated = await request('/api/admin/menus');
     assert.strictEqual(unauthenticated.response.status, 401);
     const forbidden = await request('/api/admin/menus', { token: customerToken });
-    assert.strictEqual(forbidden.response.status, 403);
+    assert.strictEqual(forbidden.response.status, 401);
 
     const menuCreate = await request('/api/admin/menus', {
         method: 'POST',

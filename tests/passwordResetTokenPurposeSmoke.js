@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const Module = require('node:module');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 process.env.NODE_ENV = 'test';
 process.env.NOVASTORE_SAFE_LOCAL_BACKEND = 'true';
@@ -19,6 +20,8 @@ process.env.SUPABASE_USE_POOLER = 'false';
 process.env.JWT_SECRET = 'password-reset-purpose-smoke-secret';
 process.env.RESEND_API_KEY = 'test-resend-key';
 process.env.APP_BASE_URL = 'https://novastore.test';
+
+const authFixture = createAuthSessionFixture();
 
 let sentEmail = null;
 
@@ -152,11 +155,12 @@ const extractResetToken = () => {
     assert.equal(typeof decodedResetToken.jti, 'string');
     assert.ok(decodedResetToken.jti.length >= 16);
 
-    const loginToken = jwt.sign(
-        { id: 42, role: 'customer' },
-        process.env.JWT_SECRET,
-        { expiresIn: '30d' }
-    );
+    const loginToken = authFixture.issue({
+        userId: 42,
+        role: 'customer',
+        principal: 'customer',
+        expiresIn: '30d'
+    }).token;
 
     const loginTokenResetRes = createResponse();
     await resetPassword({

@@ -1,10 +1,10 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const jwt = require('jsonwebtoken');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 const { privateNoStore } = require('../middlewares/privateNoStore');
 const { createRequireCurrentAdmin } = require('../services/currentAdminGuard');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 const {
     createGetAdminProductSummaries,
     parseOrderSummaryLimit
@@ -12,7 +12,13 @@ const {
 
 process.env.JWT_SECRET = 'commerce-pro-catalog-summary-smoke-secret';
 
-const tokenFor = (payload) => jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+const authFixture = createAuthSessionFixture();
+authFixture.install();
+const tokenFor = ({ id, role }) => authFixture.issue({
+    userId: id,
+    role,
+    principal: role === 'admin' ? 'admin' : 'customer'
+}).token;
 
 const createResponse = () => ({
     statusCode: 200,
@@ -190,7 +196,7 @@ const productRow = (id) => ({
     const currentAdminGuard = createRequireCurrentAdmin({
         async query(sqlText, params) {
             currentAdminQueries.push({ sql: sqlText, params });
-            return { rows: [{ id: 17, role: 'admin' }] };
+            return { rows: [{ id: 17, role: 'admin', auth_enabled: true }] };
         }
     });
     const chain = [privateNoStore, authenticate, requireAdmin, currentAdminGuard, guardedCatalogHandler];
@@ -201,10 +207,10 @@ const productRow = (id) => ({
     assert.equal(guardedCatalogQueryCount, 0);
 
     const customer = await runChain(chain, {
-        headers: { authorization: `Bearer ${tokenFor({ id: 17, role: 'customer' })}` },
+        headers: { authorization: `Bearer ${tokenFor({ id: 9, role: 'customer' })}` },
         query: { limit: '100' }
     });
-    assert.equal(customer.statusCode, 403);
+    assert.equal(customer.statusCode, 401);
     assert.equal(guardedCatalogQueryCount, 0);
 
     const missingCurrentAdminChain = [
@@ -225,7 +231,7 @@ const productRow = (id) => ({
         privateNoStore,
         authenticate,
         requireAdmin,
-        createRequireCurrentAdmin({ async query() { return { rows: [{ id: 17, role: 'customer' }] }; } }),
+        createRequireCurrentAdmin({ async query() { return { rows: [{ id: 17, role: 'customer', auth_enabled: true }] }; } }),
         guardedCatalogHandler
     ];
     const demotedCurrentAdmin = await runChain(demotedCurrentAdminChain, {
@@ -252,8 +258,8 @@ const productRow = (id) => ({
     } finally {
         console.error = originalConsoleError;
     }
-    assert.equal(currentAdminError.statusCode, 500);
-    assert.deepEqual(currentAdminError.payload, { error: 'Yönetici yetkisi doğrulanamadı.' });
+    assert.equal(currentAdminError.statusCode, 503);
+    assert.deepEqual(currentAdminError.payload, { error: 'Yönetici yetkisi geçici olarak doğrulanamadı.' });
     assert.equal(currentAdminError.headers['cache-control'], 'private, no-store, max-age=0');
     assert.equal(guardedCatalogQueryCount, 0);
 

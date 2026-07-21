@@ -320,12 +320,26 @@ export function createCustomerAccountAdapter({
     signal: options.signal,
   });
 
-  const logout = () => {
-    storage?.removeItem?.(TOKEN_KEY);
-    storage?.removeItem?.(USER_KEY);
-    if (typeof CustomEvent === "function") {
-      eventTarget?.dispatchEvent?.(new CustomEvent("novastore:auth-required"));
+  const logout = async (options = {}) => {
+    let serverRevocationVerified = false;
+    try {
+      await http.request("/api/users/logout", { method: "POST", signal: options.signal });
+      serverRevocationVerified = true;
+    } catch (_error) {
+      serverRevocationVerified = false;
+    } finally {
+      storage?.removeItem?.(TOKEN_KEY);
+      storage?.removeItem?.(USER_KEY);
+      if (typeof CustomEvent === "function") {
+        eventTarget?.dispatchEvent?.(new CustomEvent("novastore:auth-required"));
+      }
     }
+    return Object.freeze({
+      serverRevocationVerified,
+      warning: serverRevocationVerified
+        ? null
+        : "Bu cihazdaki oturum kapatıldı; sunucu oturumunun kapatıldığı doğrulanamadı.",
+    });
   };
 
   const listAddresses = async (options = {}) => {
