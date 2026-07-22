@@ -7,7 +7,8 @@ const smokeTests = [
     'tests/socketAuthSmoke.js',
     'tests/sharedStateSmoke.js',
     'tests/paymentProviderConfigSmoke.js',
-    'tests/categoryPlpStorefrontSmoke.js'
+    'tests/categoryPlpStorefrontSmoke.js',
+    'tests/stagingMigrationFoundationSmoke.js'
 ];
 
 const smokeEnv = {
