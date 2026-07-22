@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { getAppBaseUrl } = require('../config/appConfig');
+const { assertExternalSideEffectAllowed } = require('../config/stagingRuntimePolicy');
 
 const buildPaymentRef = () => `NST-PMT-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 
@@ -18,6 +19,7 @@ const verifyWebhookSignature = (payload, signature, secret) => {
 };
 
 const initializeIyzicoPayment = async ({ orderId, amount, currency }) => {
+    assertExternalSideEffectAllowed('payment_initialize');
     const paymentRef = buildPaymentRef();
 
     const callbackBase = getAppBaseUrl();

@@ -1,5 +1,6 @@
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', 'host.docker.internal']);
 const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'on']);
+const { resolveStagingRuntimePolicy } = require('./stagingRuntimePolicy');
 
 const isTruthy = (value) => TRUTHY_VALUES.has(String(value || '').trim().toLowerCase());
 
@@ -64,10 +65,12 @@ const isSafeLocalDatabase = (target) => {
 const applyDevelopmentPreviewFallback = (env = process.env) => {
     const nodeEnv = String(env.NODE_ENV || '').trim().toLowerCase();
     const target = getDatabaseTarget(env);
+    const deployEnvironment = String(env.NOVASTORE_DEPLOY_ENV || '').trim().toLowerCase();
     const localPreviewRequested = isTruthy(env.NOVASTORE_LOCAL_PREVIEW);
     const allowRemoteDatabase = isTruthy(env.NOVASTORE_ALLOW_REMOTE_DB);
 
     if (
+        deployEnvironment === 'staging' ||
         nodeEnv !== 'development' ||
         !localPreviewRequested ||
         !target.isSupabaseHost ||
@@ -120,6 +123,9 @@ const resolveStartupSafety = (env = process.env) => {
         target.database === 'novastore_preview';
     const errors = [];
     const warnings = [];
+    const stagingRuntimePolicy = resolveStagingRuntimePolicy(env);
+
+    errors.push(...stagingRuntimePolicy.errors);
 
     if (!target.hasDatabaseConfig) {
         errors.push('Acik bir DATABASE_URL veya DB_HOST tanimi gerekli.');
@@ -176,6 +182,7 @@ const resolveStartupSafety = (env = process.env) => {
     }
 
     const shouldRunSchemaInit =
+        !stagingRuntimePolicy.isStaging &&
         !localPreviewMode &&
         !skipSchemaInit &&
         allowSchemaInit &&
@@ -196,7 +203,8 @@ const resolveStartupSafety = (env = process.env) => {
         shouldVerifyDbConnection: localPreviewMode ? false : !skipSchemaInit || safeLocalMode,
         target,
         safeLocalDatabase,
-        isPreviewSinkTarget
+        isPreviewSinkTarget,
+        stagingRuntimePolicy
     };
 };
 

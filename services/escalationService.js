@@ -1,5 +1,7 @@
 ﻿const pool = require('../config/db');
 
+const { assertExternalSideEffectAllowed } = require('../config/stagingRuntimePolicy');
+
 const getPrimaryAdminId = async () => {
     const result = await pool.query("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
     if (!result.rows.length) return null;
@@ -7,6 +9,8 @@ const getPrimaryAdminId = async () => {
 };
 
 const createEscalationMessage = async ({ userId, summary }) => {
+    assertExternalSideEffectAllowed('outbound_notification');
+
     const adminId = await getPrimaryAdminId();
     if (!adminId) {
         const err = new Error('Admin hesabı bulunamadı.');

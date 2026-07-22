@@ -10,6 +10,8 @@
     "test:ci": "node scripts/runCiSmokes.js",
     "test:staging-migrations": "node tests/stagingMigrationFoundationSmoke.js",
     "test:staging-migrations:integration": "node tests/stagingMigrationIntegrationSmoke.js",
+    "test:staging-runtime-safety": "node tests/stagingRuntimeSafetySmoke.js",
+    "test:staging-access-gate": "node tests/stagingAccessGateHttpSmoke.js",
     "staging:migrate:plan": "node scripts/stagingMigrationCli.js plan",
     "staging:migrate:status": "node scripts/stagingMigrationCli.js status",
     "staging:migrate": "node scripts/stagingMigrationCli.js apply",

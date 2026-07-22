@@ -5,6 +5,10 @@ const crypto = require('crypto');
 const { Resend } = require('resend');
 const { getAppBaseUrl, getMailFrom } = require('../config/appConfig');
 const { AuthSessionError, issueAccessSession } = require('../services/authSessionService');
+const {
+    ExternalSideEffectBlockedError,
+    assertExternalSideEffectAllowed
+} = require('../config/stagingRuntimePolicy');
 
 const PASSWORD_RESET_TOKEN_PURPOSE = 'password_reset';
 const PASSWORD_RESET_TOKEN_TTL_SECONDS = 60 * 60;
@@ -98,6 +102,7 @@ const forgotPassword = async (req, res) => {
     const neutralMessage = 'Eğer bu e-posta sistemde kayıtlıysa şifre sıfırlama bağlantısı gönderildi.';
 
     try {
+        assertExternalSideEffectAllowed('email');
         ensureJwtSecret();
 
         if (!process.env.RESEND_API_KEY) {
@@ -138,6 +143,7 @@ const forgotPassword = async (req, res) => {
 
         const displayName = user.full_name || user.name || 'Kullanıcı';
 
+        assertExternalSideEffectAllowed('email');
         const resend = new Resend(process.env.RESEND_API_KEY);
 
         const { error } = await resend.emails.send({
@@ -163,6 +169,12 @@ const forgotPassword = async (req, res) => {
 
         res.status(200).json({ message: neutralMessage });
     } catch (error) {
+        if (error instanceof ExternalSideEffectBlockedError) {
+            return res.status(error.statusCode).json({
+                code: error.code,
+                message: error.publicMessage
+            });
+        }
         console.error('Şifre sıfırlama hatası:', error);
         if (String(error.message).includes('JWT config')) {
             return res.status(500).json({ message: 'Sunucu güvenlik ayarı eksik.' });

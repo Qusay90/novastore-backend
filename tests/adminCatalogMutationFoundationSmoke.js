@@ -559,9 +559,9 @@ const createResponse = () => ({
     assert.doesNotMatch(hardDeleteSource, /pool|cloudinary|DELETE FROM/i);
 
     const productRoutesSource = readSource('routes/productRoutes.js');
-    assert.match(productRoutesSource, /authenticate, requireAdmin, requireCurrentAdmin, previewUpload/);
-    assert.match(productRoutesSource, /authenticate, requireAdmin, requireCurrentAdmin, upload\.array/);
-    assert.match(productRoutesSource, /router\.delete\('\/:id', authenticate, requireAdmin, requireCurrentAdmin, deleteProduct\)/);
+    assert.match(productRoutesSource, /authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, previewUpload/);
+    assert.match(productRoutesSource, /authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, upload\.array/);
+    assert.match(productRoutesSource, /router\.delete\('\/:id', authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, deleteProduct\)/);
     for (const relativePath of [
         'routes/adminAttributeRoutes.js',
         'routes/adminCollectionRoutes.js',
@@ -569,7 +569,7 @@ const createResponse = () => ({
     ]) {
         assert.match(readSource(relativePath), /router\.use\(authenticate, requireAdmin, requireCurrentAdmin\)/);
     }
-    assert.match(readSource('routes/adminCategoryRoutes.js'), /authenticate, requireAdmin, requireCurrentAdmin/);
+    assert.match(readSource('routes/adminCategoryRoutes.js'), /authenticate, requireAdmin, requireStagingCatalogStructureWrite, requireCurrentAdmin/);
     assert.match(readSource('routes/categoryRoutes.js'), /authenticate, requireAdmin, requireCurrentAdmin/);
 
     const legacyAdminSource = readSource('frontend/admin.html');

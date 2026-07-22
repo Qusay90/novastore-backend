@@ -2,6 +2,10 @@ const { getUserFromRequestIfAny, sendAuthError } = require('../middlewares/authM
 const { handleAssistantChat } = require('../services/assistantOrchestrator');
 const { createEscalationMessage } = require('../services/escalationService');
 const { createNotification } = require('./notificationController');
+const {
+    ExternalSideEffectBlockedError,
+    assertExternalSideEffectAllowed
+} = require('../config/stagingRuntimePolicy');
 
 const { getAiProviderConfig } = require('../config/appConfig');
 
@@ -35,6 +39,9 @@ const chat = async (req, res) => {
         const response = await handleAssistantChat({ message, user, history, context });
         res.status(200).json(normalizeAssistantResponse(response));
     } catch (err) {
+        if (err instanceof ExternalSideEffectBlockedError) {
+            return res.status(err.statusCode).json({ code: err.code, error: err.publicMessage });
+        }
         if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
         const aiProviderConfig = getAiProviderConfig();
         console.error('Assistant chat hatası:', {
@@ -58,6 +65,7 @@ const escalate = async (req, res) => {
             return res.status(400).json({ error: 'summary zorunludur.' });
         }
 
+        assertExternalSideEffectAllowed('outbound_notification');
         const escalation = await createEscalationMessage({ userId: user.id, summary });
 
         try {
@@ -82,6 +90,9 @@ const escalate = async (req, res) => {
             escalation: escalation.message
         });
     } catch (err) {
+        if (err instanceof ExternalSideEffectBlockedError) {
+            return res.status(err.statusCode).json({ code: err.code, error: err.publicMessage });
+        }
         if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
         const statusCode = err.statusCode || 500;
         res.status(statusCode).json({ error: err.message || 'Canlı destek devri yapılamadı.' });

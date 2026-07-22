@@ -1,4 +1,5 @@
 const { resolveRuntimeIdentity } = require('../services/runtimeIdentityService');
+const { resolveStagingRuntimePolicy } = require('../config/stagingRuntimePolicy');
 
 const LIVE_RESPONSE = Object.freeze({ status: 'live' });
 const READY_RESPONSE = Object.freeze({ status: 'ready' });
@@ -11,6 +12,11 @@ const createRuntimeMetaController = ({ database, environment = process.env } = {
 
     const getReady = async (req, res) => {
         try {
+            const stagingRuntimePolicy = resolveStagingRuntimePolicy(environment);
+            if (!stagingRuntimePolicy.canStart) {
+                return res.status(503).json(UNAVAILABLE_RESPONSE);
+            }
+
             const identity = resolveRuntimeIdentity(environment);
             if (!identity.available) {
                 return res.status(503).json(UNAVAILABLE_RESPONSE);

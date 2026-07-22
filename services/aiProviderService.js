@@ -1,4 +1,8 @@
 const { getAiProviderConfig } = require('../config/appConfig');
+const {
+    ExternalSideEffectBlockedError,
+    assertExternalSideEffectAllowed
+} = require('../config/stagingRuntimePolicy');
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 const DEFAULT_OLLAMA_MODEL = 'llama3.1';
@@ -487,12 +491,14 @@ class MockAssistantProvider {
 
 class OllamaProvider {
     constructor() {
+        assertExternalSideEffectAllowed('external_ai');
         this.name = 'ollama';
         this.baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
         this.model = process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL;
     }
 
     async runAgent({ userMessage }) {
+        assertExternalSideEffectAllowed('external_ai');
         return {
             text: `Ollama aracılığıyla yanıt (Ajan desteği yok): ${userMessage}`,
             products: [],
@@ -506,6 +512,7 @@ class OllamaProvider {
 
 class GeminiProvider {
     constructor() {
+        assertExternalSideEffectAllowed('external_ai');
         this.name = 'gemini';
         this.apiKey = process.env.GEMINI_API_KEY;
         this.model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
@@ -513,6 +520,7 @@ class GeminiProvider {
     }
 
     async runAgent({ systemPrompt, userMessage, history = [], executeTool }) {
+        assertExternalSideEffectAllowed('external_ai');
         if (!this.apiKey) {
             throw new AiProviderFallbackError('Gemini API anahtarı bulunamadı.', {
                 provider: this.name
@@ -641,6 +649,7 @@ class GeminiProvider {
 
 class OpenAIProvider {
     constructor() {
+        assertExternalSideEffectAllowed('external_ai');
         this.name = 'openai';
         this.apiKey = process.env.OPENAI_API_KEY;
         this.model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -648,6 +657,7 @@ class OpenAIProvider {
     }
 
     async runAgent({ systemPrompt, userMessage, history = [], executeTool }) {
+        assertExternalSideEffectAllowed('external_ai');
         if (!this.apiKey) {
             throw new AiProviderFallbackError('OpenAI API anahtarı bulunamadı.', {
                 provider: this.name
@@ -798,6 +808,7 @@ class FallbackAiProvider {
                 }
                 return result;
             } catch (err) {
+                if (err instanceof ExternalSideEffectBlockedError) throw err;
                 lastError = err;
                 if (!(err instanceof AiProviderFallbackError)) {
                     console.warn(`AI provider fallback requested: provider=${provider.name} error=${err.message || err}`);
