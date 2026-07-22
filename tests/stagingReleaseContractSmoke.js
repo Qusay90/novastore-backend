@@ -171,13 +171,18 @@ const createFakeGitReader = ({
 };
 
 (async () => {
-    await check(1, 'parent SHA/tree/subject exact', () => {
-        const current = gitLine(['rev-parse', 'HEAD']);
-        const base = current === authorizedParent ? current : gitLine(['rev-parse', 'HEAD^']);
-        assert.equal(base, authorizedParent);
-        assert.equal(gitLine(['rev-parse', `${base}^{tree}`]), authorizedTree);
-        assert.equal(gitLine(['rev-parse', `${base}^`]), authorizedParentParent);
-        assert.equal(gitLine(['show', '-s', '--format=%s', base]), authorizedSubject);
+    await check(1, 'authorized 1B ancestor SHA/tree/parent/subject exact', () => {
+        assert.equal(
+            gitLine(['rev-parse', `${authorizedParent}^{commit}`]),
+            authorizedParent
+        );
+        runGit(['merge-base', '--is-ancestor', authorizedParent, 'HEAD']);
+        assert.equal(gitLine(['rev-parse', `${authorizedParent}^{tree}`]), authorizedTree);
+        assert.equal(gitLine(['rev-parse', `${authorizedParent}^`]), authorizedParentParent);
+        assert.equal(
+            gitLine(['show', '-s', '--format=%s', authorizedParent]),
+            authorizedSubject
+        );
     });
 
     await check(2, '1B changed-file list exact 28', () => {
