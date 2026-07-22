@@ -6,6 +6,8 @@ const smokeTests = [
     'tests/startupSafetySmoke.js',
     'tests/stagingRuntimeSafetySmoke.js',
     'tests/stagingAccessGateHttpSmoke.js',
+    'tests/stagingReleaseContractSmoke.js',
+    'tests/stagingVerificationHarnessSmoke.js',
     'tests/socketAuthSmoke.js',
     'tests/sharedStateSmoke.js',
     'tests/paymentProviderConfigSmoke.js',
