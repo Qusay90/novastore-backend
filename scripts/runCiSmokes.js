@@ -4,6 +4,8 @@ const path = require('path');
 const rootDir = path.join(__dirname, '..');
 const smokeTests = [
     'tests/startupSafetySmoke.js',
+    'tests/stagingRuntimeSafetySmoke.js',
+    'tests/stagingAccessGateHttpSmoke.js',
     'tests/socketAuthSmoke.js',
     'tests/sharedStateSmoke.js',
     'tests/paymentProviderConfigSmoke.js',

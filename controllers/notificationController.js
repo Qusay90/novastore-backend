@@ -1,5 +1,9 @@
 const pool = require('../config/db');
 const { emitWithRetry } = require('../services/notificationService');
+const {
+    ExternalSideEffectBlockedError,
+    assertExternalSideEffectAllowed
+} = require('../config/stagingRuntimePolicy');
 
 const redactKnownSecretText = (value = '') => {
     let text = String(value || '');
@@ -20,6 +24,7 @@ const redactKnownSecretText = (value = '') => {
  * @param {object} io
  */
 const createNotification = async (userId, type, message, io = null) => {
+    assertExternalSideEffectAllowed('outbound_notification');
     try {
         const result = await pool.query(
             'INSERT INTO notifications (user_id, type, message) VALUES ($1, $2, $3) RETURNING *',
@@ -147,6 +152,9 @@ const sendTestNotification = async (req, res) => {
         );
         res.status(201).json({ mesaj: 'Test bildirimi gonderildi!', bildirim: notif });
     } catch (err) {
+        if (err instanceof ExternalSideEffectBlockedError) {
+            return res.status(err.statusCode).json({ code: err.code, error: err.publicMessage });
+        }
         res.status(500).json({ error: err.message });
     }
 };

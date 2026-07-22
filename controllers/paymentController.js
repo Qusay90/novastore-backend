@@ -32,6 +32,24 @@ const {
     STOCK_RESERVATION_STATE,
     getStockReservationState
 } = require('../services/orderLifecyclePolicy');
+const {
+    ExternalSideEffectBlockedError,
+    assertExternalSideEffectAllowed
+} = require('../config/stagingRuntimePolicy');
+
+const rejectBlockedExternalSideEffect = (res, effect) => {
+    try {
+        assertExternalSideEffectAllowed(effect);
+        return false;
+    } catch (error) {
+        if (!(error instanceof ExternalSideEffectBlockedError)) throw error;
+        res.status(error.statusCode).json({
+            code: error.code,
+            error: error.publicMessage
+        });
+        return true;
+    }
+};
 
 const readIdempotencyKey = (req) => {
     const headerKey = req.headers['idempotency-key'];
@@ -689,6 +707,8 @@ const finalizePaytrSuccess = (payload) => finalizePaytrCallback(payload, PAYMENT
 const finalizePaytrFailure = (payload) => finalizePaytrCallback(payload, PAYMENT_CALLBACK_OUTCOME.FAILURE);
 
 const webhookPaytr = async (req, res) => {
+    if (rejectBlockedExternalSideEffect(res, 'payment_capture')) return;
+
     try {
         const payload = normalizePaytrCallbackPayload(req.body || {});
 
@@ -769,6 +789,8 @@ const webhookPaytr = async (req, res) => {
 };
 
 const initializePayment = async (req, res) => {
+    if (rejectBlockedExternalSideEffect(res, 'payment_initialize')) return;
+
     const client = await pool.connect();
 
     try {
@@ -1055,6 +1077,8 @@ const getPaymentStatus = async (req, res) => {
 };
 
 const webhookIyzico = async (req, res) => {
+    if (rejectBlockedExternalSideEffect(res, 'payment_capture')) return;
+
     const client = await pool.connect();
 
     try {

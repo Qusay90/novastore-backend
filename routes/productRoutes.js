@@ -15,19 +15,22 @@ const {
 const { upload, previewUpload } = require('../config/cloudinary');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 const { requireCurrentAdmin } = require('../middlewares/currentAdmin');
+const { requireAdminCommerceCapabilityInStaging } = require('../middlewares/adminCommerceCapability');
+
+const requireStagingCatalogProductWrite = requireAdminCommerceCapabilityInStaging('firstPartyCatalogWrite');
 
 router.get('/', getAllProducts);
 
 // Medya yolu, '/:id' ile cakismamasi icin once tanimlanir
-router.post('/media-preview/remove-background', authenticate, requireAdmin, requireCurrentAdmin, previewUpload.single('media'), previewProductMediaBackgroundRemoval);
-router.post('/media-preview/cleanup', authenticate, requireAdmin, requireCurrentAdmin, cleanupProductMediaPreview);
-router.post('/media/:mediaId/remove-background-preview', authenticate, requireAdmin, requireCurrentAdmin, previewExistingProductMediaBackgroundRemoval);
-router.post('/media/:mediaId/remove-background-apply', authenticate, requireAdmin, requireCurrentAdmin, applyExistingProductMediaBackgroundRemoval);
-router.delete('/media/:mediaId', authenticate, requireAdmin, requireCurrentAdmin, deleteProductMedia);
+router.post('/media-preview/remove-background', authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, previewUpload.single('media'), previewProductMediaBackgroundRemoval);
+router.post('/media-preview/cleanup', authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, cleanupProductMediaPreview);
+router.post('/media/:mediaId/remove-background-preview', authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, previewExistingProductMediaBackgroundRemoval);
+router.post('/media/:mediaId/remove-background-apply', authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, applyExistingProductMediaBackgroundRemoval);
+router.delete('/media/:mediaId', authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, deleteProductMedia);
 
 router.get('/:id', getProductById);
-router.post('/', authenticate, requireAdmin, requireCurrentAdmin, upload.array('media', 10), createProduct);
-router.put('/:id', authenticate, requireAdmin, requireCurrentAdmin, upload.array('media', 10), updateProduct);
-router.delete('/:id', authenticate, requireAdmin, requireCurrentAdmin, deleteProduct);
+router.post('/', authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, upload.array('media', 10), createProduct);
+router.put('/:id', authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, upload.array('media', 10), updateProduct);
+router.delete('/:id', authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, deleteProduct);
 
 module.exports = router;

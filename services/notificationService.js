@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { assertExternalSideEffectAllowed } = require('../config/stagingRuntimePolicy');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -25,6 +26,7 @@ const writeNotificationAudit = async ({
 };
 
 const emitWithRetry = async ({ io, room, eventName, payload, notificationId = null, retries = 3 }) => {
+    assertExternalSideEffectAllowed('outbound_notification');
     if (!io || !room) {
         await writeNotificationAudit({
             notificationId,

@@ -27,6 +27,11 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const { simpleRateLimit, sanitizeBody } = require('./middlewares/securityMiddleware');
+const {
+    createStagingAccessGate,
+    createStagingEngineAccessGate
+} = require('./middlewares/stagingAccessGate');
+const { assertExternalSideEffectAllowed } = require('./config/stagingRuntimePolicy');
 const pool = require('./config/db');
 const { getAllowedOrigins } = require('./config/appConfig');
 const { getPublicCategoryBySlug } = require('./services/categoryService');
@@ -54,6 +59,10 @@ const corsOptions = {
 const io = new Server(server, {
     cors: corsOptions
 });
+
+const stagingAccessGate = createStagingAccessGate({ environment: process.env });
+const stagingEngineAccessGate = createStagingEngineAccessGate({ environment: process.env });
+io.engine.use(stagingEngineAccessGate);
 
 // io export
 module.exports.io = io;
@@ -97,9 +106,21 @@ io.on('connection', (socket) => {
                 return;
             }
 
+            assertExternalSideEffectAllowed('outbound_notification');
             io.to(targetRoom).emit('receive_message', buildSafeMessagePayload(socket.user, data));
             if (typeof ack === 'function') ack({ ok: true, room: targetRoom });
         } catch (error) {
+            if (error && error.code === 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED') {
+                const payload = {
+                    ok: false,
+                    code: error.code,
+                    message: error.publicMessage || 'External side effect is disabled in staging.'
+                };
+                if (typeof ack === 'function') ack(payload);
+                socket.emit('socket_error', payload);
+                return;
+            }
+
             const payload = {
                 ok: false,
                 code: error.data?.code || 'SOCKET_SESSION_REVOKED',
@@ -117,6 +138,7 @@ io.on('connection', (socket) => {
 });
 
 // Middleware
+app.use(stagingAccessGate);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(sanitizeBody);
@@ -366,6 +388,13 @@ app.use('/api/merchant', merchantRoutes);
 app.use('/merchant', merchantRoutes);
 
 app.use((err, req, res, next) => {
+    if (err && err.code === 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED') {
+        return res.status(503).json({
+            code: err.code,
+            error: err.publicMessage || 'External side effect is disabled in staging.'
+        });
+    }
+
     console.error('Istek hatasi:', err && err.message ? err.message : err);
 
     if (res.headersSent) {
@@ -376,12 +405,6 @@ app.use((err, req, res, next) => {
     const message = err && err.message ? err.message : 'Sunucu hatasi meydana geldi.';
     return res.status(statusCode).json({ error: message });
 });
-
-// Veritabani tablolari
-const createCoreSchema = require('./models/createCoreDb');
-const createNotificationsTable = require('./models/createNotificationDb');
-const createCommerceSchema = require('./models/createCommerceDb');
-const createAnalyticsSchema = require('./models/createAnalyticsDb');
 
 const prepareDatabase = async (startupSafety) => {
     if (!startupSafety.shouldVerifyDbConnection) {
@@ -396,6 +419,11 @@ const prepareDatabase = async (startupSafety) => {
         console.log('Schema init guvenlik guard nedeniyle atlandi.');
         return;
     }
+
+    const createCoreSchema = require('./models/createCoreDb');
+    const createNotificationsTable = require('./models/createNotificationDb');
+    const createCommerceSchema = require('./models/createCommerceDb');
+    const createAnalyticsSchema = require('./models/createAnalyticsDb');
 
     await createCoreSchema();
     await createNotificationsTable();
