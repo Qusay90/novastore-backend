@@ -8,7 +8,11 @@ const {
     StagingVerificationError,
     assertRedirectAllowed,
     attestResolvedAddresses,
+    createPinnedLookup,
+    isSafeVerificationRequest,
+    isUnsafeIpAddress,
     planVerificationTarget,
+    resolvePinnedAddresses,
     runVerificationHarness,
     validateBounds
 } = require('../scripts/stagingVerificationHarness');
@@ -55,6 +59,11 @@ const createFixture = async () => {
         RENDER_GIT_COMMIT: revision
     };
     const app = express();
+    const requests = [];
+    app.use((req, _res, next) => {
+        requests.push(`${req.method} ${req.originalUrl}`);
+        next();
+    });
     app.use(createStagingAccessGate({
         environment,
         comparePassword: async (password, hash) => (
@@ -67,7 +76,6 @@ const createFixture = async () => {
     }));
     app.get('/', (_req, res) => res.status(200).type('html').send('<!doctype html><title>Storefront</title>'));
     app.get('/admin.html', (_req, res) => res.status(200).type('html').send('<!doctype html><title>Admin</title>'));
-    app.get('/api/products', (_req, res) => res.status(200).json({ products: [] }));
     app.get('/socket.io/', (_req, res) => res.status(200).send('unexpected'));
 
     const server = await new Promise((resolve, reject) => {
@@ -76,6 +84,7 @@ const createFixture = async () => {
     });
     return {
         target: `http://127.0.0.1:${server.address().port}`,
+        requests,
         close: () => new Promise((resolve, reject) => {
             server.close((error) => error ? reject(error) : resolve());
         })
@@ -88,6 +97,8 @@ const hasCheck = (result, name) => result.checks.some((entry) => (
 
 (async () => {
     let actualRemoteRequests = 0;
+    let actualRemoteDnsRequests = 0;
+    let expandedTargetCorpus = 0;
 
     await check(21, 'default remote target rejected', () => {
         expectCode(
@@ -190,6 +201,110 @@ const hasCheck = (result, name) => result.checks.some((entry) => (
         assert.equal(actualRemoteRequests, 0);
     });
 
+    await check('30a', 'canonical byte-level IPv6 and translation corpus rejects unsafe addresses', () => {
+        const unsafeAddresses = [
+            '::ffff:7f00:1',
+            '::ffff:a00:1',
+            '0:0:0:0:0:ffff:7f00:1',
+            '::127.0.0.1',
+            '64:ff9b::7f00:1',
+            '::ffff:127.0.0.1',
+            '::ffff:c0a8:1',
+            '64:ff9b::a00:1',
+            '::1',
+            '::',
+            'fc00::1',
+            'fd00::1',
+            'fe80::1',
+            'ff02::1',
+            '0:0:0:0:0:FFFF:C0A8:0001',
+            '::FFFF:192.168.0.1',
+            '64:FF9B::C0A8:1',
+            '64:ff9b:1::7f00:1',
+            '2002:7f00:1::',
+            '2001:0000:4136:e378:8000:63bf:3fff:fdd2'
+        ];
+        const safeAddresses = [
+            '2001:4860:4860::8888',
+            '2001:4860:4860:0:0:0:0:8888',
+            '2606:4700:4700::1111',
+            '93.184.216.34',
+            '8.8.8.8'
+        ];
+        for (const address of unsafeAddresses) {
+            assert.equal(isUnsafeIpAddress(address), true, address);
+            expectCode(() => attestResolvedAddresses([{ address }]), 'DNS_REBINDING_RISK');
+        }
+        for (const address of safeAddresses) {
+            assert.equal(isUnsafeIpAddress(address), false, address);
+            assert.equal(attestResolvedAddresses([{ address }]).length, 1);
+        }
+        expandedTargetCorpus += unsafeAddresses.length + safeAddresses.length;
+    });
+
+    await check('30b', 'mixed malformed and family-confused DNS answers fail closed', () => {
+        const rejectedRecords = [
+            [{ address: 'not-an-ip' }],
+            [{ address: '' }],
+            [{ address: ' 93.184.216.34' }],
+            [{ address: '93.184.216.34', family: 6 }],
+            [{ address: '2001:4860:4860::8888', family: 4 }],
+            [{ address: '2001:::1' }],
+            [{ address: '93.184.216.34' }, { address: '10.0.0.1' }]
+        ];
+        for (const records of rejectedRecords) {
+            expectCode(() => attestResolvedAddresses(records), 'DNS_REBINDING_RISK');
+        }
+        expectCode(() => attestResolvedAddresses([]), 'DNS_ATTESTATION_EMPTY');
+        expandedTargetCorpus += rejectedRecords.length + 1;
+    });
+
+    await check('30c', 'injected resolver and pinned lookup preserve the attested address', async () => {
+        const remotePlan = planVerificationTarget({
+            target: 'https://staging.example.test',
+            allowRemote: true,
+            expectedHostname: 'staging.example.test'
+        });
+        let injectedResolverCalls = 0;
+        const records = await resolvePinnedAddresses(remotePlan, async () => {
+            injectedResolverCalls += 1;
+            return [{ address: '93.184.216.34', family: 4 }];
+        });
+        assert.equal(injectedResolverCalls, 1);
+        const lookup = createPinnedLookup(records);
+        await new Promise((resolve, reject) => lookup('staging.example.test', {}, (error, address, family) => {
+            if (error) return reject(error);
+            assert.equal(address, '93.184.216.34');
+            assert.equal(family, 4);
+            return resolve();
+        }));
+        assert.equal(actualRemoteDnsRequests, 0);
+    });
+
+    await check('30d', 'verification request contract is exact method plus path', () => {
+        const allowed = [
+            ['GET', '/api/health/live'],
+            ['HEAD', '/api/health/live'],
+            ['GET', '/api/health/ready'],
+            ['HEAD', '/api/health/ready'],
+            ['GET', '/api/version'],
+            ['GET', '/'],
+            ['GET', '/admin.html'],
+            ['GET', '/_staging/access'],
+            ['POST', '/_staging/access'],
+            ['POST', '/_staging/logout'],
+            ['GET', '/socket.io/?EIO=4&transport=polling']
+        ];
+        for (const pair of allowed) assert.equal(isSafeVerificationRequest(...pair), true, pair.join(' '));
+        for (const pair of [
+            ['GET', '/api/products'],
+            ['POST', '/api/version'],
+            ['GET', '/api/version?extra=1'],
+            ['GET', '/socket.io/'],
+            ['GET', '/socket.io/?EIO=4&transport=polling&extra=1']
+        ]) assert.equal(isSafeVerificationRequest(...pair), false, pair.join(' '));
+    });
+
     const fixture = await createFixture();
     let result;
     try {
@@ -206,6 +321,27 @@ const hasCheck = (result, name) => result.checks.some((entry) => (
         });
         actualRemoteRequests += result.metrics.remoteHttpRequests;
 
+        await check('30e', 'actual emitted method and path allowlist is exact', () => {
+            assert.deepEqual(fixture.requests, [
+                'GET /api/health/live',
+                'HEAD /api/health/live',
+                'GET /api/health/ready',
+                'HEAD /api/health/ready',
+                'GET /api/version',
+                'GET /',
+                'GET /_staging/access',
+                'POST /_staging/access',
+                'GET /api/version',
+                'GET /',
+                'GET /admin.html',
+                'POST /_staging/logout',
+                'GET /',
+                'GET /api/version',
+                'GET /socket.io/?EIO=4&transport=polling'
+            ]);
+            assert.equal(fixture.requests.some((entry) => entry.includes('/api/products')), false);
+        });
+
         await check(31, 'live GET and HEAD pass', () => {
             assert.equal(hasCheck(result, 'health-live'), true);
         });
@@ -214,7 +350,7 @@ const hasCheck = (result, name) => result.checks.some((entry) => (
             assert.equal(hasCheck(result, 'health-ready'), true);
         });
 
-        await check(33, 'unauthenticated version storefront and API protected', () => {
+        await check(33, 'unauthenticated version and storefront protected', () => {
             assert.equal(hasCheck(result, 'unauthenticated-protection'), true);
         });
 
@@ -291,8 +427,10 @@ const hasCheck = (result, name) => result.checks.some((entry) => (
     }
 
     assert.equal(actualRemoteRequests, 0);
+    assert.equal(actualRemoteDnsRequests, 0);
+    assert.equal(expandedTargetCorpus, 33);
     console.log(
-        `stagingVerificationHarnessSmoke: PASS=${results.pass} FAIL=${results.fail} SKIPPED=${results.skip} remote=0 mutation=0 external=0`
+        `stagingVerificationHarnessSmoke: PASS=${results.pass} FAIL=${results.fail} SKIPPED=${results.skip} expanded=33 remote-dns=0 remote-http=0 products=0 mutation=0 external=0`
     );
     if (results.fail > 0 || results.skip > 0) process.exitCode = 1;
 })().catch((error) => {

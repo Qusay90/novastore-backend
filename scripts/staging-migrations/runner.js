@@ -104,7 +104,19 @@ const assertUnmanagedSchemaEmpty = async (client) => {
             (SELECT COUNT(*)::INTEGER
              FROM pg_proc p
              JOIN pg_namespace n ON n.oid = p.pronamespace
-             WHERE n.nspname = 'public') AS object_count`
+             WHERE n.nspname = 'public')
+            +
+            (SELECT COUNT(*)::INTEGER
+             FROM pg_type t
+             JOIN pg_namespace n ON n.oid = t.typnamespace
+             LEFT JOIN pg_class c ON c.oid = t.typrelid
+             WHERE n.nspname = 'public'
+               AND t.typisdefined
+               AND (
+                   t.typtype IN ('d', 'e', 'r', 'm')
+                   OR (t.typtype = 'c' AND c.relkind = 'c')
+                   OR (t.typtype = 'b' AND t.typelem = 0 AND t.typrelid = 0)
+               )) AS object_count`
     );
     if (Number(result.rows[0]?.object_count || 0) !== 0) {
         throw makeError(

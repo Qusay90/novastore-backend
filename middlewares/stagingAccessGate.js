@@ -210,7 +210,6 @@ const createStagingAccessGate = ({
         const method = String(req.method || '').toUpperCase();
         setStagingResponseHeaders(res);
 
-        if (method === 'OPTIONS') return next();
         if (isExactHealthBypass(req, path)) return next();
 
         if (path === LOGOUT_PATH && method === 'POST') {

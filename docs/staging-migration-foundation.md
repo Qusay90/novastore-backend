@@ -45,7 +45,10 @@ runner-owned transaction. SQL is never split on semicolons.
 There are no transaction-excluded statements in the current manifest. Any
 future non-transactional migration is unsupported until a separate recovery
 contract and tests are added. A non-empty schema without this ledger is never
-adopted automatically.
+adopted automatically. For this guard, non-empty includes public relations,
+functions, and user-defined types such as enums, domains, standalone composite
+types, ranges, multiranges, and base types. PostgreSQL-generated array and table
+row types are not treated as independent unmanaged objects.
 
 ## Schema baseline and synthetic data
 

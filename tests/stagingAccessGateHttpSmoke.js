@@ -104,6 +104,7 @@ const form = (values) => new URLSearchParams(values).toString();
     app.use(express.json());
     app.get('/api/health/live', (_req, res) => res.status(200).json({ status: 'live' }));
     app.get('/api/health/ready', (_req, res) => res.status(200).json({ status: 'ready' }));
+    app.options('/api/products', (_req, res) => res.status(204).end());
     app.all('/api/private', (req, res) => res.status(200).json({
         authorization: req.headers.authorization || null,
         accountAuthenticated: Boolean(req.user)
@@ -180,6 +181,19 @@ const form = (values) => new URLSearchParams(values).toString();
             }
         });
 
+        await check('access', '7a unauthenticated OPTIONS never bypasses the perimeter', async () => {
+            for (const pathname of [
+                '/api/products',
+                '/api/version',
+                '/api/health/live',
+                '/api/health/ready'
+            ]) {
+                const result = await request({ port, pathname, method: 'OPTIONS' });
+                assert.equal(result.status, 401, pathname);
+                assert.deepEqual(JSON.parse(result.body), { error: 'Staging access required.' });
+            }
+        });
+
         await check('access', '8 wrong credential receives a generic rejection', async () => {
             const body = form({ username: syntheticUsername, password: 'wrong-synthetic-password' });
             const result = await request({
@@ -227,6 +241,17 @@ const form = (values) => new URLSearchParams(values).toString();
             assert.match(cookie, /; Path=\//i);
             assert.match(cookie, new RegExp(`; Max-Age=${SESSION_MAX_AGE_SECONDS}(?:;|$)`, 'i'));
             assert.doesNotMatch(cookie, /; Domain=/i);
+        });
+
+        await check('access', '10a authenticated OPTIONS reaches the downstream CORS boundary', async () => {
+            const result = await request({
+                port,
+                pathname: '/api/products',
+                method: 'OPTIONS',
+                headers: { Cookie: authenticatedCookie }
+            });
+            assert.equal(result.status, 204);
+            assert.equal(result.body, '');
         });
 
         await check('access', '11 tampered cookie fails closed', async () => {
@@ -368,7 +393,7 @@ const form = (values) => new URLSearchParams(values).toString();
         await close(server);
     }
 
-    assert.equal(counts.access, 20);
+    assert.equal(counts.access, 22);
 
     await check('loopback', '44 actual server loopback integration', async () => {
         const port = await reservePort();
@@ -469,11 +494,21 @@ const form = (values) => new URLSearchParams(values).toString();
                 headers: { Cookie: cookie, Accept: 'text/html' }
             });
             const socket = await request({ port, pathname: '/socket.io/?EIO=4&transport=polling' });
-            const preflight = await request({
+            const unauthenticatedPreflight = await request({
                 port,
                 pathname: '/api/products',
                 method: 'OPTIONS',
                 headers: {
+                    Origin: `http://127.0.0.1:${port}`,
+                    'Access-Control-Request-Method': 'GET'
+                }
+            });
+            const authenticatedPreflight = await request({
+                port,
+                pathname: '/api/products',
+                method: 'OPTIONS',
+                headers: {
+                    Cookie: cookie,
                     Origin: `http://127.0.0.1:${port}`,
                     'Access-Control-Request-Method': 'GET'
                 }
@@ -484,8 +519,10 @@ const form = (values) => new URLSearchParams(values).toString();
             assert.equal(deepRoute.status, 200);
             assert.equal(admin.status, 200);
             assert.equal(socket.status, 401);
-            assert.equal(preflight.status, 204);
-            assert.equal(preflight.body, '');
+            assert.equal(unauthenticatedPreflight.status, 401);
+            assert.deepEqual(JSON.parse(unauthenticatedPreflight.body), { error: 'Staging access required.' });
+            assert.equal(authenticatedPreflight.status, 204);
+            assert.equal(authenticatedPreflight.body, '');
             assert.doesNotMatch(output, /models[\\/]initDb|createCoreDb|createNotificationDb|createCommerceDb|createAnalyticsDb/);
         } finally {
             if (child.exitCode === null) child.kill();
@@ -497,8 +534,8 @@ const form = (values) => new URLSearchParams(values).toString();
         }
     });
 
-    assert.deepEqual(counts, { access: 20, loopback: 1 });
-    console.log(`stagingAccessGateHttpSmoke: PASS access=${counts.access}/20 loopback=${counts.loopback}/1`);
+    assert.deepEqual(counts, { access: 22, loopback: 1 });
+    console.log(`stagingAccessGateHttpSmoke: PASS access=${counts.access}/22 loopback=${counts.loopback}/1`);
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;

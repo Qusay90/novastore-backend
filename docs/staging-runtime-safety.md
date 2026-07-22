@@ -54,8 +54,9 @@ credentials and are not part of that denylist.
 - unauthenticated `GET` and `HEAD` for `/api/health/ready`
 
 All other storefront, static, admin, API, upload, Socket.IO, and functional paths
-require the signed staging perimeter cookie. This cookie is separate from the
-NovaStore Bearer/JWT account session.
+require the signed staging perimeter cookie. `OPTIONS` is not a general
+unauthenticated exception; a valid perimeter session may continue to the existing
+CORS layer. This cookie is separate from the NovaStore Bearer/JWT account session.
 
 ## External side-effect classes
 

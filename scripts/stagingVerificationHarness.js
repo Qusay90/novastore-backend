@@ -18,16 +18,18 @@ const MAX_TIMEOUT_MS = 10000;
 const DEFAULT_MAX_REDIRECTS = 2;
 const MAX_REDIRECTS = 3;
 const MAX_RESPONSE_BYTES = 64 * 1024;
-const SAFE_PATHS = new Set([
-    '/api/health/live',
-    '/api/health/ready',
-    '/api/version',
-    '/',
-    '/admin.html',
-    '/api/products',
-    '/_staging/access',
-    '/_staging/logout',
-    '/socket.io/'
+const SAFE_REQUESTS = new Set([
+    'GET /api/health/live',
+    'HEAD /api/health/live',
+    'GET /api/health/ready',
+    'HEAD /api/health/ready',
+    'GET /api/version',
+    'GET /',
+    'GET /admin.html',
+    'GET /_staging/access',
+    'POST /_staging/access',
+    'POST /_staging/logout',
+    'GET /socket.io/?EIO=4&transport=polling'
 ]);
 
 class StagingVerificationError extends Error {
@@ -151,8 +153,7 @@ const planVerificationTarget = ({ target, allowRemote = false, expectedHostname 
     });
 };
 
-const isUnsafeIpv4 = (address) => {
-    const octets = address.split('.').map(Number);
+const isUnsafeIpv4Octets = (octets) => {
     const [a, b] = octets;
     return (
         a === 0 ||
@@ -168,33 +169,91 @@ const isUnsafeIpv4 = (address) => {
     );
 };
 
+const isUnsafeIpv4 = (address) => (
+    net.isIP(address) !== 4 || isUnsafeIpv4Octets(address.split('.').map(Number))
+);
+
+const parseIpv6Bytes = (address) => {
+    let expanded = address.toLowerCase();
+    if (expanded.includes('.')) {
+        const ipv4Start = expanded.lastIndexOf(':') + 1;
+        const ipv4 = expanded.slice(ipv4Start);
+        if (net.isIP(ipv4) !== 4) return null;
+        const octets = ipv4.split('.').map(Number);
+        expanded = `${expanded.slice(0, ipv4Start)}${(
+            (octets[0] << 8) | octets[1]
+        ).toString(16)}:${((octets[2] << 8) | octets[3]).toString(16)}`;
+    }
+
+    const sections = expanded.split('::');
+    if (sections.length > 2) return null;
+    const parseSection = (section) => {
+        if (!section) return [];
+        const words = section.split(':');
+        if (words.some((word) => !/^[0-9a-f]{1,4}$/.test(word))) return null;
+        return words.map((word) => Number.parseInt(word, 16));
+    };
+    const left = parseSection(sections[0]);
+    const right = sections.length === 2 ? parseSection(sections[1]) : [];
+    if (!left || !right) return null;
+
+    let words;
+    if (sections.length === 1) {
+        if (left.length !== 8) return null;
+        words = left;
+    } else {
+        const missing = 8 - left.length - right.length;
+        if (missing < 1) return null;
+        words = [...left, ...Array(missing).fill(0), ...right];
+    }
+
+    const bytes = Buffer.alloc(16);
+    words.forEach((word, index) => bytes.writeUInt16BE(word, index * 2));
+    return bytes;
+};
+
+const bytesStartWith = (bytes, prefix) => prefix.every((value, index) => bytes[index] === value);
+const bytesAreZero = (bytes, start, end) => {
+    for (let index = start; index < end; index += 1) {
+        if (bytes[index] !== 0) return false;
+    }
+    return true;
+};
+
+const hasIpv4TranslationPrefix = (bytes) => (
+    (bytesAreZero(bytes, 0, 12)) ||
+    (bytesAreZero(bytes, 0, 10) && bytes[10] === 0xff && bytes[11] === 0xff) ||
+    (bytesStartWith(bytes, [0x00, 0x64, 0xff, 0x9b]) && bytesAreZero(bytes, 4, 12)) ||
+    bytesStartWith(bytes, [0x00, 0x64, 0xff, 0x9b, 0x00, 0x01]) ||
+    bytesStartWith(bytes, [0x20, 0x02]) ||
+    bytesStartWith(bytes, [0x20, 0x01, 0x00, 0x00])
+);
+
 const isUnsafeIpAddress = (address) => {
-    const normalized = normalizeHostname(address);
-    const version = net.isIP(normalized);
-    if (version === 4) return isUnsafeIpv4(normalized);
+    if (typeof address !== 'string' || address !== address.trim() || address.length === 0) return true;
+    const version = net.isIP(address);
+    if (version === 4) return isUnsafeIpv4(address);
     if (version !== 6) return true;
 
-    const lower = normalized.toLowerCase();
-    if (
-        lower === '::' ||
-        lower === '::1' ||
-        lower.startsWith('fc') ||
-        lower.startsWith('fd') ||
-        /^fe[89ab]/.test(lower) ||
-        lower.startsWith('ff')
-    ) return true;
-
-    const mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    return mapped ? isUnsafeIpv4(mapped[1]) : false;
+    const bytes = parseIpv6Bytes(address);
+    if (!bytes) return true;
+    const unspecified = bytesAreZero(bytes, 0, 16);
+    const loopback = bytesAreZero(bytes, 0, 15) && bytes[15] === 1;
+    const uniqueLocal = (bytes[0] & 0xfe) === 0xfc;
+    const linkLocal = bytes[0] === 0xfe && (bytes[1] & 0xc0) === 0x80;
+    const multicast = bytes[0] === 0xff;
+    return unspecified || loopback || uniqueLocal || linkLocal || multicast || hasIpv4TranslationPrefix(bytes);
 };
 
 const attestResolvedAddresses = (records) => {
     if (!Array.isArray(records) || records.length === 0) fail('DNS_ATTESTATION_EMPTY');
     const normalized = records.map((record) => {
         const address = typeof record === 'string' ? record : record?.address;
-        const family = net.isIP(String(address || ''));
+        const family = typeof address === 'string' ? net.isIP(address) : 0;
+        const declaredFamily = typeof record === 'object' && record !== null ? record.family : undefined;
+        if (declaredFamily !== undefined && Number(declaredFamily) !== family) fail('DNS_REBINDING_RISK');
         if (!family || isUnsafeIpAddress(address)) fail('DNS_REBINDING_RISK');
-        return Object.freeze({ address: String(address), family });
+        return Object.freeze({ address, family });
     });
     return Object.freeze(normalized);
 };
@@ -219,6 +278,11 @@ const createPinnedLookup = (records) => (hostname, options, callback) => {
     if (normalized.all) return done(null, records.map((record) => ({ ...record })));
     return done(null, records[0].address, records[0].family);
 };
+
+const normalizeVerificationMethod = (method) => String(method || 'GET').toUpperCase();
+const isSafeVerificationRequest = (method, pathname) => (
+    SAFE_REQUESTS.has(`${normalizeVerificationMethod(method)} ${String(pathname || '')}`)
+);
 
 const assertRedirectAllowed = (plan, location) => {
     if (typeof location !== 'string' || !location || location.length > 2048) {
@@ -289,18 +353,14 @@ const requestOnce = ({ plan, pinnedAddresses, pathname, method, headers, body, t
 
 const createBoundedRequester = ({ plan, pinnedAddresses, bounds, metrics }) => {
     const request = async ({ pathname, method = 'GET', headers = {}, body, followRedirects = true }, redirects = 0) => {
-        const pathOnly = String(pathname || '').split('?')[0];
-        if (!SAFE_PATHS.has(pathOnly)) {
-            metrics.functionalMutationRequests += 1;
-            fail('UNSAFE_VERIFICATION_ENDPOINT');
-        }
-        if (!['GET', 'HEAD', 'POST'].includes(method)) {
+        const normalizedMethod = normalizeVerificationMethod(method);
+        if (!['GET', 'HEAD', 'POST'].includes(normalizedMethod)) {
             metrics.functionalMutationRequests += 1;
             fail('UNSAFE_VERIFICATION_METHOD');
         }
-        if (method === 'POST' && !['/_staging/access', '/_staging/logout'].includes(pathOnly)) {
+        if (!isSafeVerificationRequest(normalizedMethod, pathname)) {
             metrics.functionalMutationRequests += 1;
-            fail('FUNCTIONAL_MUTATION_FORBIDDEN');
+            fail('UNSAFE_VERIFICATION_ENDPOINT');
         }
 
         metrics.httpRequests += 1;
@@ -311,7 +371,7 @@ const createBoundedRequester = ({ plan, pinnedAddresses, bounds, metrics }) => {
                 plan,
                 pinnedAddresses,
                 pathname,
-                method,
+                method: normalizedMethod,
                 headers,
                 body,
                 timeoutMs: bounds.timeoutMs
@@ -326,7 +386,7 @@ const createBoundedRequester = ({ plan, pinnedAddresses, bounds, metrics }) => {
         if (!followRedirects || !isRedirect) return response;
         if (redirects >= bounds.maxRedirects) fail('REDIRECT_LIMIT_EXCEEDED');
         const next = assertRedirectAllowed(plan, location);
-        const nextMethod = response.status === 303 ? 'GET' : method;
+        const nextMethod = response.status === 303 ? 'GET' : normalizedMethod;
         return request({
             pathname: `${next.pathname}${next.search}`,
             method: nextMethod,
@@ -442,11 +502,6 @@ const runVerificationHarness = async ({
     });
     assertStatus(unauthenticatedRoot, 302, 'UNAUTHENTICATED_STOREFRONT_NOT_PROTECTED');
     assertRedirectAllowed(plan, unauthenticatedRoot.headers.location);
-    assertStatus(
-        await request({ pathname: '/api/products', followRedirects: false }),
-        401,
-        'UNAUTHENTICATED_API_NOT_PROTECTED'
-    );
     pass('unauthenticated-protection');
 
     assertStatus(
@@ -591,7 +646,9 @@ module.exports = {
     VERIFICATION_OPERATOR_ENV_KEYS,
     assertRedirectAllowed,
     attestResolvedAddresses,
+    createPinnedLookup,
     isKnownProductionHost,
+    isSafeVerificationRequest,
     isUnsafeIpAddress,
     planVerificationTarget,
     readOperatorConfiguration,

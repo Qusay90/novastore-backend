@@ -50,6 +50,32 @@ const publicObjectCount = async () => {
     return result.rows[0].count;
 };
 
+const ledgerReference = async () => (
+    await admin.query(`SELECT to_regclass('public.${LEDGER_TABLE}') AS ledger`)
+).rows[0].ledger;
+
+const migrationMutationCount = async () => (
+    await admin.query(
+        `SELECT COUNT(*)::INTEGER AS count
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'public'
+           AND c.relname IN ('users', 'products', 'categories', 'orders')`
+    )
+).rows[0].count;
+
+const assertUnmanagedRejection = async ({ name, sql }) => {
+    await resetPublic();
+    await admin.query(sql);
+    await assert.rejects(
+        runApply({ env, registry, output: silent }),
+        (error) => error?.code === 'UNMANAGED_SCHEMA',
+        `${name} must be rejected as unmanaged schema`
+    );
+    assert.equal(await ledgerReference(), null, `${name} rejection must precede ledger creation`);
+    assert.equal(await migrationMutationCount(), 0, `${name} rejection must precede migration mutation`);
+};
+
 const tableCounts = async () => {
     const result = await admin.query(
         `SELECT
@@ -85,13 +111,33 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
     assert.equal(statusBefore.filter((entry) => entry.status === 'pending').length, registry.length);
     assert.equal(await publicObjectCount(), 0, 'status must not create the ledger or any schema object');
 
-    await admin.query('CREATE TABLE unmanaged_probe (id INTEGER PRIMARY KEY)');
-    await assert.rejects(runApply({ env, registry, output: silent }), /non-empty schema/i);
-    assert.equal(
-        (await admin.query(`SELECT to_regclass('public.${LEDGER_TABLE}') AS ledger`)).rows[0].ledger,
-        null,
-        'unmanaged rejection must happen before ledger creation'
-    );
+    for (const probe of [
+        {
+            name: 'enum-only schema',
+            sql: "CREATE TYPE public.p4d1f_enum_probe AS ENUM ('synthetic')"
+        },
+        {
+            name: 'domain-only schema',
+            sql: 'CREATE DOMAIN public.p4d1f_domain_probe AS TEXT CHECK (VALUE <> \'\')'
+        },
+        {
+            name: 'standalone-composite-only schema',
+            sql: 'CREATE TYPE public.p4d1f_composite_probe AS (value INTEGER)'
+        },
+        {
+            name: 'range-and-generated-multirange-only schema',
+            sql: 'CREATE TYPE public.p4d1f_range_probe AS RANGE (subtype = integer)'
+        },
+        {
+            name: 'relation-only schema',
+            sql: 'CREATE TABLE public.p4d1f_relation_probe (id INTEGER PRIMARY KEY)'
+        },
+        {
+            name: 'function-only schema',
+            sql: `CREATE FUNCTION public.p4d1f_function_probe()
+                  RETURNS INTEGER LANGUAGE SQL IMMUTABLE AS 'SELECT 1'`
+        }
+    ]) await assertUnmanagedRejection(probe);
     await resetPublic();
 
     const firstApply = await runApply({ env, registry, output: silent });
@@ -251,7 +297,7 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
     assert.deepEqual(snapshotAfterSecond, snapshotAfterFirst);
     assert.deepEqual(await tableCounts(), protectedCountsBefore);
 
-    console.log('staging migration PostgreSQL integration smoke passed: 20 scenarios');
+    console.log('staging migration PostgreSQL integration smoke passed: 25 scenarios');
 })().finally(async () => {
     await admin.end().catch(() => {});
 }).catch((error) => {
