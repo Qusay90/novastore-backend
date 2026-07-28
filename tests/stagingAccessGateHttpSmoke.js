@@ -15,10 +15,12 @@ const {
 const { resolveStagingRuntimePolicy } = require('../config/stagingRuntimePolicy');
 
 const rootDir = path.join(__dirname, '..');
+const serverChildPath = path.join(__dirname, 'helpers', 'stagingAccessGateServerChild.js');
 const syntheticUsername = 'synthetic-p4d1b-user';
 const syntheticPassword = 'synthetic-p4d1b-password';
 const syntheticSessionSecret = 'synthetic-p4d1b-session-secret-for-tests-only';
 const syntheticHashShape = `$2b$12$${'A'.repeat(53)}`;
+const revocationReadinessMarker = 'stagingAccessGateServerChild: revocation-listener-ready';
 
 const stagingEnv = (overrides = {}) => ({
     NOVASTORE_DEPLOY_ENV: 'staging',
@@ -397,6 +399,7 @@ const form = (values) => new URLSearchParams(values).toString();
 
     await check('loopback', '44 actual server loopback integration', async () => {
         const port = await reservePort();
+        const databasePort = await reservePort();
         const syntheticHash = await bcrypt.hash(syntheticPassword, 12);
         const safeSystemEnv = {};
         for (const key of ['PATH', 'SystemRoot', 'WINDIR', 'ComSpec', 'PATHEXT', 'TEMP', 'TMP']) {
@@ -407,10 +410,9 @@ const form = (values) => new URLSearchParams(values).toString();
             ...safeSystemEnv,
             NODE_ENV: 'test',
             PORT: String(port),
-            DATABASE_URL: 'postgresql://novastore_test:novastore_test_only@127.0.0.1:55432/novastore_p4d1b_test',
             DB_HOST: '127.0.0.1',
-            DB_PORT: '55432',
-            DB_NAME: 'novastore_p4d1b_test',
+            DB_PORT: String(databasePort),
+            DB_NAME: `novastore_rc10r_access_${process.pid}_${databasePort}`,
             DB_USER: 'novastore_test',
             DB_PASSWORD: 'novastore_test_only',
             DB_SSL: 'false',
@@ -436,7 +438,7 @@ const form = (values) => new URLSearchParams(values).toString();
             NOVASTORE_STOREFRONT_MODE: 'commerce-pro'
         };
 
-        const child = spawn(process.execPath, ['server.js'], {
+        const child = spawn(process.execPath, [serverChildPath], {
             cwd: rootDir,
             env: childEnv,
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -459,6 +461,19 @@ const form = (values) => new URLSearchParams(values).toString();
             }
             assert.equal(child.exitCode, null, output);
             assert.equal(live?.status, 200, output);
+
+            for (let attempt = 0; attempt < 20; attempt += 1) {
+                if (
+                    output.includes(revocationReadinessMarker)
+                    && output.includes('NovaStore sunucusu ')
+                ) break;
+                await delay(25);
+            }
+            assert.equal(output.split(revocationReadinessMarker).length - 1, 1, output);
+            assert(
+                output.indexOf(revocationReadinessMarker) < output.indexOf('NovaStore sunucusu '),
+                output
+            );
 
             const unauthenticatedRoot = await request({
                 port,
