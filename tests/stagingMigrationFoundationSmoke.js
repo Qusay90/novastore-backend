@@ -15,7 +15,11 @@ const {
     redact,
     validateTarget
 } = require('../scripts/staging-migrations/guard');
-const { runPlan, runStatus } = require('../scripts/staging-migrations/runner');
+const {
+    createDefaultClient,
+    runPlan,
+    runStatus
+} = require('../scripts/staging-migrations/runner');
 
 const root = path.join(__dirname, '..');
 const localDatabaseName = 'novastore_p4d1a_foundation_test';
@@ -131,16 +135,97 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
         validateTarget({ ...localEnv, NOVASTORE_STAGING_BOOTSTRAP_ENABLED: 'true' }, { bootstrap: true }).localTest,
         true
     );
-    assert.equal(
-        validateTarget({
-            NOVASTORE_DEPLOY_ENV: 'staging',
-            NOVASTORE_STAGING_MIGRATIONS_ENABLED: 'true',
-            NOVASTORE_ALLOW_REMOTE_DB: 'true',
-            NOVASTORE_EXPECTED_DATABASE_HOST: 'staging-db.internal',
-            NOVASTORE_EXPECTED_DATABASE_NAME: 'novastore_staging',
+    const remoteEnv = {
+        NOVASTORE_DEPLOY_ENV: 'staging',
+        NOVASTORE_STAGING_MIGRATIONS_ENABLED: 'true',
+        NOVASTORE_ALLOW_REMOTE_DB: 'true',
+        NOVASTORE_EXPECTED_DATABASE_HOST: 'staging-db.internal',
+        NOVASTORE_EXPECTED_DATABASE_NAME: 'novastore_staging',
+        DATABASE_URL: 'postgresql://staging-db.internal/novastore_staging?sslmode=verify-full'
+    };
+    const remoteTarget = validateTarget(remoteEnv);
+    assert.equal(remoteTarget.mode, 'staging');
+    assert.deepEqual(remoteTarget.ssl, { rejectUnauthorized: true });
+    assert.equal(remoteTarget.connectionString, undefined);
+    assert.throws(
+        () => validateTarget({
+            ...remoteEnv,
             DATABASE_URL: 'postgresql://staging-db.internal/novastore_staging'
-        }).mode,
-        'staging'
+        }),
+        /verified TLS/i
+    );
+    assert.throws(
+        () => validateTarget({
+            ...remoteEnv,
+            NOVASTORE_EXPECTED_DATABASE_HOST: '198.51.100.20',
+            DATABASE_URL: 'postgresql://198.51.100.20/novastore_staging?sslmode=verify-full'
+        }),
+        /DNS hostname/i
+    );
+    for (const query of [
+        'sslmode=disable',
+        'sslmode=prefer',
+        'sslmode=require',
+        'sslmode=verify-ca',
+        'sslmode=no-verify',
+        'ssl=false',
+        'ssl=no-verify',
+        'sslmode=verify-full&sslmode=disable',
+        'sslmode=verify-full&ssl=no-verify',
+        'sslmode=verify-full&uselibpqcompat=true'
+    ]) {
+        assert.throws(
+            () => validateTarget({
+                ...remoteEnv,
+                DATABASE_URL: `postgresql://staging-db.internal/novastore_staging?${query}`
+            }),
+            /verified TLS/i,
+            `remote query must be rejected: ${query}`
+        );
+    }
+
+    const remoteClient = createDefaultClient(remoteTarget, 'foundation_tls_assertion');
+    assert.equal(remoteClient.connectionParameters.host, 'staging-db.internal');
+    assert.equal(remoteClient.connectionParameters.database, 'novastore_staging');
+    assert.deepEqual(remoteClient.connectionParameters.ssl, { rejectUnauthorized: true });
+    assert.equal(
+        Object.hasOwn(remoteClient.connectionParameters.ssl, 'checkServerIdentity'),
+        false,
+        'Node default hostname verification must remain enabled'
+    );
+
+    const priorPgSslMode = process.env.PGSSLMODE;
+    process.env.PGSSLMODE = 'disable';
+    try {
+        const ambientOverrideClient = createDefaultClient(remoteTarget, 'foundation_tls_ambient_assertion');
+        assert.deepEqual(ambientOverrideClient.connectionParameters.ssl, { rejectUnauthorized: true });
+    } finally {
+        if (priorPgSslMode === undefined) delete process.env.PGSSLMODE;
+        else process.env.PGSSLMODE = priorPgSslMode;
+    }
+
+    const localTarget = validateTarget(localEnv);
+    assert.equal(localTarget.localTest, true);
+    assert.equal(createDefaultClient(localTarget).connectionParameters.ssl, false);
+
+    const credentialMarker = ['synthetic', 'credential', 'marker'].join('-');
+    const credentialTarget = validateTarget({
+        ...remoteEnv,
+        DATABASE_URL:
+            `postgresql://migration_user:${encodeURIComponent(credentialMarker)}` +
+            '@staging-db.internal/novastore_staging?sslmode=verify-full'
+    });
+    assert.equal(credentialTarget.password, credentialMarker);
+    assert.equal(Object.keys(credentialTarget).includes('password'), false);
+    assert.equal(JSON.stringify(credentialTarget).includes(credentialMarker), false);
+    assert.throws(
+        () => validateTarget({
+            ...remoteEnv,
+            DATABASE_URL:
+                'postgresql://migration_user:%ZZ' +
+                '@staging-db.internal/novastore_staging?sslmode=verify-full'
+        }),
+        /invalid encoded credentials/i
     );
 
     const markerUrl = 'postgresql://127.0.0.1/db?marker=unit-redaction-marker';
@@ -196,7 +281,7 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
     assert.doesNotMatch(stagingSources, /require\([^)]*initDb/i);
     assert.doesNotMatch(stagingSources, /dotenv|cloudinary|nodemailer|resend|fetch\s*\(/i);
 
-    console.log('staging migration foundation smoke passed: 21 checks');
+    console.log('staging migration foundation smoke passed: manifest=15 verified-tls=15 loopback-no-tls=1');
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;

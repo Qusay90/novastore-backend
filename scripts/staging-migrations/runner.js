@@ -13,7 +13,12 @@ const makeError = (message, code) => {
 };
 
 const createDefaultClient = (target, applicationName = 'novastore_staging_migrations') => new Client({
-    connectionString: target.connectionString,
+    database: target.database,
+    host: target.host,
+    password: target.password,
+    port: target.port,
+    ssl: target.ssl,
+    user: target.user,
     application_name: applicationName
 });
 

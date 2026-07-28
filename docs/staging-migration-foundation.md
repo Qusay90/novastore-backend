@@ -27,10 +27,14 @@ Bootstrap additionally requires `NOVASTORE_STAGING_BOOTSTRAP_ENABLED`.
 
 The staging contract requires exact values for the deployment environment,
 capability flags, expected host, and expected database. A remote target must be
-the exact `novastore_staging` database. A local integration target is accepted
-only when `NODE_ENV=test`, the host is loopback, the database has a unique
-`_test` suffix, and `NOVASTORE_STAGING_LOCAL_TEST_ENABLED=true` is present.
-There is no `.env`, discrete DB-variable, or remote fallback path.
+the exact `novastore_staging` database and its URL must contain exactly
+`sslmode=verify-full` as its sole query option. The runner converts that attested
+URL into discrete `pg.Client` options with certificate and hostname verification;
+URL options and ambient `PGSSLMODE` cannot weaken that policy. A local integration
+target is accepted without TLS only when `NODE_ENV=test`, the host is loopback,
+the database has a unique `_test` suffix, and
+`NOVASTORE_STAGING_LOCAL_TEST_ENABLED=true` is present. There is no `.env`,
+discrete DB-variable, or remote fallback path.
 
 ## Ledger and execution model
 

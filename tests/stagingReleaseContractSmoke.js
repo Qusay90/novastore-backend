@@ -129,7 +129,7 @@ const createValidEnvironment = () => ({
     NOVASTORE_ALLOW_REMOTE_DB: 'true',
     NOVASTORE_EXPECTED_DATABASE_HOST: 'staging-db.example.test',
     NOVASTORE_EXPECTED_DATABASE_NAME: 'novastore_staging',
-    DATABASE_URL: 'postgresql://synthetic-user@staging-db.example.test/novastore_staging',
+    DATABASE_URL: 'postgresql://synthetic-user@staging-db.example.test/novastore_staging?sslmode=verify-full',
     JWT_SECRET: 'synthetic-jwt-secret-marker-not-for-reuse',
     RENDER_GIT_COMMIT: 'a'.repeat(40),
     NOVASTORE_STAGING_ACCESS_GATE_ENABLED: 'true',

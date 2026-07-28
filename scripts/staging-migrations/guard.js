@@ -1,9 +1,19 @@
+const net = require('node:net');
+
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 const LOCAL_TEST_CAPABILITY = 'NOVASTORE_STAGING_LOCAL_TEST_ENABLED';
+const VERIFIED_TLS_MODE = 'verify-full';
 
 const exactTrue = (value) => String(value || '').trim() === 'true';
 const normalizeHost = (value) => String(value || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
 const normalizeDatabaseName = (pathname) => decodeURIComponent(String(pathname || '').replace(/^\/+/, '')).trim();
+const decodeUrlCredential = (value) => {
+    try {
+        return decodeURIComponent(String(value || ''));
+    } catch (_) {
+        fail('DATABASE_URL contains invalid encoded credentials.');
+    }
+};
 const isProductionLikeName = (name) => {
     const normalized = String(name || '').toLowerCase();
     return normalized === 'postgres' || /production|(^|[_-])prod($|[_-])/.test(normalized);
@@ -68,6 +78,9 @@ const validateTarget = (env = process.env, { bootstrap = false } = {}) => {
     if (localHost && !localTest) {
         fail(`Loopback migration targets require NODE_ENV=test, ${LOCAL_TEST_CAPABILITY}=true, and a unique _test database.`);
     }
+    if (!localHost && net.isIP(actualHost) !== 0) {
+        fail('Remote staging migrations require a DNS hostname for TLS hostname verification.');
+    }
     if (!localHost && expectedDatabase !== 'novastore_staging') {
         fail('Remote staging migrations require the exact novastore_staging database name.');
     }
@@ -75,13 +88,33 @@ const validateTarget = (env = process.env, { bootstrap = false } = {}) => {
         fail('The attested database name is not explicitly staging-scoped.');
     }
 
-    return Object.freeze({
-        connectionString: rawUrl,
+    if (!localTest) {
+        const queryEntries = [...parsed.searchParams.entries()];
+        const verifiedTlsOnly =
+            queryEntries.length === 1 &&
+            queryEntries[0][0] === 'sslmode' &&
+            queryEntries[0][1] === VERIFIED_TLS_MODE;
+        if (!verifiedTlsOnly) {
+            fail(
+                'Remote staging migrations require certificate and hostname verified TLS ' +
+                'with exact sslmode=verify-full and no overriding URL options.'
+            );
+        }
+    }
+
+    const target = {
         database: actualDatabase,
         host: actualHost,
         localTest,
-        mode: localTest ? 'local-test' : 'staging'
+        mode: localTest ? 'local-test' : 'staging',
+        port: parsed.port ? Number.parseInt(parsed.port, 10) : 5432,
+        ssl: localTest ? false : Object.freeze({ rejectUnauthorized: true }),
+        user: decodeUrlCredential(parsed.username)
+    };
+    Object.defineProperty(target, 'password', {
+        value: decodeUrlCredential(parsed.password)
     });
+    return Object.freeze(target);
 };
 
 const redact = (value, env = process.env) => {
@@ -108,6 +141,7 @@ const redact = (value, env = process.env) => {
 module.exports = {
     LOCAL_HOSTS,
     LOCAL_TEST_CAPABILITY,
+    VERIFIED_TLS_MODE,
     exactTrue,
     isProductionLikeName,
     normalizeHost,

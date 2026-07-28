@@ -69,6 +69,9 @@ Post-deploy verification operator names:
 
 The contract reports names only. It must never print values, lengths, prefixes,
 fingerprints, cookies, authorization headers, or database connection strings.
+For remote migration status/apply/bootstrap, the attested `DATABASE_URL` must
+use `sslmode=verify-full` as its sole query option. Loopback disposable tests
+retain their explicit no-TLS exception.
 
 ## Forbidden initial-staging provider credentials
 
