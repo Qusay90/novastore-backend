@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import {
   ADMIN_LOGIN_URL,
   ADMIN_TOKEN_KEY,
@@ -32,9 +33,15 @@ import { createSameOriginAdapter } from "../admin-commerce-pro/src/adapters/same
 import { currentErrorMayPreserveData } from "../admin-commerce-pro/src/integration/useResource.js";
 
 class FakeStorage {
-  constructor(token = "") { this.values = new Map([[ADMIN_TOKEN_KEY, token]]); }
+  constructor(token = "") {
+    this.values = new Map([[ADMIN_TOKEN_KEY, token]]);
+    this.removeCalls = 0;
+  }
   getItem(key) { return this.values.get(key) || null; }
-  removeItem(key) { this.values.delete(key); }
+  removeItem(key) {
+    this.removeCalls += 1;
+    this.values.delete(key);
+  }
 }
 
 const tokenFor = (payload) => `header.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.signature`;
@@ -87,6 +94,9 @@ assert.equal(logoutRequests[0].input, "/api/auth/logout");
 assert.equal(logoutRequests[0].init.method, "POST");
 assert.equal(logoutRequests[0].init.credentials, "same-origin");
 assert.equal(logoutRequests[0].init.headers.Authorization, `Bearer ${validToken}`);
+assert.equal(logoutRequests[0].init.body, undefined);
+assert.equal(logoutRequests[0].init.signal.aborted, false);
+assert.equal(logoutStorage.removeCalls, 1);
 
 const failedLogoutStorage = new FakeStorage(validToken);
 const failedLogoutHttp = createAdminHttp({
@@ -101,6 +111,97 @@ assert.equal(failedLogout.serverRevocationVerified, false);
 assert.match(failedLogout.warning, /sunucu oturumunun kapatıldığı doğrulanamadı/);
 assert.equal(failedLogout.warning.includes(validToken), false);
 assert.equal(failedLogoutStorage.getItem(ADMIN_TOKEN_KEY), null);
+assert.equal(failedLogoutStorage.removeCalls, 1);
+
+const syncFailedLogoutStorage = new FakeStorage(validToken);
+const syncFailedLogoutHttp = createAdminHttp({
+  storage: syncFailedLogoutStorage,
+  location: { href: "admin-commerce-pro-live.html" },
+  now: () => now,
+  decodeBase64,
+  fetchImpl: () => { throw new Error("synthetic synchronous offline"); },
+});
+assert.equal((await syncFailedLogoutHttp.logout()).serverRevocationVerified, false);
+assert.equal(syncFailedLogoutStorage.getItem(ADMIN_TOKEN_KEY), null);
+assert.equal(syncFailedLogoutStorage.removeCalls, 1);
+
+const nonOkLogoutStorage = new FakeStorage(validToken);
+const nonOkLogoutHttp = createAdminHttp({
+  storage: nonOkLogoutStorage,
+  location: { href: "admin-commerce-pro-live.html" },
+  now: () => now,
+  decodeBase64,
+  fetchImpl: async () => new Response(JSON.stringify({ error: "synthetic failure" }), { status: 503 }),
+});
+const nonOkLogout = await nonOkLogoutHttp.logout();
+assert.equal(nonOkLogout.serverRevocationVerified, false);
+assert.equal(nonOkLogoutStorage.getItem(ADMIN_TOKEN_KEY), null);
+assert.equal(nonOkLogoutStorage.removeCalls, 1);
+
+const pendingLogoutStorage = new FakeStorage(validToken);
+let scheduledLogoutTimer = null;
+let clearedLogoutTimer = null;
+let pendingLogoutRequest = null;
+let rejectPendingLogout;
+const pendingLogoutHttp = createAdminHttp({
+  storage: pendingLogoutStorage,
+  location: { href: "admin-commerce-pro-live.html" },
+  now: () => now,
+  decodeBase64,
+  logoutTimeoutMs: 37,
+  setTimeoutImpl(callback, milliseconds) {
+    scheduledLogoutTimer = { callback, milliseconds, id: 41 };
+    return 41;
+  },
+  clearTimeoutImpl(id) {
+    clearedLogoutTimer = id;
+  },
+  fetchImpl: (input, init) => {
+    pendingLogoutRequest = { input, init };
+    return new Promise((_resolve, reject) => {
+      rejectPendingLogout = reject;
+    });
+  },
+});
+const unhandledLogoutRejections = [];
+const onUnhandledLogoutRejection = (reason) => unhandledLogoutRejections.push(reason);
+process.on("unhandledRejection", onUnhandledLogoutRejection);
+try {
+  const pendingLogoutPromise = pendingLogoutHttp.logout();
+  await Promise.resolve();
+  assert.deepEqual(
+    { id: scheduledLogoutTimer?.id, milliseconds: scheduledLogoutTimer?.milliseconds },
+    { id: 41, milliseconds: 37 },
+    "never-settling logout must install the injected bounded deadline",
+  );
+  assert.equal(pendingLogoutRequest.input, "/api/auth/logout");
+  assert.equal(pendingLogoutRequest.init.method, "POST");
+  assert.equal(pendingLogoutRequest.init.credentials, "same-origin");
+  assert.equal(pendingLogoutRequest.init.headers.Authorization, `Bearer ${validToken}`);
+  assert.equal(pendingLogoutRequest.init.signal.aborted, false);
+  scheduledLogoutTimer.callback();
+  const pendingLogout = await pendingLogoutPromise;
+  assert.equal(pendingLogout.serverRevocationVerified, false);
+  assert.equal(pendingLogoutStorage.getItem(ADMIN_TOKEN_KEY), null);
+  assert.equal(pendingLogoutStorage.removeCalls, 1);
+  assert.equal(pendingLogoutRequest.init.signal.aborted, true);
+  assert.equal(clearedLogoutTimer, 41);
+  rejectPendingLogout(new Error("synthetic late rejection after timeout"));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(unhandledLogoutRejections.length, 0);
+} finally {
+  process.off("unhandledRejection", onUnhandledLogoutRejection);
+}
+
+const integratedAdminSource = fs.readFileSync(
+  new URL("../admin-commerce-pro/src/IntegratedApp.jsx", import.meta.url),
+  "utf8",
+);
+assert.match(
+  integratedAdminSource,
+  /const logout = async \(\) => \{[\s\S]*?await http\.logout\(\)[\s\S]*?window\.location\.href = "admin-login\.html\?next=admin-commerce-pro-live\.html"/,
+  "bounded HTTP logout must remain the predecessor of the exact integrated-admin navigation",
+);
 
 for (const invalidPath of [
   "https://evil.example/api/orders",

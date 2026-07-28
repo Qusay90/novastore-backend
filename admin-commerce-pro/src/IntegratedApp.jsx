@@ -1453,8 +1453,7 @@ export function IntegratedApp() {
     if (catalogStructureEnabled) catalogStructureResource.reload();
   };
   const logout = async () => {
-    const result = await http.logout();
-    if (!result.serverRevocationVerified) window.alert?.(result.warning);
+    await http.logout();
     window.location.href = "admin-login.html?next=admin-commerce-pro-live.html";
   };
 

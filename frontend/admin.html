@@ -2911,24 +2911,38 @@
         }
 
         async function adminLogout() {
+            const LOGOUT_REQUEST_TIMEOUT_MS = 10_000;
             const token = localStorage.getItem('nova_admin_token');
             let serverRevocationVerified = false;
             try {
                 if (token) {
-                    const response = await _nativeFetch('/api/auth/logout', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    serverRevocationVerified = response.status === 204;
+                    const controller = new AbortController();
+                    let timeoutId;
+                    try {
+                        const request = Promise.resolve().then(() => _nativeFetch('/api/auth/logout', {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: { Authorization: `Bearer ${token}` },
+                            signal: controller.signal
+                        }));
+                        const timeout = new Promise((_, reject) => {
+                            timeoutId = setTimeout(() => {
+                                controller.abort('logout-timeout');
+                                const error = new Error('Logout request timed out.');
+                                error.name = 'AbortError';
+                                reject(error);
+                            }, LOGOUT_REQUEST_TIMEOUT_MS);
+                        });
+                        const response = await Promise.race([request, timeout]);
+                        serverRevocationVerified = response.status === 204;
+                    } finally {
+                        clearTimeout(timeoutId);
+                    }
                 }
             } catch (_) {
                 serverRevocationVerified = false;
             } finally {
                 localStorage.removeItem('nova_admin_token');
-            }
-            if (token && !serverRevocationVerified) {
-                alert('Bu cihazdaki oturum kapatıldı; sunucu oturumunun kapatıldığı doğrulanamadı.');
             }
             window.location.href = 'admin-login.html';
         }
@@ -6075,10 +6089,13 @@
                     });
                     tbody.innerHTML = html;
                 } else {
+                    if (res.status === 401 || res.status === 403) {
+                        await adminLogout();
+                        return;
+                    }
                     const errData = await res.json();
-                    if (res.status === 401 || res.status === 403 || (errData.error && errData.error.toLowerCase().includes('token'))) {
-                        alert('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
-                        adminLogout();
+                    if (errData.error && errData.error.toLowerCase().includes('token')) {
+                        await adminLogout();
                         return;
                     }
                     tbody.innerHTML = `<tr>
@@ -6086,6 +6103,7 @@
         </tr>`;
                 }
             } catch (err) {
+                if (err && err.isAdminAuthError) return;
                 console.error("Soruları çekerken hata:", err);
                 alert("Soruları çekerken hata: " + err.message);
             }
@@ -6213,10 +6231,16 @@
             }
 
             try {
-                const [questionsRes, productsRes] = await Promise.all([
-                    adminApiFetch('/api/questions/admin/all'),
-                    adminApiFetch('/api/questions/admin/products')
-                ]);
+                const questionsRes = await adminApiFetch('/api/questions/admin/all');
+                if (questionsRes.status === 401 || questionsRes.status === 403) {
+                    await adminLogout();
+                    return;
+                }
+                const productsRes = await adminApiFetch('/api/questions/admin/products');
+                if (productsRes.status === 401 || productsRes.status === 403) {
+                    await adminLogout();
+                    return;
+                }
                 adminQuestionRows = await adminReadJson(questionsRes, 'Ürün soruları alınamadı.');
                 const productPayload = productsRes.ok
                     ? await productsRes.json()
@@ -6226,6 +6250,14 @@
                     : productQuestionFallbackSummary(Array.isArray(adminQuestionRows) ? adminQuestionRows : []);
                 renderProductQuestionRows(adminQuestionProductRows);
             } catch (err) {
+                if (err && err.isAdminAuthError) return;
+                if (
+                    (err && (err.status === 401 || err.status === 403))
+                    || String(err && err.message || '').toLowerCase().includes('token')
+                ) {
+                    await adminLogout();
+                    return;
+                }
                 console.error('Ürün soruları yükleme hatası:', err);
                 if (tbody) {
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#FCA5A5; padding:28px;">${escapeAdminHtml(err.message || 'Ürün soruları alınamadı.')}</td></tr>`;
