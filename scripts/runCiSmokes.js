@@ -9,6 +9,7 @@ const smokeTests = [
     'tests/stagingReleaseContractSmoke.js',
     'tests/stagingVerificationHarnessSmoke.js',
     'tests/socketAuthSmoke.js',
+    'tests/socketRevocationLifecycleSmoke.js',
     'tests/sharedStateSmoke.js',
     'tests/paymentProviderConfigSmoke.js',
     'tests/categoryPlpStorefrontSmoke.js',

@@ -67,11 +67,12 @@ io.engine.use(stagingEngineAccessGate);
 // io export
 module.exports.io = io;
 
+io.use(socketRevocationService.guardSocketAuthentication);
 io.use(authenticateSocket);
 
 io.on('connection', (socket) => {
+    if (!socketRevocationService.register(socket)) return;
     const joinedRooms = autoJoinAllowedRooms(socket);
-    socketRevocationService.register(socket);
     console.log(`Socket baglantisi kuruldu: ${socket.id} user=${socket.user.id} role=${socket.user.role}`);
 
     socket.on('join_room', async (room, ack) => {
@@ -435,7 +436,7 @@ const start = async () => {
     try {
         console.log(`Veritabani hedefi: ${startupSafety.target.label}`);
         await prepareDatabase(startupSafety);
-        if (startupSafety.shouldVerifyDbConnection) await socketRevocationService.start();
+        if (!startupSafety.localPreviewMode) await socketRevocationService.start();
     } catch (err) {
         console.error('Veritabani hazirlama hatasi:', pool.formatError(err));
         process.exitCode = 1;

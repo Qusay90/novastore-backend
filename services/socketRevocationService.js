@@ -5,7 +5,9 @@ const CHANNEL = 'novastore_auth_session_revoked';
 const createSocketRevocationService = ({ database = pool } = {}) => {
     const socketsBySession = new Map();
     let listenerClient = null;
+    let listenerHandlers = null;
     let listenerPromise = null;
+    let ready = false;
 
     const unregister = (socket) => {
         const sessionId = Number(socket?.authSessionId);
@@ -16,14 +18,22 @@ const createSocketRevocationService = ({ database = pool } = {}) => {
         if (sockets.size === 0) socketsBySession.delete(sessionId);
     };
 
+    const disconnectAll = () => [...socketsBySession.keys()]
+        .reduce((count, sessionId) => count + disconnectSession(sessionId), 0);
+
     const register = (socket) => {
+        if (!ready) {
+            socket.emit?.('session_revoked', { code: 'SOCKET_AUTH_UNAVAILABLE' });
+            socket.disconnect?.(true);
+            return false;
+        }
         const sessionId = Number(socket?.authSessionId);
         if (!Number.isInteger(sessionId)) throw new TypeError('Socket auth session id is required.');
         const sockets = socketsBySession.get(sessionId) || new Set();
         sockets.add(socket);
         socketsBySession.set(sessionId, sockets);
         socket.once?.('disconnect', () => unregister(socket));
-        return () => unregister(socket);
+        return true;
     };
 
     const disconnectSession = (sessionId) => {
@@ -53,41 +63,94 @@ const createSocketRevocationService = ({ database = pool } = {}) => {
         }
     };
 
+    const detachListenerHandlers = (client, handlers) => {
+        if (!client || !handlers) return;
+        client.removeListener?.('notification', handlers.notification);
+        client.removeListener?.('error', handlers.error);
+        client.removeListener?.('end', handlers.end);
+    };
+
+    const markListenerUnavailable = (client) => {
+        if (!client || listenerClient !== client) return;
+        const handlers = listenerHandlers;
+        ready = false;
+        listenerClient = null;
+        listenerHandlers = null;
+        detachListenerHandlers(client, handlers);
+        disconnectAll();
+        client.release(true);
+    };
+
     const start = async () => {
-        if (listenerClient) return;
+        if (ready) return;
         if (listenerPromise) return listenerPromise;
-        listenerPromise = (async () => {
+        const pending = (async () => {
             const client = await database.connect();
+            const handlers = {
+                notification: onNotification,
+                error: () => markListenerUnavailable(client),
+                end: () => markListenerUnavailable(client)
+            };
+            listenerClient = client;
+            listenerHandlers = handlers;
+            client.on('notification', handlers.notification);
+            client.on('error', handlers.error);
+            client.on('end', handlers.end);
             try {
-                client.on('notification', onNotification);
                 await client.query(`LISTEN ${CHANNEL}`);
-                listenerClient = client;
+                if (listenerClient !== client) {
+                    throw new Error('Socket revocation listener became unavailable during startup.');
+                }
+                ready = true;
             } catch (error) {
-                client.removeListener?.('notification', onNotification);
-                client.release();
+                if (listenerClient === client) {
+                    ready = false;
+                    listenerClient = null;
+                    listenerHandlers = null;
+                    detachListenerHandlers(client, handlers);
+                    client.release(true);
+                }
                 throw error;
-            } finally {
-                listenerPromise = null;
             }
         })();
-        return listenerPromise;
+        listenerPromise = pending;
+        try {
+            return await pending;
+        } finally {
+            if (listenerPromise === pending) listenerPromise = null;
+        }
     };
 
     const stop = async () => {
         const client = listenerClient;
+        const handlers = listenerHandlers;
+        ready = false;
         listenerClient = null;
+        listenerHandlers = null;
+        disconnectAll();
         if (!client) return;
         try {
             await client.query(`UNLISTEN ${CHANNEL}`);
         } finally {
-            client.removeListener?.('notification', onNotification);
+            detachListenerHandlers(client, handlers);
             client.release();
         }
+    };
+
+    const isReady = () => ready;
+
+    const guardSocketAuthentication = (_socket, next) => {
+        if (ready) return next();
+        const error = new Error('Socket authentication temporarily unavailable.');
+        error.data = { code: 'SOCKET_AUTH_UNAVAILABLE' };
+        return next(error);
     };
 
     return Object.freeze({
         disconnectSession,
         disconnectSessions,
+        guardSocketAuthentication,
+        isReady,
         register,
         start,
         stop,
