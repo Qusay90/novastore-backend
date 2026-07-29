@@ -4,6 +4,13 @@ const path = require('node:path');
 const Module = require('node:module');
 
 const rootDir = path.join(__dirname, '..');
+const originalLoad = Module._load;
+const notificationControllerFilename = path.join(rootDir, 'controllers', 'notificationController.js');
+const assistantControllerFilename = path.join(rootDir, 'controllers', 'assistantController.js');
+const isExactModuleParent = (parent, expectedFilename) => (
+    typeof parent?.filename === 'string' &&
+    path.resolve(parent.filename) === expectedFilename
+);
 const read = (relativePath) => fs.readFileSync(path.join(rootDir, relativePath), 'utf8');
 
 const PROVIDER_KEYS = [
@@ -176,7 +183,6 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         throw new Error('staging email guard reached the database');
     };
 
-    const originalLoad = Module._load;
     Module._load = function patchedLoad(request, parent, isMain) {
         if (request === 'resend') {
             return {
@@ -244,7 +250,7 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         Module._load = function patchedNotificationServerLoad(request, parent, isMain) {
             if (
                 request === '../server' &&
-                String(parent?.filename || '').endsWith('controllers\\notificationController.js')
+                isExactModuleParent(parent, notificationControllerFilename)
             ) {
                 return { io: null };
             }
@@ -268,7 +274,7 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         Module._load = function patchedAssistantAuthLoad(request, parent, isMain) {
             if (
                 request === '../middlewares/authMiddleware' &&
-                String(parent?.filename || '').endsWith('controllers\\assistantController.js')
+                isExactModuleParent(parent, assistantControllerFilename)
             ) {
                 return {
                     getUserFromRequestIfAny: async () => ({ id: 42, role: 'customer' }),
@@ -550,7 +556,8 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
     assert.deepEqual(counts, { sideEffect: 15, runtime: 8 });
     console.log(`stagingRuntimeSafetySmoke: PASS side-effect=${counts.sideEffect}/15 runtime=${counts.runtime}/8`);
 })().catch((error) => {
-    Module._load = originalLoad;
     console.error(error);
     process.exitCode = 1;
+}).finally(() => {
+    Module._load = originalLoad;
 });
