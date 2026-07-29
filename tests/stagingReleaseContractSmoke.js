@@ -29,7 +29,7 @@ const {
 } = require('./helpers/stagingReleaseReplayProvenance');
 
 const root = path.resolve(__dirname, '..');
-const packageLockSha = '7993e816b1a610cef93ae84c332fd24fef7d419b8809889680642a4a848190da';
+const packageLockBlobSha = '56df97cbedb49a980c24c60f793225a9b2245bc65a67efaf75832ff0b494092c';
 const results = { pass: 0, fail: 0, skip: 0 };
 
 const runGit = (args, options = {}) => {
@@ -185,8 +185,14 @@ const createFakeGitReader = ({
         }
     });
 
-    await check(6, 'package-lock hash unchanged', () => {
-        assert.equal(sha256(fs.readFileSync(path.join(root, 'package-lock.json'))), packageLockSha);
+    await check(6, 'package-lock canonical blob and clean worktree exact', () => {
+        const blob = runGit(['show', 'HEAD:package-lock.json'], { encoding: null });
+        assert.equal(sha256(blob), packageLockBlobSha);
+        const worktreeStatus = runGit(
+            ['status', '--porcelain=v1', '--untracked-files=all', '--', 'package-lock.json'],
+            { encoding: null }
+        );
+        assert.equal(worktreeStatus.length, 0);
     });
 
     await check(7, 'required key names complete and unique', () => {
