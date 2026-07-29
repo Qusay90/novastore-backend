@@ -1,7 +1,10 @@
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const vm = require('node:vm');
 
 const repositoryRoot = path.join(__dirname, '..');
@@ -14,7 +17,30 @@ const sourceRoot = path.join(commerceProRoot, 'src');
 const stylesPath = path.join(repositoryRoot, 'admin-commerce-pro', 'src', 'styles.css');
 const designQaPath = path.join(repositoryRoot, 'admin-commerce-pro', 'design-qa.md');
 const standaloneBuilderPath = path.join(commerceProRoot, 'scripts', 'build-standalone.mjs');
+const sourceFingerprintPath = path.join(commerceProRoot, 'scripts', 'source-fingerprint.mjs');
 const viteConfigPath = path.join(commerceProRoot, 'vite.config.mjs');
+const gitAttributesPath = path.join(repositoryRoot, '.gitattributes');
+
+const preservedGitAttributeRules = [
+    '/frontend/assets/fonts/inter/OFL-1.1.txt text eol=lf',
+    '/frontend/assets/vendor/fontawesome/LICENSE.txt text eol=lf',
+    '/storefront-commerce-pro/canonical/NovaStore-Commerce-Pro.html text eol=lf',
+    '/storefront-commerce-pro/src/App.jsx text eol=lf',
+    '/storefront-commerce-pro/src/catalog.js text eol=lf',
+    '/storefront-commerce-pro/index.html text eol=lf',
+    '/storefront-commerce-pro/src/CanonicalRuntimePresentation.jsx text eol=lf'
+];
+const generatedArtifactAttributeRules = new Map([
+    ['frontend/admin-commerce-pro.html', 'frontend/admin-commerce-pro.html text eol=lf'],
+    ['frontend/admin-commerce-pro-live.html', 'frontend/admin-commerce-pro-live.html text eol=lf']
+]);
+const rawByteMatrixArtifactKeys = ['preview', 'live'];
+const rawByteMatrixStageKeys = ['blob', 'checkout', 'build1', 'build2'];
+const rawByteArtifactDefinitions = {
+    preview: { relativePath: 'frontend/admin-commerce-pro.html' },
+    live: { relativePath: 'frontend/admin-commerce-pro-live.html' }
+};
+const childProcessMaxBuffer = 32 * 1024 * 1024;
 
 const compareNames = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 
@@ -42,6 +68,307 @@ function listSourceFiles(directory) {
     }).sort(compareNames);
 }
 
+function executeBuffer(command, args, cwd = repositoryRoot) {
+    const output = execFileSync(command, args, {
+        cwd,
+        encoding: null,
+        maxBuffer: childProcessMaxBuffer,
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+    assert.ok(Buffer.isBuffer(output), `${command} stdout Buffer olmalı`);
+    return output;
+}
+
+function executeText(command, args, cwd = repositoryRoot) {
+    return executeBuffer(command, args, cwd).toString('utf8');
+}
+
+function executeNpmScript(scriptName) {
+    if (process.platform === 'win32') {
+        executeBuffer(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm.cmd', 'run', scriptName], commerceProRoot);
+        return;
+    }
+    executeBuffer('npm', ['run', scriptName], commerceProRoot);
+}
+
+function sha256(buffer) {
+    assert.ok(Buffer.isBuffer(buffer), 'SHA-256 girdisi Buffer olmalı');
+    return createHash('sha256').update(buffer).digest('hex');
+}
+
+function countCrBytes(buffer) {
+    assert.ok(Buffer.isBuffer(buffer), 'CR sayımı girdisi Buffer olmalı');
+    let count = 0;
+    for (const byte of buffer) {
+        if (byte === 0x0d) count += 1;
+    }
+    return count;
+}
+
+function parseNullDelimitedGitAttributes(output, expectedPaths) {
+    assert.ok(Buffer.isBuffer(output), 'git check-attr çıktısı Buffer olmalı');
+    const fields = output.toString('utf8').split('\0');
+    if (fields.at(-1) === '') fields.pop();
+    assert.equal(fields.length, expectedPaths.length * 2 * 3, 'git check-attr -z tam sonuç dönmeli');
+
+    const parsed = new Map();
+    for (let index = 0; index < fields.length; index += 3) {
+        const [filePath, attribute, value] = fields.slice(index, index + 3);
+        assert.ok(expectedPaths.includes(filePath), `beklenmeyen git check-attr yolu: ${filePath}`);
+        assert.ok(attribute === 'text' || attribute === 'eol', `beklenmeyen git attribute: ${attribute}`);
+        const attributes = parsed.get(filePath) || new Map();
+        assert.equal(attributes.has(attribute), false, `${filePath} için ${attribute} bir kez dönmeli`);
+        attributes.set(attribute, value);
+        parsed.set(filePath, attributes);
+    }
+
+    for (const filePath of expectedPaths) {
+        assert.equal(parsed.get(filePath)?.get('text'), 'set', `${filePath} text attribute set olmalı`);
+        assert.equal(parsed.get(filePath)?.get('eol'), 'lf', `${filePath} eol attribute lf olmalı`);
+    }
+    return parsed;
+}
+
+function buildRawByteOutputs(temporaryDirectory, buildLabel) {
+    const previewOutput = path.join(temporaryDirectory, `${buildLabel}-preview.html`);
+    const liveOutput = path.join(temporaryDirectory, `${buildLabel}-live.html`);
+
+    executeNpmScript('build');
+    executeBuffer(process.execPath, [standaloneBuilderPath, '--output', previewOutput], commerceProRoot);
+    const preview = fs.readFileSync(previewOutput);
+
+    executeNpmScript('build:live');
+    executeBuffer(
+        process.execPath,
+        [standaloneBuilderPath, '--mode', 'integrated', '--output', liveOutput],
+        commerceProRoot
+    );
+    const live = fs.readFileSync(liveOutput);
+
+    assert.ok(Buffer.isBuffer(preview) && preview.length > 0, `${buildLabel} preview output Buffer olmalı`);
+    assert.ok(Buffer.isBuffer(live) && live.length > 0, `${buildLabel} live output Buffer olmalı`);
+    return { preview, live };
+}
+
+function assertRawByteMatrices(matrices, { emitDiagnostics = false } = {}) {
+    assert.deepEqual(Object.keys(matrices), rawByteMatrixArtifactKeys, 'matrix artifact anahtarları exact preview + live olmalı');
+    const diagnostics = {};
+
+    for (const artifactKey of rawByteMatrixArtifactKeys) {
+        const matrix = matrices[artifactKey];
+        assert.deepEqual(
+            Object.keys(matrix),
+            rawByteMatrixStageKeys,
+            `${artifactKey} matrix stage anahtarları exact blob + checkout + build1 + build2 olmalı`
+        );
+        assert.equal(Object.entries(matrix).length, 4, `${artifactKey} matrix tam dört entry içermeli`);
+        const blob = matrix.blob;
+        assert.ok(Buffer.isBuffer(blob) && blob.length > 0, `${artifactKey} blob gerçek ve dolu Buffer olmalı`);
+        const blobSha = sha256(blob);
+        diagnostics[artifactKey] = {};
+
+        for (const stageKey of rawByteMatrixStageKeys) {
+            const buffer = matrix[stageKey];
+            assert.ok(Buffer.isBuffer(buffer), `${artifactKey} ${stageKey} gerçek Buffer olmalı`);
+            assert.ok(buffer.length > 0, `${artifactKey} ${stageKey} Buffer boş olmamalı`);
+            const crBytes = countCrBytes(buffer);
+            const stageSha = sha256(buffer);
+            assert.equal(crBytes, 0, `${artifactKey} ${stageKey} CR byte sayısı 0 olmalı`);
+            assert.equal(buffer.equals(blob), true, `${artifactKey} ${stageKey} blob ile byte-for-byte eşit olmalı`);
+            assert.equal(stageSha, blobSha, `${artifactKey} ${stageKey} SHA-256 blob SHA ile eşit olmalı`);
+            diagnostics[artifactKey][stageKey] = { sha256: stageSha, crBytes };
+            if (emitDiagnostics) {
+                console.log(`${artifactKey} ${stageKey} sha256=${stageSha} cr=${crBytes}`);
+            }
+        }
+    }
+    return diagnostics;
+}
+
+function removeOwnedMatrixDirectory(temporaryDirectory) {
+    const resolvedTemporaryDirectory = path.resolve(temporaryDirectory);
+    const resolvedTempRoot = path.resolve(os.tmpdir());
+    const normalizeCase = (value) => (process.platform === 'win32' ? value.toLocaleLowerCase('en-US') : value);
+    assert.equal(
+        normalizeCase(path.dirname(resolvedTemporaryDirectory)),
+        normalizeCase(resolvedTempRoot),
+        'matrix cleanup yalnız os.tmpdir() altındaki doğrudan görev dizinini kaldırmalı'
+    );
+    assert.match(
+        path.basename(resolvedTemporaryDirectory),
+        /^novastore-admin-raw-byte-matrix-[A-Za-z0-9_-]+$/,
+        'matrix cleanup görev prefixini doğrulamalı'
+    );
+    assert.equal(fs.existsSync(resolvedTemporaryDirectory), true, 'matrix cleanup hedefi mevcut olmalı');
+    fs.rmSync(resolvedTemporaryDirectory, { recursive: true, force: false, maxRetries: 3, retryDelay: 100 });
+    assert.equal(fs.existsSync(resolvedTemporaryDirectory), false, 'matrix disposable dizini tamamen kaldırılmalı');
+}
+
+function assertRawByteArtifactMatrix() {
+    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'novastore-admin-raw-byte-matrix-'));
+    const checkoutRoot = path.join(temporaryDirectory, 'checkout');
+    const artifactPaths = Object.values(rawByteArtifactDefinitions).map(({ relativePath }) => relativePath);
+    const primaryBefore = Object.fromEntries(Object.entries(rawByteArtifactDefinitions).map(([artifactKey, definition]) => [
+        artifactKey,
+        fs.readFileSync(path.join(repositoryRoot, ...definition.relativePath.split('/')))
+    ]));
+    let operationError;
+
+    try {
+        const headCommit = executeText('git', ['rev-parse', 'HEAD']).trim();
+        assert.match(headCommit, /^[0-9a-f]{40,64}$/, 'HEAD tam commit kimliği olmalı');
+        const blobs = Object.fromEntries(Object.entries(rawByteArtifactDefinitions).map(([artifactKey, definition]) => [
+            artifactKey,
+            executeBuffer('git', ['cat-file', 'blob', `HEAD:${definition.relativePath}`])
+        ]));
+
+        executeBuffer(
+            'git',
+            ['clone', '--local', '--no-hardlinks', '--no-checkout', '--no-tags', '--', repositoryRoot, checkoutRoot],
+            temporaryDirectory
+        );
+        executeBuffer('git', ['config', 'core.autocrlf', 'true'], checkoutRoot);
+        assert.equal(executeText('git', ['config', '--get', 'core.autocrlf'], checkoutRoot).trim(), 'true');
+        executeBuffer('git', ['checkout', '--detach', headCommit], checkoutRoot);
+        assert.equal(executeText('git', ['rev-parse', 'HEAD'], checkoutRoot).trim(), headCommit, 'checkout exact HEAD commit olmalı');
+        assert.equal(
+            executeText('git', ['status', '--porcelain=v1', '--untracked-files=all'], checkoutRoot),
+            '',
+            'clean Windows checkout status temiz olmalı'
+        );
+
+        const checkoutAttributes = parseNullDelimitedGitAttributes(
+            executeBuffer('git', ['check-attr', '-z', 'text', 'eol', '--', ...artifactPaths], checkoutRoot),
+            artifactPaths
+        );
+        const checkouts = Object.fromEntries(Object.entries(rawByteArtifactDefinitions).map(([artifactKey, definition]) => [
+            artifactKey,
+            fs.readFileSync(path.join(checkoutRoot, ...definition.relativePath.split('/')))
+        ]));
+        const build1 = buildRawByteOutputs(temporaryDirectory, 'build1');
+        const build2 = buildRawByteOutputs(temporaryDirectory, 'build2');
+        const matrices = {
+            preview: { blob: blobs.preview, checkout: checkouts.preview, build1: build1.preview, build2: build2.preview },
+            live: { blob: blobs.live, checkout: checkouts.live, build1: build1.live, build2: build2.live }
+        };
+
+        assertRawByteMatrices(matrices, { emitDiagnostics: true });
+        for (const [artifactKey, definition] of Object.entries(rawByteArtifactDefinitions)) {
+            assert.equal(
+                fs.readFileSync(path.join(repositoryRoot, ...definition.relativePath.split('/'))).equals(primaryBefore[artifactKey]),
+                true,
+                `${artifactKey} primary tracked artifact test sırasında değişmemeli`
+            );
+            console.log(
+                `check-attr ${artifactKey} text=${checkoutAttributes.get(definition.relativePath).get('text')} `
+                + `eol=${checkoutAttributes.get(definition.relativePath).get('eol')}`
+            );
+        }
+        assert.equal(
+            executeText('git', ['status', '--porcelain=v1', '--untracked-files=all'], checkoutRoot),
+            '',
+            'matrix sonunda disposable checkout temiz kalmalı'
+        );
+
+        const missingEntryMatrix = {
+            preview: {
+                blob: matrices.preview.blob,
+                checkout: matrices.preview.checkout,
+                build1: matrices.preview.build1
+            },
+            live: matrices.live
+        };
+        assert.throws(
+            () => assertRawByteMatrices(missingEntryMatrix),
+            /matrix stage anahtarları/,
+            'eksik matrix entry fail-closed assertion üretmeli'
+        );
+        const crMismatchMatrix = {
+            preview: {
+                ...matrices.preview,
+                checkout: Buffer.concat([matrices.preview.checkout, Buffer.from([0x0d])])
+            },
+            live: matrices.live
+        };
+        assert.throws(
+            () => assertRawByteMatrices(crMismatchMatrix),
+            /CR byte sayısı 0 olmalı/,
+            'checkout CR uyuşmazlığı fail-closed assertion üretmeli'
+        );
+        console.log('CLEAN_WINDOWS_CORE_AUTOCRLF=true');
+        console.log('MISSING_MATRIX_ENTRY_FAIL_CLOSED=PASS');
+        console.log('CR_MISMATCH_FAIL_CLOSED=PASS');
+        console.log('RAW_BYTE_MATRIX=PASS');
+    } catch (error) {
+        operationError = error;
+        throw error;
+    } finally {
+        try {
+            removeOwnedMatrixDirectory(temporaryDirectory);
+        } catch (cleanupError) {
+            if (operationError) {
+                throw new AggregateError([operationError, cleanupError], 'matrix işlemi ve disposable cleanup başarısız oldu');
+            }
+            throw cleanupError;
+        }
+    }
+}
+
+function assertGeneratedArtifactGitAttributes() {
+    assert.ok(fs.existsSync(gitAttributesPath), '.gitattributes bulunmalı');
+    const attributeLines = fs.readFileSync(gitAttributesPath, 'utf8').split(/\r?\n/);
+
+    for (const rule of preservedGitAttributeRules) {
+        assert.equal(
+            attributeLines.filter((line) => line === rule).length,
+            1,
+            `mevcut .gitattributes kuralı korunmalı: ${rule}`
+        );
+    }
+    for (const rule of generatedArtifactAttributeRules.values()) {
+        assert.equal(
+            attributeLines.filter((line) => line === rule).length,
+            1,
+            `generated artifact LF kuralı exact bir kez bulunmalı: ${rule}`
+        );
+    }
+
+    const checkAttributeOutput = execFileSync(
+        'git',
+        ['check-attr', '-z', 'text', 'eol', '--', ...generatedArtifactAttributeRules.keys()],
+        { cwd: repositoryRoot }
+    ).toString('utf8');
+    const fields = checkAttributeOutput.split('\0');
+    if (fields.at(-1) === '') fields.pop();
+    assert.equal(fields.length, generatedArtifactAttributeRules.size * 2 * 3, 'git check-attr -z tam sonuç dönmeli');
+
+    const effectiveAttributes = new Map();
+    for (let index = 0; index < fields.length; index += 3) {
+        const [filePath, attribute, value] = fields.slice(index, index + 3);
+        assert.ok(generatedArtifactAttributeRules.has(filePath), `beklenmeyen git check-attr yolu: ${filePath}`);
+        assert.ok(attribute === 'text' || attribute === 'eol', `beklenmeyen git attribute: ${attribute}`);
+        const fileAttributes = effectiveAttributes.get(filePath) || new Map();
+        assert.equal(fileAttributes.has(attribute), false, `${filePath} için ${attribute} bir kez dönmeli`);
+        fileAttributes.set(attribute, value);
+        effectiveAttributes.set(filePath, fileAttributes);
+    }
+
+    for (const filePath of generatedArtifactAttributeRules.keys()) {
+        assert.equal(effectiveAttributes.get(filePath)?.get('text'), 'set', `${filePath} text attribute set olmalı`);
+        assert.equal(effectiveAttributes.get(filePath)?.get('eol'), 'lf', `${filePath} eol attribute lf olmalı`);
+    }
+}
+
+async function run() {
+const {
+    canonicalizeFingerprintContent,
+    canonicalizeFingerprintPath,
+    createSourceFingerprint,
+    updateSourceFingerprint
+} = await import(pathToFileURL(sourceFingerprintPath).href);
+
+assertGeneratedArtifactGitAttributes();
+
 assert.ok(
     fs.existsSync(previewPath),
     [
@@ -53,7 +380,9 @@ assert.ok(
 
 assert.ok(fs.existsSync(adminPath), 'frontend/admin.html bulunamadı');
 
-const previewSource = fs.readFileSync(previewPath, 'utf8');
+const previewBytes = fs.readFileSync(previewPath);
+assert.equal(previewBytes.includes(0x0d), false, 'preview artifact CR byte içermemeli');
+const previewSource = previewBytes.toString('utf8');
 const adminSource = fs.readFileSync(adminPath, 'utf8');
 const sourceModuleFiles = listSourceModules(sourceRoot);
 const sourceFiles = listSourceFiles(sourceRoot);
@@ -77,29 +406,10 @@ const stylesSource = fs.readFileSync(stylesPath, 'utf8');
 const designQaSource = fs.readFileSync(designQaPath, 'utf8');
 const standaloneBuilderSource = fs.readFileSync(standaloneBuilderPath, 'utf8');
 const viteConfigSource = fs.readFileSync(viteConfigPath, 'utf8');
-const fingerprintFiles = [
-    'index.html',
-    'package.json',
-    'package-lock.json',
-    'vite.config.mjs',
-    'scripts/build-standalone.mjs',
-    'scripts/source-fingerprint.mjs',
-    ...previewSourceFiles,
-    'public/icons.js',
-    'public/favicon-96x96.png',
-    'public/assets/category-home.webp',
-    'public/assets/phone-iphone.webp',
-    'public/assets/phone-samsung.webp',
-    'public/assets/product-bedding.webp',
-    'public/assets/product-headphones.webp',
-    'public/assets/product-laptop.webp',
-    'public/assets/product-vacuum.webp',
-    'public/assets/product-watch.webp',
-    'public/assets/fonts/inter-latin-ext-400-normal.woff2',
-    'public/assets/fonts/inter-latin-ext-600-normal.woff2',
-    'public/assets/fonts/inter-latin-ext-700-normal.woff2',
-    'public/assets/fonts/inter-latin-ext-800-normal.woff2'
-].sort(compareNames);
+const { value: expectedFingerprint, fingerprintFiles } = await createSourceFingerprint(
+    commerceProRoot,
+    { mode: 'preview' }
+);
 
 assert.ok(sourceModuleFiles.length > 0, 'src altında en az bir JavaScript modülü bulunmalı');
 assert.ok(sourceFiles.includes('src/styles.css'), 'tüm src girdileri fingerprint kapsamına alınmalı');
@@ -123,13 +433,78 @@ assert.match(
     /buildStart\(\)[\s\S]{0,220}createSourceFingerprint\(root, \{ mode \}\)[\s\S]{0,300}writeFile\(path\.join\(root, outputDirectory, "\.source-fingerprint"\), buildSourceFingerprint/,
     'Vite build kendi kaynak parmak izini seçili çıktı dizinine yazmalı'
 );
+assert.deepEqual(
+    fingerprintFiles,
+    [...fingerprintFiles].sort(compareNames),
+    'fingerprint girdileri deterministik sırada olmalı'
+);
+assertRawByteArtifactMatrix();
+assert.ok(
+    fingerprintFiles.every((relativePath) => !relativePath.includes('\\') && !path.isAbsolute(relativePath)),
+    'fingerprint yalnız canonical repository-relative yollar içermeli'
+);
 
-const fingerprint = createHash('sha256');
-for (const relativePath of fingerprintFiles) {
-    fingerprint.update(relativePath);
-    fingerprint.update(fs.readFileSync(path.join(commerceProRoot, relativePath)));
-}
-const expectedFingerprint = fingerprint.digest('hex');
+const digestEntry = (relativePath, content) => {
+    const fingerprint = createHash('sha256');
+    updateSourceFingerprint(fingerprint, relativePath, content);
+    return fingerprint.digest('hex');
+};
+const lfText = Buffer.from('birinci\nikinci\nson\n', 'utf8');
+const crlfText = Buffer.from('birinci\r\nikinci\r\nson\r\n', 'utf8');
+const loneCrText = Buffer.from('birinci\rikinci\rson\r', 'utf8');
+
+assert.equal(
+    digestEntry('src/example.js', lfText),
+    digestEntry('src/example.js', crlfText),
+    'LF ve CRLF metin temsilleri aynı fingerprint değerini üretmeli'
+);
+assert.equal(
+    digestEntry('src/example.js', lfText),
+    digestEntry('src/example.js', loneCrText),
+    'lone CR satır sonları LF olarak canonicalize edilmeli'
+);
+assert.deepEqual(
+    canonicalizeFingerprintContent('src/example.js', loneCrText),
+    lfText,
+    'metin canonicalization yalnız satır sonlarını LF yapmalı'
+);
+
+const binaryFixture = Buffer.from([0x00, 0x0d, 0x0a, 0x7f, 0xff]);
+const changedBinaryFixture = Buffer.from(binaryFixture);
+changedBinaryFixture[3] ^= 0x01;
+assert.deepEqual(
+    canonicalizeFingerprintContent('public/example.png', binaryFixture),
+    binaryFixture,
+    'binary fingerprint girdisi byte-birebir korunmalı'
+);
+assert.notEqual(
+    digestEntry('public/example.png', binaryFixture),
+    digestEntry('public/example.png', changedBinaryFixture),
+    'binary girdide tek byte değişikliği fingerprint değerini değiştirmeli'
+);
+assert.equal(
+    digestEntry('src/example.js', lfText),
+    digestEntry('src\\example.js', lfText),
+    'Windows ve POSIX path separator temsilleri aynı fingerprint değerini üretmeli'
+);
+assert.equal(canonicalizeFingerprintPath('src\\example.js'), 'src/example.js');
+const windowsMachinePath = ['X:', 'machine-root', 'source.js'].join('\\');
+const posixMachinePath = ['', 'machine-root', 'source.js'].join('/');
+assert.throws(
+    () => canonicalizeFingerprintPath(windowsMachinePath),
+    /repository-relative/,
+    'Windows makine yolu fingerprint girdisi olamamalı'
+);
+assert.throws(
+    () => canonicalizeFingerprintPath(posixMachinePath),
+    /repository-relative/,
+    'POSIX makine yolu fingerprint girdisi olamamalı'
+);
+assert.throws(
+    () => canonicalizeFingerprintContent('public/example.bin', binaryFixture),
+    /Desteklenmeyen fingerprint girdisi/,
+    'tanımsız uzantı geniş text varsayımına düşmemeli'
+);
 
 assert.match(previewSource, /<!doctype html>/i, 'önizleme geçerli bir HTML belgesi olmalı');
 assert.match(previewSource, /<html\b[^>]*\blang=["']tr["']/i, 'önizleme Türkçe belge dili tanımlamalı');
@@ -259,6 +634,16 @@ assert.match(
     stylesSource,
     /@media \(max-width: 760px\)[\s\S]*?\.command-trigger \{ display: grid;/,
     'mobil görünüm komut paleti için dokunmatik tetikleyiciyi korumalı'
+);
+assert.equal(
+    (stylesSource.match(/\.command-trigger > span:not\(\.icon-wrap\),\s*\.command-trigger kbd \{ display: none; \}/g) || []).length,
+    2,
+    'iki mobil breakpoint de yalnız komut etiketini gizleyip span.icon-wrap ikonunu korumalı'
+);
+assert.doesNotMatch(
+    stylesSource,
+    /\.command-trigger span,\s*\.command-trigger kbd \{ display: none; \}/,
+    'mobil komut etiketi selectorü span.icon-wrap ikonunu gizlememeli'
 );
 assert.match(
     applicationSource,
@@ -436,3 +821,9 @@ assert.match(
 );
 
 console.log('admin Commerce Pro preview smoke passed');
+}
+
+run().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});

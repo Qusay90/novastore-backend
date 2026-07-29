@@ -3,9 +3,9 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const { spawn } = require('child_process');
 const pool = require('../config/db');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 const createCoreSchema = require('../models/createCoreDb');
 const createCommerceSchema = require('../models/createCommerceDb');
 const createNotificationsTable = require('../models/createNotificationDb');
@@ -28,12 +28,10 @@ const { seedCurrentAdminUsers } = require('./helpers/seedCurrentAdminUsers');
 
 const root = path.join(__dirname, '..');
 process.env.JWT_SECRET = 'marketplace-attribute-navigation-seed-smoke';
+const authFixture = createAuthSessionFixture();
+authFixture.install();
 const adminHeaders = {
-    Authorization: `Bearer ${jwt.sign(
-        { id: 1, role: 'admin' },
-        process.env.JWT_SECRET,
-        { expiresIn: '1h' }
-    )}`
+    Authorization: `Bearer ${authFixture.issue({ userId: 1, role: 'admin', principal: 'admin' }).token}`
 };
 
 const runChild = (args, env, timeoutMs = 30000) => new Promise((resolve, reject) => {

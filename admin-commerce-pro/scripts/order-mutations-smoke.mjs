@@ -31,6 +31,13 @@ const catalogDetailPayload = {
     old_price: 1499.9,
     currency: "TRY",
     stock: 8,
+    sku: "NV-KULAKLIK-12",
+    brand: "Nova",
+    product_type: "Kulaklık",
+    vat_rate: 20,
+    vat_rate_source: "USER_SUPPLIED_TAX_VALUE",
+    weight_grams: 280,
+    desi: 0.4,
     publication_status: "draft",
     is_customer_visible: false,
     deleted_at: null,
@@ -113,6 +120,8 @@ assert.deepEqual(JSON.parse(calls[1].init.body), {
 const normalizedCatalogProduct = normalizeAdminCatalogProductDetail(catalogDetailPayload);
 assert.equal(normalizedCatalogProduct.id, "PR-000012");
 assert.equal(normalizedCatalogProduct.revision, 4);
+assert.equal(normalizedCatalogProduct.sku, "NV-KULAKLIK-12");
+assert.equal(normalizedCatalogProduct.vatRateSource, "USER_SUPPLIED_TAX_VALUE");
 assert.deepEqual(catalogAttributesToMutationMap(normalizedCatalogProduct.attributes), {
   renk: 21,
   uyumlu_platformlar: [31, 32],
@@ -136,6 +145,13 @@ const createCatalogRequest = buildCreateCatalogProductMutation({
   price: 1299.9,
   oldPrice: null,
   stock: 8,
+  sku: "NV-KULAKLIK-12",
+  brand: "Nova",
+  productType: "Kulaklık",
+  vatRate: 20,
+  vatRateSource: "USER_SUPPLIED_TAX_VALUE",
+  weightGrams: 280,
+  desi: 0.4,
   publicationStatus: "draft",
   customerVisible: false,
   categoryIds: [4],
@@ -150,6 +166,13 @@ assert.deepEqual(createCatalogRequest.body, {
   price: 1299.9,
   old_price: null,
   stock: 8,
+  sku: "NV-KULAKLIK-12",
+  brand: "Nova",
+  product_type: "Kulaklık",
+  vat_rate: 20,
+  vat_rate_source: "USER_SUPPLIED_TAX_VALUE",
+  weight_grams: 280,
+  desi: 0.4,
   publication_status: "draft",
   is_customer_visible: false,
   category_ids: [4],

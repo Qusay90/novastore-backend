@@ -70,6 +70,33 @@ npm run build:live:integrated
 
 Bu komut `frontend/admin-commerce-pro-live.html` üretir. Artifact `connect-src 'self'` CSP'si taşır ve yalnız NovaStore backend ile aynı origin'de çalışır. Admin login dönüş hedefi allowlist ile bu dosyaya yönlendirilebilir. Bu build deployment veya production cutover yapmaz.
 
+## Deterministik artifact ve fingerprint sözleşmesi
+
+Standalone üretici, nihai preview ve live HTML çıktılarını platformdan bağımsız LF byte'larıyla yazar. Artifact smoke kapıları CR byte kalmadığını ve aynı girdilerle arka arkaya iki üretimin birebir aynı SHA-256 değerini verdiğini doğrular.
+
+Canonical kaynak fingerprint'i açık bir dosya türü allowlist'i kullanır: metin girdilerinde `CRLF` ve lone `CR` satır sonları hash öncesinde `LF` olur; PNG, WebP ve WOFF2 girdileri ise ham byte olarak kalır. Yalnız repository-relative POSIX yollar hash'e girer. Bu sözleşme Windows `core.autocrlf=true` checkout'larını destekler; mutlak makine yolu fingerprint'e eklenmez.
+
+Preview ve live artifact'leri yalnız mevcut build scriptleriyle üretin; generated HTML'i elle düzenlemeyin:
+
+```powershell
+cd admin-commerce-pro
+$artifactPaths = @('..\frontend\admin-commerce-pro.html', '..\frontend\admin-commerce-pro-live.html')
+npm run build:integrated
+npm run build:live:integrated
+$firstBuild = Get-FileHash -LiteralPath $artifactPaths -Algorithm SHA256
+```
+
+Deterministik kontrol için aynı iki build komutunu ikinci kez çalıştırın; `Compare-Object` çıktı vermemelidir:
+
+```powershell
+npm run build:integrated
+npm run build:live:integrated
+$secondBuild = Get-FileHash -LiteralPath $artifactPaths -Algorithm SHA256
+Compare-Object $firstBuild $secondBuild -Property Path, Hash
+```
+
+Bu üretim ve doğrulama akışı production/deploy, veritabanı, migration, gerçek ödeme, refund veya dış servis write işlemi çalıştırmaz.
+
 ## Güvenli doğrulama
 
 Commerce Pro klasöründen tam build + model + artifact doğrulaması:

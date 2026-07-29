@@ -27,6 +27,11 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const { simpleRateLimit, sanitizeBody } = require('./middlewares/securityMiddleware');
+const {
+    createStagingAccessGate,
+    createStagingEngineAccessGate
+} = require('./middlewares/stagingAccessGate');
+const { assertExternalSideEffectAllowed } = require('./config/stagingRuntimePolicy');
 const pool = require('./config/db');
 const { getAllowedOrigins } = require('./config/appConfig');
 const { getPublicCategoryBySlug } = require('./services/categoryService');
@@ -36,8 +41,10 @@ const {
     autoJoinAllowedRooms,
     buildMessageTargetRoom,
     buildSafeMessagePayload,
-    handleJoinRoom
+    handleJoinRoom,
+    revalidateSocketSession
 } = require('./services/socketAuthService');
+const { socketRevocationService } = require('./services/socketRevocationService');
 
 const app = express();
 const server = http.createServer(app);
@@ -53,37 +60,77 @@ const io = new Server(server, {
     cors: corsOptions
 });
 
+const stagingAccessGate = createStagingAccessGate({ environment: process.env });
+const stagingEngineAccessGate = createStagingEngineAccessGate({ environment: process.env });
+io.engine.use(stagingEngineAccessGate);
+
 // io export
 module.exports.io = io;
 
+io.use(socketRevocationService.guardSocketAuthentication);
 io.use(authenticateSocket);
 
 io.on('connection', (socket) => {
+    if (!socketRevocationService.register(socket)) return;
     const joinedRooms = autoJoinAllowedRooms(socket);
     console.log(`Socket baglantisi kuruldu: ${socket.id} user=${socket.user.id} role=${socket.user.role}`);
 
-    socket.on('join_room', (room, ack) => {
-        const result = handleJoinRoom(socket, room, ack);
-        if (result.ok) {
-            console.log(`Socket ${socket.id} -> ${result.room} odasina katildi`);
-        }
-    });
-
-    socket.on('send_message', (data = {}, ack) => {
-        const targetRoom = buildMessageTargetRoom(socket.user, data);
-        if (!targetRoom) {
+    socket.on('join_room', async (room, ack) => {
+        try {
+            await revalidateSocketSession(socket);
+            const result = handleJoinRoom(socket, room, ack);
+            if (result.ok) console.log(`Socket ${socket.id} -> ${result.room} odasina katildi`);
+        } catch (error) {
             const payload = {
                 ok: false,
-                code: 'MESSAGE_FORBIDDEN',
-                message: 'Bu mesaj hedefi için yetkiniz yok.'
+                code: error.data?.code || 'SOCKET_SESSION_REVOKED',
+                message: 'Socket session is not active.'
             };
             if (typeof ack === 'function') ack(payload);
             socket.emit('socket_error', payload);
-            return;
+            socket.disconnect(true);
         }
+    });
 
-        io.to(targetRoom).emit('receive_message', buildSafeMessagePayload(socket.user, data));
-        if (typeof ack === 'function') ack({ ok: true, room: targetRoom });
+    socket.on('send_message', async (data = {}, ack) => {
+        try {
+            await revalidateSocketSession(socket);
+            const targetRoom = buildMessageTargetRoom(socket.user, data);
+            if (!targetRoom) {
+                const payload = {
+                    ok: false,
+                    code: 'MESSAGE_FORBIDDEN',
+                    message: 'Bu mesaj hedefi için yetkiniz yok.'
+                };
+                if (typeof ack === 'function') ack(payload);
+                socket.emit('socket_error', payload);
+                return;
+            }
+
+            assertExternalSideEffectAllowed('outbound_notification');
+            io.to(targetRoom).emit('receive_message', buildSafeMessagePayload(socket.user, data));
+            if (typeof ack === 'function') ack({ ok: true, room: targetRoom });
+        } catch (error) {
+            if (error && error.code === 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED') {
+                const payload = {
+                    ok: false,
+                    code: error.code,
+                    message: error.publicMessage || 'External side effect is disabled in staging.'
+                };
+                if (typeof ack === 'function') ack(payload);
+                socket.emit('socket_error', payload);
+                return;
+            }
+
+            const payload = {
+                ok: false,
+                code: error.data?.code || 'SOCKET_SESSION_REVOKED',
+                message: 'Socket session is not active.'
+            };
+            if (typeof ack === 'function') ack(payload);
+            socket.emit('socket_error', payload);
+            socket.disconnect(true);
+        }
     });
 
     socket.on('disconnect', () => {
@@ -92,14 +139,92 @@ io.on('connection', (socket) => {
 });
 
 // Middleware
+app.use(stagingAccessGate);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(sanitizeBody);
 app.use(simpleRateLimit({ windowMs: 60 * 1000, max: 240 }));
+
+const runtimeMetaRoutes = require('./routes/runtimeMetaRoutes');
+app.use('/api', runtimeMetaRoutes);
+
 app.get('/favicon.ico', (req, res) => {
     res.type('image/png');
     res.sendFile(path.join(__dirname, 'frontend', 'favicon-96x96.png'));
 });
+
+const COMMERCE_PRO_STOREFRONT_ARTIFACT = path.join(
+    __dirname,
+    'frontend',
+    'commerce-pro',
+    'index.html'
+);
+const storefrontMode = String(process.env.NOVASTORE_STOREFRONT_MODE || '').trim().toLowerCase();
+const commerceProStorefrontEnabled = storefrontMode !== 'legacy';
+
+if (storefrontMode && !['commerce-pro', 'legacy'].includes(storefrontMode)) {
+    console.warn(
+        `Bilinmeyen NOVASTORE_STOREFRONT_MODE=${storefrontMode}; ` +
+        'varsayilan Commerce Pro storefront kullanilacak.'
+    );
+}
+
+const COMMERCE_PRO_DOCUMENT_ALIASES = new Set([
+    '/',
+    '/index.html',
+    '/login.html',
+    '/forgot-password.html',
+    '/reset-password.html',
+    '/checkout.html',
+    '/profile.html',
+    '/product.html'
+]);
+const COMMERCE_PRO_HASH_ROUTES = [
+    /^\/urun-id\/\d+\/?$/,
+    /^\/arama\/?$/,
+    /^\/favoriler\/?$/,
+    /^\/sepet\/?$/,
+    /^\/hesabim(?:\/(?:adresler|kuponlar|bildirimler|guvenlik|siparisler(?:\/[^/]+)?))?\/?$/,
+    /^\/(?:giris|kayit|sifremi-unuttum|sifre-sifirla)\/?$/,
+    /^\/odeme\/(?:teslimat|odeme|onay)\/?$/,
+    /^\/(?:yardim|siparis-takibi|iletisim)\/?$/
+];
+const COMMERCE_PRO_DOCUMENT_ROUTES = /^\/(?:kategori|urun|koleksiyon)\/(?:[^/]+(?:\/[^/]+)*)\/?$/;
+
+const requestSearch = (req) => {
+    const queryIndex = req.originalUrl.indexOf('?');
+    return queryIndex === -1 ? '' : req.originalUrl.slice(queryIndex);
+};
+
+app.use((req, res, next) => {
+    if (!commerceProStorefrontEnabled || !['GET', 'HEAD'].includes(req.method)) return next();
+
+    if (/^\/category\/(?:[^/]+(?:\/[^/]+)*)\/?$/.test(req.path)) {
+        const requestedPath = req.path.slice('/category/'.length).replace(/^\/+|\/+$/g, '');
+        let canonicalPath;
+        try {
+            canonicalPath = requestedPath
+                .split('/')
+                .map((segment) => encodeURIComponent(decodeURIComponent(segment)))
+                .join('/');
+        } catch (_) {
+            return next();
+        }
+        return res.redirect(301, `/kategori/${canonicalPath}${requestSearch(req)}`);
+    }
+
+    if (COMMERCE_PRO_DOCUMENT_ALIASES.has(req.path) || COMMERCE_PRO_DOCUMENT_ROUTES.test(req.path)) {
+        return res.sendFile(COMMERCE_PRO_STOREFRONT_ARTIFACT);
+    }
+
+    if (COMMERCE_PRO_HASH_ROUTES.some((pattern) => pattern.test(req.path))) {
+        const canonicalHashPath = req.path.replace(/\/+$/g, '');
+        return res.redirect(302, `/#${canonicalHashPath}${requestSearch(req)}`);
+    }
+
+    return next();
+});
+
 const ADMIN_COMMERCE_PRO_HTML_FILES = new Set([
     'admin-commerce-pro.html',
     'admin-commerce-pro-live.html'
@@ -264,6 +389,13 @@ app.use('/api/merchant', merchantRoutes);
 app.use('/merchant', merchantRoutes);
 
 app.use((err, req, res, next) => {
+    if (err && err.code === 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED') {
+        return res.status(503).json({
+            code: err.code,
+            error: err.publicMessage || 'External side effect is disabled in staging.'
+        });
+    }
+
     console.error('Istek hatasi:', err && err.message ? err.message : err);
 
     if (res.headersSent) {
@@ -274,12 +406,6 @@ app.use((err, req, res, next) => {
     const message = err && err.message ? err.message : 'Sunucu hatasi meydana geldi.';
     return res.status(statusCode).json({ error: message });
 });
-
-// Veritabani tablolari
-const createCoreSchema = require('./models/createCoreDb');
-const createNotificationsTable = require('./models/createNotificationDb');
-const createCommerceSchema = require('./models/createCommerceDb');
-const createAnalyticsSchema = require('./models/createAnalyticsDb');
 
 const prepareDatabase = async (startupSafety) => {
     if (!startupSafety.shouldVerifyDbConnection) {
@@ -295,6 +421,11 @@ const prepareDatabase = async (startupSafety) => {
         return;
     }
 
+    const createCoreSchema = require('./models/createCoreDb');
+    const createNotificationsTable = require('./models/createNotificationDb');
+    const createCommerceSchema = require('./models/createCommerceDb');
+    const createAnalyticsSchema = require('./models/createAnalyticsDb');
+
     await createCoreSchema();
     await createNotificationsTable();
     await createCommerceSchema();
@@ -305,6 +436,7 @@ const start = async () => {
     try {
         console.log(`Veritabani hedefi: ${startupSafety.target.label}`);
         await prepareDatabase(startupSafety);
+        if (!startupSafety.localPreviewMode) await socketRevocationService.start();
     } catch (err) {
         console.error('Veritabani hazirlama hatasi:', pool.formatError(err));
         process.exitCode = 1;

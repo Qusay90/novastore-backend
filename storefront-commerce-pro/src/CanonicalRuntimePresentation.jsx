@@ -266,7 +266,7 @@ function useRoute() {
 
 function Logo() {
   return (
-    <a className="brand" href="#/" aria-label="NovaStore ana sayfa">
+    <a className="brand" href="/" aria-label="NovaStore ana sayfa">
       <StarFour className="brand-mark" weight="fill" aria-hidden="true" /><span>Nova</span><strong>Store</strong>
     </a>
   );
@@ -589,7 +589,7 @@ function Breadcrumbs({ category, productName }) {
   return (
     <nav className="breadcrumbs" aria-label="İçerik yolu">
       <ol>
-        <li><a href="#/">Ana Sayfa</a></li>
+        <li><a href="/">Ana Sayfa</a></li>
         {trail.map((item, index) => {
           const last = index === trail.length - 1 && !productName;
           return <li key={item.id}>{last ? <span aria-current="page">{item.name}</span> : <a href={`#/kategori/${item.canonicalPath}`}>{item.name}</a>}</li>;
@@ -999,7 +999,7 @@ function CheckoutPage({ step, items, appliedCoupon, consent, onConsentChange, on
 }
 
 function OrderSuccessPage({ total }) {
-  return <main id="main-content" className="page success-page"><div className="shell"><div className="success-card"><span className="success-icon"><Check /></span><span className="section-kicker">Sipariş onayı</span><h1>Siparişiniz Alındı</h1><p>Teşekkür ederiz. Sipariş detayları ve teslimat adımları aşağıda hazır.</p><div className="success-meta"><div><small>Sipariş No</small><strong>NS-2026-00923</strong></div><div><small>Sipariş Tarihi</small><strong>11 Temmuz 2026 · 23:45</strong></div><div><small>Toplam Tutar</small><strong>{money.format(total || 24997)}</strong></div></div><div className="order-timeline">{["Sipariş alındı", "Hazırlanıyor", "Kargoya verilecek", "Yolda", "Teslim edilecek"].map((label, index) => <div key={label} className={index === 0 ? "is-active" : ""}><span>{index === 0 ? <Check /> : index + 1}</span><strong>{label}</strong><small>{index === 0 ? "11 Temmuz" : `${12 + index} Temmuz`}</small></div>)}</div><div className="success-actions"><a href="#/hesabim/siparisler"><Receipt /> Siparişlerimi görüntüle</a><a href="#/siparis-takibi"><Truck /> Kargo takibi yap</a><a className="primary-button" href="#/">Alışverişe devam et</a></div></div><BenefitStrip /></div></main>;
+  return <main id="main-content" className="page success-page"><div className="shell"><div className="success-card"><span className="success-icon"><Check /></span><span className="section-kicker">Sipariş onayı</span><h1>Siparişiniz Alındı</h1><p>Teşekkür ederiz. Sipariş detayları ve teslimat adımları aşağıda hazır.</p><div className="success-meta"><div><small>Sipariş No</small><strong>NS-2026-00923</strong></div><div><small>Sipariş Tarihi</small><strong>11 Temmuz 2026 · 23:45</strong></div><div><small>Toplam Tutar</small><strong>{money.format(total || 24997)}</strong></div></div><div className="order-timeline">{["Sipariş alındı", "Hazırlanıyor", "Kargoya verilecek", "Yolda", "Teslim edilecek"].map((label, index) => <div key={label} className={index === 0 ? "is-active" : ""}><span>{index === 0 ? <Check /> : index + 1}</span><strong>{label}</strong><small>{index === 0 ? "11 Temmuz" : `${12 + index} Temmuz`}</small></div>)}</div><div className="success-actions"><a href="#/hesabim/siparisler"><Receipt /> Siparişlerimi görüntüle</a><a href="#/siparis-takibi"><Truck /> Kargo takibi yap</a><a className="primary-button" href="/">Alışverişe devam et</a></div></div><BenefitStrip /></div></main>;
 }
 
 function AccountSidebar({ section }) {
@@ -1045,7 +1045,7 @@ function TrackingPage() {
 
 function MobileBottomNav({ route, cartCount, favoriteCount }) {
   if (["product", "checkout", "order-success"].includes(route.type)) return null;
-  const items = [[House,"Ana Sayfa","#/","home"],[GridFour,"Kategoriler","#/kategori/elektronik","category"],[Heart,"Favoriler","#/favoriler","favorites"],[User,"Hesabım","#/hesabim","account"],[ShoppingCart,"Sepet","#/sepet","cart-page"]];
+  const items = [[House,"Ana Sayfa","/","home"],[GridFour,"Kategoriler","#/kategori/elektronik","category"],[Heart,"Favoriler","#/favoriler","favorites"],[User,"Hesabım","#/hesabim","account"],[ShoppingCart,"Sepet","#/sepet","cart-page"]];
   return <nav className="mobile-bottom-nav" aria-label="Mobil ana navigasyon">{items.map(([Icon,label,href,type]) => <a key={type} className={route.type === type ? "is-active" : ""} aria-current={route.type === type ? "page" : undefined} href={href}><span><Icon />{type === "favorites" && favoriteCount > 0 && <b>{favoriteCount}</b>}{type === "cart-page" && cartCount > 0 && <b>{cartCount}</b>}</span><small>{label}</small></a>)}</nav>;
 }
 
@@ -1086,11 +1086,11 @@ function LoadingPage() {
 }
 
 function NotFound() {
-  return <main id="main-content" className="page"><div className="shell not-found"><span>404</span><h1>Bu sayfayı bulamadık</h1><p>Kategori taşınmış, gizlenmiş veya artık yayında olmayabilir.</p><a className="primary-button" href="#/">Ana sayfaya dön</a></div></main>;
+  return <main id="main-content" className="page"><div className="shell not-found"><span>404</span><h1>Bu sayfayı bulamadık</h1><p>Kategori taşınmış, gizlenmiş veya artık yayında olmayabilir.</p><a className="primary-button" href="/">Ana sayfaya dön</a></div></main>;
 }
 
 function Footer() {
-  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="#/">Hakkımızda</a><a href="#/hesabim">Hesabım</a><a href="#/iletisim">İletişim</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/yardim">İade & değişim</a><a href="#/yardim">Yardım merkezi</a></div><div><strong>Güvenli alışveriş</strong><p>3D Secure ödeme, kolay iade ve NovaStore desteği.</p></div></div><div className="shell footer-bottom"><span>© 2026 NovaStore. Etkileşimli tema prototipi.</span><span>Gizlilik · Kullanım Koşulları · Çerezler</span></div></footer>;
+  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="/">Hakkımızda</a><a href="#/hesabim">Hesabım</a><a href="#/iletisim">İletişim</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/yardim">İade & değişim</a><a href="#/yardim">Yardım merkezi</a></div><div><strong>Güvenli alışveriş</strong><p>3D Secure ödeme, kolay iade ve NovaStore desteği.</p></div></div><div className="shell footer-bottom"><span>© 2026 NovaStore. Etkileşimli tema prototipi.</span><span>Gizlilik · Kullanım Koşulları · Çerezler</span></div></footer>;
 }
 
 export function App() {

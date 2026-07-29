@@ -1,6 +1,6 @@
 const assert = require('assert');
-const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 const createCoreSchema = require('../models/createCoreDb');
 const { resolveStartupSafety } = require('../config/startupSafety');
 const {
@@ -18,6 +18,9 @@ const {
 const { listPublicCategories } = require('../services/categoryService');
 
 process.env.JWT_SECRET = 'category-lifecycle-smoke-secret';
+
+const authFixture = createAuthSessionFixture();
+authFixture.install();
 
 const createResponse = () => ({
     statusCode: 200,
@@ -236,6 +239,9 @@ const statsFor = async (categoryId) => {
     const publicDetail = await invoke(getProductById, { params: { id: productId } });
     assert.strictEqual(publicDetail.statusCode, 200);
     assert.strictEqual(publicDetail.body.is_purchasable, false);
+    for (const field of ['sku', 'normalized_sku', 'vat_rate', 'vat_rate_source', 'weight_grams', 'desi']) {
+        assert(!Object.hasOwn(publicDetail.body, field), `public detail ${field} alanını taşımamalı`);
+    }
 
     const restockClient = await pool.connect();
     try {
@@ -266,6 +272,9 @@ const statsFor = async (categoryId) => {
     assert.strictEqual(publicList.body.at(-1).is_purchasable, false);
     assert(!Object.hasOwn(publicList.body[0], 'categoryIds'));
     assert(!Object.hasOwn(publicList.body[0], 'primaryCategoryId'));
+    for (const field of ['sku', 'normalized_sku', 'vat_rate', 'vat_rate_source', 'weight_grams', 'desi']) {
+        assert(!Object.hasOwn(publicList.body[0], field), `public list ${field} alanını taşımamalı`);
+    }
 
     const rootCategoryProducts = await invoke(getAllProducts, {
         query: { categorySlug: 'lifecycle-root' }
@@ -303,17 +312,18 @@ const statsFor = async (categoryId) => {
     assert(!filteredList.body.some((product) => Number(product.id) === secondProductId));
     const adminList = await invoke(getAllProducts, {
         headers: {
-            authorization: `Bearer ${jwt.sign(
-                { id: 1, role: 'admin' },
-                process.env.JWT_SECRET,
-                { expiresIn: '1h' }
-            )}`
+            authorization: `Bearer ${authFixture.issue({
+                userId: 1,
+                role: 'admin',
+                principal: 'admin'
+            }).token}`
         }
     });
     assert(adminList.body.some((product) => Number(product.id) === secondProductId));
     const adminLinkedProduct = adminList.body.find((product) => Number(product.id) === productId);
     assert.deepStrictEqual(adminLinkedProduct.categoryIds, [leafB]);
     assert.strictEqual(adminLinkedProduct.primaryCategoryId, leafB);
+    assert(!Object.hasOwn(adminLinkedProduct, 'normalized_sku'));
 
     const preservedLegacyFields = await pool.query(
         'SELECT category, categories FROM products WHERE id = $1',

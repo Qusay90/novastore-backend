@@ -106,10 +106,12 @@ class AuthViewModel @Inject constructor(
     }
 
     fun logout() {
-        authRepository.logout()
-        Timber.d("Logged out successfully.")
-        _isLoggedInState.value = false
-        _uiState.update { it.copy(isSuccess = false) }
+        viewModelScope.launch {
+            val result = authRepository.logout()
+            if (result.serverRevocationVerified) Timber.d("Server session revocation verified.")
+            _isLoggedInState.value = false
+            _uiState.update { it.copy(isSuccess = false, error = result.warning) }
+        }
     }
 
     fun resetSuccess() {

@@ -1647,11 +1647,43 @@
             }
         }
 
-        function userLogout() {
+        async function userLogout() {
+            const LOGOUT_REQUEST_TIMEOUT_MS = 10_000;
             const uid = _getUserId();
-            localStorage.removeItem(`novastore_checkout_${uid}`);
-            localStorage.removeItem('nova_user_token');
-            localStorage.removeItem('nova_user_info');
+            const token = localStorage.getItem('nova_user_token');
+            let serverRevocationVerified = false;
+            try {
+                if (token) {
+                    const controller = new AbortController();
+                    let timeoutId;
+                    try {
+                        const request = Promise.resolve().then(() => fetch('/api/users/logout', {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: { Authorization: `Bearer ${token}` },
+                            signal: controller.signal
+                        }));
+                        const timeout = new Promise((_, reject) => {
+                            timeoutId = setTimeout(() => {
+                                controller.abort('logout-timeout');
+                                const error = new Error('Logout request timed out.');
+                                error.name = 'AbortError';
+                                reject(error);
+                            }, LOGOUT_REQUEST_TIMEOUT_MS);
+                        });
+                        const response = await Promise.race([request, timeout]);
+                        serverRevocationVerified = response.status === 204;
+                    } finally {
+                        clearTimeout(timeoutId);
+                    }
+                }
+            } catch (_) {
+                serverRevocationVerified = false;
+            } finally {
+                localStorage.removeItem(`novastore_checkout_${uid}`);
+                localStorage.removeItem('nova_user_token');
+                localStorage.removeItem('nova_user_info');
+            }
             window.location.reload();
         }
 

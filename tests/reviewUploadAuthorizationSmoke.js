@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const express = require('express');
 const http = require('node:http');
 const Module = require('node:module');
-const jwt = require('jsonwebtoken');
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 process.env.NODE_ENV = 'test';
 process.env.NOVASTORE_SAFE_LOCAL_BACKEND = 'true';
@@ -18,6 +18,9 @@ process.env.DB_PASSWORD = 'novastore_test_only';
 process.env.DB_SSL = 'false';
 process.env.SUPABASE_USE_POOLER = 'false';
 process.env.JWT_SECRET = 'review-upload-authorization-smoke-secret';
+
+const authFixture = createAuthSessionFixture();
+authFixture.install();
 
 const originalLoad = Module._load;
 Module._load = function load(request, parent, isMain) {
@@ -125,11 +128,7 @@ const createServer = () => new Promise((resolve) => {
     const server = app.listen(0, '127.0.0.1', () => resolve(server));
 });
 
-const token = jwt.sign(
-    { id: 42, role: 'customer' },
-    process.env.JWT_SECRET,
-    { expiresIn: '1h' }
-);
+const token = authFixture.issue({ userId: 42, role: 'customer', principal: 'customer' }).token;
 
 const reviewRequest = {
     fields: {

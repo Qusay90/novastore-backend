@@ -1,16 +1,41 @@
-const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
-require('dotenv').config({ quiet: true });
+const { assertExternalSideEffectAllowed } = require('./stagingRuntimePolicy');
 
 const MAX_REVIEW_MEDIA_COUNT = 4;
 const MAX_REVIEW_MEDIA_BYTES = 8 * 1024 * 1024;
 const REVIEW_MEDIA_FOLDER = 'novastore_reviews';
 
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-});
+let cloudinaryClient = null;
+
+const getCloudinaryClient = (effect) => {
+    assertExternalSideEffectAllowed(effect);
+    if (!cloudinaryClient) {
+        cloudinaryClient = require('cloudinary').v2;
+        cloudinaryClient.config({
+            cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+            api_key: process.env.CLOUDINARY_API_KEY,
+            api_secret: process.env.CLOUDINARY_API_SECRET
+        });
+    }
+    return cloudinaryClient;
+};
+
+const cloudinary = {
+    url(...args) {
+        return getCloudinaryClient('cloudinary_write').url(...args);
+    },
+    uploader: {
+        upload_stream(...args) {
+            return getCloudinaryClient('cloudinary_write').uploader.upload_stream(...args);
+        },
+        explicit(...args) {
+            return getCloudinaryClient('cloudinary_write').uploader.explicit(...args);
+        },
+        destroy(...args) {
+            return getCloudinaryClient('cloudinary_delete').uploader.destroy(...args);
+        }
+    }
+};
 
 const allowedFormats = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'webm', 'ogg', 'mov'];
 const allowedReviewMimeTypes = new Set([

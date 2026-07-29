@@ -1376,7 +1376,7 @@ dialog.modal::backdrop { background: rgba(4, 23, 46, 0.58); }
     border: 0;
   }
   .command-trigger { display: grid; place-items: center; flex: 0 0 40px; width: 40px; min-width: 40px; padding: 0; }
-  .command-trigger span,
+  .command-trigger > span:not(.icon-wrap),
   .command-trigger kbd { display: none; }
   .topbar { justify-content: space-between; }
   .topbar-leading { flex: 1; min-width: 0; max-width: none; }
@@ -2093,7 +2093,7 @@ textarea { font-size: 12px; }
     padding: 0;
   }
 
-  .command-trigger span,
+  .command-trigger > span:not(.icon-wrap),
   .command-trigger kbd { display: none; }
   .topbar-leading { min-width: 100px; }
 }

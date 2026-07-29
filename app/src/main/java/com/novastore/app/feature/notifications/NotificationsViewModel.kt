@@ -508,7 +508,10 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun logout() {
-        authRepository.logout()
+        viewModelScope.launch {
+            val result = authRepository.logout()
+            _uiState.update { it.copy(securityActionMessage = result.warning) }
+        }
     }
 
     private fun validatePasswordChange(currentPassword: String, newPassword: String, repeatPassword: String): String? {

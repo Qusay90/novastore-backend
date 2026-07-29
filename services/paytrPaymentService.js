@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { assertExternalSideEffectAllowed } = require('../config/stagingRuntimePolicy');
 
 const DEFAULT_PAYTR_BASE_URL = 'https://www.paytr.com';
 const MERCHANT_OID_PREFIX = 'NST-PAYTR';
@@ -170,6 +171,7 @@ const buildPaytrTokenPayload = ({
     timeoutLimit = 30,
     lang = 'tr'
 }) => {
+    assertExternalSideEffectAllowed('payment_initialize');
     assertPlainObject(config, 'config');
     assertPlainObject(customer, 'customer');
 
@@ -252,6 +254,7 @@ const verifyPaytrCallbackHash = (payload, config) => {
 };
 
 const buildMockPaytrTokenResponse = ({ merchantOid, paymentAmount }) => {
+    assertExternalSideEffectAllowed('payment_initialize');
     const seed = `${merchantOid || ''}:${paymentAmount || ''}`;
     const token = crypto.createHash('sha256').update(seed).digest('hex').slice(0, 40);
     return {

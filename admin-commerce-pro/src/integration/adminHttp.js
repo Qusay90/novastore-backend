@@ -1,5 +1,6 @@
 export const ADMIN_TOKEN_KEY = "nova_admin_token";
 export const ADMIN_LOGIN_URL = "admin-login.html?reason=session-expired&next=admin-commerce-pro-live.html";
+export const ADMIN_LOGOUT_TIMEOUT_MS = 10_000;
 
 export class AdminHttpError extends Error {
   constructor(message, { status = 0, code = "ADMIN_HTTP_ERROR", requestId = "", details = null, cause } = {}) {
@@ -71,7 +72,16 @@ export function createAdminHttp({
   location = globalThis.location,
   now = () => Date.now(),
   decodeBase64,
+  logoutTimeoutMs = ADMIN_LOGOUT_TIMEOUT_MS,
+  setTimeoutImpl = globalThis.setTimeout?.bind(globalThis),
+  clearTimeoutImpl = globalThis.clearTimeout?.bind(globalThis),
 } = {}) {
+  if (!Number.isFinite(logoutTimeoutMs) || logoutTimeoutMs <= 0) {
+    throw new TypeError("logoutTimeoutMs must be a positive finite number.");
+  }
+  if (typeof setTimeoutImpl !== "function" || typeof clearTimeoutImpl !== "function") {
+    throw new TypeError("Logout timers must be available.");
+  }
   if (typeof fetchImpl !== "function") throw new TypeError("fetchImpl bir fonksiyon olmalıdır.");
   let redirectStarted = false;
 
@@ -145,5 +155,46 @@ export function createAdminHttp({
     return payload;
   };
 
-  return { request };
+  const logout = async () => {
+    const token = storage?.getItem?.(ADMIN_TOKEN_KEY) || "";
+    let serverRevocationVerified = false;
+    try {
+      if (token) {
+        const controller = new AbortController();
+        let timeoutId;
+        try {
+          const request = Promise.resolve().then(() => fetchImpl("/api/auth/logout", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          }));
+          const timeout = new Promise((_resolve, reject) => {
+            timeoutId = setTimeoutImpl(() => {
+              controller.abort("logout-timeout");
+              const error = new Error("Logout request timed out.");
+              error.name = "AbortError";
+              reject(error);
+            }, logoutTimeoutMs);
+          });
+          const response = await Promise.race([request, timeout]);
+          serverRevocationVerified = response.status === 204;
+        } finally {
+          clearTimeoutImpl(timeoutId);
+        }
+      }
+    } catch (_error) {
+      serverRevocationVerified = false;
+    } finally {
+      storage?.removeItem?.(ADMIN_TOKEN_KEY);
+    }
+    return Object.freeze({
+      serverRevocationVerified,
+      warning: serverRevocationVerified
+        ? null
+        : "Bu cihazdaki oturum kapatıldı; sunucu oturumunun kapatıldığı doğrulanamadı.",
+    });
+  };
+
+  return { logout, request };
 }

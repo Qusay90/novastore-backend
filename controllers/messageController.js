@@ -1,5 +1,8 @@
 const pool = require('../config/db');
 const { createNotification } = require('./notificationController');
+const {
+    assertExternalSideEffectAllowed
+} = require('../config/stagingRuntimePolicy');
 
 const AI_HANDOFF_PREFIX = '[AI DESTEK DEVRI]';
 
@@ -15,6 +18,8 @@ const normalizeMessageRow = (row) => ({
 });
 
 const emitRealtimeMessage = (messageRow, receiverRole) => {
+    assertExternalSideEffectAllowed('outbound_notification');
+
     try {
         const { io } = require('../server');
         if (!io || !messageRow) return;
@@ -97,9 +102,12 @@ exports.getChatHistory = async (req, res) => {
 };
 
 exports.sendMessage = async (req, res) => {
-    const client = await pool.connect();
+    let client = null;
 
     try {
+        assertExternalSideEffectAllowed('outbound_notification');
+        client = await pool.connect();
+
         const { receiver_id, message } = req.body;
         const trimmedMessage = String(message || '').trim();
 
@@ -167,13 +175,23 @@ exports.sendMessage = async (req, res) => {
 
         res.status(201).json(normalizedSavedMessage);
     } catch (err) {
-        try {
-            await client.query('ROLLBACK');
-        } catch (_) { }
+        if (client) {
+            try {
+                await client.query('ROLLBACK');
+            } catch (_) { }
+        }
+
+        if (err && err.code === 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED') {
+            return res.status(err.statusCode || 503).json({
+                code: err.code,
+                error: err.publicMessage || 'External side effect is disabled in staging.'
+            });
+        }
+
         console.error('Mesaj gönderilirken hata:', err);
         res.status(500).json({ error: 'Mesaj gönderilemedi' });
     } finally {
-        client.release();
+        if (client) client.release();
     }
 };
 

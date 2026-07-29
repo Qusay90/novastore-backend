@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
-const { getUserFromRequestIfAny } = require('../middlewares/authMiddleware');
+const { getUserFromRequestIfAny, sendAuthError } = require('../middlewares/authMiddleware');
 const { createNotification } = require('./notificationController');
 const { initializeIyzicoPayment, verifyWebhookSignature } = require('../services/paymentProviderService');
 const {
@@ -32,6 +32,24 @@ const {
     STOCK_RESERVATION_STATE,
     getStockReservationState
 } = require('../services/orderLifecyclePolicy');
+const {
+    ExternalSideEffectBlockedError,
+    assertExternalSideEffectAllowed
+} = require('../config/stagingRuntimePolicy');
+
+const rejectBlockedExternalSideEffect = (res, effect) => {
+    try {
+        assertExternalSideEffectAllowed(effect);
+        return false;
+    } catch (error) {
+        if (!(error instanceof ExternalSideEffectBlockedError)) throw error;
+        res.status(error.statusCode).json({
+            code: error.code,
+            error: error.publicMessage
+        });
+        return true;
+    }
+};
 
 const readIdempotencyKey = (req) => {
     const headerKey = req.headers['idempotency-key'];
@@ -689,6 +707,8 @@ const finalizePaytrSuccess = (payload) => finalizePaytrCallback(payload, PAYMENT
 const finalizePaytrFailure = (payload) => finalizePaytrCallback(payload, PAYMENT_CALLBACK_OUTCOME.FAILURE);
 
 const webhookPaytr = async (req, res) => {
+    if (rejectBlockedExternalSideEffect(res, 'payment_capture')) return;
+
     try {
         const payload = normalizePaytrCallbackPayload(req.body || {});
 
@@ -769,6 +789,8 @@ const webhookPaytr = async (req, res) => {
 };
 
 const initializePayment = async (req, res) => {
+    if (rejectBlockedExternalSideEffect(res, 'payment_initialize')) return;
+
     const client = await pool.connect();
 
     try {
@@ -791,7 +813,7 @@ const initializePayment = async (req, res) => {
             return res.status(400).json({ error: 'Sepet bo\u015F olamaz.' });
         }
 
-        const user = getUserFromRequestIfAny(req);
+        const user = await getUserFromRequestIfAny(req);
         const userId = user ? user.id : null;
 
         const idempotencyKey = readIdempotencyKey(req) || createDeterministicKeyFromBody(req.body);
@@ -991,6 +1013,7 @@ const initializePayment = async (req, res) => {
         });
     } catch (err) {
         await client.query('ROLLBACK');
+        if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
         const statusCode = err instanceof PaymentProviderConfigError ? err.statusCode : (err.statusCode || 500);
         console.error('\u00D6deme initialize hatas\u0131:', err.message);
         res.status(statusCode).json({
@@ -1054,6 +1077,8 @@ const getPaymentStatus = async (req, res) => {
 };
 
 const webhookIyzico = async (req, res) => {
+    if (rejectBlockedExternalSideEffect(res, 'payment_capture')) return;
+
     const client = await pool.connect();
 
     try {

@@ -6,6 +6,8 @@ const {
 const { applyMenuCollectionSchema } = require('./menuCollectionSchema');
 const { applyAttributeSchema } = require('./attributeSchema');
 const { applyAdminCatalogAuditSchema } = require('./adminCatalogAuditSchema');
+const { applyProductCommerceSchema } = require('./productCommerceSchema');
+const { applyAuthSessionSchema } = require('./authSessionSchema');
 
 const createCoreSchema = async () => {
     const query = `
@@ -171,6 +173,8 @@ const createCoreSchema = async () => {
     await applyMenuCollectionSchema(pool);
     await applyAttributeSchema(pool);
     await applyAdminCatalogAuditSchema(pool);
+    await applyProductCommerceSchema(pool);
+    await applyAuthSessionSchema(pool);
     console.log('Temel veritabani schema hazir.');
 };
 

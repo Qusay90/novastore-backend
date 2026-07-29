@@ -1,4 +1,5 @@
 const { isAdminCommerceCapabilityEnabled } = require('../services/adminCommerceCapabilityService');
+const { isStagingEnvironment } = require('../config/stagingRuntimePolicy');
 
 const DISABLED_CAPABILITY_RESPONSES = Object.freeze({
     firstPartyCatalogWrite: Object.freeze({
@@ -42,9 +43,18 @@ const requireAdminCommerceCapabilityIfClaimed = (capability) => {
     };
 };
 
+const requireAdminCommerceCapabilityInStaging = (capability) => {
+    const requireCapability = requireAdminCommerceCapability(capability);
+    return (req, res, next) => {
+        if (!isStagingEnvironment(process.env)) return next();
+        return requireCapability(req, res, next);
+    };
+};
+
 module.exports = {
     DISABLED_CAPABILITY_RESPONSES,
     requireAdminCommerceCapability,
+    requireAdminCommerceCapabilityInStaging,
     requireAdminCommerceCapabilityIfClaimed,
     sendDisabledCapability
 };
