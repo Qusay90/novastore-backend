@@ -78,6 +78,24 @@ const spawnServerWithExactEnv = (environment) => spawn(process.execPath, ['serve
     windowsHide: true
 });
 
+const buildRemoteDbModuleEnv = () => {
+    const environment = {};
+    for (const key of ['PATH', 'SystemRoot', 'WINDIR', 'ComSpec', 'PATHEXT', 'TEMP', 'TMP']) {
+        if (process.env[key]) environment[key] = process.env[key];
+    }
+    return {
+        ...environment,
+        NODE_ENV: 'production',
+        DATABASE_URL:
+            'postgresql://synthetic-user@runtime-db.example.test/' +
+            'novastore_runtime?sslmode=verify-full',
+        NOVASTORE_EXPECTED_DATABASE_HOST: 'runtime-db.example.test',
+        NOVASTORE_EXPECTED_DATABASE_NAME: 'novastore_runtime',
+        SKIP_SCHEMA_INIT: 'true',
+        NOVASTORE_ALLOW_SCHEMA_INIT: 'false'
+    };
+};
+
 const withoutRuntimeRevision = (environment) => {
     const sanitized = { ...environment };
     delete sanitized.RENDER_GIT_COMMIT;
@@ -174,6 +192,137 @@ const requiredLocalDatabaseEnv = () => {
     assert.doesNotMatch(blockedSupabaseOutput, /Startup preview:/);
     assert.doesNotMatch(blockedSupabaseOutput, /pg must not load/);
     assert.doesNotMatch(blockedSupabaseOutput, /postgresql:\/\/|postgres:secret/);
+
+    const fakePoolScript = `
+        const Module = require('node:module');
+        const originalLoad = Module._load;
+        let capturedConfig;
+        class FakeClient {}
+        class FakePool {
+            constructor(config) {
+                capturedConfig = config;
+                this.options = Object.assign({}, config);
+                this.Client = this.options.Client || FakeClient;
+                this.Promise = this.options.Promise || Promise;
+            }
+            on() {}
+        }
+        Module._load = function(request, parent, isMain) {
+            if (request === 'pg') return { Client: FakeClient, Pool: FakePool };
+            return originalLoad.call(this, request, parent, isMain);
+        };
+        const pool = require('./config/db');
+        const metadata = pool.getRuntimeTargetMetadata();
+        const result = {
+            configKeys: Object.keys(capturedConfig).sort(),
+            host: capturedConfig.host,
+            port: capturedConfig.port,
+            database: capturedConfig.database,
+            userPresent: typeof capturedConfig.user === 'string' && capturedConfig.user.length > 0,
+            passwordType: typeof capturedConfig.password,
+            ssl: capturedConfig.ssl,
+            hasConnectionString: Object.prototype.hasOwnProperty.call(capturedConfig, 'connectionString'),
+            metadata,
+            metadataFrozen: Object.isFrozen(metadata),
+            metadataNullPrototype: Object.getPrototypeOf(metadata) === null,
+            metadataKeys: Object.keys(metadata).sort(),
+            poolOptionsFrozen: Object.isFrozen(pool.options),
+            poolOptionsNullPrototype: Object.getPrototypeOf(pool.options) === null,
+            runtimeMetadataMethodLocked: (() => {
+                const descriptor = Object.getOwnPropertyDescriptor(pool, 'getRuntimeTargetMetadata');
+                return descriptor.writable === false && descriptor.configurable === false;
+            })(),
+            errorRedacted: !pool.formatError(new Error('SENSITIVE-REMOTE-DSN-MARKER')).includes('SENSITIVE')
+        };
+        process.stdout.write(JSON.stringify(result));
+    `;
+    const fakePoolChild = spawn(process.execPath, ['-e', fakePoolScript], {
+        cwd: root,
+        env: buildRemoteDbModuleEnv(),
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+    });
+    let fakePoolOutput = '';
+    fakePoolChild.stdout.on('data', (chunk) => { fakePoolOutput += chunk.toString(); });
+    fakePoolChild.stderr.on('data', (chunk) => { fakePoolOutput += chunk.toString(); });
+    const fakePoolCode = await waitForExit(fakePoolChild);
+    assert.equal(fakePoolCode, 0, fakePoolOutput);
+    const fakePoolResult = JSON.parse(fakePoolOutput);
+    assert.deepEqual(fakePoolResult.configKeys, [
+        'application_name',
+        'client_encoding',
+        'connectionTimeoutMillis',
+        'database',
+        'host',
+        'keepAlive',
+        'options',
+        'password',
+        'port',
+        'replication',
+        'ssl',
+        'sslnegotiation',
+        'user'
+    ]);
+    assert.equal(fakePoolResult.host, 'runtime-db.example.test');
+    assert.equal(fakePoolResult.port, 5432);
+    assert.equal(fakePoolResult.database, 'novastore_runtime');
+    assert.equal(fakePoolResult.userPresent, true);
+    assert.equal(fakePoolResult.passwordType, 'function');
+    assert.deepEqual(fakePoolResult.ssl, { rejectUnauthorized: true });
+    assert.equal(fakePoolResult.hasConnectionString, false);
+    assert.equal(fakePoolResult.metadataFrozen, true);
+    assert.equal(fakePoolResult.metadataNullPrototype, true);
+    assert.equal(fakePoolResult.poolOptionsFrozen, true);
+    assert.equal(fakePoolResult.poolOptionsNullPrototype, true);
+    assert.equal(fakePoolResult.runtimeMetadataMethodLocked, true);
+    assert.deepEqual(fakePoolResult.metadataKeys, [
+        'attested',
+        'database',
+        'host',
+        'local',
+        'port',
+        'remoteRelease',
+        'tlsEnabled',
+        'tlsVerified'
+    ]);
+    assert.deepEqual(fakePoolResult.metadata, {
+        host: 'runtime-db.example.test',
+        port: 5432,
+        database: 'novastore_runtime',
+        local: false,
+        remoteRelease: true,
+        tlsEnabled: true,
+        tlsVerified: true,
+        attested: true
+    });
+    assert.equal(fakePoolResult.errorRedacted, true);
+
+    const prototypePollutionEnv = {
+        ...buildRemoteDbModuleEnv(),
+        SYNTHETIC_POLLUTION_VALUE:
+            'postgresql://attacker@evil-db.example.test/evil_database?sslmode=no-verify',
+        NODE_OPTIONS: `--require=${path.join(__dirname, 'helpers', 'blockPgLoad.js')}`
+    };
+    const prototypePollutionChild = spawn(process.execPath, ['-e', [
+        'Object.prototype.connectionString = process.env.SYNTHETIC_POLLUTION_VALUE',
+        "require('./config/db')"
+    ].join(';')], {
+        cwd: root,
+        env: prototypePollutionEnv,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+    });
+    let prototypePollutionOutput = '';
+    prototypePollutionChild.stdout.on('data', (chunk) => {
+        prototypePollutionOutput += chunk.toString();
+    });
+    prototypePollutionChild.stderr.on('data', (chunk) => {
+        prototypePollutionOutput += chunk.toString();
+    });
+    const prototypePollutionCode = await waitForExit(prototypePollutionChild);
+    assert.notEqual(prototypePollutionCode, 0);
+    assert.match(prototypePollutionOutput, /unsafe runtime object state/);
+    assert.doesNotMatch(prototypePollutionOutput, /evil-db|evil_database|attacker|pg must not load/);
 
     const stagingPreview = spawn(process.execPath, ['server.js'], {
         cwd: root,

@@ -5,7 +5,8 @@ const {
     STAGING_ACCESS_ENV_KEYS,
     resolveStagingRuntimePolicy
 } = require('./stagingRuntimePolicy');
-const { LOCAL_TEST_CAPABILITY, validateTarget } = require('../scripts/staging-migrations/guard');
+const { resolveDatabaseTarget } = require('./startupSafety');
+const { LOCAL_TEST_CAPABILITY } = require('../scripts/staging-migrations/guard');
 const { resolveRuntimeIdentity } = require('../services/runtimeIdentityService');
 
 const RUNTIME_IDENTITY_ENV_KEYS = Object.freeze([
@@ -164,13 +165,18 @@ const validateStagingReleaseEnvironment = (
     if (hasOwn(environment, LOCAL_TEST_CAPABILITY)) {
         throw new StagingReleaseContractError('LOCAL_TEST_CAPABILITY_FORBIDDEN', [LOCAL_TEST_CAPABILITY]);
     }
-    if (hasOwn(environment, 'NOVASTORE_STAGING_BOOTSTRAP_ENABLED')) {
-        if (!allowBootstrapCapability || environment.NOVASTORE_STAGING_BOOTSTRAP_ENABLED !== 'true') {
-            throw new StagingReleaseContractError(
-                'BOOTSTRAP_CAPABILITY_NOT_AUTHORIZED',
-                ['NOVASTORE_STAGING_BOOTSTRAP_ENABLED']
-            );
-        }
+    const bootstrapCapabilityPresent = hasOwn(environment, 'NOVASTORE_STAGING_BOOTSTRAP_ENABLED');
+    if (
+        (allowBootstrapCapability && (
+            !bootstrapCapabilityPresent ||
+            environment.NOVASTORE_STAGING_BOOTSTRAP_ENABLED !== 'true'
+        )) ||
+        (!allowBootstrapCapability && bootstrapCapabilityPresent)
+    ) {
+        throw new StagingReleaseContractError(
+            'BOOTSTRAP_CAPABILITY_NOT_AUTHORIZED',
+            ['NOVASTORE_STAGING_BOOTSTRAP_ENABLED']
+        );
     }
 
     validateRequiredSecrets(environment);
@@ -187,11 +193,18 @@ const validateStagingReleaseEnvironment = (
 
     let target;
     try {
-        target = validateTarget(environment, { bootstrap: allowBootstrapCapability });
+        target = resolveDatabaseTarget(environment);
     } catch (_) {
         throw new StagingReleaseContractError('DATABASE_TARGET_ATTESTATION_REJECTED');
     }
-    if (target.localTest || target.mode !== 'staging') {
+    if (
+        !target.remoteRelease ||
+        !target.attested ||
+        !target.tlsEnabled ||
+        !target.tlsVerified ||
+        target.database !== 'novastore_staging' ||
+        target.errorCodes.length > 0
+    ) {
         throw new StagingReleaseContractError('REMOTE_STAGING_TARGET_REQUIRED');
     }
 
@@ -199,7 +212,7 @@ const validateStagingReleaseEnvironment = (
         ready: true,
         revision: identity.revision,
         runtimeProvider: identity.provider,
-        databaseMode: target.mode,
+        databaseMode: 'staging',
         bootstrapCapabilityAuthorized: allowBootstrapCapability
     });
 };
