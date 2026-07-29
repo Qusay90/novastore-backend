@@ -21,12 +21,14 @@ const {
     parseArguments
 } = require('../scripts/stagingReleasePlanCli');
 const { loadRegistry } = require('../scripts/staging-migrations/registry');
+const {
+    assertSafeStartScript,
+    runProvenanceFixtureMatrix,
+    validateWorkflowCheckoutContract,
+    verifyReleaseProvenance
+} = require('./helpers/stagingReleaseReplayProvenance');
 
 const root = path.resolve(__dirname, '..');
-const authorizedParent = 'c06cbcba0d1cba77b030d2a588e7a699be4a05a2';
-const authorizedTree = 'be3504ffea9c99b22502a88bed1dfd9351e9c59a';
-const authorizedParentParent = 'cfeaf0f043642ad1db6a7b2b565c3f0e0050ed47';
-const authorizedSubject = 'feat(staging): gate access and external side effects';
 const packageLockSha = '7993e816b1a610cef93ae84c332fd24fef7d419b8809889680642a4a848190da';
 const results = { pass: 0, fail: 0, skip: 0 };
 
@@ -40,7 +42,6 @@ const runGit = (args, options = {}) => {
     return result.stdout;
 };
 
-const gitLine = (args) => String(runGit(args)).trimEnd();
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 
 const check = async (number, name, assertion) => {
@@ -53,37 +54,6 @@ const check = async (number, name, assertion) => {
         console.error(`FAIL ${number}. ${name}: ${error.message}`);
     }
 };
-
-const expectedChangedPaths = [
-    'config/cloudinary.js',
-    'config/stagingRuntimePolicy.js',
-    'config/startupSafety.js',
-    'controllers/assistantController.js',
-    'controllers/authController.js',
-    'controllers/messageController.js',
-    'controllers/notificationController.js',
-    'controllers/paymentController.js',
-    'controllers/runtimeMetaController.js',
-    'docs/staging-runtime-safety.md',
-    'middlewares/adminCommerceCapability.js',
-    'middlewares/stagingAccessGate.js',
-    'package.json',
-    'routes/adminAttributeRoutes.js',
-    'routes/adminCategoryRoutes.js',
-    'routes/adminCollectionRoutes.js',
-    'routes/adminMenuRoutes.js',
-    'routes/productRoutes.js',
-    'scripts/runCiSmokes.js',
-    'server.js',
-    'services/aiProviderService.js',
-    'services/escalationService.js',
-    'services/notificationService.js',
-    'services/paymentProviderService.js',
-    'services/paytrPaymentService.js',
-    'tests/adminCatalogMutationFoundationSmoke.js',
-    'tests/stagingAccessGateHttpSmoke.js',
-    'tests/stagingRuntimeSafetySmoke.js'
-].sort();
 
 const expectedProviderKeys = [
     'PAYTR_MERCHANT_ID',
@@ -171,26 +141,28 @@ const createFakeGitReader = ({
 };
 
 (async () => {
-    await check(1, 'authorized 1B ancestor SHA/tree/parent/subject exact', () => {
-        assert.equal(
-            gitLine(['rev-parse', `${authorizedParent}^{commit}`]),
-            authorizedParent
+    await check(1, 'portable direct or controlled replay provenance exact', () => {
+        const provenance = verifyReleaseProvenance({ cwd: root });
+        assert(['DIRECT', 'APPROVED_REPLAY'].includes(provenance.mode));
+        assert.equal(provenance.fingerprintOccurrenceCount, 1);
+        console.log(
+            `native patch-id diagnostic: ${provenance.diagnosticPatchId || 'UNAVAILABLE'}`
         );
-        runGit(['merge-base', '--is-ancestor', authorizedParent, 'HEAD']);
-        assert.equal(gitLine(['rev-parse', `${authorizedParent}^{tree}`]), authorizedTree);
-        assert.equal(gitLine(['rev-parse', `${authorizedParent}^`]), authorizedParentParent);
-        assert.equal(
-            gitLine(['show', '-s', '--format=%s', authorizedParent]),
-            authorizedSubject
-        );
+
+        const matrix = runProvenanceFixtureMatrix({ cwd: root });
+        assert.equal(matrix.length, 25);
+        assert(matrix.every((entry) => entry.result === 'PASS'));
+        console.log('release provenance matrix: PASS=25 FAIL=0');
     });
 
-    await check(2, '1B changed-file list exact 28', () => {
-        const actual = String(runGit([
-            'diff-tree', '--no-commit-id', '--name-only', '-r', authorizedParent
-        ])).split(/\r?\n/).filter(Boolean).sort();
-        assert.equal(actual.length, 28);
-        assert.deepEqual(actual, expectedChangedPaths);
+    await check(2, 'workflow PR-head push-SHA and full-history checkout exact', () => {
+        const workflow = validateWorkflowCheckoutContract(
+            fs.readFileSync(path.join(root, '.github', 'workflows', 'ci.yml'), 'utf8')
+        );
+        assert.equal(workflow.action, 'actions/checkout@v6');
+        assert.equal(workflow.fetchDepth, 0);
+        assert.equal(workflow.permissions, 'contents: read');
+        assert.equal(workflow.checkoutCount, 3);
     });
 
     await check(3, 'exact provider credential key list', () => {
@@ -377,8 +349,7 @@ const createFakeGitReader = ({
 
     await check(20, 'npm start performs no migration or bootstrap', () => {
         const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-        assert.equal(packageJson.scripts.start, 'node server.js');
-        assert.doesNotMatch(packageJson.scripts.start, /migrat|bootstrap|initDb/i);
+        assert.equal(assertSafeStartScript(packageJson), true);
     });
 
     console.log(
