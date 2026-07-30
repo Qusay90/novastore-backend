@@ -8,14 +8,25 @@ const PROVIDERS = Object.freeze([
 const unavailableIdentity = () => ({ available: false });
 
 const resolveRuntimeIdentity = (environment = process.env) => {
-    const configuredProviders = PROVIDERS.filter(
-        ({ environmentKey }) => environment[environmentKey] !== undefined
-    );
+    let configuredProviders;
+    try {
+        configuredProviders = PROVIDERS
+            .map((provider) => ({
+                ...provider,
+                descriptor: Object.getOwnPropertyDescriptor(environment, provider.environmentKey)
+            }))
+            .filter(({ descriptor }) => descriptor !== undefined);
+    } catch (_) {
+        return unavailableIdentity();
+    }
 
     if (configuredProviders.length !== 1) return unavailableIdentity();
 
     const selectedProvider = configuredProviders[0];
-    const revision = environment[selectedProvider.environmentKey];
+    if (!Object.prototype.hasOwnProperty.call(selectedProvider.descriptor, 'value')) {
+        return unavailableIdentity();
+    }
+    const revision = selectedProvider.descriptor.value;
 
     if (typeof revision !== 'string' || !FULL_REVISION_PATTERN.test(revision)) {
         return unavailableIdentity();

@@ -3,6 +3,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const { resolveRuntimeIdentity } = require('../services/runtimeIdentityService');
+const {
+    StagingReleaseContractError,
+    validateStagingReleaseEnvironment
+} = require('../config/stagingReleaseContract');
 const { REMOTE_READINESS_QUERY } = require('../controllers/runtimeMetaController');
 const { createRuntimeMetaRouter } = require('../routes/runtimeMetaRoutes');
 
@@ -11,6 +15,51 @@ const renderRevision = 'a'.repeat(40);
 const railwayRevision = 'b'.repeat(40);
 const unavailableBody = { status: 'unavailable' };
 const results = { pass: 0, fail: 0, skip: 0 };
+
+const createAccessorEnvironment = (environmentKey, revision) => {
+    let getterCalls = 0;
+    let setterCalls = 0;
+    const environment = {};
+    Object.defineProperty(environment, environmentKey, {
+        enumerable: true,
+        get: () => {
+            getterCalls += 1;
+            return revision;
+        },
+        set: () => {
+            setterCalls += 1;
+        }
+    });
+    return {
+        environment,
+        getterCalls: () => getterCalls,
+        setterCalls: () => setterCalls
+    };
+};
+
+const createValidStagingReleaseEnvironment = () => ({
+    NOVASTORE_DEPLOY_ENV: 'staging',
+    NOVASTORE_STAGING_MIGRATIONS_ENABLED: 'true',
+    NOVASTORE_ALLOW_REMOTE_DB: 'true',
+    NOVASTORE_EXPECTED_DATABASE_HOST: 'staging-db.example.test',
+    NOVASTORE_EXPECTED_DATABASE_NAME: 'novastore_staging',
+    DATABASE_URL: 'postgresql://synthetic-user@staging-db.example.test/novastore_staging?sslmode=verify-full',
+    JWT_SECRET: 'synthetic-jwt-secret-marker-not-for-reuse',
+    RENDER_GIT_COMMIT: renderRevision,
+    NOVASTORE_STAGING_ACCESS_GATE_ENABLED: 'true',
+    NOVASTORE_STAGING_ACCESS_USERNAME: 'synthetic-release-operator',
+    NOVASTORE_STAGING_ACCESS_PASSWORD_HASH: '$2b$12$' + 'A'.repeat(53),
+    NOVASTORE_STAGING_ACCESS_SESSION_SECRET: 'synthetic-access-session-marker-not-for-reuse',
+    NOVASTORE_STAGING_EXTERNAL_SIDE_EFFECTS_DISABLED: 'true',
+    NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: 'false',
+    NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'false',
+    AI_PROVIDER: 'mock',
+    AI_PROVIDER_FALLBACK_ENABLED: 'false',
+    SKIP_SCHEMA_INIT: 'true',
+    NOVASTORE_ALLOW_SCHEMA_INIT: 'false'
+});
 
 const check = async (name, assertion) => {
     try {
@@ -113,6 +162,12 @@ const revisionCases = [
 
 const unavailableRevisionCases = [
     ['missing revision', {}],
+    ['inherited Render revision', Object.create({ RENDER_GIT_COMMIT: renderRevision })],
+    ['inherited Railway revision', Object.create({ RAILWAY_GIT_COMMIT_SHA: railwayRevision })],
+    ['setter-only Render revision', Object.defineProperty({}, 'RENDER_GIT_COMMIT', {
+        enumerable: true,
+        set: () => {}
+    })],
     ['malformed Render revision', { RENDER_GIT_COMMIT: 'not-a-revision' }],
     ['malformed Railway revision', { RAILWAY_GIT_COMMIT_SHA: 'not-a-revision' }],
     ['short revision', { RENDER_GIT_COMMIT: 'a'.repeat(39) }],
@@ -144,6 +199,46 @@ const runRevisionResolutionMatrix = async () => {
             assertUnavailable(resolveRuntimeIdentity(environment));
         });
     }
+
+    await check('revision resolution: accessor revision is rejected without getter execution', async () => {
+        const accessor = createAccessorEnvironment('RENDER_GIT_COMMIT', renderRevision);
+        assertUnavailable(resolveRuntimeIdentity(accessor.environment));
+        assert.equal(accessor.getterCalls(), 0);
+        assert.equal(accessor.setterCalls(), 0);
+    });
+
+    await check('revision resolution: inherited revision does not suppress an own provider', async () => {
+        const environment = Object.assign(
+            Object.create({ RENDER_GIT_COMMIT: renderRevision }),
+            { RAILWAY_GIT_COMMIT_SHA: railwayRevision }
+        );
+        assert.deepEqual(resolveRuntimeIdentity(environment), {
+            available: true,
+            provider: 'railway',
+            revision: railwayRevision
+        });
+    });
+
+    await check('release contract: accessor identity is rejected without getter execution', async () => {
+        const accessor = createAccessorEnvironment('RENDER_GIT_COMMIT', renderRevision);
+        const environment = createValidStagingReleaseEnvironment();
+        Object.defineProperty(
+            environment,
+            'RENDER_GIT_COMMIT',
+            Object.getOwnPropertyDescriptor(accessor.environment, 'RENDER_GIT_COMMIT')
+        );
+        assert.throws(
+            () => validateStagingReleaseEnvironment(environment),
+            (error) => (
+                error instanceof StagingReleaseContractError &&
+                error.code === 'RUNTIME_IDENTITY_REJECTED' &&
+                error.message === 'Staging release contract validation failed.' &&
+                !/RENDER|SENSITIVE/i.test(error.message)
+            )
+        );
+        assert.equal(accessor.getterCalls(), 0);
+        assert.equal(accessor.setterCalls(), 0);
+    });
 
     await check('revision resolution: no unauthorized source fallback', async () => {
         const source = fs.readFileSync(
@@ -196,6 +291,8 @@ const runReadyMatrix = async () => {
 
     const identityFailureCases = [
         ['missing revision', {}],
+        ['inherited Render revision', Object.create({ RENDER_GIT_COMMIT: renderRevision })],
+        ['inherited Railway revision', Object.create({ RAILWAY_GIT_COMMIT_SHA: railwayRevision })],
         ['malformed revision', { RENDER_GIT_COMMIT: 'invalid-RUNTIME-MARKER' }],
         ['dual provider', {
             RENDER_GIT_COMMIT: renderRevision,
@@ -214,6 +311,19 @@ const runReadyMatrix = async () => {
             assert.equal(fake.state.queryCount, 0);
         });
     }
+
+    await check('ready: accessor revision skips DB without invoking getter', async () => {
+        const accessor = createAccessorEnvironment('RENDER_GIT_COMMIT', renderRevision);
+        const fake = createDatabase(async () => ({ rows: [{ ready: 1 }] }));
+        await withRuntimeServer({ database: fake.database, environment: accessor.environment }, async (baseUrl) => {
+            const response = await request(baseUrl, '/api/health/ready');
+            assertJsonResponse(response, 503, unavailableBody);
+            assert.doesNotMatch(response.text, /RENDER|SENSITIVE/i);
+        });
+        assert.equal(fake.state.queryCount, 0);
+        assert.equal(accessor.getterCalls(), 0);
+        assert.equal(accessor.setterCalls(), 0);
+    });
 
     await check('ready: DB failure is generic', async () => {
         const fake = createDatabase(async () => {
@@ -540,6 +650,8 @@ const runVersionMatrix = async () => {
 
     for (const [name, environment] of [
         ['missing revision', {}],
+        ['inherited Render revision', Object.create({ RENDER_GIT_COMMIT: renderRevision })],
+        ['inherited Railway revision', Object.create({ RAILWAY_GIT_COMMIT_SHA: railwayRevision })],
         ['malformed revision', { RENDER_GIT_COMMIT: 'invalid-RUNTIME-MARKER' }],
         ['dual provider', {
             RENDER_GIT_COMMIT: renderRevision,
@@ -557,6 +669,20 @@ const runVersionMatrix = async () => {
             assert.equal(fake.state.queryCount, 0);
         });
     }
+
+    await check('version: accessor revision is generic without invoking getter', async () => {
+        const accessor = createAccessorEnvironment('RENDER_GIT_COMMIT', renderRevision);
+        const fake = createDatabase(async () => { throw new Error('must not query'); });
+        await withRuntimeServer({ database: fake.database, environment: accessor.environment }, async (baseUrl) => {
+            const response = await request(baseUrl, '/api/version');
+            assertJsonResponse(response, 503, unavailableBody);
+            assert.equal(response.headers.get('cache-control'), 'no-store');
+            assert.doesNotMatch(response.text, /RENDER|SENSITIVE/i);
+        });
+        assert.equal(fake.state.queryCount, 0);
+        assert.equal(accessor.getterCalls(), 0);
+        assert.equal(accessor.setterCalls(), 0);
+    });
 
     await check('version: unexpected identity error is generic', async () => {
         const fake = createDatabase(async () => { throw new Error('must not query'); });
