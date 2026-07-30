@@ -13,6 +13,10 @@ const localPort = 5204;
 const failedDatabasePort = 5205;
 const previewPort = 5206;
 const validRuntimeRevision = 'c'.repeat(40);
+const failedDatabaseConnectionTimeoutMs = 10000;
+const failedDatabaseSchedulingAndDrainGraceMs = 5000;
+const failedDatabaseExitTimeoutMs =
+    failedDatabaseConnectionTimeoutMs + failedDatabaseSchedulingAndDrainGraceMs;
 
 const streamIsDrained = (stream) => (
     !stream || stream.readableEnded || stream.destroyed || stream.readable === false
@@ -45,6 +49,7 @@ const waitForExit = (child, timeoutMs = 5000, label = 'child') => new Promise((r
 
     let settled = false;
     let timer;
+    const waitStartedAt = Date.now();
     let terminalResult = child.exitCode !== null || child.signalCode !== null
         ? getExitResult(child)
         : null;
@@ -100,7 +105,9 @@ const waitForExit = (child, timeoutMs = 5000, label = 'child') => new Promise((r
     }
     timer = setTimeout(
         () => settle(new Error(
-            `Blocked server did not exit in time (${label}; ${getChildLifecycleDiagnostics(child)})`
+            `Blocked server did not exit in time (${label}; ` +
+            `waitedMs=${Date.now() - waitStartedAt} timeoutMs=${timeoutMs} ` +
+            `${getChildLifecycleDiagnostics(child)})`
         )),
         timeoutMs
     );
@@ -768,7 +775,11 @@ const requiredLocalDatabaseEnv = () => {
         let failedDatabaseOutput = '';
         failedDatabase.stdout.on('data', (chunk) => { failedDatabaseOutput += chunk.toString(); });
         failedDatabase.stderr.on('data', (chunk) => { failedDatabaseOutput += chunk.toString(); });
-        const failedDatabaseExit = await waitForExit(failedDatabase, 5000, 'failed-database-server');
+        const failedDatabaseExit = await waitForExit(
+            failedDatabase,
+            failedDatabaseExitTimeoutMs,
+            'failed-database-server'
+        );
         assertNonZeroExit(failedDatabaseExit);
         assert.match(failedDatabaseOutput, /Veritabani hazirlama hatasi/);
         assert.doesNotMatch(failedDatabaseOutput, /NovaStore sunucusu/);
