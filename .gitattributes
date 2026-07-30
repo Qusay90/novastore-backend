@@ -9,3 +9,4 @@
 frontend/admin-commerce-pro.html text eol=lf
 frontend/admin-commerce-pro-live.html text eol=lf
 /migrations/*.sql text eol=lf
+package-lock.json text eol=lf

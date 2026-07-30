@@ -570,16 +570,16 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         assert.equal(packageJson.scripts['staging:bootstrap'], 'node scripts/stagingBootstrapCli.js');
     });
 
-    await check('runtime', '42 migration manifest remains the exact 16-file foundation', () => {
+    await check('runtime', '42 migration manifest remains the exact committed 15-file foundation', () => {
         const manifest = JSON.parse(read('scripts/staging-migrations/manifest.json'));
-        assert.equal(manifest.length, 16);
-        assert.equal(new Set(manifest.map((item) => item.path)).size, 16);
+        assert.equal(manifest.length, 15);
+        assert.equal(new Set(manifest.map((item) => item.path)).size, 15);
         assert.deepEqual(
             manifest.at(-1),
             {
-                id: '20260728_customer_verification_codes',
-                path: 'migrations/20260728_customer_verification_codes.sql',
-                sha256: '54b4de7256f97ceeeaea9b1b697952a321cfa6eccc622e2c0ba24e72c3826e61',
+                id: '20260721_auth_session_registry',
+                path: 'migrations/20260721_auth_session_registry.sql',
+                sha256: 'afa1ec4af7b38fd627ec3552d6f5e137da798feb81375c716b0cab45d1ca2e84',
                 mode: 'transactional',
                 transactionWrapper: false
             }

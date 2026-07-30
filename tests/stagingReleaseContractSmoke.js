@@ -23,11 +23,15 @@ const {
 const { loadRegistry } = require('../scripts/staging-migrations/registry');
 
 const root = path.resolve(__dirname, '..');
-const authorizedParent = 'c06cbcba0d1cba77b030d2a588e7a699be4a05a2';
-const authorizedTree = 'be3504ffea9c99b22502a88bed1dfd9351e9c59a';
-const authorizedParentParent = 'cfeaf0f043642ad1db6a7b2b565c3f0e0050ed47';
-const authorizedSubject = 'feat(staging): gate access and external side effects';
-const packageLockSha = '7cda791a0fdb27bd1d2bb97559663eb849f2d7c8d5d63415773c98061bf1d84b';
+const authorizedTarget = '56f49312b07d70015547976118c1077fb9631f32';
+const authorizedTree = '762733dfeff4fd377fcc3cdf72b32fc77e24f905';
+const authorizedParent = 'cdcd579e185f3f78640cee94b59dabc5648bacb7';
+const authorizedGrandparent = 'c06cbcba0d1cba77b030d2a588e7a699be4a05a2';
+const authorizedSubject = 'feat(auth): add provider sandbox foundation';
+const legacyFoundationCommit = 'c06cbcba0d1cba77b030d2a588e7a699be4a05a2';
+const legacyFoundationParent = 'cfeaf0f043642ad1db6a7b2b565c3f0e0050ed47';
+const packageLockSha = '56df97cbedb49a980c24c60f793225a9b2245bc65a67efaf75832ff0b494092c';
+const packageLockSize = 72399;
 const results = { pass: 0, fail: 0, skip: 0 };
 
 const runGit = (args, options = {}) => {
@@ -42,6 +46,10 @@ const runGit = (args, options = {}) => {
 
 const gitLine = (args) => String(runGit(args)).trimEnd();
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+const sortedGitLines = (args) => String(runGit(args))
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .sort();
 
 const check = async (number, name, assertion) => {
     try {
@@ -54,7 +62,44 @@ const check = async (number, name, assertion) => {
     }
 };
 
-const expectedChangedPaths = [
+const expectedDirectChangedEntries = [
+    'M\t.env.example',
+    'M\tconfig/stagingRuntimePolicy.js',
+    'A\tmiddlewares/customerAuthRateLimit.js',
+    'M\troutes/authRoutes.js',
+    'M\troutes/userRoutes.js',
+    'A\tservices/sharedRateLimitStore.js',
+    'A\tservices/verificationDeliveryService.js',
+    'A\ttests/customerAuthSharedRateLimitSmoke.js',
+    'A\ttests/customerVerificationSmoke.js',
+    'M\ttests/stagingReleaseContractSmoke.js',
+    'M\ttests/stagingRuntimeSafetySmoke.js',
+    'A\ttests/verificationDeliveryProviderContractSmoke.js'
+].sort();
+
+const expectedCumulativeChangedEntries = [
+    'M\t.env.example',
+    'A\tconfig/stagingReleaseContract.js',
+    'M\tconfig/stagingRuntimePolicy.js',
+    'A\tdocs/staging-release-readiness.md',
+    'A\tmiddlewares/customerAuthRateLimit.js',
+    'M\tpackage.json',
+    'M\troutes/authRoutes.js',
+    'M\troutes/userRoutes.js',
+    'M\tscripts/runCiSmokes.js',
+    'A\tscripts/stagingReleasePlanCli.js',
+    'A\tscripts/stagingVerificationHarness.js',
+    'A\tservices/sharedRateLimitStore.js',
+    'A\tservices/verificationDeliveryService.js',
+    'A\ttests/customerAuthSharedRateLimitSmoke.js',
+    'A\ttests/customerVerificationSmoke.js',
+    'A\ttests/stagingReleaseContractSmoke.js',
+    'A\ttests/stagingVerificationHarnessSmoke.js',
+    'M\ttests/stagingRuntimeSafetySmoke.js',
+    'A\ttests/verificationDeliveryProviderContractSmoke.js'
+].sort();
+
+const expectedLegacyChangedPaths = [
     'config/cloudinary.js',
     'config/stagingRuntimePolicy.js',
     'config/startupSafety.js',
@@ -83,6 +128,37 @@ const expectedChangedPaths = [
     'tests/adminCatalogMutationFoundationSmoke.js',
     'tests/stagingAccessGateHttpSmoke.js',
     'tests/stagingRuntimeSafetySmoke.js'
+].sort();
+
+const expectedLegacyChangedEntries = [
+    'M\tconfig/cloudinary.js',
+    'A\tconfig/stagingRuntimePolicy.js',
+    'M\tconfig/startupSafety.js',
+    'M\tcontrollers/assistantController.js',
+    'M\tcontrollers/authController.js',
+    'M\tcontrollers/messageController.js',
+    'M\tcontrollers/notificationController.js',
+    'M\tcontrollers/paymentController.js',
+    'M\tcontrollers/runtimeMetaController.js',
+    'A\tdocs/staging-runtime-safety.md',
+    'M\tmiddlewares/adminCommerceCapability.js',
+    'A\tmiddlewares/stagingAccessGate.js',
+    'M\tpackage.json',
+    'M\troutes/adminAttributeRoutes.js',
+    'M\troutes/adminCategoryRoutes.js',
+    'M\troutes/adminCollectionRoutes.js',
+    'M\troutes/adminMenuRoutes.js',
+    'M\troutes/productRoutes.js',
+    'M\tscripts/runCiSmokes.js',
+    'M\tserver.js',
+    'M\tservices/aiProviderService.js',
+    'M\tservices/escalationService.js',
+    'M\tservices/notificationService.js',
+    'M\tservices/paymentProviderService.js',
+    'M\tservices/paytrPaymentService.js',
+    'M\ttests/adminCatalogMutationFoundationSmoke.js',
+    'A\ttests/stagingAccessGateHttpSmoke.js',
+    'A\ttests/stagingRuntimeSafetySmoke.js'
 ].sort();
 
 const expectedProviderKeys = [
@@ -174,21 +250,53 @@ const createFakeGitReader = ({
 };
 
 (async () => {
-    await check(1, 'parent SHA/tree/subject exact', () => {
-        const current = gitLine(['rev-parse', 'HEAD']);
-        const base = current === authorizedParent ? current : gitLine(['rev-parse', 'HEAD^']);
-        assert.equal(base, authorizedParent);
-        assert.equal(gitLine(['rev-parse', `${base}^{tree}`]), authorizedTree);
-        assert.equal(gitLine(['rev-parse', `${base}^`]), authorizedParentParent);
-        assert.equal(gitLine(['show', '-s', '--format=%s', base]), authorizedSubject);
+    await check(1, 'frozen target commit/tree/parent/grandparent/subject exact', () => {
+        assert.equal(gitLine(['rev-parse', 'HEAD']), authorizedTarget);
+        assert.equal(gitLine(['rev-parse', `${authorizedTarget}^{tree}`]), authorizedTree);
+        assert.equal(gitLine(['rev-parse', `${authorizedTarget}^`]), authorizedParent);
+        assert.equal(gitLine(['rev-parse', `${authorizedTarget}^^`]), authorizedGrandparent);
+        assert.equal(
+            gitLine(['show', '-s', '--format=%s', authorizedTarget]),
+            authorizedSubject
+        );
     });
 
-    await check(2, '1B changed-file list exact 28', () => {
-        const actual = String(runGit([
-            'diff-tree', '--no-commit-id', '--name-only', '-r', authorizedParent
-        ])).split(/\r?\n/).filter(Boolean).sort();
-        assert.equal(actual.length, 28);
-        assert.deepEqual(actual, expectedChangedPaths);
+    await check('2A', 'target direct commit contract exact 12', () => {
+        const actual = sortedGitLines([
+            'diff', '--name-status', '--no-renames', authorizedParent, authorizedTarget
+        ]);
+        assert.equal(actual.length, 12);
+        assert.deepEqual(actual, expectedDirectChangedEntries);
+    });
+
+    await check('2B', 'target cumulative foundation contract exact 19', () => {
+        const actual = sortedGitLines([
+            'diff', '--name-status', '--no-renames', authorizedGrandparent, authorizedTarget
+        ]);
+        assert.equal(actual.length, 19);
+        assert.deepEqual(actual, expectedCumulativeChangedEntries);
+    });
+
+    await check('2C', 'legacy foundation commit contract exact 28', () => {
+        assert.equal(legacyFoundationCommit, authorizedGrandparent);
+        assert.equal(
+            gitLine(['rev-parse', `${legacyFoundationCommit}^`]),
+            legacyFoundationParent
+        );
+        const actualEntries = sortedGitLines([
+            'diff-tree',
+            '--no-commit-id',
+            '--name-status',
+            '--no-renames',
+            '-r',
+            legacyFoundationCommit
+        ]);
+        assert.equal(actualEntries.length, 28);
+        assert.deepEqual(actualEntries, expectedLegacyChangedEntries);
+        assert.deepEqual(
+            actualEntries.map((entry) => entry.split('\t').slice(1).join('\t')).sort(),
+            expectedLegacyChangedPaths
+        );
     });
 
     await check(3, 'exact provider credential key list', () => {
@@ -202,27 +310,33 @@ const createFakeGitReader = ({
         assert.equal(FORBIDDEN_PROVIDER_CREDENTIAL_NAMES, FORBIDDEN_PROVIDER_CREDENTIAL_KEYS);
     });
 
-    await check(5, '1A migration bytes/checksums 16/16 exact', () => {
+    await check(5, '1A migration bytes/checksums 15/15 exact', () => {
         const registry = loadRegistry();
-        assert.equal(registry.length, 16);
+        assert.equal(registry.length, 15);
         for (const migration of registry) {
             const bytes = fs.readFileSync(migration.absolutePath);
             assert.equal(sha256(bytes), migration.sha256);
             assert.equal(bytes.includes(0x0d), false);
-            if (migration.id === '20260728_customer_verification_codes') {
-                assert.equal(
-                    migration.sha256,
-                    '54b4de7256f97ceeeaea9b1b697952a321cfa6eccc622e2c0ba24e72c3826e61'
-                );
-                continue;
-            }
             const blob = runGit(['show', `HEAD:${migration.path}`], { encoding: null });
             assert.equal(sha256(blob), migration.sha256);
         }
     });
 
-    await check(6, 'package-lock hash unchanged', () => {
-        assert.equal(sha256(fs.readFileSync(path.join(root, 'package-lock.json'))), packageLockSha);
+    await check(6, 'package-lock committed/index/working raw bytes exact', () => {
+        const committed = runGit(
+            ['show', `${authorizedTarget}:package-lock.json`],
+            { encoding: null }
+        );
+        const index = runGit(['show', ':package-lock.json'], { encoding: null });
+        const working = fs.readFileSync(path.join(root, 'package-lock.json'));
+        assert.equal(committed.length, packageLockSize);
+        assert.equal(index.length, packageLockSize);
+        assert.equal(working.length, packageLockSize);
+        assert.equal(sha256(committed), packageLockSha);
+        assert.equal(sha256(index), packageLockSha);
+        assert.equal(sha256(working), packageLockSha);
+        assert.equal(committed.equals(index), true);
+        assert.equal(committed.equals(working), true);
     });
 
     await check(7, 'required key names complete and unique', () => {

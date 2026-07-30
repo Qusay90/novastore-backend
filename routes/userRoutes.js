@@ -12,11 +12,7 @@ const {
 const {
     completePasswordResetWithCode,
     requestPasswordReset,
-    sendEmailVerification,
-    sendPhoneVerification,
-    verifyEmailCode,
-    verifyPasswordReset,
-    verifyPhoneCode
+    verifyPasswordReset
 } = require('../controllers/customerVerificationController');
 
 // Kullanıcı işlemleri için yollarımız
@@ -31,9 +27,5 @@ router.get('/me', authenticateCustomer, getMe);
 router.patch('/me', authenticateCustomer, updateMe);
 router.get('/security-status', authenticateCustomer, getSecurityStatus);
 router.post('/change-password', authenticateCustomer, changePassword);
-router.post('/verification/email/send', authenticateCustomer, sendEmailVerification);
-router.post('/verification/email/verify', authenticateCustomer, verifyEmailCode);
-router.post('/verification/phone/send', authenticateCustomer, sendPhoneVerification);
-router.post('/verification/phone/verify', authenticateCustomer, verifyPhoneCode);
 
 module.exports = router;
