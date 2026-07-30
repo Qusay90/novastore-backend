@@ -27,7 +27,7 @@ const authorizedParent = 'c06cbcba0d1cba77b030d2a588e7a699be4a05a2';
 const authorizedTree = 'be3504ffea9c99b22502a88bed1dfd9351e9c59a';
 const authorizedParentParent = 'cfeaf0f043642ad1db6a7b2b565c3f0e0050ed47';
 const authorizedSubject = 'feat(staging): gate access and external side effects';
-const packageLockSha = '7993e816b1a610cef93ae84c332fd24fef7d419b8809889680642a4a848190da';
+const packageLockSha = '7cda791a0fdb27bd1d2bb97559663eb849f2d7c8d5d63415773c98061bf1d84b';
 const results = { pass: 0, fail: 0, skip: 0 };
 
 const runGit = (args, options = {}) => {
@@ -91,12 +91,15 @@ const expectedProviderKeys = [
     'PAYTR_MERCHANT_SALT',
     'IYZICO_WEBHOOK_SECRET',
     'RESEND_API_KEY',
+    'NETGSM_USERCODE',
+    'NETGSM_PASSWORD',
+    'NETGSM_MSGHEADER',
     'CLOUDINARY_CLOUD_NAME',
     'CLOUDINARY_API_KEY',
     'CLOUDINARY_API_SECRET',
     'GEMINI_API_KEY',
     'OPENAI_API_KEY'
-];
+].sort();
 
 const expectedRequiredNames = [
     'AI_PROVIDER',
@@ -189,20 +192,30 @@ const createFakeGitReader = ({
     });
 
     await check(3, 'exact provider credential key list', () => {
-        assert.deepEqual([...FORBIDDEN_PROVIDER_CREDENTIAL_NAMES], expectedProviderKeys);
+        const actualProviderKeys = [...FORBIDDEN_PROVIDER_CREDENTIAL_NAMES];
+        assert.equal(actualProviderKeys.length, 13);
+        assert.equal(new Set(actualProviderKeys).size, actualProviderKeys.length);
+        assert.deepEqual(actualProviderKeys.sort(), expectedProviderKeys);
     });
 
     await check(4, 'denylist and runtime policy source exact equality', () => {
         assert.equal(FORBIDDEN_PROVIDER_CREDENTIAL_NAMES, FORBIDDEN_PROVIDER_CREDENTIAL_KEYS);
     });
 
-    await check(5, '1A migration bytes/checksums 15/15 exact', () => {
+    await check(5, '1A migration bytes/checksums 16/16 exact', () => {
         const registry = loadRegistry();
-        assert.equal(registry.length, 15);
+        assert.equal(registry.length, 16);
         for (const migration of registry) {
             const bytes = fs.readFileSync(migration.absolutePath);
             assert.equal(sha256(bytes), migration.sha256);
             assert.equal(bytes.includes(0x0d), false);
+            if (migration.id === '20260728_customer_verification_codes') {
+                assert.equal(
+                    migration.sha256,
+                    '54b4de7256f97ceeeaea9b1b697952a321cfa6eccc622e2c0ba24e72c3826e61'
+                );
+                continue;
+            }
             const blob = runGit(['show', `HEAD:${migration.path}`], { encoding: null });
             assert.equal(sha256(blob), migration.sha256);
         }

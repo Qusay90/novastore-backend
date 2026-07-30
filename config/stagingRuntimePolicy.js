@@ -38,6 +38,9 @@ const FORBIDDEN_PROVIDER_CREDENTIAL_KEYS = Object.freeze([
     'PAYTR_MERCHANT_SALT',
     'IYZICO_WEBHOOK_SECRET',
     'RESEND_API_KEY',
+    'NETGSM_USERCODE',
+    'NETGSM_PASSWORD',
+    'NETGSM_MSGHEADER',
     'CLOUDINARY_CLOUD_NAME',
     'CLOUDINARY_API_KEY',
     'CLOUDINARY_API_SECRET',
@@ -134,6 +137,10 @@ const resolveStagingRuntimePolicy = (env = process.env) => {
 
     if (normalizeLower(env.AI_PROVIDER_FALLBACK_ENABLED) !== 'false') {
         errors.push('AI_PROVIDER_FALLBACK_ENABLED must be exact false in staging.');
+    }
+
+    if (normalizeLower(env.SMS_PROVIDER) === 'netgsm') {
+        errors.push('SMS_PROVIDER must not select netgsm in the initial staging foundation.');
     }
 
     if (normalizeLower(env.SKIP_SCHEMA_INIT) !== 'true') {

@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const Module = require('node:module');
+const originalLoad = Module._load;
 
 const rootDir = path.join(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(rootDir, relativePath), 'utf8');
@@ -12,6 +13,9 @@ const PROVIDER_KEYS = [
     'PAYTR_MERCHANT_SALT',
     'IYZICO_WEBHOOK_SECRET',
     'RESEND_API_KEY',
+    'NETGSM_USERCODE',
+    'NETGSM_PASSWORD',
+    'NETGSM_MSGHEADER',
     'CLOUDINARY_CLOUD_NAME',
     'CLOUDINARY_API_KEY',
     'CLOUDINARY_API_SECRET',
@@ -176,7 +180,6 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         throw new Error('staging email guard reached the database');
     };
 
-    const originalLoad = Module._load;
     Module._load = function patchedLoad(request, parent, isMain) {
         if (request === 'resend') {
             return {
@@ -429,6 +432,60 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         );
     });
 
+    await check('sideEffect', '35a Netgsm selector and credential fields fail closed without reading secrets', () => {
+        const selectorPolicy = resolveStagingRuntimePolicy(syntheticStagingEnv({
+            SMS_PROVIDER: ' NeTgSm '
+        }));
+        assert.equal(selectorPolicy.canStart, false);
+        assert.match(selectorPolicy.errors.join('\n'), /SMS_PROVIDER/);
+
+        for (const key of ['NETGSM_USERCODE', 'NETGSM_PASSWORD', 'NETGSM_MSGHEADER']) {
+            const env = syntheticStagingEnv();
+            Object.defineProperty(env, key, {
+                configurable: true,
+                enumerable: true,
+                get() {
+                    throw new Error(`${key} value was read`);
+                }
+            });
+            const policy = resolveStagingRuntimePolicy(env);
+            assert.equal(policy.canStart, false, key);
+            assert.match(policy.errors.join('\n'), new RegExp(key));
+            assert.doesNotMatch(policy.errors.join('\n'), /value was read/);
+        }
+    });
+
+    await check('sideEffect', '35b Netgsm staging policy performs no provider request and does not affect production', () => {
+        let fetchCalls = 0;
+        const originalFetch = global.fetch;
+        global.fetch = async () => {
+            fetchCalls += 1;
+            throw new Error('Netgsm provider request must not occur during policy evaluation');
+        };
+        try {
+            const stagingPolicy = resolveStagingRuntimePolicy(syntheticStagingEnv({
+                SMS_PROVIDER: 'netgsm',
+                NETGSM_USERCODE: 'synthetic-usercode',
+                NETGSM_PASSWORD: 'synthetic-password',
+                NETGSM_MSGHEADER: 'synthetic-header'
+            }));
+            assert.equal(stagingPolicy.canStart, false);
+
+            const productionPolicy = resolveStagingRuntimePolicy({
+                NODE_ENV: 'production',
+                NOVASTORE_DEPLOY_ENV: 'production',
+                SMS_PROVIDER: 'netgsm',
+                NETGSM_USERCODE: 'synthetic-usercode',
+                NETGSM_PASSWORD: 'synthetic-password',
+                NETGSM_MSGHEADER: 'synthetic-header'
+            });
+            assert.equal(productionPolicy.canStart, true);
+        } finally {
+            global.fetch = originalFetch;
+        }
+        assert.equal(fetchCalls, 0);
+    });
+
     await check('runtime', '36 missing or enabled admin write flags reject startup', () => {
         for (const key of ADMIN_WRITE_ENV_KEYS) {
             const missing = syntheticStagingEnv();
@@ -513,10 +570,20 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         assert.equal(packageJson.scripts['staging:bootstrap'], 'node scripts/stagingBootstrapCli.js');
     });
 
-    await check('runtime', '42 migration manifest remains the exact 15-file foundation', () => {
+    await check('runtime', '42 migration manifest remains the exact 16-file foundation', () => {
         const manifest = JSON.parse(read('scripts/staging-migrations/manifest.json'));
-        assert.equal(manifest.length, 15);
-        assert.equal(new Set(manifest.map((item) => item.path)).size, 15);
+        assert.equal(manifest.length, 16);
+        assert.equal(new Set(manifest.map((item) => item.path)).size, 16);
+        assert.deepEqual(
+            manifest.at(-1),
+            {
+                id: '20260728_customer_verification_codes',
+                path: 'migrations/20260728_customer_verification_codes.sql',
+                sha256: '54b4de7256f97ceeeaea9b1b697952a321cfa6eccc622e2c0ba24e72c3826e61',
+                mode: 'transactional',
+                transactionWrapper: false
+            }
+        );
     });
 
     await check('runtime', '43 local and production behavior stays outside staging policy', () => {
@@ -547,8 +614,8 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         assert.equal(nextCalls, 1);
     });
 
-    assert.deepEqual(counts, { sideEffect: 15, runtime: 8 });
-    console.log(`stagingRuntimeSafetySmoke: PASS side-effect=${counts.sideEffect}/15 runtime=${counts.runtime}/8`);
+    assert.deepEqual(counts, { sideEffect: 17, runtime: 8 });
+    console.log(`stagingRuntimeSafetySmoke: PASS side-effect=${counts.sideEffect}/17 runtime=${counts.runtime}/8`);
 })().catch((error) => {
     Module._load = originalLoad;
     console.error(error);

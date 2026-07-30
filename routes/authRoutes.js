@@ -13,10 +13,14 @@ const {
 } = require('../controllers/authController');
 const { logoutAll, logoutCurrent } = require('../controllers/sessionController');
 const { authenticateAdmin, authenticateAdminForLogout } = require('../middlewares/authMiddleware');
+const {
+    adminForgotPasswordRateLimit,
+    adminLoginRateLimit
+} = require('../middlewares/customerAuthRateLimit');
 
 // Sadece POST isteği alacağız çünkü şifre gönderiliyor
-router.post('/login', login);
-router.post('/forgot-password', forgotPassword);
+router.post('/login', adminLoginRateLimit, login);
+router.post('/forgot-password', adminForgotPasswordRateLimit, forgotPassword);
 router.post('/reset-password', resetPassword);
 router.post('/logout', authenticateAdminForLogout, logoutCurrent);
 router.post('/logout-all', authenticateAdmin, logoutAll);
