@@ -14,7 +14,9 @@ const failedDatabasePort = 5205;
 const previewPort = 5206;
 const validRuntimeRevision = 'c'.repeat(40);
 
-const streamIsDrained = (stream) => !stream || stream.readableEnded || stream.destroyed;
+const streamIsDrained = (stream) => (
+    !stream || stream.readableEnded || stream.destroyed || stream.readable === false
+);
 
 const getExitResult = (child, code = child.exitCode, signal = child.signalCode) => Object.freeze({
     code: code ?? null,
@@ -27,7 +29,15 @@ const childHasExitedAndStreamsDrained = (child) => (
     streamIsDrained(child.stderr)
 );
 
-const waitForExit = (child, timeoutMs = 5000) => new Promise((resolve, reject) => {
+const getChildLifecycleDiagnostics = (child) => (
+    `pid=${child?.pid ?? 'unknown'} ` +
+    `exitCode=${child?.exitCode ?? 'null'} ` +
+    `signalCode=${child?.signalCode ?? 'null'} ` +
+    `stdoutDrained=${streamIsDrained(child?.stdout)} ` +
+    `stderrDrained=${streamIsDrained(child?.stderr)}`
+);
+
+const waitForExit = (child, timeoutMs = 5000, label = 'child') => new Promise((resolve, reject) => {
     if (!child || typeof child.once !== 'function') {
         reject(new TypeError('Child process is required.'));
         return;
@@ -35,6 +45,9 @@ const waitForExit = (child, timeoutMs = 5000) => new Promise((resolve, reject) =
 
     let settled = false;
     let timer;
+    let terminalResult = child.exitCode !== null || child.signalCode !== null
+        ? getExitResult(child)
+        : null;
     const streams = [child.stdout, child.stderr].filter(Boolean);
     const cleanup = () => {
         clearTimeout(timer);
@@ -53,25 +66,30 @@ const waitForExit = (child, timeoutMs = 5000) => new Promise((resolve, reject) =
         if (error) reject(error);
         else resolve(result);
     };
-    const settleIfAlreadyClosed = () => {
-        if (!childHasExitedAndStreamsDrained(child)) return false;
-        settle(null, getExitResult(child));
+    const settleIfTerminalAndDrained = () => {
+        if (!terminalResult && (child.exitCode !== null || child.signalCode !== null)) {
+            terminalResult = getExitResult(child);
+        }
+        if (!terminalResult || !streams.every(streamIsDrained)) return false;
+        settle(null, terminalResult);
         return true;
     };
-    const onExit = () => {
-        settleIfAlreadyClosed();
+    const onExit = (code, signal) => {
+        terminalResult = getExitResult(child, code, signal);
+        settleIfTerminalAndDrained();
     };
     const onClose = (code, signal) => {
-        settle(null, getExitResult(child, code, signal));
+        terminalResult ??= getExitResult(child, code, signal);
+        settle(null, terminalResult);
     };
     const onError = (error) => {
         settle(error);
     };
     const onStreamTerminal = () => {
-        settleIfAlreadyClosed();
+        settleIfTerminalAndDrained();
     };
 
-    if (settleIfAlreadyClosed()) return;
+    if (settleIfTerminalAndDrained()) return;
 
     child.once('exit', onExit);
     child.once('close', onClose);
@@ -81,11 +99,13 @@ const waitForExit = (child, timeoutMs = 5000) => new Promise((resolve, reject) =
         stream.once('close', onStreamTerminal);
     }
     timer = setTimeout(
-        () => settle(new Error('Blocked server did not exit in time')),
+        () => settle(new Error(
+            `Blocked server did not exit in time (${label}; ${getChildLifecycleDiagnostics(child)})`
+        )),
         timeoutMs
     );
 
-    settleIfAlreadyClosed();
+    settleIfTerminalAndDrained();
 });
 
 const assertExitCode = (result, expectedCode, message) => {
@@ -145,22 +165,21 @@ const waitForStreamMarker = (stream, marker) => new Promise((resolve, reject) =>
 const runWaitForExitMatrix = async () => {
     const earlyExit = spawnHarnessChild('process.exit(17)');
     await waitForChildClose(earlyExit);
-    assertExitCode(await waitForExit(earlyExit, 100), 17);
+    assertExitCode(await waitForExit(earlyExit, 100, 'early-exit'), 17);
 
     const postListenerExit = spawnHarnessChild(
         "process.stdin.resume(); process.stdin.once('data', () => process.exit(18)); process.stdout.write('WAIT_HELPER_READY')",
         { stdio: ['pipe', 'pipe', 'pipe'] }
     );
     await waitForStreamMarker(postListenerExit.stdout, 'WAIT_HELPER_READY');
-    const postListenerResult = waitForExit(postListenerExit, 500);
     postListenerExit.stdin.end('exit');
-    assertExitCode(await postListenerResult, 18);
+    assertExitCode(await waitForExit(postListenerExit, 500, 'post-listener-exit'), 18);
 
     const nonZeroExit = spawnHarnessChild('process.exit(19)');
-    assertNonZeroExit(await waitForExit(nonZeroExit, 500));
+    assertNonZeroExit(await waitForExit(nonZeroExit, 500, 'non-zero-exit'));
 
     const signalledChild = spawnHarnessChild('setInterval(() => {}, 1000)');
-    const signalledResult = waitForExit(signalledChild, 500);
+    const signalledResult = waitForExit(signalledChild, 500, 'signalled-child');
     assert.equal(signalledChild.kill('SIGTERM'), true);
     assert.deepStrictEqual(await signalledResult, { code: null, signal: 'SIGTERM' });
 
@@ -169,12 +188,12 @@ const runWaitForExitMatrix = async () => {
         "process.stderr.write('WAIT_HELPER_STDERR_MARKER'); process.exit(20)"
     );
     stderrChild.stderr.on('data', (chunk) => { stderrOutput += chunk.toString(); });
-    assertExitCode(await waitForExit(stderrChild, 500), 20);
+    assertExitCode(await waitForExit(stderrChild, 500, 'stderr-child'), 20);
     assert.match(stderrOutput, /WAIT_HELPER_STDERR_MARKER/);
 
     const missingExecutable = spawn(path.join(root, 'missing-child-executable'));
     await assert.rejects(
-        () => waitForExit(missingExecutable, 500),
+        () => waitForExit(missingExecutable, 500, 'missing-executable'),
         (error) => error && error.code === 'ENOENT'
     );
 
@@ -194,12 +213,15 @@ const runWaitForExitMatrix = async () => {
         event,
         count: target.listenerCount(event)
     }));
-    await assert.rejects(() => waitForExit(hangingChild, 50), /Blocked server did not exit in time/);
+    await assert.rejects(
+        () => waitForExit(hangingChild, 50, 'intentional-hanging-child'),
+        /Blocked server did not exit in time/
+    );
     for (const { label, target, event, count } of baselineListeners) {
         assert.strictEqual(target.listenerCount(event), count, label);
     }
     assert.equal(hangingChild.kill('SIGTERM'), true);
-    assert.deepStrictEqual(await waitForExit(hangingChild, 500), {
+    assert.deepStrictEqual(await waitForExit(hangingChild, 500, 'terminated-hanging-child'), {
         code: null,
         signal: 'SIGTERM'
     });
@@ -207,22 +229,119 @@ const runWaitForExitMatrix = async () => {
     console.log('wait-for-exit race-safe matrix passed');
 };
 
-const waitForServer = (child, timeoutMs = 30000) => new Promise((resolve, reject) => {
+const sanitizeStartupOutput = (output, maxLength = 1024) => String(output)
+    .replace(/postgresql:\/\/[^\s'"`]+/gi, '[REDACTED_DATABASE_URL]')
+    .replace(/\r?\n/g, '\\n')
+    .slice(0, maxLength);
+
+const waitForServer = (child, port, timeoutMs = 30000) => new Promise((resolve, reject) => {
+    if (!child || typeof child.once !== 'function') {
+        reject(new TypeError('Child process is required.'));
+        return;
+    }
+
+    const expectedPort = Number(port);
+    if (!Number.isInteger(expectedPort) || expectedPort < 1 || expectedPort > 65535) {
+        reject(new RangeError('A valid loopback port is required.'));
+        return;
+    }
+
     let output = '';
-    const timer = setTimeout(() => reject(new Error(`Local server startup timed out: ${output}`)), timeoutMs);
+    let startupOutputObserved = false;
+    let portReady = false;
+    let settled = false;
+    let timer;
+    let retryTimer;
+    let activeSocket;
+    const deadline = Date.now() + timeoutMs;
+    const cleanup = () => {
+        clearTimeout(timer);
+        clearTimeout(retryTimer);
+        child.removeListener('exit', onExit);
+        child.removeListener('error', onError);
+        child.stdout?.removeListener('data', onData);
+        child.stderr?.removeListener('data', onData);
+        if (activeSocket && !activeSocket.destroyed) activeSocket.destroy();
+    };
+    const settle = (error, result) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (error) reject(error);
+        else resolve(result);
+    };
+    const lifecycleSummary = () => getChildLifecycleDiagnostics(child);
+    const failForExit = (code = child.exitCode, signal = child.signalCode) => settle(new Error(
+        `Local server exited before readiness: pid=${child.pid ?? 'unknown'} ` +
+        `exitCode=${code ?? 'null'} signalCode=${signal ?? 'null'} ` +
+        `startupOutput=${startupOutputObserved} portReady=${portReady} ` +
+        `output=${sanitizeStartupOutput(output)}`
+    ));
+    const resolveIfReady = () => {
+        if (startupOutputObserved && portReady) settle(null, output);
+    };
+    const schedulePortProbe = () => {
+        if (settled || portReady) return;
+        const remainingMs = deadline - Date.now();
+        if (remainingMs <= 0) return;
+        retryTimer = setTimeout(probePort, Math.min(100, Math.max(1, remainingMs)));
+    };
+    const probePort = () => {
+        retryTimer = undefined;
+        if (settled || portReady) return;
+        const remainingMs = deadline - Date.now();
+        if (remainingMs <= 0) return;
+
+        const socket = net.createConnection({ host: '127.0.0.1', port: expectedPort });
+        activeSocket = socket;
+        let probeSettled = false;
+        const finishProbe = (ready) => {
+            if (probeSettled) return;
+            probeSettled = true;
+            socket.removeListener('connect', onConnect);
+            socket.removeListener('error', onUnavailable);
+            socket.removeListener('timeout', onUnavailable);
+            if (activeSocket === socket) activeSocket = undefined;
+            socket.destroy();
+            if (ready) {
+                portReady = true;
+                resolveIfReady();
+            } else {
+                schedulePortProbe();
+            }
+        };
+        const onConnect = () => finishProbe(true);
+        const onUnavailable = () => finishProbe(false);
+        socket.setTimeout(Math.min(750, remainingMs));
+        socket.once('connect', onConnect);
+        socket.once('error', onUnavailable);
+        socket.once('timeout', onUnavailable);
+    };
     const onData = (chunk) => {
         output += chunk.toString();
         if (output.includes('NovaStore sunucusu')) {
-            clearTimeout(timer);
-            resolve(output);
+            startupOutputObserved = true;
+            resolveIfReady();
         }
     };
-    child.stdout.on('data', onData);
-    child.stderr.on('data', onData);
-    child.once('exit', (code) => {
-        clearTimeout(timer);
-        reject(new Error(`Local server exited before startup: ${code}\n${output}`));
-    });
+    const onExit = (code, signal) => failForExit(code, signal);
+    const onError = () => settle(new Error('Local server spawn failed before readiness.'));
+
+    child.stdout?.on('data', onData);
+    child.stderr?.on('data', onData);
+    child.once('exit', onExit);
+    child.once('error', onError);
+    timer = setTimeout(() => settle(new Error(
+        `Local server startup timed out: ${lifecycleSummary()} ` +
+        `startupOutput=${startupOutputObserved} portReady=${portReady} ` +
+        `output=${sanitizeStartupOutput(output)}`
+    )), timeoutMs);
+
+    if (child.exitCode !== null || child.signalCode !== null) {
+        failForExit();
+        return;
+    }
+    probePort();
 });
 
 const isPortOpen = (port) => new Promise((resolve) => {
@@ -238,6 +357,48 @@ const isPortOpen = (port) => new Promise((resolve) => {
     };
     socket.once('error', close);
     socket.once('timeout', close);
+});
+
+const createPostgresErrorResponse = () => {
+    const fields = Buffer.from('SFATAL\0C57P01\0Mdeterministic local test database failure\0\0');
+    const response = Buffer.allocUnsafe(5);
+    response.writeUInt8('E'.charCodeAt(0), 0);
+    response.writeUInt32BE(fields.length + 4, 1);
+    return Buffer.concat([response, fields]);
+};
+
+const startLoopbackPostgresErrorServer = () => new Promise((resolve, reject) => {
+    const errorResponse = createPostgresErrorResponse();
+    const server = net.createServer((socket) => {
+        const sendError = () => {
+            socket.removeListener('data', sendError);
+            socket.end(errorResponse);
+        };
+        socket.once('data', sendError);
+        socket.once('error', () => {});
+    });
+    const onError = (error) => reject(error);
+    server.once('error', onError);
+    server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        server.removeListener('error', onError);
+        if (!address || typeof address === 'string') {
+            server.close(() => reject(new Error('Loopback PostgreSQL error server did not expose a numeric port.')));
+            return;
+        }
+        resolve({ server, port: address.port });
+    });
+});
+
+const stopLoopbackServer = (server) => new Promise((resolve, reject) => {
+    if (!server?.listening) {
+        resolve();
+        return;
+    }
+    server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+    });
 });
 
 const requestRuntimeMeta = async (port, pathname, method = 'GET') => {
@@ -329,7 +490,7 @@ const requiredLocalDatabaseEnv = () => {
     let blockedOutput = '';
     blocked.stdout.on('data', (chunk) => { blockedOutput += chunk.toString(); });
     blocked.stderr.on('data', (chunk) => { blockedOutput += chunk.toString(); });
-    const blockedExit = await waitForExit(blocked);
+    const blockedExit = await waitForExit(blocked, 5000, 'blocked-remote-server');
     assertNonZeroExit(blockedExit);
     assert.match(blockedOutput, /Startup blocked: Remote veritabani/);
     assert.doesNotMatch(blockedOutput, /Veritabani hedefi|Veritabani baglantisi|Veritabani hazirlama/);
@@ -344,7 +505,7 @@ const requiredLocalDatabaseEnv = () => {
     let blockedDirectDbOutput = '';
     blockedDirectDb.stdout.on('data', (chunk) => { blockedDirectDbOutput += chunk.toString(); });
     blockedDirectDb.stderr.on('data', (chunk) => { blockedDirectDbOutput += chunk.toString(); });
-    const blockedDirectDbExit = await waitForExit(blockedDirectDb);
+    const blockedDirectDbExit = await waitForExit(blockedDirectDb, 5000, 'blocked-direct-db');
     assertNonZeroExit(blockedDirectDbExit);
     assert.match(blockedDirectDbOutput, /Database startup blocked: Remote veritabani/);
     assert.doesNotMatch(blockedDirectDbOutput, /pg must not load/);
@@ -373,7 +534,7 @@ const requiredLocalDatabaseEnv = () => {
     let blockedSupabaseOutput = '';
     blockedSupabase.stdout.on('data', (chunk) => { blockedSupabaseOutput += chunk.toString(); });
     blockedSupabase.stderr.on('data', (chunk) => { blockedSupabaseOutput += chunk.toString(); });
-    const blockedSupabaseExit = await waitForExit(blockedSupabase);
+    const blockedSupabaseExit = await waitForExit(blockedSupabase, 5000, 'blocked-supabase-server');
     assertNonZeroExit(blockedSupabaseExit);
     assert.match(blockedSupabaseOutput, /Startup blocked: Remote veritabani/);
     assert.doesNotMatch(blockedSupabaseOutput, /Startup preview:/);
@@ -432,7 +593,7 @@ const requiredLocalDatabaseEnv = () => {
     let fakePoolOutput = '';
     fakePoolChild.stdout.on('data', (chunk) => { fakePoolOutput += chunk.toString(); });
     fakePoolChild.stderr.on('data', (chunk) => { fakePoolOutput += chunk.toString(); });
-    const fakePoolExit = await waitForExit(fakePoolChild);
+    const fakePoolExit = await waitForExit(fakePoolChild, 5000, 'fake-pool-child');
     assertExitCode(fakePoolExit, 0, fakePoolOutput);
     const fakePoolResult = JSON.parse(fakePoolOutput);
     assert.deepEqual(fakePoolResult.configKeys, [
@@ -506,7 +667,11 @@ const requiredLocalDatabaseEnv = () => {
     prototypePollutionChild.stderr.on('data', (chunk) => {
         prototypePollutionOutput += chunk.toString();
     });
-    const prototypePollutionExit = await waitForExit(prototypePollutionChild);
+    const prototypePollutionExit = await waitForExit(
+        prototypePollutionChild,
+        5000,
+        'prototype-pollution-child'
+    );
     assertNonZeroExit(prototypePollutionExit);
     assert.match(prototypePollutionOutput, /unsafe runtime object state/);
     assert.doesNotMatch(prototypePollutionOutput, /evil-db|evil_database|attacker|pg must not load/);
@@ -524,7 +689,7 @@ const requiredLocalDatabaseEnv = () => {
     let stagingPreviewOutput = '';
     stagingPreview.stdout.on('data', (chunk) => { stagingPreviewOutput += chunk.toString(); });
     stagingPreview.stderr.on('data', (chunk) => { stagingPreviewOutput += chunk.toString(); });
-    const stagingPreviewExit = await waitForExit(stagingPreview);
+    const stagingPreviewExit = await waitForExit(stagingPreview, 5000, 'blocked-staging-preview');
     assertNonZeroExit(stagingPreviewExit);
     assert.match(stagingPreviewOutput, /Startup blocked: Local preview yalnizca acik NODE_ENV=development/);
     assert.doesNotMatch(stagingPreviewOutput, /Startup preview:/);
@@ -549,7 +714,7 @@ const requiredLocalDatabaseEnv = () => {
                 NODE_OPTIONS: ''
         }));
         previewServer = spawnServerWithExactEnv(previewEnv);
-        const previewOutput = await waitForServer(previewServer);
+        const previewOutput = await waitForServer(previewServer, previewPort);
         assert.match(previewOutput, /Startup preview: UI-only localhost modu etkin/);
         assert.match(previewOutput, /Veritabani hedefi: 127\.0\.0\.1:55432\/novastore_preview/);
         assert.match(previewOutput, /Veritabani baglantisi ve schema init SKIP_SCHEMA_INIT=true ile atlandi/);
@@ -584,23 +749,33 @@ const requiredLocalDatabaseEnv = () => {
     }
     assert.strictEqual(await isPortOpen(previewPort), false);
 
-    const failedDatabase = spawn(process.execPath, ['server.js'], {
-        cwd: root,
-        env: buildLocalServerEnv({
-            PORT: String(failedDatabasePort),
-            DATABASE_URL: 'postgresql://novastore_test:novastore_test_only@127.0.0.1:1/novastore_category_v2_test',
-            DB_PORT: '1'
-        }),
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true
-    });
-    let failedDatabaseOutput = '';
-    failedDatabase.stdout.on('data', (chunk) => { failedDatabaseOutput += chunk.toString(); });
-    failedDatabase.stderr.on('data', (chunk) => { failedDatabaseOutput += chunk.toString(); });
-    const failedDatabaseExit = await waitForExit(failedDatabase);
-    assertNonZeroExit(failedDatabaseExit);
-    assert.match(failedDatabaseOutput, /Veritabani hazirlama hatasi/);
-    assert.doesNotMatch(failedDatabaseOutput, /NovaStore sunucusu/);
+    let failedDatabase;
+    let databaseFailureServer;
+    try {
+        databaseFailureServer = await startLoopbackPostgresErrorServer();
+        failedDatabase = spawn(process.execPath, ['server.js'], {
+            cwd: root,
+            env: buildLocalServerEnv({
+                PORT: String(failedDatabasePort),
+                DATABASE_URL:
+                    'postgresql://novastore_test:novastore_test_only@127.0.0.1:' +
+                    `${databaseFailureServer.port}/novastore_category_v2_test`,
+                DB_PORT: String(databaseFailureServer.port)
+            }),
+            stdio: ['ignore', 'pipe', 'pipe'],
+            windowsHide: true
+        });
+        let failedDatabaseOutput = '';
+        failedDatabase.stdout.on('data', (chunk) => { failedDatabaseOutput += chunk.toString(); });
+        failedDatabase.stderr.on('data', (chunk) => { failedDatabaseOutput += chunk.toString(); });
+        const failedDatabaseExit = await waitForExit(failedDatabase, 5000, 'failed-database-server');
+        assertNonZeroExit(failedDatabaseExit);
+        assert.match(failedDatabaseOutput, /Veritabani hazirlama hatasi/);
+        assert.doesNotMatch(failedDatabaseOutput, /NovaStore sunucusu/);
+    } finally {
+        await stopServerProcess(failedDatabase);
+        await stopLoopbackServer(databaseFailureServer?.server);
+    }
     assert.strictEqual(await isPortOpen(failedDatabasePort), false);
 
     const localDatabase = requiredLocalDatabaseEnv();
@@ -616,7 +791,7 @@ const requiredLocalDatabaseEnv = () => {
         }));
         localServerEnv.RENDER_GIT_COMMIT = validRuntimeRevision;
         localServer = spawnServerWithExactEnv(localServerEnv);
-        const localOutput = await waitForServer(localServer);
+        const localOutput = await waitForServer(localServer, localPort);
         assert.strictEqual(await isPortOpen(localPort), true);
         assert.doesNotMatch(localOutput, /postgresql:\/\//);
         if (localDatabase.DB_PASSWORD) {
