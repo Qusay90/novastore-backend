@@ -143,16 +143,20 @@ const createFakeGitReader = ({
 (async () => {
     await check(1, 'portable direct or controlled replay provenance exact', () => {
         const provenance = verifyReleaseProvenance({ cwd: root });
-        assert(['DIRECT', 'APPROVED_REPLAY'].includes(provenance.mode));
+        assert([
+            'DIRECT',
+            'APPROVED_REPLAY',
+            'APPROVED_RC13_MERGE'
+        ].includes(provenance.mode));
         assert.equal(provenance.fingerprintOccurrenceCount, 1);
         console.log(
             `native patch-id diagnostic: ${provenance.diagnosticPatchId || 'UNAVAILABLE'}`
         );
 
         const matrix = runProvenanceFixtureMatrix({ cwd: root });
-        assert.equal(matrix.length, 25);
+        assert.equal(matrix.length, 52);
         assert(matrix.every((entry) => entry.result === 'PASS'));
-        console.log('release provenance matrix: PASS=25 FAIL=0');
+        console.log('release provenance matrix: PASS=52 FAIL=0');
     });
 
     await check(2, 'workflow PR-head push-SHA and full-history checkout exact', () => {

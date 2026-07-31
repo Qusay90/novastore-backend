@@ -3,6 +3,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const { resolveRuntimeIdentity } = require('../services/runtimeIdentityService');
+const {
+    StagingReleaseContractError,
+    validateStagingReleaseEnvironment
+} = require('../config/stagingReleaseContract');
+const { REMOTE_READINESS_QUERY } = require('../controllers/runtimeMetaController');
 const { createRuntimeMetaRouter } = require('../routes/runtimeMetaRoutes');
 
 const repositoryRoot = path.resolve(__dirname, '..');
@@ -10,6 +15,51 @@ const renderRevision = 'a'.repeat(40);
 const railwayRevision = 'b'.repeat(40);
 const unavailableBody = { status: 'unavailable' };
 const results = { pass: 0, fail: 0, skip: 0 };
+
+const createAccessorEnvironment = (environmentKey, revision) => {
+    let getterCalls = 0;
+    let setterCalls = 0;
+    const environment = {};
+    Object.defineProperty(environment, environmentKey, {
+        enumerable: true,
+        get: () => {
+            getterCalls += 1;
+            return revision;
+        },
+        set: () => {
+            setterCalls += 1;
+        }
+    });
+    return {
+        environment,
+        getterCalls: () => getterCalls,
+        setterCalls: () => setterCalls
+    };
+};
+
+const createValidStagingReleaseEnvironment = () => ({
+    NOVASTORE_DEPLOY_ENV: 'staging',
+    NOVASTORE_STAGING_MIGRATIONS_ENABLED: 'true',
+    NOVASTORE_ALLOW_REMOTE_DB: 'true',
+    NOVASTORE_EXPECTED_DATABASE_HOST: 'staging-db.example.test',
+    NOVASTORE_EXPECTED_DATABASE_NAME: 'novastore_staging',
+    DATABASE_URL: 'postgresql://synthetic-user@staging-db.example.test/novastore_staging?sslmode=verify-full',
+    JWT_SECRET: 'synthetic-jwt-secret-marker-not-for-reuse',
+    RENDER_GIT_COMMIT: renderRevision,
+    NOVASTORE_STAGING_ACCESS_GATE_ENABLED: 'true',
+    NOVASTORE_STAGING_ACCESS_USERNAME: 'synthetic-release-operator',
+    NOVASTORE_STAGING_ACCESS_PASSWORD_HASH: '$2b$12$' + 'A'.repeat(53),
+    NOVASTORE_STAGING_ACCESS_SESSION_SECRET: 'synthetic-access-session-marker-not-for-reuse',
+    NOVASTORE_STAGING_EXTERNAL_SIDE_EFFECTS_DISABLED: 'true',
+    NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: 'false',
+    NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'false',
+    AI_PROVIDER: 'mock',
+    AI_PROVIDER_FALLBACK_ENABLED: 'false',
+    SKIP_SCHEMA_INIT: 'true',
+    NOVASTORE_ALLOW_SCHEMA_INIT: 'false'
+});
 
 const check = async (name, assertion) => {
     try {
@@ -66,17 +116,24 @@ const withRuntimeServer = async (options, assertion, configureApp) => {
     }
 };
 
-const createDatabase = (queryImplementation) => {
-    const state = { queryCount: 0, statements: [] };
+const createDatabase = (queryImplementation, metadataImplementation) => {
+    const state = { queryCount: 0, metadataCount: 0, statements: [] };
+    const database = {
+        query: async (statement) => {
+            state.queryCount += 1;
+            state.statements.push(statement);
+            return queryImplementation(statement);
+        }
+    };
+    if (metadataImplementation) {
+        database.getRuntimeTargetMetadata = () => {
+            state.metadataCount += 1;
+            return metadataImplementation();
+        };
+    }
     return {
         state,
-        database: {
-            query: async (statement) => {
-                state.queryCount += 1;
-                state.statements.push(statement);
-                return queryImplementation(statement);
-            }
-        }
+        database
     };
 };
 
@@ -105,6 +162,12 @@ const revisionCases = [
 
 const unavailableRevisionCases = [
     ['missing revision', {}],
+    ['inherited Render revision', Object.create({ RENDER_GIT_COMMIT: renderRevision })],
+    ['inherited Railway revision', Object.create({ RAILWAY_GIT_COMMIT_SHA: railwayRevision })],
+    ['setter-only Render revision', Object.defineProperty({}, 'RENDER_GIT_COMMIT', {
+        enumerable: true,
+        set: () => {}
+    })],
     ['malformed Render revision', { RENDER_GIT_COMMIT: 'not-a-revision' }],
     ['malformed Railway revision', { RAILWAY_GIT_COMMIT_SHA: 'not-a-revision' }],
     ['short revision', { RENDER_GIT_COMMIT: 'a'.repeat(39) }],
@@ -136,6 +199,46 @@ const runRevisionResolutionMatrix = async () => {
             assertUnavailable(resolveRuntimeIdentity(environment));
         });
     }
+
+    await check('revision resolution: accessor revision is rejected without getter execution', async () => {
+        const accessor = createAccessorEnvironment('RENDER_GIT_COMMIT', renderRevision);
+        assertUnavailable(resolveRuntimeIdentity(accessor.environment));
+        assert.equal(accessor.getterCalls(), 0);
+        assert.equal(accessor.setterCalls(), 0);
+    });
+
+    await check('revision resolution: inherited revision does not suppress an own provider', async () => {
+        const environment = Object.assign(
+            Object.create({ RENDER_GIT_COMMIT: renderRevision }),
+            { RAILWAY_GIT_COMMIT_SHA: railwayRevision }
+        );
+        assert.deepEqual(resolveRuntimeIdentity(environment), {
+            available: true,
+            provider: 'railway',
+            revision: railwayRevision
+        });
+    });
+
+    await check('release contract: accessor identity is rejected without getter execution', async () => {
+        const accessor = createAccessorEnvironment('RENDER_GIT_COMMIT', renderRevision);
+        const environment = createValidStagingReleaseEnvironment();
+        Object.defineProperty(
+            environment,
+            'RENDER_GIT_COMMIT',
+            Object.getOwnPropertyDescriptor(accessor.environment, 'RENDER_GIT_COMMIT')
+        );
+        assert.throws(
+            () => validateStagingReleaseEnvironment(environment),
+            (error) => (
+                error instanceof StagingReleaseContractError &&
+                error.code === 'RUNTIME_IDENTITY_REJECTED' &&
+                error.message === 'Staging release contract validation failed.' &&
+                !/RENDER|SENSITIVE/i.test(error.message)
+            )
+        );
+        assert.equal(accessor.getterCalls(), 0);
+        assert.equal(accessor.setterCalls(), 0);
+    });
 
     await check('revision resolution: no unauthorized source fallback', async () => {
         const source = fs.readFileSync(
@@ -188,6 +291,8 @@ const runReadyMatrix = async () => {
 
     const identityFailureCases = [
         ['missing revision', {}],
+        ['inherited Render revision', Object.create({ RENDER_GIT_COMMIT: renderRevision })],
+        ['inherited Railway revision', Object.create({ RAILWAY_GIT_COMMIT_SHA: railwayRevision })],
         ['malformed revision', { RENDER_GIT_COMMIT: 'invalid-RUNTIME-MARKER' }],
         ['dual provider', {
             RENDER_GIT_COMMIT: renderRevision,
@@ -206,6 +311,19 @@ const runReadyMatrix = async () => {
             assert.equal(fake.state.queryCount, 0);
         });
     }
+
+    await check('ready: accessor revision skips DB without invoking getter', async () => {
+        const accessor = createAccessorEnvironment('RENDER_GIT_COMMIT', renderRevision);
+        const fake = createDatabase(async () => ({ rows: [{ ready: 1 }] }));
+        await withRuntimeServer({ database: fake.database, environment: accessor.environment }, async (baseUrl) => {
+            const response = await request(baseUrl, '/api/health/ready');
+            assertJsonResponse(response, 503, unavailableBody);
+            assert.doesNotMatch(response.text, /RENDER|SENSITIVE/i);
+        });
+        assert.equal(fake.state.queryCount, 0);
+        assert.equal(accessor.getterCalls(), 0);
+        assert.equal(accessor.setterCalls(), 0);
+    });
 
     await check('ready: DB failure is generic', async () => {
         const fake = createDatabase(async () => {
@@ -247,6 +365,273 @@ const runReadyMatrix = async () => {
     });
 };
 
+const runRemoteReadyMatrix = async () => {
+    const remoteEnvironment = () => ({
+        NODE_ENV: 'production',
+        DATABASE_URL:
+            'postgresql://synthetic-user@runtime-db.example.test/' +
+            'novastore_runtime?sslmode=verify-full',
+        NOVASTORE_EXPECTED_DATABASE_HOST: 'runtime-db.example.test',
+        NOVASTORE_EXPECTED_DATABASE_NAME: 'novastore_runtime',
+        SKIP_SCHEMA_INIT: 'true',
+        NOVASTORE_ALLOW_SCHEMA_INIT: 'false',
+        RENDER_GIT_COMMIT: renderRevision
+    });
+    const metadata = (overrides = {}) => Object.freeze(Object.assign(Object.create(null), {
+        host: 'runtime-db.example.test',
+        port: 5432,
+        database: 'novastore_runtime',
+        local: false,
+        remoteRelease: true,
+        tlsEnabled: true,
+        tlsVerified: true,
+        attested: true,
+        ...overrides
+    }));
+    const successResult = () => ({
+        rows: [{
+            ready: 1,
+            database: 'novastore_runtime',
+            port: 5432
+        }]
+    });
+
+    await check('ready remote: attested target metadata and connected identity pass', async () => {
+        const fake = createDatabase(async () => successResult(), () => metadata());
+        await withRuntimeServer({
+            database: fake.database,
+            environment: remoteEnvironment()
+        }, async (baseUrl) => {
+            assertJsonResponse(await request(baseUrl, '/api/health/ready'), 200, { status: 'ready' });
+        });
+        assert.equal(fake.state.metadataCount, 1);
+        assert.equal(fake.state.queryCount, 1);
+        assert.deepEqual(fake.state.statements, [REMOTE_READINESS_QUERY]);
+    });
+
+    await check('ready remote: direct non-default server port remains exact', async () => {
+        const environment = remoteEnvironment();
+        environment.DATABASE_URL =
+            'postgresql://synthetic-user@runtime-db.example.test:5433/' +
+            'novastore_runtime?sslmode=verify-full';
+        const directMetadata = () => metadata({ port: 5433 });
+
+        const positive = createDatabase(async () => ({
+            rows: [{ ready: 1, database: 'novastore_runtime', port: 5433 }]
+        }), directMetadata);
+        await withRuntimeServer({
+            database: positive.database,
+            environment
+        }, async (baseUrl) => {
+            assertJsonResponse(await request(baseUrl, '/api/health/ready'), 200, { status: 'ready' });
+        });
+
+        const mismatch = createDatabase(async () => ({
+            rows: [{ ready: 1, database: 'novastore_runtime', port: 5432 }]
+        }), directMetadata);
+        await withRuntimeServer({
+            database: mismatch.database,
+            environment
+        }, async (baseUrl) => {
+            assertJsonResponse(await request(baseUrl, '/api/health/ready'), 503, unavailableBody);
+        });
+    });
+
+    await check('ready remote: Supabase transaction-pooler maps client 6543 to backend 5432', async () => {
+        const environment = remoteEnvironment();
+        environment.NOVASTORE_EXPECTED_DATABASE_HOST = 'aws-0-eu.pooler.supabase.com';
+        environment.DATABASE_URL =
+            'postgresql://synthetic-user@aws-0-eu.pooler.supabase.com:6543/' +
+            'novastore_runtime?sslmode=verify-full';
+        const poolerMetadata = () => metadata({
+            host: 'aws-0-eu.pooler.supabase.com',
+            port: 6543
+        });
+
+        const positive = createDatabase(async () => ({
+            rows: [{ ready: 1, database: 'novastore_runtime', port: 5432 }]
+        }), poolerMetadata);
+        await withRuntimeServer({
+            database: positive.database,
+            environment
+        }, async (baseUrl) => {
+            assertJsonResponse(await request(baseUrl, '/api/health/ready'), 200, { status: 'ready' });
+        });
+
+        const mismatch = createDatabase(async () => ({
+            rows: [{ ready: 1, database: 'novastore_runtime', port: 6543 }]
+        }), poolerMetadata);
+        await withRuntimeServer({
+            database: mismatch.database,
+            environment
+        }, async (baseUrl) => {
+            assertJsonResponse(await request(baseUrl, '/api/health/ready'), 503, unavailableBody);
+        });
+    });
+
+    await check('ready remote: missing metadata fails before query', async () => {
+        const fake = createDatabase(async () => successResult());
+        await withRuntimeServer({
+            database: fake.database,
+            environment: remoteEnvironment()
+        }, async (baseUrl) => {
+            assertJsonResponse(await request(baseUrl, '/api/health/ready'), 503, unavailableBody);
+        });
+        assert.equal(fake.state.queryCount, 0);
+    });
+
+    const metadataFailures = [
+        ['host mismatch', () => metadata({ host: 'wrong-db.example.test' })],
+        ['database mismatch', () => metadata({ database: 'wrong_database' })],
+        ['port mismatch', () => metadata({ port: 6543 })],
+        ['local flag', () => metadata({ local: true })],
+        ['remote release flag', () => metadata({ remoteRelease: false })],
+        ['TLS disabled', () => metadata({ tlsEnabled: false })],
+        ['TLS unverified', () => metadata({ tlsVerified: false })],
+        ['target unattested', () => metadata({ attested: false })],
+        ['mutable metadata', () => ({ ...metadata() })],
+        ['extra metadata field', () => Object.freeze(Object.assign(
+            Object.create(null),
+            metadata(),
+            { username: 'forbidden' }
+        ))],
+        ['inherited secret field', () => Object.freeze(Object.assign(
+            Object.create({ password: 'inherited-secret' }),
+            metadata()
+        ))]
+    ];
+
+    for (const [name, metadataFactory] of metadataFailures) {
+        await check(`ready remote: ${name} fails before query`, async () => {
+            const fake = createDatabase(async () => successResult(), metadataFactory);
+            await withRuntimeServer({
+                database: fake.database,
+                environment: remoteEnvironment()
+            }, async (baseUrl) => {
+                const response = await request(baseUrl, '/api/health/ready');
+                assertJsonResponse(response, 503, unavailableBody);
+                assert.doesNotMatch(response.text, /wrong|username|runtime-db|novastore_runtime/i);
+            });
+            assert.equal(fake.state.queryCount, 0);
+        });
+    }
+
+    const queryFailures = [
+        ['database identity mismatch', async () => ({
+            rows: [{ ready: 1, database: 'wrong_database', port: 5432 }]
+        })],
+        ['server port mismatch', async () => ({
+            rows: [{ ready: 1, database: 'novastore_runtime', port: 6543 }]
+        })],
+        ['ready value invalid', async () => ({
+            rows: [{ ready: 0, database: 'novastore_runtime', port: 5432 }]
+        })],
+        ['row cardinality invalid', async () => ({ rows: [] })],
+        ['sensitive query failure', async () => {
+            throw new Error('SENSITIVE-REMOTE-DSN-MARKER runtime-db.example.test');
+        }]
+    ];
+
+    for (const [name, queryImplementation] of queryFailures) {
+        await check(`ready remote: ${name} is generic`, async () => {
+            const fake = createDatabase(queryImplementation, () => metadata());
+            await withRuntimeServer({
+                database: fake.database,
+                environment: remoteEnvironment()
+            }, async (baseUrl) => {
+                const response = await request(baseUrl, '/api/health/ready');
+                assertJsonResponse(response, 503, unavailableBody);
+                assert.doesNotMatch(response.text, /SENSITIVE|REMOTE|DSN|runtime-db|novastore_runtime/i);
+            });
+            assert.equal(fake.state.queryCount, 1);
+        });
+    }
+
+    await check('ready remote: invalid attestation skips metadata and query', async () => {
+        const environment = remoteEnvironment();
+        environment.DATABASE_URL =
+            'postgresql://synthetic-user@runtime-db.example.test/novastore_runtime?sslmode=require';
+        const fake = createDatabase(async () => successResult(), () => metadata());
+        await withRuntimeServer({ database: fake.database, environment }, async (baseUrl) => {
+            assertJsonResponse(await request(baseUrl, '/api/health/ready'), 503, unavailableBody);
+        });
+        assert.equal(fake.state.metadataCount, 0);
+        assert.equal(fake.state.queryCount, 0);
+    });
+
+    await check('ready remote: missing revision skips metadata and query', async () => {
+        const environment = remoteEnvironment();
+        delete environment.RENDER_GIT_COMMIT;
+        const fake = createDatabase(async () => successResult(), () => metadata());
+        await withRuntimeServer({ database: fake.database, environment }, async (baseUrl) => {
+            assertJsonResponse(await request(baseUrl, '/api/health/ready'), 503, unavailableBody);
+        });
+        assert.equal(fake.state.metadataCount, 0);
+        assert.equal(fake.state.queryCount, 0);
+    });
+
+    const configuredLocalEnvironment = {
+        NODE_ENV: 'test',
+        DB_HOST: '127.0.0.1',
+        DB_PORT: '5432',
+        DB_NAME: 'novastore_runtime_local_test',
+        DB_USER: 'novastore_test',
+        DB_PASSWORD: 'novastore_test_only',
+        DB_SSL: 'false',
+        NOVASTORE_ALLOW_REMOTE_DB: 'false',
+        SKIP_SCHEMA_INIT: 'true',
+        NOVASTORE_ALLOW_SCHEMA_INIT: 'false',
+        RENDER_GIT_COMMIT: renderRevision
+    };
+    const exactMetadata = (fields) => Object.freeze(Object.assign(Object.create(null), fields));
+
+    await check('ready local: matching active Pool metadata remains compatible', async () => {
+        const fake = createDatabase(
+            async () => ({ rows: [{ ready: 1 }] }),
+            () => exactMetadata({
+                host: '127.0.0.1',
+                port: 5432,
+                database: 'novastore_runtime_local_test',
+                local: true,
+                remoteRelease: false,
+                tlsEnabled: false,
+                tlsVerified: false,
+                attested: false
+            })
+        );
+        await withRuntimeServer({
+            database: fake.database,
+            environment: configuredLocalEnvironment
+        }, async (baseUrl) => {
+            assertJsonResponse(await request(baseUrl, '/api/health/ready'), 200, { status: 'ready' });
+        });
+        assert.equal(fake.state.queryCount, 1);
+    });
+
+    await check('ready local: remote Pool metadata cannot downgrade to local checks', async () => {
+        const fake = createDatabase(
+            async () => ({ rows: [{ ready: 1 }] }),
+            () => exactMetadata({
+                host: 'remote-db.example.test',
+                port: 5432,
+                database: 'novastore_remote',
+                local: false,
+                remoteRelease: true,
+                tlsEnabled: true,
+                tlsVerified: true,
+                attested: true
+            })
+        );
+        await withRuntimeServer({
+            database: fake.database,
+            environment: configuredLocalEnvironment
+        }, async (baseUrl) => {
+            assertJsonResponse(await request(baseUrl, '/api/health/ready'), 503, unavailableBody);
+        });
+        assert.equal(fake.state.queryCount, 0);
+    });
+};
+
 const runVersionMatrix = async () => {
     for (const [name, environment, expected] of revisionCases) {
         await check(`version: ${name}`, async () => {
@@ -265,6 +650,8 @@ const runVersionMatrix = async () => {
 
     for (const [name, environment] of [
         ['missing revision', {}],
+        ['inherited Render revision', Object.create({ RENDER_GIT_COMMIT: renderRevision })],
+        ['inherited Railway revision', Object.create({ RAILWAY_GIT_COMMIT_SHA: railwayRevision })],
         ['malformed revision', { RENDER_GIT_COMMIT: 'invalid-RUNTIME-MARKER' }],
         ['dual provider', {
             RENDER_GIT_COMMIT: renderRevision,
@@ -282,6 +669,20 @@ const runVersionMatrix = async () => {
             assert.equal(fake.state.queryCount, 0);
         });
     }
+
+    await check('version: accessor revision is generic without invoking getter', async () => {
+        const accessor = createAccessorEnvironment('RENDER_GIT_COMMIT', renderRevision);
+        const fake = createDatabase(async () => { throw new Error('must not query'); });
+        await withRuntimeServer({ database: fake.database, environment: accessor.environment }, async (baseUrl) => {
+            const response = await request(baseUrl, '/api/version');
+            assertJsonResponse(response, 503, unavailableBody);
+            assert.equal(response.headers.get('cache-control'), 'no-store');
+            assert.doesNotMatch(response.text, /RENDER|SENSITIVE/i);
+        });
+        assert.equal(fake.state.queryCount, 0);
+        assert.equal(accessor.getterCalls(), 0);
+        assert.equal(accessor.setterCalls(), 0);
+    });
 
     await check('version: unexpected identity error is generic', async () => {
         const fake = createDatabase(async () => { throw new Error('must not query'); });
@@ -376,12 +777,70 @@ const runRealDatabaseReadiness = async () => {
             await pool.end();
         }
     });
+
+    await check('ready remote contract: real loopback PostgreSQL identity positive and mismatch', async () => {
+        const databaseUrl = process.env.P4B1_DATABASE_URL;
+        assert.ok(databaseUrl, 'P4B1_DATABASE_URL is required for the real identity gate');
+        const parsed = new URL(databaseUrl);
+        assert(['127.0.0.1', 'localhost'].includes(parsed.hostname));
+        const actualDatabase = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
+        const { Pool } = require('pg');
+        const loopbackPool = new Pool({
+            connectionString: databaseUrl,
+            ssl: false,
+            keepAlive: true
+        });
+        let effectiveDatabase = actualDatabase;
+        loopbackPool.getRuntimeTargetMetadata = () => Object.freeze(Object.assign(Object.create(null), {
+            host: 'runtime-db.example.test',
+            port: 5432,
+            database: effectiveDatabase,
+            local: false,
+            remoteRelease: true,
+            tlsEnabled: true,
+            tlsVerified: true,
+            attested: true
+        }));
+        const remoteEnvironment = (database) => ({
+            NODE_ENV: 'production',
+            DATABASE_URL:
+                `postgresql://synthetic-user@runtime-db.example.test/${database}` +
+                '?sslmode=verify-full',
+            NOVASTORE_EXPECTED_DATABASE_HOST: 'runtime-db.example.test',
+            NOVASTORE_EXPECTED_DATABASE_NAME: database,
+            SKIP_SCHEMA_INIT: 'true',
+            NOVASTORE_ALLOW_SCHEMA_INIT: 'false',
+            RENDER_GIT_COMMIT: renderRevision
+        });
+
+        try {
+            await withRuntimeServer({
+                database: loopbackPool,
+                environment: remoteEnvironment(actualDatabase)
+            }, async (baseUrl) => {
+                assertJsonResponse(await request(baseUrl, '/api/health/ready'), 200, { status: 'ready' });
+            });
+
+            effectiveDatabase = 'novastore_connected_identity_mismatch';
+            await withRuntimeServer({
+                database: loopbackPool,
+                environment: remoteEnvironment(effectiveDatabase)
+            }, async (baseUrl) => {
+                const response = await request(baseUrl, '/api/health/ready');
+                assertJsonResponse(response, 503, unavailableBody);
+                assert.doesNotMatch(response.text, /novastore|database|runtime-db/i);
+            });
+        } finally {
+            await loopbackPool.end();
+        }
+    });
 };
 
 (async () => {
     await runRevisionResolutionMatrix();
     await runLiveMatrix();
     await runReadyMatrix();
+    await runRemoteReadyMatrix();
     await runVersionMatrix();
     await runHeadAndIsolationMatrix();
     await runRealDatabaseReadiness();

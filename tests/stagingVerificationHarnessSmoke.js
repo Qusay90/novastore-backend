@@ -56,6 +56,12 @@ const createFixture = async () => {
         AI_PROVIDER_FALLBACK_ENABLED: 'false',
         SKIP_SCHEMA_INIT: 'true',
         NOVASTORE_ALLOW_SCHEMA_INIT: 'false',
+        NOVASTORE_ALLOW_REMOTE_DB: 'true',
+        NOVASTORE_EXPECTED_DATABASE_HOST: 'staging-db.example.test',
+        NOVASTORE_EXPECTED_DATABASE_NAME: 'novastore_staging',
+        DATABASE_URL:
+            'postgresql://synthetic-user@staging-db.example.test/' +
+            'novastore_staging?sslmode=verify-full',
         RENDER_GIT_COMMIT: revision
     };
     const app = express();
@@ -72,7 +78,25 @@ const createFixture = async () => {
     }));
     app.use('/api', createRuntimeMetaRouter({
         environment,
-        database: { query: async () => ({ rows: [{ ready: 1 }] }) }
+        database: {
+            getRuntimeTargetMetadata: () => Object.freeze(Object.assign(Object.create(null), {
+                host: 'staging-db.example.test',
+                port: 5432,
+                database: 'novastore_staging',
+                local: false,
+                remoteRelease: true,
+                tlsEnabled: true,
+                tlsVerified: true,
+                attested: true
+            })),
+            query: async () => ({
+                rows: [{
+                    ready: 1,
+                    database: 'novastore_staging',
+                    port: 5432
+                }]
+            })
+        }
     }));
     app.get('/', (_req, res) => res.status(200).type('html').send('<!doctype html><title>Storefront</title>'));
     app.get('/admin.html', (_req, res) => res.status(200).type('html').send('<!doctype html><title>Admin</title>'));

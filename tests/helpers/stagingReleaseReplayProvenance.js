@@ -50,6 +50,13 @@ const EXPECTED_CHANGED_PATHS = Object.freeze([
 const RELEASE_PROVENANCE_CONTRACT = Object.freeze({
     frozenTarget: '71ff4ed76b09496343d1593e23dc5d30d9cf5964',
     frozenTargetTree: '1084dec268b39e2c97bd730ce1a919381d5735ba',
+    approvedMergeSha: 'ccede5fa36e22fb0d3de9e96f8ee58a5c9909411',
+    approvedMergeFirstParent: '71ff4ed76b09496343d1593e23dc5d30d9cf5964',
+    approvedMergeSecondParent: '3b9bce487d8257da3bbb334117c8af3b51e469c2',
+    approvedMergeResultTree: 'b22f19c4011f4f423fd30857ca61c3504cae30b3',
+    approvedMergeSecondParentTree: 'b22f19c4011f4f423fd30857ca61c3504cae30b3',
+    approvedMergeSubject:
+        'Merge pull request #24 from Qusay90/codex/commerce-pro-v3-reconciled-r5-20260729',
     originalSha: 'c06cbcba0d1cba77b030d2a588e7a699be4a05a2',
     originalParent: 'cfeaf0f043642ad1db6a7b2b565c3f0e0050ed47',
     replaySha: '7b4765b1c0868852821c16af6d6483ab41a5bef0',
@@ -318,6 +325,11 @@ const assertContractShape = (contract) => {
     for (const name of [
         'frozenTarget',
         'frozenTargetTree',
+        'approvedMergeSha',
+        'approvedMergeFirstParent',
+        'approvedMergeSecondParent',
+        'approvedMergeResultTree',
+        'approvedMergeSecondParentTree',
         'originalSha',
         'originalParent',
         'replaySha',
@@ -325,6 +337,19 @@ const assertContractShape = (contract) => {
         'parentTree',
         'resultTree'
     ]) ensure(FULL_SHA_PATTERN.test(contract[name]), 'MALFORMED_CONTRACT_SHA');
+    ensure(
+        contract.approvedMergeFirstParent === contract.frozenTarget,
+        'MALFORMED_APPROVED_MERGE_FIRST_PARENT'
+    );
+    ensure(
+        contract.approvedMergeResultTree === contract.approvedMergeSecondParentTree,
+        'MALFORMED_APPROVED_MERGE_TREE'
+    );
+    ensure(
+        typeof contract.approvedMergeSubject === 'string' &&
+        contract.approvedMergeSubject.length > 0,
+        'MALFORMED_APPROVED_MERGE_SUBJECT'
+    );
     ensure(SHA256_PATTERN.test(contract.rawDiffSha256), 'MALFORMED_CONTRACT_HASH');
     ensure(Number.isInteger(contract.rawDiffSize) && contract.rawDiffSize >= 0, 'MALFORMED_CONTRACT_SIZE');
     ensure(Number.isInteger(contract.replayOrdinal) && contract.replayOrdinal > 0, 'MALFORMED_ORDINAL');
@@ -372,54 +397,43 @@ const findFingerprintMatches = (cwd, chain, contract) => {
     return matches;
 };
 
-const verifyRepositoryForTest = ({
+const commitList = (cwd, args) => {
+    const output = gitText(cwd, args);
+    return output ? output.split(/\r?\n/).filter(Boolean) : [];
+};
+
+const assertNormalFirstParentDescendants = (
     cwd,
-    contract = RELEASE_PROVENANCE_CONTRACT,
-    head = 'HEAD'
-}) => {
-    assertContractShape(contract);
-    assertRepositoryIsComplete(cwd);
-
-    const resolvedHead = gitText(cwd, ['rev-parse', `${head}^{commit}`]);
-    ensure(FULL_SHA_PATTERN.test(resolvedHead), 'HEAD_MALFORMED');
-    const headTree = gitText(cwd, ['rev-parse', `${resolvedHead}^{tree}`]);
-
-    const originalExists = objectExists(cwd, contract.originalSha);
-    const originalIsAncestor = originalExists && isAncestor(cwd, contract.originalSha, resolvedHead);
-
-    if (originalIsAncestor) {
-        const directIdentity = assertExactIdentity(
-            cwd,
-            contract.originalSha,
-            contract.originalParent,
-            contract,
-            'SOURCE'
-        );
-        const chain = firstParentChain(cwd, resolvedHead);
-        ensure(chain.includes(contract.originalSha), 'SOURCE_NOT_FIRST_PARENT');
-        const matches = findFingerprintMatches(cwd, chain, contract);
-        ensure(
-            matches.length === 1 && matches[0] === contract.originalSha,
-            'AMBIGUOUS_RELEASE_LINEAGE'
-        );
-        if (
-            contract.replaySha !== contract.originalSha &&
-            objectExists(cwd, contract.replaySha) &&
-            isAncestor(cwd, contract.replaySha, resolvedHead)
-        ) fail('AMBIGUOUS_RELEASE_LINEAGE');
-        return Object.freeze({
-            mode: 'DIRECT',
-            head: resolvedHead,
-            headTree,
-            acceptedCommit: contract.originalSha,
-            fingerprintOccurrenceCount: matches.length,
-            diagnosticPatchId: directIdentity.diagnosticPatchId
-        });
+    ancestor,
+    resolvedHead,
+    role,
+    requireNonEmpty = true
+) => {
+    const descendants = firstParentChain(cwd, `${ancestor}..${resolvedHead}`);
+    let expectedParent = ancestor;
+    for (const sha of descendants) {
+        const identity = readIdentity(cwd, sha);
+        ensure(identity.parents.length === 1, `${role}_MERGE`);
+        ensure(identity.parent === expectedParent, `${role}_NOT_FIRST_PARENT`);
+        if (requireNonEmpty) {
+            ensure(identity.parentTree !== identity.resultTree, `${role}_EMPTY`);
+        }
+        expectedParent = sha;
     }
+    ensure(expectedParent === resolvedHead, `${role}_NOT_FIRST_PARENT`);
+    return descendants;
+};
 
+const verifyApprovedReplayForHead = ({
+    cwd,
+    contract,
+    resolvedHead,
+    headTree
+}) => {
     ensure(objectExists(cwd, contract.frozenTarget), 'FROZEN_TARGET_MISSING');
     ensure(
-        gitText(cwd, ['rev-parse', `${contract.frozenTarget}^{tree}`]) === contract.frozenTargetTree,
+        gitText(cwd, ['rev-parse', `${contract.frozenTarget}^{tree}`]) ===
+            contract.frozenTargetTree,
         'FROZEN_TARGET_TREE_MISMATCH'
     );
     ensure(
@@ -460,6 +474,161 @@ const verifyRepositoryForTest = ({
         replayOrdinal: chain.indexOf(contract.replaySha) + 1,
         fingerprintOccurrenceCount: matches.length,
         diagnosticPatchId: replayIdentity.diagnosticPatchId
+    });
+};
+
+const verifyApprovedMergeForHead = ({
+    cwd,
+    contract,
+    resolvedHead,
+    headTree
+}) => {
+    const mergeIdentity = readIdentity(cwd, contract.approvedMergeSha);
+    ensure(mergeIdentity.parents.length === 2, 'APPROVED_MERGE_PARENT_COUNT');
+    ensure(
+        mergeIdentity.parents[0] === contract.approvedMergeFirstParent,
+        'APPROVED_MERGE_FIRST_PARENT_MISMATCH'
+    );
+    ensure(
+        mergeIdentity.parents[1] === contract.approvedMergeSecondParent,
+        'APPROVED_MERGE_SECOND_PARENT_MISMATCH'
+    );
+    ensure(
+        mergeIdentity.resultTree === contract.approvedMergeResultTree,
+        'APPROVED_MERGE_RESULT_TREE_MISMATCH'
+    );
+    ensure(
+        mergeIdentity.subject === contract.approvedMergeSubject,
+        'APPROVED_MERGE_SUBJECT_MISMATCH'
+    );
+    ensure(
+        gitText(
+            cwd,
+            ['rev-parse', `${contract.approvedMergeSecondParent}^{tree}`]
+        ) === contract.approvedMergeSecondParentTree,
+        'APPROVED_MERGE_SECOND_PARENT_TREE_MISMATCH'
+    );
+
+    const headFirstParentChain = firstParentChain(cwd, resolvedHead);
+    ensure(
+        headFirstParentChain.includes(contract.approvedMergeSha),
+        'APPROVED_MERGE_NOT_FIRST_PARENT'
+    );
+
+    const merges = commitList(cwd, [
+        'rev-list',
+        '--min-parents=2',
+        `${contract.frozenTarget}..${resolvedHead}`
+    ]);
+    ensure(
+        merges.length === 1 && merges[0] === contract.approvedMergeSha,
+        'UNAPPROVED_MERGE_PRESENT'
+    );
+
+    assertNormalFirstParentDescendants(
+        cwd,
+        contract.approvedMergeSha,
+        resolvedHead,
+        'APPROVED_MERGE_DESCENDANT'
+    );
+
+    const replay = verifyApprovedReplayForHead({
+        cwd,
+        contract,
+        resolvedHead: contract.approvedMergeSecondParent,
+        headTree: contract.approvedMergeSecondParentTree
+    });
+
+    return Object.freeze({
+        mode: 'APPROVED_RC13_MERGE',
+        head: resolvedHead,
+        headTree,
+        acceptedCommit: contract.approvedMergeSha,
+        approvedSecondParent: contract.approvedMergeSecondParent,
+        replayOrdinal: replay.replayOrdinal,
+        fingerprintOccurrenceCount: replay.fingerprintOccurrenceCount,
+        diagnosticPatchId: replay.diagnosticPatchId
+    });
+};
+
+const verifyRepositoryForTest = ({
+    cwd,
+    contract = RELEASE_PROVENANCE_CONTRACT,
+    head = 'HEAD'
+}) => {
+    assertContractShape(contract);
+    assertRepositoryIsComplete(cwd);
+
+    const resolvedHead = gitText(cwd, ['rev-parse', `${head}^{commit}`]);
+    ensure(FULL_SHA_PATTERN.test(resolvedHead), 'HEAD_MALFORMED');
+    const headTree = gitText(cwd, ['rev-parse', `${resolvedHead}^{tree}`]);
+
+    const originalExists = objectExists(cwd, contract.originalSha);
+    const originalIsAncestor = originalExists && isAncestor(cwd, contract.originalSha, resolvedHead);
+
+    if (originalIsAncestor) {
+        const directIdentity = assertExactIdentity(
+            cwd,
+            contract.originalSha,
+            contract.originalParent,
+            contract,
+            'SOURCE'
+        );
+        const chain = firstParentChain(cwd, resolvedHead);
+        ensure(chain.includes(contract.originalSha), 'SOURCE_NOT_FIRST_PARENT');
+        const matches = findFingerprintMatches(cwd, chain, contract);
+        ensure(
+            matches.length === 1 && matches[0] === contract.originalSha,
+            'AMBIGUOUS_RELEASE_LINEAGE'
+        );
+        ensure(
+            gitText(cwd, [
+                'rev-list',
+                '--min-parents=2',
+                `${contract.originalSha}..${resolvedHead}`
+            ]) === '',
+            'SOURCE_DESCENDANT_MERGE'
+        );
+        assertNormalFirstParentDescendants(
+            cwd,
+            contract.originalSha,
+            resolvedHead,
+            'SOURCE_DESCENDANT',
+            false
+        );
+        if (
+            contract.replaySha !== contract.originalSha &&
+            objectExists(cwd, contract.replaySha) &&
+            isAncestor(cwd, contract.replaySha, resolvedHead)
+        ) fail('AMBIGUOUS_RELEASE_LINEAGE');
+        return Object.freeze({
+            mode: 'DIRECT',
+            head: resolvedHead,
+            headTree,
+            acceptedCommit: contract.originalSha,
+            fingerprintOccurrenceCount: matches.length,
+            diagnosticPatchId: directIdentity.diagnosticPatchId
+        });
+    }
+
+    const approvedMergeExists = objectExists(cwd, contract.approvedMergeSha);
+    if (
+        approvedMergeExists &&
+        isAncestor(cwd, contract.approvedMergeSha, resolvedHead)
+    ) {
+        return verifyApprovedMergeForHead({
+            cwd,
+            contract,
+            resolvedHead,
+            headTree
+        });
+    }
+
+    return verifyApprovedReplayForHead({
+        cwd,
+        contract,
+        resolvedHead,
+        headTree
     });
 };
 
@@ -608,6 +777,12 @@ const contractFromIdentity = ({
     return Object.freeze({
         frozenTarget: target,
         frozenTargetTree: gitText(cwd, ['rev-parse', `${target}^{tree}`]),
+        approvedMergeSha: '4'.repeat(40),
+        approvedMergeFirstParent: target,
+        approvedMergeSecondParent: '5'.repeat(40),
+        approvedMergeResultTree: '6'.repeat(40),
+        approvedMergeSecondParentTree: '6'.repeat(40),
+        approvedMergeSubject: 'fixture approved merge',
         originalSha: mode === 'DIRECT' ? identitySha : ZERO_SHA,
         originalParent: mode === 'DIRECT' ? identity.parent : '1'.repeat(40),
         replaySha: mode === 'APPROVED_REPLAY' ? identitySha : '2'.repeat(40),
@@ -681,9 +856,19 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
         assertion();
         matrix.push(Object.freeze({ number, name, result: 'PASS' }));
     };
-    const recordFailClosed = (number, name, assertion) => {
+    const recordFailClosed = (
+        number,
+        name,
+        expectedCodeOrAssertion,
+        maybeAssertion
+    ) => {
+        const expectedCode = typeof expectedCodeOrAssertion === 'string'
+            ? expectedCodeOrAssertion
+            : null;
+        const assertion = expectedCode ? maybeAssertion : expectedCodeOrAssertion;
+        let actualCode;
         try {
-            expectReleaseFailure(assertion, `case=${number} ${name}`);
+            actualCode = expectReleaseFailure(assertion, `case=${number} ${name}`);
         } catch (error) {
             if (error.code === 'FIXTURE_EXPECTED_FAILURE_MISSING') {
                 throw new ReleaseProvenanceError(
@@ -692,6 +877,12 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
                 );
             }
             throw error;
+        }
+        if (expectedCode && actualCode !== expectedCode) {
+            throw new ReleaseProvenanceError(
+                'FIXTURE_UNEXPECTED_FAILURE_CODE',
+                `case=${number} expected=${expectedCode} actual=${actualCode}`
+            );
         }
         matrix.push(Object.freeze({ number, name, result: 'PASS' }));
     };
@@ -1164,7 +1355,579 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
             assertSafeStartScript(packageJson);
         });
 
-        ensure(matrix.length === 25, 'FIXTURE_MATRIX_INCOMPLETE');
+        const approvedMerge = replay.contract.approvedMergeSha;
+        const approvedCandidate = replay.contract.approvedMergeSecondParent;
+        const approvedTree = replay.contract.approvedMergeResultTree;
+        const approvedSubject = replay.contract.approvedMergeSubject;
+
+        recordPass(26, 'approved matrix existing DIRECT lineage', () => {
+            ensure(
+                verifyRepositoryForTest({
+                    cwd: direct.cwd,
+                    contract: direct.contract,
+                    head: direct.head
+                }).mode === 'DIRECT',
+                'FIXTURE_DIRECT_NOT_ACCEPTED'
+            );
+        });
+        recordPass(27, 'approved matrix existing APPROVED_REPLAY candidate', () => {
+            ensure(
+                verifyRepositoryForTest({
+                    cwd: replay.cwd,
+                    contract: replay.contract,
+                    head: approvedCandidate
+                }).mode === 'APPROVED_REPLAY',
+                'FIXTURE_APPROVED_CANDIDATE_NOT_ACCEPTED'
+            );
+        });
+        recordPass(28, 'exact RC13 merge at HEAD', () => {
+            ensure(
+                verifyRepositoryForTest({
+                    cwd: replay.cwd,
+                    contract: replay.contract,
+                    head: approvedMerge
+                }).mode === 'APPROVED_RC13_MERGE',
+                'FIXTURE_APPROVED_MERGE_NOT_ACCEPTED'
+            );
+        });
+
+        const approvedDescendantTree = deriveTree(
+            replay.cwd,
+            approvedTree,
+            { 'approved-descendant.txt': 'approved descendant\n' }
+        );
+        const approvedDescendant = commitTree(
+            replay.cwd,
+            approvedDescendantTree,
+            [approvedMerge],
+            'approved merge descendant'
+        );
+        recordPass(29, 'exact RC13 merge plus one non-empty descendant', () => {
+            ensure(
+                verifyRepositoryForTest({
+                    cwd: replay.cwd,
+                    contract: replay.contract,
+                    head: approvedDescendant
+                }).mode === 'APPROVED_RC13_MERGE',
+                'FIXTURE_APPROVED_DESCENDANT_NOT_ACCEPTED'
+            );
+        });
+        recordPass(30, 'current source anchor', () => {
+            const result = verifyRepositoryForTest({
+                cwd,
+                contract: RELEASE_PROVENANCE_CONTRACT,
+                head: RELEASE_PROVENANCE_CONTRACT.approvedMergeSha
+            });
+            ensure(result.mode === 'APPROVED_RC13_MERGE', 'FIXTURE_SOURCE_ANCHOR_NOT_ACCEPTED');
+        });
+
+        const wrongFirstMerge = commitTree(
+            replay.cwd,
+            approvedTree,
+            [replay.replayParent, approvedCandidate],
+            approvedSubject
+        );
+        recordFailClosed(
+            31,
+            'approved merge wrong first parent',
+            'APPROVED_MERGE_FIRST_PARENT_MISMATCH',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    approvedMergeSha: wrongFirstMerge
+                }),
+                head: wrongFirstMerge
+            });
+            }
+        );
+
+        const wrongSecondMerge = commitTree(
+            replay.cwd,
+            approvedTree,
+            [replay.target, CURRENT_26_CANDIDATE_SHA],
+            approvedSubject
+        );
+        recordFailClosed(
+            32,
+            'approved merge wrong second parent',
+            'APPROVED_MERGE_SECOND_PARENT_MISMATCH',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    approvedMergeSha: wrongSecondMerge
+                }),
+                head: wrongSecondMerge
+            });
+            }
+        );
+
+        const reversedParentMerge = commitTree(
+            replay.cwd,
+            approvedTree,
+            [approvedCandidate, replay.target],
+            approvedSubject
+        );
+        recordFailClosed(
+            33,
+            'approved merge reversed parents',
+            'APPROVED_MERGE_FIRST_PARENT_MISMATCH',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    approvedMergeSha: reversedParentMerge
+                }),
+                head: reversedParentMerge
+            });
+            }
+        );
+
+        const wrongMergeTree = deriveTree(
+            replay.cwd,
+            approvedTree,
+            { 'wrong-merge-result.txt': 'wrong result\n' }
+        );
+        const wrongResultMerge = commitTree(
+            replay.cwd,
+            wrongMergeTree,
+            [replay.target, approvedCandidate],
+            approvedSubject
+        );
+        recordFailClosed(
+            34,
+            'approved merge wrong result tree',
+            'APPROVED_MERGE_RESULT_TREE_MISMATCH',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    approvedMergeSha: wrongResultMerge
+                }),
+                head: wrongResultMerge
+            });
+            }
+        );
+
+        const wrongSecondParentTree = deriveTree(
+            replay.cwd,
+            approvedTree,
+            { 'wrong-second-parent-tree.txt': 'wrong second parent tree\n' }
+        );
+        const wrongTreeCandidate = commitTree(
+            replay.cwd,
+            wrongSecondParentTree,
+            [approvedCandidate],
+            'candidate with wrong tree'
+        );
+        const wrongSecondTreeMerge = commitTree(
+            replay.cwd,
+            approvedTree,
+            [replay.target, wrongTreeCandidate],
+            approvedSubject
+        );
+        recordFailClosed(
+            35,
+            'approved merge wrong second-parent tree',
+            'APPROVED_MERGE_SECOND_PARENT_TREE_MISMATCH',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    approvedMergeSha: wrongSecondTreeMerge,
+                    approvedMergeSecondParent: wrongTreeCandidate
+                }),
+                head: wrongSecondTreeMerge
+            });
+            }
+        );
+
+        const wrongSubjectMerge = commitTree(
+            replay.cwd,
+            approvedTree,
+            [replay.target, approvedCandidate],
+            'wrong approved merge subject'
+        );
+        recordFailClosed(
+            36,
+            'approved merge wrong subject',
+            'APPROVED_MERGE_SUBJECT_MISMATCH',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    approvedMergeSha: wrongSubjectMerge
+                }),
+                head: wrongSubjectMerge
+            });
+            }
+        );
+
+        const sameVisibleDifferentSha = commitTree(
+            replay.cwd,
+            approvedTree,
+            [replay.target, approvedCandidate],
+            approvedSubject
+        );
+        recordFailClosed(
+            37,
+            'same visible merge fields but different SHA',
+            'CANDIDATE_MERGE_PRESENT',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: sameVisibleDifferentSha
+            });
+            }
+        );
+
+        const outsideMainTree = deriveTree(
+            replay.cwd,
+            replay.contract.frozenTargetTree,
+            { 'outside-main.txt': 'outside main\n' }
+        );
+        const outsideMain = commitTree(
+            replay.cwd,
+            outsideMainTree,
+            [replay.target],
+            'outside first-parent main'
+        );
+        const mergeOutsideFirstParent = commitTree(
+            replay.cwd,
+            approvedTree,
+            [outsideMain, approvedMerge],
+            'approved merge only on side parent'
+        );
+        recordFailClosed(
+            38,
+            'approved merge outside first-parent chain',
+            'APPROVED_MERGE_NOT_FIRST_PARENT',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: mergeOutsideFirstParent
+            });
+            }
+        );
+
+        const wrapperSideTree = deriveTree(
+            replay.cwd,
+            approvedTree,
+            { 'wrapper-side.txt': 'wrapper side\n' }
+        );
+        const wrapperSide = commitTree(
+            replay.cwd,
+            wrapperSideTree,
+            [approvedMerge],
+            'wrapper side'
+        );
+        const syntheticWrapper = commitTree(
+            replay.cwd,
+            approvedTree,
+            [approvedMerge, wrapperSide],
+            'synthetic wrapper above approved merge'
+        );
+        recordFailClosed(
+            39,
+            'synthetic wrapper merge above approved merge',
+            'UNAPPROVED_MERGE_PRESENT',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: syntheticWrapper
+            });
+            }
+        );
+
+        const secondMergeAfter = commitTree(
+            replay.cwd,
+            approvedDescendantTree,
+            [approvedDescendant, wrapperSide],
+            'second merge after approved merge'
+        );
+        recordFailClosed(
+            40,
+            'second merge after approved merge',
+            'UNAPPROVED_MERGE_PRESENT',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: secondMergeAfter
+            });
+            }
+        );
+
+        const beforeSide = commitTree(
+            replay.cwd,
+            outsideMainTree,
+            [replay.target],
+            'merge-before side'
+        );
+        const mergeBefore = commitTree(
+            replay.cwd,
+            outsideMainTree,
+            [replay.target, beforeSide],
+            'merge before approved merge'
+        );
+        const approvedAfterUnknownMerge = commitTree(
+            replay.cwd,
+            approvedTree,
+            [mergeBefore, approvedCandidate],
+            approvedSubject
+        );
+        recordFailClosed(
+            41,
+            'merge before approved merge fails exact first-parent identity',
+            'APPROVED_MERGE_FIRST_PARENT_MISMATCH',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    approvedMergeSha: approvedAfterUnknownMerge
+                }),
+                head: approvedAfterUnknownMerge
+            });
+            }
+        );
+
+        const octopusMerge = commitTree(
+            replay.cwd,
+            approvedTree,
+            [replay.target, approvedCandidate, wrapperSide],
+            approvedSubject
+        );
+        recordFailClosed(
+            42,
+            'octopus approved merge imitation',
+            'APPROVED_MERGE_PARENT_COUNT',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    approvedMergeSha: octopusMerge
+                }),
+                head: octopusMerge
+            });
+            }
+        );
+
+        const candidateMergeSide = commitTree(
+            replay.cwd,
+            approvedTree,
+            [approvedCandidate],
+            'candidate merge side'
+        );
+        const mergedCandidate = commitTree(
+            replay.cwd,
+            approvedTree,
+            [approvedCandidate, candidateMergeSide],
+            'merged candidate'
+        );
+        const mergeWithMergedCandidate = commitTree(
+            replay.cwd,
+            approvedTree,
+            [replay.target, mergedCandidate],
+            approvedSubject
+        );
+        recordFailClosed(
+            43,
+            'candidate second parent contains merge',
+            'UNAPPROVED_MERGE_PRESENT',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    approvedMergeSha: mergeWithMergedCandidate,
+                    approvedMergeSecondParent: mergedCandidate
+                }),
+                head: mergeWithMergedCandidate
+            });
+            }
+        );
+
+        recordFailClosed(
+            44,
+            'approved merge candidate replay absent',
+            'REPLAY_NOT_FIRST_PARENT',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    replaySha: 'e'.repeat(40)
+                }),
+                head: approvedMerge
+            });
+            }
+        );
+
+        const duplicateReplayTree = gitText(
+            replay.cwd,
+            ['rev-parse', `${reapply}^{tree}`]
+        );
+        const mergeWithDuplicateReplay = commitTree(
+            replay.cwd,
+            duplicateReplayTree,
+            [replay.target, reapply],
+            approvedSubject
+        );
+        recordFailClosed(
+            45,
+            'approved merge candidate replay duplicate',
+            'AMBIGUOUS_RELEASE_LINEAGE',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    approvedMergeSha: mergeWithDuplicateReplay,
+                    approvedMergeSecondParent: reapply,
+                    approvedMergeResultTree: duplicateReplayTree,
+                    approvedMergeSecondParentTree: duplicateReplayTree
+                }),
+                head: mergeWithDuplicateReplay
+            });
+            }
+        );
+
+        recordFailClosed(
+            46,
+            'approved merge candidate replay wrong ordinal',
+            'REPLAY_ORDINAL_MISMATCH',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneContract(replay.contract, {
+                    replayOrdinal: 17
+                }),
+                head: approvedMerge
+            });
+            }
+        );
+
+        recordFailClosed(
+            47,
+            'approved matrix shallow history',
+            'SHALLOW_HISTORY',
+            () => {
+            verifyRepositoryForTest({
+                cwd: shallowPath,
+                contract: replay.contract,
+                head: 'HEAD'
+            });
+            }
+        );
+
+        runGit(bypassPath, ['config', '--local', 'extensions.partialClone', 'origin']);
+        recordFailClosed(
+            48,
+            'approved matrix partial history',
+            'PARTIAL_HISTORY',
+            () => {
+            verifyRepositoryForTest({
+                cwd: bypassPath,
+                contract: replay.contract,
+                head: approvedMerge
+            });
+            }
+        );
+        runGit(bypassPath, ['config', '--local', '--unset', 'extensions.partialClone']);
+
+        const emptyApprovedDescendant = commitTree(
+            replay.cwd,
+            approvedTree,
+            [approvedMerge],
+            'empty approved descendant'
+        );
+        recordFailClosed(
+            49,
+            'empty post-approved-merge descendant',
+            'APPROVED_MERGE_DESCENDANT_EMPTY',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: emptyApprovedDescendant
+            });
+            }
+        );
+
+        const unknownMain = commitTree(
+            replay.cwd,
+            outsideMainTree,
+            [replay.target],
+            'unknown merge main'
+        );
+        const unknownCandidateMerge = commitTree(
+            replay.cwd,
+            approvedTree,
+            [unknownMain, approvedCandidate],
+            'unknown merge containing approved candidate'
+        );
+        recordFailClosed(
+            50,
+            'unknown merge containing approved candidate',
+            'CANDIDATE_MERGE_PRESENT',
+            () => {
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: unknownCandidateMerge
+            });
+            }
+        );
+
+        const directSideTree = deriveTree(
+            direct.cwd,
+            gitText(direct.cwd, ['rev-parse', `${direct.original}^{tree}`]),
+            { 'direct-merge-side.txt': 'direct merge side\n' }
+        );
+        const directSide = commitTree(
+            direct.cwd,
+            directSideTree,
+            [direct.original],
+            'direct merge side'
+        );
+        const directMerge = commitTree(
+            direct.cwd,
+            gitText(direct.cwd, ['rev-parse', `${direct.head}^{tree}`]),
+            [direct.head, directSide],
+            'unknown merge after approved direct source'
+        );
+        recordFailClosed(
+            51,
+            'unknown merge after approved DIRECT source',
+            'SOURCE_DESCENDANT_MERGE',
+            () => {
+            verifyRepositoryForTest({
+                cwd: direct.cwd,
+                contract: direct.contract,
+                head: directMerge
+            });
+            }
+        );
+
+        const directEmptyDescendant = commitTree(
+            direct.cwd,
+            gitText(direct.cwd, ['rev-parse', `${direct.head}^{tree}`]),
+            [direct.head],
+            'empty direct descendant'
+        );
+        recordPass(52, 'DIRECT empty linear descendant compatibility', () => {
+            ensure(
+                verifyRepositoryForTest({
+                    cwd: direct.cwd,
+                    contract: direct.contract,
+                    head: directEmptyDescendant
+                }).mode === 'DIRECT',
+                'FIXTURE_DIRECT_EMPTY_DESCENDANT_NOT_ACCEPTED'
+            );
+        });
+
+        ensure(matrix.length === 52, 'FIXTURE_MATRIX_INCOMPLETE');
         return Object.freeze(matrix);
     } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
