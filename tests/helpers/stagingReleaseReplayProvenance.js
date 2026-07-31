@@ -47,16 +47,103 @@ const EXPECTED_CHANGED_PATHS = Object.freeze([
     'tests/stagingRuntimeSafetySmoke.js'
 ].sort());
 
+const CHECKPOINT_2_SECOND_PARENT_CHAIN = Object.freeze([
+    Object.freeze({
+        sha: 'cad3ae7593c37ce81cc7e62d11c20566527a20c3',
+        parent: 'ccede5fa36e22fb0d3de9e96f8ee58a5c9909411',
+        tree: 'c4af6a989f660c2425d1ef15252db44fc48c6498',
+        subject: 'fix(release): attest approved RC13 merge topology',
+        changedPaths: Object.freeze([
+            'tests/helpers/stagingReleaseReplayProvenance.js',
+            'tests/stagingReleaseContractSmoke.js'
+        ])
+    }),
+    Object.freeze({
+        sha: '31fc915b369ade956ebfbcad9eeb610f1e27fa16',
+        parent: 'cad3ae7593c37ce81cc7e62d11c20566527a20c3',
+        tree: '4ea6d2a162a1321fea5658d352e53454628258b0',
+        subject: 'fix(db): enforce attested verified runtime target',
+        changedPaths: Object.freeze([
+            'config/db.js',
+            'config/stagingReleaseContract.js',
+            'config/startupSafety.js',
+            'controllers/runtimeMetaController.js',
+            'tests/runtimeIdentitySmoke.js',
+            'tests/serverStartupSafetySmoke.js',
+            'tests/stagingVerificationHarnessSmoke.js',
+            'tests/startupSafetySmoke.js'
+        ])
+    }),
+    Object.freeze({
+        sha: '44c3a314f87a024fa534238bbac164abe4e5a757',
+        parent: '31fc915b369ade956ebfbcad9eeb610f1e27fa16',
+        tree: '8329d8f78182329eb0b1391fb9ffa1170d6b1fb6',
+        subject: 'fix(runtime): require own revision attestation',
+        changedPaths: Object.freeze([
+            'services/runtimeIdentityService.js',
+            'tests/runtimeIdentitySmoke.js'
+        ])
+    }),
+    Object.freeze({
+        sha: '56a0adce4baacd61a396d5a7d8a6a7517dd09769',
+        parent: '44c3a314f87a024fa534238bbac164abe4e5a757',
+        tree: '2bd17eba01f58aaec31dfceb3d31b4bf184f3fae',
+        subject: 'fix(test): make blocked startup wait race-safe',
+        changedPaths: Object.freeze([
+            'tests/serverStartupSafetySmoke.js'
+        ])
+    }),
+    Object.freeze({
+        sha: '0ca267c39e68bb683f85ffa3a6ae2083547a78ef',
+        parent: '56a0adce4baacd61a396d5a7d8a6a7517dd09769',
+        tree: 'e85429600962ef873441fcc202d10591096e90bd',
+        subject: 'fix(test): synchronize startup smoke readiness',
+        changedPaths: Object.freeze([
+            'tests/serverStartupSafetySmoke.js'
+        ])
+    }),
+    Object.freeze({
+        sha: 'fc8c0e4aaca343fcfb03810451507a263b1fe674',
+        parent: '0ca267c39e68bb683f85ffa3a6ae2083547a78ef',
+        tree: '63582c7ff60f829287b72d0e08271cd03973ae08',
+        subject: 'fix(test): bound failed-db shutdown wait',
+        changedPaths: Object.freeze([
+            'tests/serverStartupSafetySmoke.js'
+        ])
+    })
+]);
+
+const APPROVED_MERGE_CHECKPOINTS = Object.freeze([
+    Object.freeze({
+        sha: 'ccede5fa36e22fb0d3de9e96f8ee58a5c9909411',
+        firstParent: '71ff4ed76b09496343d1593e23dc5d30d9cf5964',
+        secondParent: '3b9bce487d8257da3bbb334117c8af3b51e469c2',
+        resultTree: 'b22f19c4011f4f423fd30857ca61c3504cae30b3',
+        secondParentTree: 'b22f19c4011f4f423fd30857ca61c3504cae30b3',
+        subject:
+            'Merge pull request #24 from Qusay90/codex/commerce-pro-v3-reconciled-r5-20260729',
+        secondParentValidation: Object.freeze({ type: 'CONTROLLED_REPLAY' })
+    }),
+    Object.freeze({
+        sha: 'efc20acb5f221a8abdf7dc7d6e30ffb5c59383f0',
+        firstParent: 'ccede5fa36e22fb0d3de9e96f8ee58a5c9909411',
+        secondParent: 'fc8c0e4aaca343fcfb03810451507a263b1fe674',
+        resultTree: '63582c7ff60f829287b72d0e08271cd03973ae08',
+        secondParentTree: '63582c7ff60f829287b72d0e08271cd03973ae08',
+        subject:
+            'Merge pull request #25 from Qusay90/codex/main5-prepromotion-remediation-20260730',
+        secondParentValidation: Object.freeze({
+            type: 'EXACT_COMMIT_CHAIN',
+            baseSha: 'ccede5fa36e22fb0d3de9e96f8ee58a5c9909411',
+            commits: CHECKPOINT_2_SECOND_PARENT_CHAIN
+        })
+    })
+]);
+
 const RELEASE_PROVENANCE_CONTRACT = Object.freeze({
     frozenTarget: '71ff4ed76b09496343d1593e23dc5d30d9cf5964',
     frozenTargetTree: '1084dec268b39e2c97bd730ce1a919381d5735ba',
-    approvedMergeSha: 'ccede5fa36e22fb0d3de9e96f8ee58a5c9909411',
-    approvedMergeFirstParent: '71ff4ed76b09496343d1593e23dc5d30d9cf5964',
-    approvedMergeSecondParent: '3b9bce487d8257da3bbb334117c8af3b51e469c2',
-    approvedMergeResultTree: 'b22f19c4011f4f423fd30857ca61c3504cae30b3',
-    approvedMergeSecondParentTree: 'b22f19c4011f4f423fd30857ca61c3504cae30b3',
-    approvedMergeSubject:
-        'Merge pull request #24 from Qusay90/codex/commerce-pro-v3-reconciled-r5-20260729',
+    approvedMergeCheckpoints: APPROVED_MERGE_CHECKPOINTS,
     originalSha: 'c06cbcba0d1cba77b030d2a588e7a699be4a05a2',
     originalParent: 'cfeaf0f043642ad1db6a7b2b565c3f0e0050ed47',
     replaySha: '7b4765b1c0868852821c16af6d6483ab41a5bef0',
@@ -325,11 +412,6 @@ const assertContractShape = (contract) => {
     for (const name of [
         'frozenTarget',
         'frozenTargetTree',
-        'approvedMergeSha',
-        'approvedMergeFirstParent',
-        'approvedMergeSecondParent',
-        'approvedMergeResultTree',
-        'approvedMergeSecondParentTree',
         'originalSha',
         'originalParent',
         'replaySha',
@@ -337,23 +419,78 @@ const assertContractShape = (contract) => {
         'parentTree',
         'resultTree'
     ]) ensure(FULL_SHA_PATTERN.test(contract[name]), 'MALFORMED_CONTRACT_SHA');
-    ensure(
-        contract.approvedMergeFirstParent === contract.frozenTarget,
-        'MALFORMED_APPROVED_MERGE_FIRST_PARENT'
-    );
-    ensure(
-        contract.approvedMergeResultTree === contract.approvedMergeSecondParentTree,
-        'MALFORMED_APPROVED_MERGE_TREE'
-    );
-    ensure(
-        typeof contract.approvedMergeSubject === 'string' &&
-        contract.approvedMergeSubject.length > 0,
-        'MALFORMED_APPROVED_MERGE_SUBJECT'
-    );
     ensure(SHA256_PATTERN.test(contract.rawDiffSha256), 'MALFORMED_CONTRACT_HASH');
     ensure(Number.isInteger(contract.rawDiffSize) && contract.rawDiffSize >= 0, 'MALFORMED_CONTRACT_SIZE');
     ensure(Number.isInteger(contract.replayOrdinal) && contract.replayOrdinal > 0, 'MALFORMED_ORDINAL');
     ensure(Array.isArray(contract.changedPaths), 'MALFORMED_PATH_CONTRACT');
+
+    const checkpoints = contract.approvedMergeCheckpoints;
+    ensure(Array.isArray(checkpoints), 'MALFORMED_CHECKPOINT_CONTRACT');
+    ensure(checkpoints.length >= 1 && checkpoints.length <= 2, 'MALFORMED_CHECKPOINT_COUNT');
+    ensure(Object.isFrozen(checkpoints), 'MALFORMED_CHECKPOINT_IMMUTABILITY');
+
+    const seen = new Set();
+    let expectedFirstParent = contract.frozenTarget;
+    for (const [index, checkpoint] of checkpoints.entries()) {
+        const role = `CHECKPOINT_${index + 1}`;
+        ensure(Object.isFrozen(checkpoint), `${role}_MUTABLE`);
+        for (const name of [
+            'sha',
+            'firstParent',
+            'secondParent',
+            'resultTree',
+            'secondParentTree'
+        ]) ensure(FULL_SHA_PATTERN.test(checkpoint[name]), `${role}_MALFORMED_SHA`);
+        ensure(!seen.has(checkpoint.sha), 'DUPLICATE_APPROVED_CHECKPOINT');
+        seen.add(checkpoint.sha);
+        ensure(checkpoint.firstParent === expectedFirstParent, 'MALFORMED_CHECKPOINT_ORDER');
+        ensure(checkpoint.resultTree === checkpoint.secondParentTree, `${role}_TREE_CONTRACT`);
+        ensure(
+            typeof checkpoint.subject === 'string' && checkpoint.subject.length > 0,
+            `${role}_SUBJECT_CONTRACT`
+        );
+
+        const validation = checkpoint.secondParentValidation;
+        ensure(
+            validation && typeof validation === 'object' && Object.isFrozen(validation),
+            `${role}_SECOND_PARENT_CONTRACT`
+        );
+        if (validation.type === 'CONTROLLED_REPLAY') {
+            ensure(index === 0, `${role}_REPLAY_POSITION`);
+        } else if (validation.type === 'EXACT_COMMIT_CHAIN') {
+            ensure(index > 0, `${role}_CHAIN_POSITION`);
+            ensure(validation.baseSha === checkpoint.firstParent, `${role}_CHAIN_BASE`);
+            ensure(Array.isArray(validation.commits), `${role}_CHAIN_CONTRACT`);
+            ensure(validation.commits.length === 6, `${role}_CHAIN_LENGTH`);
+            ensure(Object.isFrozen(validation.commits), `${role}_CHAIN_MUTABLE`);
+            let expectedParent = validation.baseSha;
+            for (const [commitIndex, entry] of validation.commits.entries()) {
+                const commitRole = `${role}_CHAIN_${commitIndex + 1}`;
+                ensure(Object.isFrozen(entry), `${commitRole}_MUTABLE`);
+                for (const name of ['sha', 'parent', 'tree']) {
+                    ensure(FULL_SHA_PATTERN.test(entry[name]), `${commitRole}_MALFORMED_SHA`);
+                }
+                ensure(entry.parent === expectedParent, `${commitRole}_ORDER`);
+                ensure(
+                    typeof entry.subject === 'string' && entry.subject.length > 0,
+                    `${commitRole}_SUBJECT_CONTRACT`
+                );
+                ensure(
+                    Array.isArray(entry.changedPaths) && Object.isFrozen(entry.changedPaths),
+                    `${commitRole}_PATH_CONTRACT`
+                );
+                expectedParent = entry.sha;
+            }
+            ensure(expectedParent === checkpoint.secondParent, `${role}_CHAIN_TIP`);
+            ensure(
+                validation.commits.at(-1).tree === checkpoint.secondParentTree,
+                `${role}_CHAIN_TREE`
+            );
+        } else {
+            fail(`${role}_SECOND_PARENT_MODE`);
+        }
+        expectedFirstParent = checkpoint.sha;
+    }
 };
 
 const assertExactIdentity = (cwd, sha, expectedParent, contract, role) => {
@@ -477,74 +614,123 @@ const verifyApprovedReplayForHead = ({
     });
 };
 
-const verifyApprovedMergeForHead = ({
+const assertExactMergeCheckpoint = (cwd, checkpoint, role) => {
+    ensure(objectExists(cwd, checkpoint.sha), `${role}_OBJECT_MISSING`);
+    ensure(objectExists(cwd, checkpoint.secondParent), `${role}_SECOND_PARENT_OBJECT_MISSING`);
+    const identity = readIdentity(cwd, checkpoint.sha);
+    ensure(identity.parents.length === 2, `${role}_PARENT_COUNT`);
+    ensure(identity.parents[0] === checkpoint.firstParent, `${role}_FIRST_PARENT_MISMATCH`);
+    ensure(identity.parents[1] === checkpoint.secondParent, `${role}_SECOND_PARENT_MISMATCH`);
+    ensure(identity.resultTree === checkpoint.resultTree, `${role}_RESULT_TREE_MISMATCH`);
+    ensure(identity.subject === checkpoint.subject, `${role}_SUBJECT_MISMATCH`);
+    ensure(
+        gitText(cwd, ['rev-parse', `${checkpoint.secondParent}^{tree}`]) ===
+            checkpoint.secondParentTree,
+        `${role}_SECOND_PARENT_TREE_MISMATCH`
+    );
+    return identity;
+};
+
+const verifyExactSecondParentChain = (cwd, checkpoint, role) => {
+    const validation = checkpoint.secondParentValidation;
+    const expectedChain = validation.commits.map((entry) => entry.sha);
+    const actualChain = firstParentChain(
+        cwd,
+        `${validation.baseSha}..${checkpoint.secondParent}`
+    );
+    ensure(sameStringArray(actualChain, expectedChain), `${role}_SECOND_PARENT_CHAIN_MISMATCH`);
+
+    let expectedParent = validation.baseSha;
+    for (const [index, entry] of validation.commits.entries()) {
+        const commitRole = `${role}_SECOND_PARENT_${index + 1}`;
+        ensure(objectExists(cwd, entry.sha), `${commitRole}_OBJECT_MISSING`);
+        const identity = readIdentity(cwd, entry.sha);
+        ensure(identity.parents.length === 1, `${commitRole}_MERGE`);
+        ensure(identity.parent === expectedParent, `${commitRole}_PARENT_MISMATCH`);
+        ensure(identity.parent === entry.parent, `${commitRole}_CONTRACT_PARENT_MISMATCH`);
+        ensure(identity.resultTree === entry.tree, `${commitRole}_TREE_MISMATCH`);
+        ensure(identity.parentTree !== identity.resultTree, `${commitRole}_EMPTY`);
+        ensure(identity.subject === entry.subject, `${commitRole}_SUBJECT_MISMATCH`);
+        ensure(
+            sameStringArray(identity.changedPaths, [...entry.changedPaths].sort()),
+            `${commitRole}_PATH_SET_MISMATCH`
+        );
+        expectedParent = entry.sha;
+    }
+    ensure(expectedParent === checkpoint.secondParent, `${role}_SECOND_PARENT_TIP_MISMATCH`);
+};
+
+const verifyApprovedCheckpointChainForHead = ({
     cwd,
     contract,
     resolvedHead,
     headTree
 }) => {
-    const mergeIdentity = readIdentity(cwd, contract.approvedMergeSha);
-    ensure(mergeIdentity.parents.length === 2, 'APPROVED_MERGE_PARENT_COUNT');
-    ensure(
-        mergeIdentity.parents[0] === contract.approvedMergeFirstParent,
-        'APPROVED_MERGE_FIRST_PARENT_MISMATCH'
+    const headFirstParentChain = firstParentChain(
+        cwd,
+        `${contract.frozenTarget}..${resolvedHead}`
     );
-    ensure(
-        mergeIdentity.parents[1] === contract.approvedMergeSecondParent,
-        'APPROVED_MERGE_SECOND_PARENT_MISMATCH'
-    );
-    ensure(
-        mergeIdentity.resultTree === contract.approvedMergeResultTree,
-        'APPROVED_MERGE_RESULT_TREE_MISMATCH'
-    );
-    ensure(
-        mergeIdentity.subject === contract.approvedMergeSubject,
-        'APPROVED_MERGE_SUBJECT_MISMATCH'
-    );
-    ensure(
-        gitText(
-            cwd,
-            ['rev-parse', `${contract.approvedMergeSecondParent}^{tree}`]
-        ) === contract.approvedMergeSecondParentTree,
-        'APPROVED_MERGE_SECOND_PARENT_TREE_MISMATCH'
-    );
+    const applicable = [];
+    let missingPrefixEntry = false;
+    for (const checkpoint of contract.approvedMergeCheckpoints) {
+        const present = headFirstParentChain.includes(checkpoint.sha);
+        if (present) {
+            ensure(!missingPrefixEntry, 'APPROVED_CHECKPOINT_PREFIX_ORDER');
+            applicable.push(checkpoint);
+        } else {
+            missingPrefixEntry = true;
+        }
+    }
+    ensure(applicable.length > 0, 'APPROVED_MERGE_NOT_FIRST_PARENT');
 
-    const headFirstParentChain = firstParentChain(cwd, resolvedHead);
-    ensure(
-        headFirstParentChain.includes(contract.approvedMergeSha),
-        'APPROVED_MERGE_NOT_FIRST_PARENT'
-    );
+    const replayResults = [];
+    for (const [index, checkpoint] of applicable.entries()) {
+        const role = `APPROVED_CHECKPOINT_${index + 1}`;
+        assertExactMergeCheckpoint(cwd, checkpoint, role);
+        if (checkpoint.secondParentValidation.type === 'CONTROLLED_REPLAY') {
+            replayResults.push(verifyApprovedReplayForHead({
+                cwd,
+                contract,
+                resolvedHead: checkpoint.secondParent,
+                headTree: checkpoint.secondParentTree
+            }));
+        } else {
+            verifyExactSecondParentChain(cwd, checkpoint, role);
+        }
+    }
 
     const merges = commitList(cwd, [
         'rev-list',
+        '--topo-order',
+        '--reverse',
         '--min-parents=2',
         `${contract.frozenTarget}..${resolvedHead}`
     ]);
     ensure(
-        merges.length === 1 && merges[0] === contract.approvedMergeSha,
+        sameStringArray(merges, applicable.map((checkpoint) => checkpoint.sha)),
         'UNAPPROVED_MERGE_PRESENT'
     );
 
+    const latestCheckpoint = applicable.at(-1);
     assertNormalFirstParentDescendants(
         cwd,
-        contract.approvedMergeSha,
+        latestCheckpoint.sha,
         resolvedHead,
-        'APPROVED_MERGE_DESCENDANT'
+        'APPROVED_CHECKPOINT_DESCENDANT'
     );
 
-    const replay = verifyApprovedReplayForHead({
-        cwd,
-        contract,
-        resolvedHead: contract.approvedMergeSecondParent,
-        headTree: contract.approvedMergeSecondParentTree
-    });
+    const replay = replayResults[0];
 
     return Object.freeze({
-        mode: 'APPROVED_RC13_MERGE',
+        mode: applicable.length === 1
+            ? 'APPROVED_RC13_MERGE'
+            : 'APPROVED_MERGE_CHECKPOINT_CHAIN',
         head: resolvedHead,
         headTree,
-        acceptedCommit: contract.approvedMergeSha,
-        approvedSecondParent: contract.approvedMergeSecondParent,
+        acceptedCommit: latestCheckpoint.sha,
+        approvedSecondParent: latestCheckpoint.secondParent,
+        approvedCheckpointCount: applicable.length,
+        approvedCheckpoints: Object.freeze(applicable.map((checkpoint) => checkpoint.sha)),
         replayOrdinal: replay.replayOrdinal,
         fingerprintOccurrenceCount: replay.fingerprintOccurrenceCount,
         diagnosticPatchId: replay.diagnosticPatchId
@@ -611,12 +797,12 @@ const verifyRepositoryForTest = ({
         });
     }
 
-    const approvedMergeExists = objectExists(cwd, contract.approvedMergeSha);
-    if (
-        approvedMergeExists &&
-        isAncestor(cwd, contract.approvedMergeSha, resolvedHead)
-    ) {
-        return verifyApprovedMergeForHead({
+    const approvedCheckpointIsAncestor = contract.approvedMergeCheckpoints.some(
+        (checkpoint) => objectExists(cwd, checkpoint.sha) &&
+            isAncestor(cwd, checkpoint.sha, resolvedHead)
+    );
+    if (approvedCheckpointIsAncestor) {
+        return verifyApprovedCheckpointChainForHead({
             cwd,
             contract,
             resolvedHead,
@@ -765,6 +951,20 @@ const setFixtureHead = (cwd, sha) => {
     runGit(cwd, ['symbolic-ref', 'HEAD', 'refs/heads/fixture']);
 };
 
+const freezeCheckpoint = (checkpoint) => {
+    const validation = { ...checkpoint.secondParentValidation };
+    if (Array.isArray(validation.commits)) {
+        validation.commits = Object.freeze(validation.commits.map((entry) => Object.freeze({
+            ...entry,
+            changedPaths: Object.freeze([...entry.changedPaths])
+        })));
+    }
+    return Object.freeze({
+        ...checkpoint,
+        secondParentValidation: Object.freeze(validation)
+    });
+};
+
 const contractFromIdentity = ({
     cwd,
     target,
@@ -777,12 +977,15 @@ const contractFromIdentity = ({
     return Object.freeze({
         frozenTarget: target,
         frozenTargetTree: gitText(cwd, ['rev-parse', `${target}^{tree}`]),
-        approvedMergeSha: '4'.repeat(40),
-        approvedMergeFirstParent: target,
-        approvedMergeSecondParent: '5'.repeat(40),
-        approvedMergeResultTree: '6'.repeat(40),
-        approvedMergeSecondParentTree: '6'.repeat(40),
-        approvedMergeSubject: 'fixture approved merge',
+        approvedMergeCheckpoints: Object.freeze([freezeCheckpoint({
+            sha: '4'.repeat(40),
+            firstParent: target,
+            secondParent: '5'.repeat(40),
+            resultTree: '6'.repeat(40),
+            secondParentTree: '6'.repeat(40),
+            subject: 'fixture approved merge',
+            secondParentValidation: { type: 'CONTROLLED_REPLAY' }
+        })]),
         originalSha: mode === 'DIRECT' ? identitySha : ZERO_SHA,
         originalParent: mode === 'DIRECT' ? identity.parent : '1'.repeat(40),
         replaySha: mode === 'APPROVED_REPLAY' ? identitySha : '2'.repeat(40),
@@ -837,8 +1040,37 @@ const cloneContract = (contract, overrides = {}) => Object.freeze({
     ...overrides,
     changedPaths: Object.freeze([
         ...(overrides.changedPaths || contract.changedPaths)
-    ])
+    ]),
+    approvedMergeCheckpoints: Object.freeze([
+        ...(overrides.approvedMergeCheckpoints || contract.approvedMergeCheckpoints)
+    ].map(freezeCheckpoint))
 });
+
+const cloneCheckpointContract = (contract, checkpointIndex, overrides = {}) => {
+    const checkpoints = contract.approvedMergeCheckpoints.map((checkpoint, index) => (
+        index === checkpointIndex
+            ? freezeCheckpoint({
+                ...checkpoint,
+                ...overrides,
+                secondParentValidation: overrides.secondParentValidation ||
+                    checkpoint.secondParentValidation
+            })
+            : checkpoint
+    ));
+    return cloneContract(contract, { approvedMergeCheckpoints: checkpoints });
+};
+
+const cloneHistoricalCheckpointContract = (contract, overrides = {}) => cloneContract(
+    contract,
+    {
+        approvedMergeCheckpoints: [freezeCheckpoint({
+            ...contract.approvedMergeCheckpoints[0],
+            ...overrides,
+            secondParentValidation: overrides.secondParentValidation ||
+                contract.approvedMergeCheckpoints[0].secondParentValidation
+        })]
+    }
+);
 
 const expectReleaseFailure = (assertion, detail = '') => {
     try {
@@ -854,7 +1086,12 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
     const matrix = [];
     const recordPass = (number, name, assertion) => {
         assertion();
-        matrix.push(Object.freeze({ number, name, result: 'PASS' }));
+        matrix.push(Object.freeze({
+            number,
+            name,
+            expectedOutcome: 'ACCEPT',
+            result: 'PASS'
+        }));
     };
     const recordFailClosed = (
         number,
@@ -884,7 +1121,13 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
                 `case=${number} expected=${expectedCode} actual=${actualCode}`
             );
         }
-        matrix.push(Object.freeze({ number, name, result: 'PASS' }));
+        matrix.push(Object.freeze({
+            number,
+            name,
+            expectedOutcome: 'REJECT',
+            rejectionCode: actualCode,
+            result: 'PASS'
+        }));
     };
 
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'novastore-rc10r4-provenance-'));
@@ -1355,10 +1598,11 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
             assertSafeStartScript(packageJson);
         });
 
-        const approvedMerge = replay.contract.approvedMergeSha;
-        const approvedCandidate = replay.contract.approvedMergeSecondParent;
-        const approvedTree = replay.contract.approvedMergeResultTree;
-        const approvedSubject = replay.contract.approvedMergeSubject;
+        const approvedCheckpoint = replay.contract.approvedMergeCheckpoints[0];
+        const approvedMerge = approvedCheckpoint.sha;
+        const approvedCandidate = approvedCheckpoint.secondParent;
+        const approvedTree = approvedCheckpoint.resultTree;
+        const approvedSubject = approvedCheckpoint.subject;
 
         recordPass(26, 'approved matrix existing DIRECT lineage', () => {
             ensure(
@@ -1416,7 +1660,7 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
             const result = verifyRepositoryForTest({
                 cwd,
                 contract: RELEASE_PROVENANCE_CONTRACT,
-                head: RELEASE_PROVENANCE_CONTRACT.approvedMergeSha
+                head: RELEASE_PROVENANCE_CONTRACT.approvedMergeCheckpoints[0].sha
             });
             ensure(result.mode === 'APPROVED_RC13_MERGE', 'FIXTURE_SOURCE_ANCHOR_NOT_ACCEPTED');
         });
@@ -1430,12 +1674,12 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
         recordFailClosed(
             31,
             'approved merge wrong first parent',
-            'APPROVED_MERGE_FIRST_PARENT_MISMATCH',
+            'APPROVED_CHECKPOINT_1_FIRST_PARENT_MISMATCH',
             () => {
             verifyRepositoryForTest({
                 cwd: replay.cwd,
-                contract: cloneContract(replay.contract, {
-                    approvedMergeSha: wrongFirstMerge
+                contract: cloneHistoricalCheckpointContract(replay.contract, {
+                    sha: wrongFirstMerge
                 }),
                 head: wrongFirstMerge
             });
@@ -1451,12 +1695,12 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
         recordFailClosed(
             32,
             'approved merge wrong second parent',
-            'APPROVED_MERGE_SECOND_PARENT_MISMATCH',
+            'APPROVED_CHECKPOINT_1_SECOND_PARENT_MISMATCH',
             () => {
             verifyRepositoryForTest({
                 cwd: replay.cwd,
-                contract: cloneContract(replay.contract, {
-                    approvedMergeSha: wrongSecondMerge
+                contract: cloneHistoricalCheckpointContract(replay.contract, {
+                    sha: wrongSecondMerge
                 }),
                 head: wrongSecondMerge
             });
@@ -1472,12 +1716,12 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
         recordFailClosed(
             33,
             'approved merge reversed parents',
-            'APPROVED_MERGE_FIRST_PARENT_MISMATCH',
+            'APPROVED_CHECKPOINT_1_FIRST_PARENT_MISMATCH',
             () => {
             verifyRepositoryForTest({
                 cwd: replay.cwd,
-                contract: cloneContract(replay.contract, {
-                    approvedMergeSha: reversedParentMerge
+                contract: cloneHistoricalCheckpointContract(replay.contract, {
+                    sha: reversedParentMerge
                 }),
                 head: reversedParentMerge
             });
@@ -1498,12 +1742,12 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
         recordFailClosed(
             34,
             'approved merge wrong result tree',
-            'APPROVED_MERGE_RESULT_TREE_MISMATCH',
+            'APPROVED_CHECKPOINT_1_RESULT_TREE_MISMATCH',
             () => {
             verifyRepositoryForTest({
                 cwd: replay.cwd,
-                contract: cloneContract(replay.contract, {
-                    approvedMergeSha: wrongResultMerge
+                contract: cloneHistoricalCheckpointContract(replay.contract, {
+                    sha: wrongResultMerge
                 }),
                 head: wrongResultMerge
             });
@@ -1530,13 +1774,13 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
         recordFailClosed(
             35,
             'approved merge wrong second-parent tree',
-            'APPROVED_MERGE_SECOND_PARENT_TREE_MISMATCH',
+            'APPROVED_CHECKPOINT_1_SECOND_PARENT_TREE_MISMATCH',
             () => {
             verifyRepositoryForTest({
                 cwd: replay.cwd,
-                contract: cloneContract(replay.contract, {
-                    approvedMergeSha: wrongSecondTreeMerge,
-                    approvedMergeSecondParent: wrongTreeCandidate
+                contract: cloneHistoricalCheckpointContract(replay.contract, {
+                    sha: wrongSecondTreeMerge,
+                    secondParent: wrongTreeCandidate
                 }),
                 head: wrongSecondTreeMerge
             });
@@ -1552,12 +1796,12 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
         recordFailClosed(
             36,
             'approved merge wrong subject',
-            'APPROVED_MERGE_SUBJECT_MISMATCH',
+            'APPROVED_CHECKPOINT_1_SUBJECT_MISMATCH',
             () => {
             verifyRepositoryForTest({
                 cwd: replay.cwd,
-                contract: cloneContract(replay.contract, {
-                    approvedMergeSha: wrongSubjectMerge
+                contract: cloneHistoricalCheckpointContract(replay.contract, {
+                    sha: wrongSubjectMerge
                 }),
                 head: wrongSubjectMerge
             });
@@ -1683,12 +1927,12 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
         recordFailClosed(
             41,
             'merge before approved merge fails exact first-parent identity',
-            'APPROVED_MERGE_FIRST_PARENT_MISMATCH',
+            'APPROVED_CHECKPOINT_1_FIRST_PARENT_MISMATCH',
             () => {
             verifyRepositoryForTest({
                 cwd: replay.cwd,
-                contract: cloneContract(replay.contract, {
-                    approvedMergeSha: approvedAfterUnknownMerge
+                contract: cloneHistoricalCheckpointContract(replay.contract, {
+                    sha: approvedAfterUnknownMerge
                 }),
                 head: approvedAfterUnknownMerge
             });
@@ -1704,12 +1948,12 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
         recordFailClosed(
             42,
             'octopus approved merge imitation',
-            'APPROVED_MERGE_PARENT_COUNT',
+            'APPROVED_CHECKPOINT_1_PARENT_COUNT',
             () => {
             verifyRepositoryForTest({
                 cwd: replay.cwd,
-                contract: cloneContract(replay.contract, {
-                    approvedMergeSha: octopusMerge
+                contract: cloneHistoricalCheckpointContract(replay.contract, {
+                    sha: octopusMerge
                 }),
                 head: octopusMerge
             });
@@ -1737,13 +1981,13 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
         recordFailClosed(
             43,
             'candidate second parent contains merge',
-            'UNAPPROVED_MERGE_PRESENT',
+            'CANDIDATE_MERGE_PRESENT',
             () => {
             verifyRepositoryForTest({
                 cwd: replay.cwd,
-                contract: cloneContract(replay.contract, {
-                    approvedMergeSha: mergeWithMergedCandidate,
-                    approvedMergeSecondParent: mergedCandidate
+                contract: cloneHistoricalCheckpointContract(replay.contract, {
+                    sha: mergeWithMergedCandidate,
+                    secondParent: mergedCandidate
                 }),
                 head: mergeWithMergedCandidate
             });
@@ -1782,11 +2026,11 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
             () => {
             verifyRepositoryForTest({
                 cwd: replay.cwd,
-                contract: cloneContract(replay.contract, {
-                    approvedMergeSha: mergeWithDuplicateReplay,
-                    approvedMergeSecondParent: reapply,
-                    approvedMergeResultTree: duplicateReplayTree,
-                    approvedMergeSecondParentTree: duplicateReplayTree
+                contract: cloneHistoricalCheckpointContract(replay.contract, {
+                    sha: mergeWithDuplicateReplay,
+                    secondParent: reapply,
+                    resultTree: duplicateReplayTree,
+                    secondParentTree: duplicateReplayTree
                 }),
                 head: mergeWithDuplicateReplay
             });
@@ -1845,7 +2089,7 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
         recordFailClosed(
             49,
             'empty post-approved-merge descendant',
-            'APPROVED_MERGE_DESCENDANT_EMPTY',
+            'APPROVED_CHECKPOINT_DESCENDANT_EMPTY',
             () => {
             verifyRepositoryForTest({
                 cwd: replay.cwd,
@@ -1927,7 +2171,610 @@ const runProvenanceFixtureMatrix = ({ cwd }) => {
             );
         });
 
-        ensure(matrix.length === 52, 'FIXTURE_MATRIX_INCOMPLETE');
+        const checkpoint1 = replay.contract.approvedMergeCheckpoints[0];
+        const checkpoint2 = replay.contract.approvedMergeCheckpoints[1];
+        const checkpoint2Chain = checkpoint2.secondParentValidation.commits;
+        const withCheckpoint2Chain = (contract, commits, overrides = {}) => (
+            cloneCheckpointContract(contract, 1, {
+                ...overrides,
+                secondParentValidation: {
+                    ...checkpoint2.secondParentValidation,
+                    commits
+                }
+            })
+        );
+        const replaceChainEntry = (entries, index, overrides) => entries.map(
+            (entry, entryIndex) => entryIndex === index ? { ...entry, ...overrides } : entry
+        );
+
+        recordPass(53, 'exact Checkpoint 2 merge HEAD', () => {
+            const result = verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: checkpoint2.sha
+            });
+            ensure(
+                result.mode === 'APPROVED_MERGE_CHECKPOINT_CHAIN' &&
+                    result.approvedCheckpointCount === 2,
+                'FIXTURE_CHECKPOINT_2_NOT_ACCEPTED'
+            );
+        });
+
+        const checkpoint2DescendantTree = deriveTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            { 'checkpoint-2-descendant.txt': 'checkpoint 2 descendant\n' }
+        );
+        const checkpoint2Descendant = commitTree(
+            replay.cwd,
+            checkpoint2DescendantTree,
+            [checkpoint2.sha],
+            'checkpoint 2 normal descendant'
+        );
+        recordPass(54, 'Checkpoint 2 plus one normal non-empty descendant', () => {
+            ensure(
+                verifyRepositoryForTest({
+                    cwd: replay.cwd,
+                    contract: replay.contract,
+                    head: checkpoint2Descendant
+                }).mode === 'APPROVED_MERGE_CHECKPOINT_CHAIN',
+                'FIXTURE_CHECKPOINT_2_DESCENDANT_NOT_ACCEPTED'
+            );
+        });
+
+        const correctivePaths = [
+            'tests/helpers/stagingReleaseReplayProvenance.js',
+            'tests/stagingReleaseContractSmoke.js'
+        ];
+        const correctiveCandidateTree = deriveTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            Object.fromEntries(correctivePaths.map((relativePath) => [
+                relativePath,
+                fs.readFileSync(path.join(cwd, relativePath))
+            ]))
+        );
+        ensure(
+            correctiveCandidateTree !== checkpoint2.resultTree,
+            'FIXTURE_CORRECTIVE_CANDIDATE_EMPTY'
+        );
+        const correctiveCandidate = commitTree(
+            replay.cwd,
+            correctiveCandidateTree,
+            [checkpoint2.sha],
+            'fix(release): attest ordered merge checkpoints'
+        );
+        recordPass(55, 'new corrective commit HEAD', () => {
+            ensure(
+                verifyRepositoryForTest({
+                    cwd: replay.cwd,
+                    contract: replay.contract,
+                    head: correctiveCandidate
+                }).mode === 'APPROVED_MERGE_CHECKPOINT_CHAIN',
+                'FIXTURE_CORRECTIVE_COMMIT_NOT_ACCEPTED'
+            );
+        });
+        recordPass(56, 'historical Checkpoint 1 HEAD remains accepted', () => {
+            ensure(
+                verifyRepositoryForTest({
+                    cwd: replay.cwd,
+                    contract: replay.contract,
+                    head: checkpoint1.sha
+                }).mode === 'APPROVED_RC13_MERGE',
+                'FIXTURE_HISTORICAL_CHECKPOINT_1_NOT_ACCEPTED'
+            );
+        });
+        recordPass(57, 'historical Checkpoint 1 normal descendant remains accepted', () => {
+            ensure(
+                verifyRepositoryForTest({
+                    cwd: replay.cwd,
+                    contract: replay.contract,
+                    head: approvedDescendant
+                }).mode === 'APPROVED_RC13_MERGE',
+                'FIXTURE_HISTORICAL_CHECKPOINT_1_DESCENDANT_NOT_ACCEPTED'
+            );
+        });
+
+        const wrongCheckpoint2FirstParentTree = deriveTree(
+            replay.cwd,
+            checkpoint1.resultTree,
+            { 'wrong-checkpoint-2-first-parent.txt': 'wrong first parent\n' }
+        );
+        const wrongCheckpoint2FirstParent = commitTree(
+            replay.cwd,
+            wrongCheckpoint2FirstParentTree,
+            [checkpoint1.sha],
+            'wrong Checkpoint 2 first parent'
+        );
+        const checkpoint2WrongFirstParent = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [wrongCheckpoint2FirstParent, checkpoint2.secondParent],
+            checkpoint2.subject
+        );
+        recordFailClosed(
+            58,
+            'PR #25 wrong first parent',
+            'APPROVED_CHECKPOINT_2_FIRST_PARENT_MISMATCH',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneCheckpointContract(replay.contract, 1, {
+                    sha: checkpoint2WrongFirstParent
+                }),
+                head: checkpoint2WrongFirstParent
+            })
+        );
+
+        const checkpoint2WrongSecondParent = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [checkpoint1.sha, checkpoint2Chain[4].sha],
+            checkpoint2.subject
+        );
+        recordFailClosed(
+            59,
+            'PR #25 wrong second parent',
+            'APPROVED_CHECKPOINT_2_SECOND_PARENT_MISMATCH',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneCheckpointContract(replay.contract, 1, {
+                    sha: checkpoint2WrongSecondParent
+                }),
+                head: checkpoint2WrongSecondParent
+            })
+        );
+
+        const checkpoint2ReversedParents = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [checkpoint2.secondParent, checkpoint1.sha],
+            checkpoint2.subject
+        );
+        recordFailClosed(
+            60,
+            'PR #25 reversed parents',
+            'APPROVED_CHECKPOINT_2_FIRST_PARENT_MISMATCH',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneCheckpointContract(replay.contract, 1, {
+                    sha: checkpoint2ReversedParents
+                }),
+                head: checkpoint2ReversedParents
+            })
+        );
+
+        const checkpoint2Octopus = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [checkpoint1.sha, checkpoint2.secondParent, wrongCheckpoint2FirstParent],
+            checkpoint2.subject
+        );
+        recordFailClosed(
+            61,
+            'PR #25 third parent octopus',
+            'APPROVED_CHECKPOINT_2_PARENT_COUNT',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneCheckpointContract(replay.contract, 1, {
+                    sha: checkpoint2Octopus
+                }),
+                head: checkpoint2Octopus
+            })
+        );
+
+        const checkpoint2WrongResultTree = deriveTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            { 'wrong-checkpoint-2-result.txt': 'wrong result tree\n' }
+        );
+        const checkpoint2WrongResult = commitTree(
+            replay.cwd,
+            checkpoint2WrongResultTree,
+            [checkpoint1.sha, checkpoint2.secondParent],
+            checkpoint2.subject
+        );
+        recordFailClosed(
+            62,
+            'PR #25 wrong result tree',
+            'APPROVED_CHECKPOINT_2_RESULT_TREE_MISMATCH',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneCheckpointContract(replay.contract, 1, {
+                    sha: checkpoint2WrongResult
+                }),
+                head: checkpoint2WrongResult
+            })
+        );
+
+        const wrongCheckpoint2SecondParentTree = deriveTree(
+            replay.cwd,
+            checkpoint2Chain[4].tree,
+            { 'wrong-checkpoint-2-second-parent.txt': 'wrong second-parent tree\n' }
+        );
+        const wrongCheckpoint2SecondParent = commitTree(
+            replay.cwd,
+            wrongCheckpoint2SecondParentTree,
+            [checkpoint2Chain[4].sha],
+            checkpoint2Chain[5].subject
+        );
+        const checkpoint2WrongSecondTreeMerge = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [checkpoint1.sha, wrongCheckpoint2SecondParent],
+            checkpoint2.subject
+        );
+        const wrongSecondTreeChain = replaceChainEntry(checkpoint2Chain, 5, {
+            sha: wrongCheckpoint2SecondParent
+        });
+        recordFailClosed(
+            63,
+            'PR #25 wrong second-parent tree',
+            'APPROVED_CHECKPOINT_2_SECOND_PARENT_TREE_MISMATCH',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: withCheckpoint2Chain(replay.contract, wrongSecondTreeChain, {
+                    sha: checkpoint2WrongSecondTreeMerge,
+                    secondParent: wrongCheckpoint2SecondParent
+                }),
+                head: checkpoint2WrongSecondTreeMerge
+            })
+        );
+
+        const checkpoint2WrongSubject = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [checkpoint1.sha, checkpoint2.secondParent],
+            'wrong PR #25 checkpoint subject'
+        );
+        recordFailClosed(
+            64,
+            'PR #25 wrong subject',
+            'APPROVED_CHECKPOINT_2_SUBJECT_MISMATCH',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneCheckpointContract(replay.contract, 1, {
+                    sha: checkpoint2WrongSubject
+                }),
+                head: checkpoint2WrongSubject
+            })
+        );
+
+        const missingCheckpoint1 = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [replay.target, checkpoint2.secondParent],
+            checkpoint2.subject
+        );
+        recordFailClosed(
+            65,
+            'missing Checkpoint 1',
+            'APPROVED_MERGE_NOT_FIRST_PARENT',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: missingCheckpoint1
+            })
+        );
+        recordFailClosed(
+            66,
+            'missing Checkpoint 2 when HEAD is after it',
+            'UNAPPROVED_MERGE_PRESENT',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: cloneHistoricalCheckpointContract(replay.contract),
+                head: checkpoint2Descendant
+            })
+        );
+        recordFailClosed(67, 'reversed checkpoint order', () => verifyRepositoryForTest({
+            cwd: replay.cwd,
+            contract: cloneContract(replay.contract, {
+                approvedMergeCheckpoints: [checkpoint2, checkpoint1]
+            }),
+            head: checkpoint2.sha
+        }));
+
+        const duplicateCheckpoint2SideTree = deriveTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            { 'duplicate-checkpoint-2-side.txt': 'duplicate side\n' }
+        );
+        const duplicateCheckpoint2Side = commitTree(
+            replay.cwd,
+            duplicateCheckpoint2SideTree,
+            [checkpoint2.sha],
+            'duplicate Checkpoint 2 side'
+        );
+        const duplicateCheckpoint2 = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [checkpoint2.sha, duplicateCheckpoint2Side],
+            checkpoint2.subject
+        );
+        recordFailClosed(
+            68,
+            'duplicate Checkpoint 2',
+            'UNAPPROVED_MERGE_PRESENT',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: duplicateCheckpoint2
+            })
+        );
+
+        const betweenCheckpointSideTree = deriveTree(
+            replay.cwd,
+            checkpoint1.resultTree,
+            { 'between-checkpoints-side.txt': 'between checkpoints\n' }
+        );
+        const betweenCheckpointSide = commitTree(
+            replay.cwd,
+            betweenCheckpointSideTree,
+            [checkpoint1.sha],
+            'between checkpoints side'
+        );
+        const mergeBetweenCheckpoints = commitTree(
+            replay.cwd,
+            betweenCheckpointSideTree,
+            [checkpoint1.sha, betweenCheckpointSide],
+            'additional merge between checkpoints'
+        );
+        recordFailClosed(
+            69,
+            'additional merge between checkpoints',
+            'UNAPPROVED_MERGE_PRESENT',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: mergeBetweenCheckpoints
+            })
+        );
+
+        const mergeAfterCheckpoint2 = commitTree(
+            replay.cwd,
+            checkpoint2DescendantTree,
+            [checkpoint2Descendant, duplicateCheckpoint2Side],
+            'additional merge after Checkpoint 2'
+        );
+        recordFailClosed(
+            70,
+            'additional merge after Checkpoint 2',
+            'UNAPPROVED_MERGE_PRESENT',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: mergeAfterCheckpoint2
+            })
+        );
+        const syntheticCheckpoint2Wrapper = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [checkpoint2.sha, checkpoint2Descendant],
+            'synthetic wrapper above Checkpoint 2'
+        );
+        recordFailClosed(
+            71,
+            'synthetic wrapper above Checkpoint 2',
+            'UNAPPROVED_MERGE_PRESENT',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: syntheticCheckpoint2Wrapper
+            })
+        );
+
+        recordFailClosed(72, 'second-parent chain missing a commit', () => (
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: withCheckpoint2Chain(
+                    replay.contract,
+                    checkpoint2Chain.filter((_, index) => index !== 2)
+                ),
+                head: checkpoint2.sha
+            })
+        ));
+        const reorderedCheckpoint2Chain = [...checkpoint2Chain];
+        [reorderedCheckpoint2Chain[1], reorderedCheckpoint2Chain[2]] = [
+            reorderedCheckpoint2Chain[2],
+            reorderedCheckpoint2Chain[1]
+        ];
+        recordFailClosed(73, 'second-parent chain reordered', () => (
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: withCheckpoint2Chain(replay.contract, reorderedCheckpoint2Chain),
+                head: checkpoint2.sha
+            })
+        ));
+        recordFailClosed(74, 'second-parent chain with extra commit', () => (
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: withCheckpoint2Chain(replay.contract, [
+                    ...checkpoint2Chain,
+                    checkpoint2Chain[5]
+                ]),
+                head: checkpoint2.sha
+            })
+        ));
+
+        const emptyChainTip = commitTree(
+            replay.cwd,
+            checkpoint2Chain[4].tree,
+            [checkpoint2Chain[4].sha],
+            checkpoint2Chain[5].subject
+        );
+        const emptyCheckpoint2 = commitTree(
+            replay.cwd,
+            checkpoint2Chain[4].tree,
+            [checkpoint1.sha, emptyChainTip],
+            checkpoint2.subject
+        );
+        const emptyCheckpoint2Chain = replaceChainEntry(checkpoint2Chain, 5, {
+            sha: emptyChainTip,
+            tree: checkpoint2Chain[4].tree,
+            changedPaths: []
+        });
+        recordFailClosed(
+            75,
+            'second-parent chain with empty commit',
+            'APPROVED_CHECKPOINT_2_SECOND_PARENT_6_EMPTY',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: withCheckpoint2Chain(replay.contract, emptyCheckpoint2Chain, {
+                    sha: emptyCheckpoint2,
+                    secondParent: emptyChainTip,
+                    resultTree: checkpoint2Chain[4].tree,
+                    secondParentTree: checkpoint2Chain[4].tree
+                }),
+                head: emptyCheckpoint2
+            })
+        );
+
+        const chainMergeSideTree = deriveTree(
+            replay.cwd,
+            checkpoint2Chain[4].tree,
+            { 'chain-merge-side.txt': 'chain merge side\n' }
+        );
+        const chainMergeSide = commitTree(
+            replay.cwd,
+            chainMergeSideTree,
+            [checkpoint2Chain[4].sha],
+            'authorized chain merge side'
+        );
+        const chainMergeTip = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [checkpoint2Chain[4].sha, chainMergeSide],
+            checkpoint2Chain[5].subject
+        );
+        const chainMergeCheckpoint2 = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [checkpoint1.sha, chainMergeTip],
+            checkpoint2.subject
+        );
+        const mergedCheckpoint2Chain = replaceChainEntry(checkpoint2Chain, 5, {
+            sha: chainMergeTip,
+            changedPaths: []
+        });
+        recordFailClosed(
+            76,
+            'second-parent chain containing a merge',
+            'APPROVED_CHECKPOINT_2_SECOND_PARENT_6_MERGE',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: withCheckpoint2Chain(replay.contract, mergedCheckpoint2Chain, {
+                    sha: chainMergeCheckpoint2,
+                    secondParent: chainMergeTip
+                }),
+                head: chainMergeCheckpoint2
+            })
+        );
+
+        const shaMismatchChain = replaceChainEntry(checkpoint2Chain, 2, {
+            sha: 'a'.repeat(40)
+        }).map((entry, index) => index === 3 ? {
+            ...entry,
+            parent: 'a'.repeat(40)
+        } : entry);
+        recordFailClosed(77, 'authorized commit SHA mismatch', () => (
+            verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: withCheckpoint2Chain(replay.contract, shaMismatchChain),
+                head: checkpoint2.sha
+            })
+        ));
+        recordFailClosed(
+            78,
+            'authorized commit tree mismatch',
+            'APPROVED_CHECKPOINT_2_SECOND_PARENT_3_TREE_MISMATCH',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: withCheckpoint2Chain(
+                    replay.contract,
+                    replaceChainEntry(checkpoint2Chain, 2, { tree: 'f'.repeat(40) })
+                ),
+                head: checkpoint2.sha
+            })
+        );
+        recordFailClosed(
+            79,
+            'authorized commit subject mismatch',
+            'APPROVED_CHECKPOINT_2_SECOND_PARENT_3_SUBJECT_MISMATCH',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: withCheckpoint2Chain(
+                    replay.contract,
+                    replaceChainEntry(checkpoint2Chain, 2, {
+                        subject: 'wrong authorized subject'
+                    })
+                ),
+                head: checkpoint2.sha
+            })
+        );
+        recordFailClosed(
+            80,
+            'authorized commit path mismatch',
+            'APPROVED_CHECKPOINT_2_SECOND_PARENT_3_PATH_SET_MISMATCH',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: withCheckpoint2Chain(
+                    replay.contract,
+                    replaceChainEntry(checkpoint2Chain, 2, {
+                        changedPaths: [
+                            ...checkpoint2Chain[2].changedPaths,
+                            'unexpected-authorized-path.txt'
+                        ]
+                    })
+                ),
+                head: checkpoint2.sha
+            })
+        );
+
+        const arbitrarySameTreeMerge = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [checkpoint1.sha, checkpoint2.secondParent],
+            'arbitrary merge with same result tree'
+        );
+        recordFailClosed(
+            81,
+            'arbitrary merge with same result tree',
+            'UNAPPROVED_MERGE_PRESENT',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: arbitrarySameTreeMerge
+            })
+        );
+
+        const nonFirstParentMainTree = deriveTree(
+            replay.cwd,
+            checkpoint1.resultTree,
+            { 'non-first-parent-main.txt': 'non-first-parent main\n' }
+        );
+        const nonFirstParentMain = commitTree(
+            replay.cwd,
+            nonFirstParentMainTree,
+            [checkpoint1.sha],
+            'non-first-parent main'
+        );
+        const checkpoint2OnSideLineage = commitTree(
+            replay.cwd,
+            checkpoint2.resultTree,
+            [nonFirstParentMain, checkpoint2.sha],
+            'Checkpoint 2 only on side lineage'
+        );
+        recordFailClosed(
+            82,
+            'checkpoint-shaped merge on non-first-parent lineage',
+            'UNAPPROVED_MERGE_PRESENT',
+            () => verifyRepositoryForTest({
+                cwd: replay.cwd,
+                contract: replay.contract,
+                head: checkpoint2OnSideLineage
+            })
+        );
+
+        ensure(matrix.length === 82, 'FIXTURE_MATRIX_INCOMPLETE');
         return Object.freeze(matrix);
     } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });

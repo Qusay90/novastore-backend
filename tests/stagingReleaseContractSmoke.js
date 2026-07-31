@@ -22,10 +22,12 @@ const {
 } = require('../scripts/stagingReleasePlanCli');
 const { loadRegistry } = require('../scripts/staging-migrations/registry');
 const {
+    RELEASE_PROVENANCE_CONTRACT,
     assertSafeStartScript,
     runProvenanceFixtureMatrix,
     validateWorkflowCheckoutContract,
-    verifyReleaseProvenance
+    verifyReleaseProvenance,
+    verifyRepositoryForTest
 } = require('./helpers/stagingReleaseReplayProvenance');
 
 const root = path.resolve(__dirname, '..');
@@ -141,22 +143,87 @@ const createFakeGitReader = ({
 };
 
 (async () => {
-    await check(1, 'portable direct or controlled replay provenance exact', () => {
+    await check(1, 'portable ordered merge-checkpoint provenance exact', () => {
         const provenance = verifyReleaseProvenance({ cwd: root });
-        assert([
+        const legitimateModes = [
             'DIRECT',
             'APPROVED_REPLAY',
-            'APPROVED_RC13_MERGE'
-        ].includes(provenance.mode));
+            'APPROVED_RC13_MERGE',
+            'APPROVED_MERGE_CHECKPOINT_CHAIN'
+        ];
+        assert(legitimateModes.includes(provenance.mode));
+        assert.equal(provenance.mode, 'APPROVED_MERGE_CHECKPOINT_CHAIN');
+        assert.equal(provenance.approvedCheckpointCount, 2);
         assert.equal(provenance.fingerprintOccurrenceCount, 1);
         console.log(
             `native patch-id diagnostic: ${provenance.diagnosticPatchId || 'UNAVAILABLE'}`
         );
 
+        const [checkpoint1, checkpoint2] = RELEASE_PROVENANCE_CONTRACT
+            .approvedMergeCheckpoints;
+        const historical = verifyRepositoryForTest({
+            cwd: root,
+            contract: RELEASE_PROVENANCE_CONTRACT,
+            head: checkpoint1.sha
+        });
+        assert.equal(historical.mode, 'APPROVED_RC13_MERGE');
+        const mergedIntegration = verifyRepositoryForTest({
+            cwd: root,
+            contract: RELEASE_PROVENANCE_CONTRACT,
+            head: checkpoint2.sha
+        });
+        assert.equal(mergedIntegration.mode, 'APPROVED_MERGE_CHECKPOINT_CHAIN');
+        assert.deepEqual(mergedIntegration.approvedCheckpoints, [
+            checkpoint1.sha,
+            checkpoint2.sha
+        ]);
+
         const matrix = runProvenanceFixtureMatrix({ cwd: root });
-        assert.equal(matrix.length, 52);
+        assert(matrix.length >= 74);
         assert(matrix.every((entry) => entry.result === 'PASS'));
-        console.log('release provenance matrix: PASS=52 FAIL=0');
+        const requiredCheckpointCases = [
+            'exact Checkpoint 2 merge HEAD',
+            'Checkpoint 2 plus one normal non-empty descendant',
+            'new corrective commit HEAD',
+            'historical Checkpoint 1 HEAD remains accepted',
+            'historical Checkpoint 1 normal descendant remains accepted',
+            'PR #25 wrong first parent',
+            'PR #25 wrong second parent',
+            'PR #25 reversed parents',
+            'PR #25 third parent octopus',
+            'PR #25 wrong result tree',
+            'PR #25 wrong second-parent tree',
+            'PR #25 wrong subject',
+            'missing Checkpoint 1',
+            'missing Checkpoint 2 when HEAD is after it',
+            'reversed checkpoint order',
+            'duplicate Checkpoint 2',
+            'additional merge between checkpoints',
+            'additional merge after Checkpoint 2',
+            'synthetic wrapper above Checkpoint 2',
+            'second-parent chain missing a commit',
+            'second-parent chain reordered',
+            'second-parent chain with extra commit',
+            'second-parent chain with empty commit',
+            'second-parent chain containing a merge',
+            'authorized commit SHA mismatch',
+            'authorized commit tree mismatch',
+            'authorized commit subject mismatch',
+            'authorized commit path mismatch',
+            'arbitrary merge with same result tree',
+            'checkpoint-shaped merge on non-first-parent lineage'
+        ];
+        for (const name of requiredCheckpointCases) {
+            assert(matrix.some((entry) => entry.name === name && entry.result === 'PASS'));
+        }
+        const negativeMatrix = matrix.filter((entry) => entry.expectedOutcome === 'REJECT');
+        assert(negativeMatrix.length >= 22);
+        const arbitraryMergeBypassCount = negativeMatrix.filter(
+            (entry) => typeof entry.rejectionCode !== 'string' || entry.rejectionCode.length === 0
+        ).length;
+        assert.equal(arbitraryMergeBypassCount, 0);
+        console.log(`release provenance matrix: PASS=${matrix.length} FAIL=0`);
+        console.log(`arbitrary merge bypass count: ${arbitraryMergeBypassCount}`);
     });
 
     await check(2, 'workflow PR-head push-SHA and full-history checkout exact', () => {
