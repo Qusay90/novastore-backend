@@ -50,20 +50,36 @@ interface NovaStoreApi {
     @POST("api/users/change-password")
     suspend fun changePassword(@Body body: ChangePasswordRequest): BasicMessageResponse
 
-    @POST("api/auth/forgot-password")
-    suspend fun forgotPassword(@Body body: ForgotPasswordRequest): BasicMessageResponse
+    @POST("api/users/verification/email/send")
+    suspend fun sendEmailVerification(
+        @Body body: EmailVerificationSendRequest = EmailVerificationSendRequest()
+    ): BasicMessageResponse
 
-    @POST("api/auth/phone/send-code")
-    suspend fun sendPhoneCode(@Body body: PhoneCodeRequest): BasicMessageResponse
+    @POST("api/users/verification/email/verify")
+    suspend fun verifyEmailCode(@Body body: VerificationCodeRequest): BasicMessageResponse
 
-    @POST("api/auth/phone/verify-code")
-    suspend fun verifyPhoneCode(@Body body: PhoneCodeRequest): BasicMessageResponse
+    @POST("api/users/verification/phone/send")
+    suspend fun sendPhoneCode(@Body body: PhoneVerificationSendRequest): BasicMessageResponse
 
-    @POST("api/auth/email/send-verification")
-    suspend fun sendEmailVerification(): BasicMessageResponse
+    @POST("api/users/verification/phone/verify")
+    suspend fun verifyPhoneCode(@Body body: VerificationCodeRequest): BasicMessageResponse
 
-    @POST("api/auth/2fa/setup")
-    suspend fun setupTwoFactor(): BasicMessageResponse
+    @POST("api/users/password-reset/request")
+    suspend fun requestPasswordReset(@Body body: PasswordResetCodeRequest): BasicMessageResponse
+
+    @POST("api/users/password-reset/verify")
+    suspend fun verifyPasswordResetCode(
+        @Body body: PasswordResetCodeVerificationRequest
+    ): PasswordResetCodeVerificationResponse
+
+    @POST("api/users/password-reset/complete")
+    suspend fun completePasswordReset(
+        @Body body: PasswordResetCompletionRequest
+    ): BasicMessageResponse
+
+    suspend fun setupTwoFactor(): BasicMessageResponse {
+        throw UnsupportedOperationException("CUSTOMER_TWO_FACTOR_UNAVAILABLE")
+    }
 
     // Notifications
     @GET("api/notifications/user/{userId}")

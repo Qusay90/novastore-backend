@@ -12,7 +12,8 @@ class AuthInterceptor @Inject constructor(
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
-        val token = sessionManager.token
+        val sessionSnapshot = sessionManager.captureSession()
+        val token = sessionSnapshot?.token
 
         val request = if (!token.isNullOrEmpty()) {
             originalRequest.newBuilder()
@@ -23,8 +24,8 @@ class AuthInterceptor @Inject constructor(
         }
 
         val response = chain.proceed(request)
-        if (response.code == 401 && !token.isNullOrEmpty()) {
-            sessionManager.clearSession()
+        if (response.code == 401 && sessionSnapshot != null) {
+            sessionManager.clearSessionIfCurrent(sessionSnapshot)
         }
 
         return response

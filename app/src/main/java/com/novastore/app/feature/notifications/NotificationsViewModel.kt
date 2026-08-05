@@ -88,6 +88,9 @@ class NotificationsViewModel @Inject constructor(
         get() = authRepository.currentUserId
 
     fun loadAccount() {
+        _uiState.update {
+            it.copy(profileSaving = false, profileSaved = false, profileError = null)
+        }
         refreshUserProfile()
         loadAddresses()
         loadNotifications()
@@ -314,20 +317,12 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun setupTwoFactor() {
-        _uiState.update { it.copy(securityActionLoading = true, securityActionMessage = null, passwordChanged = false) }
-        viewModelScope.launch {
-            val result = accountRepository.setupTwoFactor()
-            _uiState.update {
-                it.copy(
-                    securityActionLoading = false,
-                    securityActionMessage = if (result.isSuccess) {
-                        result.getOrNull()?.message ?: "İki adımlı doğrulama kurulumu başlatıldı."
-                    } else {
-                        "İki adımlı doğrulama altyapısı henüz yapılandırılmadı."
-                    },
-                    passwordChanged = false
-                )
-            }
+        _uiState.update {
+            it.copy(
+                securityActionLoading = false,
+                securityActionMessage = "İki adımlı doğrulama müşteriler için henüz kullanılamıyor.",
+                passwordChanged = false
+            )
         }
     }
 
@@ -422,32 +417,48 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun updateProfile(fullName: String, phone: String?) {
+        val owner = authRepository.captureSession() ?: return
+        val normalizedName = fullName.trim().ifBlank { authRepository.currentUserName.orEmpty() }
+        val normalizedPhone = phone?.filter { it.isDigit() || it == '+' }?.take(16)
         viewModelScope.launch {
-            val normalizedName = fullName.trim().ifBlank { authRepository.currentUserName.orEmpty() }
-            val normalizedPhone = phone?.filter { it.isDigit() || it == '+' }?.take(16)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update { it.copy(profileSaving = true, profileSaved = false, profileError = null) }
 
             val result = accountRepository.updateProfile(normalizedName, normalizedPhone)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             if (result.isSuccess) {
                 val user = result.getOrThrow().user
-                authRepository.updateCachedProfile(user.fullName, user.phone)
-                _uiState.update {
-                    it.copy(
-                        actionMessage = null,
-                        profileVersion = it.profileVersion + 1,
-                        profileSaving = false,
-                        profileSaved = true,
-                        profileError = null
+                if (!authRepository.updateCachedProfileIfCurrent(
+                        owner,
+                        user.fullName,
+                        user.phone
                     )
+                ) return@launch
+                _uiState.update {
+                    if (!authRepository.isSessionCurrent(owner)) {
+                        it
+                    } else {
+                        it.copy(
+                            actionMessage = null,
+                            profileVersion = it.profileVersion + 1,
+                            profileSaving = false,
+                            profileSaved = true,
+                            profileError = null
+                        )
+                    }
                 }
             } else {
                 Timber.w(result.exceptionOrNull(), "Profile update endpoint failed.")
                 _uiState.update {
-                    it.copy(
-                        profileSaving = false,
-                        profileSaved = false,
-                        profileError = result.exceptionOrNull().toSecurityMessage("Profil kaydedilemedi. Lütfen tekrar dene.")
-                    )
+                    if (!authRepository.isSessionCurrent(owner)) {
+                        it
+                    } else {
+                        it.copy(
+                            profileSaving = false,
+                            profileSaved = false,
+                            profileError = result.exceptionOrNull().toSecurityMessage("Profil kaydedilemedi. Lütfen tekrar dene.")
+                        )
+                    }
                 }
             }
         }
@@ -505,13 +516,6 @@ class NotificationsViewModel @Inject constructor(
 
     fun clearSecurityActionMessage() {
         _uiState.update { it.copy(securityActionMessage = null, passwordChanged = false) }
-    }
-
-    fun logout() {
-        viewModelScope.launch {
-            val result = authRepository.logout()
-            _uiState.update { it.copy(securityActionMessage = result.warning) }
-        }
     }
 
     private fun validatePasswordChange(currentPassword: String, newPassword: String, repeatPassword: String): String? {

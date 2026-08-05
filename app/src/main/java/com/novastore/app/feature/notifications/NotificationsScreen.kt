@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -48,7 +47,6 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.LocalShipping
@@ -113,6 +111,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.novastore.app.R
+import com.novastore.app.core.design.CustomerColors
+import com.novastore.app.core.design.CustomerGlassState
+import com.novastore.app.core.design.CustomerSpacing
+import com.novastore.app.core.ui.components.CustomerTopBar
 import com.novastore.app.data.model.AccountCoupon
 import com.novastore.app.data.model.AccountMessage
 import com.novastore.app.data.model.AccountOrder
@@ -121,19 +123,17 @@ import com.novastore.app.data.model.Notification
 import com.novastore.app.data.model.ProductQuestion
 import coil3.compose.AsyncImage
 import java.text.NumberFormat
-import java.time.OffsetDateTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.delay
 
-private val PrimaryBlue = Color(0xFF0D4B7A)
-private val DarkBlue = Color(0xFF08365C)
-private val OrangeAccent = Color(0xFFF28C18)
-private val LightBackground = Color(0xFFF7F8FA)
-private val BorderColor = Color(0xFFEEF0F3)
-private val SuccessGreen = Color(0xFF28C76F)
-private val ErrorRed = Color(0xFFEA5455)
-private val MutedText = Color(0xFF6B7280)
+private val PrimaryBlue = CustomerColors.Navy
+private val DarkBlue = CustomerColors.NavyDeep
+private val OrangeAccent = CustomerColors.Orange
+private val LightBackground = CustomerColors.Page
+private val BorderColor = CustomerColors.Divider
+private val SuccessGreen = CustomerColors.Success
+private val ErrorRed = CustomerColors.Error
+private val MutedText = CustomerColors.TextSecondary
 
 private enum class AccountPage(@StringRes val titleRes: Int) {
     Center(R.string.account_center),
@@ -206,6 +206,7 @@ fun NotificationsScreen(
     onNavigateFavorites: () -> Unit = {},
     onNavigateCart: () -> Unit = {},
     onNavigateSupport: () -> Unit = {},
+    glassState: CustomerGlassState? = null,
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -275,9 +276,9 @@ fun NotificationsScreen(
             onBack = { page = AccountPage.Center },
             onNotificationsClick = { page = AccountPage.Notifications },
             onLogoutClick = {
-                viewModel.logout()
                 onLogoutClick()
-            }
+            },
+            glassState = glassState
         )
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -427,40 +428,32 @@ private fun AccountHeader(
     canGoBack: Boolean,
     onBack: () -> Unit,
     onNotificationsClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    glassState: CustomerGlassState?
 ) {
-    Row(
+    CustomerTopBar(
+        title = title,
+        onBack = onBack.takeIf { canGoBack },
+        glassState = glassState,
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
-            .background(PrimaryBlue)
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = CustomerSpacing.ScreenHorizontal, vertical = CustomerSpacing.Xs)
     ) {
-        if (canGoBack) {
-            IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Geri", tint = Color.White, modifier = Modifier.size(30.dp))
-            }
-        } else {
-            Icon(painterResource(id = R.drawable.support_novastore), contentDescription = "NovaStore", tint = Color.Unspecified, modifier = Modifier.size(42.dp))
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            title,
-            modifier = Modifier.weight(1f),
-            color = Color.White,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = if (title.length > 16) 21.sp else 26.sp,
-            lineHeight = 23.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
         IconButton(onClick = onNotificationsClick) {
-            Icon(Icons.Default.Notifications, contentDescription = "Bildirimler", tint = Color.White, modifier = Modifier.size(25.dp))
+            Icon(
+                Icons.Default.Notifications,
+                contentDescription = "Bildirimler",
+                tint = CustomerColors.Navy,
+                modifier = Modifier.size(22.dp)
+            )
         }
         IconButton(onClick = onLogoutClick) {
-            Icon(Icons.Default.ExitToApp, contentDescription = "Çıkış Yap", tint = Color.White, modifier = Modifier.size(25.dp))
+            Icon(
+                Icons.Default.ExitToApp,
+                contentDescription = "Çıkış Yap",
+                tint = CustomerColors.Navy,
+                modifier = Modifier.size(22.dp)
+            )
         }
     }
 }
@@ -1088,8 +1081,12 @@ private fun SecurityPage(
         SecurityActionCard(
             icon = Icons.Default.Shield,
             title = "İki Adımlı Doğrulama",
-            description = "Hesabına ekstra güvenlik katmanı ekle.",
-            status = if (status?.twoFactorEnabled == true) "Aktif" else "Pasif",
+            description = if (status?.twoFactorEnabled == true) {
+                "Hesabında ek giriş güvenliği etkin."
+            } else {
+                "Müşteri hesapları için henüz kullanılamıyor."
+            },
+            status = if (status?.twoFactorEnabled == true) "Aktif" else "Henüz kullanılamıyor",
             statusColor = if (status?.twoFactorEnabled == true) SuccessGreen else MutedText,
             onClick = { dialog = SecurityDialog.TwoFactor }
         )
@@ -1128,8 +1125,8 @@ private fun SecurityPage(
         )
         SecurityDialog.TwoFactor -> ServiceActionDialog(
             title = "İki Adımlı Doğrulama",
-            description = "Authenticator uygulamasıyla giriş güvenliğini artırmak için kurulum başlatılacak.",
-            action = "Kurulumu Başlat",
+            description = "Bu özellik müşteri hesapları için henüz kullanılamıyor. Mevcut oturumun açık kalacak.",
+            action = "Anladım",
             loading = state.securityActionLoading,
             onDismiss = { dialog = null },
             onAction = {
@@ -2197,9 +2194,8 @@ private fun formatCurrency(value: Double): String {
 
 private fun formatDate(raw: String?): String {
     if (raw.isNullOrBlank()) return "Tarih yok"
-    return runCatching {
-        OffsetDateTime.parse(raw).format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale("tr", "TR")))
-    }.getOrElse {
-        raw.take(16).replace("T", " ")
-    }
+    val match = Regex("""^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})""").find(raw)
+        ?: return raw.take(16).replace("T", " ")
+    val (year, month, day, hour, minute) = match.destructured
+    return "$day.$month.$year $hour:$minute"
 }

@@ -2,16 +2,37 @@ package com.novastore.app.feature.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,27 +42,43 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.novastore.app.core.theme.NavyDark
-import com.novastore.app.core.theme.Orange
+import com.novastore.app.core.design.CustomerColors
+import com.novastore.app.core.design.CustomerGlassState
+import com.novastore.app.core.design.CustomerRadii
+import com.novastore.app.core.design.CustomerSpacing
+import com.novastore.app.core.ui.components.CustomerButton
+import com.novastore.app.core.ui.components.CustomerButtonStyle
+import com.novastore.app.core.ui.components.CustomerCard
+import com.novastore.app.core.ui.components.CustomerModalDialog
+import com.novastore.app.core.ui.components.CustomerOtpInput
+import com.novastore.app.core.ui.components.CustomerTabs
+import com.novastore.app.core.ui.components.CustomerTextField
+import com.novastore.app.core.ui.components.CustomerTopBar
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(
     onAuthSuccess: () -> Unit,
     modifier: Modifier = Modifier,
+    glassState: CustomerGlassState? = null,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     var isLoginMode by remember { mutableStateOf(true) }
     var fullName by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordConfirmation by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var localError by remember { mutableStateOf<String?>(null) }
     var showForgotDialog by remember { mutableStateOf(false) }
-    var resetEmail by remember { mutableStateOf("") }
+    var resetIdentifier by remember { mutableStateOf("") }
+    var resetCode by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var newPasswordConfirmation by remember { mutableStateOf("") }
+    var resetLocalError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess) {
@@ -50,232 +87,358 @@ fun AuthScreen(
         }
     }
 
-    Box(
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
+            .background(CustomerColors.Page)
+            .padding(bottom = 92.dp)
     ) {
-        if (uiState.isLoading) {
-            CircularProgressIndicator(color = Orange)
-        } else {
+        CustomerTopBar(
+            title = "Hesabım",
+            glassState = glassState,
+            modifier = Modifier.padding(
+                horizontal = CustomerSpacing.ScreenHorizontal,
+                vertical = CustomerSpacing.Xs
+            )
+        )
+
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            val contentWidth = if (maxWidth >= 700.dp) 560.dp else maxWidth
             Column(
                 modifier = Modifier
+                    .widthIn(max = contentWidth)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .verticalScroll(rememberScrollState())
+                    .padding(
+                        horizontal = CustomerSpacing.ScreenHorizontal,
+                        vertical = CustomerSpacing.Lg
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Brand Header
                 Text(
-                    text = "NovaStore",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Orange,
-                    fontSize = 36.sp
+                    text = "NovaStore'a hoş geldin",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = CustomerColors.Navy,
+                    textAlign = TextAlign.Center
                 )
+                Spacer(Modifier.height(CustomerSpacing.Xs))
                 Text(
-                    text = "Alışverişin Yeni Yıldızı",
+                    text = "Siparişlerini, favorilerini ve hesap ayarlarını tek yerden yönet.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = NavyDark,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = 4.dp)
+                    color = CustomerColors.TextSecondary,
+                    textAlign = TextAlign.Center
                 )
+                Spacer(Modifier.height(CustomerSpacing.Xl))
 
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Form title
-                Text(
-                    text = if (isLoginMode) "Giriş Yap" else "Kayıt Ol",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = NavyDark,
-                    modifier = Modifier.align(Alignment.Start)
+                CustomerTabs(
+                    tabs = listOf("Giriş Yap", "Kayıt Ol"),
+                    selectedIndex = if (isLoginMode) 0 else 1,
+                    onSelected = { index ->
+                        isLoginMode = index == 0
+                        localError = null
+                        viewModel.resetSuccess()
+                        viewModel.clearMessages()
+                    }
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(CustomerSpacing.Md))
 
-                // Full name field (Only for Register)
-                if (!isLoginMode) {
-                    OutlinedTextField(
-                        value = fullName,
-                        onValueChange = { fullName = it },
-                        label = { Text("Ad Soyad") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Orange)
+                CustomerCard {
+                    Text(
+                        text = if (isLoginMode) "Hesabına giriş yap" else "Yeni hesap oluştur",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = CustomerColors.Navy
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
+                    Spacer(Modifier.height(CustomerSpacing.Md))
 
-                // Email field
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("E-posta") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Orange)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+                    if (!isLoginMode) {
+                        CustomerTextField(
+                            value = fullName,
+                            onValueChange = { fullName = it },
+                            label = "Ad Soyad"
+                        )
+                        Spacer(Modifier.height(CustomerSpacing.Sm))
+                        CustomerTextField(
+                            value = phone,
+                            onValueChange = { phone = it },
+                            label = "Telefon (isteğe bağlı)",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                        )
+                        Spacer(Modifier.height(CustomerSpacing.Sm))
+                    }
 
-                // Password field
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Şifre") },
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    trailingIcon = {
-                        val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(imageVector = image, contentDescription = "Şifre Göster")
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Orange)
-                )
-
-                if (isLoginMode) {
-                    TextButton(
-                        onClick = {
-                            resetEmail = email
-                            showForgotDialog = true
-                            viewModel.clearMessages()
+                    CustomerTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        label = "E-posta veya telefon",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                    )
+                    Spacer(Modifier.height(CustomerSpacing.Sm))
+                    CustomerTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = "Şifre",
+                        visualTransformation = if (passwordVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
                         },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text("Şifremi unuttum", color = Orange, fontWeight = FontWeight.Bold)
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) {
+                                        Icons.Default.VisibilityOff
+                                    } else {
+                                        Icons.Default.Visibility
+                                    },
+                                    contentDescription = if (passwordVisible) "Şifreyi gizle" else "Şifreyi göster"
+                                )
+                            }
+                        }
+                    )
+
+                    if (!isLoginMode) {
+                        Spacer(Modifier.height(CustomerSpacing.Sm))
+                        CustomerTextField(
+                            value = passwordConfirmation,
+                            onValueChange = { passwordConfirmation = it },
+                            label = "Şifre Tekrar",
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                        )
+                    }
+
+                    if (isLoginMode) {
+                        Text(
+                            text = "Şifremi unuttum",
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .clickable {
+                                    resetIdentifier = email
+                                    resetCode = ""
+                                    newPassword = ""
+                                    newPasswordConfirmation = ""
+                                    resetLocalError = null
+                                    viewModel.restartPasswordReset()
+                                    showForgotDialog = true
+                                }
+                                .padding(vertical = CustomerSpacing.Sm),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = CustomerColors.Orange
+                        )
+                    } else {
+                        Spacer(Modifier.height(CustomerSpacing.Md))
+                    }
+
+                    val message = localError ?: uiState.error
+                    message?.let {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = CustomerColors.ErrorSurface,
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(CustomerRadii.Field)
+                        ) {
+                            Text(
+                                text = it,
+                                modifier = Modifier.padding(CustomerSpacing.Sm),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = CustomerColors.Error
+                            )
+                        }
+                        Spacer(Modifier.height(CustomerSpacing.Md))
+                    }
+
+                    CustomerButton(
+                        text = if (isLoginMode) "Giriş Yap" else "Kayıt Ol",
+                        onClick = {
+                            localError = null
+                            if (isLoginMode) {
+                                viewModel.login(email, password)
+                            } else if (password != passwordConfirmation) {
+                                localError = "Şifreler birbiriyle aynı olmalıdır."
+                            } else {
+                                viewModel.register(
+                                    fullName = fullName,
+                                    email = email,
+                                    password = password,
+                                    phone = phone.takeIf(String::isNotBlank)
+                                )
+                            }
+                        },
+                        enabled = !uiState.isLoading,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (uiState.isLoading) {
+                        Spacer(Modifier.height(CustomerSpacing.Sm))
+                        CircularProgressIndicator(
+                            color = CustomerColors.Orange,
+                            modifier = Modifier
+                                .size(22.dp)
+                                .align(Alignment.CenterHorizontally),
+                            strokeWidth = 2.dp
+                        )
                     }
                 }
 
-                // Error text
-                if (uiState.error != null) {
-                    Text(
-                        text = uiState.error!!,
-                        color = Color.Red,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Start,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Submit Button
-                Button(
-                    onClick = {
-                        if (isLoginMode) {
-                            viewModel.login(email, password)
-                        } else {
-                            viewModel.register(fullName, email, password)
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Orange),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
+                Spacer(Modifier.height(CustomerSpacing.Md))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = if (isLoginMode) "Giriş Yap" else "Kayıt Ol",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                        text = if (isLoginMode) {
+                            "Hesabın yok mu? Kayıt Ol"
+                        } else {
+                            "Zaten üye misin? Giriş Yap"
+                        },
+                        modifier = Modifier
+                            .clickable {
+                                isLoginMode = !isLoginMode
+                                localError = null
+                                viewModel.clearMessages()
+                            }
+                            .padding(CustomerSpacing.Xs),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = CustomerColors.Orange,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Toggle Mode Clickable Text
-                Text(
-                    text = if (isLoginMode) "Henüz hesabın yok mu? Kayıt Ol" else "Zaten üye misin? Giriş Yap",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Orange,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clickable {
-                            isLoginMode = !isLoginMode
-                            viewModel.resetSuccess()
-                            viewModel.clearMessages()
-                        }
-                        .padding(8.dp)
-                )
             }
         }
     }
 
     if (showForgotDialog) {
-        AlertDialog(
+        CustomerModalDialog(
+            title = "Şifremi Sıfırla",
+            message = when (uiState.resetStep) {
+                PasswordResetStep.IDENTIFIER -> "Hesabındaki e-posta veya telefonu yaz."
+                PasswordResetStep.CODE -> "Gönderilen 6 haneli kodu gir."
+                PasswordResetStep.NEW_PASSWORD -> "Hesabın için yeni bir şifre belirle."
+            },
             onDismissRequest = {
                 showForgotDialog = false
-                viewModel.clearMessages()
-            },
-            title = {
-                Text("Şifremi Unuttum", color = NavyDark, fontWeight = FontWeight.Bold)
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        "E-posta adresini yaz, şifre sıfırlama bağlantısını gönderelim.",
-                        color = NavyDark,
-                        style = MaterialTheme.typography.bodyMedium
+                viewModel.restartPasswordReset()
+            }
+        ) {
+            when {
+                uiState.resetComplete -> {
+                    ResetMessage(uiState.resetMessage.orEmpty(), success = true)
+                    Spacer(Modifier.height(CustomerSpacing.Md))
+                    CustomerButton(
+                        text = "Girişe dön",
+                        onClick = {
+                            showForgotDialog = false
+                            email = resetIdentifier
+                            password = ""
+                            viewModel.restartPasswordReset()
+                        },
+                        style = CustomerButtonStyle.NAVY,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    OutlinedTextField(
-                        value = resetEmail,
-                        onValueChange = { resetEmail = it },
-                        label = { Text("E-posta") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Orange)
+                }
+
+                uiState.resetStep == PasswordResetStep.IDENTIFIER -> {
+                    CustomerTextField(
+                        value = resetIdentifier,
+                        onValueChange = { resetIdentifier = it },
+                        label = "E-posta veya telefon",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                     )
-                    uiState.resetMessage?.let { message ->
-                        Surface(
-                            color = if (message.contains("gönderildi", ignoreCase = true)) Color(0xFFEAFBF1) else Color(0xFFFFF4E5),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                message,
-                                color = NavyDark,
-                                fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-                            )
-                        }
-                    }
+                    ResetMessage(uiState.resetMessage, success = false)
+                    Spacer(Modifier.height(CustomerSpacing.Md))
+                    CustomerButton(
+                        text = "Kod Gönder",
+                        onClick = { viewModel.sendPasswordReset(resetIdentifier) },
+                        enabled = !uiState.resetLoading,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.sendPasswordReset(resetEmail) },
-                    enabled = !uiState.resetLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = Orange),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    if (uiState.resetLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text("Bağlantı Gönder", fontWeight = FontWeight.Bold)
-                    }
+
+                uiState.resetStep == PasswordResetStep.CODE -> {
+                    CustomerOtpInput(
+                        value = resetCode,
+                        onValueChange = { resetCode = it },
+                        enabled = !uiState.resetLoading
+                    )
+                    ResetMessage(uiState.resetMessage, success = false)
+                    Spacer(Modifier.height(CustomerSpacing.Md))
+                    CustomerButton(
+                        text = "Kodu Doğrula",
+                        onClick = { viewModel.verifyPasswordResetCode(resetIdentifier, resetCode) },
+                        enabled = !uiState.resetLoading && resetCode.length == 6,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showForgotDialog = false
-                        viewModel.clearMessages()
-                    }
-                ) {
-                    Text("Kapat", color = NavyDark)
+
+                else -> {
+                    CustomerTextField(
+                        value = newPassword,
+                        onValueChange = { newPassword = it },
+                        label = "Yeni şifre",
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                    )
+                    Spacer(Modifier.height(CustomerSpacing.Sm))
+                    CustomerTextField(
+                        value = newPasswordConfirmation,
+                        onValueChange = { newPasswordConfirmation = it },
+                        label = "Yeni şifre tekrar",
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                    )
+                    ResetMessage(resetLocalError ?: uiState.resetMessage, success = false)
+                    Spacer(Modifier.height(CustomerSpacing.Md))
+                    CustomerButton(
+                        text = "Şifreyi Güncelle",
+                        onClick = {
+                            resetLocalError = if (newPassword != newPasswordConfirmation) {
+                                "Şifreler birbiriyle aynı olmalıdır."
+                            } else {
+                                null
+                            }
+                            if (resetLocalError == null) {
+                                viewModel.completePasswordReset(
+                                    identifier = resetIdentifier,
+                                    code = resetCode,
+                                    newPassword = newPassword
+                                )
+                            }
+                        },
+                        enabled = !uiState.resetLoading,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
-            },
-            containerColor = Color.White,
-            shape = RoundedCornerShape(18.dp)
+            }
+
+            if (uiState.resetLoading) {
+                Spacer(Modifier.height(CustomerSpacing.Md))
+                CircularProgressIndicator(
+                    color = CustomerColors.Orange,
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResetMessage(message: String?, success: Boolean) {
+    if (message.isNullOrBlank()) return
+    Spacer(Modifier.height(CustomerSpacing.Sm))
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = if (success) CustomerColors.SuccessSurface else CustomerColors.WarningSurface,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(CustomerRadii.Field)
+    ) {
+        Text(
+            text = message,
+            modifier = Modifier.padding(CustomerSpacing.Sm),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (success) CustomerColors.Success else CustomerColors.Navy
         )
     }
 }

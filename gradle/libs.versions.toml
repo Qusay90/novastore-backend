@@ -14,10 +14,13 @@ navigation3 = "1.1.0"
 timber = "5.0.1"
 core = "1.18.0"
 security-crypto = "1.1.0"
+haze = "2.0.0-alpha03"
 lifecycle = "2.10.0"
 activity-compose = "1.13.0"
 serialization-json = "1.11.0"
 junit = "4.13.2"
+androidx-test-junit = "1.3.0"
+espresso = "3.7.0"
 
 [libraries]
 # Compose
@@ -73,9 +76,15 @@ serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serializ
 # AndroidX Core
 core = { group = "androidx.core", name = "core", version.ref = "core" }
 security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "security-crypto" }
+haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-junit" }
+espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
+compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

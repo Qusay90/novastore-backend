@@ -3,11 +3,15 @@ package com.novastore.app.data.repository
 import com.novastore.app.core.network.NovaStoreApi
 import com.novastore.app.data.model.CancelOrderRequestBody
 import com.novastore.app.data.model.ChangePasswordRequest
-import com.novastore.app.data.model.ForgotPasswordRequest
-import com.novastore.app.data.model.PhoneCodeRequest
+import com.novastore.app.data.model.CustomerVerificationCode
+import com.novastore.app.data.model.PasswordResetCodeRequest
+import com.novastore.app.data.model.PasswordResetCodeVerificationRequest
+import com.novastore.app.data.model.PasswordResetCompletionRequest
+import com.novastore.app.data.model.PhoneVerificationSendRequest
 import com.novastore.app.data.model.ReturnRequestBody
 import com.novastore.app.data.model.SendMessageRequest
 import com.novastore.app.data.model.UpdateProfileRequest
+import com.novastore.app.data.model.VerificationCodeRequest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -54,20 +58,50 @@ class AccountRepository @Inject constructor(
         api.changePassword(ChangePasswordRequest(currentPassword, newPassword))
     }
 
-    suspend fun forgotPassword(email: String) = runCatching {
-        api.forgotPassword(ForgotPasswordRequest(email))
+    suspend fun forgotPassword(identifier: String) = runCatching {
+        api.requestPasswordReset(PasswordResetCodeRequest(identifier.trim()))
     }
 
     suspend fun sendPhoneCode(phone: String?) = runCatching {
-        api.sendPhoneCode(PhoneCodeRequest(phone = phone))
+        api.sendPhoneCode(PhoneVerificationSendRequest(phone = phone))
     }
 
-    suspend fun verifyPhoneCode(phone: String?, code: String) = runCatching {
-        api.verifyPhoneCode(PhoneCodeRequest(phone = phone, code = code))
+    suspend fun verifyPhoneCode(code: String) = runCatching {
+        require(CustomerVerificationCode.isValid(code))
+        api.verifyPhoneCode(VerificationCodeRequest(code))
     }
 
     suspend fun sendEmailVerification() = runCatching {
         api.sendEmailVerification()
+    }
+
+    suspend fun verifyEmailCode(code: String) = runCatching {
+        require(CustomerVerificationCode.isValid(code))
+        api.verifyEmailCode(VerificationCodeRequest(code))
+    }
+
+    suspend fun verifyPasswordResetCode(identifier: String, code: String) = runCatching {
+        require(CustomerVerificationCode.isValid(code))
+        api.verifyPasswordResetCode(
+            PasswordResetCodeVerificationRequest(identifier.trim(), code)
+        )
+    }
+
+    suspend fun completePasswordReset(
+        identifier: String,
+        code: String,
+        newPassword: String,
+        logoutAll: Boolean? = null
+    ) = runCatching {
+        require(CustomerVerificationCode.isValid(code))
+        api.completePasswordReset(
+            PasswordResetCompletionRequest(
+                identifier = identifier.trim(),
+                code = code,
+                newPassword = newPassword,
+                logoutAll = logoutAll
+            )
+        )
     }
 
     suspend fun setupTwoFactor() = runCatching {

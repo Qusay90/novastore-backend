@@ -107,14 +107,43 @@ data class ChangePasswordRequest(
     val newPassword: String
 )
 
-data class ForgotPasswordRequest(
-    val email: String
+class EmailVerificationSendRequest
+
+data class VerificationCodeRequest(
+    val code: String
 )
 
-data class PhoneCodeRequest(
-    val phone: String? = null,
-    val code: String? = null
+data class PhoneVerificationSendRequest(
+    val phone: String? = null
 )
+
+data class PasswordResetCodeRequest(
+    val identifier: String
+)
+
+data class PasswordResetCodeVerificationRequest(
+    val identifier: String,
+    val code: String
+)
+
+data class PasswordResetCodeVerificationResponse(
+    val valid: Boolean,
+    val expiresAt: String? = null,
+    val message: String? = null
+)
+
+data class PasswordResetCompletionRequest(
+    val identifier: String,
+    val code: String,
+    val newPassword: String,
+    val logoutAll: Boolean? = null
+)
+
+object CustomerVerificationCode {
+    private val sixDigitPattern = Regex("^\\d{6}$")
+
+    fun isValid(value: String): Boolean = sixDigitPattern.matches(value)
+}
 
 data class UserReview(
     val id: Int,
