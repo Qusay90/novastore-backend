@@ -39,6 +39,7 @@ import {
   upsertProductOffer,
   validateProductDraft,
 } from "./previewModel.js";
+import { AdminPresentationShell } from "./AdminPresentationShell.jsx";
 
 const money = (value) => new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -815,7 +816,7 @@ function Operations({
   initialOrderId,
 }) {
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(20);
   const scopedOrders = useMemo(() => orders.filter((order) => matchesStore(order, store)), [orders, store]);
   const filtered = useMemo(
     () => scopedOrders.filter((order) => (
@@ -904,8 +905,7 @@ function Operations({
     <div className={"workspace operations-workspace " + (editingLayout ? "is-editing" : "")}>
       <div className="workspace-heading operations-heading">
         <div>
-          <span className="eyebrow">{profile.label} · örnek veri</span>
-          <h2 tabIndex="-1">Sipariş Operasyonu Önizlemesi</h2>
+          <h2 tabIndex="-1">Sipariş Operasyonu</h2>
         </div>
         <div className="heading-actions">
           <label className="heading-select">
@@ -2171,16 +2171,20 @@ export function App() {
   }[domain];
 
   return (
-    <div className={"admin-shell " + (contextOpen ? "context-open" : "context-closed")} data-testid="admin-shell">
-      <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
-      <IconRail active={domain} setActive={navigate} onProfile={() => openDialog("profile")} inactive={mobile && contextOpen} />
-      <ContextRail domain={domain} open={contextOpen} mobile={mobile} savedViews={savedViews} activeItem={contextItem} onItem={selectContextItem} onView={applyView} onSaveView={() => openDialog("save-view")} onNavigate={navigate} onClose={closeContext} store={store} onStoreChange={setStoreScope} dateRange={dateRange} onDateRangeChange={(next) => { setDateRange(next); notify("“" + next + "” dönemi örnek göstergelere uygulandı."); }} panelRef={contextPanelRef} />
-      {contextOpen && <button className="context-scrim" aria-label="Bağlamsal menüyü kapat" onClick={closeContext} data-testid="context-scrim" />}
-      <div className="admin-main" inert={mobile && contextOpen ? true : undefined}>
-        <AppHeader title={title} section={section} contextOpen={contextOpen} onToggleContext={toggleContext} contextToggleRef={contextToggleRef} onCommand={() => openDialog("command")} onQuickCreate={() => openDialog("quick-create")} onNotifications={() => openDialog("notifications")} onProfile={() => openDialog("profile")} notifications={notifications} dateRange={dateRange} setDateRange={(next) => { setDateRange(next); notify("“" + next + "” dönemi örnek göstergelere uygulandı."); }} showDate={domain === "dashboard" || domain === "operations"} toast={toast} clearToast={() => setToast("")} />
-        <main className="content-area" id="main-content" ref={headingRef} tabIndex="-1">{body}</main>
-        <footer className="statusbar"><PreviewBanner /><span>Hedef pazaryeri simülasyonu · backend tek satıcılı</span><span>API ve ödeme bağlantıları kapalı</span><button aria-label="Önizlemeyi başlangıç değerlerine döndür" onClick={() => openDialog("reset")}><Icon name="refresh" />Önizlemeyi yenile</button></footer>
-      </div>
+    <>
+      <AdminPresentationShell
+        testId="admin-shell"
+        contextOpen={contextOpen}
+        mobile={mobile}
+        iconRail={<IconRail active={domain} setActive={navigate} onProfile={() => openDialog("profile")} inactive={mobile && contextOpen} />}
+        contextRail={<ContextRail domain={domain} open={contextOpen} mobile={mobile} savedViews={savedViews} activeItem={contextItem} onItem={selectContextItem} onView={applyView} onSaveView={() => openDialog("save-view")} onNavigate={navigate} onClose={closeContext} store={store} onStoreChange={setStoreScope} dateRange={dateRange} onDateRangeChange={(next) => { setDateRange(next); notify("“" + next + "” dönemi örnek göstergelere uygulandı."); }} panelRef={contextPanelRef} />}
+        contextScrim={contextOpen && <button className="context-scrim" aria-label="Bağlamsal menüyü kapat" onClick={closeContext} data-testid="context-scrim" />}
+        header={<AppHeader title={title} section={section} contextOpen={contextOpen} onToggleContext={toggleContext} contextToggleRef={contextToggleRef} onCommand={() => openDialog("command")} onQuickCreate={() => openDialog("quick-create")} onNotifications={() => openDialog("notifications")} onProfile={() => openDialog("profile")} notifications={notifications} dateRange={dateRange} setDateRange={(next) => { setDateRange(next); notify("“" + next + "” dönemi örnek göstergelere uygulandı."); }} showDate={domain === "dashboard" || domain === "operations"} toast={toast} clearToast={() => setToast("")} />}
+        contentRef={headingRef}
+        statusbar={<footer className="statusbar"><PreviewBanner /><span>Hedef pazaryeri simülasyonu · backend tek satıcılı</span><span>API ve ödeme bağlantıları kapalı</span><button aria-label="Önizlemeyi başlangıç değerlerine döndür" onClick={() => openDialog("reset")}><Icon name="refresh" />Önizlemeyi yenile</button></footer>}
+      >
+        {body}
+      </AdminPresentationShell>
 
       {dialog?.type === "command" && <CommandPalette onClose={closeDialog} run={runCommand} orders={orders} products={products} sellers={sellers} customers={customers} />}
       {dialog?.type === "quick-create" && (
@@ -2251,6 +2255,6 @@ export function App() {
           <div className="confirmation-body"><Icon name="warning" /><p>Ürün, sipariş, satıcı, müşteri, modül ve ayarlarda yaptığınız tüm yerel değişiklikler sıfırlanacak.</p></div><footer className="modal-actions"><button className="secondary-button" onClick={closeDialog}>Vazgeç</button><button className="danger-button" onClick={resetPreview}>Tüm yerel durumu sıfırla</button></footer>
         </Modal>
       )}
-    </div>
+    </>
   );
 }

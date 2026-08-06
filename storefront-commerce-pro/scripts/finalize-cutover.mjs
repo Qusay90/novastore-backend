@@ -28,6 +28,42 @@ const EXPECTED = Object.freeze({
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
+function assertMediaCsp(html) {
+  const cspMeta = [...html.matchAll(/<meta\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .find((tag) => /\bhttp-equiv\s*=\s*["']Content-Security-Policy["']/i.test(tag));
+  const content = cspMeta?.match(/\bcontent\s*=\s*(["'])([\s\S]*?)\1/i)?.[2];
+  if (!content) throw new Error("Production artifact CSP meta içeriğini taşımıyor.");
+  const directives = new Map(content.split(";").map((value) => value.trim()).filter(Boolean).map((value) => {
+    const [name, ...sources] = value.split(/\s+/);
+    return [name.toLowerCase(), sources];
+  }));
+  if (JSON.stringify(directives.get("media-src")) !== JSON.stringify(["'self'", "https:"])) {
+    throw new Error("Production artifact CSP media-src sınırını tam olarak 'self' + https ile taşımıyor.");
+  }
+}
+
+function assertEmbeddedInterFonts(html) {
+  const fontFaces = html.match(/@font-face\s*\{[^}]*\}/gi) || [];
+  const interFaces = fontFaces.filter((face) => /font-family:\s*(?:"Inter"|Inter)\s*;/i.test(face));
+  if (interFaces.length !== 10) throw new Error(`Production artifact tam 10 Inter font yüzü taşımıyor: ${interFaces.length}`);
+  for (const weight of [400, 500, 600, 700, 800]) {
+    const faces = interFaces.filter((face) => new RegExp(`font-weight:\\s*${weight}\\s*;`, "i").test(face));
+    const subsets = faces.map((face) => {
+      if (/unicode-range:\s*U\+0100-02BA/i.test(face)) return "latin-ext";
+      if (/unicode-range:\s*U\+0000-00FF/i.test(face)) return "latin";
+      return "unknown";
+    }).sort();
+    if (faces.length !== 2 || JSON.stringify(subsets) !== JSON.stringify(["latin", "latin-ext"])) {
+      throw new Error(`Production artifact Inter ${weight} latin/latin-ext çiftini taşımıyor.`);
+    }
+    if (faces.some((face) => !/font-style:\s*normal\s*;[\s\S]*font-display:\s*swap\s*;/i.test(face)
+      || !/src:\s*url\(data:font\/woff2;base64,/i.test(face))) {
+      throw new Error(`Production artifact Inter ${weight} gömülü WOFF2/swap sözleşmesini taşımıyor.`);
+    }
+  }
+}
+
 function assertSafeTempRoot(tempRoot) {
   const systemTempRoot = path.resolve(os.tmpdir());
   const resolved = path.resolve(tempRoot);
@@ -110,6 +146,12 @@ function validateArtifact(buffer) {
     "Tükendi",
   ]) {
     if (!html.includes(required)) throw new Error(`Production artifact sınırı eksik: ${required}`);
+  }
+
+  assertMediaCsp(html);
+  assertEmbeddedInterFonts(html);
+  if (/inter-(?:latin|latin-ext)-(?:400|500|600|700|800)-normal\.woff2/.test(html)) {
+    throw new Error("Production artifact çözümlenmemiş Inter font yolu içeriyor.");
   }
 
   if (!/import\s*["']\/shared-state-sync\.js["'];\s*import\s*["']\/favorites-sync\.js["']/.test(html)) {

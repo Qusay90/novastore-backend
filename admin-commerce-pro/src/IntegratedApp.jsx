@@ -25,6 +25,11 @@ import {
   ORDER_CANCEL_REASONS,
 } from "./integration/orderMutations.js";
 import { useResource } from "./integration/useResource.js";
+import { AdminPresentationShell } from "./AdminPresentationShell.jsx";
+import {
+  integratedAdminPageHash,
+  resolveIntegratedAdminPage,
+} from "./integration/adminHistory.js";
 
 const money = (value, currency = "TRY") => new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -1318,6 +1323,13 @@ const pageCapabilities = Object.freeze({
   catalogStructure: "catalogStructureRead",
 });
 const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler", catalog: "Ürünler", catalogStructure: "Katalog yapısı" });
+const readIntegratedPageFromLocation = () => resolveIntegratedAdminPage(window.location.hash);
+const writeIntegratedPageToHistory = (page, { replace = false } = {}) => {
+  const nextHash = integratedAdminPageHash(page);
+  if (window.location.hash === nextHash) return;
+  const method = replace ? "replaceState" : "pushState";
+  window.history[method]({ novastoreAdminPage: page }, "", nextHash);
+};
 const noSupportedModuleError = Object.freeze({
   message: "Bu admin oturumunda Commerce Pro'nun entegre salt-okunur modülleri açık değil.",
 });
@@ -1341,11 +1353,12 @@ const catalogStructureUnavailableError = Object.freeze({
 });
 
 export function IntegratedApp() {
-  const [page, setPage] = useState("dashboard");
+  const [page, setPage] = useState(readIntegratedPageFromLocation);
   const [mobile, setMobile] = useState(() => window.innerWidth <= 760);
   const [contextOpen, setContextOpen] = useState(() => window.innerWidth > 760);
   const contextRef = useRef(null);
   const contextToggleRef = useRef(null);
+  const contentRef = useRef(null);
   const http = useMemo(() => createAdminHttp(), []);
   const adapter = useMemo(() => createSameOriginAdapter(http), [http]);
   const loadSession = useCallback(({ signal }) => adapter.session({ signal }), [adapter]);
@@ -1401,8 +1414,21 @@ export function IntegratedApp() {
   }, []);
 
   useEffect(() => {
+    const synchronizePage = () => setPage(readIntegratedPageFromLocation());
+    window.addEventListener("popstate", synchronizePage);
+    window.addEventListener("hashchange", synchronizePage);
+    return () => {
+      window.removeEventListener("popstate", synchronizePage);
+      window.removeEventListener("hashchange", synchronizePage);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!sessionLoaded) return;
     if (!enabledPages.includes(page) && enabledPages[0]) setPage(enabledPages[0]);
+    if (!enabledPages.includes(page) && enabledPages[0]) {
+      writeIntegratedPageToHistory(enabledPages[0], { replace: true });
+    }
   }, [enabledPages, page, sessionLoaded]);
 
   useEffect(() => {
@@ -1440,6 +1466,7 @@ export function IntegratedApp() {
   const navigate = (next) => {
     const capability = pageCapabilities[next];
     if (!capability || !hasCapability(capabilities, capability)) return;
+    writeIntegratedPageToHistory(next);
     setPage(next);
     if (mobile) setContextOpen(false);
   };
@@ -1503,30 +1530,34 @@ export function IntegratedApp() {
   }
 
   return (
-    <div className={`admin-shell ${contextOpen ? "context-open" : "context-closed"}`} data-testid="integrated-admin-shell">
-      <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
-      <aside className="icon-rail" aria-label="Ana yönetim alanları">
-        <div className="rail-logo"><Icon name="storefront" /><span>NOVA</span></div>
-        <nav className="rail-nav">
-          {railItems.map((item) => {
-            const enabled = item.implemented && hasCapability(capabilities, item.capability);
-            if (["catalog", "catalogStructure"].includes(item.id) && !enabled) return null;
-            return (
-              <button
-                key={item.id}
-                className={page === item.id ? "active" : ""}
-                disabled={!enabled}
-                aria-label={item.label}
-                title={item.label}
-                onClick={() => navigate(item.id)}
-              ><Icon name={item.icon} /></button>
-            );
-          })}
-        </nav>
-        <div className="rail-bottom"><button aria-label="Çıkış yap" title="Çıkış yap" onClick={logout}><Icon name="back" /></button></div>
-      </aside>
-
-      {contextOpen && (
+    <AdminPresentationShell
+      testId="integrated-admin-shell"
+      contextOpen={contextOpen}
+      mobile={mobile}
+      contentRef={contentRef}
+      iconRail={(
+        <aside className="icon-rail" aria-label="Ana yönetim alanları">
+          <div className="rail-logo"><Icon name="storefront" /><span>NOVA</span></div>
+          <nav className="rail-nav">
+            {railItems.map((item) => {
+              const enabled = item.implemented && hasCapability(capabilities, item.capability);
+              if (["catalog", "catalogStructure"].includes(item.id) && !enabled) return null;
+              return (
+                <button
+                  key={item.id}
+                  className={page === item.id ? "active" : ""}
+                  disabled={!enabled}
+                  aria-label={item.label}
+                  title={item.label}
+                  onClick={() => navigate(item.id)}
+                ><Icon name={item.icon} /></button>
+              );
+            })}
+          </nav>
+          <div className="rail-bottom"><button aria-label="Çıkış yap" title="Çıkış yap" onClick={logout}><Icon name="back" /></button></div>
+        </aside>
+      )}
+      contextRail={contextOpen ? (
         <aside ref={contextRef} className="context-rail" id="context-navigation" aria-label="Entegre yönetim menüsü" tabIndex="-1">
           <header className="context-title"><h1>Commerce Pro</h1><span className="live-mode-chip">ENTEGRE</span></header>
           <section className="context-nav">
@@ -1544,10 +1575,9 @@ export function IntegratedApp() {
           </section>
           <button className="collapse-caption" onClick={() => setContextOpen(false)}><Icon name="back" />Menüyü daralt</button>
         </aside>
-      )}
-      {contextOpen && mobile && <button className="context-scrim" aria-label="Menüyü kapat" onClick={() => setContextOpen(false)} />}
-
-      <div className="admin-main" inert={mobile && contextOpen ? true : undefined}>
+      ) : null}
+      contextScrim={contextOpen && mobile ? <button className="context-scrim" aria-label="Menüyü kapat" onClick={() => setContextOpen(false)} /> : null}
+      header={(
         <header className="topbar">
           <div className="topbar-leading">
             <button ref={contextToggleRef} className="icon-button rail-toggle" onClick={() => setContextOpen((value) => !value)} aria-label={contextOpen ? "Menüyü daralt" : "Menüyü aç"} aria-expanded={contextOpen}><Icon name={contextOpen ? "back" : "menu"} /></button>
@@ -1557,18 +1587,17 @@ export function IntegratedApp() {
           <button className="secondary-button live-refresh" onClick={reloadAll} disabled={sessionResource.refreshing || sessionResource.phase === "loading"}><Icon name="refresh" /><span>Veriyi yenile</span></button>
           <button className="profile-button" onClick={logout}><span className="avatar avatar-small">A</span><span>Çıkış</span></button>
         </header>
-
-        <main className="content-area" id="main-content">
-          {pageContent}
-        </main>
-
+      )}
+      statusbar={(
         <footer className="statusbar">
           <div className="preview-banner live-banner" role="note" data-testid="live-banner"><Icon name="shield" /><strong>Entegre tek-satıcı modu</strong><span>Mock fallback yok · {cancelWriteEnabled || shipmentWriteEnabled || catalogWriteEnabled ? "yazmalar capability ve doğrulamayla sınırlı" : "bu oturum yazma isteği göndermez"}</span></div>
           <span className={sessionLoaded ? "healthy" : ""}>{sessionLoaded ? "Oturum doğrulandı" : sessionResource.phase === "error" ? "Bağlantı hatası" : "Bağlantı bekleniyor"}</span>
           <span>{lastUpdatedAt ? `Son veri okuması ${dateTime(lastUpdatedAt)}` : "Entegre veri bekleniyor"}</span>
           <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing || returnsResource.refreshing || notificationsResource.refreshing || catalogResource.refreshing || catalogStructureResource.refreshing}><Icon name="refresh" />Yenile</button>
         </footer>
-      </div>
-    </div>
+      )}
+    >
+      {pageContent}
+    </AdminPresentationShell>
   );
 }

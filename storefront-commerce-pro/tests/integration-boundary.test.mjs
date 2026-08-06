@@ -295,6 +295,13 @@ test("ürün detay adapterı public attribute değerlerini gerçek PDP alanları
         description: "Pamuklu gömlek",
         price: 900,
         stock: 4,
+        image_url: "/shirt-fallback.webp",
+        media: [
+          { id: 31, media_url: "/shirt-main.webp", media_type: "image", is_main: true, sort_order: 2 },
+          { id: 32, media_url: "https://cdn.example.com/video/upload/shirt.mp4", media_type: "video", sort_order: 1 },
+          { id: 33, media_url: "javascript:alert(1)", media_type: "image", sort_order: 0 },
+          { id: 34, media_url: "/shirt-main.webp", media_type: "image", sort_order: 3 },
+        ],
         categoryIds: [21],
         primaryCategoryId: 21,
         attributes: [
@@ -323,6 +330,12 @@ test("ürün detay adapterı public attribute değerlerini gerçek PDP alanları
   assert.equal(detail.rating, 4.7);
   assert.equal(detail.reviews, 12);
   assert.deepEqual(detail.collectionSlugs, ["yeni-gelenler"]);
+  assert.equal(detail.imageUrl, "/shirt-main.webp");
+  assert.deepEqual(detail.media.map(({ url, type }) => ({ url, type })), [
+    { url: "/shirt-main.webp", type: "image" },
+    { url: "https://cdn.example.com/video/upload/shirt.mp4", type: "video" },
+    { url: "/shirt-fallback.webp", type: "image" },
+  ]);
   assert.ok(detail.features.includes("Ölçü: 70–74 cm"));
 });
 
@@ -436,7 +449,12 @@ test("cart adapter guest, authenticated ve checkout handoff sözleşmelerini kor
     () => adapter.handoffToCheckout([{ productId: 202, quantity: 5 }]),
     /güncel stokla uyuşmuyor/,
   );
+  const locallyPreserved = JSON.parse(storage.getItem("novastore_cart_7"));
+  assert.equal(locallyPreserved[0].productId, 202);
+  assert.equal(locallyPreserved[0].quantity, 4, "stok uyuşmazlığında ürün yerel sepette güvenli miktarla korunmalı");
+  assert.equal(calls.saveCart.length, 1, "stok uyuşmazlığı doğrulanmadan sunucu sepeti yazılmamalı");
   await adapter.handoffToCheckout([{ productId: 202, quantity: 1 }]);
+  assert.equal(calls.saveCart.length, 2);
   assert.equal(calls.saveCheckout.length, 1);
   assert.deepEqual(calls.assigned, ["#/odeme/teslimat"]);
   assert.ok(calls.events.includes("novastore:shared-cart-updated"));

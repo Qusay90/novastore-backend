@@ -344,6 +344,14 @@
   .live-operation-buttons button { min-height: 44px; }
   .live-operation-form footer { align-items: stretch; flex-direction: column-reverse; }
   .live-operation-form footer button { width: 100%; min-height: 44px; }
+  .live-boundary-notice p,
+  .live-resource-warning p,
+  .live-state-card small,
+  .live-customer-cell small,
+  .live-status-note,
+  .live-notification-card p,
+  .live-notification-card small,
+  .live-result-count { font-size: 11px; line-height: 1.5; }
 }
 
 @media (prefers-reduced-motion: reduce) {

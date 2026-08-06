@@ -18,6 +18,47 @@ const safeMediaUrl = (value) => {
   }
 };
 
+const productMediaType = (item, url) => {
+  const declared = String(item?.media_type || item?.mediaType || item?.type || "").trim().toLocaleLowerCase("en-US");
+  if (declared === "video") return "video";
+  return /\/video\/upload\//i.test(url) || /\.(?:mp4|webm|mov)(?:[?#]|$)/i.test(url)
+    ? "video"
+    : "image";
+};
+
+const normalizeProductMedia = (product, fallbackImageUrl) => {
+  const seen = new Set();
+  const items = asArray(product?.media).map((item, index) => {
+    const url = safeMediaUrl(item?.media_url || item?.mediaUrl || item?.url);
+    if (!url || seen.has(url)) return null;
+    seen.add(url);
+    return Object.freeze({
+      id: String(item?.id ?? `${product?.id || "product"}-${index}`),
+      url,
+      type: productMediaType(item, url),
+      isMain: item?.is_main === true || item?.isMain === true,
+      sortOrder: nonNegativeInteger(item?.sort_order ?? item?.sortOrder ?? index),
+    });
+  }).filter(Boolean);
+
+  const fallback = safeMediaUrl(fallbackImageUrl);
+  if (fallback && !seen.has(fallback)) {
+    items.push(Object.freeze({
+      id: `${product?.id || "product"}-primary`,
+      url: fallback,
+      type: "image",
+      isMain: items.length === 0,
+      sortOrder: items.length,
+    }));
+  }
+
+  return Object.freeze(items.sort((left, right) => (
+    Number(right.isMain) - Number(left.isMain)
+    || left.sortOrder - right.sortOrder
+    || left.id.localeCompare(right.id)
+  )));
+};
+
 const flattenCategoryTree = (tree) => {
   const flattened = [];
   const visit = (items, parentPath = "") => {
@@ -174,14 +215,18 @@ const normalizeProducts = (payload, categories, collectionDetails) => {
     const oldPrice = product.old_price === null || product.old_price === undefined
       ? null
       : Number(product.old_price);
-    const media = asArray(product.media);
+    const rawMedia = asArray(product.media);
     const attributes = asArray(product.attributes);
-    const imageUrl = safeMediaUrl(
+    const fallbackImageUrl = safeMediaUrl(
       product.image_url
       || product.imageUrl
-      || media.find((item) => item.is_main === true)?.media_url
-      || media[0]?.media_url,
+      || rawMedia.find((item) => item.is_main === true)?.media_url
+      || rawMedia[0]?.media_url,
     );
+    const media = normalizeProductMedia(product, fallbackImageUrl);
+    const imageUrl = media.find((item) => item.type === "image" && item.isMain)?.url
+      || media.find((item) => item.type === "image")?.url
+      || null;
     const discount = oldPrice && oldPrice > price
       ? Math.round((1 - price / oldPrice) * 100)
       : 0;
@@ -204,6 +249,7 @@ const normalizeProducts = (payload, categories, collectionDetails) => {
       storage: product.storage || attributeValueByCode(attributes, ["kapasite", "depolama", "storage"]) || null,
       badge: stock <= 0 ? "Tükendi" : discount > 0 ? `%${discount} İndirim` : "",
       imageUrl,
+      media,
       imageKey: null,
       description: String(product.description || "").trim(),
       features: Object.freeze(normalizeAttributeFeatures(attributes)),
@@ -378,6 +424,7 @@ export const catalogAdapterTestUtils = Object.freeze({
   collectNavigationCategoryOrder,
   normalizeCategories,
   normalizeProducts,
+  normalizeProductMedia,
   formatAttributeValue,
   attributeValueByCode,
   categoryNavigationFallback,

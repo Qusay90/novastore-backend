@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { RuntimeComparisonContext } from "./integration/RuntimeComparisonContext.jsx";
 import {
   ArrowLeft,
   ArrowsLeftRight,
@@ -154,7 +155,7 @@ function cx(...values) {
 }
 
 function isolatePageFromModal() {
-  const backgroundNodes = [...document.querySelectorAll("#root > .skip-link, #root > .site-header, #root > main, #root > .site-footer, #root > .mobile-bottom-nav")];
+  const backgroundNodes = [...document.querySelectorAll("#root > *")];
   const previous = backgroundNodes.map((node) => ({
     node,
     ariaHidden: node.getAttribute("aria-hidden"),
@@ -602,7 +603,8 @@ function Breadcrumbs({ category, productName }) {
 
 function ProductCard({ product, favorite, onFavorite, onAdd }) {
   const soldOut = product.stock <= 0;
-  const [compared, setCompared] = useState(false);
+  const comparison = useContext(RuntimeComparisonContext);
+  const compared = comparison.ids.has(product.id);
   const discount = product.oldPrice ? Math.round((1 - product.price / product.oldPrice) * 100) : 0;
   return (
     <article className={cx("product-card", soldOut && "is-sold-out")}>
@@ -625,7 +627,7 @@ function ProductCard({ product, favorite, onFavorite, onAdd }) {
           </div>
         </div>
         <div className="product-card__actions">
-          <button className={cx("compare-button", compared && "is-active")} type="button" aria-pressed={compared} onClick={() => setCompared((value) => !value)} aria-label={compared ? `${product.name} ürününü karşılaştırmadan çıkar` : `${product.name} ürününü karşılaştır`}><ArrowsLeftRight /></button>
+          <button className={cx("compare-button", compared && "is-active")} type="button" aria-pressed={compared} disabled={!comparison.available} onClick={() => comparison.toggle(product.id)} aria-label={compared ? `${product.name} ürününü karşılaştırmadan çıkar` : `${product.name} ürününü karşılaştır`}><ArrowsLeftRight /></button>
           <button className="card-add-button" type="button" disabled={soldOut} onClick={() => onAdd(product.id)}>{soldOut ? "Tükendi" : <><ShoppingCart /> Sepete ekle</>}</button>
         </div>
       </div>
@@ -878,9 +880,52 @@ function ProductListing({ category, initialItems, title, favorites, onFavorite, 
   );
 }
 
-function ProductDetail({ product, favorite, favorites, onFavorite, onAdd }) {
+function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyNow, buyNowPending = false }) {
   const category = getCategoryById(product.categoryId);
   const [quantity, setQuantity] = useState(1);
+  const maxQuantity = Math.max(1, Math.min(9, Number(product.stock) || 1));
+  const runtimeMedia = useMemo(() => {
+    const media = Array.isArray(product.media)
+      ? product.media.filter((item) => item?.url && ["image", "video"].includes(item.type))
+      : [];
+    return media.length > 0
+      ? media
+      : [{ id: `${product.id}-primary`, url: productImage(product), type: "image", isMain: true }];
+  }, [product]);
+  const [activeMediaId, setActiveMediaId] = useState(() => runtimeMedia[0]?.id);
+  const [mediaOpen, setMediaOpen] = useState(false);
+  const mediaTriggerRef = useRef(null);
+  const mediaDialogRef = useRef(null);
+  const mediaCloseRef = useRef(null);
+  const activeMedia = runtimeMedia.find((item) => item.id === activeMediaId) || runtimeMedia[0];
+
+  useEffect(() => {
+    setActiveMediaId(runtimeMedia[0]?.id);
+    setMediaOpen(false);
+    setQuantity((current) => Math.min(maxQuantity, Math.max(1, current)));
+  }, [maxQuantity, product.id, runtimeMedia]);
+
+  useEffect(() => {
+    if (!mediaOpen) return undefined;
+    const restorePage = isolatePageFromModal();
+    document.body.classList.add("is-locked");
+    window.requestAnimationFrame(() => mediaCloseRef.current?.focus());
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMediaOpen(false);
+        return;
+      }
+      keepFocusInDialog(event, mediaDialogRef.current);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.classList.remove("is-locked");
+      restorePage();
+      restoreFocus(mediaTriggerRef);
+    };
+  }, [mediaOpen]);
   const storageOptions = product.storage ? [product.storage] : [];
   const colorOptions = product.color ? [product.color] : [];
   const [selectedStorage, setSelectedStorage] = useState(storageOptions[0] || "Standart");
@@ -912,15 +957,21 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd }) {
     <main id="main-content" className="page product-page">
       <div className="shell"><Breadcrumbs category={category} productName={product.name} />
         <div className="product-detail-grid">
-          <section className="product-gallery" aria-label="Ürün görseli"><span className="product-badge">{soldOut ? "Tükendi" : product.badge}</span><button className={cx("favorite-button", favorite && "is-active")} type="button" onClick={() => onFavorite(product.id)} aria-pressed={favorite} aria-label={favorite ? "Favorilerden çıkar" : "Favorilere ekle"}><Heart weight={favorite ? "fill" : "regular"} /></button><img src={productImage(product)} alt={product.name} /><span className="zoom-note"><span>Görseli büyütmek için üzerine gel</span><b>Dokunarak büyüt</b></span></section>
+          <section className="product-gallery runtime-product-gallery" aria-label="Ürün görseli"><span className="product-badge">{soldOut ? "Tükendi" : product.badge}</span><button className={cx("favorite-button", favorite && "is-active")} type="button" onClick={() => onFavorite(product.id)} aria-pressed={favorite} aria-label={favorite ? "Favorilerden çıkar" : "Favorilere ekle"}><Heart weight={favorite ? "fill" : "regular"} /></button><button ref={mediaTriggerRef} className="runtime-product-media-stage" type="button" onClick={() => setMediaOpen(true)} aria-label={`${product.name} medyasını büyüt`}>
+              {activeMedia?.type === "video"
+                ? <video src={activeMedia.url} muted playsInline preload="metadata" />
+                : <img src={activeMedia?.url || productImage(product)} alt={product.name} />}
+            </button>
+            {runtimeMedia.length > 1 && <div className="runtime-product-thumbnails" aria-label="Ürün medyaları">{runtimeMedia.map((item, index) => <button key={item.id} className={cx(item.id === activeMedia?.id && "is-active")} type="button" aria-label={`${index + 1}. medyayı göster`} aria-pressed={item.id === activeMedia?.id} onClick={() => setActiveMediaId(item.id)}>{item.type === "video" ? <video src={item.url} muted playsInline preload="metadata" /> : <img src={item.url} alt="" />}</button>)}</div>}
+            {mediaOpen && activeMedia && createPortal(<div className="runtime-media-lightbox" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setMediaOpen(false)}><div ref={mediaDialogRef} className="runtime-media-lightbox__dialog" role="dialog" aria-modal="true" aria-label={`${product.name} medya önizlemesi`} tabIndex="-1"><button ref={mediaCloseRef} className="runtime-media-lightbox__close" type="button" onClick={() => setMediaOpen(false)} aria-label="Medya önizlemesini kapat"><X /></button>{activeMedia.type === "video" ? <video src={activeMedia.url} controls autoPlay playsInline /> : <img src={activeMedia.url} alt={product.name} />}</div></div>, document.body)}<span className="zoom-note"><span>Görseli büyütmek için üzerine gel</span><b>Dokunarak büyüt</b></span></section>
           <section className="product-summary">
             <span className="product-brand">{product.brand}</span><h1>{product.name}</h1>
-            <div className="detail-rating"><span><Star weight="fill" /> {product.rating.toFixed(1)}</span><button type="button" onClick={() => document.getElementById("reviews")?.scrollIntoView({ behavior: "smooth", block: "start" })}>{product.reviews} değerlendirme</button><small>Ürün kodu: {product.id}</small></div>
+            <div className="detail-rating"><span><Star weight="fill" /> {product.rating.toFixed(1)}</span><button type="button" onClick={() => document.getElementById("community-reviews")?.scrollIntoView({ behavior: "smooth", block: "start" })}>{product.reviews} değerlendirme</button><small>Ürün kodu: {product.id}</small></div>
             <div className="detail-price"><strong>{money.format(product.price)}</strong>{product.oldPrice && <del>{money.format(product.oldPrice)}</del>}</div>
             <p className="installment">Peşin fiyatına <strong>3 taksit</strong> · Aylık {money.format(Math.ceil(product.price / 3))}</p>
             {colorOptions.length > 0 && <div className="variant-group"><div><strong>Renk</strong><span>{colorOptions[0]}</span></div><button className="color-swatch is-active" type="button" aria-label={colorOptions[0]} aria-pressed="true"><i /></button></div>}
             {storageOptions.length > 0 && <div className="variant-group"><div><strong>Kapasite</strong><span>Stokta</span></div><div className="storage-options">{storageOptions.map((storage) => <button key={storage} className={selectedStorage === storage ? "is-active" : ""} type="button" aria-pressed={selectedStorage === storage} onClick={() => setSelectedStorage(storage)}>{storage}</button>)}</div></div>}
-            <div className="purchase-row"><div className="quantity-control"><button type="button" onClick={() => setQuantity((value) => Math.max(1, value - 1))} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" onClick={() => setQuantity((value) => Math.min(9, value + 1))} aria-label="Adedi artır"><Plus /></button></div><button className="primary-button" type="button" disabled={soldOut} onClick={() => onAdd(product.id, quantity)}><ShoppingCart /> {soldOut ? "Tükendi" : "Sepete ekle"}</button></div>
+            <div className="purchase-row"><div className="quantity-control"><button type="button" disabled={soldOut || quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" disabled={soldOut || quantity >= maxQuantity} onClick={() => setQuantity((value) => Math.min(maxQuantity, value + 1))} aria-label="Adedi artır"><Plus /></button></div><button className="buy-now-button" type="button" disabled={soldOut || buyNowPending || typeof onBuyNow !== "function"} onClick={() => onBuyNow?.(product.id, quantity)}><CreditCard /> {buyNowPending ? "Hazırlanıyor" : "Hemen Al"}</button><button className="primary-button" type="button" disabled={soldOut} onClick={() => onAdd(product.id, quantity)}><ShoppingCart /> {soldOut ? "Tükendi" : "Sepete ekle"}</button></div>
             <div className="stock-line">{soldOut ? <><X /> Stokta yok</> : <><CheckCircle weight="fill" /> Stokta · 24 saat içinde kargoda</>}</div>
             <div className="detail-benefits"><div><Truck /><span><strong>Ücretsiz teslimat</strong><small>1–2 iş günü</small></span></div><div><ArrowsClockwise /><span><strong>Kolay iade</strong><small>14 gün içinde</small></span></div><div><ShieldCheck /><span><strong>2 yıl garanti</strong><small>NovaStore güvencesi</small></span></div></div>
           </section>
@@ -931,7 +982,7 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd }) {
         </section>
         {related.length > 0 && <section className="section"><div className="section-heading"><div><span className="section-kicker">Benzer ürünler</span><h2>Bunları da sevebilirsin</h2></div></div><ProductGrid items={related} favorites={favorites} onFavorite={onFavorite} onAdd={onAdd} /></section>}
       </div>
-      <div className="mobile-purchase-bar"><div><small>Toplam</small><strong>{money.format(product.price * quantity)}</strong></div><button type="button" disabled={soldOut} onClick={() => onAdd(product.id, quantity)}><ShoppingCart />{soldOut ? "Tükendi" : "Sepete ekle"}</button></div>
+      <div className="mobile-purchase-bar"><div><small>Toplam</small><strong>{money.format(product.price * quantity)}</strong></div><button type="button" disabled={soldOut || buyNowPending || typeof onBuyNow !== "function"} onClick={() => onBuyNow?.(product.id, quantity)}><CreditCard />{soldOut ? "Tükendi" : buyNowPending ? "Hazırlanıyor" : "Hemen Al"}</button></div>
     </main>
   );
 }

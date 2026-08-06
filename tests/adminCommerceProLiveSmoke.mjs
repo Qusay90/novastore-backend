@@ -144,9 +144,18 @@ assert.doesNotMatch(source, /\/api\/returns\/admin\/all|\/api\/notifications\/ad
 assert.doesNotMatch(source, /\/api\/shipments\/[^"']+\/create/);
 assert.doesNotMatch(source, /\/api\/orders\/[^"']+\/status|\/api\/returns\/[^"']+\/status|\/api\/notifications\/[^"']+\/read/);
 assert.doesNotMatch(source, /\/api\/payments\/|paytr|iyzico/i);
-assert.doesNotMatch(source, /<script\b[^>]*\bsrc\s*=/i);
-assert.doesNotMatch(source, /<link\b[^>]*\brel=["'][^"']*stylesheet/i);
-assert.doesNotMatch(source, /<(?:img|script|link|source)\b[^>]*\b(?:src|href|srcset)=["'](?:https?:)?\/\//i);
+const stripInlinePayload = (documentSource) => documentSource
+  .replace(/(<style\b[^>]*>)[\s\S]*?(<\/style>)/gi, "$1$2")
+  .replace(/(<script\b[^>]*>)[\s\S]*?(<\/script>)/gi, "$1$2");
+const documentShell = stripInlinePayload(source);
+assert.match(
+  stripInlinePayload('<script type="module" src="/unexpected.js">ignored payload</script>'),
+  /<script\b[^>]*\bsrc="\/unexpected\.js"[^>]*><\/script>/i,
+  "belge kabuğu ayrıştırması harici script niteliğini gizlememeli",
+);
+assert.doesNotMatch(documentShell, /<script\b[^>]*\bsrc\s*=/i);
+assert.doesNotMatch(documentShell, /<link\b[^>]*\brel=["'][^"']*stylesheet/i);
+assert.doesNotMatch(documentShell, /<(?:img|script|link|source)\b[^>]*\b(?:src|href|srcset)=["'](?:https?:)?\/\//i);
 assert.match(source, /data:font\/woff2;base64,/i);
 
 const scripts = Array.from(source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi), (match) => match[1]);

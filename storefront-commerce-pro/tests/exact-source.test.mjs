@@ -6,14 +6,26 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   CANONICAL_CATALOG_IMPORT,
+  CANONICAL_COMPARISON_STATE,
+  CANONICAL_COMPARISON_TOGGLE,
   CANONICAL_HOME_HREF,
   CANONICAL_MOBILE_HOME_ITEM,
+  CANONICAL_PRODUCT_DETAIL_SIGNATURE,
+  CANONICAL_PRODUCT_GALLERY_CLASS,
+  CANONICAL_PRODUCT_IMAGE,
+  CANONICAL_REACT_IMPORT,
   EXPECTED_CANONICAL_HOME_HREF_COUNT,
   EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT,
   RUNTIME_CATALOG_IMPORT,
+  RUNTIME_COMPARISON_IMPORT,
+  RUNTIME_COMPARISON_STATE,
+  RUNTIME_COMPARISON_TOGGLE,
   RUNTIME_EXPORTS,
   RUNTIME_HOME_HREF,
   RUNTIME_MOBILE_HOME_ITEM,
+  RUNTIME_PRODUCT_DETAIL_SIGNATURE,
+  RUNTIME_PRODUCT_GALLERY_CLASS,
+  RUNTIME_REACT_IMPORT,
   countExactOccurrences,
   createRuntimePresentation,
 } from "../scripts/sync-canonical.mjs";
@@ -25,6 +37,7 @@ const canonicalAppPath = path.join(root, "src", "App.jsx");
 const runtimePresentationPath = path.join(root, "src", "CanonicalRuntimePresentation.jsx");
 const EXPECTED_SHA256 = "8b6301362b6c01b649db1d7cfa4dc00d5b4392309e4ece2c7c14870cab0f2b0d";
 const EXPECTED_APP_SHA256 = "d31e7642f6bccb75094361be3dc2dd3b85cc38a4d968bbfd57ee3ee7ffd80fb6";
+const EXPECTED_RUNTIME_SHA256 = "fead9f267c82887a6dfe98f42a2d0731a6d332d76df5b5b684298a241d47b776";
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const NON_HOME_HASH_ROUTES = Object.freeze([
   "#/kategori/",
@@ -93,16 +106,34 @@ test("runtime presentation is generated directly from canonical App.jsx", async 
     EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT,
   );
 
-  const independentlyExpected = canonicalApp
-    .replace(CANONICAL_CATALOG_IMPORT, RUNTIME_CATALOG_IMPORT)
-    .replaceAll(CANONICAL_HOME_HREF, RUNTIME_HOME_HREF)
-    .replace(CANONICAL_MOBILE_HOME_ITEM, RUNTIME_MOBILE_HOME_ITEM)
-    .trimEnd()
-    .concat("\n", RUNTIME_EXPORTS);
-  assert.equal(createRuntimePresentation(canonicalApp), independentlyExpected);
-  assert.equal(runtimePresentation, independentlyExpected);
+  const expectedRuntimePresentation = createRuntimePresentation(canonicalApp);
+  assert.equal(sha256(expectedRuntimePresentation), EXPECTED_RUNTIME_SHA256);
+  assert.equal(sha256(runtimePresentation), EXPECTED_RUNTIME_SHA256);
+  assert.equal(runtimePresentation, expectedRuntimePresentation);
   assert.equal(countExactOccurrences(runtimePresentation, CANONICAL_HOME_HREF), 0);
   assert.equal(countExactOccurrences(runtimePresentation, CANONICAL_MOBILE_HOME_ITEM), 0);
+  assert.equal(countExactOccurrences(canonicalApp, CANONICAL_REACT_IMPORT), 1);
+  assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_REACT_IMPORT), 1);
+  assert.equal(countExactOccurrences(canonicalApp, CANONICAL_COMPARISON_STATE), 1);
+  assert.equal(countExactOccurrences(runtimePresentation, CANONICAL_COMPARISON_STATE), 0);
+  assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_COMPARISON_IMPORT), 1);
+  assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_COMPARISON_STATE), 1);
+  assert.equal(countExactOccurrences(canonicalApp, CANONICAL_COMPARISON_TOGGLE), 1);
+  assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_COMPARISON_TOGGLE), 1);
+  assert.equal(countExactOccurrences(canonicalApp, CANONICAL_PRODUCT_DETAIL_SIGNATURE), 1);
+  assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_DETAIL_SIGNATURE), 1);
+  assert.equal(countExactOccurrences(canonicalApp, CANONICAL_PRODUCT_GALLERY_CLASS), 1);
+  assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_GALLERY_CLASS), 1);
+  assert.equal(countExactOccurrences(canonicalApp, CANONICAL_PRODUCT_IMAGE), 1);
+  assert.match(runtimePresentation, /runtime-product-media-stage/);
+  assert.match(runtimePresentation, /runtime-media-lightbox/);
+  assert.match(runtimePresentation, /document\.querySelectorAll\("#root > \*"\)/);
+  assert.match(runtimePresentation, /isolatePageFromModal\(\)/);
+  assert.match(runtimePresentation, /keepFocusInDialog\(event, mediaDialogRef\.current\)/);
+  assert.match(runtimePresentation, /restoreFocus\(mediaTriggerRef\)/);
+  assert.match(runtimePresentation, /quantity >= maxQuantity/);
+  assert.match(runtimePresentation, /document\.getElementById\("community-reviews"\)/);
+  assert.match(runtimePresentation, /buyNowPending \? "Hazırlanıyor" : "Hemen Al"/);
   assert.equal(
     countExactOccurrences(runtimePresentation, RUNTIME_HOME_HREF),
     countExactOccurrences(canonicalApp, RUNTIME_HOME_HREF) + EXPECTED_CANONICAL_HOME_HREF_COUNT,
@@ -129,5 +160,13 @@ test("runtime presentation is generated directly from canonical App.jsx", async 
       canonicalApp.replace(CANONICAL_MOBILE_HOME_ITEM, '[House,"Ana Sayfa","#/drift","home"]'),
     ),
     /Canonical mobile home item drifted; expected 1 exact occurrence\(s\), found 0/,
+  );
+  assert.throws(
+    () => createRuntimePresentation(canonicalApp.replace(CANONICAL_COMPARISON_STATE, "const compared = false;")),
+    /Canonical comparison state owner drifted; expected 1 exact occurrence\(s\), found 0/,
+  );
+  assert.throws(
+    () => createRuntimePresentation(canonicalApp.replace(CANONICAL_PRODUCT_IMAGE, "<span />")),
+    /Canonical product image owner drifted; expected 1 exact occurrence\(s\), found 0/,
   );
 });

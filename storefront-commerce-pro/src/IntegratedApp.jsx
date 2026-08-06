@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
@@ -56,6 +56,7 @@ import {
   stockFirst,
 } from "./integration/runtimeCatalog.js";
 import { useCommerceRuntime } from "./integration/useCommerceRuntime.js";
+import { RuntimeComparisonContext } from "./integration/RuntimeComparisonContext.jsx";
 import {
   CustomerAccountPage,
   CustomerAuthPage,
@@ -171,8 +172,6 @@ const HELP_FAQS = Object.freeze([
   { question: "Kargo ücreti nasıl belirlenir?", answer: "Kargo ücreti, sepetin güncel toplamıyla ödeme adımındaki NovaStore fiyatlandırma servisi tarafından hesaplanır." },
   { question: "Ödeme bilgilerim güvende mi?", answer: "Kart bilgileri NovaStore sayfasında alınmaz; güvenli ödeme sağlayıcısının kendi alanına girilir." },
 ]);
-const ComparisonContext = createContext(Object.freeze({ ids: new Set(), toggle: () => {} }));
-
 function cx(...values) {
   return values.filter(Boolean).join(" ");
 }
@@ -710,7 +709,7 @@ function Breadcrumbs({ category, productName }) {
 
 function ProductCard({ product, favorite, onFavorite, onAdd }) {
   const soldOut = product.stock <= 0;
-  const comparison = useContext(ComparisonContext);
+  const comparison = useContext(RuntimeComparisonContext);
   const compared = comparison.ids.has(product.id);
   const discount = product.oldPrice ? Math.round((1 - product.price / product.oldPrice) * 100) : 0;
   return (
@@ -1035,7 +1034,7 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, sessio
   );
 }
 
-function ProductRoute({ summary, loadProduct, favorite, favorites, onFavorite, onAdd, session, community }) {
+function ProductRoute({ summary, loadProduct, favorite, favorites, onFavorite, onAdd, onBuyNow, buyNowPending, session, community }) {
   const [state, setState] = useState({ product: summary, phase: "loading" });
 
   useEffect(() => {
@@ -1056,7 +1055,7 @@ function ProductRoute({ summary, loadProduct, favorite, favorites, onFavorite, o
   }, [loadProduct, summary]);
 
   return <>
-    <CanonicalProductDetail key={state.product.id} product={state.product} favorite={favorite} favorites={favorites} onFavorite={onFavorite} onAdd={onAdd} />
+    <CanonicalProductDetail key={state.product.id} product={state.product} favorite={favorite} favorites={favorites} onFavorite={onFavorite} onAdd={onAdd} onBuyNow={onBuyNow} buyNowPending={buyNowPending} />
     <div className="shell integration-community-shell"><ProductCommunity productId={state.product.id} productName={state.product.name} session={session} community={community} sectionId="community-reviews" /></div>
   </>;
 }
@@ -1286,6 +1285,8 @@ export function CommerceProRuntimeApp({ runtime }) {
   const [session, setSession] = useState(runtime.session);
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
+  const buyNowPendingRef = useRef(false);
+  const [buyNowPending, setBuyNowPending] = useState(false);
   const mobileMenuTriggerRef = useRef(null);
   const cartTriggerRef = useRef(null);
 
@@ -1352,6 +1353,33 @@ export function CommerceProRuntimeApp({ runtime }) {
       : `${product.name} sepete eklendi`);
   }
 
+  async function buyNow(productId, quantity = 1) {
+    if (buyNowPendingRef.current) return;
+    const product = products.find((item) => item.id === productId);
+    if (!product || product.stock <= 0) {
+      notify("Bu ürün şu anda stokta değil");
+      return;
+    }
+    const requestedQuantity = Math.min(product.stock, Math.max(1, Number(quantity) || 1));
+    const current = cartRef.current;
+    const existing = current.find((item) => item.productId === productId);
+    const nextQuantity = Math.min(product.stock, (existing?.quantity || 0) + requestedQuantity);
+    const next = existing
+      ? current.map((item) => item.productId === productId ? { ...item, quantity: nextQuantity } : item)
+      : [...current, { productId, quantity: nextQuantity }];
+    buyNowPendingRef.current = true;
+    setBuyNowPending(true);
+    replaceCart(next, { persist: false });
+    try {
+      await runtime.cart.handoffToCheckout(next);
+    } catch {
+      notify("Güvenli ödeme özeti hazırlanamadı. Ürün sepetinde korunuyor; lütfen yeniden dene.");
+    } finally {
+      buyNowPendingRef.current = false;
+      setBuyNowPending(false);
+    }
+  }
+
   function updateCartQuantity(productId, quantity) {
     const product = products.find((item) => item.id === productId);
     const current = cartRef.current;
@@ -1410,34 +1438,11 @@ export function CommerceProRuntimeApp({ runtime }) {
     return () => window.removeEventListener("novastore:auth-required", handleAuthRequired);
   }, []);
 
-  useEffect(() => {
-    const handleComparisonClick = (event) => {
-      const button = event.target instanceof Element
-        ? event.target.closest("button.compare-button")
-        : null;
-      const href = button
-        ?.closest("article")
-        ?.querySelector('a[href^="#/urun/"]')
-        ?.getAttribute("href");
-      if (!href) return;
-      let slug = "";
-      try {
-        slug = decodeURIComponent(href.slice("#/urun/".length));
-      } catch {
-        return;
-      }
-      const product = products.find((item) => item.slug === slug);
-      if (product) toggleComparison(product.id);
-    };
-    document.addEventListener("click", handleComparisonClick);
-    return () => document.removeEventListener("click", handleComparisonClick);
-  }, []);
-
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
   const authenticated = session?.status === "authenticated" || session?.status === "unverified";
   const comparisonVisible = comparisonIds.size > 0 && !["checkout", "payment-result", "auth", "password", "order-success"].includes(route.type);
-  const comparisonContext = { ids: comparisonIds, toggle: toggleComparison };
+  const comparisonContext = { available: true, ids: comparisonIds, toggle: toggleComparison };
   const handleAuthenticated = async (nextSession, returnPath) => {
     setSession(nextSession);
     try {
@@ -1473,7 +1478,7 @@ export function CommerceProRuntimeApp({ runtime }) {
     const product = route.type === "product"
       ? getVisibleProducts().find((item) => item.slug === route.slug)
       : getVisibleProducts().find((item) => item.id === route.id);
-    content = product ? <ProductRoute summary={product} loadProduct={runtime.catalog.loadProduct} favorite={favorites.has(product.id)} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} session={session} community={runtime.community} /> : <CanonicalNotFound />;
+    content = product ? <ProductRoute summary={product} loadProduct={runtime.catalog.loadProduct} favorite={favorites.has(product.id)} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onBuyNow={buyNow} buyNowPending={buyNowPending} session={session} community={runtime.community} /> : <CanonicalNotFound />;
   } else if (route.type === "category") {
     const category = resolveCategoryPath(route.path);
     if (!category || category.active === false || category.archived === true || category.customerVisible === false || category.descendantVisibleProductCount === 0) content = <CanonicalNotFound />;
@@ -1511,7 +1516,7 @@ export function CommerceProRuntimeApp({ runtime }) {
   else content = <CanonicalNotFound />;
 
   return (
-    <ComparisonContext.Provider value={comparisonContext}>
+    <RuntimeComparisonContext.Provider value={comparisonContext}>
       <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); focusMainContent({ preventScroll: false }); }}>Ana içeriğe geç</a>
       <CanonicalHeader cartCount={cartCount} favoriteCount={favorites.size} onCartOpen={() => setCartOpen(true)} onMobileOpen={() => setMobileMenuOpen(true)} cartTriggerRef={cartTriggerRef} mobileMenuTriggerRef={mobileMenuTriggerRef} />
       {runtime.warnings.length > 0 && <div className="integration-session-warning" role="status">Bazı ikincil mağaza veya oturum verileri geçici olarak alınamadı; erişilebilen gerçek katalog gösteriliyor.</div>}
@@ -1523,7 +1528,7 @@ export function CommerceProRuntimeApp({ runtime }) {
       {comparisonVisible && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => setComparisonIds(new Set())} onAdd={addToCart} />}
       {["help", "contact"].includes(route.type) && <AssistantWidget route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonVisible} />}
       <div className={cx("toast", toast && "is-visible")} role="status" aria-live="polite"><CheckCircle weight="fill" /><span>{toast}</span></div>
-    </ComparisonContext.Provider>
+    </RuntimeComparisonContext.Provider>
   );
 }
 

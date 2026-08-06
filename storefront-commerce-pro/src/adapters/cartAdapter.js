@@ -79,16 +79,20 @@ export function createCartAdapter({
     return compactCart(readLocalCart(storage, owner), allowedProductIds);
   };
 
-  const persist = async (items) => {
+  const persistLocal = (items) => {
     const enriched = enrich(items);
     const normalized = owner.writeCartLocal(enriched);
     root.dispatchEvent?.(new CustomEvent("novastore:shared-cart-updated", {
       detail: { items: normalized, source: "commerce-pro" },
     }));
-    if (!owner.isAuthenticated()) return { localSaved: true, remoteSaved: false, items: normalized };
+    return { enriched, normalized };
+  };
+
+  const persistRemote = async (normalized) => {
+    if (!owner.isAuthenticated()) return false;
     try {
       await owner.saveCart(normalized);
-      return { localSaved: true, remoteSaved: true, items: normalized };
+      return true;
     } catch (error) {
       owner.reportError(
         "cart",
@@ -98,6 +102,12 @@ export function createCartAdapter({
       error.localSaved = true;
       throw error;
     }
+  };
+
+  const persist = async (items) => {
+    const { normalized } = persistLocal(items);
+    const remoteSaved = await persistRemote(normalized);
+    return { localSaved: true, remoteSaved, items: normalized };
   };
 
   const subscribe = (listener) => {
@@ -119,6 +129,8 @@ export function createCartAdapter({
 
   const handoffToCheckout = async (items) => {
     const requestedItems = compactCart(items);
+    const { enriched, normalized } = persistLocal(items);
+    if (!enriched.length) throw new Error("Ödemeye geçmek için sepette görünür bir ürün olmalıdır.");
     const stockIssue = requestedItems.find((item) => {
       const product = getProduct(item.productId);
       const stock = Math.max(0, Number(product?.stock || 0));
@@ -127,9 +139,7 @@ export function createCartAdapter({
     if (stockIssue) {
       throw new Error("Sepetteki ürün miktarı güncel stokla uyuşmuyor.");
     }
-    const enriched = enrich(items);
-    if (!enriched.length) throw new Error("Ödemeye geçmek için sepette görünür bir ürün olmalıdır.");
-    await persist(items);
+    await persistRemote(normalized);
     if (owner.isAuthenticated()) {
       try {
         await owner.saveCheckout({ items: enriched });

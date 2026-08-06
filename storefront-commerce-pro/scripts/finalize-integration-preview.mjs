@@ -17,6 +17,42 @@ const EXPECTED = Object.freeze({
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
+const assertMediaCsp = (html) => {
+  const cspMeta = [...html.matchAll(/<meta\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .find((tag) => /\bhttp-equiv\s*=\s*["']Content-Security-Policy["']/i.test(tag));
+  const content = cspMeta?.match(/\bcontent\s*=\s*(["'])([\s\S]*?)\1/i)?.[2];
+  if (!content) throw new Error("Entegrasyon çıktısında CSP meta içeriği bulunamadı.");
+  const directives = new Map(content.split(";").map((value) => value.trim()).filter(Boolean).map((value) => {
+    const [name, ...sources] = value.split(/\s+/);
+    return [name.toLowerCase(), sources];
+  }));
+  if (JSON.stringify(directives.get("media-src")) !== JSON.stringify(["'self'", "https:"])) {
+    throw new Error("Entegrasyon çıktısı CSP media-src sınırını tam olarak 'self' + https ile taşımıyor.");
+  }
+};
+
+const assertEmbeddedInterFonts = (html) => {
+  const fontFaces = html.match(/@font-face\s*\{[^}]*\}/gi) || [];
+  const interFaces = fontFaces.filter((face) => /font-family:\s*(?:"Inter"|Inter)\s*;/i.test(face));
+  if (interFaces.length !== 10) throw new Error(`Entegrasyon çıktısı tam 10 Inter font yüzü taşımıyor: ${interFaces.length}`);
+  for (const weight of [400, 500, 600, 700, 800]) {
+    const faces = interFaces.filter((face) => new RegExp(`font-weight:\\s*${weight}\\s*;`, "i").test(face));
+    const subsets = faces.map((face) => {
+      if (/unicode-range:\s*U\+0100-02BA/i.test(face)) return "latin-ext";
+      if (/unicode-range:\s*U\+0000-00FF/i.test(face)) return "latin";
+      return "unknown";
+    }).sort();
+    if (faces.length !== 2 || JSON.stringify(subsets) !== JSON.stringify(["latin", "latin-ext"])) {
+      throw new Error(`Entegrasyon çıktısında Inter ${weight} latin/latin-ext çifti eksik.`);
+    }
+    if (faces.some((face) => !/font-style:\s*normal\s*;[\s\S]*font-display:\s*swap\s*;/i.test(face)
+      || !/src:\s*url\(data:font\/woff2;base64,/i.test(face))) {
+      throw new Error(`Entegrasyon çıktısında Inter ${weight} gömülü WOFF2/swap sözleşmesi eksik.`);
+    }
+  }
+};
+
 const [canonical, app, catalog, integratedApp, built] = await Promise.all([
   readFile(path.join(root, "canonical", "NovaStore-Commerce-Pro.html")),
   readFile(path.join(root, "src", "App.jsx")),
@@ -72,6 +108,12 @@ for (const required of [
   "Tümünü sepete ekle",
 ]) {
   if (!html.includes(required)) throw new Error(`Entegrasyon çıktısında zorunlu sınır eksik: ${required}`);
+}
+
+assertMediaCsp(html);
+assertEmbeddedInterFonts(html);
+if (/inter-(?:latin|latin-ext)-(?:400|500|600|700|800)-normal\.woff2/.test(html)) {
+  throw new Error("Entegrasyon çıktısında çözümlenmemiş Inter font yolu bulundu.");
 }
 
 for (const customerRoute of [

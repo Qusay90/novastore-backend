@@ -386,6 +386,39 @@ const artifact = fs.readFileSync(artifactPath);
 assert(artifact.length > 100_000, 'Commerce Pro production artifact must contain the bundled application');
 const html = artifact.toString('utf8');
 
+const assertArtifactMediaCsp = (documentSource) => {
+    const cspMeta = [...documentSource.matchAll(/<meta\b[^>]*>/gi)]
+        .map((match) => match[0])
+        .find((tag) => /\bhttp-equiv\s*=\s*["']Content-Security-Policy["']/i.test(tag));
+    const content = cspMeta?.match(/\bcontent\s*=\s*(["'])([\s\S]*?)\1/i)?.[2];
+    assert(content, 'production artifact must contain CSP meta content');
+    const directives = new Map(content.split(';').map((value) => value.trim()).filter(Boolean).map((value) => {
+        const [name, ...sources] = value.split(/\s+/);
+        return [name.toLowerCase(), sources];
+    }));
+    assert.deepEqual(directives.get('media-src'), ["'self'", 'https:'], 'CSP media-src must be exact self + https');
+};
+
+const assertArtifactInterFonts = (documentSource) => {
+    const fontFaces = documentSource.match(/@font-face\s*\{[^}]*\}/gi) || [];
+    const interFaces = fontFaces.filter((face) => /font-family:\s*(?:"Inter"|Inter)\s*;/i.test(face));
+    assert.equal(interFaces.length, 10, 'production artifact must contain exactly 10 Inter font faces');
+    for (const weight of [400, 500, 600, 700, 800]) {
+        const faces = interFaces.filter((face) => new RegExp(`font-weight:\\s*${weight}\\s*;`, 'i').test(face));
+        const subsets = faces.map((face) => {
+            if (/unicode-range:\s*U\+0100-02BA/i.test(face)) return 'latin-ext';
+            if (/unicode-range:\s*U\+0000-00FF/i.test(face)) return 'latin';
+            return 'unknown';
+        }).sort();
+        assert.deepEqual(subsets, ['latin', 'latin-ext'], `Inter ${weight} must contain latin and latin-ext subsets`);
+        assert.equal(faces.length, 2, `Inter ${weight} must contain exactly two subsets`);
+        faces.forEach((face) => {
+            assert.match(face, /font-style:\s*normal\s*;[\s\S]*font-display:\s*swap\s*;/i);
+            assert.match(face, /src:\s*url\(data:font\/woff2;base64,/i);
+        });
+    }
+};
+
 for (const [relativePath, expectedHash] of Object.entries(EXPECTED)) {
     assert.equal(sha256(readCommerce(relativePath)), expectedHash, `${relativePath} canonical hash must remain locked`);
 }
@@ -438,6 +471,25 @@ for (const required of [
 ]) {
     assert(html.includes(required), `production artifact must contain ${required}`);
 }
+
+assertArtifactMediaCsp(html);
+assertArtifactInterFonts(html);
+const mediaMarker = "media-src 'self' https:";
+assert.throws(
+    () => assertArtifactMediaCsp(html.replace(mediaMarker, '').replace('</body>', `<script>/* ${mediaMarker} */</script></body>`)),
+    /media-src/,
+    'CSP marker outside the CSP meta must not satisfy the gate'
+);
+assert.throws(
+    () => assertArtifactInterFonts(html.replaceAll('font-family:Inter;', 'font-family:NotInter;')),
+    /exactly 10 Inter/,
+    'non-Inter font faces and generic embedded fonts must not satisfy the gate'
+);
+assert.doesNotMatch(
+    html,
+    /inter-(?:latin|latin-ext)-(?:400|500|600|700|800)-normal\.woff2/,
+    'production artifact must not retain unresolved Inter font paths'
+);
 
 assert.match(
     html,
