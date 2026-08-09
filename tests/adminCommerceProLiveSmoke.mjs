@@ -79,7 +79,7 @@ assert.match(integratedAppSource, /page === "notifications"[\s\S]{0,180}!notific
 assert.match(integratedAppSource, /page === "catalog"[\s\S]{0,180}!catalogEnabled[\s\S]{0,220}catalogUnavailableError/);
 assert.match(integratedAppSource, /useResource\(loadCatalog, \{ enabled: catalogEnabled \}\)/, "kapalı capability katalog resource isteğini başlatmamalı");
 assert.match(integratedAppSource, /useResource\(loadCatalogStructure, \{ enabled: catalogStructureEnabled \}\)/, "kapalı capability katalog yapı isteğini başlatmamalı");
-assert.match(integratedAppSource, /\["catalog", "catalogStructure"\]\.includes\(item\.id\) && !enabled\) return null/, "kapalı capability katalog yapı rail yüzeyini gizlemeli");
+assert.match(integratedAppSource, /\["catalog", "catalogStructure", "sellerApplications"\]\.includes\(item\.id\) && !enabled\) return null/, "kapalı capability katalog ve mağaza rail yüzeylerini gizlemeli");
 assert.match(integratedAppSource, /catalogEnabled && <button[\s\S]{0,180}>Ürünler</, "katalog context yüzeyi yalnız açık capability ile oluşmalı");
 assert.match(integratedAppSource, /catalogStructureEnabled && <button[\s\S]{0,220}>Katalog yapısı</, "katalog yapı context yüzeyi yalnız açık capability ile oluşmalı");
 assert.match(resourceHookSource, /if \(!enabled\) \{[\s\S]{0,160}setState\(initialState\)/);

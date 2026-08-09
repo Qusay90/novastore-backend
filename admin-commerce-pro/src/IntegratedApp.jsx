@@ -297,6 +297,7 @@ function OrdersTable({ orders, compact = false, mutationActions = {}, onOpenOper
 function Dashboard({ stats, orderPage, orderPhase, orderError, ordersEnabled, onRetryOrders, onOpenOrders }) {
   const recent = (orderPage?.items || []).slice(0, 6);
   const ordersLoaded = orderPhase === "ready" || orderPhase === "empty";
+  const localReviewDataUnavailable = stats.dataScope === "local_review_no_finance_order_user_data";
   return (
     <section className="workspace live-workspace" data-testid="live-dashboard">
       <header className="workspace-heading">
@@ -309,10 +310,10 @@ function Dashboard({ stats, orderPage, orderPhase, orderError, ordersEnabled, on
       </header>
 
       <section className="kpi-grid">
-        <Kpi label="Filtrelenmiş sipariş tutarı" value={money(stats.totalRevenue)} note="İptal, iade ve ödeme bekleyen hariç" />
-        <Kpi label="Filtrelenmiş sipariş sayısı" value={String(stats.totalOrders)} note="İptal ve ödeme bekleyen hariç" />
+        <Kpi label="Filtrelenmiş sipariş tutarı" value={localReviewDataUnavailable ? "Kullanılamıyor" : money(stats.totalRevenue)} note={localReviewDataUnavailable ? "Yerel inceleme finans verisi içermez" : "İptal, iade ve ödeme bekleyen hariç"} />
+        <Kpi label="Filtrelenmiş sipariş sayısı" value={localReviewDataUnavailable ? "Kullanılamıyor" : String(stats.totalOrders)} note={localReviewDataUnavailable ? "Yerel inceleme sipariş verisi içermez" : "İptal ve ödeme bekleyen hariç"} />
         <Kpi label="Mevcut ürün kaydı" value={String(stats.totalProducts)} note="Products tablosu toplamı" />
-        <Kpi label="Müşteri hesabı" value={String(stats.totalUsers)} note="Admin rolü hariç" />
+        <Kpi label="Müşteri hesabı" value={localReviewDataUnavailable ? "Kullanılamıyor" : String(stats.totalUsers)} note={localReviewDataUnavailable ? "Yerel inceleme hesap verisi içermez" : "Admin rolü hariç"} />
       </section>
 
       <section className="notice-card live-boundary-notice" role="note">
@@ -1302,6 +1303,84 @@ function Notifications({ notificationPage, error, refreshing, onRefresh }) {
   );
 }
 
+function StoreDetailDialog({ resource, storeName, onClose }) {
+  return (
+    <OperationDialog
+      title={storeName}
+      eyebrow="Yetkili mağaza detayı"
+      testId="seller-application-detail"
+      onClose={onClose}
+    >
+      {resource.phase === "ready" ? (
+        <div className="store-detail-content">
+          <section className="detail-hero">
+            <Icon name="storefront" />
+            <div><small>Mağaza</small><strong>{resource.data.storeName}</strong></div>
+            <span className={`status ${resource.data.operationalStatus === "active" ? "active" : "inactive"}`}>
+              {resource.data.operationalStatus === "active" ? "Aktif" : "Pasif"}
+            </span>
+          </section>
+          <dl className="store-private-detail-list">
+            <div><dt>Mağaza sahibi</dt><dd data-testid="store-owner-detail">{resource.data.ownerName || "Kayıtlı kişi adı yok"}</dd></div>
+            <div><dt>Katalog kategorileri</dt><dd data-testid="store-category-detail">{resource.data.catalogCategories.length > 0 ? resource.data.catalogCategories.map((item) => item.name).join(", ") : "Henüz kategori ilişkisi yok"}</dd></div>
+            <div><dt>Toplam ürün</dt><dd>{resource.data.productCount}</dd></div>
+            <div><dt>Müşteriye görünür ürün</dt><dd>{resource.data.customerVisibleProductCount}</dd></div>
+          </dl>
+          <p className="form-hint">Kişi ve kategori bilgileri özet yanıtında taşınmaz; yalnız bu açık detay isteğiyle yüklenir.</p>
+        </div>
+      ) : <StatePanel phase={resource.phase} error={resource.error} onRetry={resource.reload} />}
+    </OperationDialog>
+  );
+}
+
+function SellerApplications({ storePage, detailResource, selectedStoreId, onSelect, onCloseDetail, error, refreshing, onRefresh }) {
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const stores = storePage?.items || [];
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase("tr-TR");
+    return stores.filter((store) => (
+      (!needle || store.storeName.toLocaleLowerCase("tr-TR").includes(needle))
+      && (status === "all" || store.operationalStatus === status)
+    ));
+  }, [query, status, stores]);
+  const selectedStore = stores.find((store) => store.id === selectedStoreId) || null;
+
+  return (
+    <section className="workspace live-store-records" data-testid="seller-application-summary">
+      <div className="workspace-heading">
+        <div><span className="eyebrow">Admin · mağaza kaydı mahremiyet sınırı</span><h2>Satıcı mağaza kayıtları</h2><p>Özet yalnız operasyonel ve finans dışı alanları taşır. Kişi ve kategori bilgileri açık detay isteğine ayrılmıştır.</p></div>
+        <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
+      </div>
+      <ResourceWarning error={error} onRetry={onRefresh} />
+      <section className="table-card">
+        <div className="ledger-toolbar filter-toolbar live-filter-toolbar">
+          <label className="table-search"><Icon name="search" /><span className="sr-only">Mağaza ara</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Mağaza adı ara" /></label>
+          <label className="heading-select"><span className="sr-only">Operasyon durumuna göre filtrele</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">Tüm durumlar</option><option value="active">Aktif</option><option value="inactive">Pasif</option></select></label>
+          <span className="live-result-count">{filtered.length} / {stores.length} mağaza</span>
+        </div>
+        {stores.length === 0 ? <div className="state-panel"><Icon name="storefront" /><h3>Mağaza kaydı yok</h3><p>Backend bu platform yöneticisi için boş bir mağaza özeti döndürdü.</p></div> : filtered.length === 0 ? <div className="state-panel"><Icon name="search" /><h3>Eşleşen mağaza yok</h3><p>Arama veya durum filtresini değiştirin.</p></div> : (
+          <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Satıcı mağaza özeti tablosu">
+            <table className="data-table store-summary-table">
+              <thead><tr><th>Mağaza</th><th>Operasyon durumu</th><th>Ürün</th><th>Görünür ürün</th><th>Güncellendi</th><th><span className="sr-only">Detay</span></th></tr></thead>
+              <tbody>{filtered.map((store) => <tr key={store.id}>
+                <td><strong>{store.storeName}</strong><small>Mağaza #{store.id}</small></td>
+                <td><span className={`status ${store.operationalStatus === "active" ? "active" : "inactive"}`}>{store.operationalStatus === "active" ? "Aktif" : "Pasif"}</span></td>
+                <td>{store.productCount}</td>
+                <td>{store.customerVisibleProductCount}</td>
+                <td>{dateOnly(store.updatedAt || store.createdAt)}</td>
+                <td><button type="button" className="secondary-button store-detail-trigger" onClick={() => onSelect(store.id)} aria-label={`${store.storeName} yetkili detayını aç`}>Detayı aç <Icon name="right" /></button></td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      <section className="notice-card workspace-notice" role="note"><Icon name="shield" /><div><strong>Özet mahremiyet korumalıdır</strong><p>Mağaza sahibi ve katalog kategorileri özet API yanıtına, liste durumuna veya gizli DOM’a alınmaz. Finansal metrik üretilmez.</p></div></section>
+      {selectedStore && <StoreDetailDialog resource={detailResource} storeName={selectedStore.storeName} onClose={onCloseDetail} />}
+    </section>
+  );
+}
+
 const railItems = [
   { id: "dashboard", label: "Pano", icon: "house", capability: "dashboardRead", implemented: true },
   { id: "orders", label: "Siparişler", icon: "orders", capability: "ordersRead", implemented: true },
@@ -1310,7 +1389,7 @@ const railItems = [
   { id: "catalog", label: "Ürünler", icon: "package", capability: "firstPartyCatalogRead", implemented: true },
   { id: "catalogStructure", label: "Katalog yapısı", icon: "grid", capability: "catalogStructureRead", implemented: true },
   { id: "customers", label: "Müşteriler · endpoint yok", icon: "user", capability: "customerAdmin", implemented: false },
-  { id: "sellers", label: "Satıcılar · altyapı yok", icon: "storefront", capability: "sellerAdmin", implemented: false },
+  { id: "sellerApplications", label: "Satıcı mağazaları", icon: "storefront", capability: "storesRead", implemented: true },
   { id: "finance", label: "Finans · ledger yok", icon: "card", capability: "settlements", implemented: false },
 ];
 
@@ -1321,8 +1400,9 @@ const pageCapabilities = Object.freeze({
   notifications: "notificationsRead",
   catalog: "firstPartyCatalogRead",
   catalogStructure: "catalogStructureRead",
+  sellerApplications: "storesRead",
 });
-const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler", catalog: "Ürünler", catalogStructure: "Katalog yapısı" });
+const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler", catalog: "Ürünler", catalogStructure: "Katalog yapısı", sellerApplications: "Satıcı mağazaları" });
 const readIntegratedPageFromLocation = () => resolveIntegratedAdminPage(window.location.hash);
 const writeIntegratedPageToHistory = (page, { replace = false } = {}) => {
   const nextHash = integratedAdminPageHash(page);
@@ -1351,11 +1431,15 @@ const catalogUnavailableError = Object.freeze({
 const catalogStructureUnavailableError = Object.freeze({
   message: "Katalog yapısı okuma yeteneği bu admin oturumunda açık değil.",
 });
+const storesUnavailableError = Object.freeze({
+  message: "Mağaza özeti okuma yeteneği bu admin oturumunda açık değil.",
+});
 
 export function IntegratedApp() {
   const [page, setPage] = useState(readIntegratedPageFromLocation);
   const [mobile, setMobile] = useState(() => window.innerWidth <= 760);
   const [contextOpen, setContextOpen] = useState(() => window.innerWidth > 760);
+  const [selectedStoreId, setSelectedStoreId] = useState(null);
   const contextRef = useRef(null);
   const contextToggleRef = useRef(null);
   const contentRef = useRef(null);
@@ -1368,6 +1452,8 @@ export function IntegratedApp() {
   const loadReturns = useCallback(({ signal }) => adapter.returns({ signal }), [adapter]);
   const loadCatalog = useCallback(({ signal }) => adapter.catalog({ signal }), [adapter]);
   const loadCatalogStructure = useCallback(({ signal }) => adapter.catalogStructure({ signal }), [adapter]);
+  const loadStores = useCallback(({ signal }) => adapter.stores({ signal }), [adapter]);
+  const loadStoreDetail = useCallback(({ signal }) => adapter.storeDetail({ storeId: selectedStoreId, signal }), [adapter, selectedStoreId]);
   const sessionResource = useResource(loadSession, { preserveDataOnError: false });
   const sessionLoaded = sessionResource.phase === "ready";
   const capabilities = sessionResource.data?.capabilities || {};
@@ -1377,6 +1463,7 @@ export function IntegratedApp() {
   const notificationsEnabled = sessionLoaded && hasCapability(capabilities, "notificationsRead");
   const catalogEnabled = sessionLoaded && hasCapability(capabilities, "firstPartyCatalogRead");
   const catalogStructureEnabled = sessionLoaded && hasCapability(capabilities, "catalogStructureRead");
+  const storesEnabled = sessionLoaded && hasCapability(capabilities, "storesRead");
   const mutationActions = useMemo(() => adapter.mutationActions(capabilities), [adapter, capabilities]);
   const cancelWriteEnabled = typeof mutationActions.cancelOrder === "function";
   const shipmentWriteEnabled = typeof mutationActions.createManualShipment === "function";
@@ -1390,16 +1477,19 @@ export function IntegratedApp() {
   const returnsResource = useResource(loadReturns, { enabled: returnsEnabled });
   const catalogResource = useResource(loadCatalog, { enabled: catalogEnabled });
   const catalogStructureResource = useResource(loadCatalogStructure, { enabled: catalogStructureEnabled });
+  const storesResource = useResource(loadStores, { enabled: storesEnabled });
+  const storeDetailResource = useResource(loadStoreDetail, { enabled: storesEnabled && selectedStoreId !== null, preserveDataOnError: false });
   const statsLoaded = statsResource.phase === "ready";
   const ordersLoaded = ordersResource.phase === "ready" || ordersResource.phase === "empty";
   const returnsLoaded = returnsResource.phase === "ready" || returnsResource.phase === "empty";
   const notificationsLoaded = notificationsResource.phase === "ready" || notificationsResource.phase === "empty";
   const catalogLoaded = catalogResource.phase === "ready" || catalogResource.phase === "empty";
   const catalogStructureLoaded = catalogStructureResource.phase === "ready" || catalogStructureResource.phase === "empty";
+  const storesLoaded = storesResource.phase === "ready" || storesResource.phase === "empty";
   const enabledPages = useMemo(() => Object.keys(pageCapabilities).filter((pageId) => (
     hasCapability(capabilities, pageCapabilities[pageId])
   )), [capabilities]);
-  const lastUpdatedAt = [ordersResource.updatedAt, returnsResource.updatedAt, notificationsResource.updatedAt, catalogResource.updatedAt, catalogStructureResource.updatedAt]
+  const lastUpdatedAt = [ordersResource.updatedAt, returnsResource.updatedAt, notificationsResource.updatedAt, catalogResource.updatedAt, catalogStructureResource.updatedAt, storesResource.updatedAt]
     .filter(Boolean)
     .sort((left, right) => right.getTime() - left.getTime())[0] || null;
 
@@ -1430,6 +1520,10 @@ export function IntegratedApp() {
       writeIntegratedPageToHistory(enabledPages[0], { replace: true });
     }
   }, [enabledPages, page, sessionLoaded]);
+
+  useEffect(() => {
+    if (page !== "sellerApplications") setSelectedStoreId(null);
+  }, [page]);
 
   useEffect(() => {
     if (!mobile || !contextOpen) return undefined;
@@ -1478,6 +1572,7 @@ export function IntegratedApp() {
     if (returnsEnabled) returnsResource.reload();
     if (catalogEnabled) catalogResource.reload();
     if (catalogStructureEnabled) catalogStructureResource.reload();
+    if (storesEnabled) storesResource.reload();
   };
   const logout = async () => {
     await http.logout();
@@ -1525,6 +1620,12 @@ export function IntegratedApp() {
       : catalogStructureLoaded
         ? <CatalogStructure structure={catalogStructureResource.data} error={catalogStructureResource.error} refreshing={catalogStructureResource.refreshing} onRefresh={catalogStructureResource.reload} />
         : <StatePanel phase={catalogStructureResource.phase} error={catalogStructureResource.error} onRetry={catalogStructureResource.reload} />;
+  } else if (page === "sellerApplications") {
+    pageContent = !storesEnabled
+      ? <StatePanel phase="forbidden" error={storesUnavailableError} onRetry={storesResource.reload} />
+      : storesLoaded
+        ? <SellerApplications storePage={storesResource.data} detailResource={storeDetailResource} selectedStoreId={selectedStoreId} onSelect={setSelectedStoreId} onCloseDetail={() => setSelectedStoreId(null)} error={storesResource.error} refreshing={storesResource.refreshing} onRefresh={storesResource.reload} />
+        : <StatePanel phase={storesResource.phase} error={storesResource.error} onRetry={storesResource.reload} />;
   } else {
     pageContent = <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={sessionResource.reload} />;
   }
@@ -1541,7 +1642,7 @@ export function IntegratedApp() {
           <nav className="rail-nav">
             {railItems.map((item) => {
               const enabled = item.implemented && hasCapability(capabilities, item.capability);
-              if (["catalog", "catalogStructure"].includes(item.id) && !enabled) return null;
+              if (["catalog", "catalogStructure", "sellerApplications"].includes(item.id) && !enabled) return null;
               return (
                 <button
                   key={item.id}
@@ -1567,10 +1668,10 @@ export function IntegratedApp() {
             <button className={page === "notifications" ? "active" : ""} onClick={() => navigate("notifications")} disabled={!hasCapability(capabilities, "notificationsRead")}><Icon name="bell" /><span>Bildirimler</span><b>{notificationsResource.data?.items.filter((item) => !item.isRead).length || 0}</b></button>
             {catalogEnabled && <button className={page === "catalog" ? "active" : ""} onClick={() => navigate("catalog")}><Icon name="package" /><span>Ürünler</span><b>{catalogResource.data?.items.length || 0}</b></button>}
             {catalogStructureEnabled && <button className={page === "catalogStructure" ? "active" : ""} onClick={() => navigate("catalogStructure")}><Icon name="grid" /><span>Katalog yapısı</span><b>{catalogStructureResource.data?.categories.items.length || 0}</b></button>}
+            {storesEnabled && <button className={page === "sellerApplications" ? "active" : ""} onClick={() => navigate("sellerApplications")}><Icon name="storefront" /><span>Satıcı mağazaları</span><b>{storesResource.data?.items.length || 0}</b></button>}
           </section>
           <section className="marketplace-links">
             <strong>Planlanan modüller</strong>
-            <button disabled><Icon name="storefront" /><span>Satıcılar</span><small>Tur 6</small></button>
             <button disabled><Icon name="card" /><span>Hakedişler</span><small>Tur 8</small></button>
           </section>
           <button className="collapse-caption" onClick={() => setContextOpen(false)}><Icon name="back" />Menüyü daralt</button>
@@ -1593,7 +1694,7 @@ export function IntegratedApp() {
           <div className="preview-banner live-banner" role="note" data-testid="live-banner"><Icon name="shield" /><strong>Entegre tek-satıcı modu</strong><span>Mock fallback yok · {cancelWriteEnabled || shipmentWriteEnabled || catalogWriteEnabled ? "yazmalar capability ve doğrulamayla sınırlı" : "bu oturum yazma isteği göndermez"}</span></div>
           <span className={sessionLoaded ? "healthy" : ""}>{sessionLoaded ? "Oturum doğrulandı" : sessionResource.phase === "error" ? "Bağlantı hatası" : "Bağlantı bekleniyor"}</span>
           <span>{lastUpdatedAt ? `Son veri okuması ${dateTime(lastUpdatedAt)}` : "Entegre veri bekleniyor"}</span>
-          <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing || returnsResource.refreshing || notificationsResource.refreshing || catalogResource.refreshing || catalogStructureResource.refreshing}><Icon name="refresh" />Yenile</button>
+          <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing || returnsResource.refreshing || notificationsResource.refreshing || catalogResource.refreshing || catalogStructureResource.refreshing || storesResource.refreshing}><Icon name="refresh" />Yenile</button>
         </footer>
       )}
     >

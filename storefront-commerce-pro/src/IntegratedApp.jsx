@@ -57,6 +57,7 @@ import {
 } from "./integration/runtimeCatalog.js";
 import { useCommerceRuntime } from "./integration/useCommerceRuntime.js";
 import { RuntimeComparisonContext } from "./integration/RuntimeComparisonContext.jsx";
+import { installInputModalityTracking } from "./integration/inputModality.js";
 import {
   CustomerAccountPage,
   CustomerAuthPage,
@@ -371,7 +372,7 @@ function useRoute() {
 function Logo({ onClick }) {
   return (
     <a className="brand" href="#/" aria-label="NovaStore ana sayfa" onClick={onClick}>
-      <StarFour className="brand-mark" weight="fill" aria-hidden="true" /><span>Nova</span><strong>Store</strong>
+      <span>Nova</span><strong>Store</strong>
     </a>
   );
 }
@@ -1289,6 +1290,8 @@ export function CommerceProRuntimeApp({ runtime }) {
   const [buyNowPending, setBuyNowPending] = useState(false);
   const mobileMenuTriggerRef = useRef(null);
   const cartTriggerRef = useRef(null);
+
+  useEffect(() => installInputModalityTracking(), []);
 
   function notify(message) {
     setToast(message);

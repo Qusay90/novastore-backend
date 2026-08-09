@@ -16,6 +16,8 @@ const smokeTests = [
     'tests/sharedStateSmoke.js',
     'tests/paymentProviderConfigSmoke.js',
     'tests/categoryPlpStorefrontSmoke.js',
+    'tests/officialRuntimeVisualContractSmoke.mjs',
+    'tests/sellerApplicationSummaryPrivacySmoke.mjs',
     'tests/stagingMigrationFoundationSmoke.js'
 ];
 

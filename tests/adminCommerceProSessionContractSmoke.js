@@ -119,6 +119,7 @@ const chainFor = (rows, queries) => [
     assert.equal(validAdmin.payload.capabilities.firstPartyCatalogWrite, false);
     assert.equal(validAdmin.payload.capabilities.catalogStructureWrite, false);
     assert.equal(validAdmin.payload.capabilities.notificationsRead, true);
+    assert.equal(validAdmin.payload.capabilities.storesRead, true);
     assert.equal(validAdmin.payload.capabilities.orderStatusWrite, false);
     assert.equal(validAdmin.payload.capabilities.orderCancelWrite, false);
     assert.equal(validAdmin.payload.capabilities.manualShipmentWrite, false);

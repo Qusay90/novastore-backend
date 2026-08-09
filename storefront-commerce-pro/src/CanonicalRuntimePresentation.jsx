@@ -268,7 +268,7 @@ function useRoute() {
 function Logo() {
   return (
     <a className="brand" href="/" aria-label="NovaStore ana sayfa">
-      <StarFour className="brand-mark" weight="fill" aria-hidden="true" /><span>Nova</span><strong>Store</strong>
+      <span>Nova</span><strong>Store</strong>
     </a>
   );
 }

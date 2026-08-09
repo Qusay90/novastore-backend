@@ -6,6 +6,8 @@ const {
     getAdminOrderSummaries,
     getAdminProductSummaries,
     getAdminReturnSummaries,
+    getAdminStoreDetail,
+    getAdminStoreSummaries,
     getAdminSession,
     getDashboardStats,
     getBehaviorAnalytics
@@ -42,6 +44,8 @@ router.patch('/catalog/products/:id/archive', ...integratedAdminProductWrite, ar
 router.patch('/catalog/products/:id', ...integratedAdminProductWrite, updateAdminCatalogProduct);
 router.get('/catalog/structure/summary', ...integratedAdminRead, getAdminCatalogStructureSummary);
 router.get('/returns/summary', ...integratedAdminRead, getAdminReturnSummaries);
+router.get('/stores/summary', ...integratedAdminRead, getAdminStoreSummaries);
+router.get('/stores/:id', ...integratedAdminRead, getAdminStoreDetail);
 router.get('/stats', ...integratedAdminRead, getDashboardStats);
 router.get('/behavior', authenticate, requireAdmin, getBehaviorAnalytics);
 

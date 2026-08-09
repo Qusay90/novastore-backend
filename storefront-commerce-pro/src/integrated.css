@@ -2629,7 +2629,7 @@ button,
 input,
 select,
 textarea {
-  font-family: var(--commerce-pro-font);
+  font-family: var(--commerce-pro-font) !important;
   line-height: 1.5;
   letter-spacing: 0.2px;
 }
@@ -2651,7 +2651,7 @@ h3,
 .connected-coupon-grid h2,
 .community-score-card > strong,
 .assistant-product-card > div > strong {
-  font-family: var(--commerce-pro-font);
+  font-family: var(--commerce-pro-font) !important;
 }
 
 .brand > .brand-mark {
@@ -2683,6 +2683,17 @@ textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: 3px solid var(--orange-600) !important;
   outline-offset: 3px !important;
+}
+
+html[data-input-modality="pointer"] button:focus,
+html[data-input-modality="pointer"] a:focus,
+html[data-input-modality="pointer"] input:focus,
+html[data-input-modality="pointer"] select:focus,
+html[data-input-modality="pointer"] textarea:focus,
+html[data-input-modality="pointer"] [tabindex]:focus,
+html[data-input-modality="pointer"] .check-option input:focus + span {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .runtime-product-gallery {

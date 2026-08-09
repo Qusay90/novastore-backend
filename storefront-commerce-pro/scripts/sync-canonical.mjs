@@ -21,6 +21,7 @@ export const CANONICAL_HOME_HREF = 'href="#/"';
 export const RUNTIME_HOME_HREF = 'href="/"';
 export const CANONICAL_MOBILE_HOME_ITEM = '[House,"Ana Sayfa","#/","home"]';
 export const RUNTIME_MOBILE_HOME_ITEM = '[House,"Ana Sayfa","/","home"]';
+export const CANONICAL_BRAND_STAR_MARK = '<StarFour className="brand-mark" weight="fill" aria-hidden="true" />';
 export const EXPECTED_CANONICAL_HOME_HREF_COUNT = 5;
 export const EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT = 1;
 export const CANONICAL_REACT_IMPORT = 'import { useEffect, useMemo, useRef, useState } from "react";';
@@ -109,6 +110,13 @@ export const createRuntimePresentation = (canonicalApp) => {
     .replace(CANONICAL_CATALOG_IMPORT, RUNTIME_CATALOG_IMPORT)
     .replaceAll(CANONICAL_HOME_HREF, RUNTIME_HOME_HREF)
     .replace(CANONICAL_MOBILE_HOME_ITEM, RUNTIME_MOBILE_HOME_ITEM);
+
+  runtimePresentation = replaceExactOnce(
+    runtimePresentation,
+    CANONICAL_BRAND_STAR_MARK,
+    "",
+    "Integrated runtime brand star",
+  );
 
   runtimePresentation = replaceExactOnce(
     runtimePresentation,
@@ -248,6 +256,7 @@ export const createRuntimePresentation = (canonicalApp) => {
     "Runtime document-root home href owners"
   );
   assertExactCount(runtimePresentation, CANONICAL_MOBILE_HOME_ITEM, 0, "Runtime hash-only mobile home item");
+  assertExactCount(runtimePresentation, CANONICAL_BRAND_STAR_MARK, 0, "Runtime brand star mark");
   assertExactCount(
     runtimePresentation,
     RUNTIME_MOBILE_HOME_ITEM,

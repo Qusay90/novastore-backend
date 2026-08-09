@@ -7,6 +7,8 @@ const {
     createGetAdminOrderSummaries,
     createGetAdminProductSummaries,
     createGetAdminReturnSummaries,
+    createGetAdminStoreDetail,
+    createGetAdminStoreSummaries,
     getAdminSession
 } = require('../services/adminCommerceReadService');
 
@@ -18,6 +20,8 @@ const getAdminCatalogStructureSummary = createGetAdminCatalogStructureSummary(po
 const getAdminOrderSummaries = createGetAdminOrderSummaries(pool);
 const getAdminProductSummaries = createGetAdminProductSummaries(pool);
 const getAdminReturnSummaries = createGetAdminReturnSummaries(pool);
+const getAdminStoreDetail = createGetAdminStoreDetail(pool);
+const getAdminStoreSummaries = createGetAdminStoreSummaries(pool);
 
 const clampAnalyticsDays = (rawValue) => {
     const parsed = Number.parseInt(rawValue, 10);
@@ -658,6 +662,8 @@ module.exports = {
     getAdminOrderSummaries,
     getAdminProductSummaries,
     getAdminReturnSummaries,
+    getAdminStoreDetail,
+    getAdminStoreSummaries,
     getAdminSession,
     getDashboardStats,
     getBehaviorAnalytics

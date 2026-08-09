@@ -1,6 +1,10 @@
 import { hasCapability, resolveCapabilities } from "../integration/capabilities.js";
 import { normalizeCatalogStructureSummary } from "../integration/catalogStructureRead.js";
 import {
+  normalizeAdminStoreDetail,
+  normalizeAdminStoreSummaryPage,
+} from "../integration/storeRead.js";
+import {
   buildArchiveCatalogProductMutation,
   buildCatalogProductDetailRequest,
   buildCreateCatalogProductMutation,
@@ -31,9 +35,18 @@ export function createSameOriginAdapter(http) {
     });
   };
 
-  const dashboard = async ({ signal } = {}) => normalizeDashboardStats(
-    await http.request("/api/admin/stats", { signal }),
-  );
+  const dashboard = async ({ signal } = {}) => {
+    const payload = await http.request("/api/admin/stats", { signal });
+    const normalized = normalizeDashboardStats(payload);
+    if (payload?.dataScope !== "local_review_no_finance_order_user_data") return normalized;
+    return Object.freeze({
+      ...normalized,
+      dataScope: payload.dataScope,
+      totalRevenue: null,
+      totalOrders: null,
+      totalUsers: null,
+    });
+  };
 
   const orders = async ({ signal } = {}) => normalizeOrderSummaryPage(
     await http.request("/api/admin/orders/summary?limit=100", { signal }),
@@ -53,6 +66,14 @@ export function createSameOriginAdapter(http) {
 
   const catalogStructure = async ({ signal } = {}) => normalizeCatalogStructureSummary(
     await http.request("/api/admin/catalog/structure/summary?limit=100", { signal }),
+  );
+
+  const stores = async ({ signal } = {}) => normalizeAdminStoreSummaryPage(
+    await http.request("/api/admin/stores/summary?limit=100", { signal }),
+  );
+
+  const storeDetail = async ({ storeId, signal } = {}) => normalizeAdminStoreDetail(
+    await http.request(`/api/admin/stores/${encodeURIComponent(String(storeId))}`, { signal }),
   );
 
   const mutationActions = (capabilities) => {
@@ -116,5 +137,5 @@ export function createSameOriginAdapter(http) {
     return Object.freeze(actions);
   };
 
-  return Object.freeze({ catalog, catalogStructure, session, dashboard, notifications, orders, returns, mutationActions });
+  return Object.freeze({ catalog, catalogStructure, session, dashboard, notifications, orders, returns, stores, storeDetail, mutationActions });
 }

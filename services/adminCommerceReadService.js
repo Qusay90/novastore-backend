@@ -21,6 +21,25 @@ const toSummaryPage = (rows, limit) => ({
     hasMore: rows.length > limit
 });
 
+const toAdminStoreSummary = (row) => Object.freeze({
+    id: Number(row.id),
+    storeName: String(row.store_name || ''),
+    operationalStatus: row.is_active === true ? 'active' : 'inactive',
+    productCount: Number(row.product_count || 0),
+    customerVisibleProductCount: Number(row.customer_visible_product_count || 0),
+    createdAt: row.created_at || null,
+    updatedAt: row.updated_at || null
+});
+
+const toAdminStoreDetail = (row, categoryRows) => Object.freeze({
+    ...toAdminStoreSummary(row),
+    ownerName: row.owner_name ? String(row.owner_name) : null,
+    catalogCategories: Object.freeze(categoryRows.map((category) => Object.freeze({
+        id: Number(category.id),
+        name: String(category.name || '')
+    })))
+});
+
 const getAdminSession = (req, res) => {
     if (!req.currentAdmin) {
         return res.status(401).json({ error: 'Güncel yönetici oturumu gerekli.' });
@@ -131,6 +150,102 @@ const createGetAdminProductSummaries = (database) => async (req, res) => {
     } catch (error) {
         console.error('Admin ürün özetleri hatası:', error.message);
         return res.status(500).json({ error: 'Ürün özetleri getirilemedi.' });
+    }
+};
+
+const createGetAdminStoreSummaries = (database) => async (req, res) => {
+    const limit = parseOrderSummaryLimit(req.query?.limit);
+
+    try {
+        const result = await database.query(
+            `
+                SELECT
+                    store.id,
+                    store.name AS store_name,
+                    store.is_active,
+                    store.created_at,
+                    store.updated_at,
+                    COUNT(product.id) FILTER (WHERE product.deleted_at IS NULL)::INT AS product_count,
+                    COUNT(product.id) FILTER (
+                        WHERE product.deleted_at IS NULL
+                          AND product.publication_status = 'active'
+                          AND product.is_customer_visible = TRUE
+                    )::INT AS customer_visible_product_count
+                FROM stores store
+                LEFT JOIN products product ON product.store_id = store.id
+                WHERE store.deleted_at IS NULL
+                  AND LOWER(store.slug) <> LOWER($1)
+                GROUP BY store.id
+                ORDER BY store.created_at DESC NULLS LAST, store.id DESC
+                LIMIT $2
+            `,
+            [PLATFORM_STORE.slug, limit + 1]
+        );
+        const summaries = result.rows.map(toAdminStoreSummary);
+        return res.status(200).json(toSummaryPage(summaries, limit));
+    } catch (_error) {
+        console.error('Admin mağaza özetleri getirilemedi.');
+        return res.status(500).json({ error: 'Mağaza özetleri getirilemedi.' });
+    }
+};
+
+const parseAdminStoreId = (rawValue) => {
+    const normalized = String(rawValue ?? '').trim();
+    if (!/^[1-9]\d*$/.test(normalized)) return null;
+    const id = Number(normalized);
+    return Number.isSafeInteger(id) ? id : null;
+};
+
+const createGetAdminStoreDetail = (database) => async (req, res) => {
+    const storeId = parseAdminStoreId(req.params?.id);
+    if (!storeId) return res.status(400).json({ error: 'Geçerli bir mağaza kimliği gerekli.' });
+
+    try {
+        const storeResult = await database.query(
+            `
+                SELECT
+                    store.id,
+                    store.name AS store_name,
+                    store.is_active,
+                    store.created_at,
+                    store.updated_at,
+                    COALESCE(owner.full_name, owner.name) AS owner_name,
+                    COUNT(product.id) FILTER (WHERE product.deleted_at IS NULL)::INT AS product_count,
+                    COUNT(product.id) FILTER (
+                        WHERE product.deleted_at IS NULL
+                          AND product.publication_status = 'active'
+                          AND product.is_customer_visible = TRUE
+                    )::INT AS customer_visible_product_count
+                FROM stores store
+                LEFT JOIN users owner ON owner.id = store.owner_user_id
+                LEFT JOIN products product ON product.store_id = store.id
+                WHERE store.id = $1
+                  AND store.deleted_at IS NULL
+                  AND LOWER(store.slug) <> LOWER($2)
+                GROUP BY store.id, owner.full_name, owner.name
+            `,
+            [storeId, PLATFORM_STORE.slug]
+        );
+        const store = storeResult.rows[0];
+        if (!store) return res.status(404).json({ error: 'Mağaza kaydı bulunamadı.' });
+
+        const categoriesResult = await database.query(
+            `
+                SELECT DISTINCT category.id, category.name
+                FROM products product
+                JOIN product_categories category_link ON category_link.product_id = product.id
+                JOIN categories category ON category.id = category_link.category_id
+                WHERE product.store_id = $1
+                  AND product.deleted_at IS NULL
+                  AND category.deleted_at IS NULL
+                ORDER BY category.name ASC, category.id ASC
+            `,
+            [storeId]
+        );
+        return res.status(200).json(toAdminStoreDetail(store, categoriesResult.rows));
+    } catch (_error) {
+        console.error('Admin mağaza detayı getirilemedi.');
+        return res.status(500).json({ error: 'Mağaza detayı getirilemedi.' });
     }
 };
 
@@ -436,8 +551,13 @@ module.exports = {
     createGetAdminOrderSummaries,
     createGetAdminProductSummaries,
     createGetAdminReturnSummaries,
+    createGetAdminStoreDetail,
+    createGetAdminStoreSummaries,
     getAdminCommerceCapabilities,
     getAdminSession,
     parseOrderSummaryLimit,
+    parseAdminStoreId,
+    toAdminStoreDetail,
+    toAdminStoreSummary,
     toSummaryPage
 };

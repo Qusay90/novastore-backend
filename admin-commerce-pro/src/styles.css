@@ -111,6 +111,16 @@ a:focus-visible,
   outline-offset: 2px;
 }
 
+html[data-input-modality="pointer"] button:focus,
+html[data-input-modality="pointer"] input:focus,
+html[data-input-modality="pointer"] select:focus,
+html[data-input-modality="pointer"] textarea:focus,
+html[data-input-modality="pointer"] a:focus,
+html[data-input-modality="pointer"] [tabindex]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 a { color: var(--blue); text-decoration: none; }
 
 h1,
@@ -1901,6 +1911,52 @@ input:disabled {
 .notification-tone { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); }
 .notification-tone.warning { background: var(--amber); }
 .notification-tone.success { background: var(--green); }
+
+.live-store-records .store-summary-table td:first-child strong,
+.live-store-records .store-summary-table td:first-child small {
+  display: block;
+}
+
+.live-store-records .store-summary-table td:first-child small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.store-detail-trigger {
+  min-width: 104px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.store-detail-content {
+  padding: 18px;
+}
+
+.store-private-detail-list {
+  display: grid;
+  margin: 16px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.store-private-detail-list > div {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.45fr) minmax(0, 1fr);
+  padding: 12px 14px;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.store-private-detail-list > div:first-child { border-top: 0; }
+.store-private-detail-list dt { color: var(--muted); font-size: 10px; font-weight: 700; }
+.store-private-detail-list dd { margin: 0; color: var(--navy-900); font-size: 11px; font-weight: 700; }
+
+@media (max-width: 760px) {
+  .live-store-records .workspace-heading { align-items: stretch; }
+  .live-store-records .workspace-heading .secondary-button { width: 100%; justify-content: center; }
+  .store-private-detail-list > div { grid-template-columns: 1fr; gap: 4px; }
+}
 
 .health-grid {
   display: grid;

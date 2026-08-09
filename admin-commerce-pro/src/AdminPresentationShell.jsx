@@ -1,3 +1,6 @@
+import { useEffect } from "react";
+import { installInputModalityTracking } from "./integration/inputModality.js";
+
 export function AdminPresentationShell({
   testId,
   contextOpen,
@@ -10,6 +13,8 @@ export function AdminPresentationShell({
   children,
   statusbar,
 }) {
+  useEffect(() => installInputModalityTracking(), []);
+
   const shellIdentity = testId === "integrated-admin-shell"
     ? { "data-testid": "integrated-admin-shell" }
     : { "data-testid": "admin-shell" };

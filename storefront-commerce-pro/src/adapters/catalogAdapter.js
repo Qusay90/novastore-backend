@@ -6,6 +6,11 @@ const finiteNumber = (value, fallback = 0) => {
 };
 const nonNegativeInteger = (value) => Math.max(0, Math.floor(finiteNumber(value, 0)));
 
+const safeProductSlug = (value, fallback) => {
+  const normalized = String(value || "").trim().toLocaleLowerCase("tr-TR");
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalized) ? normalized : String(fallback);
+};
+
 const safeMediaUrl = (value) => {
   const normalized = String(value || "").trim();
   if (!normalized) return null;
@@ -233,7 +238,7 @@ const normalizeProducts = (payload, categories, collectionDetails) => {
 
     return Object.freeze({
       id,
-      slug: String(id),
+      slug: safeProductSlug(product.slug, id),
       name,
       categoryId: primaryCategoryId,
       categoryIds: Object.freeze(linkedCategoryIds),
@@ -428,4 +433,5 @@ export const catalogAdapterTestUtils = Object.freeze({
   formatAttributeValue,
   attributeValueByCode,
   categoryNavigationFallback,
+  safeProductSlug,
 });
