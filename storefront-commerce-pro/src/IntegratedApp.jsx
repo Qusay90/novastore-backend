@@ -73,7 +73,6 @@ import { reconcileFinalizedCart } from "./adapters/checkoutAdapter.js";
 import {
   CartDrawer as CanonicalCartDrawer,
   FavoritesPage as CanonicalFavoritesPage,
-  Footer as CanonicalFooter,
   Header as CanonicalHeader,
   HomePage as CanonicalHomePage,
   LoadingPage as CanonicalLoadingPage,
@@ -347,6 +346,7 @@ function parseRoute() {
   if (pathname === "/sifremi-unuttum") return { type: "password", mode: "forgot", query };
   if (pathname === "/sifre-sifirla") return { type: "password", mode: "reset", query };
   if (pathname === "/yardim") return { type: "help", query };
+  if (pathname === "/iade-degisim") return { type: "return-exchange", query };
   if (pathname === "/siparis-takibi") return { type: "tracking", query };
   if (pathname === "/iletisim") return { type: "contact", query };
   if (pathname === "/") return { type: "home", query };
@@ -1173,6 +1173,10 @@ function HelpPage() {
   return <main id="main-content" className="page help-page"><div className="shell"><Breadcrumbs /><div className="help-hero"><Question /><span className="section-kicker">Yardım merkezi</span><h1>Nasıl yardımcı olabiliriz?</h1><p>Sipariş, teslimat, iade ve ödeme konularındaki işlem noktalarını keşfet.</p><form role="search" onSubmit={(event) => event.preventDefault()}><MagnifyingGlass /><input aria-label="Yardım konularında ara" placeholder="Bir konu ara" value={helpQuery} onChange={(event) => setHelpQuery(event.target.value)} /><button type="submit">Ara</button></form></div><div className="help-grid" aria-live="polite">{visibleTopics.map(([Icon,title,copy]) => <button type="button" onClick={() => selectTopic(title)} key={title}><Icon /><strong>{title}</strong><span>{copy}</span><CaretRight /></button>)}</div><section className="faq-list" id="help-faqs"><h2>Sık sorulan sorular</h2>{visibleFaqs.length ? visibleFaqs.map(({ question, answer }) => <details key={question}><summary>{question}<CaretDown /></summary><p>{answer}</p></details>) : <p role="status">Bu aramayla eşleşen yardım konusu bulunamadı.</p>}</section></div></main>;
 }
 
+function ReturnExchangePage() {
+  return <main id="main-content" className="page return-exchange-page"><div className="shell"><Breadcrumbs /><section className="return-exchange-hero"><ArrowsClockwise /><span className="section-kicker">İade & değişim</span><h1>İade veya değişim sürecini netleştir</h1><p>Uygunluk, ürünün teslimat bilgisi ve sipariş durumu üzerinden doğrulanır. Bu bilgi sayfası yeni bir iade ya da stok işlemi oluşturmaz.</p></section><div className="return-exchange-grid"><section className="return-exchange-steps" aria-labelledby="return-exchange-steps-title"><h2 id="return-exchange-steps-title">Başlamadan önce</h2><ol><li><span>1</span><div><strong>Siparişini kontrol et</strong><p>İade veya değişim için ilgili siparişin teslimat ve ürün koşulları doğrulanır.</p></div></li><li><span>2</span><div><strong>Uygunluk bilgisini gör</strong><p>Ürün, teslimat ve sipariş durumu mevcut müşteri hesabında gösterilen bilgilere göre değerlendirilir.</p></div></li><li><span>3</span><div><strong>Güvenli kanalı kullan</strong><p>İade talebi kaydı sunulduğunda yalnız hesabına ait sipariş üzerinden başlatılır; bu yerel bilgi rotası işlem oluşturmaz.</p></div></li></ol></section><aside className="return-exchange-cta"><span className="section-kicker">Siparişin hazırsa</span><h2>Hesabındaki siparişe git</h2><p>İade/geri ödeme ve stok işlemlerinin tam backend akışı bu bilgilendirme sayfasının kapsamı dışındadır.</p><a className="primary-button" href="#/giris?return=%2Fhesabim%2Fsiparisler">Siparişlerime git <CaretRight /></a><a className="return-exchange-support" href="#/iletisim">Destek ekibinden yardım al</a></aside></div></div></main>;
+}
+
 function MobileBottomNav({ route, cartCount, favoriteCount }) {
   if (["product", "product-id", "checkout", "payment-result", "order-success", "auth", "password"].includes(route.type)) return null;
   const items = [[House,"Ana Sayfa","#/","home"],[GridFour,"Kategoriler",discoveryHref(),"category"],[Heart,"Favoriler","#/favoriler","favorites"],[User,"Hesabım","#/hesabim","account"],[ShoppingCart,"Sepet","#/sepet","cart-page"]];
@@ -1271,7 +1275,7 @@ function NotFound() {
 }
 
 function Footer() {
-  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="#/">Ana sayfa</a><a href="#/hesabim">Hesabım</a><a href="#/iletisim">İletişim</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/yardim">İade & değişim</a><a href="#/yardim">Yardım merkezi</a></div><div><strong>Güvenli alışveriş</strong><p>Ödeme, teslimat ve iade koşulları ilgili işlem adımında doğrulanır.</p></div></div><div className="shell footer-bottom"><span>© 2026 NovaStore. Commerce Pro müşteri deneyimi.</span><span>Koşullar ilgili işlem adımında görüntülenir.</span></div></footer>;
+  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="/">Hakkımızda</a><a href="#/hesabim">Hesabım</a><a href="#/iletisim">İletişim</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/iade-degisim">İade & değişim</a><a href="#/yardim">Yardım merkezi</a></div><div><strong>Güvenli alışveriş</strong><p>3D Secure ödeme, kolay iade ve NovaStore desteği.</p></div></div><div className="shell footer-bottom"><span>© 2026 NovaStore. Etkileşimli tema prototipi.</span><span>Gizlilik · Kullanım Koşulları · Çerezler</span></div></footer>;
 }
 
 export function CommerceProRuntimeApp({ runtime }) {
@@ -1513,6 +1517,7 @@ export function CommerceProRuntimeApp({ runtime }) {
     : authReturn("/siparis-takibi");
   else if (route.type === "order-success") content = <CanonicalNotFound />;
   else if (route.type === "help") content = <HelpPage />;
+  else if (route.type === "return-exchange") content = <ReturnExchangePage />;
   else if (route.type === "contact") content = authenticated
     ? <CustomerSupportPage session={session} account={runtime.customer} onNotice={notify} />
     : authReturn("/iletisim");
@@ -1524,7 +1529,7 @@ export function CommerceProRuntimeApp({ runtime }) {
       <CanonicalHeader cartCount={cartCount} favoriteCount={favorites.size} onCartOpen={() => setCartOpen(true)} onMobileOpen={() => setMobileMenuOpen(true)} cartTriggerRef={cartTriggerRef} mobileMenuTriggerRef={mobileMenuTriggerRef} />
       {runtime.warnings.length > 0 && <div className="integration-session-warning" role="status">Bazı ikincil mağaza veya oturum verileri geçici olarak alınamadı; erişilebilen gerçek katalog gösteriliyor.</div>}
       {content}
-      <CanonicalFooter />
+      <Footer />
       <CanonicalMobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={mobileMenuTriggerRef} />
       <CanonicalCartDrawer open={cartOpen} items={cartItems} onClose={() => setCartOpen(false)} onRemove={removeFromCart} returnFocusRef={cartTriggerRef} />
       <CanonicalMobileBottomNav route={route} cartCount={cartCount} favoriteCount={favorites.size} />
@@ -1555,7 +1560,7 @@ function IntegrationState({ phase, error, onRetry }) {
           {!loading && !empty && <button className="primary-button" type="button" onClick={onRetry}>Yeniden dene</button>}
         </div>
       </main>
-      <CanonicalFooter />
+      <Footer />
     </>
   );
 }
