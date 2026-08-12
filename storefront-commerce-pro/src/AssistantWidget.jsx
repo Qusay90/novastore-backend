@@ -12,6 +12,7 @@ import {
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
+import { NovaServiceIcon } from "./NovaServiceIcon.jsx";
 
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -24,10 +25,6 @@ const HIDDEN_ROUTES = new Set(["checkout", "payment-result", "auth", "password",
 const isAuthenticated = (session) => (
   session?.status === "authenticated" || session?.status === "unverified"
 );
-
-function NovaBotMark() {
-  return <span className="novabot-mark" aria-hidden="true"><svg viewBox="0 0 32 32" focusable="false"><path d="M8.2 9.1c1.7-2.3 4.5-3.7 7.8-3.7 5.2 0 9.4 3.6 9.4 8.1s-4.2 8.1-9.4 8.1c-1.2 0-2.4-.2-3.5-.6l-4.6 2 .9-4.1c-1.3-1.5-2.1-3.3-2.1-5.4 0-1.7.6-3.2 1.6-4.4Z" /><path d="M12.2 14.4h.1M16 14.4h.1M19.8 14.4h.1" /><path d="m24.8 4.2.8 2.1 2.2.8-2.2.8-.8 2.1-.8-2.1-2.2-.8 2.2-.8.8-2.1Z" /></svg></span>;
-}
 
 function AssistantProductCard({ product, favorite, onFavorite, onAdd, getProductImage }) {
   const soldOut = Number(product.stock) <= 0;
@@ -160,7 +157,7 @@ export function AssistantWidget({
       <form className="assistant-composer" onSubmit={submit}><label className="sr-only" htmlFor="assistant-message">NovaBot’a mesaj yaz</label><input ref={inputRef} id="assistant-message" value={input} maxLength="2000" autoComplete="off" placeholder="Ürün, fiyat veya destek hakkında sor…" onChange={(event) => setInput(event.target.value)} /><button type="submit" disabled={phase === "submitting" || !input.trim()} aria-label="Mesajı gönder"><PaperPlaneTilt weight="fill" /></button></form>
       <footer>NovaBot hata yapabilir; fiyat ve stok canlı katalogdan doğrulanır.</footer>
     </section>}
-    <button ref={fabRef} className="assistant-fab" type="button" aria-expanded={open} aria-label={open ? "NovaBot penceresini kapat" : "NovaBot alışveriş asistanını aç"} onClick={() => setOpen((value) => !value)}>{open ? <X /> : <><NovaBotMark /><span>NovaBot</span><CaretRight /></>}</button>
+    <button ref={fabRef} className="assistant-fab" type="button" aria-expanded={open} aria-label={open ? "NovaBot penceresini kapat" : "NovaBot alışveriş asistanını aç"} onClick={() => setOpen((value) => !value)}>{open ? <X /> : <><NovaServiceIcon kind="bot" compact /><span>NovaBot</span><CaretRight /></>}</button>
   </div>;
 }
 

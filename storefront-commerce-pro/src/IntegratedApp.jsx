@@ -69,9 +69,9 @@ import {
 } from "./ConnectedCustomerPages.jsx";
 import { ProductCommunity } from "./ProductCommunity.jsx";
 import { AssistantWidget } from "./AssistantWidget.jsx";
+import { NovaServiceIcon } from "./NovaServiceIcon.jsx";
 import { reconcileFinalizedCart } from "./adapters/checkoutAdapter.js";
 import {
-  CartDrawer as CanonicalCartDrawer,
   FavoritesPage as CanonicalFavoritesPage,
   Header as CanonicalHeader,
   HomePage as CanonicalHomePage,
@@ -1170,11 +1170,11 @@ function HelpPage() {
     setHelpQuery(topicQuery(title));
     window.requestAnimationFrame(() => document.getElementById("help-faqs")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
-  return <main id="main-content" className="page help-page"><div className="shell"><Breadcrumbs /><div className="help-hero"><Question /><span className="section-kicker">Yardım merkezi</span><h1>Nasıl yardımcı olabiliriz?</h1><p>Sipariş, teslimat, iade ve ödeme konularındaki işlem noktalarını keşfet.</p><form role="search" onSubmit={(event) => event.preventDefault()}><MagnifyingGlass /><input aria-label="Yardım konularında ara" placeholder="Bir konu ara" value={helpQuery} onChange={(event) => setHelpQuery(event.target.value)} /><button type="submit">Ara</button></form></div><div className="help-grid" aria-live="polite">{visibleTopics.map(([Icon,title,copy]) => <button type="button" onClick={() => selectTopic(title)} key={title}><Icon /><strong>{title}</strong><span>{copy}</span><CaretRight /></button>)}</div><section className="faq-list" id="help-faqs"><h2>Sık sorulan sorular</h2>{visibleFaqs.length ? visibleFaqs.map(({ question, answer }) => <details key={question}><summary>{question}<CaretDown /></summary><p>{answer}</p></details>) : <p role="status">Bu aramayla eşleşen yardım konusu bulunamadı.</p>}</section></div></main>;
+  return <main id="main-content" className="page help-page"><div className="shell"><Breadcrumbs /><div className="help-hero"><NovaServiceIcon /><span className="section-kicker">Yardım merkezi</span><h1>Nasıl yardımcı olabiliriz?</h1><p>Sipariş, teslimat, iade ve ödeme konularındaki işlem noktalarını keşfet.</p><form role="search" onSubmit={(event) => event.preventDefault()}><MagnifyingGlass /><input aria-label="Yardım konularında ara" placeholder="Bir konu ara" value={helpQuery} onChange={(event) => setHelpQuery(event.target.value)} /><button type="submit">Ara</button></form></div><div className="help-grid" aria-live="polite">{visibleTopics.map(([,title,copy]) => <button type="button" onClick={() => selectTopic(title)} key={title}><NovaServiceIcon kind={title === "Siparişler" ? "orders" : title === "Teslimat" ? "delivery" : title === "Ödeme" ? "payment" : "returns"} /><strong>{title}</strong><span>{copy}</span><CaretRight /></button>)}</div><section className="faq-list" id="help-faqs"><h2>Sık sorulan sorular</h2>{visibleFaqs.length ? visibleFaqs.map(({ question, answer }) => <details key={question}><summary>{question}<CaretDown /></summary><p>{answer}</p></details>) : <p role="status">Bu aramayla eşleşen yardım konusu bulunamadı.</p>}</section></div></main>;
 }
 
 function ReturnExchangePage() {
-  return <main id="main-content" className="page return-exchange-page"><div className="shell"><Breadcrumbs /><section className="return-exchange-hero"><ArrowsClockwise /><span className="section-kicker">İade & değişim</span><h1>İade veya değişim sürecini netleştir</h1><p>Uygunluk, ürünün teslimat bilgisi ve sipariş durumu üzerinden doğrulanır. Bu bilgi sayfası yeni bir iade ya da stok işlemi oluşturmaz.</p></section><div className="return-exchange-grid"><section className="return-exchange-steps" aria-labelledby="return-exchange-steps-title"><h2 id="return-exchange-steps-title">Başlamadan önce</h2><ol><li><span>1</span><div><strong>Siparişini kontrol et</strong><p>İade veya değişim için ilgili siparişin teslimat ve ürün koşulları doğrulanır.</p></div></li><li><span>2</span><div><strong>Uygunluk bilgisini gör</strong><p>Ürün, teslimat ve sipariş durumu mevcut müşteri hesabında gösterilen bilgilere göre değerlendirilir.</p></div></li><li><span>3</span><div><strong>Güvenli kanalı kullan</strong><p>İade talebi kaydı sunulduğunda yalnız hesabına ait sipariş üzerinden başlatılır; bu yerel bilgi rotası işlem oluşturmaz.</p></div></li></ol></section><aside className="return-exchange-cta"><span className="section-kicker">Siparişin hazırsa</span><h2>Hesabındaki siparişe git</h2><p>İade/geri ödeme ve stok işlemlerinin tam backend akışı bu bilgilendirme sayfasının kapsamı dışındadır.</p><a className="primary-button" href="#/giris?return=%2Fhesabim%2Fsiparisler">Siparişlerime git <CaretRight /></a><a className="return-exchange-support" href="#/iletisim">Destek ekibinden yardım al</a></aside></div></div></main>;
+  return <main id="main-content" className="page return-exchange-page"><div className="shell"><Breadcrumbs /><section className="return-exchange-hero"><NovaServiceIcon kind="returns" /><span className="section-kicker">İade & değişim</span><h1>İade veya değişim sürecini netleştir</h1><p>Uygunluk, ürünün teslimat bilgisi ve sipariş durumu üzerinden doğrulanır. Bu bilgi sayfası yeni bir iade ya da stok işlemi oluşturmaz.</p></section><div className="return-exchange-grid"><section className="return-exchange-steps" aria-labelledby="return-exchange-steps-title"><h2 id="return-exchange-steps-title">Başlamadan önce</h2><ol><li><span>1</span><div><strong>Siparişini kontrol et</strong><p>İade veya değişim için ilgili siparişin teslimat ve ürün koşulları doğrulanır.</p></div></li><li><span>2</span><div><strong>Uygunluk bilgisini gör</strong><p>Ürün, teslimat ve sipariş durumu mevcut müşteri hesabında gösterilen bilgilere göre değerlendirilir.</p></div></li><li><span>3</span><div><strong>Güvenli kanalı kullan</strong><p>İade talebi kaydı sunulduğunda yalnız hesabına ait sipariş üzerinden başlatılır; bu yerel bilgi rotası işlem oluşturmaz.</p></div></li></ol></section><aside className="return-exchange-cta"><span className="section-kicker">Siparişin hazırsa</span><h2>Hesabındaki siparişe git</h2><p>İade/geri ödeme ve stok işlemlerinin tam backend akışı bu bilgilendirme sayfasının kapsamı dışındadır.</p><a className="primary-button" href="#/giris?return=%2Fhesabim%2Fsiparisler">Siparişlerime git <CaretRight /></a><a className="return-exchange-support" href="#/iletisim">Destek ekibinden yardım al</a></aside></div></div></main>;
 }
 
 function MobileBottomNav({ route, cartCount, favoriteCount }) {
@@ -1234,14 +1234,14 @@ function ComparisonTray({ ids, onToggle, onClear, onAdd }) {
   return <><aside className="comparison-tray" aria-label="Karşılaştırma listesi"><span><ArrowsLeftRight /><span><strong>Karşılaştır</strong><small>{selectedProducts.length}/3 ürün seçildi</small></span></span><div className="comparison-tray__products">{selectedProducts.map((product) => <span key={product.id}><img src={productImage(product)} alt="" /><button type="button" onClick={() => onToggle(product.id)} aria-label={`${product.name} ürününü karşılaştırmadan çıkar`}><X /></button></span>)}</div><button ref={triggerRef} className="comparison-open" type="button" disabled={selectedProducts.length < 2} onClick={() => setOpen(true)}>{selectedProducts.length < 2 ? "Bir ürün daha seç" : "Karşılaştır"}</button><button className="comparison-clear" type="button" onClick={onClear} aria-label="Karşılaştırma listesini temizle"><Trash /></button></aside><ComparisonDialog open={open} products={selectedProducts} onClose={() => setOpen(false)} onRemove={onToggle} onAdd={onAdd} returnFocusRef={triggerRef} /></>;
 }
 
-function CartDrawer({ open, items, onClose, onRemove, returnFocusRef }) {
+function CartDrawer({ open, items, onClose, onRemove, onQuantity, returnFocusRef }) {
   const closeRef = useRef(null);
   const dialogRef = useRef(null);
   const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const closeDrawer = () => {
+  const closeDrawer = useCallback(() => {
     onClose();
     restoreFocus(returnFocusRef);
-  };
+  }, [onClose, returnFocusRef]);
   useEffect(() => {
     if (!open) return;
     document.body.classList.add("is-locked");
@@ -1253,16 +1253,16 @@ function CartDrawer({ open, items, onClose, onRemove, returnFocusRef }) {
     };
     document.addEventListener("keydown", onKey);
     return () => { document.body.classList.remove("is-locked"); document.removeEventListener("keydown", onKey); restorePage(); };
-  }, [open, onClose, returnFocusRef]);
+  }, [closeDrawer, open]);
   if (!open) return null;
-  return (
-    <div className="overlay-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeDrawer()}>
+  return createPortal(
+    <div className="overlay-layer cart-drawer-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeDrawer()}>
       <div ref={dialogRef} className="cart-drawer" role="dialog" aria-modal="true" aria-label="Sepetim" tabIndex="-1">
         <div className="drawer-head"><div><h2>Sepetim</h2><span>{items.reduce((sum, item) => sum + item.quantity, 0)} ürün</span></div><button ref={closeRef} className="icon-button" type="button" onClick={closeDrawer} aria-label="Sepeti kapat"><X /></button></div>
-        <div className="cart-drawer__body">{items.length ? items.map(({ product, quantity }) => <article className="cart-line" key={product.id}><img src={productImage(product)} alt="" /><div><strong>{product.name}</strong><span>{product.color ? `${product.color} · ` : ""}{quantity} adet</span><b>{money.format(product.price * quantity)}</b></div><button type="button" onClick={() => onRemove(product.id)} aria-label={`${product.name} ürününü sepetten çıkar`}><Trash /></button></article>) : <div className="cart-empty"><ShoppingBag /><h3>Sepetin henüz boş</h3><p>İhtiyacına uygun ürünleri kategorilerden keşfedebilirsin.</p><button className="primary-button" type="button" onClick={() => { closeDrawer(); navigate(defaultCategoryPath() ? `/kategori/${defaultCategoryPath()}` : "/"); }}>Alışverişe başla</button></div>}</div>
+        <div className="cart-drawer__body">{items.length ? items.map(({ product, quantity }) => <article className="cart-line" key={product.id}><a href={`#/urun/${product.slug}`} onClick={closeDrawer}><img src={productImage(product)} alt="" /></a><div><a className="cart-line__product-link" href={`#/urun/${product.slug}`} onClick={closeDrawer}><strong>{product.name}</strong></a><span>{product.color ? `${product.color} · ` : ""}{quantity} adet</span><div className="cart-line__actions"><div className="quantity-control" aria-label={`${product.name} adedi`}><button type="button" disabled={quantity <= 1} onClick={() => onQuantity(product.id, quantity - 1)} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" disabled={quantity >= product.stock} onClick={() => onQuantity(product.id, quantity + 1)} aria-label="Adedi artır"><Plus /></button></div><b>{money.format(product.price * quantity)}</b></div></div><button type="button" onClick={() => onRemove(product.id)} aria-label={`${product.name} ürününü sepetten çıkar`}><Trash /></button></article>) : <div className="cart-empty"><ShoppingBag /><h3>Sepetin henüz boş</h3><p>İhtiyacına uygun ürünleri kategorilerden keşfedebilirsin.</p><button className="primary-button" type="button" onClick={() => { closeDrawer(); navigate(defaultCategoryPath() ? `/kategori/${defaultCategoryPath()}` : "/"); }}>Alışverişe başla</button></div>}</div>
         {items.length > 0 && <div className="cart-drawer__footer"><div><span>Ürün toplamı</span><strong>{money.format(total)}</strong></div><button className="primary-button" type="button" onClick={() => { closeDrawer(); navigate("/sepet"); }}>Sepete git <CaretRight /></button><small><ShieldCheck /> Ödeme bilgileriniz güvenle korunur</small></div>}
       </div>
-    </div>
+    </div>, document.body
   );
 }
 
@@ -1294,6 +1294,8 @@ export function CommerceProRuntimeApp({ runtime }) {
   const [buyNowPending, setBuyNowPending] = useState(false);
   const mobileMenuTriggerRef = useRef(null);
   const cartTriggerRef = useRef(null);
+  const openCart = useCallback(() => setCartOpen(true), []);
+  const closeCart = useCallback(() => setCartOpen(false), []);
 
   useEffect(() => installInputModalityTracking(), []);
 
@@ -1526,12 +1528,12 @@ export function CommerceProRuntimeApp({ runtime }) {
   return (
     <RuntimeComparisonContext.Provider value={comparisonContext}>
       <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); focusMainContent({ preventScroll: false }); }}>Ana içeriğe geç</a>
-      <CanonicalHeader cartCount={cartCount} favoriteCount={favorites.size} onCartOpen={() => setCartOpen(true)} onMobileOpen={() => setMobileMenuOpen(true)} cartTriggerRef={cartTriggerRef} mobileMenuTriggerRef={mobileMenuTriggerRef} />
+      <CanonicalHeader cartCount={cartCount} favoriteCount={favorites.size} onCartOpen={openCart} onMobileOpen={() => setMobileMenuOpen(true)} cartTriggerRef={cartTriggerRef} mobileMenuTriggerRef={mobileMenuTriggerRef} />
       {runtime.warnings.length > 0 && <div className="integration-session-warning" role="status">Bazı ikincil mağaza veya oturum verileri geçici olarak alınamadı; erişilebilen gerçek katalog gösteriliyor.</div>}
       {content}
       <Footer />
       <CanonicalMobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={mobileMenuTriggerRef} />
-      <CanonicalCartDrawer open={cartOpen} items={cartItems} onClose={() => setCartOpen(false)} onRemove={removeFromCart} returnFocusRef={cartTriggerRef} />
+      <CartDrawer open={cartOpen} items={cartItems} onClose={closeCart} onRemove={removeFromCart} onQuantity={updateCartQuantity} returnFocusRef={cartTriggerRef} />
       <CanonicalMobileBottomNav route={route} cartCount={cartCount} favoriteCount={favorites.size} />
       {comparisonVisible && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => setComparisonIds(new Set())} onAdd={addToCart} />}
       {["help", "contact"].includes(route.type) && <AssistantWidget route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonVisible} />}

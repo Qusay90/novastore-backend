@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -10,6 +10,16 @@ const storefrontPort = Number(process.env.NOVASTORE_REVIEW_STOREFRONT_PORT || 51
 const adminPort = Number(process.env.NOVASTORE_REVIEW_ADMIN_PORT || 5174);
 if (process.env.NOVASTORE_OFFICIAL_REVIEW !== "true") {
   throw new Error("Official local review server requires NOVASTORE_OFFICIAL_REVIEW=true.");
+}
+const deploymentMarkers = [
+  process.env.NODE_ENV,
+  process.env.NOVASTORE_ENV,
+  process.env.RAILWAY_ENVIRONMENT_NAME,
+  process.env.VERCEL_ENV,
+  process.env.RENDER_SERVICE_NAME,
+].map((value) => String(value || "").trim().toLocaleLowerCase("en-US")).filter(Boolean);
+if (deploymentMarkers.some((value) => ["production", "staging", "preview"].includes(value)) || process.env.CI === "true") {
+  throw new Error("Official local review server is disabled in production, staging, preview and CI environments.");
 }
 for (const [label, port] of [["storefront", storefrontPort], ["admin", adminPort]]) {
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`${label} review port is invalid.`);
@@ -27,7 +37,7 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const storefrontSha256 = sha256(storefrontArtifact);
 const adminSha256 = sha256(adminArtifact);
 const expectedArtifactSha256 = Object.freeze({
-  storefront: "ed51d8b977e75d0b609937d692139ee9fda3a482eb8a66d0f749074db907c192",
+  storefront: "2f590038279e0378f62fa9c0de0f500384aade8a20971c556589264afc544f66",
   admin: "9d0de6c5c250ce19eb442faf9ddd790fdac753ff989b338fc2b7ae91e01dab54",
 });
 if (storefrontSha256 !== expectedArtifactSha256.storefront) {
@@ -77,9 +87,17 @@ const numericProductId = (value) => {
   const match = String(value || "").match(/(\d+)$/);
   return match ? Number(match[1]) : null;
 };
+const reviewMediaByProductId = Object.freeze({
+  1001: Object.freeze([
+    "/review-media/iphone-15-angle.svg",
+    "/review-media/iphone-15-detail.svg",
+    "/review-media/iphone-15-pair.svg",
+    "/review-media/iphone-15-screen.svg",
+  ]),
+});
 const publicProducts = Object.freeze(products.map((product) => ({
   id: numericProductId(product.id),
-  slug: product.slug,
+  slug: numericProductId(product.id) === 1001 ? "apple-iphone-15-128-gb" : product.slug,
   name: product.name,
   brand: product.brand,
   description: product.description,
@@ -90,8 +108,9 @@ const publicProducts = Object.freeze(products.map((product) => ({
   review_count: product.reviews,
   category_ids: [product.categoryId],
   primary_category_id: product.categoryId,
-  image_url: `/review-assets/${imageNameByKey[product.imageKey] || "product-phone.webp"}`,
-  media: [{ id: `${numericProductId(product.id)}-main`, media_url: `/review-assets/${imageNameByKey[product.imageKey] || "product-phone.webp"}`, media_type: "image", is_main: true, sort_order: 0 }],
+  image_url: numericProductId(product.id) === 1001 ? "/review-media/iphone-15-angle.svg" : `/review-assets/${imageNameByKey[product.imageKey] || "product-phone.webp"}`,
+  media: (reviewMediaByProductId[numericProductId(product.id)] || [imageNameByKey[product.imageKey] || "product-phone.webp"])
+    .map((fileName, index) => ({ id: `${numericProductId(product.id)}-media-${index + 1}`, media_url: fileName.startsWith("/") ? fileName : `/review-assets/${fileName}`, media_type: "image", is_main: index === 0, sort_order: index })),
   attributes: (product.features || []).map((value, index) => ({ code: `feature-${index + 1}`, name: `Özellik ${index + 1}`, value })),
 })).filter((product) => Number.isInteger(product.id)));
 
@@ -143,6 +162,38 @@ const adminToken = [
   Buffer.from(JSON.stringify({ id: 17, role: "admin", exp: 4_102_444_800 })).toString("base64url"),
   "local-review",
 ].join(".");
+const reviewCustomerId = 1_900_000_000 + (randomBytes(4).readUInt32BE(0) % 90_000_000);
+const reviewCustomer = Object.freeze({ id: reviewCustomerId, fullName: "Yerel İnceleme Müşterisi", email: "review.customer@local.invalid", phone: "+90 555 000 00 00", role: "customer" });
+const reviewAddresses = Object.freeze([{ id: 1, title: "Ev", fullName: reviewCustomer.fullName, phone: reviewCustomer.phone, city: "İstanbul", district: "Kadıköy", address_line: "Moda Caddesi 12", is_default: true }]);
+const reviewOrders = Object.freeze([{ id: 7002, display_status: "Kargoya Verildi", total_amount: 51999, created_at: "2026-08-01T10:00:00.000Z", items: [{ id: 1001, product_id: 1001, name: "Apple iPhone 15 128 GB", quantity: 1, price: 51999, image_url: "/review-assets/phone-iphone.webp" }], shipping_address: "Moda Caddesi 12, Kadıköy, İstanbul", payment_method: "Yerel inceleme verisi", payment_status: "İnceleme için hazır" }]);
+const initialReviewMessages = Object.freeze([Object.freeze({ id: 1, sender_id: 0, message: "Bu destek geçmişi yalnızca yerel inceleme içindir.", created_at: "2026-08-01T12:00:00.000Z" })]);
+const customerReviewSessions = new Map();
+const customerReviewSessionTtlMs = 30 * 60 * 1000;
+const customerReviewSessionLimit = 16;
+const createCustomerReviewSession = () => {
+  const now = Date.now();
+  for (const [token, session] of customerReviewSessions) {
+    if (session.expiresAt < now) customerReviewSessions.delete(token);
+  }
+  while (customerReviewSessions.size >= customerReviewSessionLimit) {
+    customerReviewSessions.delete(customerReviewSessions.keys().next().value);
+  }
+  const token = `local-review-${randomBytes(32).toString("base64url")}`;
+  const session = { token, expiresAt: now + customerReviewSessionTtlMs, state: { cart: [], favorites: [], messages: [] } };
+  customerReviewSessions.set(token, session);
+  return session;
+};
+const reviewMediaVariants = Object.freeze({
+  "iphone-15-angle.svg": Object.freeze({ source: "phone-iphone.webp", viewBox: "0 0 1448 1086", image: "0 0 1448 1086" }),
+  "iphone-15-detail.svg": Object.freeze({ source: "phone-iphone.webp", viewBox: "360 110 650 820", image: "0 0 1448 1086" }),
+  "iphone-15-pair.svg": Object.freeze({ source: "product-phone.webp", viewBox: "0 0 1086 1086", image: "0 0 1086 1086" }),
+  "iphone-15-screen.svg": Object.freeze({ source: "product-phone.webp", viewBox: "390 70 610 940", image: "0 0 1086 1086" }),
+});
+const renderReviewMedia = ({ source, viewBox, image }) => {
+  const [x, y, width, height] = image.split(" ").map(Number);
+  const encoded = fs.readFileSync(imageFiles[source]).toString("base64");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" role="img"><rect x="0" y="0" width="100%" height="100%" fill="#f7f4ef"/><image x="${x}" y="${y}" width="${width}" height="${height}" href="data:image/webp;base64,${encoded}" preserveAspectRatio="xMidYMid slice"/></svg>`;
+};
 
 const isLoopback = (address) => ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(address);
 const commonHeaders = (mode, artifactSha256 = "") => ({
@@ -172,14 +223,24 @@ const authorizeAdmin = (request, response) => {
   sendJson(request, response, 401, { error: "Yerel inceleme yönetici oturumu gerekli." }, "INTEGRATED_COMMERCE_PRO_ADMIN");
   return false;
 };
-const validateRequest = (request, response, port, mode) => {
+const authorizeCustomer = (request, response, mode) => {
+  const token = String(request.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const session = customerReviewSessions.get(token);
+  if (session && Date.now() <= session.expiresAt) return session;
+  if (session) customerReviewSessions.delete(token);
+  if (session && Date.now() > session.expiresAt) response.setHeader("X-NovaStore-Review-Session", "expired");
+  sendJson(request, response, 401, { error: "Yerel inceleme müşteri oturumu gerekli." }, mode);
+  return null;
+};
+const validateRequest = (request, response, port, mode, allowedDisposableMethods = new Set()) => {
   const host = String(request.headers.host || "").toLocaleLowerCase("en-US");
   if (!isLoopback(request.socket.remoteAddress) || ![`127.0.0.1:${port}`, `localhost:${port}`].includes(host)) {
     counters.external += 1;
     sendJson(request, response, 403, { error: "Yalnız loopback inceleme isteğine izin verilir." }, mode);
     return false;
   }
-  if (!["GET", "HEAD"].includes(request.method)) {
+  const methodKey = `${String(request.method || "GET").toUpperCase()} ${String(request.url || "").split("?")[0]}`;
+  if (!["GET", "HEAD"].includes(request.method) && !allowedDisposableMethods.has(methodKey)) {
     counters.mutation += 1;
     sendJson(request, response, 405, { error: "Yerel inceleme çalışma zamanı salt okunurdur." }, mode);
     return false;
@@ -187,12 +248,72 @@ const validateRequest = (request, response, port, mode) => {
   return true;
 };
 
+const readJsonBody = (request, { maxBytes = 32_768 } = {}) => new Promise((resolve, reject) => {
+  const chunks = [];
+  let size = 0;
+  request.on("data", (chunk) => {
+    size += chunk.length;
+    if (size > maxBytes) {
+      reject(new Error("PAYLOAD_TOO_LARGE"));
+      request.destroy();
+      return;
+    }
+    chunks.push(chunk);
+  });
+  request.on("end", () => {
+    try {
+      resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {});
+    } catch {
+      reject(new Error("INVALID_JSON"));
+    }
+  });
+  request.on("error", reject);
+});
+
+const compactReviewItems = (value) => (Array.isArray(value) ? value : [])
+  .map((item) => ({
+    productId: Number(item?.productId ?? item?.product_id ?? item?.id),
+    quantity: Math.max(1, Math.min(99, Number.parseInt(item?.quantity || 1, 10) || 1)),
+  }))
+  .filter((item) => publicProducts.some((product) => product.id === item.productId));
+
+const expandReviewItems = (items) => compactReviewItems(items).map(({ productId, quantity }) => {
+  const product = publicProducts.find((candidate) => candidate.id === productId);
+  return {
+    id: productId,
+    productId,
+    name: product.name,
+    price: product.price,
+    oldPrice: product.old_price || null,
+    image: product.image_url,
+    imageUrl: product.image_url,
+    quantity,
+    selected: true,
+  };
+});
+
+const reviewMutationMethods = new Set([
+  "PUT /api/shared-state/cart",
+  "PUT /api/shared-state/checkout",
+  "POST /api/campaigns/quote",
+  "POST /api/favorites/sync",
+  "POST /api/users/logout",
+  "POST /api/messages/send",
+  ...publicProducts.flatMap(({ id }) => [`POST /api/favorites/${id}`, `DELETE /api/favorites/${id}`]),
+]);
+
 const storefrontServer = http.createServer((request, response) => {
   const mode = "INTEGRATED_COMMERCE_PRO";
-  if (!validateRequest(request, response, storefrontPort, mode)) return;
+  if (!validateRequest(request, response, storefrontPort, mode, reviewMutationMethods)) return;
   const url = new URL(request.url, `http://127.0.0.1:${storefrontPort}`);
 
   if (url.pathname === "/__review/meta") return sendJson(request, response, 200, { mode, artifactSha256: storefrontSha256, sourceEntry: "storefront-commerce-pro/src/main-integrated.jsx", localData: "canonical-local-catalog-through-same-origin-read-api", counters }, mode);
+  if (url.pathname === "/__review/customer") {
+    const reviewSession = createCustomerReviewSession();
+    const reviewUserId = String(reviewCustomer.id);
+    const bootstrap = `<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Yerel müşteri inceleme oturumu</title><script>localStorage.setItem("nova_user_token",${JSON.stringify(reviewSession.token)});localStorage.setItem("nova_user_info",${JSON.stringify(JSON.stringify(reviewCustomer))});localStorage.setItem("novastore_review_expires_at",${JSON.stringify(String(reviewSession.expiresAt))});localStorage.setItem(${JSON.stringify(`novastore_addresses_migrated_${reviewUserId}`)},"1");localStorage.setItem(${JSON.stringify(`novastore_cart_migrated_${reviewUserId}`)},"1");localStorage.setItem(${JSON.stringify(`novastore_favs_migrated_${reviewUserId}`)},"1");localStorage.setItem(${JSON.stringify(`novastore_cart_${reviewUserId}`)},"[]");localStorage.setItem(${JSON.stringify(`novastore_favs_${reviewUserId}`)},"[]");location.replace("/#/hesabim");</script>`;
+    return send(request, response, 200, bootstrap, "text/html; charset=utf-8", commonHeaders(mode));
+  }
   if (storefrontRuntimeModules[url.pathname]) {
     return send(request, response, 200, storefrontRuntimeModules[url.pathname], "text/javascript; charset=utf-8", commonHeaders(mode));
   }
@@ -201,6 +322,12 @@ const storefrontServer = http.createServer((request, response) => {
     const filePath = imageFiles[fileName];
     if (!filePath || !fs.existsSync(filePath)) return sendJson(request, response, 404, { error: "Görsel bulunamadı." }, mode);
     return send(request, response, 200, fs.readFileSync(filePath), "image/webp", commonHeaders(mode));
+  }
+  if (url.pathname.startsWith("/review-media/")) {
+    const fileName = url.pathname.slice("/review-media/".length);
+    const variant = reviewMediaVariants[fileName];
+    if (!variant) return sendJson(request, response, 404, { error: "Yerel review medyası bulunamadı." }, mode);
+    return send(request, response, 200, renderReviewMedia(variant), "image/svg+xml; charset=utf-8", commonHeaders(mode));
   }
   if (url.pathname === "/api/public/categories") return sendJson(request, response, 200, categoryTree(), mode);
   if (url.pathname === "/api/products") return sendJson(request, response, 200, publicProducts, mode);
@@ -212,6 +339,80 @@ const storefrontServer = http.createServer((request, response) => {
     return product ? sendJson(request, response, 200, product, mode) : sendJson(request, response, 404, { error: "Ürün bulunamadı." }, mode);
   }
   if (/^\/api\/(?:reviews|questions)\/product\/\d+$/.test(url.pathname)) return sendJson(request, response, 200, [], mode);
+  let customerSession = null;
+  if (url.pathname === "/api/users/me") {
+    customerSession = authorizeCustomer(request, response, mode);
+    if (!customerSession) return;
+    return sendJson(request, response, 200, { user: reviewCustomer }, mode);
+  }
+  const customerDataPath = /^\/api\/(?:addresses|orders\/user|campaigns\/coupons\/active|notifications\/user|messages\/history|shared-state|favorites|messages\/send|users\/logout)/.test(url.pathname);
+  if (customerDataPath) {
+    customerSession = authorizeCustomer(request, response, mode);
+    if (!customerSession) return;
+  }
+  if (url.pathname === "/api/addresses") return sendJson(request, response, 200, reviewAddresses, mode);
+  if (url.pathname === `/api/orders/user/${reviewCustomer.id}`) return sendJson(request, response, 200, reviewOrders, mode);
+  if (url.pathname === "/api/campaigns/coupons/active") return sendJson(request, response, 200, [{ id: 1, code: "LOCAL10", discount_type: "PERCENT", discount_value: 10, min_order_amount: 1000 }], mode);
+  if (url.pathname === `/api/notifications/user/${reviewCustomer.id}`) return sendJson(request, response, 200, [{ id: 1, type: "order", message: "Yerel inceleme siparişin kargoya verildi.", is_read: false, created_at: "2026-08-01T12:00:00.000Z" }], mode);
+  if (url.pathname === `/api/messages/history/${reviewCustomer.id}`) return sendJson(request, response, 200, [...initialReviewMessages, ...customerSession.state.messages], mode);
+  if (url.pathname === "/api/shared-state/cart" && request.method === "GET") return sendJson(request, response, 200, { exists: true, updatedAt: null, payload: { version: 1, items: expandReviewItems(customerSession.state.cart) } }, mode);
+  if (url.pathname === "/api/favorites" && request.method === "GET") return sendJson(request, response, 200, { productIds: customerSession.state.favorites }, mode);
+  if (url.pathname === "/api/users/logout" && request.method === "POST") {
+    customerReviewSessions.delete(customerSession.token);
+    return send(request, response, 204, "", "application/json; charset=utf-8", commonHeaders(mode));
+  }
+  if (url.pathname === "/api/shared-state/cart" && request.method === "PUT") {
+    return readJsonBody(request).then((body) => {
+      customerSession.state.cart = compactReviewItems(body?.payload?.items);
+      sendJson(request, response, 200, { exists: true, payload: { version: 1, items: expandReviewItems(customerSession.state.cart) } }, mode);
+    }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel sepet verisi." }, mode));
+  }
+  if (url.pathname === "/api/shared-state/checkout" && request.method === "PUT") {
+    return readJsonBody(request).then((body) => {
+      customerSession.state.cart = compactReviewItems(body?.payload?.items);
+      sendJson(request, response, 200, { saved: true, localOnly: true }, mode);
+    }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel checkout verisi." }, mode));
+  }
+  if (url.pathname === "/api/favorites/sync" && request.method === "POST") {
+    return readJsonBody(request).then((body) => {
+      customerSession.state.favorites = [...new Set((Array.isArray(body?.productIds) ? body.productIds : []).map(Number).filter((id) => publicProducts.some((product) => product.id === id)))];
+      sendJson(request, response, 200, { productIds: customerSession.state.favorites, localOnly: true }, mode);
+    }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel favori verisi." }, mode));
+  }
+  const favoriteMatch = url.pathname.match(/^\/api\/favorites\/(\d+)$/);
+  if (favoriteMatch && ["POST", "DELETE"].includes(request.method)) {
+    const productId = Number(favoriteMatch[1]);
+    if (!publicProducts.some((product) => product.id === productId)) return sendJson(request, response, 404, { error: "Ürün bulunamadı." }, mode);
+    customerSession.state.favorites = request.method === "POST"
+      ? [...new Set([...customerSession.state.favorites, productId])]
+      : customerSession.state.favorites.filter((id) => id !== productId);
+    return sendJson(request, response, 200, { productId, favorited: request.method === "POST", localOnly: true }, mode);
+  }
+  if (url.pathname === "/api/campaigns/quote" && request.method === "POST") {
+    return readJsonBody(request).then((body) => {
+      const items = compactReviewItems(body?.cartItems);
+      if (!items.length) return sendJson(request, response, 400, { error: "Yerel fiyatlandırma için sepet boş." }, mode);
+      const subtotal = items.reduce((sum, item) => sum + (publicProducts.find((product) => product.id === item.productId)?.price || 0) * item.quantity, 0);
+      const couponApplied = String(body?.couponCode || "").toUpperCase() === "LOCAL10";
+      const couponDiscount = couponApplied ? Math.round(subtotal * .1) : 0;
+      const shippingFee = subtotal >= 1500 ? 0 : 99;
+      return sendJson(request, response, 200, { totals: { currency: "TRY", subtotal, bundleDiscount: 0, couponDiscount, shippingFee, total: subtotal - couponDiscount + shippingFee }, campaigns: {}, coupon: couponApplied ? { applied: true, code: "LOCAL10" } : {}, items }, mode);
+    }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel fiyatlandırma verisi." }, mode));
+  }
+  if (url.pathname === "/api/messages/send" && request.method === "POST") {
+    return readJsonBody(request).then((body) => {
+      const message = typeof body?.message === "string" ? body.message.trim() : "";
+      if (!message || message.length > 2_000) return sendJson(request, response, 400, { error: "Geçersiz yerel destek verisi." }, mode);
+      const entry = Object.freeze({
+        id: initialReviewMessages.length + customerSession.state.messages.length + 1,
+        sender_id: reviewCustomer.id,
+        message,
+        created_at: new Date().toISOString(),
+      });
+      customerSession.state.messages.push(entry);
+      return sendJson(request, response, 200, { ...entry, delivered: true, localOnly: true }, mode);
+    }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel destek verisi." }, mode));
+  }
   if (url.pathname.startsWith("/api/")) return sendJson(request, response, 404, { error: "Yerel inceleme endpoint'i yok." }, mode);
   return send(request, response, 200, storefrontArtifact, "text/html; charset=utf-8", commonHeaders(mode, storefrontSha256));
 });

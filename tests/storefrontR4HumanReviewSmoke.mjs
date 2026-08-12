@@ -8,6 +8,7 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8");
 const app = read("storefront-commerce-pro", "src", "IntegratedApp.jsx");
 const css = read("storefront-commerce-pro", "src", "integrated.css");
 const assistant = read("storefront-commerce-pro", "src", "AssistantWidget.jsx");
+const serviceIcon = read("storefront-commerce-pro", "src", "NovaServiceIcon.jsx");
 
 assert.match(app, /pathname === "\/iade-degisim"/);
 assert.match(app, /type: "return-exchange"/);
@@ -23,10 +24,12 @@ assert.match(css, /\.help-page \.help-hero:not\(\.compact\) h1\s*\{[\s\S]*?font-
 assert.match(css, /\.return-exchange-grid\s*\{[\s\S]*?grid-template-columns:/);
 assert.match(css, /@media \(max-width: 620px\)[\s\S]*?\.help-page \.help-hero:not\(\.compact\) h1/);
 
-assert.match(assistant, /function NovaBotMark\(\)/);
-assert.match(assistant, /className="novabot-mark"/);
+assert.match(assistant, /import \{ NovaServiceIcon \} from "\.\/NovaServiceIcon\.jsx"/);
+assert.match(assistant, /<NovaServiceIcon kind="bot" compact \/>/);
 assert.match(assistant, /aria-label=\{open \? "NovaBot penceresini kapat" : "NovaBot alışveriş asistanını aç"\}/);
-assert.match(css, /\.novabot-mark svg\s*\{[\s\S]*?stroke: #fff8ef/);
+assert.match(serviceIcon, /bot: ChatCircleText/);
+assert.match(serviceIcon, /className="nova-service-icon__glyph"/);
+assert.match(css, /\.assistant-fab \.nova-service-icon\.is-compact[\s\S]*?background: linear-gradient/);
 assert.match(css, /\.assistant-fab:hover/);
 assert.match(css, /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.assistant-fab \{ transition: none; \}/);
 

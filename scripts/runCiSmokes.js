@@ -18,6 +18,7 @@ const smokeTests = [
     'tests/categoryPlpStorefrontSmoke.js',
     'tests/officialRuntimeVisualContractSmoke.mjs',
     'tests/storefrontR4HumanReviewSmoke.mjs',
+    'tests/storefrontR5ReviewContractSmoke.mjs',
     'tests/sellerApplicationSummaryPrivacySmoke.mjs',
     'tests/stagingMigrationFoundationSmoke.js'
 ];

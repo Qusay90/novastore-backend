@@ -3700,3 +3700,183 @@ html[data-input-modality="pointer"] .check-option input:focus + span {
     gap: 12px;
   }
 }
+
+/* R5 review runtime: final semantic type and interaction layer. */
+html body {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 400;
+}
+
+body :is(p, label, input, textarea, select, small),
+body :is(.breadcrumb, .product-brand, .product-rating, .detail-rating, .delivery-line),
+body :is(.cart-line span, .cart-line__actions b, .site-footer p, .support-thread p) {
+  font-weight: 400;
+}
+
+body :is(.site-header a, .site-footer a, .account-sidebar a, .product-card h3, .product-card h3 a),
+body :is(.help-grid strong, .cart-line strong, .cart-line__product-link strong, .order-card__head strong) {
+  font-weight: 500;
+}
+
+body .connected-form label,
+body .support-composer label {
+  font-weight: 500;
+}
+
+body .connected-form input,
+body .connected-form textarea,
+body .support-composer textarea,
+body .help-grid button > span:not(.nova-service-icon) {
+  font-weight: 400;
+}
+
+body :is(button, .primary-button, .secondary-button, .help-grid button, .quantity-control button),
+body :is(.cart-drawer__footer button, .comparison-open, .account-logout) {
+  font-weight: 600;
+}
+
+body :is(.commerce-page, .product-page, .help-page, .return-exchange-page, .cart-drawer) h1 {
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+
+body :is(.commerce-page, .product-page, .help-page, .return-exchange-page, .cart-drawer) h2,
+body :is(.commerce-page, .product-page, .help-page, .return-exchange-page, .cart-drawer) h3 {
+  font-weight: 600;
+}
+
+body :is(.price-block strong, .detail-price strong, .cart-page-line__end > strong, .order-total dd) {
+  font-weight: 700;
+}
+
+.cart-drawer-overlay {
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.cart-drawer-overlay .cart-drawer {
+  z-index: 1;
+  pointer-events: auto;
+  box-shadow: -18px 0 48px rgba(4, 23, 42, .22);
+}
+
+.cart-line > a {
+  align-self: start;
+}
+
+.cart-line > a > img {
+  display: block;
+}
+
+.cart-line__product-link {
+  display: block;
+  color: inherit;
+}
+
+.cart-line__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cart-line__actions .quantity-control {
+  min-height: 36px;
+}
+
+.cart-line__actions .quantity-control button {
+  width: 32px;
+  height: 32px;
+}
+
+.nova-service-icon {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, .18), rgba(255, 255, 255, .05));
+  color: #ffb36a;
+  box-shadow: 0 12px 25px rgba(0, 0, 0, .14);
+}
+
+.nova-service-icon__glyph {
+  width: 32px;
+  height: 32px;
+}
+
+.nova-service-icon__accent {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 12px;
+  height: 12px;
+  color: #ff7a1a;
+}
+
+.help-grid .nova-service-icon {
+  grid-row: 1 / 3;
+  width: 44px;
+  height: 44px;
+  border-color: #ffd6b0;
+  border-radius: 13px;
+  background: linear-gradient(145deg, #fff7ef, #ffe1c4);
+  color: #143c5c;
+  box-shadow: none;
+}
+
+.help-grid .nova-service-icon__glyph {
+  width: 25px;
+  height: 25px;
+}
+
+.help-grid .nova-service-icon__accent {
+  top: 5px;
+  right: 5px;
+  width: 9px;
+  height: 9px;
+}
+
+.help-page .help-hero > .nova-service-icon,
+.return-exchange-hero > .nova-service-icon {
+  margin: 0 auto 13px;
+}
+
+.assistant-fab .nova-service-icon.is-compact {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #f47a19, #c75300);
+  color: #fff8ef;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 5px 14px rgba(0, 0, 0, .18);
+}
+
+.assistant-fab .nova-service-icon.is-compact .nova-service-icon__glyph {
+  width: 19px;
+  height: 19px;
+}
+
+.assistant-fab .nova-service-icon.is-compact .nova-service-icon__accent {
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  color: #fff1df;
+}
+
+@media (max-width: 620px) {
+  .cart-drawer {
+    width: min(100%, 430px);
+  }
+
+  .nova-service-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+  }
+}
