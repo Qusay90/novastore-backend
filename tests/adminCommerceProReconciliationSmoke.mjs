@@ -15,6 +15,7 @@ const preview = read("admin-commerce-pro/src/App.jsx");
 const live = read("admin-commerce-pro/src/IntegratedApp.jsx");
 const shell = read("admin-commerce-pro/src/AdminPresentationShell.jsx");
 const styles = read("admin-commerce-pro/src/styles.css");
+const integratedStyles = read("admin-commerce-pro/src/integrated.css");
 
 assert.match(preview, /import \{ AdminPresentationShell \} from "\.\/AdminPresentationShell\.jsx"/);
 assert.match(live, /import \{ AdminPresentationShell \} from "\.\/AdminPresentationShell\.jsx"/);
@@ -26,6 +27,9 @@ assert.match(shell, /event\.preventDefault\(\)/, "skip-link route hashini deği�
 assert.match(shell, /contentRef\?\.current\?\.focus\(\)/, "skip-link ortak ana içeriğe odaklanmalı");
 assert.match(live, /const contentRef = useRef\(null\)/, "canlı kabuk ana içerik odağını sahiplenmeli");
 assert.match(live, /contentRef=\{contentRef\}/, "canlı kabuk skip-link refini ortak sunuma aktarmalı");
+assert.match(live, /<h1 className="mobile-admin-heading">Commerce Pro — \{pageLabels\[page\]/, "mobil admin görünümü erişilebilir ana başlığı korumalı");
+assert.match(live, /className="secondary-button live-refresh" aria-label=\{sessionResource\.refreshing[\s\S]*?"Veriyi yenile"/, "ikon-only mobil yenileme düğmesi erişilebilir adını korumalı");
+assert.match(integratedStyles, /\.mobile-admin-heading \{[\s\S]*?display: none;[\s\S]*?@media \(max-width: 760px\) \{[\s\S]*?\.mobile-admin-heading \{[\s\S]*?clip-path: inset\(50%\)/, "mobil ana başlık görsel olarak gizlenirken erişilebilir kalmalı");
 
 assert.match(preview, /useState\(20\)/, "kabul edilen sipariş satır sayısı korunmalı");
 assert.match(preview, />Sipariş Operasyonu<\/h2>/, "kabul edilen operasyon başlığı korunmalı");

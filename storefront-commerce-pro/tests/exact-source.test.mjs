@@ -37,7 +37,7 @@ const canonicalAppPath = path.join(root, "src", "App.jsx");
 const runtimePresentationPath = path.join(root, "src", "CanonicalRuntimePresentation.jsx");
 const EXPECTED_SHA256 = "8b6301362b6c01b649db1d7cfa4dc00d5b4392309e4ece2c7c14870cab0f2b0d";
 const EXPECTED_APP_SHA256 = "d31e7642f6bccb75094361be3dc2dd3b85cc38a4d968bbfd57ee3ee7ffd80fb6";
-const EXPECTED_RUNTIME_SHA256 = "d237d0edf0cb0fc1f7b354a70719a397ed511b3f23540864e5f167644c6ed090";
+const EXPECTED_RUNTIME_SHA256 = "5622e100a25d0a18cbd070ba8577e9608a41f55bf794a19c7032bfa1ba930059";
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const NON_HOME_HASH_ROUTES = Object.freeze([
   "#/kategori/",
@@ -110,8 +110,8 @@ test("runtime presentation is generated directly from canonical App.jsx", async 
   assert.equal(sha256(expectedRuntimePresentation), EXPECTED_RUNTIME_SHA256);
   assert.equal(sha256(runtimePresentation), EXPECTED_RUNTIME_SHA256);
   assert.equal(runtimePresentation, expectedRuntimePresentation);
-  assert.equal(countExactOccurrences(runtimePresentation, CANONICAL_HOME_HREF), 0);
-  assert.equal(countExactOccurrences(runtimePresentation, CANONICAL_MOBILE_HOME_ITEM), 0);
+  assert.equal(countExactOccurrences(runtimePresentation, CANONICAL_HOME_HREF), EXPECTED_CANONICAL_HOME_HREF_COUNT);
+  assert.equal(countExactOccurrences(runtimePresentation, CANONICAL_MOBILE_HOME_ITEM), EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT);
   assert.equal(countExactOccurrences(canonicalApp, CANONICAL_REACT_IMPORT), 1);
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_REACT_IMPORT), 1);
   assert.equal(countExactOccurrences(canonicalApp, CANONICAL_COMPARISON_STATE), 1);
@@ -136,12 +136,13 @@ test("runtime presentation is generated directly from canonical App.jsx", async 
   assert.match(runtimePresentation, /buyNowPending \? "Hazırlanıyor" : "Hemen Al"/);
   assert.equal(
     countExactOccurrences(runtimePresentation, RUNTIME_HOME_HREF),
-    countExactOccurrences(canonicalApp, RUNTIME_HOME_HREF) + EXPECTED_CANONICAL_HOME_HREF_COUNT,
+    EXPECTED_CANONICAL_HOME_HREF_COUNT,
   );
   assert.equal(
     countExactOccurrences(runtimePresentation, RUNTIME_MOBILE_HOME_ITEM),
-    countExactOccurrences(canonicalApp, RUNTIME_MOBILE_HOME_ITEM) + EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT,
+    EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT,
   );
+  assert.match(runtimePresentation, /return product\?\.imageUrl \|\| IMAGE_MAP\[product\?\.imageKey\] \|\| phoneImage/);
 
   for (const route of NON_HOME_HASH_ROUTES) {
     assert.equal(

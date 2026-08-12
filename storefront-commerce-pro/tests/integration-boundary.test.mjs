@@ -600,6 +600,10 @@ test("customer HTTP yöntem, rota, sorgu ve müşteri token sınırlarını birl
     { path: "/api/reviews/product/202", method: "GET", authenticated: "optional" },
   );
   assert.deepEqual(
+    normalizeCustomerApiRequest("/api/questions/product/202", "GET", "https://novastore.tr"),
+    { path: "/api/questions/product/202", method: "GET", authenticated: "optional" },
+  );
+  assert.deepEqual(
     normalizeCustomerApiRequest("/api/assistant/chat", "POST", "https://novastore.tr"),
     { path: "/api/assistant/chat", method: "POST", authenticated: "optional" },
   );

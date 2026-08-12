@@ -26,9 +26,9 @@ const artifact = read('frontend/commerce-pro/index.html');
 const serverSource = read('server.js');
 const countExact = (source, token) => source.split(token).length - 1;
 const canonicalHomeHref = 'href="#/"';
-const runtimeHomeHref = 'href="/"';
+const runtimeHomeHref = 'href="#/"';
 const canonicalMobileHome = '[House,"Ana Sayfa","#/","home"]';
-const runtimeMobileHome = '[House,"Ana Sayfa","/","home"]';
+const runtimeMobileHome = '[House,"Ana Sayfa","#/","home"]';
 
 for (const documentRoute of ['kategori', 'urun', 'koleksiyon']) {
     assert(
@@ -71,17 +71,17 @@ assert(integratedSource.includes('getVisibleChildren(category.id)'));
 assert(integratedSource.includes('category.descendantVisibleProductCount === 0'));
 assert.equal(countExact(canonicalApp, canonicalHomeHref), 5, 'canonical App must retain five exact home href owners');
 assert.equal(countExact(canonicalApp, canonicalMobileHome), 1, 'canonical App must retain one mobile home item');
-assert.equal(countExact(runtimePresentation, canonicalHomeHref), 0, 'runtime home href owners must not be hash-only');
-assert.equal(countExact(runtimePresentation, canonicalMobileHome), 0, 'runtime mobile home must not be hash-only');
+assert.equal(countExact(runtimePresentation, canonicalHomeHref), 5, 'runtime home href owners must preserve hash-router state');
+assert.equal(countExact(runtimePresentation, canonicalMobileHome), 1, 'runtime mobile home must preserve hash-router state');
 assert.equal(
     countExact(runtimePresentation, runtimeHomeHref),
-    countExact(canonicalApp, runtimeHomeHref) + 5,
-    'runtime presentation must transform exactly five home href owners to document root'
+    5,
+    'runtime presentation must preserve exactly five hash-router home href owners'
 );
 assert.equal(
     countExact(runtimePresentation, runtimeMobileHome),
-    countExact(canonicalApp, runtimeMobileHome) + 1,
-    'runtime presentation must transform exactly one mobile home item to document root'
+    1,
+    'runtime presentation must preserve exactly one hash-router mobile home item'
 );
 for (const route of [
     '#/kategori/',

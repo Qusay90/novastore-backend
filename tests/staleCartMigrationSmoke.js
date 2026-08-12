@@ -30,7 +30,10 @@ global.CustomEvent = class CustomEvent {
         this.detail = init.detail;
     }
 };
-global.addEventListener = () => {};
+let domContentLoadedHandler = null;
+global.addEventListener = (type, handler) => {
+    if (type === 'DOMContentLoaded') domContentLoadedHandler = handler;
+};
 global.dispatchEvent = () => {};
 
 let remoteCart = { exists: false, payload: { items: [] }, updatedAt: null };
@@ -115,6 +118,20 @@ function androidRefreshDecision({ remoteExists, remoteItems, roomItems, migratio
 }
 
 (async () => {
+    let hydrateFetches = 0;
+    const originalFetch = global.fetch;
+    global.fetch = async (...args) => {
+        if (args[0] === '/api/shared-state/cart' && !args[1]?.method) hydrateFetches += 1;
+        return originalFetch(...args);
+    };
+    login();
+    global.__NOVASTORE_INTEGRATED_RUNTIME_OWNS_CART_HYDRATION__ = true;
+    domContentLoadedHandler();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.strictEqual(hydrateFetches, 0);
+    delete global.__NOVASTORE_INTEGRATED_RUNTIME_OWNS_CART_HYDRATION__;
+    resetWeb();
+
     resetWeb();
     remoteCart = { exists: true, payload: { items: [] }, updatedAt: '2026-06-22T00:00:00.000Z' };
     seedStaleLocalCart([item101]);

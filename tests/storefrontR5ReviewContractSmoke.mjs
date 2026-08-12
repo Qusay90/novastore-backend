@@ -11,9 +11,11 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8");
 const server = read("scripts", "serveOfficialRuntimeReview.mjs");
 const app = read("storefront-commerce-pro", "src", "IntegratedApp.jsx");
 const connected = read("storefront-commerce-pro", "src", "ConnectedCustomerPages.jsx");
+const community = read("storefront-commerce-pro", "src", "ProductCommunity.jsx");
 const assistant = read("storefront-commerce-pro", "src", "AssistantWidget.jsx");
 const icon = read("storefront-commerce-pro", "src", "NovaServiceIcon.jsx");
 const css = read("storefront-commerce-pro", "src", "integrated.css");
+const searchText = read("storefront-commerce-pro", "src", "searchText.js");
 const routes = read("OWNER-MANUAL-REVIEW-ROUTES.md");
 const captureEvidence = read("scripts", "captureOfficialRuntimeR5Evidence.mjs");
 
@@ -27,7 +29,12 @@ assert.match(server, /createCustomerReviewSession\(\)/);
 assert.match(server, /customerReviewSessions = new Map\(\)/);
 assert.match(server, /customerReviewSessionLimit = 16/);
 assert.match(server, /reviewCustomerId = 1_900_000_000/);
-assert.match(server, /state: \{ cart: \[\], favorites: \[\], messages: \[\] \}/);
+assert.match(server, /questionsByProduct: new Map\(\)/);
+assert.match(server, /isStructurallyPublicCategory/);
+assert.match(server, /isReviewMutationAllowed/);
+assert.match(server, /POST \/api\/questions\/ask/);
+assert.match(server, /POST \/api\/assistant\/chat/);
+assert.doesNotMatch(server, /POST \/api\/payments\/initialize/);
 assert.match(server, /const expandReviewItems = \(items\)/);
 assert.match(server, /PUT \/api\/shared-state\/cart/);
 assert.match(server, /POST \/api\/campaigns\/quote/);
@@ -56,6 +63,19 @@ assert.match(app, /const openCart = useCallback/);
 assert.match(app, /const closeCart = useCallback/);
 assert.match(app, /onQuantity=\{updateCartQuantity\}/);
 assert.match(app, /cart-line__product-link/);
+assert.match(app, /const localReviewSurface = window\.location\.protocol === "http:"[\s\S]*?window\.location\.port === "5273"/);
+assert.match(connected, /function LocalReviewAuthBoundary/);
+assert.match(connected, /href="\/__review\/customer"/);
+assert.match(connected, /couponIntentKeyRef/);
+assert.match(app, /const cartItems = useMemo\([\s\S]*?\[cart\]/);
+assert.doesNotMatch(app, /id="global-search"[\s\S]{0,250}role="combobox"/);
+assert.doesNotMatch(app, /id="global-search"[\s\S]{0,350}aria-expanded/);
+assert.match(searchText, /function normalizeSearchText\(value\)[\s\S]*?replace\(\/\[Iİı\]\/g, "i"\)/);
+assert.match(app, /const needle = normalizeSearchText\(value\)/);
+assert.match(app, /const needle = normalizeSearchText\(route\.term\)/);
+assert.match(css, /body\s*\{\s*min-width:\s*0;/);
+assert.match(community, /state\.phase === "loading"[\s\S]*?id=\{activePanelId\}[\s\S]*?role="tabpanel"[\s\S]*?aria-labelledby=\{activeTabId\}/);
+assert.match(community, /state\.phase === "error"[\s\S]*?id=\{activePanelId\}[\s\S]*?role="tabpanel"[\s\S]*?aria-labelledby=\{activeTabId\}/);
 
 for (const kind of ["help", "orders", "delivery", "returns", "payment", "support", "bot"]) {
   assert.match(icon, new RegExp(`${kind}:`));
@@ -197,6 +217,35 @@ try {
   assert.equal(secondIdentity.status, 200);
   assert.equal(JSON.parse(firstIdentity.text).user.email, "review.customer@local.invalid");
 
+  const profilePatch = await reviewRequest({ path: "/api/users/me", method: "PATCH", token: firstToken, body: JSON.stringify({ fullName: "Yerel Test Müşterisi", phone: "+90 555 000 00 01" }) });
+  assert.equal(profilePatch.status, 200);
+  assert.equal(JSON.parse(profilePatch.text).user.fullName, "Yerel Test Müşterisi");
+  assert.equal(JSON.parse((await reviewRequest({ path: "/api/users/me", token: secondToken })).text).user.fullName, "Yerel İnceleme Müşterisi");
+
+  const createdAddressResponse = await reviewRequest({ path: "/api/addresses", method: "POST", token: firstToken, body: JSON.stringify({ title: "İş", fullName: "Yerel Test Müşterisi", phone: "05550000001", city: "İstanbul", district: "Beşiktaş", addressLine: "Yerel Sokak 1", isDefault: false }) });
+  assert.equal(createdAddressResponse.status, 201);
+  const createdAddress = JSON.parse(createdAddressResponse.text);
+  assert.equal(createdAddress.id, 2);
+  assert.equal(JSON.parse((await reviewRequest({ path: "/api/addresses", token: firstToken })).text).length, 2);
+  assert.equal(JSON.parse((await reviewRequest({ path: "/api/addresses", token: secondToken })).text).length, 1);
+  assert.equal((await reviewRequest({ path: "/api/addresses/2/default", method: "PATCH", token: firstToken })).status, 200);
+  assert.equal((await reviewRequest({ path: "/api/addresses/2", method: "PUT", token: firstToken, body: JSON.stringify({ ...createdAddress, title: "Ofis" }) })).status, 200);
+  assert.equal((await reviewRequest({ path: "/api/addresses/2", method: "DELETE", token: firstToken })).status, 200);
+
+  assert.equal((await reviewRequest({ path: "/api/notifications/1/read", method: "PATCH", token: firstToken })).status, 200);
+  assert.equal(JSON.parse((await reviewRequest({ path: `/api/notifications/user/${JSON.parse(firstIdentity.text).user.id}`, token: firstToken })).text)[0].is_read, true);
+  assert.equal(JSON.parse((await reviewRequest({ path: `/api/notifications/user/${JSON.parse(secondIdentity.text).user.id}`, token: secondToken })).text)[0].is_read, false);
+
+  const questionText = "Bu ürün yerel inceleme sırasında stokta mı?";
+  assert.equal((await reviewRequest({ path: "/api/questions/ask", method: "POST", token: firstToken, body: JSON.stringify({ product_id: 1001, question: questionText }) })).status, 200);
+  assert.equal(JSON.parse((await reviewRequest({ path: "/api/questions/product/1001", token: firstToken })).text)[0].question, questionText);
+  assert.deepEqual(JSON.parse((await reviewRequest({ path: "/api/questions/product/1001", token: secondToken })).text), []);
+
+  const chat = await reviewRequest({ path: "/api/assistant/chat", method: "POST", body: JSON.stringify({ message: "Canlı desteğe bağlanmak istiyorum" }) });
+  assert.equal(chat.status, 200);
+  assert.equal(JSON.parse(chat.text).pendingAction.type, "live_support");
+  assert.equal((await reviewRequest({ path: "/api/assistant/escalate", method: "POST", token: firstToken, body: JSON.stringify({ summary: "Yerel inceleme destek görüşmesi özeti" }) })).status, 200);
+
   const cartBody = JSON.stringify({ payload: { items: [{ productId: 1001, quantity: 2 }] } });
   assert.equal((await reviewRequest({ path: "/api/shared-state/cart", method: "PUT", token: firstToken, body: cartBody })).status, 200);
   const firstCart = JSON.parse((await reviewRequest({ path: "/api/shared-state/cart", token: firstToken })).text);
@@ -209,7 +258,7 @@ try {
 
   const firstHistoryBefore = JSON.parse((await reviewRequest({ path: `/api/messages/history/${JSON.parse(firstIdentity.text).user.id}`, token: firstToken })).text);
   const secondHistoryBefore = JSON.parse((await reviewRequest({ path: `/api/messages/history/${JSON.parse(secondIdentity.text).user.id}`, token: secondToken })).text);
-  assert.equal(firstHistoryBefore.length, 1);
+  assert.equal(firstHistoryBefore.length, 2);
   assert.equal(secondHistoryBefore.length, 1);
   const supportMessage = "Birinci yerel oturum destek mesajı";
   const sentMessageResponse = await reviewRequest({ path: "/api/messages/send", method: "POST", token: firstToken, body: JSON.stringify({ message: supportMessage }) });
@@ -220,7 +269,7 @@ try {
   assert.match(sentMessage.created_at, /^\d{4}-\d{2}-\d{2}T/);
   const firstHistoryAfter = JSON.parse((await reviewRequest({ path: `/api/messages/history/${JSON.parse(firstIdentity.text).user.id}`, token: firstToken })).text);
   const secondHistoryAfter = JSON.parse((await reviewRequest({ path: `/api/messages/history/${JSON.parse(secondIdentity.text).user.id}`, token: secondToken })).text);
-  assert.equal(firstHistoryAfter.length, 2);
+  assert.equal(firstHistoryAfter.length, 3);
   assert.equal(firstHistoryAfter.at(-1).message, supportMessage);
   assert.equal(firstHistoryAfter.at(-1).sender_id, JSON.parse(firstIdentity.text).user.id);
   assert.equal(secondHistoryAfter.length, 1);
@@ -229,13 +278,19 @@ try {
   const quote = await reviewRequest({ path: "/api/campaigns/quote", method: "POST", body: JSON.stringify({ cartItems: [{ productId: 1001, quantity: 1 }] }) });
   assert.equal(quote.status, 200);
   assert.equal(JSON.parse(quote.text).totals.total, 51999);
+  const invalidCoupon = JSON.parse((await reviewRequest({ path: "/api/campaigns/quote", method: "POST", body: JSON.stringify({ cartItems: [{ productId: 1001, quantity: 1 }], couponCode: "BOGUS" }) })).text);
+  assert.equal(invalidCoupon.coupon.applied, false);
+  assert.equal(invalidCoupon.coupon.reason, "Kupon kodu geçerli değil.");
+  assert.equal((await reviewRequest({ path: "/api/public/collections/indirim?limit=100" })).status, 200);
+  assert.equal((await reviewRequest({ path: "/api/products/1016" })).status, 404);
 
   assert.equal((await reviewRequest({ path: "/api/users/me", token: "local-review-invalid" })).status, 401);
   assert.equal((await reviewRequest({ path: "/__review/meta", host: "review.example:5293" })).status, 403);
-  assert.equal((await reviewRequest({ path: "/api/addresses", method: "POST", token: firstToken, body: "{}" })).status, 405);
+  assert.equal((await reviewRequest({ path: "/api/payments/initialize", method: "POST", token: firstToken, body: "{}" })).status, 405);
+  assert.equal((await reviewRequest({ path: "/api/users/change-password", method: "POST", token: firstToken, body: "{}" })).status, 405);
   const meta = JSON.parse((await reviewRequest({ path: "/__review/meta" })).text);
   assert.equal(meta.counters.external, 1);
-  assert.equal(meta.counters.mutation, 1);
+  assert.equal(meta.counters.mutation, 2);
   assert.equal(meta.counters.database, 0);
 } finally {
   if (positive.exitCode === null) {
