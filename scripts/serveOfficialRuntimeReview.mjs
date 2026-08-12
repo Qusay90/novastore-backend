@@ -37,8 +37,8 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const storefrontSha256 = sha256(storefrontArtifact);
 const adminSha256 = sha256(adminArtifact);
 const expectedArtifactSha256 = Object.freeze({
-  storefront: "2f590038279e0378f62fa9c0de0f500384aade8a20971c556589264afc544f66",
-  admin: "9d0de6c5c250ce19eb442faf9ddd790fdac753ff989b338fc2b7ae91e01dab54",
+  storefront: "8f030cec57c7d6ef7f45060ac10ffd09859074ffad7629e9932c8b0c9244c6f7",
+  admin: "40786392e1df51bcd415e1a1c8c1af7684c85ab733d66401f66d90d70cb74405",
 });
 if (storefrontSha256 !== expectedArtifactSha256.storefront) {
   throw new Error("Storefront artifact beklenen resmî inceleme digest'iyle eşleşmiyor.");
@@ -95,7 +95,18 @@ const reviewMediaByProductId = Object.freeze({
     "/review-media/iphone-15-screen.svg",
   ]),
 });
-const publicProducts = Object.freeze(products.map((product) => ({
+const categoryById = new Map(categories.map((category) => [category.id, category]));
+const isStructurallyPublicCategory = (categoryId) => {
+  const visited = new Set();
+  let category = categoryById.get(categoryId);
+  while (category) {
+    if (visited.has(category.id) || category.active === false || category.customerVisible === false || category.archived === true) return false;
+    visited.add(category.id);
+    category = category.parentId === null ? null : categoryById.get(category.parentId);
+  }
+  return visited.size > 0;
+};
+const publicProducts = Object.freeze(products.filter((product) => isStructurallyPublicCategory(product.categoryId)).map((product) => ({
   id: numericProductId(product.id),
   slug: numericProductId(product.id) === 1001 ? "apple-iphone-15-128-gb" : product.slug,
   name: product.name,
@@ -165,7 +176,8 @@ const adminToken = [
 const reviewCustomerId = 1_900_000_000 + (randomBytes(4).readUInt32BE(0) % 90_000_000);
 const reviewCustomer = Object.freeze({ id: reviewCustomerId, fullName: "Yerel İnceleme Müşterisi", email: "review.customer@local.invalid", phone: "+90 555 000 00 00", role: "customer" });
 const reviewAddresses = Object.freeze([{ id: 1, title: "Ev", fullName: reviewCustomer.fullName, phone: reviewCustomer.phone, city: "İstanbul", district: "Kadıköy", address_line: "Moda Caddesi 12", is_default: true }]);
-const reviewOrders = Object.freeze([{ id: 7002, display_status: "Kargoya Verildi", total_amount: 51999, created_at: "2026-08-01T10:00:00.000Z", items: [{ id: 1001, product_id: 1001, name: "Apple iPhone 15 128 GB", quantity: 1, price: 51999, image_url: "/review-assets/phone-iphone.webp" }], shipping_address: "Moda Caddesi 12, Kadıköy, İstanbul", payment_method: "Yerel inceleme verisi", payment_status: "İnceleme için hazır" }]);
+const reviewOrders = Object.freeze([{ id: 7002, display_status: "Kargoya Verildi", total_amount: 51999, created_at: "2026-08-01T10:00:00.000Z", tracking_no: "LOCAL-7002", eta_date: "2026-08-15T18:00:00.000Z", items: [{ id: 1001, product_id: 1001, name: "Apple iPhone 15 128 GB", quantity: 1, price: 51999, image_url: "/review-media/iphone-15-angle.svg" }], shipping_address: "Moda Caddesi 12, Kadıköy, İstanbul", payment_method: "Yerel inceleme verisi", payment_status: "İnceleme için hazır" }]);
+const reviewNotifications = Object.freeze([{ id: 1, type: "order", message: "Yerel inceleme siparişin kargoya verildi.", is_read: false, created_at: "2026-08-01T12:00:00.000Z" }]);
 const initialReviewMessages = Object.freeze([Object.freeze({ id: 1, sender_id: 0, message: "Bu destek geçmişi yalnızca yerel inceleme içindir.", created_at: "2026-08-01T12:00:00.000Z" })]);
 const customerReviewSessions = new Map();
 const customerReviewSessionTtlMs = 30 * 60 * 1000;
@@ -179,7 +191,21 @@ const createCustomerReviewSession = () => {
     customerReviewSessions.delete(customerReviewSessions.keys().next().value);
   }
   const token = `local-review-${randomBytes(32).toString("base64url")}`;
-  const session = { token, expiresAt: now + customerReviewSessionTtlMs, state: { cart: [], favorites: [], messages: [] } };
+  const session = {
+    token,
+    expiresAt: now + customerReviewSessionTtlMs,
+    state: {
+      user: { ...reviewCustomer },
+      cart: [],
+      favorites: [],
+      messages: [],
+      addresses: reviewAddresses.map((address) => ({ ...address })),
+      notifications: reviewNotifications.map((notification) => ({ ...notification })),
+      questionsByProduct: new Map(),
+      nextAddressId: 2,
+      nextQuestionId: 1,
+    },
+  };
   customerReviewSessions.set(token, session);
   return session;
 };
@@ -223,12 +249,19 @@ const authorizeAdmin = (request, response) => {
   sendJson(request, response, 401, { error: "Yerel inceleme yönetici oturumu gerekli." }, "INTEGRATED_COMMERCE_PRO_ADMIN");
   return false;
 };
-const authorizeCustomer = (request, response, mode) => {
+const findCustomerSession = (request) => {
   const token = String(request.headers.authorization || "").replace(/^Bearer\s+/i, "");
   const session = customerReviewSessions.get(token);
   if (session && Date.now() <= session.expiresAt) return session;
   if (session) customerReviewSessions.delete(token);
-  if (session && Date.now() > session.expiresAt) response.setHeader("X-NovaStore-Review-Session", "expired");
+  return null;
+};
+const authorizeCustomer = (request, response, mode) => {
+  const token = String(request.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const expiredSession = customerReviewSessions.get(token);
+  const session = findCustomerSession(request);
+  if (session) return session;
+  if (expiredSession && Date.now() > expiredSession.expiresAt) response.setHeader("X-NovaStore-Review-Session", "expired");
   sendJson(request, response, 401, { error: "Yerel inceleme müşteri oturumu gerekli." }, mode);
   return null;
 };
@@ -240,7 +273,10 @@ const validateRequest = (request, response, port, mode, allowedDisposableMethods
     return false;
   }
   const methodKey = `${String(request.method || "GET").toUpperCase()} ${String(request.url || "").split("?")[0]}`;
-  if (!["GET", "HEAD"].includes(request.method) && !allowedDisposableMethods.has(methodKey)) {
+  const allowedMutation = typeof allowedDisposableMethods === "function"
+    ? allowedDisposableMethods(methodKey)
+    : allowedDisposableMethods.has(methodKey);
+  if (!["GET", "HEAD"].includes(request.method) && !allowedMutation) {
     counters.mutation += 1;
     sendJson(request, response, 405, { error: "Yerel inceleme çalışma zamanı salt okunurdur." }, mode);
     return false;
@@ -269,6 +305,24 @@ const readJsonBody = (request, { maxBytes = 32_768 } = {}) => new Promise((resol
   });
   request.on("error", reject);
 });
+
+const cleanReviewText = (value, maxLength = 2_000) => String(value || "")
+  .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, " ")
+  .trim()
+  .slice(0, maxLength);
+const reviewAddressFromBody = (body, id, defaultValue = false) => ({
+  id,
+  title: cleanReviewText(body?.title, 80) || "Adres",
+  fullName: cleanReviewText(body?.fullName || body?.full_name, 160),
+  phone: cleanReviewText(body?.phone, 40),
+  city: cleanReviewText(body?.city, 80),
+  district: cleanReviewText(body?.district, 80),
+  addressLine: cleanReviewText(body?.addressLine || body?.address_line, 500),
+  isDefault: body?.isDefault === true || body?.is_default === true || defaultValue,
+});
+const validReviewAddress = (address) => (
+  address.fullName && address.phone && address.city && address.district && address.addressLine
+);
 
 const compactReviewItems = (value) => (Array.isArray(value) ? value : [])
   .map((item) => ({
@@ -299,12 +353,27 @@ const reviewMutationMethods = new Set([
   "POST /api/favorites/sync",
   "POST /api/users/logout",
   "POST /api/messages/send",
+  "PATCH /api/users/me",
+  "POST /api/addresses",
+  "POST /api/questions/ask",
+  "POST /api/assistant/chat",
+  "POST /api/assistant/escalate",
   ...publicProducts.flatMap(({ id }) => [`POST /api/favorites/${id}`, `DELETE /api/favorites/${id}`]),
 ]);
+const reviewMutationPatterns = Object.freeze([
+  /^PUT \/api\/addresses\/\d+$/,
+  /^DELETE \/api\/addresses\/\d+$/,
+  /^PATCH \/api\/addresses\/\d+\/default$/,
+  /^PATCH \/api\/notifications\/\d+\/read$/,
+  /^PATCH \/api\/notifications\/read-all\/\d+$/,
+]);
+const isReviewMutationAllowed = (methodKey) => (
+  reviewMutationMethods.has(methodKey) || reviewMutationPatterns.some((pattern) => pattern.test(methodKey))
+);
 
 const storefrontServer = http.createServer((request, response) => {
   const mode = "INTEGRATED_COMMERCE_PRO";
-  if (!validateRequest(request, response, storefrontPort, mode, reviewMutationMethods)) return;
+  if (!validateRequest(request, response, storefrontPort, mode, isReviewMutationAllowed)) return;
   const url = new URL(request.url, `http://127.0.0.1:${storefrontPort}`);
 
   if (url.pathname === "/__review/meta") return sendJson(request, response, 200, { mode, artifactSha256: storefrontSha256, sourceEntry: "storefront-commerce-pro/src/main-integrated.jsx", localData: "canonical-local-catalog-through-same-origin-read-api", counters }, mode);
@@ -331,29 +400,121 @@ const storefrontServer = http.createServer((request, response) => {
   }
   if (url.pathname === "/api/public/categories") return sendJson(request, response, 200, categoryTree(), mode);
   if (url.pathname === "/api/products") return sendJson(request, response, 200, publicProducts, mode);
-  if (url.pathname === "/api/public/collections") return sendJson(request, response, 200, [], mode);
+  if (url.pathname === "/api/public/collections") return sendJson(request, response, 200, [{ id: 1, slug: "indirim", name: "Günün fırsatları", show_on_home: true }], mode);
+  if (url.pathname === "/api/public/collections/indirim") {
+    const discountedProducts = publicProducts.filter((product) => Number(product.old_price) > Number(product.price));
+    return sendJson(request, response, 200, {
+      collection: { id: 1, slug: "indirim", name: "Günün fırsatları" },
+      products: discountedProducts,
+      pagination: { page: 1, limit: Math.min(100, Math.max(1, Number(url.searchParams.get("limit")) || 100)), total: discountedProducts.length, hasMore: false },
+    }, mode);
+  }
   if (url.pathname === "/api/public/navigation/main") return sendJson(request, response, 200, publicNavigation, mode);
   const productMatch = url.pathname.match(/^\/api\/products\/(\d+)$/);
   if (productMatch) {
     const product = publicProducts.find((item) => item.id === Number(productMatch[1]));
     return product ? sendJson(request, response, 200, product, mode) : sendJson(request, response, 404, { error: "Ürün bulunamadı." }, mode);
   }
-  if (/^\/api\/(?:reviews|questions)\/product\/\d+$/.test(url.pathname)) return sendJson(request, response, 200, [], mode);
+  if (/^\/api\/reviews\/product\/\d+$/.test(url.pathname)) return sendJson(request, response, 200, [], mode);
+  const productQuestionsMatch = url.pathname.match(/^\/api\/questions\/product\/(\d+)$/);
+  if (productQuestionsMatch) {
+    const optionalSession = findCustomerSession(request);
+    return sendJson(request, response, 200, optionalSession?.state.questionsByProduct.get(Number(productQuestionsMatch[1])) || [], mode);
+  }
   let customerSession = null;
   if (url.pathname === "/api/users/me") {
     customerSession = authorizeCustomer(request, response, mode);
     if (!customerSession) return;
-    return sendJson(request, response, 200, { user: reviewCustomer }, mode);
+    if (request.method === "PATCH") {
+      return readJsonBody(request).then((body) => {
+        const fullName = cleanReviewText(body?.fullName, 160);
+        const phone = cleanReviewText(body?.phone, 40) || null;
+        if (fullName.length < 2) return sendJson(request, response, 400, { error: "Geçerli ad soyad gerekli." }, mode);
+        customerSession.state.user = { ...customerSession.state.user, fullName, phone };
+        return sendJson(request, response, 200, { user: customerSession.state.user, localOnly: true }, mode);
+      }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel profil verisi." }, mode));
+    }
+    return sendJson(request, response, 200, { user: customerSession.state.user }, mode);
   }
-  const customerDataPath = /^\/api\/(?:addresses|orders\/user|campaigns\/coupons\/active|notifications\/user|messages\/history|shared-state|favorites|messages\/send|users\/logout)/.test(url.pathname);
+  if (url.pathname === "/api/assistant/chat" && request.method === "POST") {
+    return readJsonBody(request).then((body) => {
+      const message = cleanReviewText(body?.message);
+      if (!message) return sendJson(request, response, 400, { error: "NovaBot mesajı boş olamaz." }, mode);
+      const asksForSupport = /destek|canlı|müşteri temsilcisi/i.test(message);
+      return sendJson(request, response, 200, {
+        reply: asksForSupport ? "İstersen konuşma özetini yerel destek geçmişine aktarabilirsin." : "Yerel incelemede katalog, sepet ve destek akışlarını güvenle deneyebilirsin.",
+        mode: "friendly",
+        modeLabel: "NovaBot",
+        suggestions: asksForSupport ? [] : ["Canlı desteğe aktar"],
+        products: [],
+        requiresConfirmation: asksForSupport,
+        pendingAction: asksForSupport ? { type: "live_support", reason: "Yerel inceleme destek talebi" } : null,
+        allowEscalation: asksForSupport,
+        localOnly: true,
+      }, mode);
+    }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel NovaBot verisi." }, mode));
+  }
+  const customerDataPath = /^\/api\/(?:addresses|orders\/user|campaigns\/coupons\/active|notifications|messages\/history|shared-state|favorites|messages\/send|users\/logout|questions\/ask|assistant\/escalate)/.test(url.pathname);
   if (customerDataPath) {
     customerSession = authorizeCustomer(request, response, mode);
     if (!customerSession) return;
   }
-  if (url.pathname === "/api/addresses") return sendJson(request, response, 200, reviewAddresses, mode);
+  if (url.pathname === "/api/addresses" && request.method === "GET") return sendJson(request, response, 200, customerSession.state.addresses, mode);
+  if (url.pathname === "/api/addresses" && request.method === "POST") {
+    return readJsonBody(request).then((body) => {
+      const address = reviewAddressFromBody(body, customerSession.state.nextAddressId, customerSession.state.addresses.length === 0);
+      if (!validReviewAddress(address)) return sendJson(request, response, 400, { error: "Adres alanları eksik." }, mode);
+      customerSession.state.nextAddressId += 1;
+      if (address.isDefault) customerSession.state.addresses = customerSession.state.addresses.map((item) => ({ ...item, isDefault: false, is_default: false }));
+      customerSession.state.addresses.push(address);
+      return sendJson(request, response, 201, { ...address, localOnly: true }, mode);
+    }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel adres verisi." }, mode));
+  }
+  const addressDefaultMatch = url.pathname.match(/^\/api\/addresses\/(\d+)\/default$/);
+  if (addressDefaultMatch && request.method === "PATCH") {
+    const addressId = Number(addressDefaultMatch[1]);
+    const address = customerSession.state.addresses.find((item) => Number(item.id) === addressId);
+    if (!address) return sendJson(request, response, 404, { error: "Adres bulunamadı." }, mode);
+    customerSession.state.addresses = customerSession.state.addresses.map((item) => ({ ...item, isDefault: Number(item.id) === addressId, is_default: Number(item.id) === addressId }));
+    return sendJson(request, response, 200, { ...customerSession.state.addresses.find((item) => Number(item.id) === addressId), localOnly: true }, mode);
+  }
+  const addressMatch = url.pathname.match(/^\/api\/addresses\/(\d+)$/);
+  if (addressMatch && request.method === "PUT") {
+    const addressId = Number(addressMatch[1]);
+    const index = customerSession.state.addresses.findIndex((item) => Number(item.id) === addressId);
+    if (index < 0) return sendJson(request, response, 404, { error: "Adres bulunamadı." }, mode);
+    return readJsonBody(request).then((body) => {
+      const address = reviewAddressFromBody(body, addressId, customerSession.state.addresses[index].isDefault === true);
+      if (!validReviewAddress(address)) return sendJson(request, response, 400, { error: "Adres alanları eksik." }, mode);
+      if (address.isDefault) customerSession.state.addresses = customerSession.state.addresses.map((item) => ({ ...item, isDefault: false, is_default: false }));
+      customerSession.state.addresses[index] = address;
+      return sendJson(request, response, 200, { ...address, localOnly: true }, mode);
+    }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel adres verisi." }, mode));
+  }
+  if (addressMatch && request.method === "DELETE") {
+    const addressId = Number(addressMatch[1]);
+    const address = customerSession.state.addresses.find((item) => Number(item.id) === addressId);
+    if (!address) return sendJson(request, response, 404, { error: "Adres bulunamadı." }, mode);
+    customerSession.state.addresses = customerSession.state.addresses.filter((item) => Number(item.id) !== addressId);
+    if (address.isDefault && customerSession.state.addresses.length) customerSession.state.addresses[0] = { ...customerSession.state.addresses[0], isDefault: true, is_default: true };
+    return sendJson(request, response, 200, { deleted: true, id: addressId, localOnly: true }, mode);
+  }
   if (url.pathname === `/api/orders/user/${reviewCustomer.id}`) return sendJson(request, response, 200, reviewOrders, mode);
   if (url.pathname === "/api/campaigns/coupons/active") return sendJson(request, response, 200, [{ id: 1, code: "LOCAL10", discount_type: "PERCENT", discount_value: 10, min_order_amount: 1000 }], mode);
-  if (url.pathname === `/api/notifications/user/${reviewCustomer.id}`) return sendJson(request, response, 200, [{ id: 1, type: "order", message: "Yerel inceleme siparişin kargoya verildi.", is_read: false, created_at: "2026-08-01T12:00:00.000Z" }], mode);
+  if (url.pathname === `/api/notifications/user/${reviewCustomer.id}`) return sendJson(request, response, 200, customerSession.state.notifications, mode);
+  const notificationReadMatch = url.pathname.match(/^\/api\/notifications\/(\d+)\/read$/);
+  if (notificationReadMatch && request.method === "PATCH") {
+    const notificationId = Number(notificationReadMatch[1]);
+    const notification = customerSession.state.notifications.find((item) => Number(item.id) === notificationId);
+    if (!notification) return sendJson(request, response, 404, { error: "Bildirim bulunamadı." }, mode);
+    notification.is_read = true;
+    return sendJson(request, response, 200, { ...notification, localOnly: true }, mode);
+  }
+  if (url.pathname === `/api/notifications/read-all/${reviewCustomer.id}` && request.method === "PATCH") {
+    const count = customerSession.state.notifications.filter((item) => item.is_read !== true).length;
+    customerSession.state.notifications.forEach((item) => { item.is_read = true; });
+    return sendJson(request, response, 200, { updated: true, count, localOnly: true }, mode);
+  }
   if (url.pathname === `/api/messages/history/${reviewCustomer.id}`) return sendJson(request, response, 200, [...initialReviewMessages, ...customerSession.state.messages], mode);
   if (url.pathname === "/api/shared-state/cart" && request.method === "GET") return sendJson(request, response, 200, { exists: true, updatedAt: null, payload: { version: 1, items: expandReviewItems(customerSession.state.cart) } }, mode);
   if (url.pathname === "/api/favorites" && request.method === "GET") return sendJson(request, response, 200, { productIds: customerSession.state.favorites }, mode);
@@ -393,10 +554,11 @@ const storefrontServer = http.createServer((request, response) => {
       const items = compactReviewItems(body?.cartItems);
       if (!items.length) return sendJson(request, response, 400, { error: "Yerel fiyatlandırma için sepet boş." }, mode);
       const subtotal = items.reduce((sum, item) => sum + (publicProducts.find((product) => product.id === item.productId)?.price || 0) * item.quantity, 0);
-      const couponApplied = String(body?.couponCode || "").toUpperCase() === "LOCAL10";
+      const requestedCoupon = cleanReviewText(body?.couponCode, 80).toLocaleUpperCase("tr-TR");
+      const couponApplied = requestedCoupon === "LOCAL10";
       const couponDiscount = couponApplied ? Math.round(subtotal * .1) : 0;
       const shippingFee = subtotal >= 1500 ? 0 : 99;
-      return sendJson(request, response, 200, { totals: { currency: "TRY", subtotal, bundleDiscount: 0, couponDiscount, shippingFee, total: subtotal - couponDiscount + shippingFee }, campaigns: {}, coupon: couponApplied ? { applied: true, code: "LOCAL10" } : {}, items }, mode);
+      return sendJson(request, response, 200, { totals: { currency: "TRY", subtotal, bundleDiscount: 0, couponDiscount, shippingFee, total: subtotal - couponDiscount + shippingFee }, campaigns: {}, coupon: couponApplied ? { applied: true, code: "LOCAL10" } : requestedCoupon ? { applied: false, code: requestedCoupon, reason: "Kupon kodu geçerli değil." } : {}, items }, mode);
     }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel fiyatlandırma verisi." }, mode));
   }
   if (url.pathname === "/api/messages/send" && request.method === "POST") {
@@ -412,6 +574,38 @@ const storefrontServer = http.createServer((request, response) => {
       customerSession.state.messages.push(entry);
       return sendJson(request, response, 200, { ...entry, delivered: true, localOnly: true }, mode);
     }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel destek verisi." }, mode));
+  }
+  if (url.pathname === "/api/questions/ask" && request.method === "POST") {
+    return readJsonBody(request).then((body) => {
+      const productId = Number(body?.product_id ?? body?.productId);
+      const question = cleanReviewText(body?.question, 1_000);
+      if (!publicProducts.some((product) => product.id === productId) || question.length < 5) return sendJson(request, response, 400, { error: "Geçerli ürün ve soru gerekli." }, mode);
+      const entry = {
+        id: customerSession.state.nextQuestionId,
+        question,
+        user_name: customerSession.state.user.fullName,
+        created_at: new Date().toISOString(),
+        is_answered: false,
+      };
+      customerSession.state.nextQuestionId += 1;
+      const existing = customerSession.state.questionsByProduct.get(productId) || [];
+      customerSession.state.questionsByProduct.set(productId, [...existing, entry]);
+      return sendJson(request, response, 200, { ...entry, mesaj: "Sorun yerel inceleme oturumunda kaydedildi.", localOnly: true }, mode);
+    }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel soru verisi." }, mode));
+  }
+  if (url.pathname === "/api/assistant/escalate" && request.method === "POST") {
+    return readJsonBody(request).then((body) => {
+      const summary = cleanReviewText(body?.summary, 4_000);
+      if (summary.length < 10) return sendJson(request, response, 400, { error: "Destek özeti için biraz daha ayrıntı gerekli." }, mode);
+      customerSession.state.messages.push({
+        id: initialReviewMessages.length + customerSession.state.messages.length + 1,
+        sender_id: 0,
+        message: `[AI DESTEK DEVRI] ${summary}`,
+        is_ai_handoff: true,
+        created_at: new Date().toISOString(),
+      });
+      return sendJson(request, response, 200, { message: "Konuşma özeti yerel inceleme destek geçmişine aktarıldı.", localOnly: true }, mode);
+    }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel destek özeti." }, mode));
   }
   if (url.pathname.startsWith("/api/")) return sendJson(request, response, 404, { error: "Yerel inceleme endpoint'i yok." }, mode);
   return send(request, response, 200, storefrontArtifact, "text/html; charset=utf-8", commonHeaders(mode, storefrontSha256));

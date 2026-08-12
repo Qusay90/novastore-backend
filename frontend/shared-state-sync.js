@@ -3,6 +3,8 @@
     const CART_MIGRATION_PREFIX = 'novastore_cart_migrated_';
     const writeQueues = new Map();
     const recentNotices = new Map();
+    let hydratePromise = null;
+    let hydrateUserId = null;
 
     function storage() {
         return root.localStorage;
@@ -261,7 +263,7 @@
         return normalized;
     }
 
-    async function hydrateCart() {
+    async function hydrateCartOnce() {
         if (!isAuthenticated()) return;
         const key = scopedKey(CART_PREFIX);
         try {
@@ -290,6 +292,20 @@
         }
     }
 
+    function hydrateCart() {
+        if (!isAuthenticated()) return Promise.resolve();
+        const userId = getUserId();
+        if (hydratePromise && hydrateUserId === userId) return hydratePromise;
+        hydrateUserId = userId;
+        hydratePromise = hydrateCartOnce().finally(() => {
+            if (hydrateUserId === userId) {
+                hydratePromise = null;
+                hydrateUserId = null;
+            }
+        });
+        return hydratePromise;
+    }
+
     root.NovaStoreSharedState = {
         isAuthenticated,
         hydrateCart,
@@ -306,6 +322,7 @@
     };
 
     root.addEventListener('DOMContentLoaded', () => {
+        if (root.__NOVASTORE_INTEGRATED_RUNTIME_OWNS_CART_HYDRATION__ === true) return;
         hydrateCart();
     });
 })(typeof window !== 'undefined' ? window : globalThis);

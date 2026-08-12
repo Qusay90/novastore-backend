@@ -1680,12 +1680,13 @@ export function IntegratedApp() {
       contextScrim={contextOpen && mobile ? <button className="context-scrim" aria-label="Menüyü kapat" onClick={() => setContextOpen(false)} /> : null}
       header={(
         <header className="topbar">
+          <h1 className="mobile-admin-heading">Commerce Pro — {pageLabels[page] || "Modül"}</h1>
           <div className="topbar-leading">
             <button ref={contextToggleRef} className="icon-button rail-toggle" onClick={() => setContextOpen((value) => !value)} aria-label={contextOpen ? "Menüyü daralt" : "Menüyü aç"} aria-expanded={contextOpen}><Icon name={contextOpen ? "back" : "menu"} /></button>
             <div className="breadcrumb"><span>Entegre yönetim</span><Icon name="right" /><strong>{pageLabels[page] || "Modül"}</strong></div>
           </div>
           <div className="command-trigger live-command-status" role="status"><Icon name="shield" /><span>{sessionLoaded ? "Admin oturumu doğrulandı" : "Admin oturumu doğrulanıyor"}</span></div>
-          <button className="secondary-button live-refresh" onClick={reloadAll} disabled={sessionResource.refreshing || sessionResource.phase === "loading"}><Icon name="refresh" /><span>Veriyi yenile</span></button>
+          <button className="secondary-button live-refresh" aria-label={sessionResource.refreshing || sessionResource.phase === "loading" ? "Veri yenileniyor" : "Veriyi yenile"} onClick={reloadAll} disabled={sessionResource.refreshing || sessionResource.phase === "loading"}><Icon name="refresh" /><span>Veriyi yenile</span></button>
           <button className="profile-button" onClick={logout}><span className="avatar avatar-small">A</span><span>Çıkış</span></button>
         </header>
       )}

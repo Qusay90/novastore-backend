@@ -128,11 +128,27 @@ function AuthHero({ kicker, title, copy }) {
   return <div className="auth-hero"><ShieldCheck weight="fill" /><span className="section-kicker">{kicker}</span><h1>{title}</h1><p>{copy}</p><div className="auth-trust-list"><span><CheckCircle weight="fill" /> Aynı-origin güvenli oturum</span><span><CheckCircle weight="fill" /> Sepet ve favoriler korunur</span><span><CheckCircle weight="fill" /> Şifren tarayıcıda saklanmaz</span></div></div>;
 }
 
+function LocalReviewAuthBoundary({ password = false }) {
+  return <main id="main-content" className="page auth-page"><div className="shell auth-layout">
+    <AuthHero kicker="Yerel inceleme" title={password ? "Parola işlemleri bu oturumda kapalı." : "Sentetik inceleme hesabını aç."} copy="Bu sunucu gerçek üyelik, kimlik doğrulaması veya e-posta gönderimi yapmaz." />
+    <section className="auth-card" aria-labelledby="review-auth-title">
+      <span className="section-kicker">Güvenli inceleme sınırı</span>
+      <h2 id="review-auth-title">Gerçek hesap verisi kullanılmaz</h2>
+      <p>Kısa süreli, yalnızca bu yerel çalışma zamanına ait sentetik hesabı güvenli giriş noktasından açabilirsin.</p>
+      <div className="connected-review-boundary">
+        <div className="form-message is-warning" role="status"><ShieldCheck />Gerçek parola, e-posta veya hesap verisi bu çalışma zamanına gönderilmez.</div>
+        <a className="primary-button connected-submit" href="/__review/customer">İnceleme hesabını aç <CaretRight /></a>
+      </div>
+    </section>
+  </div></main>;
+}
+
 export function CustomerAuthPage({
   account,
   initialMode = "login",
   returnPath = "/hesabim",
   onAuthenticated,
+  reviewOnly = false,
 }) {
   const [mode, setMode] = useState(initialMode === "register" ? "register" : "login");
   const [phase, setPhase] = useState("idle");
@@ -140,6 +156,8 @@ export function CustomerAuthPage({
   const [error, setError] = useState("");
 
   useEffect(() => setMode(initialMode === "register" ? "register" : "login"), [initialMode]);
+
+  if (reviewOnly) return <LocalReviewAuthBoundary />;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -196,11 +214,13 @@ export function CustomerAuthPage({
   </div></main>;
 }
 
-export function CustomerPasswordPage({ account, mode, token = "" }) {
+export function CustomerPasswordPage({ account, mode, token = "", reviewOnly = false }) {
   const reset = mode === "reset";
   const [phase, setPhase] = useState("idle");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  if (reviewOnly) return <LocalReviewAuthBoundary password />;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -477,11 +497,12 @@ function NotificationsSection({ session, account, onNotice }) {
   return <><div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Bildirimlerim</h1><p>Sipariş ve hesap güncellemelerin.</p></div>{notifications.some((item) => !item.isRead) && <button className="secondary-action" type="button" onClick={markAll} disabled={busy}>Tümünü okundu yap</button>}</div>{error && <div className="form-message is-error"><WarningCircle />{error}</div>}{notifications.length ? <div className="notification-list connected-notifications">{notifications.map((item) => { const Icon = notificationIcon(item.type); return <button key={item.id} type="button" className={item.isRead ? "is-read" : "is-unread"} onClick={() => markOne(item)} disabled={busy}><Icon /><span><strong>{item.message}</strong><small>{formatDate(item.createdAt)}</small></span>{!item.isRead && <i aria-label="Okunmadı" />}</button>; })}</div> : <div className="connected-empty"><Bell /><h2>Henüz bildirimin yok</h2><p>Sipariş ve hesap güncellemeleri burada gösterilecek.</p></div>}</>;
 }
 
-function SecuritySection({ account, onNotice }) {
+function SecuritySection({ account, onNotice, reviewOnly = false }) {
   const [phase, setPhase] = useState("idle");
   const [error, setError] = useState("");
   const submit = async (event) => {
     event.preventDefault();
+    if (reviewOnly) return;
     const form = new FormData(event.currentTarget);
     const currentPassword = String(form.get("currentPassword") || "");
     const newPassword = String(form.get("newPassword") || "");
@@ -494,7 +515,7 @@ function SecuritySection({ account, onNotice }) {
     catch (requestError) { setError(errorMessage(requestError, "Şifre güncellenemedi.")); }
     finally { setPhase("idle"); }
   };
-  return <><div className="commerce-heading"><div><span className="section-kicker">Hesap güvenliği</span><h1>Şifremi değiştir</h1><p>Yeni şifren en az 8 karakter, bir harf ve bir rakam içermelidir.</p></div></div><form className="security-form connected-form" onSubmit={submit}><Key />{error && <div className="form-message is-error"><WarningCircle />{error}</div>}<label>Mevcut şifre<input name="currentPassword" type="password" autoComplete="current-password" required /></label><label>Yeni şifre<input name="newPassword" type="password" autoComplete="new-password" minLength="8" required /></label><label>Yeni şifre tekrarı<input name="confirmation" type="password" autoComplete="new-password" minLength="8" required /></label><button className="primary-button" type="submit" disabled={phase === "submitting"}>{phase === "submitting" ? "Güncelleniyor…" : "Şifremi güncelle"}</button></form></>;
+  return <><div className="commerce-heading"><div><span className="section-kicker">Hesap güvenliği</span><h1>Şifremi değiştir</h1><p>{reviewOnly ? "Yerel inceleme oturumu gerçek parola işlemi yapmaz." : "Yeni şifren en az 8 karakter, bir harf ve bir rakam içermelidir."}</p></div></div><form className="security-form connected-form" onSubmit={submit}><Key />{reviewOnly && <div className="form-message is-warning" role="status"><ShieldCheck />Parola değiştirme, üretim kimliği gerektirdiği için bu yerel oturumda devre dışıdır.</div>}{error && <div className="form-message is-error"><WarningCircle />{error}</div>}<label>Mevcut şifre<input name="currentPassword" type="password" autoComplete="current-password" required disabled={reviewOnly} /></label><label>Yeni şifre<input name="newPassword" type="password" autoComplete="new-password" minLength="8" required disabled={reviewOnly} /></label><label>Yeni şifre tekrarı<input name="confirmation" type="password" autoComplete="new-password" minLength="8" required disabled={reviewOnly} /></label><button className="primary-button" type="submit" disabled={reviewOnly || phase === "submitting"}>{reviewOnly ? "Yerel incelemede kullanılamaz" : phase === "submitting" ? "Güncelleniyor…" : "Şifremi güncelle"}</button></form></>;
 }
 
 export function CustomerAccountPage({
@@ -508,6 +529,7 @@ export function CustomerAccountPage({
   onSessionUpdated,
   onLogout,
   onNotice,
+  reviewOnly = false,
 }) {
   const productById = useMemo(() => new Map(products.map((product) => [Number(product.id), product])), [products]);
   const activeSection = section === "order-detail" ? "orders" : section;
@@ -517,7 +539,7 @@ export function CustomerAccountPage({
   else if (section === "addresses") content = <AddressesSection account={account} user={session.user} onNotice={onNotice} />;
   else if (section === "coupons") content = <CouponsSection account={account} onNotice={onNotice} />;
   else if (section === "notifications") content = <NotificationsSection session={session} account={account} onNotice={onNotice} />;
-  else if (section === "security") content = <SecuritySection account={account} onNotice={onNotice} />;
+  else if (section === "security") content = <SecuritySection account={account} onNotice={onNotice} reviewOnly={reviewOnly} />;
   else content = <div className="connected-empty"><WarningCircle /><h2>Hesap bölümü bulunamadı</h2><a className="primary-button" href="#/hesabim">Hesap özetine dön</a></div>;
 
   return <main id="main-content" className="page commerce-page"><div className="shell"><div className="account-layout"><ConnectedAccountSidebar section={activeSection} onLogout={onLogout} /><section className="account-content">{content}</section></div></div></main>;
@@ -550,6 +572,7 @@ export function CustomerCheckoutPage({
   getProductImage,
   onStepChange,
   onNotice,
+  reviewOnly = false,
 }) {
   const addressesResource = useAsyncResource((options) => account.listAddresses(options), [account]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
@@ -560,6 +583,9 @@ export function CustomerCheckoutPage({
   const [couponInput, setCouponInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponBusy, setCouponBusy] = useState(false);
+  const couponRequestRef = useRef(false);
+  const couponIntentKeyRef = useRef("");
+  const skipCouponEffectRef = useRef(false);
   const [consent, setConsent] = useState(false);
   const [submitPhase, setSubmitPhase] = useState("idle");
   const [submitError, setSubmitError] = useState("");
@@ -579,6 +605,10 @@ export function CustomerCheckoutPage({
 
   useEffect(() => {
     if (!items.length || hasStockIssues) return undefined;
+    if (skipCouponEffectRef.current) {
+      skipCouponEffectRef.current = false;
+      return undefined;
+    }
     const controller = new AbortController();
     loadQuote(appliedCoupon, controller.signal).catch(() => {});
     return () => controller.abort("effect-cleanup");
@@ -613,30 +643,48 @@ export function CustomerCheckoutPage({
 
   const applyCoupon = async (event) => {
     event.preventDefault();
+    if (couponRequestRef.current) return;
     const code = couponInput.trim().toLocaleUpperCase("tr-TR");
     if (!code) return;
+    const cartFingerprint = items
+      .map(({ product, quantity }) => `${product.id}:${quantity}`)
+      .sort()
+      .join("|");
+    const intentKey = `${code}::${cartFingerprint}`;
+    if (couponIntentKeyRef.current === intentKey) return;
+    couponRequestRef.current = true;
+    couponIntentKeyRef.current = intentKey;
     setCouponBusy(true);
     try {
       const next = await checkout.quote(items, code);
       setQuoteState({ phase: "ready", data: next, error: null });
       if (next.coupon?.applied) {
-        setAppliedCoupon(code);
+        if (appliedCoupon !== code) {
+          skipCouponEffectRef.current = true;
+          setAppliedCoupon(code);
+        }
         setCouponInput(code);
         onNotice("Kupon güncel sepet toplamına uygulandı.");
       } else {
-        setAppliedCoupon(null);
+        if (appliedCoupon !== null) {
+          skipCouponEffectRef.current = true;
+          setAppliedCoupon(null);
+        }
       }
     } catch (error) {
+      if (couponIntentKeyRef.current === intentKey) couponIntentKeyRef.current = "";
       setQuoteState({ phase: "error", data: null, error });
-    } finally { setCouponBusy(false); }
+    } finally { couponRequestRef.current = false; setCouponBusy(false); }
   };
 
   const clearCoupon = () => {
+    couponIntentKeyRef.current = "";
     setAppliedCoupon(null);
     setCouponInput("");
   };
 
   const submitPayment = async () => {
+    if (reviewOnly) return;
     if (!selectedAddress) { setSubmitError("Teslimat adresi seçmelisin."); onStepChange("delivery"); return; }
     if (!consent) { setSubmitError("Ödeme yönlendirmesinden önce bilgilendirmeyi onaylamalısın."); onStepChange("payment"); return; }
     if (quoteState.phase !== "ready" || !quote) { setSubmitError("Güncel sipariş toplamı doğrulanmadan ödeme başlatılamaz."); return; }
@@ -670,7 +718,7 @@ export function CustomerCheckoutPage({
       </>}
       {step === "payment" && <>
         <div className="checkout-panel__head"><div><CreditCard /><span><strong>Ödeme Yöntemi</strong><small>Kart bilgileri NovaStore arayüzünde alınmaz veya saklanmaz.</small></span></div></div>
-        <div className="payment-method is-selected connected-payment-method"><CreditCard /><span><strong>Kredi / Banka Kartı</strong><small>Devam ettiğinde yapılandırılmış güvenli ödeme sağlayıcısı ekranı açılır.</small></span><ShieldCheck weight="fill" /></div>
+        <div className="payment-method is-selected connected-payment-method"><CreditCard /><span><strong>Kredi / Banka Kartı</strong><small>{reviewOnly ? "Yerel incelemede sağlayıcı açılmaz; bu adım yalnız arayüz ve toplam doğrulaması içindir." : "Devam ettiğinde yapılandırılmış güvenli ödeme sağlayıcısı ekranı açılır."}</small></span><ShieldCheck weight="fill" /></div>
         <div className="payment-provider-disclosure"><LockKey /><div><strong>Kart bilgilerin ödeme sağlayıcısına girilir</strong><p>NovaStore yalnız sipariş, teslimat ve doğrulanmış toplam bilgilerini iletir. Bu sayfa kart numarası, son kullanma tarihi veya CVV toplamaz.</p></div></div>
         <label className="secure-consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /> <span>Sipariş özetini kontrol ettiğimi ve kart bilgilerimi güvenli ödeme sağlayıcısı ekranında gireceğimi onaylıyorum.</span></label>
         <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("delivery")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={!consent} onClick={() => onStepChange("review")}>Siparişi kontrol et <CaretRight /></button></div>
@@ -679,10 +727,11 @@ export function CustomerCheckoutPage({
         <div className="checkout-panel__head"><div><Receipt /><span><strong>Siparişini Kontrol Et</strong><small>Ödeme sağlayıcısına geçmeden önce adres ve ürünleri doğrula.</small></span></div></div>
         {selectedAddress ? <div className="review-box"><span>Teslimat</span><strong>{selectedAddress.title}</strong><p>{selectedAddress.fullName} · {selectedAddress.addressLine}, {selectedAddress.district} / {selectedAddress.city}</p></div> : <div className="form-message is-error"><WarningCircle />Teslimat adresi seçilmedi.</div>}
         <div className="review-products">{items.map(({ product, quantity }) => <div key={product.id}><img src={getProductImage(product)} alt="" /><span><strong>{product.name}</strong><small>{quantity} adet</small></span><b>{money.format(product.price * quantity)}</b></div>)}</div>
-        <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("payment")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={submitPhase === "submitting" || quoteState.phase !== "ready" || !selectedAddress || !consent} onClick={submitPayment}><ShieldCheck /> {submitPhase === "submitting" ? "Güvenli ödeme hazırlanıyor…" : "Güvenli ödeme ekranına geç"}</button></div>
+        {reviewOnly && <div className="form-message is-warning" role="status"><ShieldCheck />Yerel incelemede gerçek ödeme, sipariş oluşturma ve sağlayıcı yönlendirmesi yapılmaz.</div>}
+        <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("payment")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={reviewOnly || submitPhase === "submitting" || quoteState.phase !== "ready" || !selectedAddress || !consent} onClick={submitPayment}><ShieldCheck /> {reviewOnly ? "Yerel incelemede ödeme kapalı" : submitPhase === "submitting" ? "Güvenli ödeme hazırlanıyor…" : "Güvenli ödeme ekranına geç"}</button></div>
       </>}
     </section><CheckoutSummary quote={quote} phase={quoteState.phase} error={quoteState.error} couponInput={couponInput} onCouponInput={setCouponInput} onApplyCoupon={applyCoupon} onClearCoupon={clearCoupon} couponBusy={couponBusy} /></div>
-    {step === "review" && quoteState.phase === "ready" && <div className="mobile-checkout-bar"><span><small>Doğrulanmış toplam</small><strong>{money.format(quote.totals.total)}</strong></span><button type="button" disabled={submitPhase === "submitting" || !selectedAddress || !consent} onClick={submitPayment}><ShieldCheck /> Ödemeye geç</button></div>}
+    {step === "review" && quoteState.phase === "ready" && <div className="mobile-checkout-bar"><span><small>Doğrulanmış toplam</small><strong>{money.format(quote.totals.total)}</strong></span><button type="button" disabled={reviewOnly || submitPhase === "submitting" || !selectedAddress || !consent} onClick={submitPayment}><ShieldCheck /> {reviewOnly ? "Ödeme kapalı" : "Ödemeye geç"}</button></div>}
   </div></main>;
 }
 

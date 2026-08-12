@@ -1,11 +1,13 @@
 # NovaStore yerel insan inceleme rotaları
 
-Bu sayfa yalnızca `http://127.0.0.1:5273` üzerindeki resmî entegre yerel inceleme runtime'ı içindir. Veriler sentetiktir, istekler loopback ile sınırlıdır; yalnız sepet, favori, checkout özeti ve destek mesajı review süreci RAM'inde tutulur, diğer yazma işlemleri reddedilir.
+Bu sayfa yalnızca `http://127.0.0.1:5273` üzerindeki resmî entegre yerel inceleme runtime'ı içindir. Veriler sentetiktir, istekler loopback ile sınırlıdır; sepet, favori, checkout özeti, profil, adres, bildirim, ürün sorusu ve destek mesajı yalnız token'a bağlı review süreci RAM'inde tutulur. Parola, gerçek ödeme ve sipariş oluşturma işlemleri reddedilir.
 
 | Rota | Oturum | Deterministik durum | İncelenecek yüzey |
 | --- | --- | --- | --- |
 | `/#/` | Gerekmez | Yerel katalog | Ana sayfa, tipografi ve kart ağırlıkları |
 | `/#/kategori/elektronik` | Gerekmez | Yerel katalog | Liste kartı, sepet ekleme ve karşılaştırma |
+| `/#/koleksiyon/firsatlar` | Gerekmez | İndirimli yerel katalog | Fırsatlar listesi ve filtreler |
+| `/#/arama?q=iphone` | Gerekmez | Yerel katalog araması | Arama sonucu ve boş sonuç yönlendirmesi |
 | `/#/urun/apple-iphone-15-128-gb` | Gerekmez | Yerel review ürünü | Dört tutarlı yerel görsel, küçük görseller, seçim ve lightbox |
 | `/#/sepet` | Gerekmez | Tarayıcı yerel sepeti | Sepet satırları ve ödeme yönlendirmesi |
 | `/#/yardim` | Gerekmez | Yerel yardım içeriği | Yeni NovaStore yardım simge ailesi |
@@ -18,10 +20,11 @@ Bu sayfa yalnızca `http://127.0.0.1:5273` üzerindeki resmî entegre yerel ince
 | `/#/favoriler` | Yerel review oturumu | Tarayıcı yerel favorileri | Favoriler |
 | `/#/hesabim/kuponlar` | Yerel review oturumu | `LOCAL10` | Kuponlar |
 | `/#/hesabim/bildirimler` | Yerel review oturumu | Bir sentetik bildirim | Bildirimler |
-| `/#/hesabim/guvenlik` | Yerel review oturumu | Sentetik müşteri | Hesap güvenliği ve parola formunun salt-okunur hata davranışı |
+| `/#/hesabim/guvenlik` | Yerel review oturumu | Sentetik müşteri | Gerçek parola işleminin açıkça devre dışı bırakıldığı güvenlik sınırı |
 | `/#/siparis-takibi` | Yerel review oturumu | Sipariş `7002` | Hesaba bağlı teslimat araması |
 | `/#/iletisim` | Yerel review oturumu | Sentetik destek geçmişi | Destek/iletişim ve yerel, RAM'de yaşayan mesaj gönderimi |
 | `/#/odeme/teslimat` | Yerel review oturumu + sepette ürün | Yerel fiyatlandırma | Teslimat ve checkout yerleşimi; ödeme başlatma bu review runtime'ında kapalıdır |
+| `/#/odeme/sonuc?paymentRef=LOCAL-REVIEW-NONPAYMENT&orderId=7002` | Yerel review oturumu | Ödeme yok sınırı | Sağlayıcı veya ödeme durumu sorgusu yapmadan dürüst review açıklaması |
 
 ## Girişli inceleme akışı
 

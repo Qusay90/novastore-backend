@@ -18,9 +18,9 @@ const EXPECTED_CSS_SHA256 = "5b8e0d4a4eb1fb954e089f5c0e9dbabcad8217032ef12e3a67a
 export const CANONICAL_CATALOG_IMPORT = '} from "./catalog.js";';
 export const RUNTIME_CATALOG_IMPORT = '} from "./integration/runtimeCatalog.js";';
 export const CANONICAL_HOME_HREF = 'href="#/"';
-export const RUNTIME_HOME_HREF = 'href="/"';
+export const RUNTIME_HOME_HREF = 'href="#/"';
 export const CANONICAL_MOBILE_HOME_ITEM = '[House,"Ana Sayfa","#/","home"]';
-export const RUNTIME_MOBILE_HOME_ITEM = '[House,"Ana Sayfa","/","home"]';
+export const RUNTIME_MOBILE_HOME_ITEM = '[House,"Ana Sayfa","#/","home"]';
 export const CANONICAL_BRAND_STAR_MARK = '<StarFour className="brand-mark" weight="fill" aria-hidden="true" />';
 export const EXPECTED_CANONICAL_HOME_HREF_COUNT = 5;
 export const EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT = 1;
@@ -36,6 +36,8 @@ export const CANONICAL_COMPARISON_TOGGLE = 'onClick={() => setCompared((value) =
 export const RUNTIME_COMPARISON_TOGGLE = 'disabled={!comparison.available} onClick={() => comparison.toggle(product.id)}';
 export const CANONICAL_PRODUCT_DETAIL_SIGNATURE = 'function ProductDetail({ product, favorite, favorites, onFavorite, onAdd }) {';
 export const RUNTIME_PRODUCT_DETAIL_SIGNATURE = 'function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyNow, buyNowPending = false }) {';
+export const CANONICAL_PRODUCT_IMAGE_FUNCTION = 'function productImage(product) {\n  return IMAGE_MAP[product.imageKey] || phoneImage;\n}';
+export const RUNTIME_PRODUCT_IMAGE_FUNCTION = 'function productImage(product) {\n  return product?.imageUrl || IMAGE_MAP[product?.imageKey] || phoneImage;\n}';
 export const CANONICAL_PRODUCT_QUANTITY_STATE = 'const [quantity, setQuantity] = useState(1);';
 export const CANONICAL_PRODUCT_QUANTITY_CONTROL = '<div className="quantity-control"><button type="button" onClick={() => setQuantity((value) => Math.max(1, value - 1))} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" onClick={() => setQuantity((value) => Math.min(9, value + 1))} aria-label="Adedi artır"><Plus /></button></div>';
 export const RUNTIME_PRODUCT_QUANTITY_CONTROL = '<div className="quantity-control"><button type="button" disabled={soldOut || quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" disabled={soldOut || quantity >= maxQuantity} onClick={() => setQuantity((value) => Math.min(maxQuantity, value + 1))} aria-label="Adedi artır"><Plus /></button></div>';
@@ -104,12 +106,8 @@ export const createRuntimePresentation = (canonicalApp) => {
     "Canonical mobile home item"
   );
 
-  const existingRuntimeHrefCount = countExactOccurrences(canonicalApp, RUNTIME_HOME_HREF);
-  const existingRuntimeMobileCount = countExactOccurrences(canonicalApp, RUNTIME_MOBILE_HOME_ITEM);
   let runtimePresentation = canonicalApp
-    .replace(CANONICAL_CATALOG_IMPORT, RUNTIME_CATALOG_IMPORT)
-    .replaceAll(CANONICAL_HOME_HREF, RUNTIME_HOME_HREF)
-    .replace(CANONICAL_MOBILE_HOME_ITEM, RUNTIME_MOBILE_HOME_ITEM);
+    .replace(CANONICAL_CATALOG_IMPORT, RUNTIME_CATALOG_IMPORT);
 
   runtimePresentation = replaceExactOnce(
     runtimePresentation,
@@ -153,6 +151,12 @@ export const createRuntimePresentation = (canonicalApp) => {
     CANONICAL_PRODUCT_DETAIL_SIGNATURE,
     RUNTIME_PRODUCT_DETAIL_SIGNATURE,
     "Canonical product detail boundary",
+  );
+  runtimePresentation = replaceExactOnce(
+    runtimePresentation,
+    CANONICAL_PRODUCT_IMAGE_FUNCTION,
+    RUNTIME_PRODUCT_IMAGE_FUNCTION,
+    "Canonical product image resolver",
   );
   runtimePresentation = replaceExactOnce(
     runtimePresentation,
@@ -248,20 +252,20 @@ export const createRuntimePresentation = (canonicalApp) => {
 
   assertExactCount(runtimePresentation, CANONICAL_CATALOG_IMPORT, 0, "Runtime canonical catalog import");
   assertExactCount(runtimePresentation, RUNTIME_CATALOG_IMPORT, 1, "Runtime catalog import boundary");
-  assertExactCount(runtimePresentation, CANONICAL_HOME_HREF, 0, "Runtime hash-only home href owners");
+  assertExactCount(runtimePresentation, CANONICAL_HOME_HREF, EXPECTED_CANONICAL_HOME_HREF_COUNT, "Runtime hash-router home href owners");
   assertExactCount(
     runtimePresentation,
     RUNTIME_HOME_HREF,
-    existingRuntimeHrefCount + EXPECTED_CANONICAL_HOME_HREF_COUNT,
-    "Runtime document-root home href owners"
+    EXPECTED_CANONICAL_HOME_HREF_COUNT,
+    "Runtime hash-router home href owners"
   );
-  assertExactCount(runtimePresentation, CANONICAL_MOBILE_HOME_ITEM, 0, "Runtime hash-only mobile home item");
+  assertExactCount(runtimePresentation, CANONICAL_MOBILE_HOME_ITEM, EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT, "Runtime hash-router mobile home item");
   assertExactCount(runtimePresentation, CANONICAL_BRAND_STAR_MARK, 0, "Runtime brand star mark");
   assertExactCount(
     runtimePresentation,
     RUNTIME_MOBILE_HOME_ITEM,
-    existingRuntimeMobileCount + EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT,
-    "Runtime document-root mobile home item"
+    EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT,
+    "Runtime hash-router mobile home item"
   );
   assertExactCount(runtimePresentation, RUNTIME_COMPARISON_IMPORT, 1, "Runtime comparison context import");
   assertExactCount(runtimePresentation, RUNTIME_MODAL_BACKGROUND_QUERY, 1, "Runtime modal background isolation");
@@ -315,7 +319,7 @@ export const synchronizeCanonical = async () => {
   console.log(`canonical CSS synchronized: ${css.length} characters`);
   console.log("canonical runtime presentation synchronized from App.jsx");
   console.log(
-    `runtime home transform: href=${EXPECTED_CANONICAL_HOME_HREF_COUNT} mobile=${EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT}`
+    `runtime home preservation: href=${EXPECTED_CANONICAL_HOME_HREF_COUNT} mobile=${EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT}`
   );
 };
 

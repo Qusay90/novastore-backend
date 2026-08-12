@@ -3781,6 +3781,21 @@ body :is(.price-block strong, .detail-price strong, .cart-page-line__end > stron
   margin-top: 10px;
 }
 
+body {
+  min-width: 0;
+}
+
+.connected-review-boundary {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.connected-review-boundary .connected-submit {
+  width: 100%;
+  justify-content: center;
+}
+
 .cart-line__actions .quantity-control {
   min-height: 36px;
 }
@@ -3874,9 +3889,80 @@ body :is(.price-block strong, .detail-price strong, .cart-page-line__end > stron
     width: min(100%, 430px);
   }
 
+  html {
+    scroll-padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  .plp-page .product-card {
+    scroll-margin-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  .plp-page .product-card__media {
+    aspect-ratio: 1.8 / 1;
+  }
+
+  .assistant-fab {
+    width: 52px;
+    min-width: 52px;
+    padding-inline: 0;
+  }
+
+  .assistant-fab > span,
+  .assistant-fab > svg:last-child {
+    display: none;
+  }
+
+  .mobile-checkout-bar {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .mobile-checkout-bar > span {
+    min-width: 0;
+  }
+
+  .mobile-checkout-bar button {
+    min-width: 0;
+    padding-inline: 9px;
+  }
+
   .nova-service-icon {
     width: 52px;
     height: 52px;
     border-radius: 16px;
+  }
+}
+
+@media (max-width: 340px) {
+  .trust-bar {
+    display: none;
+  }
+
+  .help-page .help-grid {
+    padding-right: 68px;
+  }
+
+  .plp-page .product-card__media {
+    aspect-ratio: 2.7 / 1;
+  }
+
+  .plp-page .plp-heading p {
+    display: none;
+  }
+
+  .plp-page .quick-subcategories {
+    height: 54px;
+    padding-block: 2px 4px;
+  }
+
+  .plp-page .quick-subcategories a {
+    height: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 390px) {
+  .plp-page .breadcrumbs {
+    display: none;
   }
 }

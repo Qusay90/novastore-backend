@@ -27,7 +27,7 @@ const isAuthenticatedSession = (session) => (
 function Stars({ value, label }) {
   const rounded = Math.round(Number(value) || 0);
   return (
-    <span className="community-stars" aria-label={label || `${Number(value || 0).toFixed(1)} / 5 puan`}>
+    <span className="community-stars" role="img" aria-label={label || `${Number(value || 0).toFixed(1)} / 5 puan`}>
       {Array.from({ length: 5 }, (_, index) => (
         <Star key={index} weight={index < rounded ? "fill" : "regular"} aria-hidden="true" />
       ))}
@@ -207,6 +207,8 @@ export function ProductCommunity({ productId, productName, session, community, s
   }, [attempt, community, productId]);
 
   const reload = () => setAttempt((value) => value + 1);
+  const activeTabId = `community-tab-${activeTab}`;
+  const activePanelId = `community-panel-${activeTab}`;
   const switchTabFromKeyboard = (event, tab) => {
     if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
     event.preventDefault();
@@ -222,8 +224,8 @@ export function ProductCommunity({ productId, productName, session, community, s
         <button id="community-tab-reviews" type="button" role="tab" aria-selected={activeTab === "reviews"} aria-controls="community-panel-reviews" tabIndex={activeTab === "reviews" ? 0 : -1} className={activeTab === "reviews" ? "is-active" : ""} onClick={() => setActiveTab("reviews")} onKeyDown={(event) => switchTabFromKeyboard(event, "reviews")}><Star weight="fill" /> Değerlendirmeler {state.data ? <b>{state.data.totalReviews}</b> : null}</button>
         <button id="community-tab-questions" type="button" role="tab" aria-selected={activeTab === "questions"} aria-controls="community-panel-questions" tabIndex={activeTab === "questions" ? 0 : -1} className={activeTab === "questions" ? "is-active" : ""} onClick={() => setActiveTab("questions")} onKeyDown={(event) => switchTabFromKeyboard(event, "questions")}><Question /> Soru & cevap {state.data ? <b>{state.data.questions.length}</b> : null}</button>
       </div>
-      {state.phase === "loading" && <div className="community-loading" role="status" aria-live="polite"><span className="integration-spinner" /> Değerlendirmeler güvenli biçimde yükleniyor…</div>}
-      {state.phase === "error" && <div className="community-error" role="alert"><Question /><div><strong>Değerlendirme alanı yüklenemedi</strong><p>{state.error?.message || "Ürün topluluğu verisi şu anda alınamıyor."}</p></div><button type="button" className="secondary-button" onClick={reload}>Yeniden dene</button></div>}
+      {state.phase === "loading" && <div id={activePanelId} className="community-panel" role="tabpanel" aria-labelledby={activeTabId}><div className="community-loading" role="status" aria-live="polite"><span className="integration-spinner" /> Değerlendirmeler güvenli biçimde yükleniyor…</div></div>}
+      {state.phase === "error" && <div id={activePanelId} className="community-panel" role="tabpanel" aria-labelledby={activeTabId}><div className="community-error" role="alert"><Question /><div><strong>Değerlendirme alanı yüklenemedi</strong><p>{state.error?.message || "Ürün topluluğu verisi şu anda alınamıyor."}</p></div><button type="button" className="secondary-button" onClick={reload}>Yeniden dene</button></div></div>}
       {state.phase === "ready" && <>
         {state.data.warnings.length > 0 && <div className="community-warning" role="status">{state.data.warnings.join(" ")} <button type="button" onClick={reload}>Yeniden dene</button></div>}
         {activeTab === "reviews"

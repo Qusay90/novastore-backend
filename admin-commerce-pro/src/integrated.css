@@ -319,7 +319,24 @@
 .status-başarısız,
 .status-reddedildi { color: var(--red); background: var(--red-bg); }
 
+.mobile-admin-heading {
+  display: none;
+}
+
 @media (max-width: 760px) {
+  .mobile-admin-heading {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   .live-resource-warning { grid-template-columns: 24px minmax(0, 1fr); }
   .live-resource-warning .secondary-button { grid-column: 2; justify-self: start; }
   .live-refresh span { display: none; }

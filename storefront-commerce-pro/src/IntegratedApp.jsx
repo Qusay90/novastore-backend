@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { normalizeSearchText } from "./searchText.js";
 import {
   ArrowLeft,
   ArrowsLeftRight,
@@ -73,12 +74,9 @@ import { NovaServiceIcon } from "./NovaServiceIcon.jsx";
 import { reconcileFinalizedCart } from "./adapters/checkoutAdapter.js";
 import {
   FavoritesPage as CanonicalFavoritesPage,
-  Header as CanonicalHeader,
   HomePage as CanonicalHomePage,
   LoadingPage as CanonicalLoadingPage,
   Logo as CanonicalLogo,
-  MobileBottomNav as CanonicalMobileBottomNav,
-  MobileCategoryDrawer as CanonicalMobileCategoryDrawer,
   NotFound as CanonicalNotFound,
   ProductDetail as CanonicalProductDetail,
   ProductListing as CanonicalProductListing,
@@ -183,7 +181,7 @@ function normalizeRuntimeProductId(value) {
 }
 
 function isolatePageFromModal() {
-  const backgroundNodes = [...document.querySelectorAll("#root > .skip-link, #root > .site-header, #root > main, #root > .site-footer, #root > .mobile-bottom-nav")];
+  const backgroundNodes = [...document.querySelectorAll("#root > *")];
   const previous = backgroundNodes.map((node) => ({
     node,
     ariaHidden: node.getAttribute("aria-hidden"),
@@ -359,7 +357,7 @@ function useRoute() {
   useEffect(() => {
     const onHash = () => {
       setRoute(parseRoute());
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, behavior: motionBehavior() });
       window.requestAnimationFrame(() => window.requestAnimationFrame(() => focusMainContent()));
     };
     window.addEventListener("hashchange", onHash);
@@ -375,6 +373,10 @@ function Logo({ onClick }) {
       <span>Nova</span><strong>Store</strong>
     </a>
   );
+}
+
+function motionBehavior() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 }
 
 function TrustBar() {
@@ -396,10 +398,10 @@ function SearchBox({ onSearch }) {
   const [focused, setFocused] = useState(false);
   const wrapRef = useRef(null);
   const suggestions = useMemo(() => {
-    const needle = value.trim().toLocaleLowerCase("tr-TR");
+    const needle = normalizeSearchText(value);
     if (needle.length < 2) return [];
     return getVisibleProducts()
-      .filter((product) => `${product.name} ${product.brand}`.toLocaleLowerCase("tr-TR").includes(needle))
+      .filter((product) => normalizeSearchText(`${product.name} ${product.brand}`).includes(needle))
       .slice(0, 4);
   }, [value]);
 
@@ -423,9 +425,8 @@ function SearchBox({ onSearch }) {
           onFocus={() => setFocused(true)}
           onBlur={(event) => { if (!wrapRef.current?.contains(event.relatedTarget)) setFocused(false); }}
           placeholder="Ürün, kategori veya marka ara"
+          aria-label="Site genelinde ara"
           autoComplete="off"
-          aria-expanded={focused && suggestions.length > 0}
-          aria-controls="search-suggestions"
         />
         <button type="submit" aria-label="Ara"><MagnifyingGlass weight="bold" /></button>
       </form>
@@ -445,9 +446,9 @@ function SearchBox({ onSearch }) {
   );
 }
 
-function HeaderAction({ icon: Icon, label, detail, badge, onClick, buttonRef }) {
+function HeaderAction({ icon: Icon, label, detail, badge, onClick, buttonRef, expanded, controls }) {
   return (
-    <button ref={buttonRef} className="header-action" type="button" onClick={onClick} aria-label={`${label}: ${detail}`}>
+    <button ref={buttonRef} className="header-action" type="button" onClick={onClick} aria-label={`${label}: ${detail}`} aria-haspopup={controls ? "dialog" : undefined} aria-expanded={controls ? expanded : undefined} aria-controls={controls}>
       <span className="header-action__icon"><Icon size={22} />{badge > 0 && <b>{badge}</b>}</span>
       <span><small>{label}</small><strong>{detail}</strong></span>
     </button>
@@ -529,7 +530,7 @@ function MegaMenu({ root, onRootChange, onClose }) {
   );
 }
 
-function CategoryNavigation({ onMobileOpen }) {
+function CategoryNavigation({ onMobileOpen, drawerOpen }) {
   const roots = getVisibleRoots();
   const [open, setOpen] = useState(false);
   const [activeRoot, setActiveRoot] = useState(roots[0]);
@@ -573,7 +574,7 @@ function CategoryNavigation({ onMobileOpen }) {
   return (
     <div className={cx("category-navigation", open && "is-mega-open")} ref={containerRef} onMouseEnter={cancelClose} onMouseLeave={scheduleClose}>
       <div className="shell category-navigation__row">
-        <button className="all-categories-button" type="button" onClick={onMobileOpen}>
+        <button className="all-categories-button" type="button" onClick={onMobileOpen} aria-haspopup="dialog" aria-expanded={drawerOpen} aria-controls="category-drawer">
           <List size={21} /> <span>Tüm Kategoriler</span>
         </button>
         <nav aria-label="Ürün kategorileri">
@@ -608,21 +609,21 @@ function CategoryNavigation({ onMobileOpen }) {
   );
 }
 
-function Header({ cartCount, favoriteCount, onCartOpen, onMobileOpen, onAccountOpen, accountDetail, cartTriggerRef, mobileMenuTriggerRef }) {
+function Header({ cartCount, favoriteCount, onCartOpen, onMobileOpen, onAccountOpen, accountDetail, cartTriggerRef, mobileMenuOpen, cartOpen }) {
   return (
     <header className="site-header">
       <TrustBar />
       <div className="shell main-header">
-        <button ref={mobileMenuTriggerRef} className="mobile-menu-trigger" type="button" onClick={onMobileOpen} aria-label="Kategorileri aç"><List /></button>
+        <button className="mobile-menu-trigger" type="button" onClick={onMobileOpen} aria-label="Kategorileri aç" aria-haspopup="dialog" aria-expanded={mobileMenuOpen} aria-controls="category-drawer"><List /></button>
         <Logo />
         <SearchBox onSearch={(term) => navigate(`/arama?q=${encodeURIComponent(term)}`)} />
         <div className="header-actions">
           <HeaderAction icon={User} label="Hesabım" detail={accountDetail} onClick={onAccountOpen} />
           <HeaderAction icon={Heart} label="Listem" detail="Favorilerim" badge={favoriteCount} onClick={() => navigate("/favoriler")} />
-          <HeaderAction icon={ShoppingCart} label="Sepetim" detail={cartCount ? `${cartCount} ürün` : "0 ürün"} badge={cartCount} onClick={onCartOpen} buttonRef={cartTriggerRef} />
+          <HeaderAction icon={ShoppingCart} label="Sepetim" detail={cartCount ? `${cartCount} ürün` : "0 ürün"} badge={cartCount} onClick={onCartOpen} buttonRef={cartTriggerRef} expanded={cartOpen} controls="cart-drawer" />
         </div>
       </div>
-      <CategoryNavigation onMobileOpen={onMobileOpen} />
+      <CategoryNavigation onMobileOpen={onMobileOpen} drawerOpen={mobileMenuOpen} />
     </header>
   );
 }
@@ -662,9 +663,9 @@ function MobileCategoryDrawer({ open, onClose, returnFocusRef }) {
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="overlay-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeDrawer()}>
-      <div ref={dialogRef} className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Kategori menüsü" tabIndex="-1">
+      <div id="category-drawer" ref={dialogRef} className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Kategori menüsü" tabIndex="-1">
         <div className="drawer-head">
           {current ? <button type="button" onClick={() => setStack((value) => value.slice(0, -1))}><ArrowLeft /> Geri</button> : <Logo onClick={closeDrawer} />}
           <button ref={closeRef} className="icon-button" type="button" onClick={closeDrawer} aria-label="Menüyü kapat"><X /></button>
@@ -688,7 +689,7 @@ function MobileCategoryDrawer({ open, onClose, returnFocusRef }) {
         </div>
         <div className="drawer-footer"><ShieldCheck /><span><strong>NovaStore güvencesi</strong><small>Güvenli ödeme ve hesap destekli işlemler</small></span></div>
       </div>
-    </div>
+    </div>, document.body
   );
 }
 
@@ -1168,13 +1169,13 @@ function HelpPage() {
   const topicQuery = (title) => title === "Siparişler" ? "sipariş" : title === "Teslimat" ? "kargo" : title === "Ödeme" ? "ödeme" : "iade";
   const selectTopic = (title) => {
     setHelpQuery(topicQuery(title));
-    window.requestAnimationFrame(() => document.getElementById("help-faqs")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    window.requestAnimationFrame(() => document.getElementById("help-faqs")?.scrollIntoView({ behavior: motionBehavior(), block: "start" }));
   };
   return <main id="main-content" className="page help-page"><div className="shell"><Breadcrumbs /><div className="help-hero"><NovaServiceIcon /><span className="section-kicker">Yardım merkezi</span><h1>Nasıl yardımcı olabiliriz?</h1><p>Sipariş, teslimat, iade ve ödeme konularındaki işlem noktalarını keşfet.</p><form role="search" onSubmit={(event) => event.preventDefault()}><MagnifyingGlass /><input aria-label="Yardım konularında ara" placeholder="Bir konu ara" value={helpQuery} onChange={(event) => setHelpQuery(event.target.value)} /><button type="submit">Ara</button></form></div><div className="help-grid" aria-live="polite">{visibleTopics.map(([,title,copy]) => <button type="button" onClick={() => selectTopic(title)} key={title}><NovaServiceIcon kind={title === "Siparişler" ? "orders" : title === "Teslimat" ? "delivery" : title === "Ödeme" ? "payment" : "returns"} /><strong>{title}</strong><span>{copy}</span><CaretRight /></button>)}</div><section className="faq-list" id="help-faqs"><h2>Sık sorulan sorular</h2>{visibleFaqs.length ? visibleFaqs.map(({ question, answer }) => <details key={question}><summary>{question}<CaretDown /></summary><p>{answer}</p></details>) : <p role="status">Bu aramayla eşleşen yardım konusu bulunamadı.</p>}</section></div></main>;
 }
 
 function ReturnExchangePage() {
-  return <main id="main-content" className="page return-exchange-page"><div className="shell"><Breadcrumbs /><section className="return-exchange-hero"><NovaServiceIcon kind="returns" /><span className="section-kicker">İade & değişim</span><h1>İade veya değişim sürecini netleştir</h1><p>Uygunluk, ürünün teslimat bilgisi ve sipariş durumu üzerinden doğrulanır. Bu bilgi sayfası yeni bir iade ya da stok işlemi oluşturmaz.</p></section><div className="return-exchange-grid"><section className="return-exchange-steps" aria-labelledby="return-exchange-steps-title"><h2 id="return-exchange-steps-title">Başlamadan önce</h2><ol><li><span>1</span><div><strong>Siparişini kontrol et</strong><p>İade veya değişim için ilgili siparişin teslimat ve ürün koşulları doğrulanır.</p></div></li><li><span>2</span><div><strong>Uygunluk bilgisini gör</strong><p>Ürün, teslimat ve sipariş durumu mevcut müşteri hesabında gösterilen bilgilere göre değerlendirilir.</p></div></li><li><span>3</span><div><strong>Güvenli kanalı kullan</strong><p>İade talebi kaydı sunulduğunda yalnız hesabına ait sipariş üzerinden başlatılır; bu yerel bilgi rotası işlem oluşturmaz.</p></div></li></ol></section><aside className="return-exchange-cta"><span className="section-kicker">Siparişin hazırsa</span><h2>Hesabındaki siparişe git</h2><p>İade/geri ödeme ve stok işlemlerinin tam backend akışı bu bilgilendirme sayfasının kapsamı dışındadır.</p><a className="primary-button" href="#/giris?return=%2Fhesabim%2Fsiparisler">Siparişlerime git <CaretRight /></a><a className="return-exchange-support" href="#/iletisim">Destek ekibinden yardım al</a></aside></div></div></main>;
+  return <main id="main-content" className="page return-exchange-page"><div className="shell"><Breadcrumbs /><section className="return-exchange-hero"><NovaServiceIcon kind="returns" /><span className="section-kicker">İade & değişim</span><h1>İade veya değişim sürecini netleştir</h1><p>Uygunluk, ürünün teslimat bilgisi ve sipariş durumu üzerinden doğrulanır. Bu bilgi sayfası yeni bir iade ya da stok işlemi oluşturmaz.</p></section><div className="return-exchange-grid"><section className="return-exchange-steps" aria-labelledby="return-exchange-steps-title"><h2 id="return-exchange-steps-title">Başlamadan önce</h2><ol><li><span>1</span><div><strong>Siparişini kontrol et</strong><p>İade veya değişim için ilgili siparişin teslimat ve ürün koşulları doğrulanır.</p></div></li><li><span>2</span><div><strong>Uygunluk bilgisini gör</strong><p>Ürün, teslimat ve sipariş durumu mevcut müşteri hesabında gösterilen bilgilere göre değerlendirilir.</p></div></li><li><span>3</span><div><strong>Güvenli kanalı kullan</strong><p>İade talebi kaydı sunulduğunda yalnız hesabına ait sipariş üzerinden başlatılır; bu yerel bilgi rotası işlem oluşturmaz.</p></div></li></ol></section><aside className="return-exchange-cta"><span className="section-kicker">Siparişin hazırsa</span><h2>Hesabındaki siparişe git</h2><p>İade/geri ödeme ve stok işlemlerinin tam backend akışı bu bilgilendirme sayfasının kapsamı dışındadır.</p><a className="primary-button" href="#/hesabim/siparisler">Siparişlerime git <CaretRight /></a><a className="return-exchange-support" href="#/iletisim">Destek ekibinden yardım al</a></aside></div></div></main>;
 }
 
 function MobileBottomNav({ route, cartCount, favoriteCount }) {
@@ -1186,6 +1187,10 @@ function MobileBottomNav({ route, cartCount, favoriteCount }) {
 function ComparisonDialog({ open, products: selectedProducts, onClose, onRemove, onAdd, returnFocusRef }) {
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
+  const closeAndRestore = useCallback(() => {
+    onClose();
+    restoreFocus(returnFocusRef);
+  }, [onClose, returnFocusRef]);
 
   useEffect(() => {
     if (!open) return;
@@ -1193,7 +1198,7 @@ function ComparisonDialog({ open, products: selectedProducts, onClose, onRemove,
     const restorePage = isolatePageFromModal();
     window.setTimeout(() => closeRef.current?.focus(), 20);
     const onKey = (event) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") closeAndRestore();
       else keepFocusInDialog(event, dialogRef.current);
     };
     document.addEventListener("keydown", onKey);
@@ -1202,7 +1207,7 @@ function ComparisonDialog({ open, products: selectedProducts, onClose, onRemove,
       document.removeEventListener("keydown", onKey);
       restorePage();
     };
-  }, [open, onClose]);
+  }, [closeAndRestore, open]);
 
   if (!open) return null;
   const rows = [
@@ -1213,11 +1218,6 @@ function ComparisonDialog({ open, products: selectedProducts, onClose, onRemove,
     ["Renk", (product) => product.color || "Belirtilmemiş"],
     ["Kapasite", (product) => product.storage || "Belirtilmemiş"],
   ];
-  const closeAndRestore = () => {
-    onClose();
-    restoreFocus(returnFocusRef);
-  };
-
   return createPortal(<div className="overlay-layer comparison-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeAndRestore()}><section ref={dialogRef} className="comparison-dialog" role="dialog" aria-modal="true" aria-labelledby="comparison-title" tabIndex="-1"><header><div><span className="section-kicker">Canlı katalog</span><h2 id="comparison-title">Ürünleri karşılaştır</h2><p>Fiyat, stok ve ürün bilgileri güncel NovaStore kataloğundan alınır.</p></div><button ref={closeRef} className="icon-button" type="button" onClick={closeAndRestore} aria-label="Karşılaştırmayı kapat"><X /></button></header><div className="comparison-scroll"><div className="comparison-table" style={{ "--comparison-columns": selectedProducts.length }} role="table" aria-label="Seçili ürünlerin karşılaştırması"><div className="comparison-product-row" role="row"><strong role="rowheader">Ürün</strong>{selectedProducts.map((product) => <article role="cell" key={product.id}><button type="button" onClick={() => onRemove(product.id)} aria-label={`${product.name} ürününü karşılaştırmadan çıkar`}><X /></button><a href={`#/urun/${product.slug}`} onClick={closeAndRestore}><img src={productImage(product)} alt="" /><span>{productEyebrow(product)}</span><b>{product.name}</b></a><button className="primary-button" type="button" disabled={product.stock <= 0} onClick={() => onAdd(product.id)}><ShoppingCart />{product.stock > 0 ? "Sepete ekle" : "Tükendi"}</button></article>)}</div>{rows.map(([label, render]) => <div className="comparison-fact-row" role="row" key={label}><strong role="rowheader">{label}</strong>{selectedProducts.map((product) => <span role="cell" key={product.id}>{render(product)}</span>)}</div>)}</div></div></section></div>, document.body);
 }
 
@@ -1257,7 +1257,7 @@ function CartDrawer({ open, items, onClose, onRemove, onQuantity, returnFocusRef
   if (!open) return null;
   return createPortal(
     <div className="overlay-layer cart-drawer-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeDrawer()}>
-      <div ref={dialogRef} className="cart-drawer" role="dialog" aria-modal="true" aria-label="Sepetim" tabIndex="-1">
+      <div id="cart-drawer" ref={dialogRef} className="cart-drawer" role="dialog" aria-modal="true" aria-label="Sepetim" tabIndex="-1">
         <div className="drawer-head"><div><h2>Sepetim</h2><span>{items.reduce((sum, item) => sum + item.quantity, 0)} ürün</span></div><button ref={closeRef} className="icon-button" type="button" onClick={closeDrawer} aria-label="Sepeti kapat"><X /></button></div>
         <div className="cart-drawer__body">{items.length ? items.map(({ product, quantity }) => <article className="cart-line" key={product.id}><a href={`#/urun/${product.slug}`} onClick={closeDrawer}><img src={productImage(product)} alt="" /></a><div><a className="cart-line__product-link" href={`#/urun/${product.slug}`} onClick={closeDrawer}><strong>{product.name}</strong></a><span>{product.color ? `${product.color} · ` : ""}{quantity} adet</span><div className="cart-line__actions"><div className="quantity-control" aria-label={`${product.name} adedi`}><button type="button" disabled={quantity <= 1} onClick={() => onQuantity(product.id, quantity - 1)} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" disabled={quantity >= product.stock} onClick={() => onQuantity(product.id, quantity + 1)} aria-label="Adedi artır"><Plus /></button></div><b>{money.format(product.price * quantity)}</b></div></div><button type="button" onClick={() => onRemove(product.id)} aria-label={`${product.name} ürününü sepetten çıkar`}><Trash /></button></article>) : <div className="cart-empty"><ShoppingBag /><h3>Sepetin henüz boş</h3><p>İhtiyacına uygun ürünleri kategorilerden keşfedebilirsin.</p><button className="primary-button" type="button" onClick={() => { closeDrawer(); navigate(defaultCategoryPath() ? `/kategori/${defaultCategoryPath()}` : "/"); }}>Alışverişe başla</button></div>}</div>
         {items.length > 0 && <div className="cart-drawer__footer"><div><span>Ürün toplamı</span><strong>{money.format(total)}</strong></div><button className="primary-button" type="button" onClick={() => { closeDrawer(); navigate("/sepet"); }}>Sepete git <CaretRight /></button><small><ShieldCheck /> Ödeme bilgileriniz güvenle korunur</small></div>}
@@ -1274,8 +1274,17 @@ function NotFound() {
   return <main id="main-content" className="page"><div className="shell not-found"><span>404</span><h1>Bu sayfayı bulamadık</h1><p>Kategori taşınmış, gizlenmiş veya artık yayında olmayabilir.</p><a className="primary-button" href="#/">Ana sayfaya dön</a></div></main>;
 }
 
+function SearchEmpty({ term }) {
+  const hasTerm = Boolean(String(term || "").trim());
+  return <main id="main-content" className="page"><div className="shell not-found"><MagnifyingGlass /><h1>{hasTerm ? "Aramana uygun ürün bulamadık" : "Aramak istediğin ürünü yaz"}</h1><p>{hasTerm ? "Yazımı kontrol edebilir veya daha kısa bir ürün, marka ya da kategori adı deneyebilirsin." : "Ürün, marka veya kategori adıyla arama yapabilirsin."}</p><a className="primary-button" href="#/">Ana sayfaya dön</a></div></main>;
+}
+
+function LocalReviewPaymentBoundary() {
+  return <main id="main-content" className="page success-page"><div className="shell"><section className="success-card connected-payment-result is-info"><div className="success-icon"><ShieldCheck /></div><span className="section-kicker">Yerel inceleme sınırı</span><h1>Bu oturumda ödeme oluşturulmadı</h1><p>Gerçek ödeme sağlayıcısı, sipariş oluşturma ve ödeme durumu sorgusu yerel incelemede devre dışıdır.</p><div className="success-actions"><a className="primary-button" href="#/sepet">Sepete dön</a><a href="#/hesabim/siparisler">Siparişlerime git <CaretRight /></a></div></section></div></main>;
+}
+
 function Footer() {
-  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="/">Hakkımızda</a><a href="#/hesabim">Hesabım</a><a href="#/iletisim">İletişim</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/iade-degisim">İade & değişim</a><a href="#/yardim">Yardım merkezi</a></div><div><strong>Güvenli alışveriş</strong><p>3D Secure ödeme, kolay iade ve NovaStore desteği.</p></div></div><div className="shell footer-bottom"><span>© 2026 NovaStore. Etkileşimli tema prototipi.</span><span>Gizlilik · Kullanım Koşulları · Çerezler</span></div></footer>;
+  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="#/hesabim">Hesabım</a><a href="#/iletisim">İletişim</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/iade-degisim">İade & değişim</a><a href="#/yardim">Yardım merkezi</a></div><div><strong>Güvenli alışveriş</strong><p>Ödeme bilgileri NovaStore sayfasında toplanmaz; destek kanalları hesabınla korunur.</p></div></div><div className="shell footer-bottom"><span>© 2026 NovaStore.</span><span>Yasal metinler onaylandığında yayımlanacaktır.</span></div></footer>;
 }
 
 export function CommerceProRuntimeApp({ runtime }) {
@@ -1292,10 +1301,14 @@ export function CommerceProRuntimeApp({ runtime }) {
   const toastTimer = useRef(null);
   const buyNowPendingRef = useRef(false);
   const [buyNowPending, setBuyNowPending] = useState(false);
-  const mobileMenuTriggerRef = useRef(null);
+  const categoryDrawerTriggerRef = useRef(null);
   const cartTriggerRef = useRef(null);
   const openCart = useCallback(() => setCartOpen(true), []);
   const closeCart = useCallback(() => setCartOpen(false), []);
+  const openCategoryDrawer = useCallback((event) => {
+    categoryDrawerTriggerRef.current = event?.currentTarget || null;
+    setMobileMenuOpen(true);
+  }, []);
 
   useEffect(() => installInputModalityTracking(), []);
 
@@ -1430,7 +1443,10 @@ export function CommerceProRuntimeApp({ runtime }) {
     }
   }
 
-  const cartItems = cart.map((item) => ({ ...item, product: products.find((product) => product.id === item.productId) })).filter((item) => item.product);
+  const cartItems = useMemo(
+    () => cart.map((item) => ({ ...item, product: products.find((product) => product.id === item.productId) })).filter((item) => item.product),
+    [cart],
+  );
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
@@ -1450,6 +1466,10 @@ export function CommerceProRuntimeApp({ runtime }) {
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
   const authenticated = session?.status === "authenticated" || session?.status === "unverified";
+  const localReviewSurface = window.location.protocol === "http:"
+    && ["127.0.0.1", "localhost"].includes(window.location.hostname)
+    && window.location.port === "5273";
+  const localReviewSession = authenticated && String(session?.user?.email || "").endsWith("@local.invalid");
   const comparisonVisible = comparisonIds.size > 0 && !["checkout", "payment-result", "auth", "password", "order-success"].includes(route.type);
   const comparisonContext = { available: true, ids: comparisonIds, toggle: toggleComparison };
   const handleAuthenticated = async (nextSession, returnPath) => {
@@ -1465,7 +1485,7 @@ export function CommerceProRuntimeApp({ runtime }) {
     }
     navigate(returnPath);
   };
-  const authReturn = (path) => <CustomerAuthPage account={runtime.customer} returnPath={path} onAuthenticated={handleAuthenticated} />;
+  const authReturn = (path) => <CustomerAuthPage account={runtime.customer} returnPath={path} onAuthenticated={handleAuthenticated} reviewOnly={localReviewSurface} />;
   const handleSessionUpdated = (user) => setSession((current) => Object.freeze({ ...current, status: "authenticated", user, warning: null }));
   const handleLogout = async () => {
     const result = await runtime.customer.logout();
@@ -1493,26 +1513,26 @@ export function CommerceProRuntimeApp({ runtime }) {
     if (!category || category.active === false || category.archived === true || category.customerVisible === false || category.descendantVisibleProductCount === 0) content = <CanonicalNotFound />;
     else content = <CanonicalProductListing category={category} title={category.name} initialItems={getProductsForCategory(category.id)} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
   } else if (route.type === "search") {
-    const needle = route.term.toLocaleLowerCase("tr-TR");
-    const results = getVisibleProducts().filter((product) => `${product.name} ${product.brand} ${product.color || ""} ${product.storage || ""} ${product.description || ""} ${(product.features || []).join(" ")} ${getBreadcrumb(product.categoryId).map((item) => item.name).join(" ")}`.toLocaleLowerCase("tr-TR").includes(needle));
-    content = <CanonicalProductListing title={`“${route.term}” arama sonuçları`} initialItems={results} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
+    const needle = normalizeSearchText(route.term);
+    const results = getVisibleProducts().filter((product) => normalizeSearchText(`${product.name} ${product.brand} ${product.color || ""} ${product.storage || ""} ${product.description || ""} ${(product.features || []).join(" ")} ${getBreadcrumb(product.categoryId).map((item) => item.name).join(" ")}`).includes(needle));
+    content = results.length && route.term.trim() ? <CanonicalProductListing title={`“${route.term}” arama sonuçları`} initialItems={results} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} /> : <SearchEmpty term={route.term} />;
   } else if (route.type === "collection") content = <CollectionRoute slug={route.slug} title={route.title} loadCollection={runtime.catalog.loadCollection} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
   else if (route.type === "favorites") content = <CanonicalFavoritesPage favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
   else if (route.type === "cart-page") content = <CartPage items={cartItems} onQuantity={updateCartQuantity} onRemove={removeFromCart} onCheckout={handoffToCheckout} />;
   else if (route.type === "auth") content = authenticated
-    ? <CustomerAccountPage session={session} account={runtime.customer} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} />
-    : <CustomerAuthPage account={runtime.customer} initialMode={route.mode} returnPath={safeDecodeReturn(route.query.get("return"), "/hesabim")} onAuthenticated={handleAuthenticated} />;
-  else if (route.type === "password") content = <CustomerPasswordPage account={runtime.customer} mode={route.mode} token={route.query.get("token") || ""} />;
+    ? <CustomerAccountPage session={session} account={runtime.customer} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} reviewOnly={localReviewSession} />
+    : <CustomerAuthPage account={runtime.customer} initialMode={route.mode} returnPath={safeDecodeReturn(route.query.get("return"), "/hesabim")} onAuthenticated={handleAuthenticated} reviewOnly={localReviewSurface} />;
+  else if (route.type === "password") content = <CustomerPasswordPage account={runtime.customer} mode={route.mode} token={route.query.get("token") || ""} reviewOnly={localReviewSurface} />;
   else if (route.type === "account") content = authenticated
-    ? <CustomerAccountPage session={session} account={runtime.customer} section={route.section} orderId={route.orderId} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} />
+    ? <CustomerAccountPage session={session} account={runtime.customer} section={route.section} orderId={route.orderId} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} reviewOnly={localReviewSession} />
     : authReturn(route.section === "order-detail"
       ? `/hesabim/siparisler/${route.orderId}`
       : `/hesabim${route.section === "orders" ? "/siparisler" : route.section === "addresses" ? "/adresler" : route.section === "coupons" ? "/kuponlar" : route.section === "notifications" ? "/bildirimler" : route.section === "security" ? "/guvenlik" : ""}`);
   else if (route.type === "checkout") content = authenticated
-    ? <CustomerCheckoutPage step={route.step} session={session} account={runtime.customer} checkout={runtime.checkout} items={cartItems} getProductImage={productImage} onStepChange={(step) => navigate(`/odeme/${step === "delivery" ? "teslimat" : step === "payment" ? "odeme" : "onay"}`)} onNotice={notify} />
+    ? <CustomerCheckoutPage step={route.step} session={session} account={runtime.customer} checkout={runtime.checkout} items={cartItems} getProductImage={productImage} onStepChange={(step) => navigate(`/odeme/${step === "delivery" ? "teslimat" : step === "payment" ? "odeme" : "onay"}`)} onNotice={notify} reviewOnly={localReviewSession} />
     : authReturn(`/odeme/${route.step === "delivery" ? "teslimat" : route.step === "payment" ? "odeme" : "onay"}`);
   else if (route.type === "payment-result") content = authenticated
-    ? <CustomerPaymentResultPage checkout={runtime.checkout} paymentRef={route.query.get("paymentRef") || ""} orderId={route.query.get("orderId") || ""} onFinalized={handlePaymentFinalized} />
+    ? localReviewSession ? <LocalReviewPaymentBoundary /> : <CustomerPaymentResultPage checkout={runtime.checkout} paymentRef={route.query.get("paymentRef") || ""} orderId={route.query.get("orderId") || ""} onFinalized={handlePaymentFinalized} />
     : authReturn(`/odeme/sonuc?${route.query.toString()}`);
   else if (route.type === "tracking") content = authenticated
     ? <CustomerTrackingPage session={session} account={runtime.customer} products={getVisibleProducts()} getProductImage={productImage} />
@@ -1528,13 +1548,13 @@ export function CommerceProRuntimeApp({ runtime }) {
   return (
     <RuntimeComparisonContext.Provider value={comparisonContext}>
       <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); focusMainContent({ preventScroll: false }); }}>Ana içeriğe geç</a>
-      <CanonicalHeader cartCount={cartCount} favoriteCount={favorites.size} onCartOpen={openCart} onMobileOpen={() => setMobileMenuOpen(true)} cartTriggerRef={cartTriggerRef} mobileMenuTriggerRef={mobileMenuTriggerRef} />
+      <Header cartCount={cartCount} favoriteCount={favorites.size} onCartOpen={openCart} onMobileOpen={openCategoryDrawer} onAccountOpen={() => navigate("/hesabim")} accountDetail={authenticated ? session.user.fullName || "Hesabım" : "Giriş yap"} cartTriggerRef={cartTriggerRef} mobileMenuOpen={mobileMenuOpen} cartOpen={cartOpen} />
       {runtime.warnings.length > 0 && <div className="integration-session-warning" role="status">Bazı ikincil mağaza veya oturum verileri geçici olarak alınamadı; erişilebilen gerçek katalog gösteriliyor.</div>}
       {content}
       <Footer />
-      <CanonicalMobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={mobileMenuTriggerRef} />
+      <MobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={categoryDrawerTriggerRef} />
       <CartDrawer open={cartOpen} items={cartItems} onClose={closeCart} onRemove={removeFromCart} onQuantity={updateCartQuantity} returnFocusRef={cartTriggerRef} />
-      <CanonicalMobileBottomNav route={route} cartCount={cartCount} favoriteCount={favorites.size} />
+      <MobileBottomNav route={route} cartCount={cartCount} favoriteCount={favorites.size} />
       {comparisonVisible && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => setComparisonIds(new Set())} onAdd={addToCart} />}
       {["help", "contact"].includes(route.type) && <AssistantWidget route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonVisible} />}
       <div className={cx("toast", toast && "is-visible")} role="status" aria-live="polite"><CheckCircle weight="fill" /><span>{toast}</span></div>

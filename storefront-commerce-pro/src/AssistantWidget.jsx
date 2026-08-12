@@ -26,6 +26,10 @@ const isAuthenticated = (session) => (
   session?.status === "authenticated" || session?.status === "unverified"
 );
 
+const motionBehavior = () => (
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+);
+
 function AssistantProductCard({ product, favorite, onFavorite, onAdd, getProductImage }) {
   const soldOut = Number(product.stock) <= 0;
   return <article className="assistant-product-card"><a href={`#/urun/${product.slug}`}><img src={getProductImage(product)} alt={product.name} /></a><div><span>{product.brand || "NovaStore"}</span><h4><a href={`#/urun/${product.slug}`}>{product.name}</a></h4><strong>{money.format(product.price)}</strong><div><button type="button" disabled={soldOut} onClick={() => onAdd(product.id)}><ShoppingCart />{soldOut ? "Tükendi" : "Sepete ekle"}</button><button className={favorite ? "is-active" : ""} type="button" aria-pressed={favorite} aria-label={favorite ? "Favorilerden çıkar" : "Favorilere ekle"} onClick={() => onFavorite(product.id)}><Heart weight={favorite ? "fill" : "regular"} /></button></div></div></article>;
@@ -83,7 +87,7 @@ export function AssistantWidget({
 
   useEffect(() => {
     if (!open || !threadRef.current) return;
-    threadRef.current.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" });
+    threadRef.current.scrollTo({ top: threadRef.current.scrollHeight, behavior: motionBehavior() });
   }, [messages, open, phase]);
 
   if (HIDDEN_ROUTES.has(route.type)) return null;

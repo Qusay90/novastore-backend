@@ -5,6 +5,8 @@ import { createCanonicalFixtureRuntime } from "./integration/createCanonicalFixt
 import "./canonical.css";
 import "./integrated.css";
 
+globalThis.__NOVASTORE_INTEGRATED_RUNTIME_OWNS_CART_HYDRATION__ = true;
+
 const runtime = createCanonicalFixtureRuntime();
 
 createRoot(document.getElementById("root")).render(
