@@ -62,7 +62,8 @@ const notifyOrderCreated = async (orderId, userId, customerName) => {
             userId,
             'order_update',
             `#${orderId} numaralı siparişiniz alındı ve ödeme süreci başlatıldı.`,
-            io
+            io,
+            { entityType: 'order', entityId: orderId }
         );
     }
 
@@ -70,7 +71,8 @@ const notifyOrderCreated = async (orderId, userId, customerName) => {
         null,
         'new_order',
         `Yeni sipariş alındı! Sipariş No: #${orderId} - Müşteri: ${customerName}`,
-        io
+        io,
+        { entityType: 'order', entityId: orderId }
     );
 };
 
@@ -454,7 +456,8 @@ const cancelOrder = async (req, res) => {
                     order.user_id,
                     'order_update',
                     `Sipariş #${orderId} iptal edildi.`,
-                    io
+                    io,
+                    { entityType: 'order', entityId: orderId }
                 );
             } catch (notificationError) {
                 console.error('İptal sonrası bildirim hazırlanamadı:', notificationError.message);

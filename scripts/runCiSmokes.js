@@ -27,6 +27,7 @@ const smokeTests = [
     'tests/adminOperationsContractSmoke.mjs',
     'tests/notificationTargetRoutingSmoke.mjs',
     'tests/reviewPublicationVisibilitySmoke.js',
+    'tests/localMain6sSchemaInitSmoke.js',
     'tests/stagingMigrationFoundationSmoke.js'
 ];
 

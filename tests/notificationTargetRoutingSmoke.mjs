@@ -49,8 +49,14 @@ assert.throws(
 const targetService = fs.readFileSync(path.join(root, "services", "notificationTargetService.js"), "utf8");
 const customerUi = fs.readFileSync(path.join(root, "storefront-commerce-pro", "src", "ConnectedCustomerPages.jsx"), "utf8");
 const adminUi = fs.readFileSync(path.join(root, "admin-commerce-pro", "src", "IntegratedApp.jsx"), "utf8");
+const orderController = fs.readFileSync(path.join(root, "controllers", "orderController.js"), "utf8");
 assert.match(targetService, /ALLOWED_TARGET_FIELDS = new Set\(\['entityType', 'entityId', 'entity_type', 'entity_id'\]\)/);
 assert.doesNotMatch(targetService, /redirect|https?:|targetUrl|target_url/i);
 assert.match(customerUi, /window\.location\.hash = item\.target\.slice\(1\)/);
 assert.match(adminUi, /onOpenTarget\(item\.targetPage\)/);
+assert.equal(
+  [...orderController.matchAll(/\{ entityType: 'order', entityId: orderId \}/g)].length,
+  3,
+  "customer create, Admin create ve cancellation bildirimleri exact order hedefi taşımalı",
+);
 console.log("notificationTargetRoutingSmoke: OK");

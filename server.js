@@ -425,11 +425,15 @@ const prepareDatabase = async (startupSafety) => {
     const createNotificationsTable = require('./models/createNotificationDb');
     const createCommerceSchema = require('./models/createCommerceDb');
     const createAnalyticsSchema = require('./models/createAnalyticsDb');
+    const {
+        applyLocalMain6sOperationMigrations
+    } = require('./models/applyLocalMain6sOperationMigrations');
 
     await createCoreSchema();
     await createNotificationsTable();
     await createCommerceSchema();
     await createAnalyticsSchema();
+    await applyLocalMain6sOperationMigrations();
 };
 
 const start = async () => {
