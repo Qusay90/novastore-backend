@@ -3590,30 +3590,44 @@ html[data-input-modality="pointer"] .check-option input:focus + span {
   }
 
   .comparison-tray {
-    right: 10px;
-    bottom: calc(78px + env(safe-area-inset-bottom));
-    left: 10px;
+    position: relative;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    gap: 6px;
+    width: calc(100% - 20px);
     max-width: none;
-    min-height: 58px;
+    min-height: 60px;
+    margin: 10px auto 0;
     padding: 7px 8px 7px 11px;
   }
 
-  .comparison-tray > span > span,
-  .comparison-clear {
+  .comparison-tray > span {
     display: none;
   }
 
   .comparison-tray__products {
-    flex: 1;
+    flex: 0 1 auto;
+    min-width: 0;
+    gap: 4px;
   }
 
   .comparison-tray__products > span {
-    width: 39px;
-    height: 39px;
+    width: 34px;
+    height: 34px;
   }
 
   .comparison-open {
-    min-width: 118px;
+    flex: 1 1 92px;
+    min-width: 0;
+    min-height: 44px;
+    padding-inline: 8px;
+  }
+
+  .comparison-clear {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
   }
 
   .comparison-overlay {

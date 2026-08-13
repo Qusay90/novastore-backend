@@ -170,6 +170,13 @@ const HELP_FAQS = Object.freeze([
   { question: "Kargo ücreti nasıl belirlenir?", answer: "Kargo ücreti, sepetin güncel toplamıyla ödeme adımındaki NovaStore fiyatlandırma servisi tarafından hesaplanır." },
   { question: "Ödeme bilgilerim güvende mi?", answer: "Kart bilgileri NovaStore sayfasında alınmaz; güvenli ödeme sağlayıcısının kendi alanına girilir." },
 ]);
+const COMPARISON_TRAY_ROUTE_TYPES = new Set([
+  "home",
+  "category",
+  "search",
+  "collection",
+  "favorites",
+]);
 function cx(...values) {
   return values.filter(Boolean).join(" ");
 }
@@ -1470,7 +1477,7 @@ export function CommerceProRuntimeApp({ runtime }) {
     && ["127.0.0.1", "localhost"].includes(window.location.hostname)
     && window.location.port === "5273";
   const localReviewSession = authenticated && String(session?.user?.email || "").endsWith("@local.invalid");
-  const comparisonVisible = comparisonIds.size > 0 && !["checkout", "payment-result", "auth", "password", "order-success"].includes(route.type);
+  const comparisonVisible = comparisonIds.size > 0 && COMPARISON_TRAY_ROUTE_TYPES.has(route.type);
   const comparisonContext = { available: true, ids: comparisonIds, toggle: toggleComparison };
   const handleAuthenticated = async (nextSession, returnPath) => {
     setSession(nextSession);
@@ -1550,12 +1557,12 @@ export function CommerceProRuntimeApp({ runtime }) {
       <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); focusMainContent({ preventScroll: false }); }}>Ana içeriğe geç</a>
       <Header cartCount={cartCount} favoriteCount={favorites.size} onCartOpen={openCart} onMobileOpen={openCategoryDrawer} onAccountOpen={() => navigate("/hesabim")} accountDetail={authenticated ? session.user.fullName || "Hesabım" : "Giriş yap"} cartTriggerRef={cartTriggerRef} mobileMenuOpen={mobileMenuOpen} cartOpen={cartOpen} />
       {runtime.warnings.length > 0 && <div className="integration-session-warning" role="status">Bazı ikincil mağaza veya oturum verileri geçici olarak alınamadı; erişilebilen gerçek katalog gösteriliyor.</div>}
+      {comparisonVisible && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => setComparisonIds(new Set())} onAdd={addToCart} />}
       {content}
       <Footer />
       <MobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={categoryDrawerTriggerRef} />
       <CartDrawer open={cartOpen} items={cartItems} onClose={closeCart} onRemove={removeFromCart} onQuantity={updateCartQuantity} returnFocusRef={cartTriggerRef} />
       <MobileBottomNav route={route} cartCount={cartCount} favoriteCount={favorites.size} />
-      {comparisonVisible && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => setComparisonIds(new Set())} onAdd={addToCart} />}
       {["help", "contact"].includes(route.type) && <AssistantWidget route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonVisible} />}
       <div className={cx("toast", toast && "is-visible")} role="status" aria-live="polite"><CheckCircle weight="fill" /><span>{toast}</span></div>
     </RuntimeComparisonContext.Provider>
