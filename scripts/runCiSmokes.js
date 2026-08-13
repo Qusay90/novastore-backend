@@ -20,6 +20,13 @@ const smokeTests = [
     'tests/storefrontR4HumanReviewSmoke.mjs',
     'tests/storefrontR5ReviewContractSmoke.mjs',
     'tests/sellerApplicationSummaryPrivacySmoke.mjs',
+    'tests/reviewQuestionOperationsSmoke.js',
+    'tests/supportNotificationOperationsSmoke.js',
+    'tests/couponAdminOperationsSmoke.js',
+    'tests/adminCatalogMediaOperationsSmoke.js',
+    'tests/adminOperationsContractSmoke.mjs',
+    'tests/notificationTargetRoutingSmoke.mjs',
+    'tests/reviewPublicationVisibilitySmoke.js',
     'tests/stagingMigrationFoundationSmoke.js'
 ];
 

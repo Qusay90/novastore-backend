@@ -529,7 +529,8 @@ const createGetAdminNotificationSummaries = (database) => async (req, res) => {
     try {
         const result = await database.query(
             `
-                SELECT id, type, message, COALESCE(is_read, FALSE) AS is_read, created_at
+                SELECT id, type, message, COALESCE(is_read, FALSE) AS is_read,
+                       entity_type, entity_id, created_at
                 FROM notifications
                 WHERE user_id IS NULL
                 ORDER BY created_at DESC NULLS LAST, id DESC

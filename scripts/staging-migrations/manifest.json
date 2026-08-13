@@ -103,5 +103,33 @@
     "sha256": "afa1ec4af7b38fd627ec3552d6f5e137da798feb81375c716b0cab45d1ca2e84",
     "mode": "transactional",
     "transactionWrapper": false
+  },
+  {
+    "id": "20260813_01_review_question_operations",
+    "path": "migrations/20260813_01_review_question_operations.sql",
+    "sha256": "c684be9d778d566acbd2de6f9212d479f8dcaedd35eefd04557af40fb6290ad3",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260813_02_support_notification_operations",
+    "path": "migrations/20260813_02_support_notification_operations.sql",
+    "sha256": "cef218ccabe5e2e9b038b408725ee1bf703299b4e37e19d76e8a2b61bcaae2e4",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260813_03_coupon_operations",
+    "path": "migrations/20260813_03_coupon_operations.sql",
+    "sha256": "8cbde4412539dadcb87b8f6c3e0ed1eff66d53f2c045550a433293c8658840be",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260813_04_product_media_operations",
+    "path": "migrations/20260813_04_product_media_operations.sql",
+    "sha256": "3ed7088af058096d81302950af2d0566b0d846af7fe28e02d6236186a6fb7e4e",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

@@ -39,6 +39,10 @@ const syntheticStagingEnv = (overrides = {}) => ({
     NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'false',
     NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: 'false',
     NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_COUPON_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_SUPPORT_WRITE_ENABLED: 'false',
     AI_PROVIDER: 'mock',
     AI_PROVIDER_FALLBACK_ENABLED: 'false',
     SKIP_SCHEMA_INIT: 'true',
@@ -445,10 +449,10 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         }
     });
 
-    await check('runtime', '37 four exact false admin write flags permit safe policy', () => {
+    await check('runtime', '37 eight exact false admin write flags permit safe policy', () => {
         const policy = resolveStagingRuntimePolicy(syntheticStagingEnv());
         assert.equal(policy.canStart, true);
-        assert.equal(ADMIN_WRITE_ENV_KEYS.length, 4);
+        assert.equal(ADMIN_WRITE_ENV_KEYS.length, 8);
     });
 
     await check('runtime', '38 real admin mutation routes consume capability guards', () => {
@@ -475,6 +479,10 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         assert.match(read('routes/adminRoutes.js'), /firstPartyCatalogWrite/);
         assert.match(read('routes/orderRoutes.js'), /orderCancelWrite/);
         assert.match(read('routes/shipmentRoutes.js'), /manualShipmentWrite/);
+        assert.match(read('routes/reviewRoutes.js'), /reviewModerationWrite/);
+        assert.match(read('routes/questionRoutes.js'), /questionAnswerWrite/);
+        assert.match(read('routes/campaignRoutes.js'), /couponWrite/);
+        assert.match(read('routes/messageRoutes.js'), /supportWrite/);
 
         const {
             requireAdminCommerceCapabilityInStaging
@@ -483,7 +491,11 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
             'firstPartyCatalogWrite',
             'catalogStructureWrite',
             'orderCancelWrite',
-            'manualShipmentWrite'
+            'manualShipmentWrite',
+            'reviewModerationWrite',
+            'questionAnswerWrite',
+            'couponWrite',
+            'supportWrite'
         ]) {
             let nextCalls = 0;
             const result = responseRecorder();
@@ -519,10 +531,10 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         assert.equal(packageJson.scripts['staging:bootstrap'], 'node scripts/stagingBootstrapCli.js');
     });
 
-    await check('runtime', '42 migration manifest remains the exact 15-file foundation', () => {
+    await check('runtime', '42 migration manifest remains the exact 19-file registry', () => {
         const manifest = JSON.parse(read('scripts/staging-migrations/manifest.json'));
-        assert.equal(manifest.length, 15);
-        assert.equal(new Set(manifest.map((item) => item.path)).size, 15);
+        assert.equal(manifest.length, 19);
+        assert.equal(new Set(manifest.map((item) => item.path)).size, 19);
     });
 
     await check('runtime', '43 local and production behavior stays outside staging policy', () => {

@@ -45,6 +45,13 @@ const catalogDetailPayload = {
     updated_at: null,
     revision: 4,
     has_media: true,
+    media: [{
+      id: 501,
+      media_url: "https://res.cloudinary.com/novastore-test/image/upload/v1/nova-kulaklik.jpg",
+      media_type: "image",
+      is_main: true,
+      sort_order: 0,
+    }],
     category_ids: [4],
     primary_category_id: 4,
     categories: [{ id: 4, name: "Kulaklık", path: "Elektronik / Ses / Kulaklık", is_primary: true }],

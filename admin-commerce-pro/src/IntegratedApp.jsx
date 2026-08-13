@@ -796,6 +796,96 @@ function CatalogProductArchiveDialog({ product, action, onClose, onComplete, onR
   );
 }
 
+function CatalogMediaDialog({ product: initialProduct, actions, onClose, onComplete, onRequestError }) {
+  const [product, setProduct] = useState(initialProduct);
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaType, setMediaType] = useState("image");
+  const [isCover, setIsCover] = useState(initialProduct.media.length === 0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const run = async (operation) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await operation();
+      setProduct(next);
+      onComplete?.(next, { keepOpen: true });
+      return next;
+    } catch (requestError) {
+      if (!onRequestError(requestError)) setError(requestError);
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const register = async (event) => {
+    event.preventDefault();
+    const next = await run(() => actions.registerCatalogMedia({
+      productId: product.rawId,
+      expectedRevision: product.revision,
+      mediaUrl,
+      mediaType,
+      isCover,
+    }));
+    if (next) {
+      setMediaUrl("");
+      setIsCover(false);
+    }
+  };
+
+  const reorder = (mediaId, direction) => {
+    const ids = product.media.map((entry) => entry.id);
+    const index = ids.indexOf(mediaId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    const cover = product.media.find((entry) => entry.isCover && entry.mediaType === "image")?.id
+      || product.media.find((entry) => entry.mediaType === "image")?.id
+      || null;
+    run(() => actions.reorderCatalogMedia({ productId: product.rawId, expectedRevision: product.revision, mediaIds: ids, coverMediaId: cover }));
+  };
+
+  const setCover = (mediaId) => run(() => actions.reorderCatalogMedia({
+    productId: product.rawId,
+    expectedRevision: product.revision,
+    mediaIds: product.media.map((entry) => entry.id),
+    coverMediaId: mediaId,
+  }));
+
+  const remove = (mediaId) => run(() => actions.deleteCatalogMedia({
+    productId: product.rawId,
+    mediaId,
+    expectedRevision: product.revision,
+  }));
+
+  return (
+    <OperationDialog title={`${product.name} · medya kayıtları`} busy={busy} onClose={onClose} testId="catalog-media-dialog" wide>
+      <section className="notice-card live-boundary-notice" role="note"><Icon name="shield" /><div><strong>Sağlayıcıya çağrı yapılmaz</strong><p>Bu ekran yalnız doğrulanmış HTTPS Cloudinary varlıklarını kataloğa kaydeder, sıralar ve kapak seçer. Silme yalnız katalog kaydını kaldırır; sağlayıcı varlığının silinmesi ayrı yayın kapısıdır.</p></div></section>
+      {error && <OperationError error={error} id="catalog-media-error" />}
+      <form className="connected-form live-catalog-form" onSubmit={register}>
+        <label className="field field-wide"><span>Cloudinary HTTPS medya URL</span><input value={mediaUrl} onChange={(event) => setMediaUrl(event.target.value)} required maxLength="2048" placeholder="https://res.cloudinary.com/.../image/upload/..." /></label>
+        <label className="field"><span>Medya türü</span><select value={mediaType} onChange={(event) => { const nextType = event.target.value; setMediaType(nextType); if (nextType === "video") setIsCover(false); }}><option value="image">Görsel</option><option value="video" disabled>Video — renderer handoff bekliyor</option></select></label>
+        <label className="check-row"><input type="checkbox" checked={isCover} onChange={(event) => setIsCover(event.target.checked)} disabled={mediaType !== "image"} /><span>{mediaType === "image" ? "Kapak yap" : "Video kapak olamaz"}</span></label>
+        <button className="primary-button" type="submit" disabled={busy || !mediaUrl.trim()}>Medya kaydını ekle</button>
+      </form>
+      <div className="table-scroll" tabIndex="0" role="region" aria-label="Ürün medya sırası">
+        <table className="data-table"><thead><tr><th>Medya</th><th>Tür</th><th>Kapak</th><th>Sıra</th><th>İşlem</th></tr></thead><tbody>
+          {product.media.map((entry, index) => <tr key={entry.id}>
+            <td><a href={entry.mediaUrl} target="_blank" rel="noreferrer">Medya #{entry.id}</a></td>
+            <td>{entry.mediaType === "video" ? "Video" : "Görsel"}</td>
+            <td><button className="secondary-button small" type="button" disabled={busy || entry.isCover || entry.mediaType !== "image"} onClick={() => setCover(entry.id)}>{entry.isCover ? "Kapak" : entry.mediaType === "image" ? "Kapak yap" : "Yalnız görsel"}</button></td>
+            <td><span className="live-operation-buttons"><button className="secondary-button small" type="button" disabled={busy || index === 0} onClick={() => reorder(entry.id, -1)} aria-label={`Medya ${entry.id} yukarı taşı`}>↑</button><button className="secondary-button small" type="button" disabled={busy || index === product.media.length - 1} onClick={() => reorder(entry.id, 1)} aria-label={`Medya ${entry.id} aşağı taşı`}>↓</button></span></td>
+            <td><button className="danger-button small" type="button" disabled={busy} onClick={() => remove(entry.id)}>Kaydı kaldır</button></td>
+          </tr>)}
+          {product.media.length === 0 && <tr><td colSpan="5">Henüz medya kaydı yok.</td></tr>}
+        </tbody></table>
+      </div>
+    </OperationDialog>
+  );
+}
+
 function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh, onReloadCapabilities, mutationActions }) {
   const products = catalogPage.items;
   const [query, setQuery] = useState("");
@@ -906,11 +996,22 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
     setOperationNotice({
       tone: "success",
       message: kind === "create"
-        ? `${product.id} ürünü ${CATALOG_PUBLICATION_STATUS_LABELS[product.publicationStatus]} durumunda oluşturuldu. Medya eklenmedi; liste sunucudan yenileniyor.`
+        ? `${product.id} ürünü ${CATALOG_PUBLICATION_STATUS_LABELS[product.publicationStatus]} durumunda oluşturuldu. Medya ayrı kontrollü kayıt ekranından eklenebilir; liste sunucudan yenileniyor.`
         : kind === "edit"
           ? `${product.id} ürün değişiklikleri revision ${product.revision} olarak kaydedildi. Liste sunucudan yenileniyor.`
           : `${product.id} hard-delete yapılmadan arşivlendi ve müşteri görünürlüğü kapatıldı.`,
     });
+    onRefresh();
+  };
+  const handleMediaComplete = (product, { keepOpen = false } = {}) => {
+    setOperationNotice({ tone: "success", message: `${product.id} medya kaydı revision ${product.revision} ile güncellendi. Sağlayıcıya yazma veya silme çağrısı yapılmadı.` });
+    if (!keepOpen) {
+      setOperation(null);
+      onRefresh();
+    }
+  };
+  const closeMediaOperation = () => {
+    setOperation(null);
     onRefresh();
   };
   const archivedProduct = (product) => Boolean(product.deletedAt) || product.publicationStatus === "archived";
@@ -943,8 +1044,8 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
       <section className="notice-card live-boundary-notice" role="note">
         <Icon name="shield" />
         <div>
-          <strong>Tek satıcılı first-party katalog · medya sınırı kapalı</strong>
-          <p>Bu liste yalnız NovaStore ürün kayıtlarını işler. “İç yayın incelemesi” satıcı izni değildir; satıcı, teklif, risk veya manuel ürün onay kuyruğu oluşturulmaz. Ürün JSON yazmaları capability ile açılabilir ancak medya/görsel/Cloudinary yazması, hard-delete ve arşivden geri yükleme bu turda yoktur.</p>
+          <strong>Tek satıcılı first-party katalog · sağlayıcı yazması kapalı</strong>
+          <p>Bu liste yalnız NovaStore ürün kayıtlarını işler. “İç yayın incelemesi” satıcı izni değildir; satıcı, teklif veya risk kuyruğu oluşturulmaz. Doğrulanmış Cloudinary URL kayıtları capability ile sıralanabilir; dosya yükleme/silme, hard-delete ve arşivden geri yükleme bu turda yoktur.</p>
         </div>
       </section>
 
@@ -1005,7 +1106,7 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
                     <td><span className={`status ${customerVisible ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{customerVisible ? "Görünür" : "Görünmez"}</span>{!customerVisible && product.customerVisible && <small className="live-status-note">Ham bayrak açık; yayın veya arşiv durumu vitrine kapatır.</small>}</td>
                     <td><span className={`live-media-presence ${product.hasMedia ? "has-media" : "no-media"}`}><Icon name={product.hasMedia ? "check" : "warning"} />{product.hasMedia ? "Mevcut" : "Yok"}</span></td>
                     <td><span className="live-customer-cell"><strong>{dateTime(product.updatedAt || product.createdAt)}</strong><small>{product.updatedAt ? "Son güncelleme" : product.createdAt ? "Oluşturulma" : "Tarih bilgisi yok"}</small></span></td>
-                    {writeCapabilityEnabled && <td>{archivedProduct(product) ? <span className="live-archived-lock"><Icon name="shield" />Arşivli · kilitli</span> : <span className="live-operation-buttons"><button type="button" className="secondary-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("edit", product)}>{openingProductId === product.rawId ? "Tam DTO alınıyor…" : "Düzenle"}</button><button type="button" className="danger-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("archive", product)}>Arşivle</button></span>}</td>}
+                    {writeCapabilityEnabled && <td>{archivedProduct(product) ? <span className="live-archived-lock"><Icon name="shield" />Arşivli · kilitli</span> : <span className="live-operation-buttons"><button type="button" className="secondary-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("edit", product)}>{openingProductId === product.rawId ? "Tam DTO alınıyor…" : "Düzenle"}</button><button type="button" className="secondary-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("media", product)}>Medya</button><button type="button" className="danger-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("archive", product)}>Arşivle</button></span>}</td>}
                   </tr>
                 );
               })}</tbody>
@@ -1019,11 +1120,12 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
             <button className="secondary-button" onClick={resetFilters}>Filtreleri temizle</button>
           </div>
         )}
-        <footer className={`table-footer live-catalog-write-footer ${writesBlocked ? "is-blocked" : "is-ready"}`} role="note"><span><Icon name={writesBlocked ? "shield" : "check"} />{writeBoundaryMessage}</span><strong>{writeCapabilityEnabled ? "Medya hariç JSON CRUD" : "Salt okunur"}</strong></footer>
+        <footer className={`table-footer live-catalog-write-footer ${writesBlocked ? "is-blocked" : "is-ready"}`} role="note"><span><Icon name={writesBlocked ? "shield" : "check"} />{writeBoundaryMessage}</span><strong>{writeCapabilityEnabled ? "JSON CRUD + medya kaydı" : "Salt okunur"}</strong></footer>
       </section>
       {operation?.kind === "create" && typeof mutationActions.createCatalogProduct === "function" && <CatalogProductFormDialog mode="create" action={mutationActions.createCatalogProduct} onClose={() => setOperation(null)} onComplete={handleComplete} onRequestError={handleMutationError} />}
       {operation?.kind === "edit" && typeof mutationActions.updateCatalogProduct === "function" && <CatalogProductFormDialog mode="edit" product={operation.product} action={mutationActions.updateCatalogProduct} onClose={() => setOperation(null)} onComplete={handleComplete} onRequestError={handleMutationError} />}
       {operation?.kind === "archive" && typeof mutationActions.archiveCatalogProduct === "function" && <CatalogProductArchiveDialog product={operation.product} action={mutationActions.archiveCatalogProduct} onClose={() => setOperation(null)} onComplete={handleComplete} onRequestError={handleMutationError} />}
+      {operation?.kind === "media" && typeof mutationActions.registerCatalogMedia === "function" && <CatalogMediaDialog product={operation.product} actions={mutationActions} onClose={closeMediaOperation} onComplete={handleMediaComplete} onRequestError={handleMutationError} />}
     </section>
   );
 }
@@ -1269,7 +1371,7 @@ function Returns({ returnPage, error, refreshing, onRefresh }) {
   );
 }
 
-function Notifications({ notificationPage, error, refreshing, onRefresh }) {
+function Notifications({ notificationPage, error, refreshing, onRefresh, onOpenTarget }) {
   const notifications = notificationPage.items;
   const [query, setQuery] = useState("");
   const [readFilter, setReadFilter] = useState("Tümü");
@@ -1296,7 +1398,7 @@ function Notifications({ notificationPage, error, refreshing, onRefresh }) {
           <span className="live-result-count">{filtered.length} / {notifications.length} kayıt{notificationPage.hasMore ? " · daha eski kayıtlar bu turda gösterilmiyor" : ""}</span>
         </div>
         {notifications.length === 0 ? <div className="state-panel"><Icon name="bell" /><h3>Henüz admin bildirimi yok</h3><p>Backend boş bir admin bildirimi özeti döndürdü.</p></div> : filtered.length > 0 ? <div className="live-notification-list">{filtered.map((item) => <article className={`live-notification-card ${item.isRead ? "is-read" : "is-unread"}`} key={item.id}>
-          <Icon name="bell" /><div><header><strong>{item.type.replaceAll("_", " ")}</strong><span>{item.isRead ? "Okundu" : "Okunmadı"}</span></header><p>{item.message}</p><small>{item.id} · {dateTime(item.createdAt)}</small></div>
+          <Icon name="bell" /><div><header><strong>{item.type.replaceAll("_", " ")}</strong><span>{item.isRead ? "Okundu" : "Okunmadı"}</span></header><p>{item.message}</p><small>{item.id} · {dateTime(item.createdAt)}</small>{item.targetPage && <button className="secondary-button small" type="button" onClick={() => onOpenTarget(item.targetPage)}>İlgili kaydı aç</button>}</div>
         </article>)}</div> : <div className="state-panel"><Icon name="bell" /><h3>Eşleşen bildirim yok</h3><p>Arama veya okunma filtresini değiştirin.</p><button className="secondary-button" onClick={() => { setQuery(""); setReadFilter("Tümü"); }}>Filtreleri temizle</button></div>}
       </section>
     </section>
@@ -1381,11 +1483,80 @@ function SellerApplications({ storePage, detailResource, selectedStoreId, onSele
   );
 }
 
+function ReviewModerationDialog({ review, action, onClose, onComplete }) {
+  const [status, setStatus] = useState(review.status === "PUBLISHED" ? "HIDDEN" : "PUBLISHED");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const submit = async (event) => {
+    event.preventDefault(); setBusy(true); setError(null);
+    try {
+      await action({ reviewId: review.id, expectedRevision: review.revision, status, moderationNote: note.trim() || null });
+      onComplete();
+    } catch (requestError) { setError(requestError); } finally { setBusy(false); }
+  };
+  return <OperationDialog title={`Yorum #${review.id} moderasyonu`} busy={busy} onClose={onClose} testId="review-moderation-dialog"><form className="connected-form" onSubmit={submit}>{error && <OperationError error={error} id="review-moderation-error" />}<label className="field"><span>Karar</span><select value={status} onChange={(event) => setStatus(event.target.value)}>{review.status === "PENDING" && <option value="PUBLISHED">Yayınla</option>}<option value="HIDDEN">Gizle</option></select></label><label className="field field-wide"><span>Moderasyon notu</span><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength="1000" rows="4" /></label><button className="primary-button" disabled={busy}>Kararı kaydet</button></form></OperationDialog>;
+}
+
+function ReviewsWorkspace({ page, error, refreshing, onRefresh, action }) {
+  const [operation, setOperation] = useState(null);
+  return <section className="workspace live-workspace" data-testid="live-reviews"><header className="workspace-heading operations-heading"><div><span className="eyebrow">Doğrulanmış müşteri değerlendirmeleri</span><h2 tabIndex="-1">Yorum moderasyonu</h2><p>Bekleyen yorumlar yayın kararı alır; yayınlanmış yorumlar gerektiğinde gizlenebilir.</p></div><button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />Yenile</button></header><ResourceWarning error={error} onRetry={onRefresh} /><section className="notice-card live-boundary-notice" role="note"><Icon name="shield" /><div><strong>Sunucu tarafı yayın kapısı</strong><p>Müşteri kimliği yalnız yönetici ekranında görünür; storefront yalnız yayınlanmış yorumları ve maskelenmiş adı alır.</p></div></section><div className="table-card"><div className="table-scroll" tabIndex="0" role="region" aria-label="Yorum moderasyon kuyruğu"><table className="data-table"><thead><tr><th>Ürün</th><th>Müşteri</th><th>Puan</th><th>Yorum</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>{page.items.map((item) => <tr key={item.id}><td><strong>{item.productName}</strong><small> #{item.productId}</small></td><td>{item.userName}</td><td>{item.rating}/5</td><td>{item.comment || "Yorum metni yok"}</td><td><span className={`status status-${statusClass(item.status)}`}>{item.status}</span></td><td>{action && (item.status === "PENDING" || item.status === "PUBLISHED") ? <button className="primary-button small" onClick={() => setOperation(item)}>{item.status === "PUBLISHED" ? "Gizle" : "İncele"}</button> : <span>Revision {item.revision}</span>}</td></tr>)}{page.items.length === 0 && <tr><td colSpan="6">Bekleyen veya yayınlanmış yorum yok.</td></tr>}</tbody></table></div></div>{operation && action && <ReviewModerationDialog review={operation} action={action} onClose={() => setOperation(null)} onComplete={() => { setOperation(null); onRefresh(); }} />}</section>;
+}
+
+function QuestionAnswerDialog({ question, action, onClose, onComplete }) {
+  const [answer, setAnswer] = useState(question.answer || "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const submit = async (event) => { event.preventDefault(); setBusy(true); setError(null); try { await action({ questionId: question.id, expectedRevision: question.revision, answer }); onComplete(); } catch (requestError) { setError(requestError); } finally { setBusy(false); } };
+  return <OperationDialog title={`Soru #${question.id} yanıtı`} busy={busy} onClose={onClose} testId="question-answer-dialog"><form className="connected-form" onSubmit={submit}>{error && <OperationError error={error} id="question-answer-error" />}<section className="notice-card"><Icon name="help" /><div><strong>{question.productName}</strong><p>{question.question}</p></div></section><label className="field field-wide"><span>Yayınlanacak yanıt</span><textarea value={answer} onChange={(event) => setAnswer(event.target.value)} minLength="1" maxLength="2000" required rows="6" /></label><button className="primary-button" disabled={busy || !answer.trim()}>Yanıtla ve yayınla</button></form></OperationDialog>;
+}
+
+function QuestionsWorkspace({ items, error, refreshing, onRefresh, action }) {
+  const [operation, setOperation] = useState(null);
+  return <section className="workspace live-workspace" data-testid="live-questions"><header className="workspace-heading operations-heading"><div><span className="eyebrow">Ürün soru ve cevap operasyonu</span><h2 tabIndex="-1">Müşteri soruları</h2><p>Yanıtsız sorular storefront'a yayımlanmaz.</p></div><button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />Yenile</button></header><ResourceWarning error={error} onRetry={onRefresh} /><div className="table-card"><div className="table-scroll" tabIndex="0" role="region" aria-label="Müşteri soruları"><table className="data-table"><thead><tr><th>Ürün</th><th>Müşteri</th><th>Soru</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td>{item.productName}</td><td>{item.userName}</td><td>{item.question}</td><td>{item.answer ? "Yanıtlandı" : "Bekliyor"}</td><td>{action ? <button className="primary-button small" onClick={() => setOperation(item)}>{item.answer ? "Yanıtı güncelle" : "Yanıtla"}</button> : "Salt okunur"}</td></tr>)}{items.length === 0 && <tr><td colSpan="5">Soru kaydı yok.</td></tr>}</tbody></table></div></div>{operation && action && <QuestionAnswerDialog question={operation} action={action} onClose={() => setOperation(null)} onComplete={() => { setOperation(null); onRefresh(); }} />}</section>;
+}
+
+const toLocalInput = (value) => value instanceof Date ? new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+
+function CouponDialog({ coupon, actions, onClose, onComplete }) {
+  const editing = Boolean(coupon);
+  const [form, setForm] = useState(() => ({ code: coupon?.code || "", type: coupon?.discountType || "PERCENT", value: coupon?.discountValue ?? 10, min: coupon?.minOrderAmount ?? 0, max: coupon?.maxDiscountAmount ?? "", limit: coupon?.usageLimit ?? "", starts: toLocalInput(coupon?.startsAt), ends: toLocalInput(coupon?.endsAt), active: coupon?.active ?? false }));
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(null);
+  const field = (name, value) => setForm((current) => ({ ...current, [name]: value }));
+  const submit = async (event) => { event.preventDefault(); setBusy(true); setError(null); const body = { discount_value: Number(form.value), min_order_amount: Number(form.min), max_discount_amount: form.max === "" ? null : Number(form.max), usage_limit: form.limit === "" ? null : Number(form.limit), starts_at: form.starts ? new Date(form.starts).toISOString() : null, ends_at: form.ends ? new Date(form.ends).toISOString() : null }; try { if (editing) await actions.updateCoupon({ couponId: coupon.id, body: { expected_revision: coupon.revision, ...body } }); else await actions.createCoupon({ body: { code: form.code, discount_type: form.type, is_active: form.active, ...body } }); onComplete(); } catch (requestError) { setError(requestError); } finally { setBusy(false); } };
+  return <OperationDialog title={editing ? `${coupon.code} kuponunu düzenle` : "Yeni kupon"} busy={busy} onClose={onClose} testId="coupon-operation-dialog"><form className="connected-form" onSubmit={submit}>{error && <OperationError error={error} id="coupon-operation-error" />}<label className="field"><span>Kod</span><input value={form.code} onChange={(event) => field("code", event.target.value)} disabled={editing} required maxLength="64" /></label><label className="field"><span>Tür</span><select value={form.type} onChange={(event) => field("type", event.target.value)} disabled={editing}><option value="PERCENT">Yüzde</option><option value="FIXED">Sabit</option></select></label><label className="field"><span>İndirim değeri</span><input type="number" min="0.01" step="0.01" value={form.value} onChange={(event) => field("value", event.target.value)} required /></label><label className="field"><span>Minimum sepet</span><input type="number" min="0" step="0.01" value={form.min} onChange={(event) => field("min", event.target.value)} /></label><label className="field"><span>Maksimum indirim</span><input type="number" min="0.01" step="0.01" value={form.max} onChange={(event) => field("max", event.target.value)} /></label><label className="field"><span>Kullanım limiti</span><input type="number" min="1" step="1" value={form.limit} onChange={(event) => field("limit", event.target.value)} /></label><label className="field"><span>Başlangıç</span><input type="datetime-local" value={form.starts} onChange={(event) => field("starts", event.target.value)} /></label><label className="field"><span>Bitiş</span><input type="datetime-local" value={form.ends} onChange={(event) => field("ends", event.target.value)} /></label>{!editing && <label className="check-row"><input type="checkbox" checked={form.active} onChange={(event) => field("active", event.target.checked)} /><span>Etkin oluştur</span></label>}<button className="primary-button" disabled={busy}>Kaydet</button></form></OperationDialog>;
+}
+
+function CouponsWorkspace({ items, error, refreshing, onRefresh, actions }) {
+  const [operation, setOperation] = useState(null); const [actionError, setActionError] = useState(null); const write = typeof actions.createCoupon === "function";
+  const toggle = async (coupon) => { setActionError(null); try { await actions.setCouponStatus({ couponId: coupon.id, expectedRevision: coupon.revision, active: !coupon.active }); onRefresh(); } catch (requestError) { setActionError(requestError); } };
+  return <section className="workspace live-workspace" data-testid="live-coupons"><header className="workspace-heading operations-heading"><div><span className="eyebrow">Sunucu otoriteli fiyatlandırma</span><h2 tabIndex="-1">Kuponlar</h2><p>Geçerlilik, limit ve etkinlik durumu checkout fiyatlandırmasında sunucudan doğrulanır.</p></div><div className="heading-actions">{write && <button className="primary-button" onClick={() => setOperation({ kind: "create" })}>Yeni kupon</button>}<button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />Yenile</button></div></header><ResourceWarning error={error || actionError} onRetry={onRefresh} /><div className="table-card"><div className="table-scroll" tabIndex="0" role="region" aria-label="Kupon operasyonları"><table className="data-table"><thead><tr><th>Kod</th><th>İndirim</th><th>Kullanım</th><th>Durum</th><th>Geçerlilik</th><th>İşlem</th></tr></thead><tbody>{items.map((coupon) => <tr key={coupon.id}><td><strong>{coupon.code}</strong></td><td>{coupon.discountType === "PERCENT" ? `%${coupon.discountValue}` : money(coupon.discountValue)}</td><td>{coupon.usedCount}/{coupon.usageLimit ?? "∞"}</td><td>{coupon.operationalStatus}</td><td>{coupon.startsAt ? dateTime(coupon.startsAt) : "Hemen"} – {coupon.endsAt ? dateTime(coupon.endsAt) : "Süresiz"}</td><td>{write ? <span className="live-operation-buttons"><button className="secondary-button small" onClick={() => setOperation({ kind: "edit", coupon })}>Düzenle</button><button className={coupon.active ? "danger-button small" : "primary-button small"} onClick={() => toggle(coupon)}>{coupon.active ? "Devre dışı bırak" : "Etkinleştir"}</button></span> : "Salt okunur"}</td></tr>)}{items.length === 0 && <tr><td colSpan="6">Kupon kaydı yok.</td></tr>}</tbody></table></div></div>{operation && write && <CouponDialog coupon={operation.coupon || null} actions={actions} onClose={() => setOperation(null)} onComplete={() => { setOperation(null); onRefresh(); }} />}</section>;
+}
+
+function SupportDialog({ thread, loadHistory, actions, onClose, onComplete }) {
+  const [messages, setMessages] = useState([]); const [phase, setPhase] = useState("loading"); const [reply, setReply] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState(null);
+  const refresh = useCallback(async () => { setPhase("loading"); try { setMessages(await loadHistory(thread.customerId)); setPhase("ready"); } catch (requestError) { setError(requestError); setPhase("error"); } }, [loadHistory, thread.customerId]);
+  useEffect(() => { refresh(); }, [refresh]);
+  const mutate = async (callback) => { setBusy(true); setError(null); try { await callback(); await refresh(); onComplete(); return true; } catch (requestError) { setError(requestError); return false; } finally { setBusy(false); } };
+  const send = async (event) => { event.preventDefault(); if (await mutate(() => actions.sendSupportReply({ customerId: thread.customerId, message: reply }))) setReply(""); };
+  const mutateAndClose = async (callback) => { if (await mutate(callback)) onClose(); };
+  return <OperationDialog title={`${thread.name} · destek görüşmesi`} busy={busy} onClose={onClose} testId="support-thread-dialog" wide>{error && <OperationError error={error} id="support-thread-error" />}<section className="notice-card"><Icon name="shield" /><div><strong>{thread.status}</strong><p>Thread #{thread.threadId} · {thread.email}</p></div></section>{phase === "loading" ? <p role="status">Görüşme yükleniyor…</p> : <div className="support-thread-messages">{messages.map((message) => <article className="notice-card" key={message.id}><div><strong>{message.senderId === thread.customerId ? thread.name : "Admin"}</strong><p>{message.message}</p><small>{dateTime(message.createdAt)}</small></div></article>)}</div>}<div className="heading-actions">{thread.status !== "TAKEN_OVER" && actions.takeoverSupport && <button className="secondary-button" onClick={() => mutateAndClose(() => actions.takeoverSupport({ threadId: thread.threadId }))}>Görüşmeyi devral</button>}{thread.status !== "CLOSED" && actions.setSupportStatus && <button className="danger-button" onClick={() => mutateAndClose(() => actions.setSupportStatus({ threadId: thread.threadId, status: "CLOSED" }))}>Görüşmeyi kapat</button>}</div>{actions.sendSupportReply && thread.status !== "CLOSED" && <form className="connected-form" onSubmit={send}><label className="field field-wide"><span>Yanıt</span><textarea value={reply} onChange={(event) => setReply(event.target.value)} required maxLength="2000" rows="4" /></label><button className="primary-button" disabled={busy || !reply.trim()}>Yanıt gönder</button></form>}</OperationDialog>;
+}
+
+function SupportWorkspace({ items, error, refreshing, onRefresh, loadHistory, actions }) {
+  const [selected, setSelected] = useState(null);
+  return <section className="workspace live-workspace" data-testid="live-support"><header className="workspace-heading operations-heading"><div><span className="eyebrow">Müşteri · NovaBot · Admin ortak thread</span><h2 tabIndex="-1">Destek gelen kutusu</h2><p>Devir, yönetici sahipliği ve yanıtlar ortak thread kimliğinde izlenir.</p></div><button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />Yenile</button></header><ResourceWarning error={error} onRetry={onRefresh} /><div className="table-card"><div className="table-scroll" tabIndex="0" role="region" aria-label="Destek görüşmeleri"><table className="data-table"><thead><tr><th>Müşteri</th><th>Kaynak</th><th>Durum</th><th>Son mesaj</th><th>İşlem</th></tr></thead><tbody>{items.map((thread) => <tr key={thread.threadId}><td><strong>{thread.name}</strong><small> {thread.email}</small></td><td>{thread.source}</td><td>{thread.status}</td><td>{thread.lastMessageAt ? dateTime(thread.lastMessageAt) : "Mesaj yok"}</td><td><button className="primary-button small" onClick={() => setSelected(thread)}>Görüşmeyi aç</button></td></tr>)}{items.length === 0 && <tr><td colSpan="5">Destek görüşmesi yok.</td></tr>}</tbody></table></div></div>{selected && <SupportDialog thread={selected} loadHistory={loadHistory} actions={actions} onClose={() => setSelected(null)} onComplete={onRefresh} />}</section>;
+}
+
 const railItems = [
   { id: "dashboard", label: "Pano", icon: "house", capability: "dashboardRead", implemented: true },
   { id: "orders", label: "Siparişler", icon: "orders", capability: "ordersRead", implemented: true },
   { id: "returns", label: "İadeler", icon: "refresh", capability: "returnsRead", implemented: true },
   { id: "notifications", label: "Bildirimler", icon: "bell", capability: "notificationsRead", implemented: true },
+  { id: "reviews", label: "Yorumlar", icon: "check", capability: "reviewsRead", implemented: true },
+  { id: "questions", label: "Sorular", icon: "help", capability: "questionsRead", implemented: true },
+  { id: "coupons", label: "Kuponlar", icon: "card", capability: "couponsRead", implemented: true },
+  { id: "support", label: "Destek", icon: "user", capability: "supportRead", implemented: true },
   { id: "catalog", label: "Ürünler", icon: "package", capability: "firstPartyCatalogRead", implemented: true },
   { id: "catalogStructure", label: "Katalog yapısı", icon: "grid", capability: "catalogStructureRead", implemented: true },
   { id: "customers", label: "Müşteriler · endpoint yok", icon: "user", capability: "customerAdmin", implemented: false },
@@ -1401,8 +1572,12 @@ const pageCapabilities = Object.freeze({
   catalog: "firstPartyCatalogRead",
   catalogStructure: "catalogStructureRead",
   sellerApplications: "storesRead",
+  reviews: "reviewsRead",
+  questions: "questionsRead",
+  coupons: "couponsRead",
+  support: "supportRead",
 });
-const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler", catalog: "Ürünler", catalogStructure: "Katalog yapısı", sellerApplications: "Satıcı mağazaları" });
+const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler", catalog: "Ürünler", catalogStructure: "Katalog yapısı", sellerApplications: "Satıcı mağazaları", reviews: "Yorumlar", questions: "Sorular", coupons: "Kuponlar", support: "Destek" });
 const readIntegratedPageFromLocation = () => resolveIntegratedAdminPage(window.location.hash);
 const writeIntegratedPageToHistory = (page, { replace = false } = {}) => {
   const nextHash = integratedAdminPageHash(page);
@@ -1454,6 +1629,18 @@ export function IntegratedApp() {
   const loadCatalogStructure = useCallback(({ signal }) => adapter.catalogStructure({ signal }), [adapter]);
   const loadStores = useCallback(({ signal }) => adapter.stores({ signal }), [adapter]);
   const loadStoreDetail = useCallback(({ signal }) => adapter.storeDetail({ storeId: selectedStoreId, signal }), [adapter, selectedStoreId]);
+  const loadReviews = useCallback(async ({ signal }) => {
+    const [pending, published] = await Promise.all([
+      adapter.reviews({ status: "PENDING", signal }),
+      adapter.reviews({ status: "PUBLISHED", signal }),
+    ]);
+    const items = Object.freeze([...pending.items, ...published.items]);
+    return Object.freeze({ items, count: items.length });
+  }, [adapter]);
+  const loadQuestions = useCallback(({ signal }) => adapter.questions({ signal }), [adapter]);
+  const loadCoupons = useCallback(({ signal }) => adapter.coupons({ signal }), [adapter]);
+  const loadSupportThreads = useCallback(({ signal }) => adapter.supportThreads({ signal }), [adapter]);
+  const loadSupportHistory = useCallback((customerId) => adapter.supportHistory({ customerId }), [adapter]);
   const sessionResource = useResource(loadSession, { preserveDataOnError: false });
   const sessionLoaded = sessionResource.phase === "ready";
   const capabilities = sessionResource.data?.capabilities || {};
@@ -1464,6 +1651,10 @@ export function IntegratedApp() {
   const catalogEnabled = sessionLoaded && hasCapability(capabilities, "firstPartyCatalogRead");
   const catalogStructureEnabled = sessionLoaded && hasCapability(capabilities, "catalogStructureRead");
   const storesEnabled = sessionLoaded && hasCapability(capabilities, "storesRead");
+  const reviewsEnabled = sessionLoaded && hasCapability(capabilities, "reviewsRead");
+  const questionsEnabled = sessionLoaded && hasCapability(capabilities, "questionsRead");
+  const couponsEnabled = sessionLoaded && hasCapability(capabilities, "couponsRead");
+  const supportEnabled = sessionLoaded && hasCapability(capabilities, "supportRead");
   const mutationActions = useMemo(() => adapter.mutationActions(capabilities), [adapter, capabilities]);
   const cancelWriteEnabled = typeof mutationActions.cancelOrder === "function";
   const shipmentWriteEnabled = typeof mutationActions.createManualShipment === "function";
@@ -1478,6 +1669,10 @@ export function IntegratedApp() {
   const catalogResource = useResource(loadCatalog, { enabled: catalogEnabled });
   const catalogStructureResource = useResource(loadCatalogStructure, { enabled: catalogStructureEnabled });
   const storesResource = useResource(loadStores, { enabled: storesEnabled });
+  const reviewsResource = useResource(loadReviews, { enabled: reviewsEnabled });
+  const questionsResource = useResource(loadQuestions, { enabled: questionsEnabled });
+  const couponsResource = useResource(loadCoupons, { enabled: couponsEnabled });
+  const supportResource = useResource(loadSupportThreads, { enabled: supportEnabled });
   const storeDetailResource = useResource(loadStoreDetail, { enabled: storesEnabled && selectedStoreId !== null, preserveDataOnError: false });
   const statsLoaded = statsResource.phase === "ready";
   const ordersLoaded = ordersResource.phase === "ready" || ordersResource.phase === "empty";
@@ -1486,10 +1681,14 @@ export function IntegratedApp() {
   const catalogLoaded = catalogResource.phase === "ready" || catalogResource.phase === "empty";
   const catalogStructureLoaded = catalogStructureResource.phase === "ready" || catalogStructureResource.phase === "empty";
   const storesLoaded = storesResource.phase === "ready" || storesResource.phase === "empty";
+  const reviewsLoaded = reviewsResource.phase === "ready" || reviewsResource.phase === "empty";
+  const questionsLoaded = questionsResource.phase === "ready" || questionsResource.phase === "empty";
+  const couponsLoaded = couponsResource.phase === "ready" || couponsResource.phase === "empty";
+  const supportLoaded = supportResource.phase === "ready" || supportResource.phase === "empty";
   const enabledPages = useMemo(() => Object.keys(pageCapabilities).filter((pageId) => (
     hasCapability(capabilities, pageCapabilities[pageId])
   )), [capabilities]);
-  const lastUpdatedAt = [ordersResource.updatedAt, returnsResource.updatedAt, notificationsResource.updatedAt, catalogResource.updatedAt, catalogStructureResource.updatedAt, storesResource.updatedAt]
+  const lastUpdatedAt = [ordersResource.updatedAt, returnsResource.updatedAt, notificationsResource.updatedAt, catalogResource.updatedAt, catalogStructureResource.updatedAt, storesResource.updatedAt, reviewsResource.updatedAt, questionsResource.updatedAt, couponsResource.updatedAt, supportResource.updatedAt]
     .filter(Boolean)
     .sort((left, right) => right.getTime() - left.getTime())[0] || null;
 
@@ -1573,6 +1772,10 @@ export function IntegratedApp() {
     if (catalogEnabled) catalogResource.reload();
     if (catalogStructureEnabled) catalogStructureResource.reload();
     if (storesEnabled) storesResource.reload();
+    if (reviewsEnabled) reviewsResource.reload();
+    if (questionsEnabled) questionsResource.reload();
+    if (couponsEnabled) couponsResource.reload();
+    if (supportEnabled) supportResource.reload();
   };
   const logout = async () => {
     await http.logout();
@@ -1606,7 +1809,7 @@ export function IntegratedApp() {
     pageContent = !notificationsEnabled
       ? <StatePanel phase="forbidden" error={notificationsUnavailableError} onRetry={notificationsResource.reload} />
       : notificationsLoaded
-        ? <Notifications notificationPage={notificationsResource.data} error={notificationsResource.error} refreshing={notificationsResource.refreshing} onRefresh={notificationsResource.reload} />
+        ? <Notifications notificationPage={notificationsResource.data} error={notificationsResource.error} refreshing={notificationsResource.refreshing} onRefresh={notificationsResource.reload} onOpenTarget={navigate} />
         : <StatePanel phase={notificationsResource.phase} error={notificationsResource.error} onRetry={notificationsResource.reload} />;
   } else if (page === "catalog") {
     pageContent = !catalogEnabled
@@ -1626,6 +1829,22 @@ export function IntegratedApp() {
       : storesLoaded
         ? <SellerApplications storePage={storesResource.data} detailResource={storeDetailResource} selectedStoreId={selectedStoreId} onSelect={setSelectedStoreId} onCloseDetail={() => setSelectedStoreId(null)} error={storesResource.error} refreshing={storesResource.refreshing} onRefresh={storesResource.reload} />
         : <StatePanel phase={storesResource.phase} error={storesResource.error} onRetry={storesResource.reload} />;
+  } else if (page === "reviews") {
+    pageContent = !reviewsEnabled ? <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={reviewsResource.reload} /> : reviewsLoaded
+      ? <ReviewsWorkspace page={reviewsResource.data || { items: [], count: 0 }} error={reviewsResource.error} refreshing={reviewsResource.refreshing} onRefresh={reviewsResource.reload} action={mutationActions.moderateReview} />
+      : <StatePanel phase={reviewsResource.phase} error={reviewsResource.error} onRetry={reviewsResource.reload} />;
+  } else if (page === "questions") {
+    pageContent = !questionsEnabled ? <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={questionsResource.reload} /> : questionsLoaded
+      ? <QuestionsWorkspace items={questionsResource.data || []} error={questionsResource.error} refreshing={questionsResource.refreshing} onRefresh={questionsResource.reload} action={mutationActions.answerQuestion} />
+      : <StatePanel phase={questionsResource.phase} error={questionsResource.error} onRetry={questionsResource.reload} />;
+  } else if (page === "coupons") {
+    pageContent = !couponsEnabled ? <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={couponsResource.reload} /> : couponsLoaded
+      ? <CouponsWorkspace items={couponsResource.data || []} error={couponsResource.error} refreshing={couponsResource.refreshing} onRefresh={couponsResource.reload} actions={mutationActions} />
+      : <StatePanel phase={couponsResource.phase} error={couponsResource.error} onRetry={couponsResource.reload} />;
+  } else if (page === "support") {
+    pageContent = !supportEnabled ? <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={supportResource.reload} /> : supportLoaded
+      ? <SupportWorkspace items={supportResource.data || []} error={supportResource.error} refreshing={supportResource.refreshing} onRefresh={supportResource.reload} loadHistory={loadSupportHistory} actions={mutationActions} />
+      : <StatePanel phase={supportResource.phase} error={supportResource.error} onRetry={supportResource.reload} />;
   } else {
     pageContent = <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={sessionResource.reload} />;
   }
@@ -1666,6 +1885,10 @@ export function IntegratedApp() {
             <button className={page === "orders" ? "active" : ""} onClick={() => navigate("orders")} disabled={!hasCapability(capabilities, "ordersRead")}><Icon name="orders" /><span>Siparişler</span><b>{ordersResource.data?.items.length || 0}</b></button>
             <button className={page === "returns" ? "active" : ""} onClick={() => navigate("returns")} disabled={!hasCapability(capabilities, "returnsRead")}><Icon name="refresh" /><span>İadeler</span><b>{returnsResource.data?.items.length || 0}</b></button>
             <button className={page === "notifications" ? "active" : ""} onClick={() => navigate("notifications")} disabled={!hasCapability(capabilities, "notificationsRead")}><Icon name="bell" /><span>Bildirimler</span><b>{notificationsResource.data?.items.filter((item) => !item.isRead).length || 0}</b></button>
+            {reviewsEnabled && <button className={page === "reviews" ? "active" : ""} onClick={() => navigate("reviews")}><Icon name="check" /><span>Yorumlar</span><b>{reviewsResource.data?.items.length || 0}</b></button>}
+            {questionsEnabled && <button className={page === "questions" ? "active" : ""} onClick={() => navigate("questions")}><Icon name="help" /><span>Sorular</span><b>{questionsResource.data?.filter((item) => !item.answer).length || 0}</b></button>}
+            {couponsEnabled && <button className={page === "coupons" ? "active" : ""} onClick={() => navigate("coupons")}><Icon name="card" /><span>Kuponlar</span><b>{couponsResource.data?.length || 0}</b></button>}
+            {supportEnabled && <button className={page === "support" ? "active" : ""} onClick={() => navigate("support")}><Icon name="user" /><span>Destek</span><b>{supportResource.data?.filter((item) => item.status !== "CLOSED").length || 0}</b></button>}
             {catalogEnabled && <button className={page === "catalog" ? "active" : ""} onClick={() => navigate("catalog")}><Icon name="package" /><span>Ürünler</span><b>{catalogResource.data?.items.length || 0}</b></button>}
             {catalogStructureEnabled && <button className={page === "catalogStructure" ? "active" : ""} onClick={() => navigate("catalogStructure")}><Icon name="grid" /><span>Katalog yapısı</span><b>{catalogStructureResource.data?.categories.items.length || 0}</b></button>}
             {storesEnabled && <button className={page === "sellerApplications" ? "active" : ""} onClick={() => navigate("sellerApplications")}><Icon name="storefront" /><span>Satıcı mağazaları</span><b>{storesResource.data?.items.length || 0}</b></button>}

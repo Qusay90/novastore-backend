@@ -49,6 +49,7 @@ const productResponseFields = new Set([
   "updated_at",
   "revision",
   "has_media",
+  "media",
   "category_ids",
   "primary_category_id",
   "categories",
@@ -66,6 +67,7 @@ const attributeResponseFields = new Set([
   "is_variant_relevant",
   "value",
 ]);
+const mediaResponseFields = new Set(["id", "media_url", "media_type", "is_main", "sort_order"]);
 const createInputFields = new Set([
   "name",
   "description",
@@ -337,6 +339,32 @@ export function normalizeAdminCatalogProductDetail(payload) {
     throw new TypeError("product.attributes yinelenen kimlik veya kod içeremez.");
   }
 
+  if (!Array.isArray(product.media) || product.media.length > 10) throw new TypeError("product.media en fazla 10 kayıt içeren dizi olmalıdır.");
+  const media = product.media.map((entry, index) => {
+    const value = requireRecord(entry, `product.media[${index}]`);
+    requireExactFields(value, mediaResponseFields, `product.media[${index}]`);
+    if (!['image', 'video'].includes(value.media_type)) throw new TypeError(`product.media[${index}].media_type geçersiz.`);
+    const mediaUrl = requireText(value.media_url, `product.media[${index}].media_url`, { max: 2048 });
+    let parsed;
+    try { parsed = new URL(mediaUrl); } catch (_) { throw new TypeError(`product.media[${index}].media_url geçersiz.`); }
+    if (parsed.protocol !== 'https:' || parsed.hostname !== 'res.cloudinary.com' || parsed.username || parsed.password || parsed.search || parsed.hash) {
+      throw new TypeError(`product.media[${index}].media_url izin verilmeyen kaynak içeriyor.`);
+    }
+    return Object.freeze({
+      id: requirePositiveInteger(value.id, `product.media[${index}].id`),
+      mediaUrl,
+      mediaType: value.media_type,
+      isCover: requireBoolean(value.is_main, `product.media[${index}].is_main`),
+      sortOrder: requireNonNegativeInteger(value.sort_order, `product.media[${index}].sort_order`),
+    });
+  });
+  if (new Set(media.map((entry) => entry.id)).size !== media.length
+    || media.filter((entry) => entry.isCover).length > 1
+    || media.some((entry) => entry.isCover && entry.mediaType !== "image")
+    || (product.has_media !== (media.length > 0))) {
+    throw new TypeError("product.media kimlik, kapak veya has_media sözleşmesi tutarsız.");
+  }
+
   const rawId = requirePositiveInteger(product.id, "product.id");
   const vatRate = requireVatRate(product.vat_rate, "product.vat_rate", { nullable: true });
   const vatRateSource = requireVatRateSource(
@@ -370,6 +398,7 @@ export function normalizeAdminCatalogProductDetail(payload) {
     updatedAt: requireNullableDate(product.updated_at, "product.updated_at"),
     revision: requirePositiveInteger(product.revision, "product.revision"),
     hasMedia: requireBoolean(product.has_media, "product.has_media"),
+    media: Object.freeze(media),
     categoryIds: Object.freeze(categoryIds),
     primaryCategoryId,
     categories: Object.freeze(categories),

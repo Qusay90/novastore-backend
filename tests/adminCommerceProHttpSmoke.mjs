@@ -345,12 +345,14 @@ assert.equal(returnPage.items[0].currency, "TRY");
 assert.throws(() => normalizeReturnSummaryPage({ items: [{ id: 1, order_id: 2, refund_amount: -1 }], limit: 100, hasMore: false }), /refund_amount/);
 
 const notificationPage = normalizeNotificationSummaryPage({
-  items: [{ id: 5, type: "new_order", message: "Yeni sipariş", is_read: false, created_at: "2026-07-14T10:00:00.000Z" }],
+  items: [{ id: 5, type: "new_order", message: "Yeni sipariş", is_read: false, entity_type: "order", entity_id: 42, created_at: "2026-07-14T10:00:00.000Z" }],
   limit: 50,
   hasMore: false,
 });
 assert.equal(notificationPage.items[0].id, "NT-000005");
 assert.equal(notificationPage.items[0].isRead, false);
+assert.equal(notificationPage.items[0].targetPage, "orders");
+assert.equal(notificationPage.items[0].entityId, 42);
 assert.throws(() => normalizeNotificationSummaryPage({ items: [{ id: 5, is_read: 0 }], limit: 50, hasMore: false }), /boolean/);
 
 const catalogPage = normalizeFirstPartyCatalogPage({

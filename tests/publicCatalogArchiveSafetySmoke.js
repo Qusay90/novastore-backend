@@ -362,6 +362,7 @@ const testPublicReviewsAndArchiveRace = async () => {
             return {
                 rows: [{
                     public_product_exists: visibility !== 'archived',
+                    first_party_write_eligible: visibility !== 'archived',
                     has_delivered_order: visibility === 'public-delivered'
                 }],
                 rowCount: 1
@@ -488,7 +489,8 @@ const testAuthenticatedHistoryRemainsAvailable = async () => {
         }
 
         if (/FROM product_questions pq[\s\S]*JOIN users u/i.test(text)) {
-            assert.doesNotMatch(text, /publication_status|is_customer_visible|deleted_at/i);
+            assert.doesNotMatch(text, /p\.publication_status|p\.is_customer_visible/i);
+            assert.match(text, /first_party_store\.deleted_at IS NULL/i);
             return {
                 rows: [{
                     id: 601,

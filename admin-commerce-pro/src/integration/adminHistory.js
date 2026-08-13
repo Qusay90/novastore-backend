@@ -6,6 +6,10 @@ const INTEGRATED_ADMIN_PAGES = Object.freeze([
   "catalog",
   "catalogStructure",
   "sellerApplications",
+  "reviews",
+  "questions",
+  "coupons",
+  "support",
 ]);
 
 export const resolveIntegratedAdminPage = (hash = "") => {

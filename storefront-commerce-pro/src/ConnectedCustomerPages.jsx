@@ -482,9 +482,14 @@ function NotificationsSection({ session, account, onNotice }) {
   if (resource.phase !== "ready") return <InlineState phase={resource.phase} error={resource.error} onRetry={resource.reload} />;
   const notifications = resource.data;
   const markOne = async (item) => {
-    if (item.isRead) return;
     setBusy(true); setError("");
-    try { await account.markNotificationRead(item.id); resource.reload(); }
+    try {
+      if (!item.isRead) {
+        await account.markNotificationRead(item.id);
+        resource.reload();
+      }
+      if (item.target) window.location.hash = item.target.slice(1);
+    }
     catch (requestError) { setError(errorMessage(requestError, "Bildirim güncellenemedi.")); }
     finally { setBusy(false); }
   };

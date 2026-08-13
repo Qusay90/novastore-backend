@@ -23,6 +23,7 @@ process.env.DB_PASSWORD = decodeURIComponent(parsed.password);
 process.env.DB_SSL = 'false';
 process.env.SUPABASE_USE_POOLER = 'false';
 process.env.JWT_SECRET = 'p4b-local-revocation-secret';
+process.env.NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED = 'true';
 
 const serverModulePath = require.resolve('../server');
 require.cache[serverModulePath] = {
@@ -45,6 +46,7 @@ const {
     requireAdmin
 } = require('../middlewares/authMiddleware');
 const { requireCurrentAdmin } = require('../middlewares/currentAdmin');
+const { privateNoStore } = require('../middlewares/privateNoStore');
 const {
     getUserFromRequestIfAny,
     inferExpectedPrincipal,
@@ -94,7 +96,7 @@ const questionPaths = Object.freeze([
     { method: 'GET', path: '/api/questions/user', principal: 'customer' },
     { method: 'GET', path: '/api/questions/admin/all', principal: 'admin' },
     { method: 'GET', path: '/api/questions/admin/products', principal: 'admin' },
-    { method: 'PATCH', path: '/api/questions/admin/answer/1', principal: 'admin', body: { answer: 'Evet, stokta.' } }
+    { method: 'PATCH', path: '/api/questions/admin/answer/1', principal: 'admin', body: { answer: 'Evet, stokta.', expected_revision: 1 } }
 ]);
 
 const findQuestionRoute = (path) => questionRoutes.stack.find((layer) => layer.route?.path === path).route;
@@ -102,7 +104,9 @@ const findQuestionRoute = (path) => questionRoutes.stack.find((layer) => layer.r
 const assertQuestionRoute = (path, expectedHandlers) => {
     const actual = findQuestionRoute(path).stack.map((layer) => layer.handle);
     assert.equal(actual.length, expectedHandlers.length);
-    expectedHandlers.forEach((handler, index) => assert.equal(actual[index], handler));
+    expectedHandlers.forEach((handler, index) => {
+        if (handler !== null) assert.equal(actual[index], handler);
+    });
 };
 
 const inferPrincipal = (method, originalUrl) => inferExpectedPrincipal({ method, originalUrl });
@@ -130,8 +134,16 @@ const inferPrincipal = (method, originalUrl) => inferExpectedPrincipal({ method,
             role VARCHAR(20) NOT NULL DEFAULT 'customer',
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE stores (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            slug TEXT NOT NULL,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            deleted_at TIMESTAMPTZ
+        );
         CREATE TABLE products (
             id SERIAL PRIMARY KEY,
+            store_id INTEGER NOT NULL REFERENCES stores(id),
             name TEXT NOT NULL,
             image_url TEXT,
             publication_status TEXT NOT NULL DEFAULT 'active',
@@ -144,14 +156,31 @@ const inferPrincipal = (method, originalUrl) => inferExpectedPrincipal({ method,
             user_id INTEGER REFERENCES users(id),
             question TEXT NOT NULL,
             answer TEXT,
+            revision INTEGER NOT NULL DEFAULT 1,
+            answered_by INTEGER REFERENCES users(id),
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            answered_at TIMESTAMPTZ
+            answered_at TIMESTAMPTZ,
+            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE customer_operation_audit_events (
+            id BIGSERIAL PRIMARY KEY,
+            actor_user_id INTEGER REFERENCES users(id),
+            actor_role TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            before_state JSONB,
+            after_state JSONB,
+            metadata JSONB,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE notifications (
             id SERIAL PRIMARY KEY,
             user_id INTEGER,
             type TEXT,
             message TEXT,
+            entity_type TEXT,
+            entity_id INTEGER,
             is_read BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
@@ -186,7 +215,10 @@ const inferPrincipal = (method, originalUrl) => inferExpectedPrincipal({ method,
     );
     const customerId = Number(customer.rows[0].id);
     const adminId = Number(admin.rows[0].id);
-    await pool.query("INSERT INTO products (id, name) VALUES (1, 'Test Product')");
+    const store = await pool.query(
+        "INSERT INTO stores (name, slug) VALUES ('NovaStore', 'novastore-platform') RETURNING id"
+    );
+    await pool.query("INSERT INTO products (id, store_id, name) VALUES (1, $1, 'Test Product')", [store.rows[0].id]);
 
     const app = express();
     app.use(express.json());
@@ -338,16 +370,16 @@ const inferPrincipal = (method, originalUrl) => inferExpectedPrincipal({ method,
         }
         assert.deepEqual(successStatuses, [201, 200, 200, 200, 200]);
 
-        assertQuestionRoute('/ask', [authenticateCustomer, questionController.askQuestion]);
-        assertQuestionRoute('/user', [authenticateCustomer, questionController.getUserQuestions]);
+        assertQuestionRoute('/ask', [privateNoStore, authenticateCustomer, questionController.askQuestion]);
+        assertQuestionRoute('/user', [privateNoStore, authenticateCustomer, questionController.getUserQuestions]);
         assertQuestionRoute('/admin/all', [
-            authenticateAdmin, requireAdmin, requireCurrentAdmin, questionController.getAllQuestionsAdmin
+            privateNoStore, authenticateAdmin, requireAdmin, null, requireCurrentAdmin, questionController.getAllQuestionsAdmin
         ]);
         assertQuestionRoute('/admin/products', [
-            authenticateAdmin, requireAdmin, requireCurrentAdmin, questionController.getProductQuestionSummaryAdmin
+            privateNoStore, authenticateAdmin, requireAdmin, null, requireCurrentAdmin, questionController.getProductQuestionSummaryAdmin
         ]);
         assertQuestionRoute('/admin/answer/:id', [
-            authenticateAdmin, requireAdmin, requireCurrentAdmin, questionController.answerQuestion
+            privateNoStore, authenticateAdmin, requireAdmin, null, requireCurrentAdmin, questionController.answerQuestion
         ]);
 
         for (const entry of questionPaths.filter((item) => item.principal === 'admin')) {

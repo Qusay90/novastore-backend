@@ -2690,12 +2690,12 @@
                         </div>
                     </div>
                     <div class="form-group" id="existing-media-group" style="display: none;">
-                        <label>Mevcut Görseller/Videolar</label>
+                            <label>Mevcut Görseller</label>
                         <div id="existing-media-container" class="media-preview-grid"></div>
                         <div id="existing-media-preview-stage" class="pending-media-preview-stage"></div>
                     </div>
                     <div class="form-group" id="image-upload-group">
-                        <label>Yeni Görsel/Video Ekle</label>
+                            <label>Yeni Görsel Ekle</label>
                         <div class="upload-option-toggle">
                             <span class="upload-option-icon" aria-hidden="true">BG</span>
                             <span>
@@ -2708,7 +2708,7 @@
                             <span class="upload-area-text">Sürükle ve Bırak veya Tıklayarak
                                 Seç</span>
                         </div>
-                        <input type="file" id="prod-media" class="form-control" accept="image/*,video/mp4,image/gif"
+                        <input type="file" id="prod-media" class="form-control" accept="image/jpeg,image/png,image/webp,image/gif"
                             multiple style="display: none;"
                             onchange="handleProductMediaSelection(this)">
                         <div id="upload-status" class="upload-status"></div>
@@ -2747,6 +2747,7 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="modal-question-id">
+                <input type="hidden" id="modal-question-revision">
                 <div
                     style="background:rgba(247,148,29,0.08); border-left:3px solid #F7941D; padding:12px 15px; border-radius:6px; margin-bottom:20px;">
                     <p style="margin:0; font-weight:600; color:var(--text); font-size:0.9rem;">Müşteri Sorusu:</p>
@@ -3537,6 +3538,19 @@
             };
         }
 
+        const supportedProductMediaMimeTypes = new Set([
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+            'image/gif'
+        ]);
+
+        function isSupportedProductMediaFile(file) {
+            return supportedProductMediaMimeTypes.has(
+                String(file && file.type ? file.type : '').trim().toLowerCase()
+            );
+        }
+
         function getPendingMediaEntryIndexByKey(key) {
             return pendingProductMediaFiles.findIndex((entry) => entry.key === key);
         }
@@ -3875,13 +3889,22 @@
         }
 
         function appendPendingProductMediaFiles(selectedFiles, input = null) {
-            if (!selectedFiles.length) {
+            const files = Array.from(selectedFiles || []);
+            const supportedFiles = files.filter(isSupportedProductMediaFile);
+            const rejectedCount = files.length - supportedFiles.length;
+
+            if (rejectedCount > 0) {
+                alert('Bu sürümde ürün medyası olarak yalnızca JPG, PNG, WebP veya GIF görselleri eklenebilir. Video yayını Android ve web desteği tamamlanana kadar kapalıdır.');
+            }
+
+            if (!supportedFiles.length) {
+                if (input) input.value = '';
                 updatePendingMediaStatus();
                 return;
             }
 
             const timestamp = Date.now();
-            const newEntries = selectedFiles.map((file, index) => createPendingProductMediaEntry(file, index, timestamp));
+            const newEntries = supportedFiles.map((file, index) => createPendingProductMediaEntry(file, index, timestamp));
 
             pendingProductMediaFiles = pendingProductMediaFiles.concat(newEntries);
             if (input) {
@@ -4264,7 +4287,7 @@
 
                 const deleteButton = document.createElement('button');
                 deleteButton.type = 'button';
-                deleteButton.innerText = 'Sil';
+                deleteButton.innerText = 'Kuyruktan kaldır';
                 deleteButton.style.alignSelf = 'center';
                 deleteButton.style.border = 'none';
                 deleteButton.style.borderRadius = '10px';
@@ -4295,20 +4318,23 @@
             if (!Number.isInteger(numericUserId)) return;
 
             const item = aiHandoffItems.find((entry) => Number(entry.id) === numericUserId);
-            const displayName = item && item.name ? item.name : `Musteri #${numericUserId}`;
-            const confirmed = confirm(`${displayName} için kayıtlı tüm yapay zekâ devir özetleri silinsin mi?`);
+            const displayName = item && item.name ? item.name : `Müşteri #${numericUserId}`;
+            const confirmed = confirm(`${displayName} için açık yapay zekâ devir kayıtları kuyruktan kaldırılsın mı? Görüşme geçmişi korunur.`);
             if (!confirmed) return;
 
             try {
                 const response = await adminApiFetch(`/api/messages/handoffs/${numericUserId}`, { method: 'DELETE' });
-                const payload = await adminReadJson(response, 'Yapay zekâ devir kaydı silinemedi.');
+                const payload = await adminReadJson(response, 'Yapay zekâ devir kaydı kuyruktan kaldırılamadı.');
                 if (Number(currentAiHandoffUserId) === numericUserId) {
                     currentAiHandoffUserId = null;
                 }
-                await loadAiHandoffs(false);
-                alert(payload && payload.mesaj ? payload.mesaj : 'Yapay zekâ devir kaydı silindi.');
+                await Promise.all([
+                    loadAiHandoffs(false),
+                    fetchAdminNotifications()
+                ]);
+                alert(payload && payload.mesaj ? payload.mesaj : 'Yapay zekâ devir kaydı kuyruktan kaldırıldı; görüşme geçmişi korundu.');
             } catch (err) {
-                alert(err.message || 'Yapay zekâ devir kaydı silinemedi.');
+                alert(err.message || 'Yapay zekâ devir kaydı kuyruktan kaldırılamadı.');
             }
         }
 
@@ -4375,7 +4401,7 @@
                 `;
                 const deleteButton = document.createElement('button');
                 deleteButton.type = 'button';
-                deleteButton.innerText = 'Yapay zekâ devrini sil';
+                deleteButton.innerText = 'Devri kuyruktan kaldır';
                 deleteButton.style.marginTop = '14px';
                 deleteButton.style.border = 'none';
                 deleteButton.style.borderRadius = '10px';
@@ -6080,7 +6106,7 @@
             </td>
             <td>${dateStr}</td>
             <td>
-                <button class="btn-edit" onclick="openAnswerModal(${Number(q.id)}, decodeURIComponent('${questionArg}'), decodeURIComponent('${answerArg}'))">
+                <button class="btn-edit" onclick="openAnswerModal(${Number(q.id)}, ${Number(q.revision)}, decodeURIComponent('${questionArg}'), decodeURIComponent('${answerArg}'))">
                     ${isAnswered ? 'Güncelle' : 'Yanıtla'}
                 </button>
             </td>
@@ -6109,8 +6135,9 @@
             }
         }
 
-        function openAnswerModal(id, questionText, currentAnswer) {
+        function openAnswerModal(id, revision, questionText, currentAnswer) {
             document.getElementById('modal-question-id').value = id;
+            document.getElementById('modal-question-revision').value = revision;
             document.getElementById('modal-question-text').innerText = questionText;
             document.getElementById('modal-answer-text').value = currentAnswer;
             document.getElementById('answerModal').style.display = 'flex';
@@ -6122,6 +6149,7 @@
 
         async function submitAnswer() {
             const id = document.getElementById('modal-question-id').value;
+            const revision = Number(document.getElementById('modal-question-revision').value);
             const answer = document.getElementById('modal-answer-text').value.trim();
             const token = localStorage.getItem('nova_admin_token');
 
@@ -6134,7 +6162,7 @@
                 const res = await adminApiFetch(`/api/questions/admin/answer/${id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ answer })
+                    body: JSON.stringify({ answer, expected_revision: revision })
                 });
 
                 const result = await res.json();
@@ -6272,6 +6300,7 @@
             if (!pending) return;
             openAnswerModal(
                 Number(pending.id),
+                Number(pending.revision),
                 `${pending.product_name || 'Ürün'}\n\n${pending.question || ''}`,
                 pending.answer || ''
             );

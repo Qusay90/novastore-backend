@@ -37,8 +37,8 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const storefrontSha256 = sha256(storefrontArtifact);
 const adminSha256 = sha256(adminArtifact);
 const expectedArtifactSha256 = Object.freeze({
-  storefront: "7a03b4f89bb941b27fb0d89580ae692b89b3b8104f0a3042f9cb7819004f4c0f",
-  admin: "40786392e1df51bcd415e1a1c8c1af7684c85ab733d66401f66d90d70cb74405",
+  storefront: "ce39e778fcce33c96d236c9e51149afdb864ab12884244a8562b1120bba06be6",
+  admin: "63d33d8bd3e4befd59b1ad60bb65404b12bec38389e4a70e4f3e284b62fab431",
 });
 if (storefrontSha256 !== expectedArtifactSha256.storefront) {
   throw new Error("Storefront artifact beklenen resmî inceleme digest'iyle eşleşmiyor.");

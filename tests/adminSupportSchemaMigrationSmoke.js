@@ -3,7 +3,6 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const express = require('express');
-const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 const DEFAULT_LOCAL_DATABASE_URL =
     'postgresql://novastore_test:novastore_test_only@127.0.0.1:55433/novastore_admin_support_test';
@@ -87,6 +86,7 @@ process.env.SUPABASE_REGION = '';
 process.env.SUPABASE_PROJECT_REF = '';
 process.env.JWT_SECRET = 'admin-support-local-smoke-secret';
 
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 const authFixture = createAuthSessionFixture();
 authFixture.install();
 

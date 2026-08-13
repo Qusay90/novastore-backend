@@ -26,6 +26,7 @@ const loadReviewRows = async (productId) => {
         `SELECT rating, comment, created_at
          FROM reviews
          WHERE product_id = $1
+           AND status = 'PUBLISHED'
          ORDER BY created_at DESC`,
         [productId]
     );

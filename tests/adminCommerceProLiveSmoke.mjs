@@ -72,6 +72,41 @@ assert.match(source, /Sipariş özeti okuma yeteneği bu admin oturumunda açık
 assert.match(source, /Dashboard okuma yeteneği bu admin oturumunda açık değil/);
 assert.match(source, /Filtrelenmiş sipariş sayısı/);
 assert.match(integratedAppSource, /if \(!enabledPages\.includes\(page\) && enabledPages\[0\]\) setPage\(enabledPages\[0\]\)/);
+assert.match(
+  integratedAppSource,
+  /Promise\.all\(\[\s*adapter\.reviews\(\{ status: "PENDING", signal \}\),\s*adapter\.reviews\(\{ status: "PUBLISHED", signal \}\),\s*\]\)/,
+  "yorum operasyonu bekleyen ve yayınlanmış kayıtları birlikte yüklemeli",
+);
+assert.match(
+  integratedAppSource,
+  /item\.status === "PENDING" \|\| item\.status === "PUBLISHED"/,
+  "yayınlanmış yorum Admin UI üzerinden gizlenebilir kalmalı",
+);
+assert.match(
+  integratedAppSource,
+  /review\.status === "PUBLISHED" \? "HIDDEN" : "PUBLISHED"/,
+  "yayınlanmış yorum moderasyon diyaloğu güvenli biçimde gizleme kararıyla açılmalı",
+);
+assert.match(
+  integratedAppSource,
+  /const handleMediaComplete = \(product, \{ keepOpen = false \} = \{\}\) => \{[\s\S]{0,360}if \(!keepOpen\) \{[\s\S]{0,120}onRefresh\(\)/,
+  "medya ara işlemi keepOpen ile diyaloğu kapatmadan exact revision üzerinde devam etmeli",
+);
+assert.match(
+  integratedAppSource,
+  /const closeMediaOperation = \(\) => \{\s*setOperation\(null\);\s*onRefresh\(\);\s*\}/,
+  "medya özeti yalnız diyalog kapatılırken yenilenmeli",
+);
+assert.match(
+  integratedAppSource,
+  /active: coupon\?\.active \?\? false/,
+  "yeni kupon diyaloğu fail-closed olarak devre dışı başlamalı",
+);
+assert.match(
+  integratedAppSource,
+  /else await actions\.createCoupon\(\{ body: \{ code: form\.code, discount_type: form\.type, is_active: form\.active/,
+  "kupon oluşturma etkinlik kararını açıkça sunucuya taşımalı",
+);
 assert.match(integratedAppSource, /page === "dashboard"[\s\S]{0,180}!statsEnabled[\s\S]{0,180}dashboardUnavailableError/);
 assert.match(integratedAppSource, /page === "orders"[\s\S]{0,180}!ordersEnabled[\s\S]{0,180}ordersUnavailableError/);
 assert.match(integratedAppSource, /page === "returns"[\s\S]{0,180}!returnsEnabled[\s\S]{0,180}returnsUnavailableError/);
@@ -107,7 +142,7 @@ assert.match(source, /Taşıyıcı API\/etiket işlemi yapılmadı/);
 assert.match(source, /Paketi fiziksel olarak taşıyıcıya teslim ettiğimi doğruluyorum/);
 assert.match(source, /Birinci taraf ürün özeti tablosu/);
 assert.match(source, /İç yayın incelemesi/);
-assert.match(source, /manuel ürün onay kuyruğu oluşturulmaz/);
+assert.match(source, /satıcı, teklif veya risk kuyruğu oluşturulmaz/);
 assert.match(source, /daha eski ürünler bu turda gösterilmiyor/);
 assert.match(source, /medyasız ürün JSON CRUD/i);
 assert.match(source, /Tam DTO alınıyor/);
@@ -129,7 +164,16 @@ assert.match(integratedAppSource, /if \(!writesBlocked \|\| !operation\) return;
 assert.match(catalogMutationsSource, /CATALOG_PRODUCT_INPUT_INVALID/);
 assert.match(catalogMutationsSource, /\/api\/admin\/catalog\/products\/\$\{productId\}\/archive/);
 assert.match(catalogMutationsSource, /expected_revision: expectedRevision/);
-assert.doesNotMatch(catalogMutationsSource, /FormData|image_url|imageUrl|cloudinary|store_id|seller_id/i, "katalog mutation sözleşmesi medya, mağaza veya satıcı alanı taşımamalı");
+assert.match(catalogMutationsSource, /const mediaResponseFields = new Set/);
+const catalogMutationInputFields = catalogMutationsSource.match(
+  /const createInputFields = new Set\(\[[\s\S]*?const attributeTypes = new Set/,
+)?.[0] || "";
+assert.ok(catalogMutationInputFields, "katalog create\/update input alan sözleşmesi bulunmalı");
+assert.doesNotMatch(
+  catalogMutationInputFields,
+  /FormData|media|image_url|imageUrl|cloudinary|store_id|seller_id/i,
+  "katalog mutation input sözleşmesi medya, mağaza veya satıcı alanı taşımamalı",
+);
 assert.match(catalogReadSource, /!product\.deletedAt[\s\S]{0,100}product\.publicationStatus === "active"[\s\S]{0,100}product\.customerVisible/, "etkin görünürlük silinmiş ve yayın dışı kayıtları fail-closed dışarıda bırakmalı");
 const catalogAdapterSource = adapterSource.match(/const catalog = async[\s\S]*?\n  \);/)?.[0] || "";
 assert.match(catalogAdapterSource, /\/api\/admin\/catalog\/products\/summary\?limit=100/);

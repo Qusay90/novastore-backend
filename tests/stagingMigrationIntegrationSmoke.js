@@ -138,6 +138,38 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
                   RETURNS INTEGER LANGUAGE SQL IMMUTABLE AS 'SELECT 1'`
         }
     ]) await assertUnmanagedRejection(probe);
+
+    await resetPublic();
+    const mediaMigration = registry.at(-1);
+    assert.equal(mediaMigration.id, '20260813_04_product_media_operations');
+    const preMediaRegistry = registry.slice(0, -1);
+    const preMediaApply = await runApply({ env, registry: preMediaRegistry, output: silent });
+    assert.deepEqual(preMediaApply.applied, preMediaRegistry.map((entry) => entry.id));
+    const legacyVideoProduct = await admin.query(
+        `INSERT INTO products (name, price, image_url)
+         VALUES ('Legacy mislabeled video probe', 1, $1)
+         RETURNING id`,
+        ['https://res.cloudinary.com/demo/video/upload/v1/legacy-cover.mp4']
+    );
+    await admin.query(
+        `INSERT INTO product_media (product_id, media_url, is_main, sort_order)
+         VALUES ($1, $2, TRUE, 0)`,
+        [
+            legacyVideoProduct.rows[0].id,
+            'https://res.cloudinary.com/demo/video/upload/v1/legacy-gallery.mp4'
+        ]
+    );
+    await assert.rejects(
+        runApply({ env, registry, output: silent }),
+        (error) => error?.code === '23514' && /video rows|video media/i.test(error.message),
+        'Mislabeled legacy video URLs must block the image-only publication migration.'
+    );
+    const mediaLedgerAfterRejection = await admin.query(
+        `SELECT COUNT(*)::INTEGER AS count FROM ${LEDGER_TABLE} WHERE migration_id = $1`,
+        [mediaMigration.id]
+    );
+    assert.equal(mediaLedgerAfterRejection.rows[0].count, 0);
+
     await resetPublic();
 
     const firstApply = await runApply({ env, registry, output: silent });
@@ -153,13 +185,14 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'admin_catalog_audit_events', 'attribute_definitions', 'attribute_options',
         'attribute_templates', 'auth_sessions', 'campaign_configs', 'categories',
         'category_aliases', 'category_stats', 'collection_products', 'collection_rules',
-        'collections', 'coupons', 'customer_addresses', 'favorites', 'invoices',
+        'collections', 'coupons', 'customer_addresses', 'customer_operation_audit_events', 'favorites', 'invoices',
         'menu_items', 'menus', 'messages', 'notification_audit_logs', 'notifications',
         'order_events', 'order_item_backfill_issues', 'order_items', 'orders',
         'page_visits', 'payments', 'product_actions', 'product_attribute_values',
         'product_categories', 'product_media', 'product_questions', 'products',
         'returns', 'review_media', 'reviews', 'shipments', 'stores',
-        'template_attributes', 'user_shared_state', 'users', 'visitor_sessions',
+        'support_thread_events', 'support_threads', 'template_attributes', 'user_shared_state', 'users', 'visitor_sessions',
+        'admin_coupon_audit_events',
         'webhook_events', LEDGER_TABLE
     ].sort();
     const tables = await admin.query(
@@ -181,10 +214,23 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
               ('categories', 'path'),
               ('categories', 'revision'),
               ('orders', 'analytics_session_key'),
-              ('collections', 'show_on_home')
+              ('collections', 'show_on_home'),
+              ('reviews', 'status'),
+              ('reviews', 'revision'),
+              ('reviews', 'moderated_by'),
+              ('reviews', 'moderated_at'),
+              ('reviews', 'moderation_note'),
+              ('product_questions', 'revision'),
+              ('product_questions', 'answered_by'),
+              ('product_questions', 'updated_at'),
+              ('notifications', 'entity_type'),
+              ('notifications', 'entity_id'),
+              ('messages', 'support_thread_id'),
+              ('coupons', 'revision'),
+              ('product_media', 'media_type')
            )`
     );
-    assert.equal(requiredColumns.rowCount, 7);
+    assert.equal(requiredColumns.rowCount, 20);
 
     const triggers = await admin.query(
         `SELECT trigger_name
@@ -193,10 +239,62 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
            AND trigger_name IN (
               'trg_admin_catalog_audit_append_only',
               'trg_users_revoke_auth_sessions',
-              'trg_auth_sessions_notify_revoked'
+              'trg_auth_sessions_notify_revoked',
+              'trg_customer_operation_audit_append_only',
+              'trg_admin_coupon_audit_append_only',
+              'trg_coupons_reject_hard_delete',
+              'trg_support_thread_events_append_only'
            )`
     );
-    assert.equal(new Set(triggers.rows.map((row) => row.trigger_name)).size, 3);
+    assert.equal(new Set(triggers.rows.map((row) => row.trigger_name)).size, 7);
+
+    const requiredConstraints = [
+        'chk_reviews_operational_status', 'chk_reviews_revision_positive',
+        'chk_reviews_comment_no_control', 'chk_reviews_moderation_note_no_control',
+        'chk_product_questions_revision_positive', 'chk_product_questions_question_no_control',
+        'chk_product_questions_answer_no_control', 'chk_customer_operation_audit_actor_role',
+        'chk_customer_operation_audit_entity_type', 'chk_customer_operation_audit_action',
+        'chk_customer_operation_audit_before_object', 'chk_customer_operation_audit_after_object',
+        'chk_customer_operation_audit_metadata_object', 'chk_notifications_entity_pair',
+        'chk_notifications_entity_type', 'chk_notifications_entity_id', 'uq_support_threads_customer',
+        'chk_support_threads_status', 'chk_support_threads_source', 'chk_support_threads_assignment',
+        'fk_messages_support_thread', 'chk_messages_handoff_dismissal_pair',
+        'chk_messages_handoff_dismissal_scope', 'chk_messages_message_no_control',
+        'chk_support_thread_events_type', 'chk_coupons_revision_positive',
+        'chk_coupons_discount_value_positive', 'chk_coupons_amount_bounds', 'chk_coupons_usage_bounds',
+        'chk_coupons_date_range', 'chk_admin_coupon_audit_actor_role', 'chk_admin_coupon_audit_action',
+        'chk_admin_coupon_audit_revision', 'chk_admin_coupon_audit_metadata_object',
+        'chk_product_media_type', 'chk_product_media_image_cover',
+        'chk_product_media_video_publication_disabled', 'chk_products_image_url_not_video'
+    ].sort();
+    const constraints = await admin.query(
+        `SELECT conname
+         FROM pg_constraint
+         WHERE connamespace = 'public'::regnamespace
+           AND conname = ANY($1::TEXT[])
+         ORDER BY conname`,
+        [requiredConstraints]
+    );
+    assert.deepEqual(constraints.rows.map((row) => row.conname), requiredConstraints);
+
+    const safetyIndexes = await admin.query(
+        `SELECT indexname, indexdef
+         FROM pg_indexes
+         WHERE schemaname = 'public'
+           AND indexname = ANY($1::TEXT[])
+         ORDER BY indexname`,
+        [[
+            'idx_product_media_one_main',
+            'idx_product_media_product_url_unique',
+            'idx_reviews_product_user_unique'
+        ]]
+    );
+    assert.equal(safetyIndexes.rowCount, 3);
+    for (const row of safetyIndexes.rows) assert.match(row.indexdef, /CREATE UNIQUE INDEX/i);
+    assert.match(
+        safetyIndexes.rows.find((row) => row.indexname === 'idx_product_media_one_main').indexdef,
+        /WHERE \(is_main = true\)/i
+    );
     const platformStore = await admin.query(
         `SELECT COUNT(*)::INTEGER AS count
          FROM stores
@@ -297,7 +395,7 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
     assert.deepEqual(snapshotAfterSecond, snapshotAfterFirst);
     assert.deepEqual(await tableCounts(), protectedCountsBefore);
 
-    console.log('staging migration PostgreSQL integration smoke passed: 25 scenarios');
+    console.log('staging migration PostgreSQL integration smoke passed: 26 scenarios');
 })().finally(async () => {
     await admin.end().catch(() => {});
 }).catch((error) => {

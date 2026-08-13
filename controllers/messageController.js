@@ -1,28 +1,55 @@
 const pool = require('../config/db');
 const { createNotification } = require('./notificationController');
+const { assertExternalSideEffectAllowed } = require('../config/stagingRuntimePolicy');
 const {
-    assertExternalSideEffectAllowed
-} = require('../config/stagingRuntimePolicy');
+    SupportThreadError,
+    appendSupportEvent,
+    appendSupportMessage,
+    claimSupportThread,
+    getOrCreateSupportThread,
+    normalizeSupportText,
+    reopenSupportThreadForCustomer,
+    requireCustomer,
+    requirePositiveId,
+    serializeThread,
+    setSupportThreadStatus,
+    withSupportTransaction
+} = require('../services/supportThreadService');
 
 const AI_HANDOFF_PREFIX = '[AI DESTEK DEVRI]';
 
 const getPrimaryAdminId = async (db = pool) => {
-    const result = await db.query("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
+    const result = await db.query(
+        "SELECT id FROM users WHERE role = 'admin' AND auth_enabled = TRUE ORDER BY id ASC LIMIT 1"
+    );
     if (result.rows.length === 0) return null;
     return Number(result.rows[0].id);
 };
 
 const normalizeMessageRow = (row) => ({
     ...row,
-    is_ai_handoff: String(row.message || '').startsWith(AI_HANDOFF_PREFIX)
+    support_thread_id: row.support_thread_id == null ? null : Number(row.support_thread_id),
+    is_ai_handoff: String(row.message || '').startsWith(AI_HANDOFF_PREFIX),
+    is_ai_handoff_dismissed: row.handoff_dismissed_at != null
 });
 
-const emitRealtimeMessage = (messageRow, receiverRole) => {
-    assertExternalSideEffectAllowed('outbound_notification');
+const sendSupportError = (res, error, fallback = 'Destek işlemi tamamlanamadı.') => {
+    if (error instanceof SupportThreadError || Number.isInteger(error?.statusCode)) {
+        return res.status(error.statusCode || 409).json({
+            code: error.code || 'SUPPORT_THREAD_ERROR',
+            error: error.message,
+            ...(error.details ? { details: error.details } : {})
+        });
+    }
+    console.error(fallback, error?.message || error);
+    return res.status(500).json({ error: fallback });
+};
 
+const emitRealtimeMessage = (messageRow, receiverRole) => {
     try {
+        assertExternalSideEffectAllowed('outbound_notification');
         const { io } = require('../server');
-        if (!io || !messageRow) return;
+        if (!io || !messageRow) return false;
 
         const normalizedMessage = normalizeMessageRow(messageRow);
         const targetRoom = receiverRole === 'admin'
@@ -33,316 +60,263 @@ const emitRealtimeMessage = (messageRow, receiverRole) => {
             ...normalizedMessage,
             receiver_role: receiverRole
         });
-    } catch (err) {
-        console.error('Gerçek zamanlı mesaj yayını hatası:', err.message);
+        return true;
+    } catch (error) {
+        console.error('Gerçek zamanlı mesaj yayını tamamlanamadı:', error.message);
+        return false;
     }
-};
-
-const ensureSupportHandoffThread = async ({ client, customerId, adminId, firstMessage }) => {
-    const existingHandoff = await client.query(
-        `SELECT id
-         FROM messages
-         WHERE ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1))
-           AND message LIKE $3
-         LIMIT 1`,
-        [customerId, adminId, `${AI_HANDOFF_PREFIX}%`]
-    );
-
-    if (existingHandoff.rows.length > 0) {
-        return null;
-    }
-
-    const summaryLines = [
-        AI_HANDOFF_PREFIX,
-        'Müşteri doğrudan canlı destek moduna geçti.',
-        `İlk mesaj: ${String(firstMessage || '').trim().slice(0, 500)}`
-    ];
-
-    const handoffInsert = await client.query(
-        `INSERT INTO messages (sender_id, receiver_id, message)
-         VALUES ($1, $2, $3)
-         RETURNING *`,
-        [customerId, adminId, summaryLines.join('\n')]
-    );
-
-    return handoffInsert.rows[0];
 };
 
 exports.getChatHistory = async (req, res) => {
     try {
-        const requestedUserId = Number(req.params.userId);
-        if (!Number.isInteger(requestedUserId)) {
-            return res.status(400).json({ error: 'Geçersiz kullanıcı kimliği.' });
-        }
-
-        const adminId = await getPrimaryAdminId();
-        if (!adminId) {
-            return res.status(500).json({ error: 'Admin hesabı bulunamadı.' });
-        }
-
-        const targetUserId = req.user.role === 'admin' ? requestedUserId : req.user.id;
-
-        if (req.user.role !== 'admin' && requestedUserId !== req.user.id) {
+        const requestedUserId = requirePositiveId(req.params.userId, 'userId');
+        if (req.user.role !== 'admin' && requestedUserId !== Number(req.user.id)) {
             return res.status(403).json({ error: 'Bu sohbet geçmişine erişim yetkiniz yok.' });
         }
+        await requireCustomer(pool, requestedUserId);
 
-        const query = `
-            SELECT * FROM messages
-            WHERE (sender_id = $1 AND receiver_id = $2)
-               OR (sender_id = $2 AND receiver_id = $1)
-            ORDER BY created_at ASC
-        `;
-
-        const result = await pool.query(query, [targetUserId, adminId]);
-        res.status(200).json(result.rows.map(normalizeMessageRow));
-    } catch (err) {
-        console.error('Mesaj geçmişi çekilirken hata:', err);
-        res.status(500).json({ error: 'Mesaj geçmişi alınamadı' });
+        const result = await pool.query(
+            `SELECT m.*
+             FROM support_threads st
+             JOIN messages m ON m.support_thread_id = st.id
+             WHERE st.customer_id = $1
+             ORDER BY m.created_at ASC, m.id ASC`,
+            [requestedUserId]
+        );
+        return res.status(200).json(result.rows.map(normalizeMessageRow));
+    } catch (error) {
+        return sendSupportError(res, error, 'Mesaj geçmişi alınamadı.');
     }
 };
 
 exports.sendMessage = async (req, res) => {
-    let client = null;
-
     try {
         assertExternalSideEffectAllowed('outbound_notification');
-        client = await pool.connect();
+        const message = normalizeSupportText(req.body?.message);
+        const senderId = requirePositiveId(req.user?.id, 'senderId');
+        const isAdmin = req.user?.role === 'admin' && req.user?.principal === 'admin';
+        const customerId = isAdmin
+            ? requirePositiveId(req.body?.receiver_id, 'receiverId')
+            : senderId;
 
-        const { receiver_id, message } = req.body;
-        const trimmedMessage = String(message || '').trim();
-
-        if (!trimmedMessage) {
-            return res.status(400).json({ error: 'Mesaj içeriği boş olamaz.' });
-        }
-
-        const adminId = await getPrimaryAdminId();
-        if (!adminId) {
-            return res.status(500).json({ error: 'Admin hesabı bulunamadı.' });
-        }
-
-        const senderId = req.user.id;
-        let receiverId;
-
-        if (req.user.role === 'admin') {
-            receiverId = Number(receiver_id);
-            if (!Number.isInteger(receiverId)) {
-                return res.status(400).json({ error: 'Geçersiz alıcı kimliği.' });
-            }
-        } else {
-            receiverId = adminId;
-        }
-
-        await client.query('BEGIN');
-
-        let createdHandoffMessage = null;
-        if (req.user.role !== 'admin') {
-            createdHandoffMessage = await ensureSupportHandoffThread({
-                client,
-                customerId: senderId,
-                adminId: receiverId,
-                firstMessage: trimmedMessage
+        const result = await withSupportTransaction(async (client) => {
+            let thread = await getOrCreateSupportThread(client, {
+                customerId,
+                source: 'DIRECT',
+                actorId: senderId
             });
-        }
+            if (isAdmin) {
+                thread = await claimSupportThread(client, { threadId: thread.id, adminId: senderId });
+            } else {
+                thread = await reopenSupportThreadForCustomer(client, { thread, customerId });
+            }
+            const receiverId = isAdmin
+                ? customerId
+                : Number(thread.assigned_admin_id) || await getPrimaryAdminId(client);
+            if (!receiverId) {
+                throw new SupportThreadError('Etkin destek yöneticisi bulunamadı.', {
+                    code: 'SUPPORT_ADMIN_NOT_FOUND',
+                    statusCode: 503
+                });
+            }
+            const savedMessage = await appendSupportMessage(client, {
+                thread,
+                senderId,
+                receiverId,
+                message
+            });
+            return { thread, savedMessage };
+        });
 
-        const insertResult = await client.query(
-            `INSERT INTO messages (sender_id, receiver_id, message)
-             VALUES ($1, $2, $3)
-             RETURNING *`,
-            [senderId, receiverId, trimmedMessage]
-        );
+        const normalizedSavedMessage = normalizeMessageRow(result.savedMessage);
+        emitRealtimeMessage(result.savedMessage, isAdmin ? 'customer' : 'admin');
 
-        await client.query('COMMIT');
-
-        const savedMessage = insertResult.rows[0];
-        const normalizedSavedMessage = normalizeMessageRow(savedMessage);
-
-        if (createdHandoffMessage) {
-            emitRealtimeMessage(createdHandoffMessage, 'admin');
+        if (!isAdmin) {
             try {
                 const { io } = require('../server');
                 await createNotification(
                     null,
-                    'ai_handoff',
-                    `Canlı destek talebi oluştu. Müşteri #${senderId} size yazdı.`,
-                    io
+                    'support_message',
+                    `Müşteri #${customerId} destek ekibine yazdı.`,
+                    io,
+                    { entityType: 'support_thread', entityId: result.thread.id }
                 );
-            } catch (err) {
-                console.error('Canlı destek handoff bildirimi oluşturulamadı:', err.message);
+            } catch (error) {
+                console.error('Destek mesajı bildirimi oluşturulamadı:', error.message);
             }
         }
 
-        emitRealtimeMessage(savedMessage, req.user.role === 'admin' ? 'customer' : 'admin');
-
-        res.status(201).json(normalizedSavedMessage);
-    } catch (err) {
-        if (client) {
-            try {
-                await client.query('ROLLBACK');
-            } catch (_) { }
-        }
-
-        if (err && err.code === 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED') {
-            return res.status(err.statusCode || 503).json({
-                code: err.code,
-                error: err.publicMessage || 'External side effect is disabled in staging.'
+        return res.status(201).json(normalizedSavedMessage);
+    } catch (error) {
+        if (error?.code === 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED') {
+            return res.status(error.statusCode || 503).json({
+                code: error.code,
+                error: error.publicMessage || 'External side effect is disabled in staging.'
             });
         }
-
-        console.error('Mesaj gönderilirken hata:', err);
-        res.status(500).json({ error: 'Mesaj gönderilemedi' });
-    } finally {
-        if (client) client.release();
+        return sendSupportError(res, error, 'Mesaj gönderilemedi.');
     }
 };
 
-exports.getChatUsers = async (req, res) => {
+exports.getChatUsers = async (_req, res) => {
     try {
-        const adminId = await getPrimaryAdminId();
-        if (!adminId) {
-            return res.status(500).json({ error: 'Admin hesabı bulunamadı.' });
-        }
-
-        const query = `
-            WITH user_threads AS (
-                SELECT
-                    CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END AS customer_id,
-                    MAX(m.created_at) AS last_message_at,
-                    COUNT(*) FILTER (WHERE m.message LIKE $2) AS ai_handoff_count
-                FROM messages m
-                WHERE m.sender_id = $1 OR m.receiver_id = $1
-                GROUP BY CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END
-            )
-            SELECT
+        const result = await pool.query(
+            `SELECT
                 u.id,
                 COALESCE(u.full_name, u.name) AS name,
                 u.email,
-                ut.last_message_at,
-                CAST(ut.ai_handoff_count AS INTEGER) AS ai_handoff_count
-            FROM user_threads ut
-            JOIN users u ON u.id = ut.customer_id
-            WHERE u.role = 'customer'
-            ORDER BY ut.last_message_at DESC NULLS LAST, u.id DESC
-        `;
-
-        const result = await pool.query(query, [adminId, `${AI_HANDOFF_PREFIX}%`]);
-        res.status(200).json(result.rows);
-    } catch (err) {
-        console.error('Sohbet eden kullanıcılar çekilirken hata:', err);
-        res.status(500).json({ error: 'Kullanıcılar alınamadı' });
+                st.id AS support_thread_id,
+                st.status,
+                st.assigned_admin_id,
+                st.source,
+                st.last_message_at,
+                CAST(COUNT(m.id) FILTER (
+                    WHERE m.message LIKE $1 AND m.handoff_dismissed_at IS NULL
+                ) AS INTEGER) AS ai_handoff_count
+             FROM support_threads st
+             JOIN users u ON u.id = st.customer_id AND u.role = 'customer'
+             LEFT JOIN messages m ON m.support_thread_id = st.id
+             GROUP BY u.id, u.full_name, u.name, u.email, st.id
+             ORDER BY st.last_message_at DESC NULLS LAST, st.id DESC`,
+            [`${AI_HANDOFF_PREFIX}%`]
+        );
+        return res.status(200).json(result.rows);
+    } catch (error) {
+        return sendSupportError(res, error, 'Kullanıcılar alınamadı.');
     }
 };
 
-exports.getAiHandoffs = async (req, res) => {
+exports.getAiHandoffs = async (_req, res) => {
     try {
-        const adminId = await getPrimaryAdminId();
-        if (!adminId) {
-            return res.status(500).json({ error: 'Admin hesabı bulunamadı.' });
-        }
-
-        const query = `
-            WITH handoff_messages AS (
-                SELECT
-                    CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END AS customer_id,
-                    m.id,
+        const result = await pool.query(
+            `WITH latest_handoff AS (
+                SELECT DISTINCT ON (m.support_thread_id)
+                    m.support_thread_id,
                     m.message,
-                    m.created_at,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END
-                        ORDER BY m.created_at DESC
-                    ) AS rn
+                    m.created_at
                 FROM messages m
-                WHERE (m.sender_id = $1 OR m.receiver_id = $1)
-                  AND m.message LIKE $2
-            ),
-            thread_counts AS (
-                SELECT
-                    CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END AS customer_id,
-                    COUNT(*) FILTER (WHERE m.message LIKE $2) AS handoff_count,
-                    MAX(m.created_at) AS last_thread_message_at
-                FROM messages m
-                WHERE m.sender_id = $1 OR m.receiver_id = $1
-                GROUP BY CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END
-            )
-            SELECT
-                hm.customer_id AS id,
+                WHERE m.message LIKE $1
+                  AND m.support_thread_id IS NOT NULL
+                  AND m.handoff_dismissed_at IS NULL
+                ORDER BY m.support_thread_id, m.created_at DESC, m.id DESC
+             )
+             SELECT
+                u.id,
                 COALESCE(u.full_name, u.name) AS name,
                 u.email,
-                hm.message AS latest_handoff_message,
-                hm.created_at AS latest_handoff_at,
-                CAST(tc.handoff_count AS INTEGER) AS handoff_count,
-                tc.last_thread_message_at
-            FROM handoff_messages hm
-            JOIN thread_counts tc ON tc.customer_id = hm.customer_id
-            JOIN users u ON u.id = hm.customer_id
-            WHERE hm.rn = 1
-              AND u.role = 'customer'
-            ORDER BY hm.created_at DESC
-        `;
+                st.id AS support_thread_id,
+                st.status,
+                st.assigned_admin_id,
+                st.source,
+                lh.message AS latest_handoff_message,
+                lh.created_at AS latest_handoff_at,
+                st.last_message_at AS last_thread_message_at,
+                CAST(COUNT(m.id) FILTER (
+                    WHERE m.message LIKE $1 AND m.handoff_dismissed_at IS NULL
+                ) AS INTEGER) AS handoff_count
+             FROM latest_handoff lh
+             JOIN support_threads st ON st.id = lh.support_thread_id
+             JOIN users u ON u.id = st.customer_id AND u.role = 'customer'
+             JOIN messages m ON m.support_thread_id = st.id
+             GROUP BY u.id, u.full_name, u.name, u.email, st.id, lh.message, lh.created_at
+             ORDER BY lh.created_at DESC, st.id DESC`,
+            [`${AI_HANDOFF_PREFIX}%`]
+        );
+        return res.status(200).json(result.rows);
+    } catch (error) {
+        return sendSupportError(res, error, 'AI handoff listesi alınamadı.');
+    }
+};
 
-        const result = await pool.query(query, [adminId, `${AI_HANDOFF_PREFIX}%`]);
-        res.status(200).json(result.rows);
-    } catch (err) {
-        console.error('AI handoff listesi çekilirken hata:', err);
-        res.status(500).json({ error: 'AI handoff listesi alınamadı.' });
+exports.takeOverSupportThread = async (req, res) => {
+    try {
+        const thread = await withSupportTransaction((client) => claimSupportThread(client, {
+            threadId: req.params.threadId,
+            adminId: req.currentAdmin?.id || req.user?.id
+        }));
+        return res.status(200).json({ thread: serializeThread(thread) });
+    } catch (error) {
+        return sendSupportError(res, error, 'Destek konuşması devralınamadı.');
+    }
+};
+
+exports.updateSupportThreadStatus = async (req, res) => {
+    try {
+        const thread = await withSupportTransaction((client) => setSupportThreadStatus(client, {
+            threadId: req.params.threadId,
+            adminId: req.currentAdmin?.id || req.user?.id,
+            status: req.body?.status
+        }));
+        return res.status(200).json({ thread: serializeThread(thread) });
+    } catch (error) {
+        return sendSupportError(res, error, 'Destek konuşması durumu güncellenemedi.');
     }
 };
 
 exports.deleteAiHandoffThread = async (req, res) => {
-    const client = await pool.connect();
-
     try {
-        const requestedUserId = Number(req.params.userId);
-        if (!Number.isInteger(requestedUserId)) {
-            return res.status(400).json({ error: 'Geçersiz kullanıcı kimliği.' });
-        }
-
-        await client.query('BEGIN');
-
-        const adminId = await getPrimaryAdminId(client);
-        if (!adminId) {
-            await client.query('ROLLBACK');
-            return res.status(500).json({ error: 'Admin hesabı bulunamadı.' });
-        }
-
-        const customerResult = await client.query(
-            "SELECT id FROM users WHERE id = $1 AND role = 'customer' LIMIT 1",
-            [requestedUserId]
-        );
-        if (customerResult.rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Müşteri bulunamadı.' });
-        }
-
-        const deleteMessagesResult = await client.query(
-            `DELETE FROM messages
-             WHERE ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1))
-               AND message LIKE $3`,
-            [requestedUserId, adminId, `${AI_HANDOFF_PREFIX}%`]
-        );
-
-        await client.query(
-            `DELETE FROM notifications
-             WHERE user_id IS NULL
-               AND type = 'ai_handoff'
-               AND message LIKE $1`,
-            [`%Müşteri #${requestedUserId}%`]
-        );
-
-        await client.query('COMMIT');
-
-        res.status(200).json({
-            mesaj: deleteMessagesResult.rowCount > 0
-                ? 'AI devir kayıtları silindi.'
-                : 'Silinecek AI devir kaydı bulunamadı.',
-            deletedCount: Number(deleteMessagesResult.rowCount || 0)
+        const requestedUserId = requirePositiveId(req.params.userId, 'userId');
+        const result = await withSupportTransaction(async (client) => {
+            await requireCustomer(client, requestedUserId);
+            const threadResult = await client.query(
+                'SELECT * FROM support_threads WHERE customer_id = $1 FOR UPDATE',
+                [requestedUserId]
+            );
+            const thread = threadResult.rows[0];
+            if (!thread) {
+                throw new SupportThreadError('Destek konuşması bulunamadı.', {
+                    code: 'SUPPORT_THREAD_NOT_FOUND',
+                    statusCode: 404
+                });
+            }
+            const dismissed = await client.query(
+                `UPDATE messages
+                 SET handoff_dismissed_at = CURRENT_TIMESTAMP,
+                     handoff_dismissed_by = $3
+                 WHERE support_thread_id = $1
+                   AND message LIKE $2
+                   AND handoff_dismissed_at IS NULL`,
+                [thread.id, `${AI_HANDOFF_PREFIX}%`, req.currentAdmin?.id || req.user?.id]
+            );
+            await client.query(
+                `UPDATE notifications
+                 SET is_read = TRUE
+                 WHERE user_id IS NULL
+                   AND type = 'ai_handoff'
+                   AND (
+                       (entity_type = 'support_thread' AND entity_id = $1)
+                       OR (
+                           entity_type IS NULL
+                           AND entity_id IS NULL
+                           AND message ~ $2
+                       )
+                   )`,
+                [thread.id, `Müşteri #${requestedUserId}([^0-9]|$)`]
+            );
+            if (Number(dismissed.rowCount || 0) > 0) {
+                await appendSupportEvent(client, {
+                    threadId: thread.id,
+                    actorId: req.currentAdmin?.id || req.user?.id,
+                    eventType: 'HANDOFF_DISMISSED',
+                    payload: { dismissedCount: Number(dismissed.rowCount || 0) }
+                });
+            }
+            return Number(dismissed.rowCount || 0);
         });
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error('AI handoff silinirken hata:', err);
-        res.status(500).json({ error: 'AI devir kaydı silinemedi.' });
-    } finally {
-        client.release();
+
+        return res.status(200).json({
+            mesaj: result > 0
+                ? 'AI devir kayıtları, görüşme geçmişi korunarak kapatıldı.'
+                : 'Kapatılacak AI devir kaydı bulunamadı.',
+            dismissedCount: result,
+            deletedCount: 0
+        });
+    } catch (error) {
+        return sendSupportError(res, error, 'AI devir kaydı kapatılamadı.');
     }
 };
 
 module.exports.AI_HANDOFF_PREFIX = AI_HANDOFF_PREFIX;
+module.exports.emitRealtimeMessage = emitRealtimeMessage;
+module.exports.getPrimaryAdminId = getPrimaryAdminId;
+module.exports.normalizeMessageRow = normalizeMessageRow;

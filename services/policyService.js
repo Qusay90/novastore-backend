@@ -1,59 +1,24 @@
-﻿const pool = require('../config/db');
+const pool = require('../config/db');
 
-const POLICY_COPY = {
-    returns: {
-        title: 'İade politikası',
-        body: [
-            'Teslim tarihinden itibaren 14 gün içinde iade talebi oluşturulabilir.',
-            'Ürünün kullanılmamış, tekrar satılabilir durumda ve orijinal ambalajında olması gerekir.',
-            'Onaylanan iade ödemeleri banka sürecine göre genelde 1-3 iş günü içinde tamamlanır.'
-        ]
-    },
-    privacy: {
-        title: 'Gizlilik sözleşmesi',
-        body: [
-            'Üyelik ve sipariş sürecinde paylaşılan veriler hizmet sunmak, teslimat ve destek sürecini yönetmek için kullanılır.',
-            'Veriler operasyon ve yasal yükümlülükler dışında paylaşılmaz.'
-        ]
-    },
-    kvkk: {
-        title: 'KVKK aydınlatma',
-        body: [
-            'Kişisel veriler sipariş yönetimi, faturalama, teslimat ve müşteri desteği amaçlarıyla işlenir.',
-            'Yasal saklama süreleri sonunda veriler güvenli şekilde silinir, yok edilir veya anonim hale getirilir.'
-        ]
-    },
-    payment: {
-        title: 'Ödeme',
-        body: [
-            'Sitede kart ödemesi ve havale/EFT seçeneği bulunur.',
-            'Kart ödemeleri 3D doğrulama adımına yönlendirilir.',
-            'Havale seçilirse sipariş numarasını açıklama alanına eklemek gerekir ve ödeme 24 saat içinde onaylanmazsa sipariş iptal edilebilir.'
-        ]
-    }
-};
+const POLICY_TOPIC_CONFIG = Object.freeze({
+    returns: Object.freeze({ title: 'İade ve değişim', envKey: 'RETURNS' }),
+    privacy: Object.freeze({ title: 'Gizlilik', envKey: 'PRIVACY' }),
+    kvkk: Object.freeze({ title: 'KVKK aydınlatma', envKey: 'KVKK' }),
+    payment: Object.freeze({ title: 'Ödeme koşulları', envKey: 'PAYMENT' }),
+    shipping: Object.freeze({ title: 'Kargo ve teslimat', envKey: 'SHIPPING' })
+});
+
+const exactTrue = (value) => String(value || '').trim().toLowerCase() === 'true';
 
 const detectPolicyTopic = (message) => {
-    const text = String(message || '').toLowerCase();
-    if (/kvkk|aydinlatma/.test(text)) return 'kvkk';
+    const text = String(message || '').toLocaleLowerCase('tr-TR');
+    if (/kvkk|aydınlatma|aydinlatma/.test(text)) return 'kvkk';
     if (/gizlilik|privacy/.test(text)) return 'privacy';
-    if (/iade|iptal|refund|return/.test(text)) return 'returns';
-    if (/odeme|kart|3d|havale|eft/.test(text)) return 'payment';
+    if (/iade|değişim|degisim|iptal|refund|return/.test(text)) return 'returns';
+    if (/ödeme|odeme|kart|3d|havale|eft/.test(text)) return 'payment';
     if (/teslim|kargo|shipment|cargo/.test(text)) return 'shipping';
     if (/kampanya|kupon|indirim/.test(text)) return 'campaigns';
     return null;
-};
-
-const getConfigMap = async () => {
-    try {
-        const result = await pool.query('SELECT key, value FROM campaign_configs');
-        return result.rows.reduce((acc, row) => {
-            acc[row.key] = row.value;
-            return acc;
-        }, {});
-    } catch (_) {
-        return {};
-    }
 };
 
 const getActiveCoupons = async () => {
@@ -64,6 +29,7 @@ const getActiveCoupons = async () => {
              WHERE is_active = TRUE
                AND (starts_at IS NULL OR starts_at <= NOW())
                AND (ends_at IS NULL OR ends_at >= NOW())
+               AND (usage_limit IS NULL OR used_count < usage_limit)
              ORDER BY created_at DESC
              LIMIT 5`
         );
@@ -73,20 +39,37 @@ const getActiveCoupons = async () => {
     }
 };
 
-const getPolicyAnswer = async (message) => {
-    const topic = detectPolicyTopic(message);
-    const config = await getConfigMap();
-    const freeShippingThreshold = Number(config.FREE_SHIPPING_THRESHOLD || process.env.FREE_SHIPPING_THRESHOLD || 1500);
-    const defaultShippingFee = Number(config.DEFAULT_SHIPPING_FEE || process.env.DEFAULT_SHIPPING_FEE || 49.9);
-    const defaultProvider = process.env.DEFAULT_SHIPMENT_PROVIDER || 'Yurtici Kargo';
+const getApprovedPolicyContent = (topic, env = process.env) => {
+    const config = POLICY_TOPIC_CONFIG[topic];
+    if (!config) return null;
+    const prefix = `NOVASTORE_POLICY_${config.envKey}`;
+    const approved = exactTrue(env[`${prefix}_APPROVED`]);
+    const version = String(env[`${prefix}_VERSION`] || '').trim();
+    const text = String(env[`${prefix}_TEXT`] || '').trim();
 
-    if (topic === 'shipping') {
-        return {
-            topic,
-            title: 'Kargo ve teslimat',
-            answer: `Varsayılan kargo partneri ${defaultProvider}. ${freeShippingThreshold.toFixed(0)} TL ve üzeri siparişlerde kargo ücretsiz, bunun altında varsayılan kargo ücreti ${defaultShippingFee.toFixed(2)} TL. Sistem tarafında tahmini teslimat 2-3 iş günü olarak yönetiliyor.`
-        };
+    if (
+        !approved ||
+        !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(version) ||
+        !text ||
+        text.length > 8000 ||
+        /[\u0000\u000b\u000c\u007f]/.test(text)
+    ) {
+        return null;
     }
+    return Object.freeze({ title: config.title, version, text });
+};
+
+const unpublishedPolicyAnswer = (topic) => ({
+    topic,
+    title: POLICY_TOPIC_CONFIG[topic]?.title || 'Politika bilgisi',
+    answer: 'Bu konuya ait şirket ve hukuk onaylı metin henüz yayımlanmadı. Destek ekibi doğrulanmamış süre, koşul veya şirket bilgisi taahhüt edemez.',
+    published: false,
+    contentVersion: null,
+    requiresLegalCompanyInput: true
+});
+
+const getPolicyAnswer = async (message, { env = process.env } = {}) => {
+    const topic = detectPolicyTopic(message);
 
     if (topic === 'campaigns') {
         const coupons = await getActiveCoupons();
@@ -94,7 +77,9 @@ const getPolicyAnswer = async (message) => {
             return {
                 topic,
                 title: 'Kampanyalar',
-                answer: 'Şu anda doğrulanmış aktif kupon bilgisi göremiyorum. Sepette kupon kodu alanına kod girerek kontrol etmek en güvenli yöntem olur.'
+                answer: 'Şu anda doğrulanmış aktif kupon bilgisi bulunmuyor. Kupon uygunluğu ve net toplam yalnız sunucu tarafındaki sepet doğrulamasında kesinleşir.',
+                published: true,
+                contentVersion: 'live-coupon-query'
             };
         }
 
@@ -109,26 +94,39 @@ const getPolicyAnswer = async (message) => {
         return {
             topic,
             title: 'Kampanyalar',
-            answer: `Doğrulanmış aktif kuponlar: ${couponText}. Sepette uygulayıp net toplam etkisini görebilirsiniz.`
+            answer: `Doğrulanmış aktif kuponlar: ${couponText}. Kesin uygunluk ve tutar sepet doğrulamasında belirlenir.`,
+            published: true,
+            contentVersion: 'live-coupon-query'
         };
     }
 
-    if (topic && POLICY_COPY[topic]) {
+    if (topic && POLICY_TOPIC_CONFIG[topic]) {
+        const approved = getApprovedPolicyContent(topic, env);
+        if (!approved) return unpublishedPolicyAnswer(topic);
         return {
             topic,
-            title: POLICY_COPY[topic].title,
-            answer: POLICY_COPY[topic].body.join(' ')
+            title: approved.title,
+            answer: approved.text,
+            published: true,
+            contentVersion: approved.version,
+            requiresLegalCompanyInput: false
         };
     }
 
     return {
         topic: null,
         title: 'Genel bilgi',
-        answer: 'Ürün, kargo, iade, ödeme, kampanya veya KVKK konularından birini yazarsanız doğrudan net bilgi verebilirim.'
+        answer: 'Ürün veya kampanya konusunda yardımcı olabilirim. İade, teslimat, ödeme, gizlilik ve KVKK metinleri yalnız şirket ve hukuk onayıyla yayımlanır.',
+        published: false,
+        contentVersion: null
     };
 };
 
 module.exports = {
+    POLICY_TOPIC_CONFIG,
     detectPolicyTopic,
-    getPolicyAnswer
+    exactTrue,
+    getApprovedPolicyContent,
+    getPolicyAnswer,
+    unpublishedPolicyAnswer
 };

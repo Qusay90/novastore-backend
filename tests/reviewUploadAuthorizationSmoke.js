@@ -2,7 +2,6 @@ const assert = require('node:assert/strict');
 const express = require('express');
 const http = require('node:http');
 const Module = require('node:module');
-const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 process.env.NODE_ENV = 'test';
 process.env.NOVASTORE_SAFE_LOCAL_BACKEND = 'true';
@@ -19,6 +18,7 @@ process.env.DB_SSL = 'false';
 process.env.SUPABASE_USE_POOLER = 'false';
 process.env.JWT_SECRET = 'review-upload-authorization-smoke-secret';
 
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 const authFixture = createAuthSessionFixture();
 authFixture.install();
 
@@ -186,6 +186,7 @@ pool.query = async (sql, params = []) => {
         return {
             rows: [{
                 public_product_exists: true,
+                first_party_write_eligible: true,
                 has_delivered_order: deliveredRows.length > 0
             }]
         };
@@ -216,7 +217,7 @@ pool.connect = async () => {
 
             if (/INSERT INTO reviews/i.test(text)) {
                 reviewInserts += 1;
-                assert.deepEqual(params, [101, 42, 5, 'Review media authorization smoke']);
+                assert.deepEqual(params, [101, 42, 5, 'Review media authorization smoke', 'novastore-platform']);
                 return { rows: [{ id: 9001 }] };
             }
 

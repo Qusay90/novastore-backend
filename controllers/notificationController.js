@@ -1,6 +1,10 @@
 const pool = require('../config/db');
 const { emitWithRetry } = require('../services/notificationService');
 const {
+    NotificationTargetError,
+    normalizeNotificationTarget
+} = require('../services/notificationTargetService');
+const {
     ExternalSideEffectBlockedError,
     assertExternalSideEffectAllowed
 } = require('../config/stagingRuntimePolicy');
@@ -22,13 +26,23 @@ const redactKnownSecretText = (value = '') => {
  * @param {string} type
  * @param {string} message
  * @param {object} io
+ * @param {{entityType:string,entityId:number}|null} target
  */
-const createNotification = async (userId, type, message, io = null) => {
+const createNotification = async (userId, type, message, io = null, target = null) => {
     assertExternalSideEffectAllowed('outbound_notification');
+    const normalizedTarget = normalizeNotificationTarget(target);
     try {
         const result = await pool.query(
-            'INSERT INTO notifications (user_id, type, message) VALUES ($1, $2, $3) RETURNING *',
-            [userId || null, type, message]
+            `INSERT INTO notifications (user_id, type, message, entity_type, entity_id)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING *`,
+            [
+                userId || null,
+                type,
+                message,
+                normalizedTarget?.entityType || null,
+                normalizedTarget?.entityId || null
+            ]
         );
         const notif = result.rows[0];
 
@@ -142,16 +156,21 @@ const markAllAsRead = async (req, res) => {
 // POST /api/notifications/test
 const sendTestNotification = async (req, res) => {
     try {
-        const { userId, type, message } = req.body;
+        const { userId, type, message, entityType, entityId } = req.body;
         const { io } = require('../server');
+        const hasTarget = entityType !== undefined || entityId !== undefined;
         const notif = await createNotification(
             userId || null,
             type || 'order_update',
             message || 'Bu bir test bildirimidir.',
-            io
+            io,
+            hasTarget ? { entityType, entityId } : null
         );
         res.status(201).json({ mesaj: 'Test bildirimi gonderildi!', bildirim: notif });
     } catch (err) {
+        if (err instanceof NotificationTargetError) {
+            return res.status(err.statusCode).json({ code: err.code, error: err.message });
+        }
         if (err instanceof ExternalSideEffectBlockedError) {
             return res.status(err.statusCode).json({ code: err.code, error: err.publicMessage });
         }

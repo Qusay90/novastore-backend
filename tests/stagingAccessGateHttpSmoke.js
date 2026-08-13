@@ -33,6 +33,10 @@ const stagingEnv = (overrides = {}) => ({
     NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'false',
     NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: 'false',
     NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_COUPON_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_SUPPORT_WRITE_ENABLED: 'false',
     AI_PROVIDER: 'mock',
     AI_PROVIDER_FALLBACK_ENABLED: 'false',
     SKIP_SCHEMA_INIT: 'true',
@@ -430,6 +434,10 @@ const form = (values) => new URLSearchParams(values).toString();
             NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'false',
             NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: 'false',
             NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'false',
+            NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED: 'false',
+            NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED: 'false',
+            NOVASTORE_ADMIN_COUPON_WRITE_ENABLED: 'false',
+            NOVASTORE_ADMIN_SUPPORT_WRITE_ENABLED: 'false',
             AI_PROVIDER: 'mock',
             AI_PROVIDER_FALLBACK_ENABLED: 'false',
             JWT_SECRET: 'synthetic-account-jwt-secret-for-tests-only',
@@ -450,7 +458,7 @@ const form = (values) => new URLSearchParams(values).toString();
 
         try {
             let live = null;
-            for (let attempt = 0; attempt < 80; attempt += 1) {
+            for (let attempt = 0; attempt < 300; attempt += 1) {
                 if (child.exitCode !== null) break;
                 try {
                     live = await request({ port, pathname: '/api/health/live' });

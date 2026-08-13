@@ -1,6 +1,24 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+
+Object.assign(process.env, {
+    NODE_ENV: 'test',
+    NOVASTORE_SAFE_LOCAL_BACKEND: 'true',
+    NOVASTORE_ALLOW_REMOTE_DB: 'false',
+    SKIP_SCHEMA_INIT: 'true',
+    NOVASTORE_ALLOW_SCHEMA_INIT: 'false',
+    DATABASE_URL: 'postgresql://novastore_test:novastore_test_only@127.0.0.1:55432/novastore_admin_session_test',
+    DB_HOST: '127.0.0.1',
+    DB_PORT: '55432',
+    DB_NAME: 'novastore_admin_session_test',
+    DB_USER: 'novastore_test',
+    DB_PASSWORD: 'novastore_test_only',
+    DB_SSL: 'false',
+    SUPABASE_USE_POOLER: 'false',
+    JWT_SECRET: 'commerce-pro-session-smoke-secret'
+});
+
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 const { privateNoStore } = require('../middlewares/privateNoStore');
 const { createRequireCurrentAdmin } = require('../services/currentAdminGuard');
@@ -14,8 +32,6 @@ const {
     getAdminSession,
     parseOrderSummaryLimit
 } = require('../services/adminCommerceReadService');
-
-process.env.JWT_SECRET = 'commerce-pro-session-smoke-secret';
 
 const authFixture = createAuthSessionFixture();
 authFixture.install();
@@ -123,6 +139,14 @@ const chainFor = (rows, queries) => [
     assert.equal(validAdmin.payload.capabilities.orderStatusWrite, false);
     assert.equal(validAdmin.payload.capabilities.orderCancelWrite, false);
     assert.equal(validAdmin.payload.capabilities.manualShipmentWrite, false);
+    assert.equal(validAdmin.payload.capabilities.reviewsRead, true);
+    assert.equal(validAdmin.payload.capabilities.reviewModerationWrite, false);
+    assert.equal(validAdmin.payload.capabilities.questionsRead, true);
+    assert.equal(validAdmin.payload.capabilities.questionAnswerWrite, false);
+    assert.equal(validAdmin.payload.capabilities.couponsRead, true);
+    assert.equal(validAdmin.payload.capabilities.couponWrite, false);
+    assert.equal(validAdmin.payload.capabilities.supportRead, true);
+    assert.equal(validAdmin.payload.capabilities.supportWrite, false);
     assert.equal(validAdmin.payload.capabilities.sellerAdmin, false);
     assert.equal(Object.isFrozen(ADMIN_COMMERCE_CAPABILITIES), true);
     assert.equal(Object.isFrozen(validAdmin.payload.capabilities), true);
@@ -132,23 +156,39 @@ const chainFor = (rows, queries) => [
         NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: 'true',
         NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'true',
         NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED: 'true',
-        NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'true'
+        NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'true',
+        NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED: 'true',
+        NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED: 'true',
+        NOVASTORE_ADMIN_COUPON_WRITE_ENABLED: 'true',
+        NOVASTORE_ADMIN_SUPPORT_WRITE_ENABLED: 'true'
     });
     assert.equal(enabledWriteCapabilities.orderCancelWrite, true);
     assert.equal(enabledWriteCapabilities.manualShipmentWrite, true);
     assert.equal(enabledWriteCapabilities.firstPartyCatalogWrite, true);
     assert.equal(enabledWriteCapabilities.catalogStructureWrite, true);
+    assert.equal(enabledWriteCapabilities.reviewModerationWrite, true);
+    assert.equal(enabledWriteCapabilities.questionAnswerWrite, true);
+    assert.equal(enabledWriteCapabilities.couponWrite, true);
+    assert.equal(enabledWriteCapabilities.supportWrite, true);
     assert.equal(enabledWriteCapabilities.orderStatusWrite, false);
     const nonExplicitWriteCapabilities = getAdminCommerceCapabilities({
         NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: '1',
         NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'yes',
         NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED: '1',
-        NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'yes'
+        NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'yes',
+        NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED: '1',
+        NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED: 'yes',
+        NOVASTORE_ADMIN_COUPON_WRITE_ENABLED: '1',
+        NOVASTORE_ADMIN_SUPPORT_WRITE_ENABLED: 'yes'
     });
     assert.equal(nonExplicitWriteCapabilities.orderCancelWrite, false);
     assert.equal(nonExplicitWriteCapabilities.manualShipmentWrite, false);
     assert.equal(nonExplicitWriteCapabilities.firstPartyCatalogWrite, false);
     assert.equal(nonExplicitWriteCapabilities.catalogStructureWrite, false);
+    assert.equal(nonExplicitWriteCapabilities.reviewModerationWrite, false);
+    assert.equal(nonExplicitWriteCapabilities.questionAnswerWrite, false);
+    assert.equal(nonExplicitWriteCapabilities.couponWrite, false);
+    assert.equal(nonExplicitWriteCapabilities.supportWrite, false);
 
     const guardFailure = await runChain([
         privateNoStore,

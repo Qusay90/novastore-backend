@@ -5,9 +5,67 @@ const { ORDER_STATUS } = require('../constants/orderStatus');
 const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 const { maskFullName } = require('../services/privacyService');
 const { reviewUpload, uploadReviewMediaFiles, cleanupCloudinaryAssets } = require('../config/cloudinary');
+const { PLATFORM_STORE } = require('../services/categoryV2BackfillService');
 
 const MAX_REVIEW_MEDIA_COUNT = 4;
 const MAX_REVIEW_COMMENT_LENGTH = 2000;
+const MAX_REVIEW_MODERATION_NOTE_LENGTH = 1000;
+const REVIEW_STATUS = Object.freeze({
+    PENDING: 'PENDING',
+    PUBLISHED: 'PUBLISHED',
+    HIDDEN: 'HIDDEN'
+});
+const REVIEW_MODERATION_STATUSES = new Set([REVIEW_STATUS.PUBLISHED, REVIEW_STATUS.HIDDEN]);
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
+
+class ReviewOperationError extends Error {
+    constructor(message, code, statusCode = 400) {
+        super(message);
+        this.name = 'ReviewOperationError';
+        this.code = code;
+        this.statusCode = statusCode;
+    }
+}
+
+const parseExpectedRevision = (body = {}) => {
+    const value = body.expected_revision ?? body.expectedRevision;
+    const revision = Number(value);
+    if (!Number.isSafeInteger(revision) || revision < 1) {
+        throw new ReviewOperationError(
+            'expected_revision pozitif g\u00fcvenli tam say\u0131 olmal\u0131d\u0131r.',
+            'REVIEW_REVISION_INVALID'
+        );
+    }
+    return revision;
+};
+
+const normalizeModerationNote = (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value !== 'string') {
+        throw new ReviewOperationError('Moderasyon notu metin olmal\u0131d\u0131r.', 'REVIEW_MODERATION_NOTE_INVALID');
+    }
+    const note = value.trim();
+    if (CONTROL_CHARACTER_PATTERN.test(note)) {
+        throw new ReviewOperationError('Moderasyon notu kontrol karakteri i\u00e7eremez.', 'REVIEW_MODERATION_NOTE_INVALID');
+    }
+    if (note.length > MAX_REVIEW_MODERATION_NOTE_LENGTH) {
+        throw new ReviewOperationError(
+            `Moderasyon notu en fazla ${MAX_REVIEW_MODERATION_NOTE_LENGTH} karakter olabilir.`,
+            'REVIEW_MODERATION_NOTE_INVALID'
+        );
+    }
+    return note || null;
+};
+
+const requestAuditMetadata = (req, values = {}) => {
+    const requestId = String(req.headers?.['x-request-id'] || '').trim();
+    return {
+        ...values,
+        request_id: requestId && requestId.length <= 120 && /^[A-Za-z0-9._:-]+$/.test(requestId)
+            ? requestId
+            : null
+    };
+};
 
 const getPublicProductReviewEligibility = async (userId, productId) => {
     const result = await pool.query(
@@ -18,6 +76,17 @@ const getPublicProductReviewEligibility = async (userId, productId) => {
                 WHERE products.id = $3
                   AND ${buildPublicProductSqlPredicate('products')}
             ) AS public_product_exists,
+            EXISTS (
+                SELECT 1
+                FROM products
+                JOIN stores first_party_store
+                  ON first_party_store.id = products.store_id
+                 AND LOWER(first_party_store.slug) = LOWER($4)
+                 AND first_party_store.is_active = TRUE
+                 AND first_party_store.deleted_at IS NULL
+                WHERE products.id = $3
+                  AND ${buildPublicProductSqlPredicate('products')}
+            ) AS first_party_write_eligible,
             EXISTS (
                 SELECT 1
                 FROM orders o
@@ -35,11 +104,12 @@ const getPublicProductReviewEligibility = async (userId, productId) => {
                         ((item.value->>'product_id') ~ '^[0-9]+$' AND (item.value->>'product_id')::int = $3)
                   )
             ) AS has_delivered_order`,
-        [userId, ORDER_STATUS.TESLIM_EDILDI, productId]
+        [userId, ORDER_STATUS.TESLIM_EDILDI, productId, PLATFORM_STORE.slug]
     );
 
     const row = result.rows?.[0];
     if (typeof row?.public_product_exists !== 'boolean'
+        || typeof row?.first_party_write_eligible !== 'boolean'
         || typeof row?.has_delivered_order !== 'boolean') {
         const error = new Error('Yorum uygunluk sorgusu geçersiz sonuç döndürdü.');
         error.code = 'REVIEW_ELIGIBILITY_RESULT_INVALID';
@@ -48,6 +118,7 @@ const getPublicProductReviewEligibility = async (userId, productId) => {
 
     return {
         publicProductExists: row.public_product_exists,
+        firstPartyWriteEligible: row.first_party_write_eligible,
         hasDeliveredOrder: row.has_delivered_order
     };
 };
@@ -69,6 +140,15 @@ const getReviewPermission = async (userId, productId) => {
             requiresAuth: false,
             code: 'PRODUCT_NOT_FOUND',
             message: 'Ürün bulunamadı.'
+        };
+    }
+
+    if (!eligibility.firstPartyWriteEligible) {
+        return {
+            canReview: false,
+            requiresAuth: false,
+            code: 'SELLER_REVIEW_HANDOFF_REQUIRED',
+            message: 'Bu satıcı ürünü için değerlendirme iş akışı satıcı operasyonları açılana kadar kullanılamaz.'
         };
     }
 
@@ -105,7 +185,14 @@ const getReviewPermission = async (userId, productId) => {
 
 const normalizeReviewComment = (value) => {
     if (value === undefined || value === null) return null;
-    const normalized = String(value).trim();
+    if (typeof value !== 'string') {
+        throw new ReviewOperationError('Değerlendirme metin olmalıdır.', 'REVIEW_COMMENT_INVALID');
+    }
+
+    const normalized = value.trim();
+    if (CONTROL_CHARACTER_PATTERN.test(normalized)) {
+        throw new ReviewOperationError('De\u011ferlendirme kontrol karakteri i\u00e7eremez.', 'REVIEW_COMMENT_INVALID');
+    }
     return normalized || null;
 };
 
@@ -312,13 +399,18 @@ const addReview = async (req, res) => {
         await client.query('BEGIN');
 
         const reviewResult = await client.query(
-            `INSERT INTO reviews (product_id, user_id, rating, comment)
-             SELECT products.id, $2, $3, $4
+            `INSERT INTO reviews (product_id, user_id, rating, comment, status)
+             SELECT products.id, $2, $3, $4, 'PENDING'
              FROM products
+             JOIN stores first_party_store
+               ON first_party_store.id = products.store_id
+              AND LOWER(first_party_store.slug) = LOWER($5)
+              AND first_party_store.is_active = TRUE
+              AND first_party_store.deleted_at IS NULL
              WHERE products.id = $1
                AND ${buildPublicProductSqlPredicate('products')}
              RETURNING id`,
-            [numericProductId, userId, numericRating, normalizedComment]
+            [numericProductId, userId, numericRating, normalizedComment, PLATFORM_STORE.slug]
         );
 
         if (reviewResult.rows.length === 0) {
@@ -338,8 +430,9 @@ const addReview = async (req, res) => {
         await client.query('COMMIT');
 
         res.status(201).json({
-            mesaj: 'Değerlendirmeniz başarıyla eklendi!',
-            reviewId
+            mesaj: 'Değerlendirmeniz alındı ve yayın incelemesine gönderildi.',
+            reviewId,
+            status: REVIEW_STATUS.PENDING
         });
 
         // Admin'e yeni yorum bildirimi (asenkron)
@@ -349,7 +442,8 @@ const addReview = async (req, res) => {
                 null,
                 'new_review',
                 `Yeni bir ürün yorumu eklendi! Ürün ID: #${numericProductId} - Puan: ${numericRating}/5`,
-                io
+                io,
+                { entityType: 'review', entityId: Number(reviewId) }
             );
         } catch (_) { }
     } catch (err) {
@@ -369,6 +463,17 @@ const addReview = async (req, res) => {
 
         if (err.code === 'PRODUCT_NOT_FOUND') {
             return res.status(404).json({ error: 'Ürün bulunamadı.', code: 'PRODUCT_NOT_FOUND' });
+        }
+
+        if (err.code === '23505') {
+            return res.status(409).json({
+                error: 'Bu ürünü zaten değerlendirdiniz.',
+                code: 'ALREADY_REVIEWED'
+            });
+        }
+
+        if (err instanceof ReviewOperationError) {
+            return res.status(err.statusCode).json({ error: err.message, code: err.code });
         }
 
         console.error('Yorum ekleme hatası:', err.message);
@@ -395,7 +500,9 @@ const getProductReviews = async (req, res) => {
                     AVG(r.rating) OVER () AS average,
                     COUNT(r.id) OVER () AS total
              FROM products
-             LEFT JOIN reviews r ON r.product_id = products.id
+             LEFT JOIN reviews r
+               ON r.product_id = products.id
+              AND r.status = 'PUBLISHED'
              LEFT JOIN users u ON r.user_id = u.id
              WHERE products.id = $1
                AND ${buildPublicProductSqlPredicate('products')}
@@ -441,7 +548,8 @@ const getUserReviews = async (req, res) => {
         const { userId } = req.params;
 
         const reviewResult = await pool.query(
-            `SELECT r.id, r.rating, r.comment, r.created_at, p.name as product_name, p.image_url, p.id as product_id
+            `SELECT r.id, r.rating, r.comment, r.status, r.created_at,
+                    p.name as product_name, p.image_url, p.id as product_id
              FROM reviews r
              JOIN products p ON r.product_id = p.id
              WHERE r.user_id = $1
@@ -463,4 +571,177 @@ const getUserReviews = async (req, res) => {
     }
 };
 
-module.exports = { addReview, getProductReviews, getUserReviews };
+const getAdminReviews = async (req, res) => {
+    try {
+        const rawStatus = String(req.query?.status || '').trim().toUpperCase();
+        const status = rawStatus || null;
+        if (status && !Object.values(REVIEW_STATUS).includes(status)) {
+            return res.status(400).json({ error: 'Geçersiz değerlendirme durumu.', code: 'REVIEW_STATUS_INVALID' });
+        }
+
+        const rawLimit = req.query?.limit === undefined ? 50 : Number(req.query.limit);
+        if (!Number.isSafeInteger(rawLimit) || rawLimit < 1 || rawLimit > 100) {
+            return res.status(400).json({ error: 'limit 1 ile 100 arasında olmalıdır.', code: 'REVIEW_LIMIT_INVALID' });
+        }
+
+        const result = await pool.query(
+            `SELECT r.id, r.product_id, r.user_id, r.rating, r.comment, r.status, r.revision,
+                    r.created_at, r.moderated_by, r.moderated_at, r.moderation_note,
+                    product.name AS product_name,
+                    COALESCE(customer.full_name, customer.name) AS user_name
+             FROM reviews r
+             JOIN products product ON product.id = r.product_id
+             JOIN stores first_party_store
+               ON first_party_store.id = product.store_id
+              AND LOWER(first_party_store.slug) = LOWER($1)
+              AND first_party_store.is_active = TRUE
+              AND first_party_store.deleted_at IS NULL
+             JOIN users customer ON customer.id = r.user_id
+             WHERE ($2::TEXT IS NULL OR r.status = $2)
+             ORDER BY
+                CASE r.status WHEN 'PENDING' THEN 0 WHEN 'HIDDEN' THEN 1 ELSE 2 END,
+                r.created_at ASC,
+                r.id ASC
+             LIMIT $3`,
+            [PLATFORM_STORE.slug, status, rawLimit]
+        );
+
+        const mediaMap = await loadReviewMediaMap(result.rows.map((review) => Number(review.id)));
+        const reviews = result.rows.map((review) => ({
+            ...review,
+            media: mediaMap.get(review.id) || mediaMap.get(Number(review.id)) || []
+        }));
+        return res.status(200).json({ reviews, count: reviews.length });
+    } catch (error) {
+        console.error('Admin değerlendirme kuyruğu hatası:', error.message);
+        return res.status(500).json({ error: 'Değerlendirme kuyruğu getirilemedi.' });
+    }
+};
+
+const moderateReview = async (req, res) => {
+    let client;
+    try {
+        const reviewId = parsePositiveInteger(req.params.reviewId);
+        if (!reviewId) {
+            throw new ReviewOperationError('Geçersiz değerlendirme kimliği.', 'REVIEW_ID_INVALID');
+        }
+
+        const status = String(req.body?.status || '').trim().toUpperCase();
+        if (!REVIEW_MODERATION_STATUSES.has(status)) {
+            throw new ReviewOperationError(
+                'Moderasyon durumu yalnızca PUBLISHED veya HIDDEN olabilir.',
+                'REVIEW_MODERATION_STATUS_INVALID'
+            );
+        }
+        const expectedRevision = parseExpectedRevision(req.body);
+        const moderationNote = normalizeModerationNote(req.body?.moderation_note ?? req.body?.moderationNote);
+        const actorId = Number(req.currentAdmin?.id);
+        if (!Number.isSafeInteger(actorId) || actorId < 1) {
+            throw new ReviewOperationError('Güncel yönetici kimliği zorunludur.', 'REVIEW_ADMIN_ACTOR_INVALID', 403);
+        }
+
+        client = await pool.connect();
+        await client.query('BEGIN');
+        const currentResult = await client.query(
+            `SELECT r.id, r.product_id, r.status, r.revision, r.moderation_note
+             FROM reviews r
+             JOIN products product ON product.id = r.product_id
+             JOIN stores first_party_store
+               ON first_party_store.id = product.store_id
+              AND LOWER(first_party_store.slug) = LOWER($2)
+              AND first_party_store.is_active = TRUE
+              AND first_party_store.deleted_at IS NULL
+             WHERE r.id = $1
+             FOR UPDATE OF r`,
+            [reviewId, PLATFORM_STORE.slug]
+        );
+        if (currentResult.rows.length === 0) {
+            throw new ReviewOperationError('Değerlendirme bulunamadı.', 'REVIEW_NOT_FOUND', 404);
+        }
+
+        const current = currentResult.rows[0];
+        const currentRevision = Number(current.revision);
+        if (currentRevision !== expectedRevision) {
+            throw new ReviewOperationError(
+                'Değerlendirme başka bir işlem tarafından güncellendi; kuyruğu yenileyin.',
+                'REVIEW_REVISION_CONFLICT',
+                409
+            );
+        }
+        if (current.status === status && (current.moderation_note || null) === moderationNote) {
+            throw new ReviewOperationError(
+                'Moderasyon isteği mevcut durumla aynı.',
+                'REVIEW_MODERATION_NOOP',
+                409
+            );
+        }
+
+        const updatedResult = await client.query(
+            `UPDATE reviews
+             SET status = $1,
+                 moderation_note = $2,
+                 moderated_by = $3,
+                 moderated_at = CURRENT_TIMESTAMP,
+                 revision = revision + 1
+             WHERE id = $4 AND revision = $5
+             RETURNING id, product_id, status, revision, moderated_by, moderated_at, moderation_note`,
+            [status, moderationNote, actorId, reviewId, expectedRevision]
+        );
+        if (updatedResult.rows.length !== 1) {
+            throw new ReviewOperationError(
+                'Değerlendirme revision güncellemesi çakıştı.',
+                'REVIEW_REVISION_CONFLICT',
+                409
+            );
+        }
+
+        const updated = updatedResult.rows[0];
+        await client.query(
+            `INSERT INTO customer_operation_audit_events (
+                actor_user_id, actor_role, entity_type, entity_id, action,
+                before_state, after_state, metadata
+             ) VALUES ($1, 'admin', 'review', $2, $3, $4::JSONB, $5::JSONB, $6::JSONB)`,
+            [
+                actorId,
+                reviewId,
+                status === REVIEW_STATUS.PUBLISHED ? 'publish' : 'hide',
+                JSON.stringify({
+                    status: current.status,
+                    revision: currentRevision,
+                    moderation_note: current.moderation_note || null
+                }),
+                JSON.stringify({
+                    status: updated.status,
+                    revision: Number(updated.revision),
+                    moderation_note: updated.moderation_note || null
+                }),
+                JSON.stringify(requestAuditMetadata(req, { product_id: Number(current.product_id) }))
+            ]
+        );
+        await client.query('COMMIT');
+
+        return res.status(200).json({
+            mesaj: status === REVIEW_STATUS.PUBLISHED
+                ? 'Değerlendirme yayınlandı.'
+                : 'Değerlendirme yayından gizlendi.',
+            review: updated
+        });
+    } catch (error) {
+        if (client) await client.query('ROLLBACK').catch(() => {});
+        if (error instanceof ReviewOperationError) {
+            return res.status(error.statusCode).json({ error: error.message, code: error.code });
+        }
+        console.error('Değerlendirme moderasyon hatası:', error.message);
+        return res.status(500).json({ error: 'Değerlendirme moderasyonu tamamlanamadı.' });
+    } finally {
+        if (client) client.release();
+    }
+};
+
+module.exports = {
+    addReview,
+    getProductReviews,
+    getUserReviews,
+    getAdminReviews,
+    moderateReview
+};

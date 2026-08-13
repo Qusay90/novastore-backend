@@ -1,6 +1,7 @@
 const { getUserFromRequestIfAny, sendAuthError } = require('../middlewares/authMiddleware');
 const { handleAssistantChat } = require('../services/assistantOrchestrator');
 const { createEscalationMessage } = require('../services/escalationService');
+const { SUPPORT_SUMMARY_MAX_LENGTH } = require('../services/supportThreadService');
 const { createNotification } = require('./notificationController');
 const {
     ExternalSideEffectBlockedError,
@@ -60,9 +61,15 @@ const escalate = async (req, res) => {
             return res.status(401).json({ error: 'Canlı destek devri için giriş yapmalısınız.' });
         }
 
-        const summary = String(req.body.summary || '').trim();
+        const summary = String(req.body?.summary || '').trim();
         if (!summary) {
             return res.status(400).json({ error: 'summary zorunludur.' });
+        }
+        if (summary.length > SUPPORT_SUMMARY_MAX_LENGTH) {
+            return res.status(400).json({
+                code: 'SUPPORT_TEXT_INVALID',
+                error: `summary en fazla ${SUPPORT_SUMMARY_MAX_LENGTH} karakter olabilir.`
+            });
         }
 
         assertExternalSideEffectAllowed('outbound_notification');
@@ -75,19 +82,20 @@ const escalate = async (req, res) => {
                     ...escalation.message,
                     receiver_role: 'admin'
                 });
-
-                await createNotification(
-                    null,
-                    'ai_handoff',
-                    `AI devri oluştu. Müşteri #${user.id} temsilciye aktarıldı.`,
-                    io
-                );
             }
+            await createNotification(
+                null,
+                'ai_handoff',
+                `AI devri oluştu. Müşteri #${user.id} temsilciye aktarıldı.`,
+                io,
+                { entityType: 'support_thread', entityId: escalation.thread.id }
+            );
         } catch (_) {}
 
         res.status(201).json({
             message: 'Konuşma özeti canlı destek ekibine iletildi.',
-            escalation: escalation.message
+            escalation: escalation.message,
+            thread: escalation.thread
         });
     } catch (err) {
         if (err instanceof ExternalSideEffectBlockedError) {

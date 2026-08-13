@@ -2,13 +2,14 @@ const assert = require('node:assert/strict');
 const express = require('express');
 const http = require('node:http');
 const { Writable } = require('node:stream');
-const { cloudinary, createUpload } = require('../config/cloudinary');
+const { cloudinary, createUpload, upload } = require('../config/cloudinary');
 
 const originalUploadStream = cloudinary.uploader.upload_stream;
 const originalDestroy = cloudinary.uploader.destroy;
 
 let uploadCalls = 0;
 let uploadedBody = Buffer.alloc(0);
+const uploadOptions = [];
 
 const restoreState = () => {
     cloudinary.uploader.upload_stream = originalUploadStream;
@@ -17,8 +18,8 @@ const restoreState = () => {
 
 cloudinary.uploader.upload_stream = (options, callback) => {
     uploadCalls += 1;
+    uploadOptions.push(options);
     assert.equal(options.folder, 'novastore_products');
-    assert.equal(options.resource_type, 'auto');
     assert.ok(options.allowed_formats.includes('jpg'));
 
     const chunks = [];
@@ -112,6 +113,12 @@ app.post('/upload', createUpload('novastore_products').single('media'), (req, re
         mimetype: req.file.mimetype
     });
 });
+app.post('/product-upload', upload.single('media'), (req, res) => {
+    res.status(200).json({ path: req.file.path, resource_type: req.file.resource_type });
+});
+app.use((error, _req, res, _next) => {
+    res.status(error?.statusCode || 500).json({ code: error?.code || 'UPLOAD_FAILED' });
+});
 
 (async () => {
     const server = await new Promise((resolve) => {
@@ -140,6 +147,34 @@ app.post('/upload', createUpload('novastore_products').single('media'), (req, re
         assert.equal(response.body.size, content.length);
         assert.equal(response.body.originalname, 'proof.jpg');
         assert.equal(response.body.mimetype, 'image/jpeg');
+
+        const productResponse = await postMultipart(server, '/product-upload', {
+            fields: { name: 'Product proof' },
+            files: [{
+                fieldName: 'media',
+                filename: 'product-proof.jpg',
+                contentType: 'image/jpeg',
+                content
+            }]
+        });
+        assert.equal(productResponse.status, 200);
+        assert.equal(uploadCalls, 2);
+        assert.equal(uploadOptions[0].resource_type, 'auto');
+        assert.equal(uploadOptions[1].resource_type, 'image');
+        assert.deepEqual(uploadOptions[1].allowed_formats, ['jpg', 'jpeg', 'png', 'webp', 'gif']);
+        assert.equal(productResponse.body.resource_type, 'image');
+
+        const rejectedVideo = await postMultipart(server, '/product-upload', {
+            fields: { name: 'Rejected product video' },
+            files: [{
+                fieldName: 'media',
+                filename: 'product-proof.mp4',
+                contentType: 'video/mp4',
+                content: Buffer.from('fake video bytes')
+            }]
+        });
+        assert.equal(rejectedVideo.status, 400);
+        assert.equal(uploadCalls, 2, 'Rejected product video must not reach Cloudinary.');
 
         console.log('cloudinaryUploadStorageSmoke: OK');
     } finally {

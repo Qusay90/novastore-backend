@@ -23,6 +23,13 @@ import {
   normalizeOrderSummaryPage,
   normalizeReturnSummaryPage,
 } from "../integration/legacyMappers.js";
+import {
+  normalizeCoupons,
+  normalizeQuestions,
+  normalizeReviewPage,
+  normalizeSupportMessages,
+  normalizeSupportThreads,
+} from "../integration/adminOperations.js";
 
 export function createSameOriginAdapter(http) {
   if (!http || typeof http.request !== "function") throw new TypeError("Geçerli bir HTTP istemcisi gerekir.");
@@ -76,6 +83,26 @@ export function createSameOriginAdapter(http) {
     await http.request(`/api/admin/stores/${encodeURIComponent(String(storeId))}`, { signal }),
   );
 
+  const reviews = async ({ status = "PENDING", signal } = {}) => normalizeReviewPage(
+    await http.request(`/api/reviews/admin/all?status=${encodeURIComponent(status)}&limit=100`, { signal }),
+  );
+
+  const questions = async ({ signal } = {}) => normalizeQuestions(
+    await http.request("/api/questions/admin/all", { signal }),
+  );
+
+  const coupons = async ({ signal } = {}) => normalizeCoupons(
+    await http.request("/api/campaigns/coupons", { signal }),
+  );
+
+  const supportThreads = async ({ signal } = {}) => normalizeSupportThreads(
+    await http.request("/api/messages/users", { signal }),
+  );
+
+  const supportHistory = async ({ customerId, signal } = {}) => normalizeSupportMessages(
+    await http.request(`/api/messages/history/${encodeURIComponent(String(customerId))}`, { signal }),
+  );
+
   const mutationActions = (capabilities) => {
     const actions = {};
     if (hasCapability(capabilities, "firstPartyCatalogRead")
@@ -111,6 +138,39 @@ export function createSameOriginAdapter(http) {
           signal,
         }));
       };
+      actions.registerCatalogMedia = async ({ productId, expectedRevision, mediaUrl, mediaType, isCover = false, signal } = {}) => {
+        await http.request(`/api/admin/catalog/products/${encodeURIComponent(String(productId))}/media`, {
+          method: "POST",
+          body: JSON.stringify({
+            expected_revision: expectedRevision,
+            media_url: mediaUrl,
+            media_type: mediaType,
+            is_cover: isCover,
+          }),
+          signal,
+        });
+        return actions.getCatalogProduct({ productId, signal });
+      };
+      actions.reorderCatalogMedia = async ({ productId, expectedRevision, mediaIds, coverMediaId, signal } = {}) => {
+        await http.request(`/api/admin/catalog/products/${encodeURIComponent(String(productId))}/media/order`, {
+          method: "PUT",
+          body: JSON.stringify({
+            expected_revision: expectedRevision,
+            media_ids: mediaIds,
+            cover_media_id: coverMediaId,
+          }),
+          signal,
+        });
+        return actions.getCatalogProduct({ productId, signal });
+      };
+      actions.deleteCatalogMedia = async ({ productId, mediaId, expectedRevision, signal } = {}) => {
+        await http.request(`/api/admin/catalog/products/${encodeURIComponent(String(productId))}/media/${encodeURIComponent(String(mediaId))}`, {
+          method: "DELETE",
+          body: JSON.stringify({ expected_revision: expectedRevision }),
+          signal,
+        });
+        return actions.getCatalogProduct({ productId, signal });
+      };
     }
     if (hasCapability(capabilities, "orderCancelWrite")) {
       actions.cancelOrder = async (input = {}) => {
@@ -134,8 +194,42 @@ export function createSameOriginAdapter(http) {
         });
       };
     }
+    if (hasCapability(capabilities, "reviewModerationWrite")) {
+      actions.moderateReview = ({ reviewId, expectedRevision, status, moderationNote = null, signal } = {}) => http.request(
+        `/api/reviews/admin/${encodeURIComponent(String(reviewId))}/moderation`,
+        { method: "PATCH", body: JSON.stringify({ expected_revision: expectedRevision, status, moderation_note: moderationNote }), signal },
+      );
+    }
+    if (hasCapability(capabilities, "questionAnswerWrite")) {
+      actions.answerQuestion = ({ questionId, expectedRevision, answer, signal } = {}) => http.request(
+        `/api/questions/admin/answer/${encodeURIComponent(String(questionId))}`,
+        { method: "PATCH", body: JSON.stringify({ expected_revision: expectedRevision, answer }), signal },
+      );
+    }
+    if (hasCapability(capabilities, "couponWrite")) {
+      actions.createCoupon = ({ body, signal } = {}) => http.request("/api/campaigns/coupons", { method: "POST", body: JSON.stringify(body), signal });
+      actions.updateCoupon = ({ couponId, body, signal } = {}) => http.request(
+        `/api/campaigns/coupons/${encodeURIComponent(String(couponId))}`,
+        { method: "PUT", body: JSON.stringify(body), signal },
+      );
+      actions.setCouponStatus = ({ couponId, expectedRevision, active, signal } = {}) => http.request(
+        `/api/campaigns/coupons/${encodeURIComponent(String(couponId))}/status`,
+        { method: "PATCH", body: JSON.stringify({ expected_revision: expectedRevision, is_active: active }), signal },
+      );
+    }
+    if (hasCapability(capabilities, "supportWrite")) {
+      actions.takeoverSupport = ({ threadId, signal } = {}) => http.request(
+        `/api/messages/threads/${encodeURIComponent(String(threadId))}/takeover`, { method: "POST", body: "{}", signal },
+      );
+      actions.setSupportStatus = ({ threadId, status, signal } = {}) => http.request(
+        `/api/messages/threads/${encodeURIComponent(String(threadId))}/status`, { method: "PATCH", body: JSON.stringify({ status }), signal },
+      );
+      actions.sendSupportReply = ({ customerId, message, signal } = {}) => http.request(
+        "/api/messages/send", { method: "POST", body: JSON.stringify({ receiver_id: customerId, message }), signal },
+      );
+    }
     return Object.freeze(actions);
   };
 
-  return Object.freeze({ catalog, catalogStructure, session, dashboard, notifications, orders, returns, stores, storeDetail, mutationActions });
+  return Object.freeze({ catalog, catalogStructure, session, dashboard, notifications, orders, returns, stores, storeDetail, reviews, questions, coupons, supportThreads, supportHistory, mutationActions });
 }

@@ -161,12 +161,28 @@ export function normalizeNotificationSummary(row) {
   if (!row || typeof row !== "object") throw new TypeError("Bildirim özeti nesne olmalıdır.");
   const rawId = toInteger(row.id, "notification.id");
   if (rawId < 1) throw new TypeError("notification.id pozitif olmalıdır.");
+  const entityType = row.entity_type == null ? null : toLegacyNullableText(row.entity_type, "notification.entity_type", null);
+  const entityId = row.entity_id == null ? null : toInteger(row.entity_id, "notification.entity_id");
+  if ((entityType === null) !== (entityId === null) || (entityId !== null && entityId < 1)) {
+    throw new TypeError("notification hedef kimliği geçersiz.");
+  }
+  const targetPage = ({
+    order: "orders",
+    product: "catalog",
+    product_question: "questions",
+    return_request: "returns",
+    review: "reviews",
+    support_thread: "support",
+  })[entityType] || null;
   return Object.freeze({
     id: `NT-${String(rawId).padStart(6, "0")}`,
     rawId,
     type: toLegacyNullableText(row.type, "notification.type", "notification"),
     message: toLegacyNullableText(row.message, "notification.message", "Bildirim içeriği yok"),
     isRead: toBoolean(row.is_read, "notification.is_read"),
+    entityType,
+    entityId,
+    targetPage,
     createdAt: toLegacyNullableDate(row.created_at, "notification.created_at"),
   });
 }

@@ -68,7 +68,7 @@ const runCatalogQuery = async () => {
             ROUND(COALESCE(AVG(r.rating), 0), 1) AS average_rating,
             CAST(COUNT(r.id) AS INTEGER) AS review_count
         FROM products p
-        LEFT JOIN reviews r ON r.product_id = p.id
+        LEFT JOIN reviews r ON r.product_id = p.id AND r.status = 'PUBLISHED'
         WHERE ${buildPublicProductSqlPredicate('p')}
         GROUP BY p.id
         ORDER BY p.created_at DESC
@@ -88,7 +88,7 @@ const runCatalogQuery = async () => {
             ROUND(COALESCE(AVG(r.rating), 0), 1) AS average_rating,
             CAST(COUNT(r.id) AS INTEGER) AS review_count
         FROM products p
-        LEFT JOIN reviews r ON r.product_id = p.id
+        LEFT JOIN reviews r ON r.product_id = p.id AND r.status = 'PUBLISHED'
         WHERE ${buildPublicProductSqlPredicate('p')}
         GROUP BY p.id
         ORDER BY p.created_at DESC

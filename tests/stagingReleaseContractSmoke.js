@@ -78,6 +78,10 @@ const expectedRequiredNames = [
     'NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED',
     'NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED',
     'NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED',
+    'NOVASTORE_ADMIN_COUPON_WRITE_ENABLED',
+    'NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED',
+    'NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED',
+    'NOVASTORE_ADMIN_SUPPORT_WRITE_ENABLED',
     'NOVASTORE_ALLOW_REMOTE_DB',
     'NOVASTORE_ALLOW_SCHEMA_INIT',
     'NOVASTORE_DEPLOY_ENV',
@@ -113,6 +117,10 @@ const createValidEnvironment = () => ({
     NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'false',
     NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: 'false',
     NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_COUPON_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_SUPPORT_WRITE_ENABLED: 'false',
     AI_PROVIDER: 'mock',
     AI_PROVIDER_FALLBACK_ENABLED: 'false',
     SKIP_SCHEMA_INIT: 'true',
@@ -244,9 +252,9 @@ const createFakeGitReader = ({
         assert.equal(FORBIDDEN_PROVIDER_CREDENTIAL_NAMES, FORBIDDEN_PROVIDER_CREDENTIAL_KEYS);
     });
 
-    await check(5, '1A migration bytes/checksums 15/15 exact', () => {
+    await check(5, 'migration bytes/checksums 19/19 exact', () => {
         const registry = loadRegistry();
-        assert.equal(registry.length, 15);
+        assert.equal(registry.length, 19);
         for (const migration of registry) {
             const bytes = fs.readFileSync(migration.absolutePath);
             assert.equal(sha256(bytes), migration.sha256);

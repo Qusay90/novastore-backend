@@ -22,6 +22,23 @@ const toPositiveInteger = (value) => {
   return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
 };
 
+const CUSTOMER_NOTIFICATION_TARGETS = Object.freeze({
+  order: (id) => `#/hesabim/siparisler/${id}`,
+  product: (id) => `#/urun-id/${id}`,
+  product_question: () => "#/hesabim",
+  return_request: () => "#/hesabim/siparisler",
+  review: () => "#/hesabim",
+  support_thread: () => "#/iletisim",
+});
+
+export const resolveCustomerNotificationTarget = (value) => {
+  if (!value || typeof value !== "object") return null;
+  const entityType = asTrimmedString(value.entity_type ?? value.entityType).toLowerCase();
+  const entityId = toPositiveInteger(value.entity_id ?? value.entityId);
+  const resolver = CUSTOMER_NOTIFICATION_TARGETS[entityType];
+  return resolver && entityId ? resolver(entityId) : null;
+};
+
 export const normalizeCustomerUser = (value) => {
   if (!value || typeof value !== "object") return null;
   const id = toPositiveInteger(value.id);
@@ -157,6 +174,7 @@ export const normalizeCustomerNotification = (value) => {
     message,
     isRead: value.is_read === true || value.isRead === true,
     createdAt: value.created_at || value.createdAt || null,
+    target: resolveCustomerNotificationTarget(value),
   });
 };
 
@@ -520,6 +538,7 @@ export const customerAccountAdapterTestUtils = Object.freeze({
   parseArray,
   readLegacyAddressPayloads,
   readStoredUserId,
+  resolveCustomerNotificationTarget,
   requireUserId,
   safeMediaUrl,
   toPositiveInteger,

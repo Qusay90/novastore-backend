@@ -38,6 +38,7 @@ const cloudinary = {
 };
 
 const allowedFormats = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'webm', 'ogg', 'mov'];
+const allowedProductImageFormats = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 const allowedReviewMimeTypes = new Set([
     'image/jpeg',
     'image/png',
@@ -48,11 +49,17 @@ const allowedReviewMimeTypes = new Set([
     'video/ogg',
     'video/quicktime'
 ]);
+const allowedProductImageMimeTypes = new Set([
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/gif'
+]);
 
-const createUploadOptions = (folder, resourceType = 'auto') => ({
+const createUploadOptions = (folder, resourceType = 'auto', formats = allowedFormats) => ({
     folder,
     resource_type: resourceType,
-    allowed_formats: allowedFormats
+    allowed_formats: formats
 });
 
 const buildUploadedFileInfo = (file, result, fallbackResourceType) => {
@@ -76,7 +83,10 @@ const buildUploadedFileInfo = (file, result, fallbackResourceType) => {
     };
 };
 
-const createCloudinaryStorage = (folder) => ({
+const createCloudinaryStorage = (folder, {
+    resourceType = 'auto',
+    formats = allowedFormats
+} = {}) => ({
     _handleFile(_req, file, cb) {
         let settled = false;
         const done = (error, info) => {
@@ -86,12 +96,12 @@ const createCloudinaryStorage = (folder) => ({
         };
 
         const uploadStream = cloudinary.uploader.upload_stream(
-            createUploadOptions(folder, 'auto'),
+            createUploadOptions(folder, resourceType, formats),
             (error, result) => {
                 if (error) return done(error);
 
                 try {
-                    return done(null, buildUploadedFileInfo(file, result || {}, 'auto'));
+                    return done(null, buildUploadedFileInfo(file, result || {}, resourceType));
                 } catch (err) {
                     return done(err);
                 }
@@ -112,8 +122,21 @@ const createCloudinaryStorage = (folder) => ({
     }
 });
 
-const createUpload = (folder) => {
-    return multer({ storage: createCloudinaryStorage(folder) });
+const createUpload = (folder, fileFilter, storageOptions) => {
+    return multer({
+        storage: createCloudinaryStorage(folder, storageOptions),
+        ...(fileFilter ? { fileFilter } : {})
+    });
+};
+
+const productImageFileFilter = (_req, file, cb) => {
+    const mimeType = String(file && file.mimetype || '').toLowerCase();
+    if (allowedProductImageMimeTypes.has(mimeType)) return cb(null, true);
+
+    const err = new Error('Ürün medyası bu sürümde yalnızca desteklenen görsel dosyalarını kabul eder. Video yayınlama Android ve web renderer sözleşmesi tamamlanana kadar kapalıdır.');
+    err.code = 'PRODUCT_MEDIA_VIDEO_RENDERER_HANDOFF_REQUIRED';
+    err.statusCode = 400;
+    return cb(err);
 };
 
 const reviewFileFilter = (_req, file, cb) => {
@@ -175,7 +198,11 @@ const uploadReviewMediaFiles = async (files = []) => {
     }
 };
 
-const upload = createUpload('novastore_products');
+const productImageStorageOptions = Object.freeze({
+    resourceType: 'image',
+    formats: allowedProductImageFormats
+});
+const upload = createUpload('novastore_products', productImageFileFilter, productImageStorageOptions);
 const reviewUpload = multer({
     storage: multer.memoryStorage(),
     limits: {
@@ -184,7 +211,11 @@ const reviewUpload = multer({
     },
     fileFilter: reviewFileFilter
 });
-const previewUpload = createUpload('novastore_product_previews');
+const previewUpload = createUpload(
+    'novastore_product_previews',
+    productImageFileFilter,
+    productImageStorageOptions
+);
 
 module.exports = {
     cloudinary,

@@ -11,6 +11,7 @@
     "test:ci": "node scripts/runCiSmokes.js",
     "test:staging-migrations": "node tests/stagingMigrationFoundationSmoke.js",
     "test:staging-migrations:integration": "node tests/stagingMigrationIntegrationSmoke.js",
+    "test:main6s-operations:integration": "node tests/main6sOperationsPostgresSmoke.js",
     "test:staging-runtime-safety": "node tests/stagingRuntimeSafetySmoke.js",
     "test:staging-access-gate": "node tests/stagingAccessGateHttpSmoke.js",
     "test:staging-release-readiness": "node tests/stagingReleaseContractSmoke.js && node tests/stagingVerificationHarnessSmoke.js",

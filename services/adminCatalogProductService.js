@@ -59,7 +59,7 @@ const translateProductDbError = (error) => {
     throw error;
 };
 
-const toProductDetail = (row, categoryRows, attributes) => Object.freeze({
+const toProductDetail = (row, categoryRows, attributes, mediaRows = []) => Object.freeze({
     id: Number(row.id),
     name: row.name,
     description: row.description ?? '',
@@ -83,6 +83,13 @@ const toProductDetail = (row, categoryRows, attributes) => Object.freeze({
     updated_at: row.updated_at ?? null,
     revision: Number(row.revision),
     has_media: row.has_media === true,
+    media: Object.freeze(mediaRows.map((media) => Object.freeze({
+        id: Number(media.id),
+        media_url: media.media_url,
+        media_type: media.media_type || 'image',
+        is_main: media.is_main === true,
+        sort_order: Number(media.sort_order || 0)
+    }))),
     category_ids: Object.freeze(categoryRows.map((category) => Number(category.id))),
     primary_category_id: (() => {
         const primary = categoryRows.find((category) => category.is_primary === true);
@@ -154,10 +161,24 @@ const readAdminCatalogProductDetail = async (database, rawId) => {
          ORDER BY category_link.is_primary DESC, category.id ASC`,
         [id]
     );
-    const attributes = await getProductAttributeValues(database, id);
+    const [attributes, mediaResult] = await Promise.all([
+        getProductAttributeValues(database, id),
+        database.query(
+            `SELECT id, media_url, media_type, is_main, sort_order
+             FROM product_media
+             WHERE product_id = $1
+             ORDER BY is_main DESC, sort_order ASC, id ASC`,
+            [id]
+        )
+    ]);
     return Object.freeze({
         catalogMode: CATALOG_MODE,
-        product: toProductDetail(productResult.rows[0], categoriesResult.rows || [], attributes)
+        product: toProductDetail(
+            productResult.rows[0],
+            categoriesResult.rows || [],
+            attributes,
+            mediaResult.rows || []
+        )
     });
 };
 

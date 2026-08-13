@@ -23,6 +23,12 @@ const {
     updateAdminCatalogProduct,
     archiveAdminCatalogProduct
 } = require('../controllers/adminCatalogProductController');
+const {
+    getAdminCatalogProductMedia,
+    registerAdminCatalogProductMedia,
+    reorderAdminCatalogProductMedia,
+    deleteAdminCatalogProductMedia
+} = require('../controllers/adminCatalogMediaController');
 
 const integratedAdminRead = [privateNoStore, authenticate, requireAdmin, requireCurrentAdmin];
 const integratedAdminProductWrite = [
@@ -39,6 +45,10 @@ router.get('/notifications/summary', ...integratedAdminRead, getAdminNotificatio
 router.get('/orders/summary', ...integratedAdminRead, getAdminOrderSummaries);
 router.get('/catalog/products/summary', ...integratedAdminRead, getAdminProductSummaries);
 router.get('/catalog/products/:id', ...integratedAdminRead, getAdminCatalogProduct);
+router.get('/catalog/products/:id/media', ...integratedAdminRead, getAdminCatalogProductMedia);
+router.post('/catalog/products/:id/media', ...integratedAdminProductWrite, registerAdminCatalogProductMedia);
+router.put('/catalog/products/:id/media/order', ...integratedAdminProductWrite, reorderAdminCatalogProductMedia);
+router.delete('/catalog/products/:id/media/:mediaId', ...integratedAdminProductWrite, deleteAdminCatalogProductMedia);
 router.post('/catalog/products', ...integratedAdminProductWrite, createAdminCatalogProduct);
 router.patch('/catalog/products/:id/archive', ...integratedAdminProductWrite, archiveAdminCatalogProduct);
 router.patch('/catalog/products/:id', ...integratedAdminProductWrite, updateAdminCatalogProduct);

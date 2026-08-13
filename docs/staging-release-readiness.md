@@ -50,6 +50,10 @@ Runtime safety names:
 - `NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED`
 - `NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED`
 - `NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED`
+- `NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED`
+- `NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED`
+- `NOVASTORE_ADMIN_COUPON_WRITE_ENABLED`
+- `NOVASTORE_ADMIN_SUPPORT_WRITE_ENABLED`
 - `SKIP_SCHEMA_INIT`
 - `NOVASTORE_ALLOW_SCHEMA_INIT`
 
@@ -98,7 +102,7 @@ Presence is a fail-closed condition, including an empty value. `DATABASE_URL`,
 3. Validate the names-only staging contract. Do not dump the environment.
 4. Reject any forbidden provider credential name.
 5. Confirm the access gate and external-side-effect kill switch are enabled; confirm
-   all four admin write capabilities are false and legacy schema init is disabled.
+   all eight listed admin write capabilities are false and legacy schema init is disabled.
 6. Run the offline guarded migration plan.
 7. With read-only database authorization, run guarded migration status.
 8. Only with a separate database mutation approval, run guarded migration apply.
@@ -111,6 +115,44 @@ Presence is a fail-closed condition, including an empty value. `DATABASE_URL`,
     rejection. Do not call functional mutation endpoints.
 13. Complete the authorized observation window.
 14. Record exactly one decision: `GO`, `HOLD`, or `ROLLBACK`.
+
+Before step 8, record a current restorable database backup identifier and run these
+read-only compatibility checks against the attested staging database. Every query
+must return `0`; any nonzero result is a `HOLD` and must be corrected by an
+explicitly reviewed forward data migration before schema apply:
+
+```sql
+SELECT COUNT(*) FROM coupons
+WHERE discount_value <= 0
+   OR (UPPER(discount_type) = 'PERCENT' AND discount_value > 100)
+   OR min_order_amount < 0
+   OR (max_discount_amount IS NOT NULL AND max_discount_amount <= 0)
+   OR used_count < 0
+   OR (usage_limit IS NOT NULL AND (usage_limit < 1 OR used_count > usage_limit))
+   OR (starts_at IS NOT NULL AND ends_at IS NOT NULL AND starts_at >= ends_at);
+
+SELECT COUNT(*) FROM (
+  SELECT product_id, media_url FROM product_media
+  GROUP BY product_id, media_url HAVING COUNT(*) > 1
+) duplicate_media;
+
+-- PC1 media publication is image-only until the Web + Android video renderer handoff closes.
+SELECT COUNT(*) FROM product_media WHERE media_url ~* '/video/upload/';
+
+SELECT COUNT(*) FROM (
+  SELECT product_id FROM product_media WHERE is_main = TRUE
+  GROUP BY product_id HAVING COUNT(*) > 1
+) multiple_covers;
+
+SELECT COUNT(*) FROM products product
+JOIN product_media media
+  ON media.product_id = product.id
+ AND media.media_url ~* '/video/upload/'
+ AND media.media_url = product.image_url;
+```
+
+The migrations repeat these checks and fail closed. They do not silently repair
+legacy coupon or media data.
 
 The offline command shape is:
 
@@ -146,7 +188,7 @@ App rollback rules:
 - Roll back only to a previously verified full commit and tree.
 - Keep the staging access gate enabled.
 - Keep the external-side-effect kill switch enabled.
-- Keep all four admin write capabilities false.
+- Keep all eight listed admin write capabilities false.
 - Keep legacy schema init disabled.
 - Never redirect to production and never reuse production credentials.
 

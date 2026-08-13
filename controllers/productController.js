@@ -477,24 +477,39 @@ const reorderUploadedFiles = (files, rawMediaOrder) => {
 };
 
 const setMainMediaForProduct = async (client, productId, mediaUrl = null) => {
+    await client.query('UPDATE product_media SET is_main = FALSE WHERE product_id = $1', [productId]);
     if (!mediaUrl) {
         await client.query('UPDATE products SET image_url = NULL WHERE id = $1', [productId]);
         return;
     }
 
-    await client.query('UPDATE product_media SET is_main = FALSE WHERE product_id = $1', [productId]);
-    await client.query(
-        'UPDATE product_media SET is_main = TRUE WHERE product_id = $1 AND media_url = $2',
+    const selected = await client.query(
+        `UPDATE product_media
+         SET is_main = TRUE
+         WHERE product_id = $1 AND media_url = $2 AND media_type = 'image'
+         RETURNING media_url`,
         [productId, mediaUrl]
     );
-    await client.query('UPDATE products SET image_url = $1 WHERE id = $2', [mediaUrl, productId]);
+    await client.query(
+        'UPDATE products SET image_url = $1 WHERE id = $2',
+        [selected.rows[0]?.media_url || null, productId]
+    );
+};
+
+const isSupportedProductImageFile = (file) => {
+    const resourceType = String(file?.resource_type || '').trim().toLowerCase();
+    const mimeType = String(file?.mimetype || '').trim().toLowerCase();
+    const mediaUrl = String(normalizeMediaUrl(file) || '');
+    return resourceType !== 'video'
+        && !mimeType.startsWith('video/')
+        && !/\/video\/upload\//i.test(mediaUrl);
 };
 
 const syncMainMediaFromDatabase = async (client, productId) => {
     const nextMediaResult = await client.query(
         `SELECT id, media_url
          FROM product_media
-         WHERE product_id = $1
+         WHERE product_id = $1 AND media_type = 'image'
          ORDER BY is_main DESC, sort_order ASC, id ASC
          LIMIT 1`,
         [productId]
@@ -514,6 +529,12 @@ const syncMainMediaFromDatabase = async (client, productId) => {
 
 const buildProductPayload = async (body, files, existingProduct = null) => {
     const orderedFiles = reorderUploadedFiles(files, body.mediaOrder);
+    if (orderedFiles.some((entry) => !isSupportedProductImageFile(entry?.file || entry))) {
+        return {
+            error: 'Video yayınlama Android ve web renderer sözleşmesi tamamlanana kadar kapalıdır.',
+            code: 'PRODUCT_MEDIA_VIDEO_RENDERER_HANDOFF_REQUIRED'
+        };
+    }
     const name = String(body.name || '').trim();
     const description = String(body.description || '').trim() || null;
     const categories = parseProductCategories(body, existingProduct);
@@ -732,7 +753,7 @@ const getAllProducts = async (req, res) => {
                        ROUND(COALESCE(AVG(r.rating), 0), 1) AS average_rating,
                        CAST(COUNT(r.id) AS INTEGER) AS review_count
                 FROM products p
-                LEFT JOIN reviews r ON p.id = r.product_id
+                LEFT JOIN reviews r ON p.id = r.product_id AND r.status = 'PUBLISHED'
                 ${visibilityWhere}
                 GROUP BY p.id
                 ORDER BY ${isAdmin ? '' : 'CASE WHEN p.stock > 0 THEN 0 ELSE 1 END,'} p.created_at DESC
@@ -793,7 +814,7 @@ const createProduct = async (req, res) => {
     try {
         const payload = await buildProductPayload(req.body, req.files);
         if (payload.error) {
-            return res.status(400).json({ error: payload.error });
+            return res.status(400).json({ error: payload.error, ...(payload.code ? { code: payload.code } : {}) });
         }
 
         await client.query('BEGIN');
@@ -845,7 +866,8 @@ const createProduct = async (req, res) => {
 
         for (let i = 0; i < payload.mediaUrls.length; i += 1) {
             await client.query(
-                'INSERT INTO product_media (product_id, media_url, is_main, sort_order) VALUES ($1, $2, $3, $4)',
+                `INSERT INTO product_media (product_id, media_url, media_type, is_main, sort_order)
+                 VALUES ($1, $2, 'image', $3, $4)`,
                 [product.id, payload.mediaUrls[i], i === 0, i]
             );
         }
@@ -1137,7 +1159,7 @@ const updateProduct = async (req, res) => {
         const payload = await buildProductPayload(req.body, req.files, existingProduct);
         if (payload.error) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: payload.error });
+            return res.status(400).json({ error: payload.error, ...(payload.code ? { code: payload.code } : {}) });
         }
         const categoryResolution = await resolveProductCategoryAssignment(
             client,
@@ -1213,7 +1235,8 @@ const updateProduct = async (req, res) => {
             await client.query('UPDATE product_media SET is_main = FALSE WHERE product_id = $1', [id]);
             for (let i = 0; i < payload.mediaUrls.length; i += 1) {
                 await client.query(
-                    'INSERT INTO product_media (product_id, media_url, is_main, sort_order) VALUES ($1, $2, $3, $4)',
+                    `INSERT INTO product_media (product_id, media_url, media_type, is_main, sort_order)
+                     VALUES ($1, $2, 'image', $3, $4)`,
                     [id, payload.mediaUrls[i], i === 0, nextSortOrder + i]
                 );
             }
