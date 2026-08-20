@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "reference_id": "001",
+  "authority": "PNG_ONLY",
+  "source_svg": null,
+  "binding_png": "source/phone/seller-phone-001-giris-default-screen.png",
+  "binding_png_sha256": "bb1021ccb12f327040c7d0215ba3b432e9b358dcf36d022f29ee6f42887de585",
+  "canvas": {
+    "width": 853,
+    "height": 1844,
+    "background": "binding_raster_sampled"
+  },
+  "measurement_method": "native-raster region segmentation and edge inspection",
+  "regions": [
+    {
+      "id": "top_bar",
+      "kind": "rounded_card",
+      "x": 39,
+      "y": 44,
+      "width": 773,
+      "height": 107,
+      "radius": 53,
+      "normalized": {
+        "x": 0.04572098,
+        "y": 0.02386117,
+        "width": 0.90621336,
+        "height": 0.05802603
+      }
+    },
+    {
+      "id": "brand",
+      "kind": "accepted_owner_asset_slot",
+      "x": 315,
+      "y": 237,
+      "width": 223,
+      "height": 175,
+      "normalized": {
+        "x": 0.36928488,
+        "y": 0.12852495,
+        "width": 0.26143025,
+        "height": 0.09490239
+      }
+    },
+    {
+      "id": "hero_copy",
+      "kind": "text_region",
+      "x": 108,
+      "y": 489,
+      "width": 637,
+      "height": 111,
+      "normalized": {
+        "x": 0.12661196,
+        "y": 0.26518438,
+        "width": 0.74677608,
+        "height": 0.06019523
+      }
+    },
+    {
+      "id": "form_card",
+      "kind": "rounded_card",
+      "x": 39,
+      "y": 665,
+      "width": 773,
+      "height": 581,
+      "radius": 42,
+      "normalized": {
+        "x": 0.04572098,
+        "y": 0.36062907,
+        "width": 0.90621336,
+        "height": 0.31507592
+      }
+    },
+    {
+      "id": "identifier_field",
+      "kind": "input",
+      "x": 91,
+      "y": 780,
+      "width": 668,
+      "height": 99,
+      "radius": 16,
+      "normalized": {
+        "x": 0.1066823,
+        "y": 0.42299349,
+        "width": 0.78311841,
+        "height": 0.05368764
+      }
+    },
+    {
+      "id": "password_field",
+      "kind": "input",
+      "x": 91,
+      "y": 983,
+      "width": 668,
+      "height": 98,
+      "radius": 16,
+      "normalized": {
+        "x": 0.1066823,
+        "y": 0.53308026,
+        "width": 0.78311841,
+        "height": 0.05314534
+      }
+    },
+    {
+      "id": "remember_row",
+      "kind": "control_row",
+      "x": 91,
+      "y": 1137,
+      "width": 668,
+      "height": 43,
+      "normalized": {
+        "x": 0.1066823,
+        "y": 0.61659436,
+        "width": 0.78311841,
+        "height": 0.02331887
+      }
+    },
+    {
+      "id": "primary_cta",
+      "kind": "button",
+      "x": 52,
+      "y": 1306,
+      "width": 744,
+      "height": 106,
+      "radius": 20,
+      "normalized": {
+        "x": 0.06096131,
+        "y": 0.70824295,
+        "width": 0.87221571,
+        "height": 0.05748373
+      }
+    },
+    {
+      "id": "application_action",
+      "kind": "text_action",
+      "x": 216,
+      "y": 1455,
+      "width": 421,
+      "height": 38,
+      "normalized": {
+        "x": 0.25322392,
+        "y": 0.78904555,
+        "width": 0.49355217,
+        "height": 0.02060738
+      }
+    },
+    {
+      "id": "support_row",
+      "kind": "support_action",
+      "x": 319,
+      "y": 1563,
+      "width": 216,
+      "height": 42,
+      "normalized": {
+        "x": 0.37397421,
+        "y": 0.84761388,
+        "width": 0.25322392,
+        "height": 0.02277657
+      }
+    },
+    {
+      "id": "security_footer",
+      "kind": "security_note",
+      "x": 177,
+      "y": 1681,
+      "width": 499,
+      "height": 39,
+      "normalized": {
+        "x": 0.20750293,
+        "y": 0.91160521,
+        "width": 0.58499414,
+        "height": 0.02114967
+      }
+    }
+  ]
+}

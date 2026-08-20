@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "phase": "SELLER-MAIN6S-R2-OWNER-AUTHORITY-REBIND-AND-FINAL-VISUAL-CLOSURE",
+  "authority": "OWNER_CURRENT_SELLER_SYSTEM_OVERRIDES_CONFLICTING_001_055_LEGACY_DETAILS",
+  "avd_name": "novastore-seller-wave4-uat",
+  "same_apk_sha256": "5efdba9e3e26530539fb80bb8890924a6fc6d3887638a91f4fd00c1ada8b2a44",
+  "references": {
+    "001": {
+      "state": "login",
+      "route": "seller://auth/login",
+      "acceptance_mode": "OWNER_CURRENT_STRUCTURAL_AND_RUNTIME_UAT",
+      "visual_result": "PASS",
+      "runtime_file": "001-runtime.png",
+      "runtime_sha256": "db9010f9b2546ced3a2979cc3cad7a7d335cd239253105a6c39991bb907b473c",
+      "capture_receipt_file": "001-capture.json",
+      "capture_receipt_sha256": "a5202a292e3089ac185a4b3acd535f6e29232981774f8ca54acaea4bff78395a",
+      "capture_valid": "YES",
+      "frame_stable": "YES",
+      "ui_idle": "YES",
+      "wrong_context": "NO"
+    },
+    "055": {
+      "state": "ref_055",
+      "route": "seller://dashboard",
+      "acceptance_mode": "OWNER_CURRENT_STRUCTURAL_AND_RUNTIME_UAT",
+      "visual_result": "PASS",
+      "runtime_file": "055-runtime.png",
+      "runtime_sha256": "d9878bcd12cd5e6c85027fd9b3ec5f3cb717f656c3e27275169cd5c2e1fd22af",
+      "capture_receipt_file": "055-capture.json",
+      "capture_receipt_sha256": "5af7d33fe15474960eb3982c9155c4adcf5590c76c0e3cad94cee4b2076801dc",
+      "capture_valid": "YES",
+      "frame_stable": "YES",
+      "ui_idle": "YES",
+      "wrong_context": "NO"
+    },
+    "282": {
+      "state": "ref_282",
+      "route": "seller://team",
+      "acceptance_mode": "UNCHANGED_BINDING_PNG_SVG_PIXEL_AND_GEOMETRY_GATE",
+      "visual_result": "PASS",
+      "runtime_file": "282-runtime.png",
+      "runtime_sha256": "2e2643be26106a3e8e67acc42e96dd4c9cd09179f5af888d2b8137b95b2f8d28",
+      "capture_receipt_file": "282-capture.json",
+      "capture_receipt_sha256": "f883244b541f219e94d7ac842437b34a8ee8b2b93fb338ed0d372d73dfbcc7ab",
+      "diff_file": "282-diff.json",
+      "diff_sha256": "accbcf36b4cfb20b804a50800d21defa3dba355f6ca628a69ecb66afda26836a",
+      "side_by_side_file": "282-side-by-side.png",
+      "side_by_side_sha256": "6efa2b78016aaf54f4aef2d0c11e4f39fb2be19fee030120969bf35538100669",
+      "delta_percent": 4.8425,
+      "threshold_percent": 5,
+      "geometry_result": "PASS",
+      "capture_valid": "YES",
+      "frame_stable": "YES",
+      "ui_idle": "YES",
+      "wrong_context": "NO"
+    }
+  }
+}

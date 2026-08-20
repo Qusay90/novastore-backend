@@ -1,0 +1,326 @@
+{
+    "reference_number":  "055",
+    "serial":  "127.0.0.1:5555",
+    "reference_path":  "source/phone/seller-phone-055-dashboard-dolu-help-screen.png",
+    "raw_runtime_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-owner-map-final\\055-runtime-raw.png",
+    "normalized_runtime_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-owner-map-final\\055-runtime.png",
+    "side_by_side_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-owner-map-final\\055-side-by-side.png",
+    "overlay_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-owner-map-final\\055-overlay.png",
+    "evidence_provenance":  {
+                                "capture_mode":  "MANIFEST_BOUND_PRECAPTURED",
+                                "comparison_algorithm":  "UNMASKED_FULL_FRAME_RGB_ABSOLUTE_DIFFERENCE_SUM_GT_36",
+                                "comparison_created_utc":  "2026-08-13T17:49:47.1828823Z",
+                                "serial":  "127.0.0.1:5555",
+                                "avd_name":  "novastore-seller-wave4-uat",
+                                "seller_package_fingerprint_sha256":  "286a310609e03232bf9004f9acbfabc42d06ec78f18a9d201b76263698fd72f7",
+                                "installed_apk_sha256":  "9f6912d428112ef3d612ecf8136433d373f9b5b0b1f70b847646e3e9bd82b713",
+                                "capture_time_avd_name":  "novastore-seller-wave4-uat",
+                                "capture_time_apk_sha256":  "9f6912d428112ef3d612ecf8136433d373f9b5b0b1f70b847646e3e9bd82b713",
+                                "capture_time_utc":  "2026-08-13T17:43:41.524Z",
+                                "capture_profile":  {
+                                                        "reference":  "055",
+                                                        "expected_route":  "seller://dashboard",
+                                                        "actual_route":  "seller://dashboard",
+                                                        "expected_markers":  [
+                                                                                 "Günaydın, Kuşay",
+                                                                                 "Bugünkü satış",
+                                                                                 "Son siparişler"
+                                                                             ],
+                                                        "markers_found":  [
+                                                                              "Günaydın, Kuşay",
+                                                                              "Bugünkü satış",
+                                                                              "Son siparişler"
+                                                                          ],
+                                                        "expected_fixture":  "seller-canonical-ref-055",
+                                                        "active_fixture":  "seller-canonical-ref-055",
+                                                        "ui_idle":  "YES",
+                                                        "wrong_context":  "NO",
+                                                        "capture_valid":  "YES"
+                                                    },
+                                "source_sha256":  "00a476a9f353f24b45f62e48aaf6636a7792eab2f691ae2ac2879ad29a28b3fd",
+                                "runtime_input_sha256":  "2f178726ca01c34076723a566abc82b3f1fc6dbbedf67745a6c54a1522a572a9",
+                                "runtime_input_last_write_utc":  "2026-08-13T17:44:17.9570480Z",
+                                "raw_runtime_sha256":  "2f178726ca01c34076723a566abc82b3f1fc6dbbedf67745a6c54a1522a572a9",
+                                "normalized_runtime_sha256":  "e617404818a146416f508deb1c621a176a28859d650f5d590e03c8269172ec8b",
+                                "capture_manifest_sha256":  "06a21ee4a6a2b62b7f83b546d383327a967277fe4839641aa133002e296f8b19",
+                                "capture_manifest_row_sha256":  "f003d6425c278e4ca5ac7fbbd5c890830be68cab3f2c283bb2ebdb21a457cdf6",
+                                "capture_manifest_row":  {
+                                                             "reference":  "055",
+                                                             "state":  "ref_055",
+                                                             "expected_route":  "seller://dashboard",
+                                                             "actual_route":  "seller://dashboard",
+                                                             "expected_markers":  "Günaydın, Kuşay|Bugünkü satış|Son siparişler",
+                                                             "markers_found":  "Günaydın, Kuşay|Bugünkü satış|Son siparişler",
+                                                             "expected_fixture":  "seller-canonical-ref-055",
+                                                             "active_fixture":  "seller-canonical-ref-055",
+                                                             "ui_idle":  "YES",
+                                                             "wrong_context":  "NO",
+                                                             "capture_valid":  "YES",
+                                                             "screenshot":  "artifacts/seller-wave4/visual/055-runtime.png",
+                                                             "frame_stable":  "YES",
+                                                             "runtime_sha256":  "2f178726ca01c34076723a566abc82b3f1fc6dbbedf67745a6c54a1522a572a9",
+                                                             "capture_utc":  "2026-08-13T17:43:41.524Z",
+                                                             "avd_name":  "novastore-seller-wave4-uat",
+                                                             "apk_sha256":  "9f6912d428112ef3d612ecf8136433d373f9b5b0b1f70b847646e3e9bd82b713",
+                                                             "capture_receipt":  "artifacts/seller-wave4/visual/055-capture.json",
+                                                             "capture_receipt_sha256":  "c1b09c8f15c5996d79eac347516aefb3f0d461dc984a012c17b1b3a5cdeb640a"
+                                                         },
+                                "capture_receipt_sha256":  "c1b09c8f15c5996d79eac347516aefb3f0d461dc984a012c17b1b3a5cdeb640a",
+                                "capture_receipt":  {
+                                                        "schema_version":  1,
+                                                        "canonical_state_id":  "055",
+                                                        "state":  "ref_055",
+                                                        "expected_route":  "seller://dashboard",
+                                                        "actual_route":  "seller://dashboard",
+                                                        "expected_semantic_markers":  [
+                                                                                          "Günaydın, Kuşay",
+                                                                                          "Bugünkü satış",
+                                                                                          "Son siparişler"
+                                                                                      ],
+                                                        "markers_found":  [
+                                                                              "Günaydın, Kuşay",
+                                                                              "Bugünkü satış",
+                                                                              "Son siparişler"
+                                                                          ],
+                                                        "expected_fixture":  "seller-canonical-ref-055",
+                                                        "active_fixture":  "seller-canonical-ref-055",
+                                                        "ui_idle":  "YES",
+                                                        "wrong_context":  "NO",
+                                                        "capture_valid":  "YES",
+                                                        "frame_stable":  "YES",
+                                                        "screenshot_path":  "artifacts/seller-wave4/visual/055-runtime.png",
+                                                        "runtime_sha256":  "2f178726ca01c34076723a566abc82b3f1fc6dbbedf67745a6c54a1522a572a9",
+                                                        "capture_utc":  "2026-08-13T17:43:41.524Z",
+                                                        "avd_name":  "novastore-seller-wave4-uat",
+                                                        "apk_sha256":  "9f6912d428112ef3d612ecf8136433d373f9b5b0b1f70b847646e3e9bd82b713"
+                                                    },
+                                "capture_record_sha256":  "5dc37b0a38273f9b5bf541cc30e260c52349be2af1f623dff91c70d143cd036b"
+                            },
+    "layout_spec":  {
+                        "path":  "docs/seller/wave4/spec/055-layout-spec.json",
+                        "sha256":  "a5b851b1df4df1f465ab610bc6d047815e8da3c1ca1fa3b2d8e0c34c65b73fed",
+                        "authority":  "PNG_ONLY"
+                    },
+    "geometry_gate":  {
+                          "result":  "FAIL",
+                          "critical_region_count":  8,
+                          "failed_region_ids":  [
+                                                    "sales_hero",
+                                                    "task_orders",
+                                                    "task_stock",
+                                                    "task_questions",
+                                                    "balance",
+                                                    "recent_orders",
+                                                    "primary_cta",
+                                                    "bottom_navigation"
+                                                ],
+                          "edge_thickness_px":  3,
+                          "translation_search_radius_px":  12,
+                          "pass_rule":  "abs(best_translation_x/y)\u003c=2 and translated_edge_delta_percent\u003c=8"
+                      },
+    "region_comparisons":  [
+                               {
+                                   "id":  "brand_header",
+                                   "kind":  "brand_context",
+                                   "source_bounds_px":  {
+                                                            "x":  42,
+                                                            "y":  43,
+                                                            "width":  779,
+                                                            "height":  108
+                                                        },
+                                   "pixel_delta_percent":  20.8827,
+                                   "edge_delta_percent":  0.8135,
+                                   "best_translation_px":  {
+                                                               "x":  -7,
+                                                               "y":  -9
+                                                           },
+                                   "translated_edge_delta_percent":  0.681,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "greeting",
+                                   "kind":  "text_region",
+                                   "source_bounds_px":  {
+                                                            "x":  42,
+                                                            "y":  190,
+                                                            "width":  475,
+                                                            "height":  94
+                                                        },
+                                   "pixel_delta_percent":  27.5543,
+                                   "edge_delta_percent":  2.8123,
+                                   "best_translation_px":  {
+                                                               "x":  -12,
+                                                               "y":  -3
+                                                           },
+                                   "translated_edge_delta_percent":  1.8354,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "sales_hero",
+                                   "kind":  "rounded_card",
+                                   "source_bounds_px":  {
+                                                            "x":  30,
+                                                            "y":  314,
+                                                            "width":  792,
+                                                            "height":  460
+                                                        },
+                                   "pixel_delta_percent":  14.8301,
+                                   "edge_delta_percent":  44.9973,
+                                   "best_translation_px":  {
+                                                               "x":  3,
+                                                               "y":  -1
+                                                           },
+                                   "translated_edge_delta_percent":  29.0396,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "task_orders",
+                                   "kind":  "task_card",
+                                   "source_bounds_px":  {
+                                                            "x":  30,
+                                                            "y":  798,
+                                                            "width":  247,
+                                                            "height":  312
+                                                        },
+                                   "pixel_delta_percent":  19.284,
+                                   "edge_delta_percent":  58.258,
+                                   "best_translation_px":  {
+                                                               "x":  11,
+                                                               "y":  -12
+                                                           },
+                                   "translated_edge_delta_percent":  0.6329,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "task_stock",
+                                   "kind":  "task_card",
+                                   "source_bounds_px":  {
+                                                            "x":  301,
+                                                            "y":  798,
+                                                            "width":  248,
+                                                            "height":  312
+                                                        },
+                                   "pixel_delta_percent":  19.6146,
+                                   "edge_delta_percent":  66.3658,
+                                   "best_translation_px":  {
+                                                               "x":  -8,
+                                                               "y":  -12
+                                                           },
+                                   "translated_edge_delta_percent":  0.6318,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "task_questions",
+                                   "kind":  "task_card",
+                                   "source_bounds_px":  {
+                                                            "x":  573,
+                                                            "y":  798,
+                                                            "width":  249,
+                                                            "height":  312
+                                                        },
+                                   "pixel_delta_percent":  20.7394,
+                                   "edge_delta_percent":  65.6456,
+                                   "best_translation_px":  {
+                                                               "x":  -9,
+                                                               "y":  -12
+                                                           },
+                                   "translated_edge_delta_percent":  0.6306,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "balance",
+                                   "kind":  "summary_card",
+                                   "source_bounds_px":  {
+                                                            "x":  30,
+                                                            "y":  1134,
+                                                            "width":  792,
+                                                            "height":  163
+                                                        },
+                                   "pixel_delta_percent":  16.3886,
+                                   "edge_delta_percent":  64.5416,
+                                   "best_translation_px":  {
+                                                               "x":  -12,
+                                                               "y":  -12
+                                                           },
+                                   "translated_edge_delta_percent":  0.5269,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "recent_orders",
+                                   "kind":  "list_card",
+                                   "source_bounds_px":  {
+                                                            "x":  30,
+                                                            "y":  1386,
+                                                            "width":  792,
+                                                            "height":  198
+                                                        },
+                                   "pixel_delta_percent":  20.5687,
+                                   "edge_delta_percent":  15.7012,
+                                   "best_translation_px":  {
+                                                               "x":  11,
+                                                               "y":  -8
+                                                           },
+                                   "translated_edge_delta_percent":  0.2541,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "primary_cta",
+                                   "kind":  "button",
+                                   "source_bounds_px":  {
+                                                            "x":  30,
+                                                            "y":  1599,
+                                                            "width":  792,
+                                                            "height":  64
+                                                        },
+                                   "pixel_delta_percent":  47.8042,
+                                   "edge_delta_percent":  41.3529,
+                                   "best_translation_px":  {
+                                                               "x":  3,
+                                                               "y":  0
+                                                           },
+                                   "translated_edge_delta_percent":  39.5686,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "bottom_navigation",
+                                   "kind":  "navigation",
+                                   "source_bounds_px":  {
+                                                            "x":  27,
+                                                            "y":  1681,
+                                                            "width":  798,
+                                                            "height":  119
+                                                        },
+                                   "pixel_delta_percent":  20.4808,
+                                   "edge_delta_percent":  22.6674,
+                                   "best_translation_px":  {
+                                                               "x":  12,
+                                                               "y":  -9
+                                                           },
+                                   "translated_edge_delta_percent":  19.2828,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               }
+                           ],
+    "delta_percent":  19.2761,
+    "threshold_percent":  5,
+    "result":  "FAIL"
+}

@@ -1,0 +1,29 @@
+phase	path	action	artifact_type	purpose	test_command
+WAVE3-PLANNING	docs/seller/wave3/SELLER-WAVE3-BUSINESS-VERTICALS-CONTRACT.md	CREATE	document	Binding vertical/API/security contract	Static consistency check
+WAVE3-PLANNING	docs/seller/wave3/SELLER-WAVE3-FILE-ALLOWLIST.tsv	CREATE	document	Deterministic Wave 3 write boundary	Import-Csv uniqueness check
+WAVE3-PLANNING	docs/seller/wave3/SELLER-WAVE3-TEST-SECURITY-AND-RECOVERY.md	CREATE	document	Required verification and recovery matrix	Static consistency check
+WAVE3	migrations/20260806_seller_wave3_business_verticals.sql	CREATE	migration	Additive seller business shadow schema	 node tests/sellerWave3MigrationContractSmoke.js; node tests/sellerWave3MigrationDisposableDbIntegrationSmoke.js
+WAVE3	models/sellerWave3MigrationRegistry.js	CREATE	model	Checksum-protected Wave 3 registry chained after F1	 node tests/sellerWave3MigrationContractSmoke.js
+WAVE3	tests/helpers/sellerWave3DisposableDb.js	CREATE	test_helper	Explicit loopback-only Wave 3 disposable DB guard	 node tests/sellerWave3MigrationDisposableDbIntegrationSmoke.js
+WAVE3	services/sellerStoreService.js	CREATE	service	Scoped store profile read/update service	 node tests/sellerWave3StoreCatalogSmoke.js
+WAVE3	services/sellerOfferInventoryService.js	CREATE	service	Scoped offer, variant and inventory mutation service	 node tests/sellerWave3StoreCatalogSmoke.js; node tests/sellerWave3InventoryFulfillmentSmoke.js
+WAVE3	services/sellerOrderFulfillmentService.js	CREATE	service	Scoped order allocation, package and return-read service	 node tests/sellerWave3InventoryFulfillmentSmoke.js
+WAVE3	services/sellerFinanceService.js	CREATE	service	Exact minor-unit dashboard and finance read service	 node tests/sellerWave3FinanceSupportSmoke.js
+WAVE3	services/sellerSupportService.js	CREATE	service	Scoped support conversation/message/rating service	 node tests/sellerWave3FinanceSupportSmoke.js
+WAVE3	controllers/sellerBusinessController.js	CREATE	controller	Safe seller business response shaping	 node tests/sellerWave3HttpBoundarySmoke.js
+WAVE3	routes/sellerBusinessRoutes.js	CREATE	route	Disabled-by-default seller business route boundary	 node tests/sellerWave3HttpBoundarySmoke.js
+WAVE3	server.js	MODIFY	server_entry	Mount only disabled seller business boundary	 node tests/sellerWave3HttpBoundarySmoke.js; node tests/sellerF1NoRegressionSmoke.js
+WAVE3	tests/sellerWave3ContractSmoke.js	CREATE	test	Allowlist and immutable-contract smoke	 node tests/sellerWave3ContractSmoke.js
+WAVE3	tests/sellerWave3MigrationContractSmoke.js	CREATE	test	Schema/registry/additive guard test	 node tests/sellerWave3MigrationContractSmoke.js
+WAVE3	tests/sellerWave3MigrationDisposableDbIntegrationSmoke.js	CREATE	test	Fresh/second apply and isolated PostgreSQL proof	 node tests/sellerWave3MigrationDisposableDbIntegrationSmoke.js
+WAVE3	tests/sellerWave3StoreCatalogSmoke.js	CREATE	test	Store/catalog permission/revision/idempotency proof	 node tests/sellerWave3StoreCatalogSmoke.js
+WAVE3	tests/sellerWave3InventoryFulfillmentSmoke.js	CREATE	test	Inventory concurrency/order state/rollback proof	 node tests/sellerWave3InventoryFulfillmentSmoke.js
+WAVE3	tests/sellerWave3FinanceSupportSmoke.js	CREATE	test	Finance reconciliation and support isolation proof	 node tests/sellerWave3FinanceSupportSmoke.js
+WAVE3	tests/sellerWave3HttpBoundarySmoke.js	CREATE	test	Seller audience/flag/validator route proof	 node tests/sellerWave3HttpBoundarySmoke.js
+WAVE3	tests/sellerWave3BusinessIsolationIntegrationSmoke.js	CREATE	test	Final real-DB cross-domain isolation regression	 node tests/sellerWave3BusinessIsolationIntegrationSmoke.js
+FORBIDDEN	models/createCoreDb.js	READ_ONLY	runtime_schema	Core initializer cannot carry seller migration	Existing startup tests
+FORBIDDEN	routes/adminRoutes.js	READ_ONLY	admin_runtime	No admin authorization bridge	Existing admin compatibility tests
+FORBIDDEN	middlewares/authMiddleware.js	READ_ONLY	customer_auth	Customer/admin JWT cannot establish seller authority	F0B security contract
+FORBIDDEN	app/**	FORBIDDEN	android	No Android/theme work	Git allowlist review
+FORBIDDEN	package.json	FORBIDDEN	package	No dependency update	Git allowlist review
+FORBIDDEN	package-lock.json	FORBIDDEN	package	No dependency update	Git allowlist review

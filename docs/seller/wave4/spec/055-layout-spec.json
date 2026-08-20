@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "reference_id": "055",
+  "authority": "PNG_ONLY",
+  "source_svg": null,
+  "binding_png": "source/phone/seller-phone-055-dashboard-dolu-help-screen.png",
+  "binding_png_sha256": "00a476a9f353f24b45f62e48aaf6636a7792eab2f691ae2ac2879ad29a28b3fd",
+  "canvas": {
+    "width": 853,
+    "height": 1844,
+    "background": "binding_raster_sampled"
+  },
+  "measurement_method": "native-raster region segmentation and edge inspection",
+  "regions": [
+    {
+      "id": "brand_header",
+      "kind": "brand_context",
+      "x": 42,
+      "y": 43,
+      "width": 779,
+      "height": 108,
+      "normalized": {
+        "x": 0.04923798,
+        "y": 0.02331887,
+        "width": 0.91324736,
+        "height": 0.05856833
+      }
+    },
+    {
+      "id": "greeting",
+      "kind": "text_region",
+      "x": 42,
+      "y": 190,
+      "width": 475,
+      "height": 94,
+      "normalized": {
+        "x": 0.04923798,
+        "y": 0.10303688,
+        "width": 0.55685815,
+        "height": 0.05097614
+      }
+    },
+    {
+      "id": "sales_hero",
+      "kind": "rounded_card",
+      "x": 30,
+      "y": 314,
+      "width": 792,
+      "height": 460,
+      "radius": 24,
+      "normalized": {
+        "x": 0.03516999,
+        "y": 0.170282,
+        "width": 0.92848769,
+        "height": 0.2494577
+      }
+    },
+    {
+      "id": "task_orders",
+      "kind": "task_card",
+      "x": 30,
+      "y": 798,
+      "width": 247,
+      "height": 312,
+      "radius": 20,
+      "normalized": {
+        "x": 0.03516999,
+        "y": 0.43275488,
+        "width": 0.28956624,
+        "height": 0.1691974
+      }
+    },
+    {
+      "id": "task_stock",
+      "kind": "task_card",
+      "x": 301,
+      "y": 798,
+      "width": 248,
+      "height": 312,
+      "radius": 20,
+      "normalized": {
+        "x": 0.35287222,
+        "y": 0.43275488,
+        "width": 0.29073857,
+        "height": 0.1691974
+      }
+    },
+    {
+      "id": "task_questions",
+      "kind": "task_card",
+      "x": 573,
+      "y": 798,
+      "width": 249,
+      "height": 312,
+      "radius": 20,
+      "normalized": {
+        "x": 0.67174678,
+        "y": 0.43275488,
+        "width": 0.2919109,
+        "height": 0.1691974
+      }
+    },
+    {
+      "id": "balance",
+      "kind": "summary_card",
+      "x": 30,
+      "y": 1134,
+      "width": 792,
+      "height": 163,
+      "radius": 20,
+      "normalized": {
+        "x": 0.03516999,
+        "y": 0.61496746,
+        "width": 0.92848769,
+        "height": 0.08839479
+      }
+    },
+    {
+      "id": "recent_orders",
+      "kind": "list_card",
+      "x": 30,
+      "y": 1386,
+      "width": 792,
+      "height": 198,
+      "radius": 20,
+      "normalized": {
+        "x": 0.03516999,
+        "y": 0.7516269,
+        "width": 0.92848769,
+        "height": 0.10737527
+      }
+    },
+    {
+      "id": "primary_cta",
+      "kind": "button",
+      "x": 30,
+      "y": 1599,
+      "width": 792,
+      "height": 64,
+      "radius": 13,
+      "normalized": {
+        "x": 0.03516999,
+        "y": 0.86713666,
+        "width": 0.92848769,
+        "height": 0.03470716
+      }
+    },
+    {
+      "id": "bottom_navigation",
+      "kind": "navigation",
+      "x": 27,
+      "y": 1681,
+      "width": 798,
+      "height": 119,
+      "radius": 38,
+      "normalized": {
+        "x": 0.03165299,
+        "y": 0.91160521,
+        "width": 0.93552169,
+        "height": 0.06453362
+      }
+    }
+  ]
+}

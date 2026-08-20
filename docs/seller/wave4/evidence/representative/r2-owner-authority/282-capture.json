@@ -1,0 +1,106 @@
+{
+  "schema_version": 2,
+  "canonical_state_id": "282",
+  "state": "ref_282",
+  "expected_route": "seller:\/\/team",
+  "actual_route": "seller:\/\/team",
+  "expected_semantic_markers": [
+    "4 etkin üye",
+    "Ayşe Kaya",
+    "Ekip Üyesi Davet Et"
+  ],
+  "markers_found": [
+    "4 etkin üye",
+    "Ayşe Kaya",
+    "Ekip Üyesi Davet Et"
+  ],
+  "expected_fixture": "seller-canonical-ref-282",
+  "active_fixture": "seller-canonical-ref-282",
+  "ui_idle": "YES",
+  "wrong_context": "NO",
+  "capture_valid": "YES",
+  "frame_stable": "YES",
+  "screenshot_path": "artifacts\/seller-wave4\/visual\/282-runtime.png",
+  "runtime_sha256": "2e2643be26106a3e8e67acc42e96dd4c9cd09179f5af888d2b8137b95b2f8d28",
+  "capture_utc": "2026-08-20T19:01:47.318Z",
+  "avd_name": "novastore-seller-wave4-uat",
+  "apk_sha256": "5efdba9e3e26530539fb80bb8890924a6fc6d3887638a91f4fd00c1ada8b2a44",
+  "capture_canvas_px": {
+    "width": 1080,
+    "height": 2400
+  },
+  "runtime_bounds_raw_px": {
+    "svg_major_01": {
+      "left": 51,
+      "top": 84,
+      "right": 1029,
+      "bottom": 221,
+      "width": 978,
+      "height": 137
+    },
+    "svg_major_02": {
+      "left": 61,
+      "top": 264,
+      "right": 1019,
+      "bottom": 452,
+      "width": 958,
+      "height": 188
+    },
+    "svg_major_03": {
+      "left": 61,
+      "top": 482,
+      "right": 1019,
+      "bottom": 827,
+      "width": 958,
+      "height": 345
+    },
+    "svg_major_04": {
+      "left": 61,
+      "top": 860,
+      "right": 1019,
+      "bottom": 1050,
+      "width": 958,
+      "height": 190
+    },
+    "svg_major_05": {
+      "left": 61,
+      "top": 1068,
+      "right": 1019,
+      "bottom": 1258,
+      "width": 958,
+      "height": 190
+    },
+    "svg_major_06": {
+      "left": 61,
+      "top": 1276,
+      "right": 1019,
+      "bottom": 1466,
+      "width": 958,
+      "height": 190
+    },
+    "svg_major_07": {
+      "left": 61,
+      "top": 1491,
+      "right": 1019,
+      "bottom": 1633,
+      "width": 958,
+      "height": 142
+    },
+    "svg_major_08": {
+      "left": 61,
+      "top": 1679,
+      "right": 1019,
+      "bottom": 1801,
+      "width": 958,
+      "height": 122
+    },
+    "svg_major_09": {
+      "left": 35,
+      "top": 2131,
+      "right": 1045,
+      "bottom": 2324,
+      "width": 1010,
+      "height": 193
+    }
+  }
+}

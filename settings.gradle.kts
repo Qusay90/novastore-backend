@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "NovaStore"
 include(":app")
+include(":seller-app")

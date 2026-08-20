@@ -1,0 +1,557 @@
+{
+    "reference_number":  "282",
+    "serial":  "emulator-5554",
+    "reference_path":  "source/phone/seller-phone-282-ekip-uyeleri-listesi.png",
+    "raw_runtime_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\r2-owner-rebind-final2-282-gate\\282-runtime-raw.png",
+    "normalized_runtime_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\r2-owner-rebind-final2-282-gate\\282-runtime.png",
+    "side_by_side_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\r2-owner-rebind-final2-282-gate\\282-side-by-side.png",
+    "overlay_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\r2-owner-rebind-final2-282-gate\\282-overlay.png",
+    "evidence_provenance":  {
+                                "capture_mode":  "MANIFEST_BOUND_PRECAPTURED",
+                                "comparison_algorithm":  "UNMASKED_FULL_FRAME_RGB_ABSOLUTE_DIFFERENCE_SUM_GT_36",
+                                "comparison_created_utc":  "2026-08-20T19:03:31.6926834Z",
+                                "serial":  "emulator-5554",
+                                "avd_name":  "novastore-seller-wave4-uat",
+                                "seller_package_fingerprint_sha256":  "d0bde026a0d0149280b17345f2f8ecc7a8ca7dc5fe397244205e0200102c1ca3",
+                                "installed_apk_sha256":  "5efdba9e3e26530539fb80bb8890924a6fc6d3887638a91f4fd00c1ada8b2a44",
+                                "capture_time_avd_name":  "novastore-seller-wave4-uat",
+                                "capture_time_apk_sha256":  "5efdba9e3e26530539fb80bb8890924a6fc6d3887638a91f4fd00c1ada8b2a44",
+                                "capture_time_utc":  "2026-08-20T19:01:47.318Z",
+                                "capture_profile":  {
+                                                        "reference":  "282",
+                                                        "expected_route":  "seller://team",
+                                                        "actual_route":  "seller://team",
+                                                        "expected_markers":  [
+                                                                                 "4 etkin üye",
+                                                                                 "Ayşe Kaya",
+                                                                                 "Ekip Üyesi Davet Et"
+                                                                             ],
+                                                        "markers_found":  [
+                                                                              "4 etkin üye",
+                                                                              "Ayşe Kaya",
+                                                                              "Ekip Üyesi Davet Et"
+                                                                          ],
+                                                        "expected_fixture":  "seller-canonical-ref-282",
+                                                        "active_fixture":  "seller-canonical-ref-282",
+                                                        "ui_idle":  "YES",
+                                                        "wrong_context":  "NO",
+                                                        "capture_valid":  "YES"
+                                                    },
+                                "source_sha256":  "9de1dc602af79b7c78e2b3736d06fb5f00b775d35e0893f6b1d2f04f59f2793c",
+                                "runtime_input_sha256":  "2e2643be26106a3e8e67acc42e96dd4c9cd09179f5af888d2b8137b95b2f8d28",
+                                "runtime_input_last_write_utc":  "2026-08-20T19:01:47.8305437Z",
+                                "raw_runtime_sha256":  "2e2643be26106a3e8e67acc42e96dd4c9cd09179f5af888d2b8137b95b2f8d28",
+                                "normalized_runtime_sha256":  "686ee7447692040ce6a868e22646d3e8a4497bb87a7efbf68b761792b7779d73",
+                                "capture_manifest_sha256":  "735fca521b38940d0b4e19b5d1b5268cf15a6b07f86be45471ecfa0fb067007b",
+                                "capture_manifest_row_sha256":  "fc34533e1ac9c8adb54dee787c69c28aa452c4b3499364d5e82716c9a2234f47",
+                                "capture_manifest_row":  {
+                                                             "reference":  "282",
+                                                             "state":  "ref_282",
+                                                             "expected_route":  "seller://team",
+                                                             "actual_route":  "seller://team",
+                                                             "expected_markers":  "4 etkin üye|Ayşe Kaya|Ekip Üyesi Davet Et",
+                                                             "markers_found":  "4 etkin üye|Ayşe Kaya|Ekip Üyesi Davet Et",
+                                                             "expected_fixture":  "seller-canonical-ref-282",
+                                                             "active_fixture":  "seller-canonical-ref-282",
+                                                             "ui_idle":  "YES",
+                                                             "wrong_context":  "NO",
+                                                             "capture_valid":  "YES",
+                                                             "screenshot":  "artifacts/seller-wave4/visual/282-runtime.png",
+                                                             "frame_stable":  "YES",
+                                                             "runtime_sha256":  "2e2643be26106a3e8e67acc42e96dd4c9cd09179f5af888d2b8137b95b2f8d28",
+                                                             "capture_utc":  "2026-08-20T19:01:47.318Z",
+                                                             "avd_name":  "novastore-seller-wave4-uat",
+                                                             "apk_sha256":  "5efdba9e3e26530539fb80bb8890924a6fc6d3887638a91f4fd00c1ada8b2a44",
+                                                             "capture_receipt":  "artifacts/seller-wave4/visual/282-capture.json",
+                                                             "capture_receipt_sha256":  "f883244b541f219e94d7ac842437b34a8ee8b2b93fb338ed0d372d73dfbcc7ab"
+                                                         },
+                                "capture_receipt_sha256":  "f883244b541f219e94d7ac842437b34a8ee8b2b93fb338ed0d372d73dfbcc7ab",
+                                "capture_receipt":  {
+                                                        "schema_version":  2,
+                                                        "canonical_state_id":  "282",
+                                                        "state":  "ref_282",
+                                                        "expected_route":  "seller://team",
+                                                        "actual_route":  "seller://team",
+                                                        "expected_semantic_markers":  [
+                                                                                          "4 etkin üye",
+                                                                                          "Ayşe Kaya",
+                                                                                          "Ekip Üyesi Davet Et"
+                                                                                      ],
+                                                        "markers_found":  [
+                                                                              "4 etkin üye",
+                                                                              "Ayşe Kaya",
+                                                                              "Ekip Üyesi Davet Et"
+                                                                          ],
+                                                        "expected_fixture":  "seller-canonical-ref-282",
+                                                        "active_fixture":  "seller-canonical-ref-282",
+                                                        "ui_idle":  "YES",
+                                                        "wrong_context":  "NO",
+                                                        "capture_valid":  "YES",
+                                                        "frame_stable":  "YES",
+                                                        "screenshot_path":  "artifacts/seller-wave4/visual/282-runtime.png",
+                                                        "runtime_sha256":  "2e2643be26106a3e8e67acc42e96dd4c9cd09179f5af888d2b8137b95b2f8d28",
+                                                        "capture_utc":  "2026-08-20T19:01:47.318Z",
+                                                        "avd_name":  "novastore-seller-wave4-uat",
+                                                        "apk_sha256":  "5efdba9e3e26530539fb80bb8890924a6fc6d3887638a91f4fd00c1ada8b2a44",
+                                                        "capture_canvas_px":  {
+                                                                                  "width":  1080,
+                                                                                  "height":  2400
+                                                                              },
+                                                        "runtime_bounds_raw_px":  {
+                                                                                      "svg_major_01":  {
+                                                                                                           "left":  51,
+                                                                                                           "top":  84,
+                                                                                                           "right":  1029,
+                                                                                                           "bottom":  221,
+                                                                                                           "width":  978,
+                                                                                                           "height":  137
+                                                                                                       },
+                                                                                      "svg_major_02":  {
+                                                                                                           "left":  61,
+                                                                                                           "top":  264,
+                                                                                                           "right":  1019,
+                                                                                                           "bottom":  452,
+                                                                                                           "width":  958,
+                                                                                                           "height":  188
+                                                                                                       },
+                                                                                      "svg_major_03":  {
+                                                                                                           "left":  61,
+                                                                                                           "top":  482,
+                                                                                                           "right":  1019,
+                                                                                                           "bottom":  827,
+                                                                                                           "width":  958,
+                                                                                                           "height":  345
+                                                                                                       },
+                                                                                      "svg_major_04":  {
+                                                                                                           "left":  61,
+                                                                                                           "top":  860,
+                                                                                                           "right":  1019,
+                                                                                                           "bottom":  1050,
+                                                                                                           "width":  958,
+                                                                                                           "height":  190
+                                                                                                       },
+                                                                                      "svg_major_05":  {
+                                                                                                           "left":  61,
+                                                                                                           "top":  1068,
+                                                                                                           "right":  1019,
+                                                                                                           "bottom":  1258,
+                                                                                                           "width":  958,
+                                                                                                           "height":  190
+                                                                                                       },
+                                                                                      "svg_major_06":  {
+                                                                                                           "left":  61,
+                                                                                                           "top":  1276,
+                                                                                                           "right":  1019,
+                                                                                                           "bottom":  1466,
+                                                                                                           "width":  958,
+                                                                                                           "height":  190
+                                                                                                       },
+                                                                                      "svg_major_07":  {
+                                                                                                           "left":  61,
+                                                                                                           "top":  1491,
+                                                                                                           "right":  1019,
+                                                                                                           "bottom":  1633,
+                                                                                                           "width":  958,
+                                                                                                           "height":  142
+                                                                                                       },
+                                                                                      "svg_major_08":  {
+                                                                                                           "left":  61,
+                                                                                                           "top":  1679,
+                                                                                                           "right":  1019,
+                                                                                                           "bottom":  1801,
+                                                                                                           "width":  958,
+                                                                                                           "height":  122
+                                                                                                       },
+                                                                                      "svg_major_09":  {
+                                                                                                           "left":  35,
+                                                                                                           "top":  2131,
+                                                                                                           "right":  1045,
+                                                                                                           "bottom":  2324,
+                                                                                                           "width":  1010,
+                                                                                                           "height":  193
+                                                                                                       }
+                                                                                  }
+                                                    },
+                                "capture_record_sha256":  "820eee5d758d48db89e0ad2644879dfc1ef639e777ab55d3ea380a0a8562fd54"
+                            },
+    "layout_spec":  {
+                        "path":  "docs/seller/wave4/spec/282-layout-spec.json",
+                        "sha256":  "d784e5c929a9d5d10ff8e7ae1dcab1859e20708e3510d054cd5f9791db792a03",
+                        "authority":  "FULL_SCREEN_SVG"
+                    },
+    "geometry_gate":  {
+                          "result":  "PASS",
+                          "critical_region_count":  9,
+                          "failed_region_ids":  [
+
+                                                ],
+                          "edge_thickness_px":  3,
+                          "translation_search_radius_px":  12,
+                          "pass_rule":  "abs(runtime/source x,y,width,height delta)\u003c=2 and translated_edge_delta_percent\u003c=8",
+                          "runtime_bounds_normalization":  {
+                                                               "raw_canvas_width":  1080,
+                                                               "raw_canvas_height":  2400,
+                                                               "reference_canvas_width":  852,
+                                                               "reference_canvas_height":  1846,
+                                                               "scale":  0.78888889,
+                                                               "offset_x":  0,
+                                                               "offset_y":  -24
+                                                           }
+                      },
+    "region_comparisons":  [
+                               {
+                                   "id":  "svg_major_01",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  40,
+                                                            "y":  42,
+                                                            "width":  772,
+                                                            "height":  108
+                                                        },
+                                   "runtime_bounds_raw_px":  {
+                                                                 "x":  51,
+                                                                 "y":  84,
+                                                                 "width":  978,
+                                                                 "height":  137
+                                                             },
+                                   "runtime_bounds_px":  {
+                                                             "x":  40,
+                                                             "y":  42,
+                                                             "width":  772,
+                                                             "height":  108
+                                                         },
+                                   "bounds_delta_px":  {
+                                                           "x":  0,
+                                                           "y":  0,
+                                                           "width":  0,
+                                                           "height":  0
+                                                       },
+                                   "pixel_delta_percent":  4.5697,
+                                   "edge_delta_percent":  0,
+                                   "best_translation_px":  {
+                                                               "x":  0,
+                                                               "y":  0
+                                                           },
+                                   "translated_edge_delta_percent":  0,
+                                   "geometry_result":  "PASS",
+                                   "classification":  "PASS",
+                                   "threshold_percent":  5,
+                                   "result":  "PASS"
+                               },
+                               {
+                                   "id":  "svg_major_02",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  184,
+                                                            "width":  756,
+                                                            "height":  148
+                                                        },
+                                   "runtime_bounds_raw_px":  {
+                                                                 "x":  61,
+                                                                 "y":  264,
+                                                                 "width":  958,
+                                                                 "height":  188
+                                                             },
+                                   "runtime_bounds_px":  {
+                                                             "x":  48,
+                                                             "y":  184,
+                                                             "width":  756,
+                                                             "height":  148
+                                                         },
+                                   "bounds_delta_px":  {
+                                                           "x":  0,
+                                                           "y":  0,
+                                                           "width":  0,
+                                                           "height":  0
+                                                       },
+                                   "pixel_delta_percent":  7.1491,
+                                   "edge_delta_percent":  0.2598,
+                                   "best_translation_px":  {
+                                                               "x":  0,
+                                                               "y":  1
+                                                           },
+                                   "translated_edge_delta_percent":  0.2227,
+                                   "geometry_result":  "PASS",
+                                   "classification":  "CONTENT_OR_TYPOGRAPHY",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_03",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  356,
+                                                            "width":  756,
+                                                            "height":  272
+                                                        },
+                                   "runtime_bounds_raw_px":  {
+                                                                 "x":  61,
+                                                                 "y":  482,
+                                                                 "width":  958,
+                                                                 "height":  345
+                                                             },
+                                   "runtime_bounds_px":  {
+                                                             "x":  48,
+                                                             "y":  356,
+                                                             "width":  756,
+                                                             "height":  272
+                                                         },
+                                   "bounds_delta_px":  {
+                                                           "x":  0,
+                                                           "y":  0,
+                                                           "width":  0,
+                                                           "height":  0
+                                                       },
+                                   "pixel_delta_percent":  7.083,
+                                   "edge_delta_percent":  0,
+                                   "best_translation_px":  {
+                                                               "x":  -12,
+                                                               "y":  -12
+                                                           },
+                                   "translated_edge_delta_percent":  0,
+                                   "geometry_result":  "PASS",
+                                   "classification":  "CONTENT_OR_TYPOGRAPHY",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_04",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  654,
+                                                            "width":  756,
+                                                            "height":  150
+                                                        },
+                                   "runtime_bounds_raw_px":  {
+                                                                 "x":  61,
+                                                                 "y":  860,
+                                                                 "width":  958,
+                                                                 "height":  190
+                                                             },
+                                   "runtime_bounds_px":  {
+                                                             "x":  48,
+                                                             "y":  654,
+                                                             "width":  756,
+                                                             "height":  150
+                                                         },
+                                   "bounds_delta_px":  {
+                                                           "x":  0,
+                                                           "y":  0,
+                                                           "width":  0,
+                                                           "height":  0
+                                                       },
+                                   "pixel_delta_percent":  6.4489,
+                                   "edge_delta_percent":  0,
+                                   "best_translation_px":  {
+                                                               "x":  0,
+                                                               "y":  0
+                                                           },
+                                   "translated_edge_delta_percent":  0,
+                                   "geometry_result":  "PASS",
+                                   "classification":  "CONTENT_OR_TYPOGRAPHY",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_05",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  818,
+                                                            "width":  756,
+                                                            "height":  150
+                                                        },
+                                   "runtime_bounds_raw_px":  {
+                                                                 "x":  61,
+                                                                 "y":  1068,
+                                                                 "width":  958,
+                                                                 "height":  190
+                                                             },
+                                   "runtime_bounds_px":  {
+                                                             "x":  48,
+                                                             "y":  819,
+                                                             "width":  756,
+                                                             "height":  150
+                                                         },
+                                   "bounds_delta_px":  {
+                                                           "x":  0,
+                                                           "y":  1,
+                                                           "width":  0,
+                                                           "height":  0
+                                                       },
+                                   "pixel_delta_percent":  5.9771,
+                                   "edge_delta_percent":  13.1481,
+                                   "best_translation_px":  {
+                                                               "x":  0,
+                                                               "y":  1
+                                                           },
+                                   "translated_edge_delta_percent":  0,
+                                   "geometry_result":  "PASS",
+                                   "classification":  "CONTENT_OR_TYPOGRAPHY",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_06",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  982,
+                                                            "width":  756,
+                                                            "height":  150
+                                                        },
+                                   "runtime_bounds_raw_px":  {
+                                                                 "x":  61,
+                                                                 "y":  1276,
+                                                                 "width":  958,
+                                                                 "height":  190
+                                                             },
+                                   "runtime_bounds_px":  {
+                                                             "x":  48,
+                                                             "y":  983,
+                                                             "width":  756,
+                                                             "height":  150
+                                                         },
+                                   "bounds_delta_px":  {
+                                                           "x":  0,
+                                                           "y":  1,
+                                                           "width":  0,
+                                                           "height":  0
+                                                       },
+                                   "pixel_delta_percent":  5.933,
+                                   "edge_delta_percent":  13.2963,
+                                   "best_translation_px":  {
+                                                               "x":  0,
+                                                               "y":  1
+                                                           },
+                                   "translated_edge_delta_percent":  0,
+                                   "geometry_result":  "PASS",
+                                   "classification":  "CONTENT_OR_TYPOGRAPHY",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_07",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  1152,
+                                                            "width":  756,
+                                                            "height":  112
+                                                        },
+                                   "runtime_bounds_raw_px":  {
+                                                                 "x":  61,
+                                                                 "y":  1491,
+                                                                 "width":  958,
+                                                                 "height":  142
+                                                             },
+                                   "runtime_bounds_px":  {
+                                                             "x":  48,
+                                                             "y":  1152,
+                                                             "width":  756,
+                                                             "height":  112
+                                                         },
+                                   "bounds_delta_px":  {
+                                                           "x":  0,
+                                                           "y":  0,
+                                                           "width":  0,
+                                                           "height":  0
+                                                       },
+                                   "pixel_delta_percent":  8.0676,
+                                   "edge_delta_percent":  0,
+                                   "best_translation_px":  {
+                                                               "x":  0,
+                                                               "y":  0
+                                                           },
+                                   "translated_edge_delta_percent":  0,
+                                   "geometry_result":  "PASS",
+                                   "classification":  "CONTENT_OR_TYPOGRAPHY",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_08",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  1300,
+                                                            "width":  756,
+                                                            "height":  96
+                                                        },
+                                   "runtime_bounds_raw_px":  {
+                                                                 "x":  61,
+                                                                 "y":  1679,
+                                                                 "width":  958,
+                                                                 "height":  122
+                                                             },
+                                   "runtime_bounds_px":  {
+                                                             "x":  48,
+                                                             "y":  1301,
+                                                             "width":  756,
+                                                             "height":  96
+                                                         },
+                                   "bounds_delta_px":  {
+                                                           "x":  0,
+                                                           "y":  1,
+                                                           "width":  0,
+                                                           "height":  0
+                                                       },
+                                   "pixel_delta_percent":  6.8177,
+                                   "edge_delta_percent":  17.3365,
+                                   "best_translation_px":  {
+                                                               "x":  0,
+                                                               "y":  1
+                                                           },
+                                   "translated_edge_delta_percent":  2.108,
+                                   "geometry_result":  "PASS",
+                                   "classification":  "CONTENT_OR_TYPOGRAPHY",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_09",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  28,
+                                                            "y":  1658,
+                                                            "width":  796,
+                                                            "height":  152
+                                                        },
+                                   "runtime_bounds_raw_px":  {
+                                                                 "x":  35,
+                                                                 "y":  2131,
+                                                                 "width":  1010,
+                                                                 "height":  193
+                                                             },
+                                   "runtime_bounds_px":  {
+                                                             "x":  28,
+                                                             "y":  1657,
+                                                             "width":  797,
+                                                             "height":  152
+                                                         },
+                                   "bounds_delta_px":  {
+                                                           "x":  0,
+                                                           "y":  -1,
+                                                           "width":  1,
+                                                           "height":  0
+                                                       },
+                                   "pixel_delta_percent":  7.7079,
+                                   "edge_delta_percent":  3.4324,
+                                   "best_translation_px":  {
+                                                               "x":  0,
+                                                               "y":  0
+                                                           },
+                                   "translated_edge_delta_percent":  3.4324,
+                                   "geometry_result":  "PASS",
+                                   "classification":  "CONTENT_OR_TYPOGRAPHY",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               }
+                           ],
+    "delta_percent":  4.8425,
+    "threshold_percent":  5,
+    "result":  "PASS"
+}

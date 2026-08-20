@@ -1,0 +1,2220 @@
+{
+  "schema_version": 1,
+  "reference_id": "185",
+  "authority": "FULL_SCREEN_SVG",
+  "source_svg": "source/svg/seller-phone-185-finans-ana-ekrani-screen.svg",
+  "source_svg_sha256": "6413c5f266612f34dc481bb82df5b6c655bc35fddcf738e38eedbbf9e8ae3227",
+  "binding_png": "source/phone/seller-phone-185-finans-ana-ekrani-screen.png",
+  "binding_png_sha256": "df23c1ebc6f90cc5fabc81b111a2e53e4df2289a259e28163882a8a05019d792",
+  "canvas": {
+    "width": 852.0,
+    "height": 1846.0,
+    "viewBox": [
+      0.0,
+      0.0,
+      852.0,
+      1846.0
+    ],
+    "background": "#F7F7F8"
+  },
+  "binding_png_canvas": {
+    "width": 852,
+    "height": 1846
+  },
+  "gradients": [
+    {
+      "id": "orangeGradient",
+      "type": "linearGradient",
+      "direction": {
+        "x1": "0",
+        "y1": "0",
+        "x2": "1",
+        "y2": "1"
+      },
+      "stops": [
+        {
+          "offset": "0%",
+          "color": "#FF6D18",
+          "opacity": "1"
+        },
+        {
+          "offset": "100%",
+          "color": "#FF4B00",
+          "opacity": "1"
+        }
+      ]
+    },
+    {
+      "id": "selectedNav",
+      "type": "linearGradient",
+      "direction": {
+        "x1": "0",
+        "y1": "0",
+        "x2": "1",
+        "y2": "1"
+      },
+      "stops": [
+        {
+          "offset": "0%",
+          "color": "#FF7B32",
+          "opacity": "1"
+        },
+        {
+          "offset": "100%",
+          "color": "#F04400",
+          "opacity": "1"
+        }
+      ]
+    }
+  ],
+  "filters": [
+    {
+      "id": "softShadow",
+      "bounds": {
+        "x": "-20%",
+        "y": "-20%",
+        "width": "140%",
+        "height": "170%"
+      },
+      "operations": [
+        {
+          "type": "feFlood",
+          "flood-color": "#17345B",
+          "flood-opacity": "0.10"
+        },
+        {
+          "type": "feComposite",
+          "operator": "in"
+        },
+        {
+          "type": "feOffset",
+          "dy": "12"
+        },
+        {
+          "type": "feGaussianBlur",
+          "stdDeviation": "18"
+        },
+        {
+          "type": "feMerge"
+        }
+      ]
+    },
+    {
+      "id": "buttonShadow",
+      "bounds": {
+        "x": "-20%",
+        "y": "-30%",
+        "width": "140%",
+        "height": "180%"
+      },
+      "operations": [
+        {
+          "type": "feFlood",
+          "flood-color": "#FF5A00",
+          "flood-opacity": "0.22"
+        },
+        {
+          "type": "feComposite",
+          "operator": "in"
+        },
+        {
+          "type": "feOffset",
+          "dy": "12"
+        },
+        {
+          "type": "feGaussianBlur",
+          "stdDeviation": "14"
+        },
+        {
+          "type": "feMerge"
+        }
+      ]
+    },
+    {
+      "id": "navShadow",
+      "bounds": {
+        "x": "-20%",
+        "y": "-30%",
+        "width": "140%",
+        "height": "190%"
+      },
+      "operations": [
+        {
+          "type": "feFlood",
+          "flood-color": "#17345B",
+          "flood-opacity": "0.14"
+        },
+        {
+          "type": "feComposite",
+          "operator": "in"
+        },
+        {
+          "type": "feOffset",
+          "dy": "10"
+        },
+        {
+          "type": "feGaussianBlur",
+          "stdDeviation": "18"
+        },
+        {
+          "type": "feMerge"
+        }
+      ]
+    },
+    {
+      "id": "selectedShadow",
+      "bounds": {
+        "x": "-30%",
+        "y": "-40%",
+        "width": "160%",
+        "height": "210%"
+      },
+      "operations": [
+        {
+          "type": "feFlood",
+          "flood-color": "#FF5A00",
+          "flood-opacity": "0.28"
+        },
+        {
+          "type": "feComposite",
+          "operator": "in"
+        },
+        {
+          "type": "feOffset",
+          "dy": "9"
+        },
+        {
+          "type": "feGaussianBlur",
+          "stdDeviation": "12"
+        },
+        {
+          "type": "feMerge"
+        }
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "id": "svg_major_01",
+      "kind": "source_rect",
+      "x": 40.0,
+      "y": 42.0,
+      "width": 772.0,
+      "height": 108.0,
+      "radius": 54.0,
+      "normalized": {
+        "x": 0.04694836,
+        "y": 0.0227519,
+        "width": 0.90610329,
+        "height": 0.05850488
+      }
+    },
+    {
+      "id": "svg_major_02",
+      "kind": "source_rect",
+      "x": 48.0,
+      "y": 184.0,
+      "width": 756.0,
+      "height": 148.0,
+      "radius": 28.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.09967497,
+        "width": 0.88732394,
+        "height": 0.08017335
+      }
+    },
+    {
+      "id": "svg_major_03",
+      "kind": "source_rect",
+      "x": 48.0,
+      "y": 356.0,
+      "width": 756.0,
+      "height": 274.0,
+      "radius": 30.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.1928494,
+        "width": 0.88732394,
+        "height": 0.14842904
+      }
+    },
+    {
+      "id": "svg_major_04",
+      "kind": "source_rect",
+      "x": 48.0,
+      "y": 930.0,
+      "width": 756.0,
+      "height": 142.0,
+      "radius": 26.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.50379198,
+        "width": 0.88732394,
+        "height": 0.07692308
+      }
+    },
+    {
+      "id": "svg_major_05",
+      "kind": "source_rect",
+      "x": 48.0,
+      "y": 1092.0,
+      "width": 756.0,
+      "height": 142.0,
+      "radius": 26.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.5915493,
+        "width": 0.88732394,
+        "height": 0.07692308
+      }
+    },
+    {
+      "id": "svg_major_06",
+      "kind": "source_rect",
+      "x": 48.0,
+      "y": 1264.0,
+      "width": 756.0,
+      "height": 156.0,
+      "radius": 24.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.68472373,
+        "width": 0.88732394,
+        "height": 0.08450704
+      }
+    },
+    {
+      "id": "svg_major_07",
+      "kind": "source_rect",
+      "x": 48.0,
+      "y": 1450.0,
+      "width": 756.0,
+      "height": 96.0,
+      "radius": 24.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.78548212,
+        "width": 0.88732394,
+        "height": 0.05200433
+      }
+    },
+    {
+      "id": "svg_major_08",
+      "kind": "source_rect",
+      "x": 28.0,
+      "y": 1658.0,
+      "width": 796.0,
+      "height": 152.0,
+      "radius": 42.0,
+      "normalized": {
+        "x": 0.03286385,
+        "y": 0.89815818,
+        "width": 0.9342723,
+        "height": 0.0823402
+      }
+    }
+  ],
+  "objects": [
+    {
+      "type": "rect",
+      "x": 0.0,
+      "y": 0.0,
+      "width": 852.0,
+      "height": 1846.0,
+      "rx": 0.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 1.0,
+        "height": 1.0
+      },
+      "fill": "#F7F7F8",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1"
+    },
+    {
+      "type": "rect",
+      "x": 40.0,
+      "y": 42.0,
+      "width": 772.0,
+      "height": 108.0,
+      "rx": 54.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.04694836,
+        "y": 0.0227519,
+        "width": 0.90610329,
+        "height": 0.05850488
+      },
+      "fill": "#FFFFFF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1",
+      "filter": "url(#softShadow)"
+    },
+    {
+      "type": "path",
+      "d": "M 100.0 74.0 L 78.0 96 L 100.0 118.0",
+      "bbox": {
+        "x": 78.0,
+        "y": 74.0,
+        "width": 22.0,
+        "height": 44.0
+      },
+      "bbox_method": "deterministic_coordinate_envelope",
+      "normalized": {
+        "x": 0.0915493,
+        "y": 0.04008667,
+        "width": 0.0258216,
+        "height": 0.02383532
+      },
+      "fill": "none",
+      "stroke": "#12345B",
+      "stroke-width": "5"
+    },
+    {
+      "type": "text",
+      "x": 426.0,
+      "y": 112.0,
+      "text": "Finans",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 34.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.5,
+        "y": 0.06067172
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 756.0,
+      "cy": 96.0,
+      "r": 27.0,
+      "bbox": {
+        "x": 729.0,
+        "y": 69.0,
+        "width": 54.0,
+        "height": 54.0
+      },
+      "normalized": {
+        "x": 0.8556338,
+        "y": 0.03737811,
+        "width": 0.06338028,
+        "height": 0.02925244
+      },
+      "fill": "#FFFFFF",
+      "stroke": "#D9DFE7",
+      "stroke-width": "2",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 756.0,
+      "y": 106.0,
+      "text": "i",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 28.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.88732394,
+        "y": 0.05742145
+      }
+    },
+    {
+      "type": "rect",
+      "x": 48.0,
+      "y": 184.0,
+      "width": 756.0,
+      "height": 148.0,
+      "rx": 28.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.09967497,
+        "width": 0.88732394,
+        "height": 0.08017335
+      },
+      "fill": "#FFFFFF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1",
+      "filter": "url(#softShadow)"
+    },
+    {
+      "type": "text",
+      "x": 72.0,
+      "y": 226.0,
+      "text": "MAĞAZA",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 19.0,
+      "font_weight": "800",
+      "fill": "#708096",
+      "letter_spacing": "1",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.08450704,
+        "y": 0.12242687
+      }
+    },
+    {
+      "type": "text",
+      "x": 72.0,
+      "y": 268.0,
+      "text": "NovaStore Demo Mağaza",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 25.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.08450704,
+        "y": 0.14517876
+      }
+    },
+    {
+      "type": "line",
+      "x1": 432.0,
+      "y1": 208.0,
+      "x2": 432.0,
+      "y2": 308.0,
+      "bbox": {
+        "x": 432.0,
+        "y": 208.0,
+        "width": 0.0,
+        "height": 100.0
+      },
+      "normalized": {
+        "x": 0.50704225,
+        "y": 0.11267606,
+        "width": 0.0,
+        "height": 0.05417118
+      },
+      "stroke": "#D9DFE7",
+      "stroke-width": "2"
+    },
+    {
+      "type": "text",
+      "x": 458.0,
+      "y": 226.0,
+      "text": "DÖNEM",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 19.0,
+      "font_weight": "800",
+      "fill": "#708096",
+      "letter_spacing": "1",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.53755869,
+        "y": 0.12242687
+      }
+    },
+    {
+      "type": "text",
+      "x": 458.0,
+      "y": 268.0,
+      "text": "01–25 Tem 2026",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 25.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.53755869,
+        "y": 0.14517876
+      }
+    },
+    {
+      "type": "rect",
+      "x": 622.0,
+      "y": 276.0,
+      "width": 146.0,
+      "height": 44.0,
+      "rx": 22.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.73004695,
+        "y": 0.14951246,
+        "width": 0.1713615,
+        "height": 0.02383532
+      },
+      "fill": "#EAF8F0",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 695.0,
+      "y": 305.48,
+      "text": "Güncel",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 17.0,
+      "font_weight": "800",
+      "fill": "#219653",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.8157277,
+        "y": 0.16548212
+      }
+    },
+    {
+      "type": "rect",
+      "x": 48.0,
+      "y": 356.0,
+      "width": 756.0,
+      "height": 274.0,
+      "rx": 30.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.1928494,
+        "width": 0.88732394,
+        "height": 0.14842904
+      },
+      "fill": "url(#orangeGradient)",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1",
+      "filter": "url(#buttonShadow)"
+    },
+    {
+      "type": "text",
+      "x": 80.0,
+      "y": 404.0,
+      "text": "KULLANILABİLİR BAKİYE",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 20.0,
+      "font_weight": "800",
+      "fill": "#FFFFFF",
+      "letter_spacing": "1",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.09389671,
+        "y": 0.21885157
+      }
+    },
+    {
+      "type": "text",
+      "x": 80.0,
+      "y": 472.0,
+      "text": "₺28.450,70",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 48.0,
+      "font_weight": "850",
+      "fill": "#FFFFFF",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.09389671,
+        "y": 0.25568797
+      }
+    },
+    {
+      "type": "text",
+      "x": 80.0,
+      "y": 516.0,
+      "text": "Doğrulanmış hesaba planlı aktarılır",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 21.0,
+      "font_weight": "600",
+      "fill": "#FFFFFF",
+      "letter_spacing": "0",
+      "opacity": "0.9",
+      "normalized_anchor": {
+        "x": 0.09389671,
+        "y": 0.27952329
+      }
+    },
+    {
+      "type": "line",
+      "x1": 80.0,
+      "y1": 548.0,
+      "x2": 772.0,
+      "y2": 548.0,
+      "bbox": {
+        "x": 80.0,
+        "y": 548.0,
+        "width": 692.0,
+        "height": 0.0
+      },
+      "normalized": {
+        "x": 0.09389671,
+        "y": 0.29685807,
+        "width": 0.81220657,
+        "height": 0.0
+      },
+      "stroke": "#FFFFFF",
+      "stroke-width": "2"
+    },
+    {
+      "type": "text",
+      "x": 80.0,
+      "y": 594.0,
+      "text": "Bekleyen bakiye",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 20.0,
+      "font_weight": "600",
+      "fill": "#FFFFFF",
+      "letter_spacing": "0",
+      "opacity": "0.88",
+      "normalized_anchor": {
+        "x": 0.09389671,
+        "y": 0.32177681
+      }
+    },
+    {
+      "type": "text",
+      "x": 302.0,
+      "y": 594.0,
+      "text": "₺7.860,40",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 24.0,
+      "font_weight": "850",
+      "fill": "#FFFFFF",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.35446009,
+        "y": 0.32177681
+      }
+    },
+    {
+      "type": "text",
+      "x": 486.0,
+      "y": 594.0,
+      "text": "Sıradaki ödeme",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 20.0,
+      "font_weight": "600",
+      "fill": "#FFFFFF",
+      "letter_spacing": "0",
+      "opacity": "0.88",
+      "normalized_anchor": {
+        "x": 0.57042254,
+        "y": 0.32177681
+      }
+    },
+    {
+      "type": "text",
+      "x": 768.0,
+      "y": 594.0,
+      "text": "28 Tem",
+      "anchor": "end",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 24.0,
+      "font_weight": "850",
+      "fill": "#FFFFFF",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.90140845,
+        "y": 0.32177681
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 756.0,
+      "cy": 402.0,
+      "r": 27.0,
+      "bbox": {
+        "x": 729.0,
+        "y": 375.0,
+        "width": 54.0,
+        "height": 54.0
+      },
+      "normalized": {
+        "x": 0.8556338,
+        "y": 0.20314193,
+        "width": 0.06338028,
+        "height": 0.02925244
+      },
+      "fill": "#FFFFFF",
+      "stroke": "#D9DFE7",
+      "stroke-width": "2",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 756.0,
+      "y": 412.0,
+      "text": "i",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 28.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.88732394,
+        "y": 0.22318527
+      }
+    },
+    {
+      "type": "rect",
+      "x": 48.0,
+      "y": 660.0,
+      "width": 236.0,
+      "height": 190.0,
+      "rx": 26.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.35752979,
+        "width": 0.27699531,
+        "height": 0.10292524
+      },
+      "fill": "#FFFFFF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1",
+      "filter": "url(#softShadow)"
+    },
+    {
+      "type": "rect",
+      "x": 68.0,
+      "y": 680.0,
+      "width": 196.0,
+      "height": 48.0,
+      "rx": 24.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.07981221,
+        "y": 0.36836403,
+        "width": 0.23004695,
+        "height": 0.02600217
+      },
+      "fill": "#EDF5FF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 84.0,
+      "y": 713.0,
+      "text": "BRÜT SATIŞ",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 18.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.09859155,
+        "y": 0.38624052
+      }
+    },
+    {
+      "type": "text",
+      "x": 84.0,
+      "y": 779.0,
+      "text": "₺46.820",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 30.0,
+      "font_weight": "850",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.09859155,
+        "y": 0.4219935
+      }
+    },
+    {
+      "type": "text",
+      "x": 84.0,
+      "y": 818.0,
+      "text": "Bu dönem",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 18.0,
+      "font_weight": "500",
+      "fill": "#708096",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.09859155,
+        "y": 0.44312026
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 252.0,
+      "cy": 704.0,
+      "r": 27.0,
+      "bbox": {
+        "x": 225.0,
+        "y": 677.0,
+        "width": 54.0,
+        "height": 54.0
+      },
+      "normalized": {
+        "x": 0.26408451,
+        "y": 0.36673889,
+        "width": 0.06338028,
+        "height": 0.02925244
+      },
+      "fill": "#FFFFFF",
+      "stroke": "#D9DFE7",
+      "stroke-width": "2",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 252.0,
+      "y": 714.0,
+      "text": "i",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 28.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.29577465,
+        "y": 0.38678223
+      }
+    },
+    {
+      "type": "rect",
+      "x": 308.0,
+      "y": 660.0,
+      "width": 236.0,
+      "height": 190.0,
+      "rx": 26.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.36150235,
+        "y": 0.35752979,
+        "width": 0.27699531,
+        "height": 0.10292524
+      },
+      "fill": "#FFFFFF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1",
+      "filter": "url(#softShadow)"
+    },
+    {
+      "type": "rect",
+      "x": 328.0,
+      "y": 680.0,
+      "width": 196.0,
+      "height": 48.0,
+      "rx": 24.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.38497653,
+        "y": 0.36836403,
+        "width": 0.23004695,
+        "height": 0.02600217
+      },
+      "fill": "#FFF3EB",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 344.0,
+      "y": 713.0,
+      "text": "KESİNTİLER",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 18.0,
+      "font_weight": "800",
+      "fill": "#F04400",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.40375587,
+        "y": 0.38624052
+      }
+    },
+    {
+      "type": "text",
+      "x": 344.0,
+      "y": 779.0,
+      "text": "₺6.210",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 30.0,
+      "font_weight": "850",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.40375587,
+        "y": 0.4219935
+      }
+    },
+    {
+      "type": "text",
+      "x": 344.0,
+      "y": 818.0,
+      "text": "Komisyon + vergi",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 18.0,
+      "font_weight": "500",
+      "fill": "#708096",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.40375587,
+        "y": 0.44312026
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 512.0,
+      "cy": 704.0,
+      "r": 27.0,
+      "bbox": {
+        "x": 485.0,
+        "y": 677.0,
+        "width": 54.0,
+        "height": 54.0
+      },
+      "normalized": {
+        "x": 0.56924883,
+        "y": 0.36673889,
+        "width": 0.06338028,
+        "height": 0.02925244
+      },
+      "fill": "#FFFFFF",
+      "stroke": "#D9DFE7",
+      "stroke-width": "2",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 512.0,
+      "y": 714.0,
+      "text": "i",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 28.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.60093897,
+        "y": 0.38678223
+      }
+    },
+    {
+      "type": "rect",
+      "x": 568.0,
+      "y": 660.0,
+      "width": 236.0,
+      "height": 190.0,
+      "rx": 26.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.66666667,
+        "y": 0.35752979,
+        "width": 0.27699531,
+        "height": 0.10292524
+      },
+      "fill": "#FFFFFF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1",
+      "filter": "url(#softShadow)"
+    },
+    {
+      "type": "rect",
+      "x": 588.0,
+      "y": 680.0,
+      "width": 196.0,
+      "height": 48.0,
+      "rx": 24.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.69014085,
+        "y": 0.36836403,
+        "width": 0.23004695,
+        "height": 0.02600217
+      },
+      "fill": "#EAF8F0",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 604.0,
+      "y": 713.0,
+      "text": "NET KAZANÇ",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 18.0,
+      "font_weight": "800",
+      "fill": "#219653",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.70892019,
+        "y": 0.38624052
+      }
+    },
+    {
+      "type": "text",
+      "x": 604.0,
+      "y": 779.0,
+      "text": "₺40.610",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 30.0,
+      "font_weight": "850",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.70892019,
+        "y": 0.4219935
+      }
+    },
+    {
+      "type": "text",
+      "x": 604.0,
+      "y": 818.0,
+      "text": "İade sonrası",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 18.0,
+      "font_weight": "500",
+      "fill": "#708096",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.70892019,
+        "y": 0.44312026
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 772.0,
+      "cy": 704.0,
+      "r": 27.0,
+      "bbox": {
+        "x": 745.0,
+        "y": 677.0,
+        "width": 54.0,
+        "height": 54.0
+      },
+      "normalized": {
+        "x": 0.87441315,
+        "y": 0.36673889,
+        "width": 0.06338028,
+        "height": 0.02925244
+      },
+      "fill": "#FFFFFF",
+      "stroke": "#D9DFE7",
+      "stroke-width": "2",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 772.0,
+      "y": 714.0,
+      "text": "i",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 28.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.90610329,
+        "y": 0.38678223
+      }
+    },
+    {
+      "type": "text",
+      "x": 48.0,
+      "y": 900.0,
+      "text": "Son hareketler",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 29.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.05633803,
+        "y": 0.48754063
+      }
+    },
+    {
+      "type": "text",
+      "x": 804.0,
+      "y": 900.0,
+      "text": "Tümünü gör",
+      "anchor": "end",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 21.0,
+      "font_weight": "700",
+      "fill": "#708096",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.94366197,
+        "y": 0.48754063
+      }
+    },
+    {
+      "type": "rect",
+      "x": 48.0,
+      "y": 930.0,
+      "width": 756.0,
+      "height": 142.0,
+      "rx": 26.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.50379198,
+        "width": 0.88732394,
+        "height": 0.07692308
+      },
+      "fill": "#FFFFFF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1",
+      "filter": "url(#softShadow)"
+    },
+    {
+      "type": "rect",
+      "x": 72.0,
+      "y": 957.0,
+      "width": 88.0,
+      "height": 88.0,
+      "rx": 22.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.08450704,
+        "y": 0.5184182,
+        "width": 0.10328638,
+        "height": 0.04767064
+      },
+      "fill": "#EDF5FF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1"
+    },
+    {
+      "type": "circle",
+      "cx": 103.76,
+      "cy": 1010.36,
+      "r": 15.84,
+      "bbox": {
+        "x": 87.92,
+        "y": 994.52,
+        "width": 31.68,
+        "height": 31.68
+      },
+      "normalized": {
+        "x": 0.10319249,
+        "y": 0.53874323,
+        "width": 0.0371831,
+        "height": 0.01716143
+      },
+      "fill": "none",
+      "stroke": "#219653",
+      "stroke-width": "4",
+      "opacity": "1"
+    },
+    {
+      "type": "circle",
+      "cx": 128.96,
+      "cy": 995.96,
+      "r": 15.84,
+      "bbox": {
+        "x": 113.12,
+        "y": 980.12,
+        "width": 31.68,
+        "height": 31.68
+      },
+      "normalized": {
+        "x": 0.13276995,
+        "y": 0.53094258,
+        "width": 0.0371831,
+        "height": 0.01716143
+      },
+      "fill": "none",
+      "stroke": "#219653",
+      "stroke-width": "4",
+      "opacity": "1"
+    },
+    {
+      "type": "line",
+      "x1": 96.56,
+      "y1": 1010.36,
+      "x2": 110.96,
+      "y2": 1010.36,
+      "bbox": {
+        "x": 96.56,
+        "y": 1010.36,
+        "width": 14.399999999999991,
+        "height": 0.0
+      },
+      "normalized": {
+        "x": 0.11333333,
+        "y": 0.54732394,
+        "width": 0.01690141,
+        "height": 0.0
+      },
+      "stroke": "#219653",
+      "stroke-width": "4"
+    },
+    {
+      "type": "line",
+      "x1": 121.76,
+      "y1": 995.96,
+      "x2": 136.16,
+      "y2": 995.96,
+      "bbox": {
+        "x": 121.76,
+        "y": 995.96,
+        "width": 14.399999999999991,
+        "height": 0.0
+      },
+      "normalized": {
+        "x": 0.1429108,
+        "y": 0.53952329,
+        "width": 0.01690141,
+        "height": 0.0
+      },
+      "stroke": "#219653",
+      "stroke-width": "4"
+    },
+    {
+      "type": "text",
+      "x": 184.0,
+      "y": 984.0,
+      "text": "Sipariş kazancı",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 25.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.21596244,
+        "y": 0.53304442
+      }
+    },
+    {
+      "type": "text",
+      "x": 184.0,
+      "y": 1021.0,
+      "text": "#NS-260724-3921 · Bugün 14:18",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 19.0,
+      "font_weight": "500",
+      "fill": "#708096",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.21596244,
+        "y": 0.55308776
+      }
+    },
+    {
+      "type": "text",
+      "x": 746.0,
+      "y": 990.0,
+      "text": "+₺1.249,90",
+      "anchor": "end",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 24.0,
+      "font_weight": "850",
+      "fill": "#219653",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.87558685,
+        "y": 0.53629469
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 760.0,
+      "cy": 1038.0,
+      "r": 27.0,
+      "bbox": {
+        "x": 733.0,
+        "y": 1011.0,
+        "width": 54.0,
+        "height": 54.0
+      },
+      "normalized": {
+        "x": 0.86032864,
+        "y": 0.54767064,
+        "width": 0.06338028,
+        "height": 0.02925244
+      },
+      "fill": "#FFFFFF",
+      "stroke": "#D9DFE7",
+      "stroke-width": "2",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 760.0,
+      "y": 1048.0,
+      "text": "i",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 28.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.89201878,
+        "y": 0.56771398
+      }
+    },
+    {
+      "type": "rect",
+      "x": 48.0,
+      "y": 1092.0,
+      "width": 756.0,
+      "height": 142.0,
+      "rx": 26.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.5915493,
+        "width": 0.88732394,
+        "height": 0.07692308
+      },
+      "fill": "#FFFFFF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1",
+      "filter": "url(#softShadow)"
+    },
+    {
+      "type": "rect",
+      "x": 72.0,
+      "y": 1119.0,
+      "width": 88.0,
+      "height": 88.0,
+      "rx": 22.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.08450704,
+        "y": 0.60617551,
+        "width": 0.10328638,
+        "height": 0.04767064
+      },
+      "fill": "#EDF5FF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1"
+    },
+    {
+      "type": "path",
+      "d": "M 94.4 1135.64 H 137.6 V 1190.36 L 128.96 1183.88 L 120.32 1190.36 L 111.68 1183.88 L 103.04 1190.36 L 94.4 1183.88 Z",
+      "bbox": {
+        "x": 94.4,
+        "y": 1135.64,
+        "width": 43.19999999999999,
+        "height": 54.7199999999998
+      },
+      "bbox_method": "deterministic_coordinate_envelope",
+      "normalized": {
+        "x": 0.11079812,
+        "y": 0.6151896,
+        "width": 0.05070423,
+        "height": 0.02964247
+      },
+      "fill": "none",
+      "stroke": "#F04400",
+      "stroke-width": "4"
+    },
+    {
+      "type": "line",
+      "x1": 105.2,
+      "y1": 1152.92,
+      "x2": 126.8,
+      "y2": 1152.92,
+      "bbox": {
+        "x": 105.2,
+        "y": 1152.92,
+        "width": 21.599999999999994,
+        "height": 0.0
+      },
+      "normalized": {
+        "x": 0.12347418,
+        "y": 0.62455038,
+        "width": 0.02535211,
+        "height": 0.0
+      },
+      "stroke": "#F04400",
+      "stroke-width": "4"
+    },
+    {
+      "type": "line",
+      "x1": 105.2,
+      "y1": 1163.72,
+      "x2": 126.8,
+      "y2": 1163.72,
+      "bbox": {
+        "x": 105.2,
+        "y": 1163.72,
+        "width": 21.599999999999994,
+        "height": 0.0
+      },
+      "normalized": {
+        "x": 0.12347418,
+        "y": 0.63040087,
+        "width": 0.02535211,
+        "height": 0.0
+      },
+      "stroke": "#F04400",
+      "stroke-width": "4"
+    },
+    {
+      "type": "line",
+      "x1": 105.2,
+      "y1": 1174.52,
+      "x2": 121.04,
+      "y2": 1174.52,
+      "bbox": {
+        "x": 105.2,
+        "y": 1174.52,
+        "width": 15.840000000000003,
+        "height": 0.0
+      },
+      "normalized": {
+        "x": 0.12347418,
+        "y": 0.63625135,
+        "width": 0.01859155,
+        "height": 0.0
+      },
+      "stroke": "#F04400",
+      "stroke-width": "4"
+    },
+    {
+      "type": "text",
+      "x": 184.0,
+      "y": 1146.0,
+      "text": "Platform kesintisi",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 25.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.21596244,
+        "y": 0.62080173
+      }
+    },
+    {
+      "type": "text",
+      "x": 184.0,
+      "y": 1183.0,
+      "text": "#NS-260724-3921 · Komisyon",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 19.0,
+      "font_weight": "500",
+      "fill": "#708096",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.21596244,
+        "y": 0.64084507
+      }
+    },
+    {
+      "type": "text",
+      "x": 746.0,
+      "y": 1152.0,
+      "text": "−₺174,99",
+      "anchor": "end",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 24.0,
+      "font_weight": "850",
+      "fill": "#F04400",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.87558685,
+        "y": 0.624052
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 760.0,
+      "cy": 1200.0,
+      "r": 27.0,
+      "bbox": {
+        "x": 733.0,
+        "y": 1173.0,
+        "width": 54.0,
+        "height": 54.0
+      },
+      "normalized": {
+        "x": 0.86032864,
+        "y": 0.63542795,
+        "width": 0.06338028,
+        "height": 0.02925244
+      },
+      "fill": "#FFFFFF",
+      "stroke": "#D9DFE7",
+      "stroke-width": "2",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 760.0,
+      "y": 1210.0,
+      "text": "i",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 28.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.89201878,
+        "y": 0.65547129
+      }
+    },
+    {
+      "type": "rect",
+      "x": 48.0,
+      "y": 1264.0,
+      "width": 756.0,
+      "height": 156.0,
+      "rx": 24.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.68472373,
+        "width": 0.88732394,
+        "height": 0.08450704
+      },
+      "fill": "#EDF5FF",
+      "stroke": "#12345B",
+      "stroke-width": "2",
+      "opacity": "1"
+    },
+    {
+      "type": "circle",
+      "cx": 108.0,
+      "cy": 1326.0,
+      "r": 31.0,
+      "bbox": {
+        "x": 77.0,
+        "y": 1295.0,
+        "width": 62.0,
+        "height": 62.0
+      },
+      "normalized": {
+        "x": 0.09037559,
+        "y": 0.70151679,
+        "width": 0.07276995,
+        "height": 0.03358613
+      },
+      "fill": "#FFFFFF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 108.0,
+      "y": 1337.0,
+      "text": "i",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 31.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.12676056,
+        "y": 0.72426869
+      }
+    },
+    {
+      "type": "text",
+      "x": 160.0,
+      "y": 1312.0,
+      "text": "Otomatik ödeme planı",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 26.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.18779343,
+        "y": 0.71072589
+      }
+    },
+    {
+      "type": "text",
+      "x": 160.0,
+      "y": 1352.0,
+      "text": "Uygun tutar doğrulanmış banka hesabına takvimde",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 22.0,
+      "font_weight": "400",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.18779343,
+        "y": 0.73239437
+      }
+    },
+    {
+      "type": "text",
+      "x": 160.0,
+      "y": 1383.0,
+      "text": "gösterilen tarihte aktarılır; manuel çekim gerekmez.",
+      "anchor": "start",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 22.0,
+      "font_weight": "400",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.18779343,
+        "y": 0.74918743
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 756.0,
+      "cy": 1311.0,
+      "r": 27.0,
+      "bbox": {
+        "x": 729.0,
+        "y": 1284.0,
+        "width": 54.0,
+        "height": 54.0
+      },
+      "normalized": {
+        "x": 0.8556338,
+        "y": 0.69555796,
+        "width": 0.06338028,
+        "height": 0.02925244
+      },
+      "fill": "#FFFFFF",
+      "stroke": "#D9DFE7",
+      "stroke-width": "2",
+      "opacity": "1"
+    },
+    {
+      "type": "text",
+      "x": 756.0,
+      "y": 1321.0,
+      "text": "i",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 28.0,
+      "font_weight": "800",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.88732394,
+        "y": 0.7156013
+      }
+    },
+    {
+      "type": "rect",
+      "x": 48.0,
+      "y": 1450.0,
+      "width": 756.0,
+      "height": 96.0,
+      "rx": 24.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.05633803,
+        "y": 0.78548212,
+        "width": 0.88732394,
+        "height": 0.05200433
+      },
+      "fill": "url(#orangeGradient)",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1",
+      "filter": "url(#buttonShadow)"
+    },
+    {
+      "type": "text",
+      "x": 426.0,
+      "y": 1509.52,
+      "text": "Finans Hareketlerini Gör",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 29.0,
+      "font_weight": "800",
+      "fill": "#FFFFFF",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.5,
+        "y": 0.81772481
+      }
+    },
+    {
+      "type": "rect",
+      "x": 28.0,
+      "y": 1658.0,
+      "width": 796.0,
+      "height": 152.0,
+      "rx": 42.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.03286385,
+        "y": 0.89815818,
+        "width": 0.9342723,
+        "height": 0.0823402
+      },
+      "fill": "#FFFFFF",
+      "stroke": "#D9DFE7",
+      "stroke-width": "2",
+      "opacity": "0.97",
+      "filter": "url(#navShadow)"
+    },
+    {
+      "type": "path",
+      "d": "M 79 1718 L 107 1693 L 135 1718 V 1747 H 115 V 1725 H 99 V 1747 H 79 Z",
+      "bbox": {
+        "x": 79.0,
+        "y": 1693.0,
+        "width": 56.0,
+        "height": 54.0
+      },
+      "bbox_method": "deterministic_coordinate_envelope",
+      "normalized": {
+        "x": 0.092723,
+        "y": 0.91711809,
+        "width": 0.0657277,
+        "height": 0.02925244
+      }
+    },
+    {
+      "type": "text",
+      "x": 107.0,
+      "y": 1784.0,
+      "text": "Genel Bakış",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 18.0,
+      "font_weight": "650",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.12558685,
+        "y": 0.96641387
+      }
+    },
+    {
+      "type": "path",
+      "d": "M 237.5 1695 H 275.5 L 296.5 1716 L 258.5 1753 L 237.5 1732 Z",
+      "bbox": {
+        "x": 237.5,
+        "y": 1695.0,
+        "width": 59.0,
+        "height": 58.0
+      },
+      "bbox_method": "deterministic_coordinate_envelope",
+      "normalized": {
+        "x": 0.27875587,
+        "y": 0.91820152,
+        "width": 0.06924883,
+        "height": 0.03141928
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 255.5,
+      "cy": 1712.0,
+      "r": 4.0,
+      "bbox": {
+        "x": 251.5,
+        "y": 1708.0,
+        "width": 8.0,
+        "height": 8.0
+      },
+      "normalized": {
+        "x": 0.29518779,
+        "y": 0.92524377,
+        "width": 0.00938967,
+        "height": 0.00433369
+      },
+      "fill": "#12345B",
+      "stroke": "none"
+    },
+    {
+      "type": "text",
+      "x": 266.5,
+      "y": 1784.0,
+      "text": "Ürünler",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 18.0,
+      "font_weight": "650",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.31279343,
+        "y": 0.96641387
+      }
+    },
+    {
+      "type": "rect",
+      "x": 401.0,
+      "y": 1689.0,
+      "width": 50.0,
+      "height": 62.0,
+      "rx": 8.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.47065728,
+        "y": 0.91495125,
+        "width": 0.05868545,
+        "height": 0.03358613
+      }
+    },
+    {
+      "type": "line",
+      "x1": 414.0,
+      "y1": 1708.0,
+      "x2": 440.0,
+      "y2": 1708.0,
+      "bbox": {
+        "x": 414.0,
+        "y": 1708.0,
+        "width": 26.0,
+        "height": 0.0
+      },
+      "normalized": {
+        "x": 0.48591549,
+        "y": 0.92524377,
+        "width": 0.03051643,
+        "height": 0.0
+      }
+    },
+    {
+      "type": "line",
+      "x1": 414.0,
+      "y1": 1722.0,
+      "x2": 440.0,
+      "y2": 1722.0,
+      "bbox": {
+        "x": 414.0,
+        "y": 1722.0,
+        "width": 26.0,
+        "height": 0.0
+      },
+      "normalized": {
+        "x": 0.48591549,
+        "y": 0.93282774,
+        "width": 0.03051643,
+        "height": 0.0
+      }
+    },
+    {
+      "type": "line",
+      "x1": 414.0,
+      "y1": 1736.0,
+      "x2": 434.0,
+      "y2": 1736.0,
+      "bbox": {
+        "x": 414.0,
+        "y": 1736.0,
+        "width": 20.0,
+        "height": 0.0
+      },
+      "normalized": {
+        "x": 0.48591549,
+        "y": 0.9404117,
+        "width": 0.02347418,
+        "height": 0.0
+      }
+    },
+    {
+      "type": "text",
+      "x": 426.0,
+      "y": 1784.0,
+      "text": "Siparişler",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 18.0,
+      "font_weight": "650",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.5,
+        "y": 0.96641387
+      }
+    },
+    {
+      "type": "rect",
+      "x": 519.0,
+      "y": 1671.0,
+      "width": 134.0,
+      "height": 124.0,
+      "rx": 36.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.60915493,
+        "y": 0.90520043,
+        "width": 0.157277,
+        "height": 0.06717226
+      },
+      "fill": "url(#selectedNav)",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "1",
+      "filter": "url(#selectedShadow)"
+    },
+    {
+      "type": "circle",
+      "cx": 568.0,
+      "cy": 1690.0,
+      "r": 13.0,
+      "bbox": {
+        "x": 555.0,
+        "y": 1677.0,
+        "width": 26.0,
+        "height": 26.0
+      },
+      "normalized": {
+        "x": 0.65140845,
+        "y": 0.9084507,
+        "width": 0.03051643,
+        "height": 0.01408451
+      },
+      "fill": "#FFFFFF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "0.76"
+    },
+    {
+      "type": "circle",
+      "cx": 601.0,
+      "cy": 1683.0,
+      "r": 6.0,
+      "bbox": {
+        "x": 595.0,
+        "y": 1677.0,
+        "width": 12.0,
+        "height": 12.0
+      },
+      "normalized": {
+        "x": 0.69835681,
+        "y": 0.9084507,
+        "width": 0.01408451,
+        "height": 0.00650054
+      },
+      "fill": "#FFFFFF",
+      "stroke": "none",
+      "stroke-width": "0",
+      "opacity": "0.58"
+    },
+    {
+      "type": "rect",
+      "x": 554.5,
+      "y": 1698.0,
+      "width": 62.0,
+      "height": 47.0,
+      "rx": 9.0,
+      "ry": 0.0,
+      "normalized": {
+        "x": 0.6508216,
+        "y": 0.91982665,
+        "width": 0.07276995,
+        "height": 0.02546046
+      }
+    },
+    {
+      "type": "path",
+      "d": "M 564.5 1698 V 1687 H 604.5",
+      "bbox": {
+        "x": 564.5,
+        "y": 1687.0,
+        "width": 40.0,
+        "height": 11.0
+      },
+      "bbox_method": "deterministic_coordinate_envelope",
+      "normalized": {
+        "x": 0.66255869,
+        "y": 0.91386782,
+        "width": 0.04694836,
+        "height": 0.00595883
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 599.5,
+      "cy": 1721.0,
+      "r": 5.0,
+      "bbox": {
+        "x": 594.5,
+        "y": 1716.0,
+        "width": 10.0,
+        "height": 10.0
+      },
+      "normalized": {
+        "x": 0.69776995,
+        "y": 0.92957746,
+        "width": 0.01173709,
+        "height": 0.00541712
+      },
+      "fill": "#FFFFFF",
+      "stroke": "none"
+    },
+    {
+      "type": "text",
+      "x": 585.5,
+      "y": 1784.0,
+      "text": "Finans",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 18.0,
+      "font_weight": "800",
+      "fill": "#FFFFFF",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.68720657,
+        "y": 0.96641387
+      }
+    },
+    {
+      "type": "path",
+      "d": "M 714 1706 H 776 L 769 1687 H 721 Z",
+      "bbox": {
+        "x": 714.0,
+        "y": 1687.0,
+        "width": 62.0,
+        "height": 19.0
+      },
+      "bbox_method": "deterministic_coordinate_envelope",
+      "normalized": {
+        "x": 0.83802817,
+        "y": 0.91386782,
+        "width": 0.07276995,
+        "height": 0.01029252
+      }
+    },
+    {
+      "type": "path",
+      "d": "M 720 1706 V 1747 H 770 V 1706",
+      "bbox": {
+        "x": 720.0,
+        "y": 1706.0,
+        "width": 50.0,
+        "height": 41.0
+      },
+      "bbox_method": "deterministic_coordinate_envelope",
+      "normalized": {
+        "x": 0.84507042,
+        "y": 0.92416035,
+        "width": 0.05868545,
+        "height": 0.02221018
+      }
+    },
+    {
+      "type": "line",
+      "x1": 738.0,
+      "y1": 1747.0,
+      "x2": 738.0,
+      "y2": 1722.0,
+      "bbox": {
+        "x": 738.0,
+        "y": 1722.0,
+        "width": 0.0,
+        "height": 25.0
+      },
+      "normalized": {
+        "x": 0.86619718,
+        "y": 0.93282774,
+        "width": 0.0,
+        "height": 0.0135428
+      }
+    },
+    {
+      "type": "text",
+      "x": 745.0,
+      "y": 1784.0,
+      "text": "Mağazam",
+      "anchor": "middle",
+      "font_family": "DejaVu Sans, Arial, sans-serif",
+      "font_size": 18.0,
+      "font_weight": "650",
+      "fill": "#12345B",
+      "letter_spacing": "0",
+      "opacity": "1",
+      "normalized_anchor": {
+        "x": 0.87441315,
+        "y": 0.96641387
+      }
+    }
+  ],
+  "svg_to_png_verification": {
+    "renderer": "msedge.exe:sha256:af02a342b7e6fa7d1154d9152b5997ff2be300b3a7a678feaae863c9fbea32cb",
+    "rgb_absolute_difference_sum_threshold": 36,
+    "delta_percent": 4.928687,
+    "acceptance_threshold_percent": 5.0,
+    "result": "PASS",
+    "package_manifest_hash": "PASS"
+  }
+}

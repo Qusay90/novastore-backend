@@ -1,0 +1,122 @@
+{
+  "schema_version": 2,
+  "canonical_state_id": "001",
+  "state": "login",
+  "expected_route": "seller:\/\/auth\/login",
+  "actual_route": "seller:\/\/auth\/login",
+  "expected_semantic_markers": [
+    "Satıcı Girişi",
+    "E-posta veya telefon numarası",
+    "Giriş Yap"
+  ],
+  "markers_found": [
+    "Satıcı Girişi",
+    "E-posta veya telefon numarası",
+    "Giriş Yap"
+  ],
+  "expected_fixture": "none",
+  "active_fixture": "none",
+  "ui_idle": "YES",
+  "wrong_context": "NO",
+  "capture_valid": "YES",
+  "frame_stable": "YES",
+  "screenshot_path": "artifacts\/seller-wave4\/visual\/001-runtime.png",
+  "runtime_sha256": "db9010f9b2546ced3a2979cc3cad7a7d335cd239253105a6c39991bb907b473c",
+  "capture_utc": "2026-08-20T19:01:28.317Z",
+  "avd_name": "novastore-seller-wave4-uat",
+  "apk_sha256": "5efdba9e3e26530539fb80bb8890924a6fc6d3887638a91f4fd00c1ada8b2a44",
+  "capture_canvas_px": {
+    "width": 1080,
+    "height": 2400
+  },
+  "runtime_bounds_raw_px": {
+    "top_bar": {
+      "left": 50,
+      "top": 89,
+      "right": 1030,
+      "bottom": 224,
+      "width": 980,
+      "height": 135
+    },
+    "brand": {
+      "left": 394,
+      "top": 333,
+      "right": 687,
+      "bottom": 583,
+      "width": 293,
+      "height": 250
+    },
+    "hero_copy": {
+      "left": 108,
+      "top": 680,
+      "right": 972,
+      "bottom": 820,
+      "width": 864,
+      "height": 140
+    },
+    "form_card": {
+      "left": 50,
+      "top": 903,
+      "right": 1030,
+      "bottom": 1686,
+      "width": 980,
+      "height": 783
+    },
+    "identifier_field": {
+      "left": 113,
+      "top": 1050,
+      "right": 967,
+      "bottom": 1187,
+      "width": 854,
+      "height": 137
+    },
+    "password_field": {
+      "left": 113,
+      "top": 1318,
+      "right": 967,
+      "bottom": 1455,
+      "width": 854,
+      "height": 137
+    },
+    "remember_row": {
+      "left": 113,
+      "top": 1497,
+      "right": 967,
+      "bottom": 1623,
+      "width": 854,
+      "height": 126
+    },
+    "primary_cta": {
+      "left": 50,
+      "top": 1749,
+      "right": 1030,
+      "bottom": 1891,
+      "width": 980,
+      "height": 142
+    },
+    "application_action": {
+      "left": 265,
+      "top": 1944,
+      "right": 815,
+      "bottom": 2007,
+      "width": 550,
+      "height": 63
+    },
+    "support_row": {
+      "left": 397,
+      "top": 2082,
+      "right": 684,
+      "bottom": 2145,
+      "width": 287,
+      "height": 63
+    },
+    "security_footer": {
+      "left": 202,
+      "top": 2232,
+      "right": 879,
+      "bottom": 2295,
+      "width": 677,
+      "height": 63
+    }
+  }
+}

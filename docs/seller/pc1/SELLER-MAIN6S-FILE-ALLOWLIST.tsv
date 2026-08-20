@@ -1,0 +1,23 @@
+phase	path	action	artifact_type	purpose	verification
+MAIN6S-ANDROID	seller-app/build.gradle.kts	MODIFY	gradle_contract	Fail-closed optional HTTPS release seller API endpoint	Gradle release configuration gates
+MAIN6S-ANDROID	seller-app/src/androidTest/java/com/novastore/seller/SellerCanonicalCaptureInstrumentationTest.kt	MODIFY	instrumentation_test	Exact route state fixture and idle readiness gate	Connected Android instrumentation gate
+MAIN6S-ANDROID	seller-app/src/androidTest/java/com/novastore/seller/SellerNavigationInstrumentationTest.kt	MODIFY	instrumentation_test	Real Android own-store and foreign-store mutation matrix	Seller Main-6S local Android E2E
+MAIN6S-ANDROID	seller-app/src/main/java/com/novastore/seller/data/SellerModels.kt	MODIFY	android_source	Synthetic foreign target identities	Seller Android unit and instrumentation gates
+MAIN6S-ANDROID	seller-app/src/main/java/com/novastore/seller/data/SellerRepository.kt	MODIFY	android_source	Real API mutation denial actions and fail-closed release connection	Seller Android unit and instrumentation gates
+MAIN6S-ANDROID	seller-app/src/main/java/com/novastore/seller/ui/SellerApp.kt	MODIFY	android_source	Debug-only foreign mutation UAT controls	Seller Android lint and instrumentation gates
+MAIN6S-ANDROID	seller-app/src/main/java/com/novastore/seller/ui/SellerScreens.kt	MODIFY	android_source	Fail-closed disabled reputation task and accessible launch actions	Seller Android visual and accessibility gates
+MAIN6S-BACKEND	server.js	MODIFY	server_entry	Store-scoped seller team reader integration	Seller F1 and startup compatibility smokes
+MAIN6S-BACKEND	services/sellerOfferInventoryService.js	MODIFY	service	Store-bound idempotency and authoritative pre-replay scope checks	Seller Wave 3 disposable PostgreSQL integration
+MAIN6S-BACKEND	services/sellerSupportService.js	MODIFY	service	Store-bound support idempotency fingerprint	Seller Wave 3 disposable PostgreSQL integration
+MAIN6S-BACKEND	services/sellerTeamReadService.js	CREATE	service	Store-overlap-scoped team read boundary	Seller F1 team store isolation smoke
+MAIN6S-BACKEND	services/sellerTenantContextService.js	MODIFY	service	Preserve live seller session identity in audit context	Seller F1 tenant isolation and Wave 3 DB integration
+MAIN6S-TEST	tests/helpers/sellerMain6sAndroidFixture.js	CREATE	test_helper	Synthetic disposable PostgreSQL Android E2E fixture	Seller Main-6S local Android E2E
+MAIN6S-TEST	tests/sellerF1TeamStoreIsolationSmoke.js	CREATE	test	Same-organization disjoint-store team isolation	Node contract smoke
+MAIN6S-TEST	tests/sellerF1TenantIsolationSmoke.js	MODIFY	test	Live session attribution contract	Node contract smoke
+MAIN6S-TEST	tests/sellerMain6sCrossLaneHandoffSmoke.js	CREATE	test	Exact PC1 handoff and path boundary contract	Node handoff smoke
+MAIN6S-TEST	tests/sellerWave3BusinessIsolationIntegrationSmoke.js	MODIFY	test	Foreign mutation matrix source guard	Node contract smoke
+MAIN6S-TEST	tests/sellerWave3MigrationDisposableDbIntegrationSmoke.js	MODIFY	integration_test	Real PostgreSQL foreign-store mutation and side-effect denial matrix	Disposable loopback PostgreSQL integration
+MAIN6S-TEST	tests/sellerWave4MobileContractSmoke.js	MODIFY	test	Release endpoint and disabled reputation/dashboard separation contract	Node mobile contract smoke
+MAIN6S-TOOL	tools/sellerMain6sLocalAndroidE2E.ps1	CREATE	local_test_runner	Loopback PostgreSQL and real Android API E2E orchestration	PowerShell parse and guarded local execution
+MAIN6S-HANDOFF	docs/seller/pc1/SELLER-MAIN6S-FILE-ALLOWLIST.tsv	CREATE	document	Exact Main-6S Seller change ledger	Exact-path uniqueness validation
+MAIN6S-HANDOFF	docs/seller/pc1/SELLER-MAIN6S-CROSS-LANE-HANDOFF.md	CREATE	document	Exact PC1 Seller handoff and residual gate record	Seller Main-6S cross-lane handoff smoke

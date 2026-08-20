@@ -1,0 +1,343 @@
+{
+    "reference_number":  "001",
+    "serial":  "127.0.0.1:5555",
+    "reference_path":  "source/phone/seller-phone-001-giris-default-screen.png",
+    "raw_runtime_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-final\\001-runtime-raw.png",
+    "normalized_runtime_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-final\\001-runtime.png",
+    "side_by_side_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-final\\001-side-by-side.png",
+    "overlay_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-final\\001-overlay.png",
+    "evidence_provenance":  {
+                                "capture_mode":  "MANIFEST_BOUND_PRECAPTURED",
+                                "comparison_algorithm":  "UNMASKED_FULL_FRAME_RGB_ABSOLUTE_DIFFERENCE_SUM_GT_36",
+                                "comparison_created_utc":  "2026-08-13T16:34:01.0420289Z",
+                                "serial":  "127.0.0.1:5555",
+                                "avd_name":  "novastore-seller-wave4-uat",
+                                "seller_package_fingerprint_sha256":  "656e804fe6cf1a0f89662e260c940a000a1857a601b2a29d9d66547ee8cd516e",
+                                "installed_apk_sha256":  "3b951409ff6e468a8edebc5886032c7ba5b7c775f70cf99950ebdf379c59ccf8",
+                                "capture_time_avd_name":  "novastore-seller-wave4-uat",
+                                "capture_time_apk_sha256":  "3b951409ff6e468a8edebc5886032c7ba5b7c775f70cf99950ebdf379c59ccf8",
+                                "capture_time_utc":  "2026-08-13T16:31:56.598Z",
+                                "capture_profile":  {
+                                                        "reference":  "001",
+                                                        "expected_route":  "seller://auth/login",
+                                                        "actual_route":  "seller://auth/login",
+                                                        "expected_markers":  [
+                                                                                 "Satıcı Girişi",
+                                                                                 "E-posta veya telefon numarası",
+                                                                                 "Giriş Yap"
+                                                                             ],
+                                                        "markers_found":  [
+                                                                              "Satıcı Girişi",
+                                                                              "E-posta veya telefon numarası",
+                                                                              "Giriş Yap"
+                                                                          ],
+                                                        "expected_fixture":  "none",
+                                                        "active_fixture":  "none",
+                                                        "ui_idle":  "YES",
+                                                        "wrong_context":  "NO",
+                                                        "capture_valid":  "YES"
+                                                    },
+                                "source_sha256":  "bb1021ccb12f327040c7d0215ba3b432e9b358dcf36d022f29ee6f42887de585",
+                                "runtime_input_sha256":  "ca1976e7584ffe5672bbc351d007350ac6eb5b9c7ac11e871b7dffd3b06c1c8c",
+                                "runtime_input_last_write_utc":  "2026-08-13T16:33:38.9916942Z",
+                                "raw_runtime_sha256":  "ca1976e7584ffe5672bbc351d007350ac6eb5b9c7ac11e871b7dffd3b06c1c8c",
+                                "normalized_runtime_sha256":  "f4df88f5ebc5ea062f89cac73b8406cbd37493bed2f16b8abc5b15ab77c96be9",
+                                "capture_manifest_sha256":  "1e0c0806d8bd9796e88be60a2fc0517e8a11d8e88876d0b790d63af727b523a8",
+                                "capture_manifest_row_sha256":  "9cc815b2565ac0f6e5d32698b5327f34fbe140412e56e8c065c1c2ddc6057aac",
+                                "capture_manifest_row":  {
+                                                             "reference":  "001",
+                                                             "state":  "login",
+                                                             "expected_route":  "seller://auth/login",
+                                                             "actual_route":  "seller://auth/login",
+                                                             "expected_markers":  "Satıcı Girişi|E-posta veya telefon numarası|Giriş Yap",
+                                                             "markers_found":  "Satıcı Girişi|E-posta veya telefon numarası|Giriş Yap",
+                                                             "expected_fixture":  "none",
+                                                             "active_fixture":  "none",
+                                                             "ui_idle":  "YES",
+                                                             "wrong_context":  "NO",
+                                                             "capture_valid":  "YES",
+                                                             "screenshot":  "artifacts/seller-wave4/visual/001-runtime.png",
+                                                             "frame_stable":  "YES",
+                                                             "runtime_sha256":  "ca1976e7584ffe5672bbc351d007350ac6eb5b9c7ac11e871b7dffd3b06c1c8c",
+                                                             "capture_utc":  "2026-08-13T16:31:56.598Z",
+                                                             "avd_name":  "novastore-seller-wave4-uat",
+                                                             "apk_sha256":  "3b951409ff6e468a8edebc5886032c7ba5b7c775f70cf99950ebdf379c59ccf8",
+                                                             "capture_receipt":  "artifacts/seller-wave4/visual/001-capture.json",
+                                                             "capture_receipt_sha256":  "ad58cb62ae7573a421aaed5a0c7ae04a4c5d403b825ed1fe0a27713910674387"
+                                                         },
+                                "capture_receipt_sha256":  "ad58cb62ae7573a421aaed5a0c7ae04a4c5d403b825ed1fe0a27713910674387",
+                                "capture_receipt":  {
+                                                        "schema_version":  1,
+                                                        "canonical_state_id":  "001",
+                                                        "state":  "login",
+                                                        "expected_route":  "seller://auth/login",
+                                                        "actual_route":  "seller://auth/login",
+                                                        "expected_semantic_markers":  [
+                                                                                          "Satıcı Girişi",
+                                                                                          "E-posta veya telefon numarası",
+                                                                                          "Giriş Yap"
+                                                                                      ],
+                                                        "markers_found":  [
+                                                                              "Satıcı Girişi",
+                                                                              "E-posta veya telefon numarası",
+                                                                              "Giriş Yap"
+                                                                          ],
+                                                        "expected_fixture":  "none",
+                                                        "active_fixture":  "none",
+                                                        "ui_idle":  "YES",
+                                                        "wrong_context":  "NO",
+                                                        "capture_valid":  "YES",
+                                                        "frame_stable":  "YES",
+                                                        "screenshot_path":  "artifacts/seller-wave4/visual/001-runtime.png",
+                                                        "runtime_sha256":  "ca1976e7584ffe5672bbc351d007350ac6eb5b9c7ac11e871b7dffd3b06c1c8c",
+                                                        "capture_utc":  "2026-08-13T16:31:56.598Z",
+                                                        "avd_name":  "novastore-seller-wave4-uat",
+                                                        "apk_sha256":  "3b951409ff6e468a8edebc5886032c7ba5b7c775f70cf99950ebdf379c59ccf8"
+                                                    },
+                                "capture_record_sha256":  "8227b7067beb74e162009816058ff79a99c4e596a865b705e618901324cb18d5"
+                            },
+    "layout_spec":  {
+                        "path":  "docs/seller/wave4/spec/001-layout-spec.json",
+                        "sha256":  "c9ef2a33337a39446efea686f6c1ce2ebe76e209b55a65941d9913795c4846c5",
+                        "authority":  "PNG_ONLY"
+                    },
+    "geometry_gate":  {
+                          "result":  "FAIL",
+                          "critical_region_count":  5,
+                          "failed_region_ids":  [
+                                                    "top_bar",
+                                                    "form_card",
+                                                    "identifier_field",
+                                                    "password_field",
+                                                    "primary_cta"
+                                                ],
+                          "edge_thickness_px":  3,
+                          "translation_search_radius_px":  12,
+                          "pass_rule":  "abs(best_translation_x/y)\u003c=2 and translated_edge_delta_percent\u003c=8"
+                      },
+    "region_comparisons":  [
+                               {
+                                   "id":  "top_bar",
+                                   "kind":  "rounded_card",
+                                   "source_bounds_px":  {
+                                                            "x":  39,
+                                                            "y":  44,
+                                                            "width":  773,
+                                                            "height":  107
+                                                        },
+                                   "pixel_delta_percent":  6.825,
+                                   "edge_delta_percent":  6.9222,
+                                   "best_translation_px":  {
+                                                               "x":  -12,
+                                                               "y":  12
+                                                           },
+                                   "translated_edge_delta_percent":  1.4302,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "brand",
+                                   "kind":  "accepted_owner_asset_slot",
+                                   "source_bounds_px":  {
+                                                            "x":  315,
+                                                            "y":  237,
+                                                            "width":  223,
+                                                            "height":  175
+                                                        },
+                                   "pixel_delta_percent":  38.5471,
+                                   "edge_delta_percent":  7.1429,
+                                   "best_translation_px":  {
+                                                               "x":  -12,
+                                                               "y":  -8
+                                                           },
+                                   "translated_edge_delta_percent":  4.1667,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "hero_copy",
+                                   "kind":  "text_region",
+                                   "source_bounds_px":  {
+                                                            "x":  108,
+                                                            "y":  489,
+                                                            "width":  637,
+                                                            "height":  111
+                                                        },
+                                   "pixel_delta_percent":  28.7143,
+                                   "edge_delta_percent":  1.7071,
+                                   "best_translation_px":  {
+                                                               "x":  -8,
+                                                               "y":  -6
+                                                           },
+                                   "translated_edge_delta_percent":  1.46,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "form_card",
+                                   "kind":  "rounded_card",
+                                   "source_bounds_px":  {
+                                                            "x":  39,
+                                                            "y":  665,
+                                                            "width":  773,
+                                                            "height":  581
+                                                        },
+                                   "pixel_delta_percent":  10.1373,
+                                   "edge_delta_percent":  21.6246,
+                                   "best_translation_px":  {
+                                                               "x":  12,
+                                                               "y":  -12
+                                                           },
+                                   "translated_edge_delta_percent":  10.2127,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "identifier_field",
+                                   "kind":  "input",
+                                   "source_bounds_px":  {
+                                                            "x":  91,
+                                                            "y":  780,
+                                                            "width":  668,
+                                                            "height":  99
+                                                        },
+                                   "pixel_delta_percent":  20.6693,
+                                   "edge_delta_percent":  96.6272,
+                                   "best_translation_px":  {
+                                                               "x":  5,
+                                                               "y":  6
+                                                           },
+                                   "translated_edge_delta_percent":  67.3894,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "password_field",
+                                   "kind":  "input",
+                                   "source_bounds_px":  {
+                                                            "x":  91,
+                                                            "y":  983,
+                                                            "width":  668,
+                                                            "height":  98
+                                                        },
+                                   "pixel_delta_percent":  13.803,
+                                   "edge_delta_percent":  95.9868,
+                                   "best_translation_px":  {
+                                                               "x":  -2,
+                                                               "y":  1
+                                                           },
+                                   "translated_edge_delta_percent":  81.6009,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "remember_row",
+                                   "kind":  "control_row",
+                                   "source_bounds_px":  {
+                                                            "x":  91,
+                                                            "y":  1137,
+                                                            "width":  668,
+                                                            "height":  43
+                                                        },
+                                   "pixel_delta_percent":  25.1427,
+                                   "edge_delta_percent":  9.2671,
+                                   "best_translation_px":  {
+                                                               "x":  7,
+                                                               "y":  -3
+                                                           },
+                                   "translated_edge_delta_percent":  6.4539,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "primary_cta",
+                                   "kind":  "button",
+                                   "source_bounds_px":  {
+                                                            "x":  52,
+                                                            "y":  1306,
+                                                            "width":  744,
+                                                            "height":  106
+                                                        },
+                                   "pixel_delta_percent":  23.3706,
+                                   "edge_delta_percent":  55.4897,
+                                   "best_translation_px":  {
+                                                               "x":  -12,
+                                                               "y":  1
+                                                           },
+                                   "translated_edge_delta_percent":  34.6169,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "application_action",
+                                   "kind":  "text_action",
+                                   "source_bounds_px":  {
+                                                            "x":  216,
+                                                            "y":  1455,
+                                                            "width":  421,
+                                                            "height":  38
+                                                        },
+                                   "pixel_delta_percent":  38.1485,
+                                   "edge_delta_percent":  4.0471,
+                                   "best_translation_px":  {
+                                                               "x":  5,
+                                                               "y":  9
+                                                           },
+                                   "translated_edge_delta_percent":  1.8028,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "support_row",
+                                   "kind":  "support_action",
+                                   "source_bounds_px":  {
+                                                            "x":  319,
+                                                            "y":  1563,
+                                                            "width":  216,
+                                                            "height":  42
+                                                        },
+                                   "pixel_delta_percent":  33.2011,
+                                   "edge_delta_percent":  23.2143,
+                                   "best_translation_px":  {
+                                                               "x":  5,
+                                                               "y":  12
+                                                           },
+                                   "translated_edge_delta_percent":  6.746,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "security_footer",
+                                   "kind":  "security_note",
+                                   "source_bounds_px":  {
+                                                            "x":  177,
+                                                            "y":  1681,
+                                                            "width":  499,
+                                                            "height":  39
+                                                        },
+                                   "pixel_delta_percent":  20.9239,
+                                   "edge_delta_percent":  1.5351,
+                                   "best_translation_px":  {
+                                                               "x":  -12,
+                                                               "y":  -12
+                                                           },
+                                   "translated_edge_delta_percent":  1.5351,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               }
+                           ],
+    "delta_percent":  9.6047,
+    "threshold_percent":  5,
+    "result":  "FAIL"
+}

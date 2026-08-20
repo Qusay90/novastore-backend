@@ -1,0 +1,114 @@
+{
+  "schema_version": 2,
+  "canonical_state_id": "055",
+  "state": "ref_055",
+  "expected_route": "seller:\/\/dashboard",
+  "actual_route": "seller:\/\/dashboard",
+  "expected_semantic_markers": [
+    "Günaydın, Kuşay",
+    "Bugünkü satış",
+    "Son siparişler"
+  ],
+  "markers_found": [
+    "Günaydın, Kuşay",
+    "Bugünkü satış",
+    "Son siparişler"
+  ],
+  "expected_fixture": "seller-canonical-ref-055",
+  "active_fixture": "seller-canonical-ref-055",
+  "ui_idle": "YES",
+  "wrong_context": "NO",
+  "capture_valid": "YES",
+  "frame_stable": "YES",
+  "screenshot_path": "artifacts\/seller-wave4\/visual\/055-runtime.png",
+  "runtime_sha256": "d9878bcd12cd5e6c85027fd9b3ec5f3cb717f656c3e27275169cd5c2e1fd22af",
+  "capture_utc": "2026-08-20T19:01:37.877Z",
+  "avd_name": "novastore-seller-wave4-uat",
+  "apk_sha256": "5efdba9e3e26530539fb80bb8890924a6fc6d3887638a91f4fd00c1ada8b2a44",
+  "capture_canvas_px": {
+    "width": 1080,
+    "height": 2400
+  },
+  "runtime_bounds_raw_px": {
+    "brand_header": {
+      "left": 53,
+      "top": 88,
+      "right": 1039,
+      "bottom": 225,
+      "width": 986,
+      "height": 137
+    },
+    "greeting": {
+      "left": 53,
+      "top": 274,
+      "right": 482,
+      "bottom": 393,
+      "width": 429,
+      "height": 119
+    },
+    "sales_hero": {
+      "left": 38,
+      "top": 431,
+      "right": 1041,
+      "bottom": 1014,
+      "width": 1003,
+      "height": 583
+    },
+    "task_orders": {
+      "left": 38,
+      "top": 1044,
+      "right": 351,
+      "bottom": 1439,
+      "width": 313,
+      "height": 395
+    },
+    "task_stock": {
+      "left": 381,
+      "top": 1044,
+      "right": 695,
+      "bottom": 1439,
+      "width": 314,
+      "height": 395
+    },
+    "task_questions": {
+      "left": 725,
+      "top": 1044,
+      "right": 1041,
+      "bottom": 1439,
+      "width": 316,
+      "height": 395
+    },
+    "balance": {
+      "left": 38,
+      "top": 1469,
+      "right": 1041,
+      "bottom": 1676,
+      "width": 1003,
+      "height": 207
+    },
+    "recent_orders": {
+      "left": 38,
+      "top": 1787,
+      "right": 1041,
+      "bottom": 2038,
+      "width": 1003,
+      "height": 251
+    },
+    "primary_cta": {
+      "left": 38,
+      "top": 2057,
+      "right": 1041,
+      "bottom": 2152,
+      "width": 1003,
+      "height": 95
+    },
+    "bottom_navigation": {
+      "left": 32,
+      "top": 2152,
+      "right": 1048,
+      "bottom": 2316,
+      "width": 1016,
+      "height": 164
+    }
+  }
+}

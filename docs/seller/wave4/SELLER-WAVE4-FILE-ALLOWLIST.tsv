@@ -1,0 +1,81 @@
+phase	path	action	artifact_type	purpose	test_command
+WAVE4-PLANNING	docs/seller/wave4/SELLER-WAVE4-MOBILE-INTEGRATION-CONTRACT.md	CREATE_OR_MODIFY	document	Binding mobile/API/screen contract	git diff --check
+WAVE4-PLANNING	docs/seller/wave4/SELLER-WAVE4-FILE-ALLOWLIST.tsv	CREATE	document	Deterministic Wave 4 path boundary	Import-Csv uniqueness check
+WAVE4-PLANNING	docs/seller/wave4/SELLER-WAVE4-VISUAL-TEST-AND-HANDOFF.md	CREATE_OR_MODIFY	document	Visual evidence and PC1 handoff record	git diff --check
+WAVE4-EVIDENCE	docs/seller/wave4/SELLER-WAVE4-CANONICAL-SCREEN-MATRIX.tsv	CREATE_OR_MODIFY	document	Deterministic 296-reference canonical screen/state matrix	Node TSV row and identifier validation
+WAVE4-EVIDENCE	docs/seller/wave4/SELLER-WAVE4-EXCLUSION-AUDIT.tsv	CREATE	document	Binding source audit for every retained fail-closed canonical reference	 node tests/sellerWave4MobileContractSmoke.js
+WAVE4-EVIDENCE	artifacts/seller-wave4/visual/**	CREATE	evidence	Canonical runtime screenshot, overlay and transition evidence	Evidence manifest validation
+WAVE4-BACKEND	server.js	MODIFY	server_entry	Explicit local-only seller API mount	 node tests/sellerWave4AuthHttpSmoke.js
+WAVE4-BACKEND	services/sellerSessionService.js	MODIFY	service	Issue and revoke seller session families without raw tokens	 node tests/sellerWave4AuthHttpSmoke.js
+WAVE4-BACKEND	services/sellerAccessTokenService.js	CREATE	service	Seller-only access-token issue/verify	 node tests/sellerWave4AuthHttpSmoke.js
+WAVE4-BACKEND	services/sellerLoginService.js	CREATE	service	Existing active seller membership login and refresh coordination	 node tests/sellerWave4AuthHttpSmoke.js
+WAVE4-BACKEND	controllers/sellerAuthController.js	CREATE	controller	Safe seller login/refresh/logout/session response boundary	 node tests/sellerWave4AuthHttpSmoke.js
+WAVE4-BACKEND	routes/sellerAuthRoutes.js	CREATE	route	Local seller auth/session namespace routes	 node tests/sellerWave4AuthHttpSmoke.js
+WAVE4-BACKEND	tests/sellerWave4AuthHttpSmoke.js	CREATE	test	Seller audience/session/refresh/local-flag regressions	 node tests/sellerWave4AuthHttpSmoke.js
+WAVE4-BACKEND	tests/sellerWave4MobileContractSmoke.js	CREATE	test	No mock release path and Android/backend contract guard	 node tests/sellerWave4MobileContractSmoke.js
+WAVE4-REGRESSION	tests/serverStartupSafetySmoke.js	MODIFY	test	Explicit seller-owned loopback startup target; never infer or use PC1	 node tests/serverStartupSafetySmoke.js
+WAVE4-ANDROID	settings.gradle.kts	MODIFY	gradle_settings	Register isolated seller application module	 ./gradlew --offline :seller-app:assembleDebug
+WAVE4-ANDROID	seller-app/build.gradle.kts	CREATE_OR_MODIFY	gradle_module	Seller Android application build contract	 ./gradlew --offline :seller-app:testDebugUnitTest
+WAVE4-ANDROID	seller-app/proguard-rules.pro	CREATE	gradle_module	Seller release shrinker rules	 ./gradlew --offline :seller-app:assembleDebug
+WAVE4-ANDROID	seller-app/src/main/AndroidManifest.xml	CREATE	android_manifest	Non-exported secure seller application shell	 ./gradlew --offline :seller-app:assembleDebug
+WAVE4-ANDROID	seller-app/src/debug/AndroidManifest.xml	CREATE	android_manifest	Debug-only loopback cleartext allowance	 ./gradlew --offline :seller-app:assembleDebug
+WAVE4-ANDROID	seller-app/src/main/assets/seller_screen_catalog.tsv	CREATE	traceability	Exact copied 296-row canonical catalog	 ./gradlew --offline :seller-app:testDebugUnitTest
+WAVE4-ANDROID	seller-app/src/main/java/com/novastore/seller/SellerMainActivity.kt	CREATE_OR_MODIFY	android_source	Seller-only Android entry activity	 ./gradlew --offline :seller-app:compileDebugKotlin
+WAVE4-ANDROID	seller-app/src/main/java/com/novastore/seller/data/SellerApi.kt	CREATE_OR_MODIFY	android_source	Strict real local seller API DTO interface	 ./gradlew --offline :seller-app:compileDebugKotlin
+WAVE4-ANDROID	seller-app/src/main/java/com/novastore/seller/data/SellerModels.kt	CREATE_OR_MODIFY	android_source	Null-safe seller DTO/domain mappings	 ./gradlew --offline :seller-app:compileDebugKotlin
+WAVE4-ANDROID	seller-app/src/main/java/com/novastore/seller/data/SellerRepository.kt	CREATE_OR_MODIFY	android_source	Tenant-safe API, offline and error repository	 ./gradlew --offline :seller-app:compileDebugKotlin
+WAVE4-ANDROID	seller-app/src/main/java/com/novastore/seller/data/SellerSessionStore.kt	CREATE	android_source	Encrypted seller-only session state and serialized refresh	 ./gradlew --offline :seller-app:compileDebugKotlin
+WAVE4-ANDROID	seller-app/src/main/java/com/novastore/seller/ui/SellerApp.kt	CREATE_OR_MODIFY	android_source	Navigation, centralized theme and accessibility shell	 ./gradlew --offline :seller-app:compileDebugKotlin
+WAVE4-ANDROID	seller-app/src/main/java/com/novastore/seller/ui/SellerScreens.kt	CREATE	android_source	Native live/disabled seller screens and state renderers	 ./gradlew --offline :seller-app:compileDebugKotlin
+WAVE4-ANDROID	seller-app/src/main/java/com/novastore/seller/ui/SellerViewModel.kt	CREATE_OR_MODIFY	android_source	State lifecycle, mutation dedupe and session failure handling	 ./gradlew --offline :seller-app:compileDebugKotlin
+WAVE4-ANDROID	seller-app/src/test/java/com/novastore/seller/SellerContractTest.kt	CREATE_OR_MODIFY	android_test	DTO, disabled capability and mock-exclusion tests	 ./gradlew --offline :seller-app:testDebugUnitTest
+WAVE4-ANDROID	seller-app/src/androidTest/java/com/novastore/seller/SellerNavigationInstrumentationTest.kt	CREATE_OR_MODIFY	android_test	Native navigation/accessibility instrumentation coverage	 ./gradlew --offline :seller-app:connectedDebugAndroidTest
+WAVE4-ANDROID	seller-app/src/androidTest/java/com/novastore/seller/SellerCanonicalStateHarness.kt	CREATE	android_test	Test-only deterministic state selection contract	 ./gradlew --offline :seller-app:connectedDebugAndroidTest
+WAVE4-ANDROID	seller-app/src/androidTest/java/com/novastore/seller/SellerCanonicalCaptureInstrumentationTest.kt	CREATE	android_test	Test-only canonical capture state coverage	 ./gradlew --offline :seller-app:connectedDebugAndroidTest
+WAVE4-EVIDENCE	docs/seller/wave4/SELLER-WAVE4-CANONICAL-STATE-CATALOG.tsv	CREATE	document	Test-only state-driver catalog	 ./gradlew --offline :seller-app:connectedDebugAndroidTest
+WAVE4-EVIDENCE	docs/seller/wave4/SELLER-WAVE4-SVG-SOURCE-MAP.tsv	CREATE	document	Deterministic 296-reference PNG and full-screen SVG source inventory	 python tools/sellerWave4SvgSourceSpec.py --check
+WAVE4-EVIDENCE	docs/seller/wave4/SELLER-WAVE4-OWNER-SUPPLEMENTAL-REFERENCE-MAP.tsv	CREATE	document	Binding inventory and provenance decision for all nine owner-supplied visual attachments	 node tests/sellerWave4MobileContractSmoke.js
+WAVE4-EVIDENCE	docs/seller/wave4/spec/001-layout-spec.json	CREATE	design_spec	PNG-authority normalized login geometry	 python tools/sellerWave4SvgSourceSpec.py --check
+WAVE4-EVIDENCE	docs/seller/wave4/spec/055-layout-spec.json	CREATE	design_spec	PNG-authority normalized dashboard geometry	 python tools/sellerWave4SvgSourceSpec.py --check
+WAVE4-EVIDENCE	docs/seller/wave4/spec/156-layout-spec.json	CREATE	design_spec	Parsed full-screen SVG order-detail geometry	 python tools/sellerWave4SvgSourceSpec.py --check
+WAVE4-EVIDENCE	docs/seller/wave4/spec/185-layout-spec.json	CREATE	design_spec	Parsed full-screen SVG finance geometry	 python tools/sellerWave4SvgSourceSpec.py --check
+WAVE4-EVIDENCE	docs/seller/wave4/spec/243-layout-spec.json	CREATE	design_spec	Parsed full-screen SVG store geometry	 python tools/sellerWave4SvgSourceSpec.py --check
+WAVE4-EVIDENCE	docs/seller/wave4/spec/276-layout-spec.json	CREATE	design_spec	Parsed full-screen SVG support-history geometry	 python tools/sellerWave4SvgSourceSpec.py --check
+WAVE4-EVIDENCE	docs/seller/wave4/spec/282-layout-spec.json	CREATE	design_spec	Parsed full-screen SVG team and RBAC geometry	 python tools/sellerWave4SvgSourceSpec.py --check
+WAVE4-EVIDENCE	docs/seller/wave4/spec/292-layout-spec.json	CREATE	design_spec	Parsed full-screen SVG security geometry	 python tools/sellerWave4SvgSourceSpec.py --check
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/representative/**	CREATE	evidence	Bounded final representative runtime side-by-side overlay diff and SHA-256 evidence	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/001-diff.json	CREATE	evidence	Bounded post-owner-map golden recovery diff metrics for reference 001	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/001-overlay.png	CREATE	evidence	Bounded post-owner-map golden recovery overlay for reference 001	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/001-runtime.png	CREATE	evidence	Bounded post-owner-map golden recovery runtime capture for reference 001	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/001-side-by-side.png	CREATE	evidence	Bounded post-owner-map golden recovery comparison for reference 001	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/055-diff.json	CREATE	evidence	Bounded post-owner-map golden recovery diff metrics for reference 055	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/055-overlay.png	CREATE	evidence	Bounded post-owner-map golden recovery overlay for reference 055	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/055-runtime.png	CREATE	evidence	Bounded post-owner-map golden recovery runtime capture for reference 055	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/055-side-by-side.png	CREATE	evidence	Bounded post-owner-map golden recovery comparison for reference 055	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/282-diff.json	CREATE	evidence	Bounded post-owner-map golden recovery diff metrics for reference 282	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/282-overlay.png	CREATE	evidence	Bounded post-owner-map golden recovery overlay for reference 282	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/282-runtime.png	CREATE	evidence	Bounded post-owner-map golden recovery runtime capture for reference 282	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/282-side-by-side.png	CREATE	evidence	Bounded post-owner-map golden recovery comparison for reference 282	Evidence manifest validation
+WAVE4-EVIDENCE	docs/seller/wave4/evidence/owner-supplemental-recovery/SHA256SUMS.txt	CREATE	evidence	Exact SHA-256 manifest for the twelve owner-recovery payloads	Evidence manifest validation
+WAVE4-EVIDENCE	design-qa.md	CREATE	document	Blocking native Android source-versus-runtime design QA for the three golden representatives	node tests/sellerWave4MobileContractSmoke.js
+WAVE4-EVIDENCE	tools/sellerWave4VisualEvidence.ps1	CREATE_OR_MODIFY	tool	Automatic local ADB capture and canonical comparison with route/state gate	 powershell -File tools/sellerWave4VisualEvidence.ps1
+WAVE4-EVIDENCE	tools/sellerWave4SvgSourceSpec.py	CREATE	tool	Deterministic handoff SVG inventory and normalized layout-spec extraction	 python tools/sellerWave4SvgSourceSpec.py --check
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_1_security_illustration.png	CREATE	asset	Exact source Tur 1 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_2_store_setup_illustration.png	CREATE	asset	Exact source Tur 2 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_3_secure_bank_documents_illustration.png	CREATE	asset	Exact source Tur 3 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_4_order_fulfillment_illustration.png	CREATE	asset	Exact source Tur 4 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_5_shipping_return_illustration.png	CREATE	asset	Exact source Tur 5 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_6_finance_payout_illustration.png	CREATE	asset	Exact source Tur 6 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_7_analytics_performance_illustration.png	CREATE	asset	Exact source Tur 7 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_8_campaign_discount_coupon_illustration.png	CREATE	asset	Exact source Tur 8 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_9_storefront_review_question_illustration.png	CREATE	asset	Exact source Tur 9 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_10_notification_center_illustration.png	CREATE	asset	Exact source Tur 10 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_11_messaging_support_illustration.png	CREATE	asset	Exact source Tur 11 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_12_team_roles_security_illustration.png	CREATE	asset	Exact source Tur 12 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/seller_tur_13_account_security_settings_illustration.png	CREATE	asset	Exact source Tur 13 illustration	SHA-256 source equality
+WAVE4-ASSETS	seller-app/src/main/res/drawable-nodpi/novastore_logo.png	CREATE	asset	Exact existing NovaStore word-mark asset for seller login	SHA-256 source equality
+FORBIDDEN	app/**	READ_ONLY	customer_android	Customer Android application remains isolated	Existing customer regressions
+FORBIDDEN	package.json	READ_ONLY	package	No Node dependency change	git diff --check
+FORBIDDEN	package-lock.json	READ_ONLY	package	No Node lockfile change	git diff --check
+FORBIDDEN	migrations/**	READ_ONLY	migration	No seller schema change in Wave 4	Existing migration regressions
+FORBIDDEN	admin-commerce-pro/**	READ_ONLY	admin	No Commerce Pro change	Existing admin regressions

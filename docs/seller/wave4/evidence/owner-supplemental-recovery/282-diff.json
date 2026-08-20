@@ -1,0 +1,304 @@
+{
+    "reference_number":  "282",
+    "serial":  "127.0.0.1:5555",
+    "reference_path":  "source/phone/seller-phone-282-ekip-uyeleri-listesi.png",
+    "raw_runtime_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-owner-map-final\\282-runtime-raw.png",
+    "normalized_runtime_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-owner-map-final\\282-runtime.png",
+    "side_by_side_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-owner-map-final\\282-side-by-side.png",
+    "overlay_path":  "C:\\Users\\kusay\\OneDrive\\Desktop\\NovaStore-Seller-Theme-Integration\\artifacts\\seller-wave4\\golden-owner-map-final\\282-overlay.png",
+    "evidence_provenance":  {
+                                "capture_mode":  "MANIFEST_BOUND_PRECAPTURED",
+                                "comparison_algorithm":  "UNMASKED_FULL_FRAME_RGB_ABSOLUTE_DIFFERENCE_SUM_GT_36",
+                                "comparison_created_utc":  "2026-08-13T17:50:31.7315651Z",
+                                "serial":  "127.0.0.1:5555",
+                                "avd_name":  "novastore-seller-wave4-uat",
+                                "seller_package_fingerprint_sha256":  "286a310609e03232bf9004f9acbfabc42d06ec78f18a9d201b76263698fd72f7",
+                                "installed_apk_sha256":  "9f6912d428112ef3d612ecf8136433d373f9b5b0b1f70b847646e3e9bd82b713",
+                                "capture_time_avd_name":  "novastore-seller-wave4-uat",
+                                "capture_time_apk_sha256":  "9f6912d428112ef3d612ecf8136433d373f9b5b0b1f70b847646e3e9bd82b713",
+                                "capture_time_utc":  "2026-08-13T17:43:57.591Z",
+                                "capture_profile":  {
+                                                        "reference":  "282",
+                                                        "expected_route":  "seller://team",
+                                                        "actual_route":  "seller://team",
+                                                        "expected_markers":  [
+                                                                                 "4 etkin üye",
+                                                                                 "Ayşe Kaya",
+                                                                                 "Ekip Üyesi Davet Et"
+                                                                             ],
+                                                        "markers_found":  [
+                                                                              "4 etkin üye",
+                                                                              "Ayşe Kaya",
+                                                                              "Ekip Üyesi Davet Et"
+                                                                          ],
+                                                        "expected_fixture":  "seller-canonical-ref-282",
+                                                        "active_fixture":  "seller-canonical-ref-282",
+                                                        "ui_idle":  "YES",
+                                                        "wrong_context":  "NO",
+                                                        "capture_valid":  "YES"
+                                                    },
+                                "source_sha256":  "9de1dc602af79b7c78e2b3736d06fb5f00b775d35e0893f6b1d2f04f59f2793c",
+                                "runtime_input_sha256":  "32fdd013e655d0cfdc615e4688c307c47db809ac1652ac57e388bb9f6c51331d",
+                                "runtime_input_last_write_utc":  "2026-08-13T17:44:18.1584334Z",
+                                "raw_runtime_sha256":  "32fdd013e655d0cfdc615e4688c307c47db809ac1652ac57e388bb9f6c51331d",
+                                "normalized_runtime_sha256":  "68de9fd61d90895f7f018f0e5d0ba4b9b8fa04f2965b3f5ba9b57e46cff90742",
+                                "capture_manifest_sha256":  "c1922cf12fad91ea2b95a456f2421cef018fb612a1dca3c48598c032def56c24",
+                                "capture_manifest_row_sha256":  "7d69548ea2616eb3d2fcd5afcd350e383a795bcec1eba82559951561cdc52f76",
+                                "capture_manifest_row":  {
+                                                             "reference":  "282",
+                                                             "state":  "ref_282",
+                                                             "expected_route":  "seller://team",
+                                                             "actual_route":  "seller://team",
+                                                             "expected_markers":  "4 etkin üye|Ayşe Kaya|Ekip Üyesi Davet Et",
+                                                             "markers_found":  "4 etkin üye|Ayşe Kaya|Ekip Üyesi Davet Et",
+                                                             "expected_fixture":  "seller-canonical-ref-282",
+                                                             "active_fixture":  "seller-canonical-ref-282",
+                                                             "ui_idle":  "YES",
+                                                             "wrong_context":  "NO",
+                                                             "capture_valid":  "YES",
+                                                             "screenshot":  "artifacts/seller-wave4/visual/282-runtime.png",
+                                                             "frame_stable":  "YES",
+                                                             "runtime_sha256":  "32fdd013e655d0cfdc615e4688c307c47db809ac1652ac57e388bb9f6c51331d",
+                                                             "capture_utc":  "2026-08-13T17:43:57.591Z",
+                                                             "avd_name":  "novastore-seller-wave4-uat",
+                                                             "apk_sha256":  "9f6912d428112ef3d612ecf8136433d373f9b5b0b1f70b847646e3e9bd82b713",
+                                                             "capture_receipt":  "artifacts/seller-wave4/visual/282-capture.json",
+                                                             "capture_receipt_sha256":  "ef27f015a00ca36d2733d355ba902acca45c44b7b882bb3cab813cf59a81b0ea"
+                                                         },
+                                "capture_receipt_sha256":  "ef27f015a00ca36d2733d355ba902acca45c44b7b882bb3cab813cf59a81b0ea",
+                                "capture_receipt":  {
+                                                        "schema_version":  1,
+                                                        "canonical_state_id":  "282",
+                                                        "state":  "ref_282",
+                                                        "expected_route":  "seller://team",
+                                                        "actual_route":  "seller://team",
+                                                        "expected_semantic_markers":  [
+                                                                                          "4 etkin üye",
+                                                                                          "Ayşe Kaya",
+                                                                                          "Ekip Üyesi Davet Et"
+                                                                                      ],
+                                                        "markers_found":  [
+                                                                              "4 etkin üye",
+                                                                              "Ayşe Kaya",
+                                                                              "Ekip Üyesi Davet Et"
+                                                                          ],
+                                                        "expected_fixture":  "seller-canonical-ref-282",
+                                                        "active_fixture":  "seller-canonical-ref-282",
+                                                        "ui_idle":  "YES",
+                                                        "wrong_context":  "NO",
+                                                        "capture_valid":  "YES",
+                                                        "frame_stable":  "YES",
+                                                        "screenshot_path":  "artifacts/seller-wave4/visual/282-runtime.png",
+                                                        "runtime_sha256":  "32fdd013e655d0cfdc615e4688c307c47db809ac1652ac57e388bb9f6c51331d",
+                                                        "capture_utc":  "2026-08-13T17:43:57.591Z",
+                                                        "avd_name":  "novastore-seller-wave4-uat",
+                                                        "apk_sha256":  "9f6912d428112ef3d612ecf8136433d373f9b5b0b1f70b847646e3e9bd82b713"
+                                                    },
+                                "capture_record_sha256":  "7922ecf351b4556b8b335c6d7af512bd3a581dd5296d951b662638430d937474"
+                            },
+    "layout_spec":  {
+                        "path":  "docs/seller/wave4/spec/282-layout-spec.json",
+                        "sha256":  "d784e5c929a9d5d10ff8e7ae1dcab1859e20708e3510d054cd5f9791db792a03",
+                        "authority":  "FULL_SCREEN_SVG"
+                    },
+    "geometry_gate":  {
+                          "result":  "FAIL",
+                          "critical_region_count":  9,
+                          "failed_region_ids":  [
+                                                    "svg_major_01",
+                                                    "svg_major_02",
+                                                    "svg_major_03",
+                                                    "svg_major_04",
+                                                    "svg_major_07",
+                                                    "svg_major_09"
+                                                ],
+                          "edge_thickness_px":  3,
+                          "translation_search_radius_px":  12,
+                          "pass_rule":  "abs(best_translation_x/y)\u003c=2 and translated_edge_delta_percent\u003c=8"
+                      },
+    "region_comparisons":  [
+                               {
+                                   "id":  "svg_major_01",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  40,
+                                                            "y":  42,
+                                                            "width":  772,
+                                                            "height":  108
+                                                        },
+                                   "pixel_delta_percent":  8.1114,
+                                   "edge_delta_percent":  2.5553,
+                                   "best_translation_px":  {
+                                                               "x":  -10,
+                                                               "y":  11
+                                                           },
+                                   "translated_edge_delta_percent":  2.0214,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_02",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  184,
+                                                            "width":  756,
+                                                            "height":  148
+                                                        },
+                                   "pixel_delta_percent":  12.4589,
+                                   "edge_delta_percent":  1.9673,
+                                   "best_translation_px":  {
+                                                               "x":  -12,
+                                                               "y":  11
+                                                           },
+                                   "translated_edge_delta_percent":  0.8723,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_03",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  356,
+                                                            "width":  756,
+                                                            "height":  272
+                                                        },
+                                   "pixel_delta_percent":  8.2404,
+                                   "edge_delta_percent":  1.7613,
+                                   "best_translation_px":  {
+                                                               "x":  -12,
+                                                               "y":  -11
+                                                           },
+                                   "translated_edge_delta_percent":  0.1142,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_04",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  654,
+                                                            "width":  756,
+                                                            "height":  150
+                                                        },
+                                   "pixel_delta_percent":  9.6825,
+                                   "edge_delta_percent":  15.3704,
+                                   "best_translation_px":  {
+                                                               "x":  -12,
+                                                               "y":  -12
+                                                           },
+                                   "translated_edge_delta_percent":  2.2407,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_05",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  818,
+                                                            "width":  756,
+                                                            "height":  150
+                                                        },
+                                   "pixel_delta_percent":  8.8907,
+                                   "edge_delta_percent":  15.4815,
+                                   "best_translation_px":  {
+                                                               "x":  0,
+                                                               "y":  1
+                                                           },
+                                   "translated_edge_delta_percent":  2.5926,
+                                   "geometry_result":  "PASS",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_06",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  982,
+                                                            "width":  756,
+                                                            "height":  150
+                                                        },
+                                   "pixel_delta_percent":  7.9109,
+                                   "edge_delta_percent":  15.7778,
+                                   "best_translation_px":  {
+                                                               "x":  0,
+                                                               "y":  1
+                                                           },
+                                   "translated_edge_delta_percent":  2.8519,
+                                   "geometry_result":  "PASS",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_07",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  1152,
+                                                            "width":  756,
+                                                            "height":  112
+                                                        },
+                                   "pixel_delta_percent":  17.3587,
+                                   "edge_delta_percent":  62.8964,
+                                   "best_translation_px":  {
+                                                               "x":  -9,
+                                                               "y":  -8
+                                                           },
+                                   "translated_edge_delta_percent":  32.5986,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_08",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  48,
+                                                            "y":  1300,
+                                                            "width":  756,
+                                                            "height":  96
+                                                        },
+                                   "pixel_delta_percent":  7.9544,
+                                   "edge_delta_percent":  19.8188,
+                                   "best_translation_px":  {
+                                                               "x":  0,
+                                                               "y":  1
+                                                           },
+                                   "translated_edge_delta_percent":  5.2797,
+                                   "geometry_result":  "PASS",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               },
+                               {
+                                   "id":  "svg_major_09",
+                                   "kind":  "source_rect",
+                                   "source_bounds_px":  {
+                                                            "x":  28,
+                                                            "y":  1658,
+                                                            "width":  796,
+                                                            "height":  152
+                                                        },
+                                   "pixel_delta_percent":  40.6233,
+                                   "edge_delta_percent":  47.4876,
+                                   "best_translation_px":  {
+                                                               "x":  -1,
+                                                               "y":  -6
+                                                           },
+                                   "translated_edge_delta_percent":  43.6483,
+                                   "geometry_result":  "FAIL",
+                                   "threshold_percent":  5,
+                                   "result":  "FAIL"
+                               }
+                           ],
+    "delta_percent":  10.4813,
+    "threshold_percent":  5,
+    "result":  "FAIL"
+}
