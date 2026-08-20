@@ -10,5 +10,9 @@ data class Notification(
     val type: String,
     val message: String,
     @SerializedName("is_read") val isRead: Boolean,
-    @SerializedName("created_at") val createdAt: String
+    @SerializedName("created_at") val createdAt: String,
+    @SerializedName(value = "entity_type", alternate = ["entityType"])
+    val entityType: String? = null,
+    @SerializedName(value = "entity_id", alternate = ["entityId"])
+    val entityId: Long? = null
 )

@@ -33,6 +33,8 @@ data class AccountOrder(
 
 data class AccountOrderItem(
     val id: Int?,
+    @SerializedName(value = "product_id", alternate = ["productId"])
+    val productId: Int? = null,
     val name: String?,
     val image: String?,
     val price: Double?,
@@ -40,6 +42,9 @@ data class AccountOrderItem(
     @SerializedName("old_price") val oldPrice: Double?,
     @SerializedName("line_total") val lineTotal: Double?
 )
+
+fun AccountOrderItem.resolvedProductId(): Int? =
+    productId?.takeIf { it > 0 } ?: id?.takeIf { it > 0 }
 
 data class AccountCoupon(
     val id: Int,
@@ -58,7 +63,9 @@ data class AccountMessage(
     @SerializedName("receiver_id") val receiverId: Int?,
     val message: String,
     @SerializedName("created_at") val createdAt: String?,
-    @SerializedName("is_ai_handoff") val isAiHandoff: Boolean?
+    @SerializedName("is_ai_handoff") val isAiHandoff: Boolean?,
+    @SerializedName("support_thread_id") val supportThreadId: Long? = null,
+    @SerializedName("is_ai_handoff_dismissed") val isAiHandoffDismissed: Boolean? = null
 )
 
 data class SendMessageRequest(
@@ -107,20 +114,121 @@ data class ChangePasswordRequest(
     val newPassword: String
 )
 
-data class ForgotPasswordRequest(
-    val email: String
+class EmailVerificationSendRequest
+
+data class VerificationCodeRequest(
+    val code: String
 )
 
-data class PhoneCodeRequest(
-    val phone: String? = null,
-    val code: String? = null
+data class PhoneVerificationSendRequest(
+    val phone: String? = null
 )
+
+data class PasswordResetCodeRequest(
+    val identifier: String
+)
+
+data class PasswordResetCodeVerificationRequest(
+    val identifier: String,
+    val code: String
+)
+
+data class PasswordResetCodeVerificationResponse(
+    val valid: Boolean,
+    val expiresAt: String? = null,
+    val message: String? = null
+)
+
+data class PasswordResetCompletionRequest(
+    val identifier: String,
+    val code: String,
+    val newPassword: String,
+    val logoutAll: Boolean? = null
+)
+
+object CustomerVerificationCode {
+    private val sixDigitPattern = Regex("^\\d{6}$")
+
+    fun isValid(value: String): Boolean = sixDigitPattern.matches(value)
+}
 
 data class UserReview(
     val id: Int,
     @SerializedName("product_id") val productId: Int?,
     val rating: Int?,
     val comment: String?,
+    val status: String? = null,
     @SerializedName("created_at") val createdAt: String?,
-    @SerializedName("product_name") val productName: String?
+    @SerializedName("product_name") val productName: String?,
+    @SerializedName("image_url") val imageUrl: String? = null,
+    val media: List<ReviewMedia> = emptyList()
 )
+
+data class ReviewMedia(
+    val id: Int? = null,
+    @SerializedName("media_url") val mediaUrl: String?,
+    @SerializedName("media_type") val mediaType: String?,
+    @SerializedName("sort_order") val sortOrder: Int? = null
+)
+
+data class ReviewPermission(
+    val canReview: Boolean,
+    val requiresAuth: Boolean,
+    val code: String,
+    val message: String?
+)
+
+data class PublicReview(
+    val id: Int,
+    val rating: Int?,
+    val comment: String?,
+    @SerializedName("created_at") val createdAt: String?,
+    @SerializedName("full_name") val fullName: String?,
+    val media: List<ReviewMedia> = emptyList()
+)
+
+data class ProductReviewsResponse(
+    val reviews: List<PublicReview> = emptyList(),
+    val average: String? = null,
+    val totalReviews: Int = 0,
+    val reviewPermission: ReviewPermission
+)
+
+data class SubmitReviewRequest(
+    @SerializedName("product_id") val productId: Int,
+    val rating: Int,
+    val comment: String? = null
+)
+
+data class SubmitReviewResponse(
+    val mesaj: String?,
+    val reviewId: Int,
+    val status: String
+)
+
+data class ReturnRequestDetails(
+    val id: Long,
+    @SerializedName("order_id") val orderId: Int?,
+    val status: String?,
+    val reason: String? = null,
+    val note: String? = null,
+    @SerializedName("created_at") val createdAt: String? = null
+)
+
+enum class CustomerQuestionState {
+    Pending,
+    Answered,
+    Invalid
+}
+
+fun ProductQuestion.customerState(): CustomerQuestionState {
+    val normalizedStatus = status?.trim()?.uppercase()
+    val hasAnswer = !answer.isNullOrBlank()
+    return when {
+        normalizedStatus == "ANSWERED" && isAnswered != false && hasAnswer -> CustomerQuestionState.Answered
+        normalizedStatus == "PENDING" && isAnswered != true && !hasAnswer -> CustomerQuestionState.Pending
+        normalizedStatus == null && isAnswered == true && hasAnswer -> CustomerQuestionState.Answered
+        normalizedStatus == null && isAnswered != true && !hasAnswer -> CustomerQuestionState.Pending
+        else -> CustomerQuestionState.Invalid
+    }
+}

@@ -201,6 +201,13 @@ class PaytrPaymentActionTest {
         assertNull(PaymentAction(type = "redirect", iframeUrl = "https://www.paytr.com/odeme/guvenli/token").resolveSafePaytrIframeUrl())
         assertNull(nestedRedirectAction.resolveSafePaytrIframeUrl())
         assertFalse(nestedRedirectAction.isPaytrIframeAction())
+        assertNull(nestedRedirectAction.resolveApprovedCustomerRedirectUrl("card"))
+        assertNull(PaymentAction(type = "redirect", iframeUrl = "javascript:alert(1)").resolveApprovedCustomerRedirectUrl("card"))
+        assertNull(PaymentAction(type = "iframe", token = "safe-token").resolveApprovedCustomerRedirectUrl("cash"))
+        assertEquals(
+            "https://www.paytr.com/odeme/guvenli/safe-token",
+            PaymentAction(type = "iframe", token = "safe-token").resolveApprovedCustomerRedirectUrl("card")
+        )
     }
 
     private fun paymentStatus(

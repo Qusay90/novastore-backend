@@ -11,6 +11,7 @@ import com.novastore.app.data.model.AssistantModeOption
 import com.novastore.app.data.model.AssistantPendingAction
 import com.novastore.app.data.model.AssistantProduct
 import com.novastore.app.data.model.CartItem
+import com.novastore.app.data.model.isOwnedByCustomer
 import com.novastore.app.data.repository.AuthRepository
 import com.novastore.app.data.repository.CartRepository
 import com.novastore.app.data.repository.CustomerLocalRepository
@@ -18,6 +19,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -61,7 +63,9 @@ data class SupportUiState(
     val pendingAction: AssistantPendingAction? = null,
     val isSending: Boolean = false,
     val isEscalating: Boolean = false,
-    val escalationCreated: Boolean = false
+    val escalationCreated: Boolean = false,
+    val supportThreadId: Long? = null,
+    val supportThreadStatus: String? = null
 )
 
 private val defaultModeOptions = listOf(
@@ -202,6 +206,15 @@ class SupportViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(SupportUiState(messages = listOf(welcomeMessage)))
     val uiState: StateFlow<SupportUiState> = _uiState.asStateFlow()
 
+    init {
+        viewModelScope.launch {
+            authRepository.isLoggedInFlow.drop(1).collect {
+                resetConversation()
+                customerLocalRepository.refreshSessionScopedState()
+            }
+        }
+    }
+
     fun resetConversation() {
         _uiState.value = SupportUiState(messages = listOf(welcomeMessage))
     }
@@ -242,6 +255,7 @@ class SupportViewModel @Inject constructor(
     }
 
     fun sendMessage(rawMessage: String) {
+        val ownerGeneration = authRepository.currentSessionGeneration()
         val message = rawMessage.trim()
         if (message.isEmpty() || _uiState.value.isSending || _uiState.value.isEscalating) return
 
@@ -260,15 +274,24 @@ class SupportViewModel @Inject constructor(
         appendUserMessage(message, sending = true)
 
         viewModelScope.launch {
+            if (!authRepository.isSessionGenerationCurrent(ownerGeneration)) {
+                resetConversation()
+                return@launch
+            }
             runCatching {
                 api.sendAssistantMessage(
-                    AssistantChatRequest(
+                    sessionGeneration = ownerGeneration,
+                    body = AssistantChatRequest(
                         message = message,
                         history = buildHistory(),
                         context = buildContext()
                     )
                 )
             }.onSuccess { response ->
+                if (!authRepository.isSessionGenerationCurrent(ownerGeneration)) {
+                    resetConversation()
+                    return@onSuccess
+                }
                 val products = safeList(response.products).ifEmpty { safeList(response.cards).map { it.toProduct() } }
                 val reply = response.reply?.takeIf { it.isNotBlank() }
                     ?: response.message?.takeIf { it.isNotBlank() }
@@ -295,6 +318,10 @@ class SupportViewModel @Inject constructor(
                     modeOptions = modeOptions.takeIf { it.isNotEmpty() }
                 )
             }.onFailure { error ->
+                if (!authRepository.isSessionGenerationCurrent(ownerGeneration)) {
+                    resetConversation()
+                    return@onFailure
+                }
                 Timber.e(error, "Assistant chat failed")
                 appendAssistantMessage(
                     SupportChatMessage(
@@ -455,12 +482,39 @@ class SupportViewModel @Inject constructor(
 
         val summary = buildEscalationSummary()
         if (summary.isBlank()) return
+        val owner = authRepository.captureSession() ?: return
 
         _uiState.update { it.copy(isEscalating = true) }
         viewModelScope.launch {
+            if (!authRepository.isSessionCurrent(owner)) {
+                resetConversation()
+                return@launch
+            }
             runCatching {
-                api.escalateAssistantConversation(AssistantEscalationRequest(summary))
+                api.escalateAssistantConversation(
+                    sessionGeneration = owner.generation,
+                    body = AssistantEscalationRequest(summary)
+                )
             }.onSuccess { response ->
+                if (!authRepository.isSessionCurrent(owner)) {
+                    resetConversation()
+                    return@onSuccess
+                }
+                val verifiedThread = response.thread?.takeIf {
+                    it.isOwnedByCustomer(owner.userId)
+                }
+                if (verifiedThread == null) {
+                    appendAssistantMessage(
+                        SupportChatMessage(
+                            role = SupportMessageRole.Assistant,
+                            message = "Canlı destek kaydının müşteri sahipliği doğrulanamadı. Kayıt açılmış kabul edilmedi; lütfen tekrar dene.",
+                            suggestions = listOf("Canlı desteğe bağlan"),
+                            allowEscalation = true
+                        ),
+                        pendingAction = null
+                    )
+                    return@onSuccess
+                }
                 appendAssistantMessage(
                     SupportChatMessage(
                         role = SupportMessageRole.System,
@@ -468,9 +522,17 @@ class SupportViewModel @Inject constructor(
                         suggestions = listOf("Yeni soru sor")
                     ),
                     escalationCreated = true,
+                    supportThreadId = verifiedThread.id,
+                    supportThreadStatus = verifiedThread.status?.takeIf {
+                        it in setOf("OPEN", "TAKEN_OVER", "CLOSED")
+                    },
                     pendingAction = null
                 )
             }.onFailure { error ->
+                if (!authRepository.isSessionCurrent(owner)) {
+                    resetConversation()
+                    return@onFailure
+                }
                 Timber.e(error, "Assistant escalation failed")
                 appendAssistantMessage(
                     SupportChatMessage(
@@ -498,6 +560,8 @@ class SupportViewModel @Inject constructor(
     private fun appendAssistantMessage(
         message: SupportChatMessage,
         escalationCreated: Boolean = false,
+        supportThreadId: Long? = null,
+        supportThreadStatus: String? = null,
         lastProducts: List<AssistantProduct>? = null,
         pendingAction: AssistantPendingAction? = _uiState.value.pendingAction,
         selectedMode: String = _uiState.value.selectedMode,
@@ -514,7 +578,9 @@ class SupportViewModel @Inject constructor(
                 modeOptions = modeOptions ?: it.modeOptions,
                 isSending = false,
                 isEscalating = false,
-                escalationCreated = it.escalationCreated || escalationCreated
+                escalationCreated = it.escalationCreated || escalationCreated,
+                supportThreadId = supportThreadId ?: it.supportThreadId,
+                supportThreadStatus = supportThreadStatus ?: it.supportThreadStatus
             )
         }
     }

@@ -8,6 +8,7 @@ import com.novastore.app.data.repository.AuthRepository
 import com.novastore.app.data.repository.CartRepository
 import com.novastore.app.data.repository.CustomerLocalRepository
 import com.novastore.app.data.repository.PaymentRepository
+import com.novastore.app.core.session.SessionGenerationSnapshot
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -49,6 +50,7 @@ class CheckoutViewModel @Inject constructor(
     val checkoutDraft: StateFlow<SharedCheckoutPayload?> = _checkoutDraft.asStateFlow()
     private var clearCartWhenPaymentFinalized: Boolean = false
     private var pendingPaymentCartProductIds: Set<Int> = emptySet()
+    private var paymentSessionSnapshot: SessionGenerationSnapshot? = null
 
     val cartItems: StateFlow<List<CartItem>> = cartRepository.cartItems
         .stateIn(
@@ -78,15 +80,19 @@ class CheckoutViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            val generation = authRepository.currentSessionGeneration()
+            customerLocalRepository.refreshSessionScopedState()
             customerLocalRepository.refreshAddresses()
-            refreshCheckoutDraft()
+            if (authRepository.isSessionGenerationCurrent(generation)) refreshCheckoutDraft(generation)
         }
     }
 
-    private suspend fun refreshCheckoutDraft() {
+    private suspend fun refreshCheckoutDraft(generation: Long) {
         if (!authRepository.isLoggedIn) return
-        runCatching { api.getSharedCheckout().payload }
-            .onSuccess { _checkoutDraft.value = it }
+        runCatching { api.getSharedCheckout(generation).payload }
+            .onSuccess {
+                if (authRepository.isSessionGenerationCurrent(generation)) _checkoutDraft.value = it
+            }
             .onFailure { Timber.w(it, "Checkout draft could not be loaded.") }
     }
 
@@ -120,9 +126,27 @@ class CheckoutViewModel @Inject constructor(
             _uiState.update { it.copy(error = "Sepetiniz bo\u015F oldu\u011Fu i\u00E7in \u00F6deme ba\u015Flat\u0131lamaz.") }
             return
         }
+        val owner = authRepository.captureSession()
+        if (owner == null) {
+            _uiState.update { it.copy(error = "Ödeme için müşteri oturumu gerekli.") }
+            return
+        }
 
-        _uiState.update { it.copy(isLoading = true, error = null) }
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                error = null,
+                successResponse = null,
+                isCheckingPaymentStatus = false,
+                paymentStatusMessage = null,
+                paymentStatus = null,
+                paymentNextAction = null,
+                paymentStatusFinalized = false,
+                paymentFinalized = false
+            )
+        }
         clearCartWhenPaymentFinalized = clearCartWhenFinalized
+        paymentSessionSnapshot = owner
         pendingPaymentCartProductIds = if (clearCartWhenFinalized) {
             itemsToPay.map { it.productId }.toSet()
         } else {
@@ -144,7 +168,8 @@ class CheckoutViewModel @Inject constructor(
                 val draftResult = runCatching {
                     val selectedId = selectedAddressId.value.takeIf { it > 0L }
                     api.putSharedCheckout(
-                        SharedCheckoutStateRequest(
+                        sessionGeneration = owner.generation,
+                        body = SharedCheckoutStateRequest(
                             SharedCheckoutPayload(
                                 items = itemsToPay,
                                 selectedAddressId = selectedId,
@@ -155,15 +180,27 @@ class CheckoutViewModel @Inject constructor(
                     ).payload
                 }
                 if (draftResult.isFailure) {
+                    if (!authRepository.isSessionCurrent(owner)) {
+                        clearPaymentStateForChangedSession()
+                        return@launch
+                    }
                     val errorMsg = draftResult.exceptionOrNull()?.message ?: "Checkout taslagi kaydedilemedi."
                     Timber.e(draftResult.exceptionOrNull(), "Checkout draft could not be saved.")
                     _uiState.update { it.copy(isLoading = false, error = errorMsg) }
                     return@launch
                 }
+                if (!authRepository.isSessionCurrent(owner)) {
+                    clearPaymentStateForChangedSession()
+                    return@launch
+                }
                 _checkoutDraft.value = draftResult.getOrNull()
             }
 
-            val result = paymentRepository.initializePayment(request)
+            val result = paymentRepository.initializePayment(request, owner.generation)
+            if (!authRepository.isSessionCurrent(owner)) {
+                clearPaymentStateForChangedSession()
+                return@launch
+            }
             if (result.isSuccess) {
                 val response = result.getOrThrow()
                 Timber.d("Payment initialized successfully: orderId=${response.orderId}")
@@ -180,22 +217,16 @@ class CheckoutViewModel @Inject constructor(
                 }
 
                 val paymentAction = response.paymentAction
-                if (paymentMethod == "card" && paymentAction.isPaytrIframeAction()) {
-                    val iframeUrl = paymentAction.resolveSafePaytrIframeUrl()
-                    if (iframeUrl.isNullOrEmpty()) {
-                        Timber.w("PayTR iframe URL is missing or rejected.")
-                        _uiState.update { it.copy(error = "Guvenli PayTR odeme baglantisi alinamadi.") }
-                    } else {
-                        Timber.d("PayTR iframe redirection requested.")
-                        onRedirectionRequested(iframeUrl)
-                    }
-                } else {
-                    // Existing card redirect shape stays available for the current provider.
-                    val redirectUrl = paymentAction?.action?.successUrl
-                    if (paymentMethod == "card" && !redirectUrl.isNullOrEmpty()) {
-                        Timber.d("Card redirection requested.")
-                        onRedirectionRequested(redirectUrl)
-                    }
+                val approvedRedirect = paymentAction.resolveApprovedCustomerRedirectUrl(paymentMethod)
+                if (approvedRedirect != null) {
+                    Timber.d("Approved payment redirection requested.")
+                    onRedirectionRequested(approvedRedirect)
+                } else if (
+                    paymentMethod == "card" &&
+                    (paymentAction.isPaytrIframeAction() || !paymentAction?.action?.successUrl.isNullOrEmpty())
+                ) {
+                    Timber.w("Unverified legacy card redirection was rejected.")
+                    _uiState.update { it.copy(error = "Güvenli ödeme yönlendirmesi doğrulanamadı.") }
                 }
             } else {
                 val errorMsg = result.exceptionOrNull()?.message ?: "\u00D6deme ba\u015Flat\u0131lamad\u0131. Sunucu hatas\u0131 olu\u015Ftu."
@@ -208,10 +239,23 @@ class CheckoutViewModel @Inject constructor(
     fun refreshPaymentStatus() {
         val response = _uiState.value.successResponse ?: return
         val paymentRef = response.paymentRef?.takeIf { it.isNotBlank() } ?: return
+        val owner = paymentSessionSnapshot?.takeIf(authRepository::isSessionCurrent)
+        if (owner == null) {
+            clearPaymentStateForChangedSession()
+            return
+        }
 
         _uiState.update { it.copy(isCheckingPaymentStatus = true, error = null) }
         viewModelScope.launch {
-            val result = paymentRepository.getPaymentStatus(paymentRef = paymentRef, orderId = response.orderId)
+            val result = paymentRepository.getPaymentStatus(
+                paymentRef = paymentRef,
+                orderId = response.orderId,
+                sessionGeneration = owner.generation
+            )
+            if (!authRepository.isSessionCurrent(owner)) {
+                clearPaymentStateForChangedSession()
+                return@launch
+            }
             if (result.isSuccess) {
                 val status = result.getOrThrow()
                 val providerCaptured = status.shouldClearCartAfterStatusRefresh()
@@ -244,16 +288,31 @@ class CheckoutViewModel @Inject constructor(
         }
         val failedProductIds = mutableSetOf<Int>()
         for (item in itemsForCapturedOrder) {
-            if (cartRepository.removeFromCart(item).isFailure) {
+            val owner = paymentSessionSnapshot?.takeIf(authRepository::isSessionCurrent)
+            if (owner == null || cartRepository.removeFromCart(item, owner).isFailure) {
                 failedProductIds += item.productId
             }
         }
         pendingPaymentCartProductIds = failedProductIds
     }
+
+    private fun clearPaymentStateForChangedSession() {
+        clearCartWhenPaymentFinalized = false
+        pendingPaymentCartProductIds = emptySet()
+        paymentSessionSnapshot = null
+        _checkoutDraft.value = null
+        _uiState.value = CheckoutUiState(
+            error = "Ödeme oturumu değişti; önceki müşteriye ait ödeme durumu temizlendi."
+        )
+    }
 }
 
 internal fun String?.normalizedCouponCode(): String? =
     this?.trim()?.takeIf { it.isNotEmpty() }
+
+internal fun PaymentAction?.resolveApprovedCustomerRedirectUrl(paymentMethod: String): String? =
+    takeIf { paymentMethod == "card" && it.isPaytrIframeAction() }
+        ?.resolveSafePaytrIframeUrl()
 
 internal fun buildPaymentRequest(
     fullName: String,

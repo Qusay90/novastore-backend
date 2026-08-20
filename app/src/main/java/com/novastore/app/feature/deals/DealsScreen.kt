@@ -44,6 +44,7 @@ import com.novastore.app.core.theme.Orange
 import com.novastore.app.core.ui.optimizedImageUrl
 import com.novastore.app.data.model.CartItem
 import com.novastore.app.data.model.Product
+import com.novastore.app.data.model.orderedImageUrls
 import kotlinx.coroutines.delay
 import timber.log.Timber
 
@@ -231,15 +232,8 @@ private fun DealProductCard(
     isFavorite: Boolean,
     onToggleFavorite: (Int) -> Unit
 ) {
-    // Build full image list from imageUrl + media
     val allImages = remember(product) {
-        val list = mutableListOf<String>()
-        product.imageUrl?.let { list.add(it) }
-        product.media.map { it.mediaUrl }.forEach { url ->
-            if (!list.contains(url)) list.add(url)
-        }
-        if (list.isEmpty()) list.add("")
-        list
+        product.orderedImageUrls().ifEmpty { listOf("") }
     }
     val previewImageUrl = remember(allImages) {
         optimizedImageUrl(allImages.firstOrNull(), width = 520, height = 520)

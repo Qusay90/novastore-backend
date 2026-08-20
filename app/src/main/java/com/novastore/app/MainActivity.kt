@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import android.graphics.Color
-import com.novastore.app.core.theme.NovaStoreTheme
+import com.novastore.app.core.design.NovaCustomerTheme
 import com.novastore.app.navigation.NovaStoreNavGraph
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
         window.statusBarColor = Color.WHITE
         WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = true
         setContent {
-            NovaStoreTheme {
+            NovaCustomerTheme {
                 NovaStoreNavGraph()
             }
         }

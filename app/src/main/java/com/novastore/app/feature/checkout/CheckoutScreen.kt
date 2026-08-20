@@ -35,11 +35,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -82,6 +85,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
@@ -108,6 +112,9 @@ import com.novastore.app.data.model.CartItem
 import com.novastore.app.data.model.CustomerAddress
 import java.util.Calendar
 import java.util.Locale
+
+private val PaymentSelectionSurface = Color(0xFFEAF0F6)
+private val PaymentSelectionBorder = Color(0xFFAABAC9)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,6 +144,7 @@ fun CheckoutScreen(
     var cardNumber by remember { mutableStateOf("") }
     var expiry by remember { mutableStateOf(TextFieldValue("")) }
     var cvc by remember { mutableStateOf("") }
+    var isCvcVisible by remember { mutableStateOf(false) }
     var isCardBackVisible by remember { mutableStateOf(false) }
     var attemptedSubmit by remember { mutableStateOf(false) }
     var localError by remember { mutableStateOf<String?>(null) }
@@ -269,6 +277,7 @@ fun CheckoutScreen(
                             cardNumber = cardNumber,
                             expiry = expiry,
                             cvc = cvc,
+                            isCvcVisible = isCvcVisible,
                             cardType = cardType,
                             cvcMaxLength = cvcMaxLength,
                             isCardBackVisible = isCardBackVisible,
@@ -296,6 +305,7 @@ fun CheckoutScreen(
                                 if (formatted.length == 5) cvcFocusRequester.requestFocus()
                             },
                             onCvcChange = { cvc = it.filter(Char::isDigit).take(cvcMaxLength) },
+                            onCvcVisibilityChange = { isCvcVisible = it },
                             onSensitiveFocus = { isCardBackVisible = false },
                             onCvcFocus = { focused -> if (focused) isCardBackVisible = true }
                         )
@@ -360,6 +370,7 @@ private fun CardPaymentPanel(
     cardNumber: String,
     expiry: TextFieldValue,
     cvc: String,
+    isCvcVisible: Boolean,
     cardType: CardType,
     cvcMaxLength: Int,
     isCardBackVisible: Boolean,
@@ -372,6 +383,7 @@ private fun CardPaymentPanel(
     onCardNumberChange: (String) -> Unit,
     onExpiryChange: (TextFieldValue) -> Unit,
     onCvcChange: (String) -> Unit,
+    onCvcVisibilityChange: (Boolean) -> Unit,
     onSensitiveFocus: () -> Unit,
     onCvcFocus: (Boolean) -> Unit
 ) {
@@ -381,14 +393,14 @@ private fun CardPaymentPanel(
             .animateContentSize(animationSpec = spring())
             .clickable(onClick = onExpand),
         shape = RoundedCornerShape(16.dp),
-        color = if (expanded) Orange.copy(alpha = 0.05f) else CardBackground,
-        border = BorderStroke(1.5.dp, Orange)
+        color = if (expanded) PaymentSelectionSurface else CardBackground,
+        border = BorderStroke(1.5.dp, if (expanded) PaymentSelectionBorder else BorderLight)
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(color = Orange.copy(alpha = 0.12f), shape = CircleShape, modifier = Modifier.size(44.dp)) {
+                Surface(color = PaymentSelectionSurface, shape = CircleShape, modifier = Modifier.size(44.dp)) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.CreditCard, contentDescription = null, tint = Orange)
+                        Icon(Icons.Default.CreditCard, contentDescription = null, tint = NavyDark)
                     }
                 }
                 Spacer(Modifier.width(10.dp))
@@ -410,7 +422,7 @@ private fun CardPaymentPanel(
                         cardHolder = cardHolder,
                         cardNumber = cardNumber,
                         expiry = expiry.text,
-                        cvc = cvc,
+                        cvc = if (isCvcVisible) cvc else "",
                         cardType = cardType,
                         showBack = isCardBackVisible
                     )
@@ -430,6 +442,14 @@ private fun CardPaymentPanel(
                         placeholder = "0000 0000 0000 0000",
                         keyboardType = KeyboardType.Number,
                         visualTransformation = CardNumberVisualTransformation(cardType),
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.CreditCard,
+                                contentDescription = null,
+                                tint = NavyDark,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
                         isError = showErrors && errors.numberError != null,
                         supportingText = if (showErrors) errors.numberError else null,
                         modifier = Modifier.onFocusChanged { if (it.isFocused) onSensitiveFocus() }
@@ -445,19 +465,42 @@ private fun CardPaymentPanel(
                                 .weight(1f)
                                 .focusRequester(expiryFocusRequester)
                                 .onFocusChanged { if (it.isFocused) onSensitiveFocus() },
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = NavyDark,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
                             isError = showErrors && errors.expiryError != null,
                             supportingText = if (showErrors) errors.expiryError else null
                         )
                         NovaTextField(
                             value = cvc,
                             onValueChange = onCvcChange,
-                            label = "CVC",
-                            placeholder = "CVC",
+                            label = "CVV",
+                            placeholder = "CVV",
                             keyboardType = KeyboardType.NumberPassword,
                             modifier = Modifier
                                 .weight(1f)
                                 .focusRequester(cvcFocusRequester)
                                 .onFocusChanged { onCvcFocus(it.isFocused) },
+                            visualTransformation = if (isCvcVisible) {
+                                VisualTransformation.None
+                            } else {
+                                PasswordVisualTransformation()
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { onCvcVisibilityChange(!isCvcVisible) }) {
+                                    Icon(
+                                        imageVector = if (isCvcVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = if (isCvcVisible) "CVV'yi gizle" else "CVV'yi göster",
+                                        tint = NavyDark,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            },
                             isError = showErrors && errors.cvcError != null,
                             supportingText = if (showErrors) errors.cvcError else null
                         )
@@ -493,11 +536,11 @@ private fun PaymentMethodOption(
     Surface(
         modifier = modifier.clickable { onSelect(method) },
         shape = RoundedCornerShape(12.dp),
-        color = if (selected) Orange.copy(alpha = 0.08f) else CardBackground,
-        border = BorderStroke(1.5.dp, if (selected) Orange else BorderLight)
+        color = if (selected) PaymentSelectionSurface else CardBackground,
+        border = BorderStroke(1.5.dp, if (selected) PaymentSelectionBorder else BorderLight)
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(method.icon, contentDescription = null, tint = if (selected) Orange else TextSecondary)
+            Icon(method.icon, contentDescription = null, tint = if (selected) NavyDark else TextSecondary)
             Text(method.title, color = NavyDark, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
             Text(method.description, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
         }
@@ -763,7 +806,9 @@ private fun NovaTextField(
     isError: Boolean = false,
     supportingText: String? = null,
     minLines: Int = 1,
-    visualTransformation: VisualTransformation = VisualTransformation.None
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    trailingIcon: (@Composable () -> Unit)? = null
 ) {
     OutlinedTextField(
         value = value,
@@ -775,6 +820,8 @@ private fun NovaTextField(
         singleLine = minLines == 1,
         minLines = minLines,
         visualTransformation = visualTransformation,
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
         isError = isError,
         supportingText = supportingText?.let { { Text(it) } },
         shape = RoundedCornerShape(12.dp),
@@ -799,7 +846,9 @@ private fun NovaTextFieldValue(
     isError: Boolean = false,
     supportingText: String? = null,
     minLines: Int = 1,
-    visualTransformation: VisualTransformation = VisualTransformation.None
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    trailingIcon: (@Composable () -> Unit)? = null
 ) {
     OutlinedTextField(
         value = value,
@@ -811,6 +860,8 @@ private fun NovaTextFieldValue(
         singleLine = minLines == 1,
         minLines = minLines,
         visualTransformation = visualTransformation,
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
         isError = isError,
         supportingText = supportingText?.let { { Text(it) } },
         shape = RoundedCornerShape(12.dp),
@@ -1095,7 +1146,7 @@ private fun validateCardForm(holder: String, cardNumber: String, expiry: String,
             else -> null
         },
         expiryError = if (!isValidExpiry(expiry)) "Son kullanma tarihi ge\u00E7ersiz." else null,
-        cvcError = if (cvc.digitsOnly().length != cvcLength) "CVC eksik." else null
+        cvcError = if (cvc.digitsOnly().length != cvcLength) "CVV eksik." else null
     )
 }
 

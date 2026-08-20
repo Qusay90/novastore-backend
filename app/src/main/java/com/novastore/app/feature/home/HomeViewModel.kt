@@ -20,6 +20,13 @@ import java.util.Locale
 import timber.log.Timber
 import javax.inject.Inject
 
+internal const val CATALOG_LOAD_ERROR_MESSAGE =
+    "İçerik şu anda yüklenemiyor. Lütfen bağlantını kontrol edip tekrar dene."
+internal const val CATEGORY_LOAD_ERROR_MESSAGE =
+    "Kategori ürünleri şu anda yüklenemiyor. Lütfen tekrar dene."
+internal const val PRODUCTS_LOAD_ERROR_MESSAGE =
+    "Ürünler şu anda yüklenemiyor. Lütfen tekrar dene."
+
 enum class HomeProductFilter(val label: String) {
     ALL("Tümü"),
     DISCOUNTED("İndirimdekiler"),
@@ -168,16 +175,15 @@ class HomeViewModel @Inject constructor(
                     )
                 }
             } else {
-                val errorMsg = productsResult.exceptionOrNull()?.message 
-                    ?: categoriesResult.exceptionOrNull()?.message 
-                    ?: "Veriler yüklenirken bilinmeyen bir hata oluştu."
-                
-                Timber.e("Error fetching data: $errorMsg")
+                val failure = productsResult.exceptionOrNull()
+                    ?: categoriesResult.exceptionOrNull()
+
+                Timber.e(failure, "Catalog data load failed")
                 _uiState.update { 
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = errorMsg
+                        error = CATALOG_LOAD_ERROR_MESSAGE
                     )
                 }
             }
@@ -236,9 +242,10 @@ class HomeViewModel @Inject constructor(
                         error = null
                     )
                 } else {
+                    Timber.e(productsResult.exceptionOrNull(), "Category products load failed")
                     it.copy(
                         isRefreshing = false,
-                        error = productsResult.exceptionOrNull()?.message ?: "Kategori ürünleri yüklenemedi."
+                        error = CATEGORY_LOAD_ERROR_MESSAGE
                     )
                 }
             }
@@ -293,9 +300,10 @@ class HomeViewModel @Inject constructor(
                         error = null
                     )
                 } else {
+                    Timber.e(productsResult.exceptionOrNull(), "Catalog reset failed")
                     it.copy(
                         isRefreshing = false,
-                        error = productsResult.exceptionOrNull()?.message ?: "Ürünler yüklenemedi."
+                        error = PRODUCTS_LOAD_ERROR_MESSAGE
                     )
                 }
             }

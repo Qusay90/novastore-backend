@@ -16,13 +16,25 @@ interface NovaStoreApi {
     suspend fun getProduct(@Path("id") id: Int): Product
 
     @POST("api/questions/ask")
-    suspend fun askProductQuestion(@Body body: AskQuestionRequest): BasicMessageResponse
+    suspend fun askProductQuestion(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: AskQuestionRequest
+    ): BasicMessageResponse
 
     @GET("api/questions/product/{productId}")
     suspend fun getProductQuestions(@Path("productId") productId: Int): List<ProductQuestion>
 
     @GET("api/questions/user")
     suspend fun getUserProductQuestions(): List<ProductQuestion>
+
+    @GET("api/reviews/product/{productId}")
+    suspend fun getProductReviews(@Path("productId") productId: Int): ProductReviewsResponse
+
+    @POST("api/reviews")
+    suspend fun submitReview(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: SubmitReviewRequest
+    ): SubmitReviewResponse
 
     // Categories
     @GET("api/public/categories")
@@ -39,7 +51,10 @@ interface NovaStoreApi {
     suspend fun logout(): Response<Unit>
 
     @PATCH("api/users/me")
-    suspend fun updateProfile(@Body body: UpdateProfileRequest): UpdateProfileResponse
+    suspend fun updateProfile(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: UpdateProfileRequest
+    ): UpdateProfileResponse
 
     @GET("api/users/me")
     suspend fun getCurrentUserProfile(): UpdateProfileResponse
@@ -48,32 +63,67 @@ interface NovaStoreApi {
     suspend fun getSecurityStatus(): SecurityStatus
 
     @POST("api/users/change-password")
-    suspend fun changePassword(@Body body: ChangePasswordRequest): BasicMessageResponse
+    suspend fun changePassword(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: ChangePasswordRequest
+    ): BasicMessageResponse
 
-    @POST("api/auth/forgot-password")
-    suspend fun forgotPassword(@Body body: ForgotPasswordRequest): BasicMessageResponse
+    @POST("api/users/verification/email/send")
+    suspend fun sendEmailVerification(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: EmailVerificationSendRequest = EmailVerificationSendRequest()
+    ): BasicMessageResponse
 
-    @POST("api/auth/phone/send-code")
-    suspend fun sendPhoneCode(@Body body: PhoneCodeRequest): BasicMessageResponse
+    @POST("api/users/verification/email/verify")
+    suspend fun verifyEmailCode(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: VerificationCodeRequest
+    ): BasicMessageResponse
 
-    @POST("api/auth/phone/verify-code")
-    suspend fun verifyPhoneCode(@Body body: PhoneCodeRequest): BasicMessageResponse
+    @POST("api/users/verification/phone/send")
+    suspend fun sendPhoneCode(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: PhoneVerificationSendRequest
+    ): BasicMessageResponse
 
-    @POST("api/auth/email/send-verification")
-    suspend fun sendEmailVerification(): BasicMessageResponse
+    @POST("api/users/verification/phone/verify")
+    suspend fun verifyPhoneCode(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: VerificationCodeRequest
+    ): BasicMessageResponse
 
-    @POST("api/auth/2fa/setup")
-    suspend fun setupTwoFactor(): BasicMessageResponse
+    @POST("api/users/password-reset/request")
+    suspend fun requestPasswordReset(@Body body: PasswordResetCodeRequest): BasicMessageResponse
+
+    @POST("api/users/password-reset/verify")
+    suspend fun verifyPasswordResetCode(
+        @Body body: PasswordResetCodeVerificationRequest
+    ): PasswordResetCodeVerificationResponse
+
+    @POST("api/users/password-reset/complete")
+    suspend fun completePasswordReset(
+        @Body body: PasswordResetCompletionRequest
+    ): BasicMessageResponse
+
+    suspend fun setupTwoFactor(): BasicMessageResponse {
+        throw UnsupportedOperationException("CUSTOMER_TWO_FACTOR_UNAVAILABLE")
+    }
 
     // Notifications
     @GET("api/notifications/user/{userId}")
     suspend fun getNotifications(@Path("userId") userId: Int): List<Notification>
 
     @PATCH("api/notifications/{id}/read")
-    suspend fun markNotificationRead(@Path("id") id: Int)
+    suspend fun markNotificationRead(
+        @Path("id") id: Int,
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null
+    )
 
     @PATCH("api/notifications/read-all/{userId}")
-    suspend fun markAllNotificationsRead(@Path("userId") userId: Int): BasicMessageResponse
+    suspend fun markAllNotificationsRead(
+        @Path("userId") userId: Int,
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null
+    ): BasicMessageResponse
 
     // Account
     @GET("api/orders/user/{userId}")
@@ -82,6 +132,7 @@ interface NovaStoreApi {
     @POST("api/orders/{id}/cancel")
     suspend fun cancelOrder(
         @Path("id") orderId: Int,
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
         @Body body: CancelOrderRequestBody
     ): BasicMessageResponse
 
@@ -92,10 +143,19 @@ interface NovaStoreApi {
     suspend fun getChatHistory(@Path("userId") userId: Int): List<AccountMessage>
 
     @POST("api/messages/send")
-    suspend fun sendSupportMessage(@Body body: SendMessageRequest): AccountMessage
+    suspend fun sendSupportMessage(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: SendMessageRequest
+    ): AccountMessage
 
     @POST("api/returns")
-    suspend fun createReturnRequest(@Body body: ReturnRequestBody): BasicMessageResponse
+    suspend fun createReturnRequest(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: ReturnRequestBody
+    ): BasicMessageResponse
+
+    @GET("api/returns/{id}")
+    suspend fun getReturnRequest(@Path("id") id: Long): ReturnRequestDetails
 
     @GET("api/reviews/user/{userId}")
     suspend fun getUserReviews(@Path("userId") userId: Int): List<UserReview>
@@ -104,57 +164,101 @@ interface NovaStoreApi {
     suspend fun getAddresses(): List<CustomerAddress>
 
     @POST("api/addresses")
-    suspend fun createAddress(@Body body: CustomerAddress): CustomerAddress
+    suspend fun createAddress(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: CustomerAddress
+    ): CustomerAddress
 
     @PUT("api/addresses/{id}")
-    suspend fun updateAddress(@Path("id") id: Long, @Body body: CustomerAddress): CustomerAddress
+    suspend fun updateAddress(
+        @Path("id") id: Long,
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: CustomerAddress
+    ): CustomerAddress
 
     @DELETE("api/addresses/{id}")
-    suspend fun deleteAddress(@Path("id") id: Long): BasicMessageResponse
+    suspend fun deleteAddress(
+        @Path("id") id: Long,
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null
+    ): BasicMessageResponse
 
     @PATCH("api/addresses/{id}/default")
-    suspend fun setDefaultAddress(@Path("id") id: Long): CustomerAddress
+    suspend fun setDefaultAddress(
+        @Path("id") id: Long,
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null
+    ): CustomerAddress
 
     // Favorites
     @GET("api/favorites")
-    suspend fun getFavorites(): FavoritesResponse
+    suspend fun getFavorites(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null
+    ): FavoritesResponse
 
     @POST("api/favorites/{productId}")
-    suspend fun addFavorite(@Path("productId") productId: Int): FavoriteMutationResponse
+    suspend fun addFavorite(
+        @Path("productId") productId: Int,
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null
+    ): FavoriteMutationResponse
 
     @DELETE("api/favorites/{productId}")
-    suspend fun removeFavorite(@Path("productId") productId: Int): FavoriteMutationResponse
+    suspend fun removeFavorite(
+        @Path("productId") productId: Int,
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null
+    ): FavoriteMutationResponse
 
     @POST("api/favorites/sync")
-    suspend fun syncFavorites(@Body body: FavoriteSyncRequest): FavoritesResponse
+    suspend fun syncFavorites(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: FavoriteSyncRequest
+    ): FavoritesResponse
 
     // Shared state
     @GET("api/shared-state/cart")
-    suspend fun getSharedCart(): SharedCartStateResponse
+    suspend fun getSharedCart(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null
+    ): SharedCartStateResponse
 
     @PUT("api/shared-state/cart")
-    suspend fun putSharedCart(@Body body: SharedCartStateRequest): SharedCartStateResponse
+    suspend fun putSharedCart(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: SharedCartStateRequest
+    ): SharedCartStateResponse
 
     @GET("api/shared-state/checkout")
-    suspend fun getSharedCheckout(): SharedCheckoutStateResponse
+    suspend fun getSharedCheckout(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null
+    ): SharedCheckoutStateResponse
 
     @PUT("api/shared-state/checkout")
-    suspend fun putSharedCheckout(@Body body: SharedCheckoutStateRequest): SharedCheckoutStateResponse
+    suspend fun putSharedCheckout(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: SharedCheckoutStateRequest
+    ): SharedCheckoutStateResponse
 
     // Payments
     @POST("api/payments/initialize")
-    suspend fun initializePayment(@Body body: PaymentRequest): PaymentResponse
+    suspend fun initializePayment(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: PaymentRequest
+    ): PaymentResponse
 
     @GET("api/payments/status")
     suspend fun getPaymentStatus(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
         @Query("paymentRef") paymentRef: String,
         @Query("orderId") orderId: Int
     ): PaymentStatusResponse
 
     // AI Assistant
     @POST("api/assistant/chat")
-    suspend fun sendAssistantMessage(@Body body: AssistantChatRequest): AssistantChatResponse
+    suspend fun sendAssistantMessage(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: AssistantChatRequest
+    ): AssistantChatResponse
 
     @POST("api/assistant/escalate")
-    suspend fun escalateAssistantConversation(@Body body: AssistantEscalationRequest): AssistantEscalationResponse
+    suspend fun escalateAssistantConversation(
+        @Header("X-NovaStore-Session-Generation") sessionGeneration: Long? = null,
+        @Body body: AssistantEscalationRequest
+    ): AssistantEscalationResponse
 }

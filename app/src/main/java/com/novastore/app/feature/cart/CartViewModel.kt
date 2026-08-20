@@ -51,6 +51,8 @@ class CartViewModel @Inject constructor(
             authRepository.isLoggedInFlow.collect { isLoggedIn ->
                 if (isLoggedIn) {
                     cartRepository.refreshCartFromServer()
+                } else {
+                    cartRepository.clearAuthenticatedCartOnLogout()
                 }
             }
         }

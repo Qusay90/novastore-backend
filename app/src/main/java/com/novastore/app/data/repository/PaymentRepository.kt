@@ -11,11 +11,19 @@ import javax.inject.Singleton
 class PaymentRepository @Inject constructor(
     private val api: NovaStoreApi
 ) {
-    suspend fun initializePayment(request: PaymentRequest): Result<PaymentResponse> = runCatching {
-        api.initializePayment(request)
+    suspend fun initializePayment(request: PaymentRequest, sessionGeneration: Long): Result<PaymentResponse> = runCatching {
+        api.initializePayment(sessionGeneration = sessionGeneration, body = request)
     }
 
-    suspend fun getPaymentStatus(paymentRef: String, orderId: Int): Result<PaymentStatusResponse> = runCatching {
-        api.getPaymentStatus(paymentRef = paymentRef, orderId = orderId)
+    suspend fun getPaymentStatus(
+        paymentRef: String,
+        orderId: Int,
+        sessionGeneration: Long
+    ): Result<PaymentStatusResponse> = runCatching {
+        api.getPaymentStatus(
+            sessionGeneration = sessionGeneration,
+            paymentRef = paymentRef,
+            orderId = orderId
+        )
     }
 }

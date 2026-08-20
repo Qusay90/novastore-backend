@@ -115,8 +115,24 @@ data class AssistantEscalationRequest(
 
 data class AssistantEscalationResponse(
     val message: String?,
-    val escalation: AssistantEscalationMessage?
+    val escalation: AssistantEscalationMessage?,
+    val thread: SupportThreadSummary? = null
 )
+
+data class SupportThreadSummary(
+    val id: Long,
+    @SerializedName(value = "customerId", alternate = ["customer_id"])
+    val customerId: Int? = null,
+    val status: String? = null,
+    @SerializedName(value = "assignedAdminId", alternate = ["assigned_admin_id"])
+    val assignedAdminId: Int? = null,
+    val source: String? = null,
+    @SerializedName(value = "lastMessageAt", alternate = ["last_message_at"])
+    val lastMessageAt: String? = null
+)
+
+fun SupportThreadSummary.isOwnedByCustomer(userId: Int?): Boolean =
+    id > 0 && userId != null && customerId == userId
 
 data class AssistantEscalationMessage(
     val id: Int?,

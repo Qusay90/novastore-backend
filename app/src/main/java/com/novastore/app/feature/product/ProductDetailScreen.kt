@@ -3,11 +3,14 @@ package com.novastore.app.feature.product
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,10 +44,13 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.AssignmentReturn
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.LocalShipping
@@ -94,17 +100,30 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -124,12 +143,62 @@ import com.novastore.app.core.theme.TextSecondary as SecondaryText
 import com.novastore.app.core.ui.optimizedImageUrl
 import com.novastore.app.data.model.AccountCoupon
 import com.novastore.app.data.model.CartItem
+import com.novastore.app.data.model.CustomerQuestionState
 import com.novastore.app.data.model.CustomerAddress
 import com.novastore.app.data.model.Product
 import com.novastore.app.data.model.ProductQuestion
+import com.novastore.app.data.model.customerState
+import com.novastore.app.data.model.orderedImageUrls
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
+
+private val PdpInfoWaveHeight = 48.dp
+private val PdpInfoWaveOverlap = 30.dp
+private val PdpAnswerIndent = 28.dp
+private val PdpAnswerRuleWidth = 3.dp
+private val PdpAnswerRuleColor = Color(0xFF061E45)
+private val PdpMediaBackground = Color(0xFFF6F0EB)
+
+/**
+ * Native equivalent of the accepted responsive V4.13 white cap:
+ * M(0,.42h) C(.17w,.07h,.48w,.79h,.66w,.78h)
+ * C(.83w,.78h,.96w,.48h,1w,.43h).
+ */
+private fun Modifier.pdpInfoWaveSurface(): Modifier = drawWithCache {
+    val waveHeight = PdpInfoWaveHeight.toPx().coerceAtMost(size.height)
+    val wave = Path().apply {
+        moveTo(0f, waveHeight * 0.42f)
+        cubicTo(
+            size.width * 0.17f,
+            waveHeight * 0.07f,
+            size.width * 0.48f,
+            waveHeight * 0.79f,
+            size.width * 0.66f,
+            waveHeight * 0.78f
+        )
+        cubicTo(
+            size.width * 0.83f,
+            waveHeight * 0.78f,
+            size.width * 0.96f,
+            waveHeight * 0.48f,
+            size.width,
+            waveHeight * 0.43f
+        )
+        lineTo(size.width, waveHeight)
+        lineTo(0f, waveHeight)
+        close()
+    }
+    onDrawBehind {
+        drawPath(path = wave, color = Color.White)
+        if (size.height > waveHeight) {
+            drawRect(
+                color = Color.White,
+                topLeft = Offset(0f, waveHeight)
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -298,6 +367,7 @@ private fun ProductDetailContent(
     var showSpecifications by remember { mutableStateOf(false) }
     var showQuestionSheet by remember { mutableStateOf(false) }
     var descriptionExpanded by remember { mutableStateOf(false) }
+    var readableText by remember(product.id) { mutableStateOf(false) }
 
     LazyColumn(
         state = listState,
@@ -308,17 +378,11 @@ private fun ProductDetailContent(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
-            ProductGallery(
-                images = images,
-                productName = product.name,
-                discount = product.discountPercentage,
-                onImageClick = { fullScreenImage = it }
-            )
-        }
-        item {
-            ProductInfoCard(
+            ProductHeroSection(
                 product = product,
-                onReviewsClick = { scope.launch { listState.animateScrollToItem(8) } }
+                images = images,
+                onImageClick = { fullScreenImage = it },
+                onReviewsClick = { scope.launch { listState.animateScrollToItem(6) } }
             )
         }
         item {
@@ -354,12 +418,15 @@ private fun ProductDetailContent(
             DescriptionCard(
                 description = product.description,
                 expanded = descriptionExpanded,
+                readableText = readableText,
+                onTextSizeToggle = { readableText = !readableText },
                 onToggle = { descriptionExpanded = !descriptionExpanded }
             )
         }
         item {
             SpecificationsCard(
                 product = product,
+                readableText = readableText,
                 onShowAll = { showSpecifications = true }
             )
         }
@@ -423,71 +490,152 @@ private fun ProductDetailContent(
 }
 
 @Composable
+private fun ProductHeroSection(
+    product: Product,
+    images: List<String>,
+    onImageClick: (Int) -> Unit,
+    onReviewsClick: () -> Unit
+) {
+    Layout(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+            .background(PdpMediaBackground)
+            .testTag("pdp_hero_surface"),
+        content = {
+            ProductGallery(
+                images = images,
+                productName = product.name,
+                discount = product.discountPercentage,
+                onImageClick = onImageClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+            ProductInfoCard(
+                product = product,
+                onReviewsClick = onReviewsClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    ) { measurables, constraints ->
+        val childConstraints = constraints.copy(
+            minWidth = constraints.maxWidth,
+            maxWidth = constraints.maxWidth,
+            minHeight = 0
+        )
+        val gallery = measurables[0].measure(childConstraints)
+        val info = measurables[1].measure(childConstraints)
+        val overlap = PdpInfoWaveOverlap.roundToPx()
+            .coerceAtMost(minOf(gallery.height, info.height))
+        layout(
+            width = maxOf(gallery.width, info.width),
+            height = gallery.height + info.height - overlap
+        ) {
+            gallery.placeRelative(0, 0)
+            info.placeRelative(0, gallery.height - overlap)
+        }
+    }
+}
+
+@Composable
 private fun ProductGallery(
     images: List<String>,
     productName: String,
     discount: Int,
-    onImageClick: (Int) -> Unit
+    onImageClick: (Int) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val pagerState = rememberPagerState(pageCount = { images.size.coerceAtLeast(1) })
-    Surface(color = Color.White) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .padding(12.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFFFAFAFB))
-        ) {
-            if (images.isEmpty()) {
-                EmptyImage(productName)
-            } else {
-                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                    AsyncImage(
-                        model = optimizedImageUrl(images[page], 1000, 1000),
-                        contentDescription = "$productName görseli ${page + 1}",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable { onImageClick(page) }
-                            .padding(18.dp)
-                    )
-                }
-                Surface(
+    val scope = rememberCoroutineScope()
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .background(PdpMediaBackground)
+            .testTag("pdp_media_surface")
+    ) {
+        if (images.isEmpty()) {
+            EmptyImage(productName)
+        } else {
+            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                AsyncImage(
+                    model = optimizedImageUrl(images[page], 1000, 1000),
+                    contentDescription = "$productName görseli ${page + 1}",
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(12.dp),
-                    color = NavyDark.copy(alpha = 0.82f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        "${pagerState.currentPage + 1}/${images.size}",
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-                    )
+                        .fillMaxSize()
+                        .clickable { onImageClick(page) }
+                        .padding(horizontal = 18.dp, vertical = 12.dp)
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 8.dp)
+                    .testTag("pdp_gallery_dots"),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                images.indices.forEach { index ->
+                    val active = pagerState.currentPage == index
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .testTag("pdp_gallery_dot_$index")
+                            .semantics {
+                                contentDescription = "${index + 1}. görsel"
+                                selected = active
+                                role = Role.Button
+                            }
+                            .clickable {
+                                scope.launch { pagerState.animateScrollToPage(index) }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(if (active) 9.dp else 6.dp)
+                                .background(
+                                    color = if (active) NavyDark else Color(0xFFCBD1D9),
+                                    shape = CircleShape
+                                )
+                        )
+                    }
                 }
             }
-            if (discount > 0) {
-                Surface(
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp),
+                color = NavyDark.copy(alpha = 0.82f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    "${pagerState.currentPage + 1}/${images.size}",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                )
+            }
+        }
+        if (discount > 0) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp),
+                color = Success,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    "%$discount indirim",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    softWrap = false,
                     modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(12.dp),
-                    color = Success,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        "%$discount indirim",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = Modifier
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                            .graphicsLayer(scaleY = 1.12f)
-                    )
-                }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .graphicsLayer(scaleY = 1.12f)
+                )
             }
         }
     }
@@ -507,8 +655,18 @@ private fun EmptyImage(productName: String) {
 }
 
 @Composable
-private fun ProductInfoCard(product: Product, onReviewsClick: () -> Unit) {
-    DetailCard {
+private fun ProductInfoCard(
+    product: Product,
+    onReviewsClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+            .pdpInfoWaveSurface()
+            .testTag("pdp_info_surface")
+            .padding(start = 16.dp, top = 42.dp, end = 16.dp, bottom = 16.dp)
+    ) {
         Text(product.category, color = Orange, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(6.dp))
         Text(
@@ -607,6 +765,11 @@ private fun PriceAndCampaignCard(
         Text("Sepette avantajlı NovaStore fiyatı", color = Success, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(14.dp))
         Text("Aktif kuponlar", color = NavyDark, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Kupon uygunluğu ve indirim tutarı ödeme adımında sunucu tarafından doğrulanır.",
+            color = SecondaryText,
+            style = MaterialTheme.typography.bodySmall
+        )
         Spacer(Modifier.height(9.dp))
         when {
             couponsLoading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -640,9 +803,9 @@ private fun PriceAndCampaignCard(
     }
 }
 
-private fun AccountCoupon.detailChipTitle(selected: Boolean): String {
+internal fun AccountCoupon.detailChipTitle(selected: Boolean): String {
     return if (selected) {
-        "Uygulandı: $code"
+        "Seçildi: $code"
     } else {
         "$code - ${discountLabel()}"
     }
@@ -777,12 +940,49 @@ private fun SellerCard(onMessage: (String) -> Unit) {
 }
 
 @Composable
-private fun DescriptionCard(description: String?, expanded: Boolean, onToggle: () -> Unit) {
+private fun DescriptionCard(
+    description: String?,
+    expanded: Boolean,
+    readableText: Boolean,
+    onTextSizeToggle: () -> Unit,
+    onToggle: () -> Unit
+) {
     val text = remember(description) { sanitizeDescription(description) }
     if (text.isBlank()) return
     val isLong = text.length > 220
-    DetailCard {
-        SectionTitle("Ürün Açıklaması", Icons.Default.Inventory2)
+    val descriptionFontSize = if (readableText) 18.sp else 14.sp
+    val descriptionLineHeight = if (readableText) 29.sp else 22.sp
+    DetailCard(modifier = Modifier.animateContentSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SectionTitle("Ürün Açıklaması", Icons.Default.Inventory2)
+            OutlinedButton(
+                onClick = onTextSizeToggle,
+                modifier = Modifier
+                    .height(36.dp)
+                    .testTag("pdp_text_size_toggle"),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, BorderLight)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FormatSize,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = if (readableText) "Yazıları küçült" else "Yazıları büyüt",
+                    color = NavyDark,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+            }
+        }
         Spacer(Modifier.height(10.dp))
         Box(
             modifier = Modifier
@@ -792,8 +992,8 @@ private fun DescriptionCard(description: String?, expanded: Boolean, onToggle: (
             Text(
                 text = text,
                 color = Color(0xFF344054),
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = 22.sp,
+                fontSize = descriptionFontSize,
+                lineHeight = descriptionLineHeight,
                 maxLines = if (expanded) Int.MAX_VALUE else 5,
                 overflow = TextOverflow.Ellipsis
             )
@@ -824,9 +1024,15 @@ private fun DescriptionCard(description: String?, expanded: Boolean, onToggle: (
 }
 
 @Composable
-private fun SpecificationsCard(product: Product, onShowAll: () -> Unit) {
+private fun SpecificationsCard(
+    product: Product,
+    readableText: Boolean,
+    onShowAll: () -> Unit
+) {
     val specs = productSpecifications(product)
-    DetailCard {
+    val specificationFontSize = if (readableText) 16.sp else 13.sp
+    val specificationLineHeight = if (readableText) 23.sp else 19.sp
+    DetailCard(modifier = Modifier.animateContentSize()) {
         SectionTitle("Teknik Özellikler", Icons.Default.Inventory2)
         Spacer(Modifier.height(10.dp))
         specs.take(5).forEachIndexed { index, spec ->
@@ -836,8 +1042,21 @@ private fun SpecificationsCard(product: Product, onShowAll: () -> Unit) {
                     .background(if (index % 2 == 0) Color(0xFFF8FAFC) else Color.White)
                     .padding(horizontal = 10.dp, vertical = 10.dp)
             ) {
-                Text(spec.first, color = SecondaryText, modifier = Modifier.weight(1f))
-                Text(spec.second, color = NavyDark, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(
+                    text = spec.first,
+                    color = SecondaryText,
+                    fontSize = specificationFontSize,
+                    lineHeight = specificationLineHeight,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = spec.second,
+                    color = NavyDark,
+                    fontSize = specificationFontSize,
+                    lineHeight = specificationLineHeight,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
         TextButton(onClick = onShowAll, modifier = Modifier.align(Alignment.End)) {
@@ -921,10 +1140,23 @@ private fun ProductQuestionsSection(
 
 @Composable
 private fun ProductQuestionCard(question: ProductQuestion) {
-    val answered = !question.answer.isNullOrBlank()
+    val questionState = question.customerState()
+    val answered = questionState == CustomerQuestionState.Answered
+    val pending = questionState == CustomerQuestionState.Pending
     Surface(
-        color = if (answered) Color.White else Color(0xFFFFF8ED),
-        border = BorderStroke(1.dp, if (answered) BorderLight else Orange.copy(alpha = 0.35f)),
+        color = when (questionState) {
+            CustomerQuestionState.Answered -> Color.White
+            CustomerQuestionState.Pending -> Color(0xFFFFF8ED)
+            CustomerQuestionState.Invalid -> ErrorRed.copy(alpha = 0.05f)
+        },
+        border = BorderStroke(
+            1.dp,
+            when (questionState) {
+                CustomerQuestionState.Answered -> BorderLight
+                CustomerQuestionState.Pending -> Orange.copy(alpha = 0.35f)
+                CustomerQuestionState.Invalid -> ErrorRed.copy(alpha = 0.35f)
+            }
+        ),
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -937,27 +1169,78 @@ private fun ProductQuestionCard(question: ProductQuestion) {
                 Text(formatQuestionDate(question.createdAt), color = SecondaryText, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
             }
             Text(question.question, color = NavyDark, fontWeight = FontWeight.SemiBold, lineHeight = 20.sp)
-            Surface(
-                color = if (answered) Color(0xFFF8FAFC) else Color.White,
-                border = BorderStroke(1.dp, BorderLight),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("NovaStore", color = NavyDark, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-                        Surface(color = if (answered) Success.copy(alpha = 0.12f) else Orange.copy(alpha = 0.12f), shape = RoundedCornerShape(999.dp)) {
-                            Text(
-                                if (answered) "Yanıtlandı" else "Bekliyor",
-                                color = if (answered) Success else Orange,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
+            if (answered) {
+                Surface(
+                    color = Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = PdpAnswerIndent)
+                        .testTag("pdp_question_answer")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .drawBehind {
+                                val strokeWidth = PdpAnswerRuleWidth.toPx()
+                                val inset = 7.dp.toPx()
+                                drawLine(
+                                    color = PdpAnswerRuleColor,
+                                    start = Offset(strokeWidth / 2f, inset),
+                                    end = Offset(strokeWidth / 2f, size.height - inset),
+                                    strokeWidth = strokeWidth,
+                                    cap = StrokeCap.Round
+                                )
+                            }
+                            .padding(start = 15.dp, top = 10.dp, end = 11.dp, bottom = 10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("NovaStore", color = NavyDark, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                            Surface(color = Success.copy(alpha = 0.12f), shape = RoundedCornerShape(999.dp)) {
+                                Text(
+                                    "Yanıtlandı",
+                                    color = Success,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
+                        Spacer(Modifier.height(6.dp))
+                        Text(question.answer.orEmpty(), color = NavyDark, lineHeight = 20.sp)
                     }
-                    Spacer(Modifier.height(6.dp))
-                    Text(question.answer ?: "Satıcı henüz yanıtlamadı.", color = if (answered) NavyDark else SecondaryText, lineHeight = 20.sp)
+                }
+            } else {
+                Surface(
+                    color = Color.White,
+                    border = BorderStroke(1.dp, if (pending) BorderLight else ErrorRed.copy(alpha = 0.35f)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("NovaStore", color = NavyDark, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                            val stateColor = if (pending) Orange else ErrorRed
+                            Surface(color = stateColor.copy(alpha = 0.12f), shape = RoundedCornerShape(999.dp)) {
+                                Text(
+                                    if (pending) "Bekliyor" else "Doğrulanamadı",
+                                    color = stateColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            if (pending) {
+                                "Satıcı henüz yanıtlamadı."
+                            } else {
+                                "Soru durumu doğrulanamadı; olası yanıt güvenlik nedeniyle gösterilmiyor."
+                            },
+                            color = SecondaryText,
+                            lineHeight = 20.sp
+                        )
+                    }
                 }
             }
         }
@@ -1197,6 +1480,11 @@ private fun FullScreenGallery(
 ) {
     if (images.isEmpty()) return
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { images.size })
+    val scope = rememberCoroutineScope()
+    var resetRevision by remember { mutableIntStateOf(0) }
+    LaunchedEffect(pagerState.currentPage) {
+        resetRevision += 1
+    }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -1204,7 +1492,11 @@ private fun FullScreenGallery(
         BackHandler(onBack = onDismiss)
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                ZoomableImage(url = images[page], contentDescription = "$productName görseli ${page + 1}")
+                ZoomableImage(
+                    url = images[page],
+                    contentDescription = "$productName görseli ${page + 1}",
+                    resetSignal = resetRevision
+                )
             }
             IconButton(
                 onClick = onDismiss,
@@ -1228,39 +1520,144 @@ private fun FullScreenGallery(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                 )
             }
+            if (images.size > 1) {
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0))
+                        }
+                    },
+                    enabled = pagerState.currentPage > 0,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(8.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.52f))
+                        .testTag("pdp_viewer_previous")
+                ) {
+                    Icon(
+                        Icons.Default.ChevronLeft,
+                        contentDescription = "Önceki ürün görseli",
+                        tint = Color.White.copy(alpha = if (pagerState.currentPage > 0) 1f else 0.28f)
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            pagerState.animateScrollToPage(
+                                (pagerState.currentPage + 1).coerceAtMost(images.lastIndex)
+                            )
+                        }
+                    },
+                    enabled = pagerState.currentPage < images.lastIndex,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(8.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.52f))
+                        .testTag("pdp_viewer_next")
+                ) {
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = "Sonraki ürün görseli",
+                        tint = Color.White.copy(
+                            alpha = if (pagerState.currentPage < images.lastIndex) 1f else 0.28f
+                        )
+                    )
+                }
+            }
+            Surface(
+                onClick = { resetRevision += 1 },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 18.dp)
+                    .testTag("pdp_viewer_reset"),
+                color = Color.White.copy(alpha = 0.13f),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.20f))
+            ) {
+                Text(
+                    text = "1× · Görseli sıfırla",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ZoomableImage(url: String, contentDescription: String) {
+private fun ZoomableImage(
+    url: String,
+    contentDescription: String,
+    resetSignal: Int
+) {
     var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
+    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+        val nextScale = (scale * zoomChange).coerceIn(1f, 4f)
+        val baselineDrag = nextScale <= 1.01f
+        val maxX = if (baselineDrag) {
+            viewportSize.width * 0.18f
+        } else {
+            viewportSize.width * (nextScale - 1f) / 2f
+        }
+        val maxY = if (baselineDrag) {
+            viewportSize.height * 0.18f
+        } else {
+            viewportSize.height * (nextScale - 1f) / 2f
+        }
+        val panResistance = if (baselineDrag) 0.65f else 1f
+        val candidate = offset + (panChange * panResistance)
+        scale = nextScale
+        offset = Offset(
+            x = candidate.x.coerceIn(-maxX, maxX),
+            y = candidate.y.coerceIn(-maxY, maxY)
+        )
+    }
+
+    LaunchedEffect(resetSignal) {
+        scale = 1f
+        offset = Offset.Zero
+    }
+    LaunchedEffect(transformState.isTransformInProgress) {
+        if (!transformState.isTransformInProgress && scale <= 1.01f) {
+            val startScale = scale
+            val startOffset = offset
+            Animatable(0f).animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 180)
+            ) {
+                scale = 1f + ((startScale - 1f) * (1f - value))
+                offset = Offset(
+                    x = startOffset.x * (1f - value),
+                    y = startOffset.y * (1f - value)
+                )
+            }
+            scale = 1f
+            offset = Offset.Zero
+        }
+    }
     AsyncImage(
         model = optimizedImageUrl(url, 1600, 1600),
         contentDescription = contentDescription,
         contentScale = ContentScale.Fit,
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 4f)
-                    if (scale > 1f) {
-                        offsetX += pan.x
-                        offsetY += pan.y
-                    } else {
-                        offsetX = 0f
-                        offsetY = 0f
-                    }
-                }
-            }
+            .onSizeChanged { viewportSize = it }
+            .transformable(state = transformState, lockRotationOnZoomPan = true)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-                translationX = offsetX
-                translationY = offsetY
+                translationX = offset.x
+                translationY = offset.y
             }
+            .testTag("pdp_viewer_transform")
             .padding(12.dp)
     )
 }
@@ -1471,12 +1868,7 @@ private fun ErrorState(message: String, onRetry: () -> Unit, onBack: () -> Unit,
 }
 
 private fun productImages(product: Product): List<String> {
-    return buildList {
-        product.imageUrl?.takeIf { it.isNotBlank() }?.let(::add)
-        product.media.sortedBy { it.sortOrder }.forEach { media ->
-            if (media.mediaUrl.isNotBlank() && media.mediaUrl !in this) add(media.mediaUrl)
-        }
-    }
+    return product.orderedImageUrls()
 }
 
 private fun productSpecifications(product: Product): List<Pair<String, String>> {

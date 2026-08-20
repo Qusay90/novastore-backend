@@ -64,6 +64,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
@@ -73,6 +75,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.novastore.app.R
+import com.novastore.app.core.design.CustomerDimensions
+import com.novastore.app.core.design.CustomerSpacing
 import com.novastore.app.data.model.AssistantComparisonRow
 import com.novastore.app.data.model.AssistantProduct
 import java.text.NumberFormat
@@ -86,6 +90,8 @@ private val OrangeAccent = Color(0xFFF28C18)
 private val LightBackground = Color(0xFFF7F8FA)
 private val SoftBorder = Color(0xFFE2E8F0)
 private val SuccessGreen = Color(0xFF28C76F)
+private val SupportBottomNavigationClearance =
+    CustomerDimensions.BottomBarSurfaceHeight + CustomerSpacing.Xl + CustomerSpacing.Xxs
 
 private val screenTurkishLocale = Locale("tr", "TR")
 
@@ -201,11 +207,14 @@ fun SupportScreen(
         modifier = modifier
             .fillMaxSize()
             .background(LightBackground)
+            .padding(bottom = SupportBottomNavigationClearance)
             .imePadding()
     ) {
         SupportChatHeader(
             selectedModeTitle = uiState.selectedModeTitle,
-            escalationCreated = uiState.escalationCreated
+            escalationCreated = uiState.escalationCreated,
+            supportThreadId = uiState.supportThreadId,
+            supportThreadStatus = uiState.supportThreadStatus
         )
 
         Row(
@@ -295,7 +304,9 @@ fun SupportScreen(
 @Composable
 private fun SupportChatHeader(
     selectedModeTitle: String,
-    escalationCreated: Boolean
+    escalationCreated: Boolean,
+    supportThreadId: Long?,
+    supportThreadStatus: String?
 ) {
     Row(
         modifier = Modifier
@@ -337,7 +348,13 @@ private fun SupportChatHeader(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = if (escalationCreated) "Canlı destek ekibinde" else selectedModeTitle,
+                    text = if (escalationCreated) {
+                        buildString {
+                            append("Destek kaydı")
+                            supportThreadId?.let { append(" #$it") }
+                            supportThreadStatus?.let { append(" • ${it.customerLabel()}") }
+                        }
+                    } else selectedModeTitle,
                     color = Color.White.copy(alpha = 0.82f),
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
@@ -347,6 +364,13 @@ private fun SupportChatHeader(
         }
         Icon(Icons.Default.SupportAgent, contentDescription = null, tint = Color.White.copy(alpha = 0.82f))
     }
+}
+
+private fun String.customerLabel(): String = when (this) {
+    "OPEN" -> "Açık"
+    "TAKEN_OVER" -> "Temsilcide"
+    "CLOSED" -> "Kapalı"
+    else -> "Durum bekleniyor"
 }
 
 @Composable
@@ -703,7 +727,9 @@ private fun MessageInputBar(
             OutlinedTextField(
                 value = draft,
                 onValueChange = onDraftChange,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = "NovaBot mesajı" },
                 enabled = enabled,
                 placeholder = { Text("Mesajını yaz...") },
                 minLines = 1,

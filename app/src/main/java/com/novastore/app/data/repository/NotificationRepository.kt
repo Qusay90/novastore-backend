@@ -13,11 +13,11 @@ class NotificationRepository @Inject constructor(
         api.getNotifications(userId)
     }
 
-    suspend fun markAsRead(id: Int): Result<Unit> = runCatching {
-        api.markNotificationRead(id)
+    suspend fun markAsRead(id: Int, sessionGeneration: Long): Result<Unit> = runCatching {
+        api.markNotificationRead(id, sessionGeneration)
     }
 
-    suspend fun markAllAsRead(userId: Int): Result<Unit> = runCatching {
-        api.markAllNotificationsRead(userId)
+    suspend fun markAllAsRead(userId: Int, sessionGeneration: Long): Result<Unit> = runCatching {
+        api.markAllNotificationsRead(userId, sessionGeneration)
     }
 }

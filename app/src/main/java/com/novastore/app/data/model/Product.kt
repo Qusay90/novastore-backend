@@ -66,8 +66,25 @@ data class ProductMedia(
     @SerializedName("product_id") val productId: Int,
     @SerializedName("media_url") val mediaUrl: String,
     @SerializedName("is_main") val isMain: Boolean,
-    @SerializedName("sort_order") val sortOrder: Int
+    @SerializedName("sort_order") val sortOrder: Int,
+    @SerializedName("media_type") val mediaType: String? = null
 )
+
+/** Main-6S is image-only. Unknown/video media is deliberately excluded until Android has a renderer. */
+fun Product.orderedImageUrls(): List<String> = buildList {
+    media.asSequence()
+        .filter { it.mediaType?.trim()?.lowercase() == "image" }
+        .sortedWith(
+            compareByDescending<ProductMedia> { it.isMain }
+                .thenBy { it.sortOrder }
+                .thenBy { it.id }
+        )
+        .map { it.mediaUrl.trim() }
+        .filter { it.isNotEmpty() }
+        .forEach { if (it !in this) add(it) }
+
+    imageUrl?.trim()?.takeIf { it.isNotEmpty() && it !in this }?.let(::add)
+}
 
 data class AskQuestionRequest(
     @SerializedName("product_id") val productId: Int,

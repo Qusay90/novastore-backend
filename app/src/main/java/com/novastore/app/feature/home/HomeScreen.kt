@@ -9,6 +9,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -61,6 +62,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -85,6 +87,7 @@ import com.novastore.app.data.model.CartItem
 import com.novastore.app.data.model.Category
 import com.novastore.app.data.model.CustomerAddress
 import com.novastore.app.data.model.Product
+import com.novastore.app.data.model.orderedImageUrls
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -151,21 +154,14 @@ fun HomeScreen(
                         )
                     }
 
-                    // Center: Logo
-                    Text(
-                        text = androidx.compose.ui.text.buildAnnotatedString {
-                            withStyle(androidx.compose.ui.text.SpanStyle(color = NavyDark)) {
-                                append("Nova")
-                            }
-                            withStyle(androidx.compose.ui.text.SpanStyle(color = Orange)) {
-                                append("Store")
-                            }
-                        },
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = (-0.5).sp
-                        ),
-                        modifier = Modifier.align(Alignment.Center)
+                    // Center: the same official artwork used by the production launcher.
+                    Image(
+                        painter = painterResource(R.drawable.app_icon_foreground),
+                        contentDescription = "NovaStore",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(52.dp)
                     )
 
                     // Right side: Notifications
@@ -674,6 +670,7 @@ private fun CategoryChip(
 ) {
     Surface(
         modifier = Modifier
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
@@ -918,15 +915,8 @@ private fun ProductCard(
     isFavorite: Boolean,
     onToggleFavorite: (Int) -> Unit
 ) {
-    // Build full image list from imageUrl + media
     val allImages = remember(product.id, product.imageUrl, product.media) {
-        val list = mutableListOf<String>()
-        product.imageUrl?.takeIf { it.isNotBlank() }?.let { list.add(it) }
-        product.media.map { it.mediaUrl }.forEach { url ->
-            if (url.isNotBlank() && !list.contains(url)) list.add(url)
-        }
-        if (list.isEmpty()) list.add("")
-        list.take(4)
+        product.orderedImageUrls().ifEmpty { listOf("") }.take(4)
     }
     val context = LocalContext.current
     val pagerState = rememberPagerState(pageCount = { allImages.size })
@@ -1035,7 +1025,7 @@ private fun ProductCard(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 8.dp, end = 8.dp)
-                        .size(36.dp)
+                        .size(48.dp)
                 ) {
                     AnimatedContent(
                         targetState = isFavorite,
@@ -1195,7 +1185,7 @@ private fun ProductCard(
                                     )
                                 }
                             },
-                            modifier = Modifier.size(34.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             AnimatedContent(
                                 targetState = showCheck,

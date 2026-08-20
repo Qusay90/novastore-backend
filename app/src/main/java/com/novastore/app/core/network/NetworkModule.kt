@@ -15,14 +15,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-
-    private val baseUrl: String
-        get() = if (BuildConfig.DEBUG) {
-            "http://10.0.2.2:5000/"
-        } else {
-            "https://novastore.tr/"
-        }
-
     @Provides
     @Singleton
     fun provideLoggingInterceptor(): HttpLoggingInterceptor {
@@ -54,7 +46,7 @@ object NetworkModule {
     @Singleton
     fun provideNovaStoreApi(okHttpClient: OkHttpClient): NovaStoreApi {
         return Retrofit.Builder()
-            .baseUrl(baseUrl)
+            .baseUrl(BuildConfig.API_BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()

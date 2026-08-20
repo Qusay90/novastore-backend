@@ -45,8 +45,10 @@ class ProductRepository @Inject constructor(
         }
     }
 
-    suspend fun getProduct(id: Int): Result<Product> = runCatching {
-        cachedProducts?.firstOrNull { it.id == id }?.let { return@runCatching it }
+    suspend fun getProduct(id: Int, forceRefresh: Boolean = false): Result<Product> = runCatching {
+        if (!forceRefresh) {
+            cachedProducts?.firstOrNull { it.id == id }?.let { return@runCatching it }
+        }
         api.getProduct(id)
     }
 
@@ -60,8 +62,11 @@ class ProductRepository @Inject constructor(
         }
     }
 
-    suspend fun askProductQuestion(productId: Int, question: String) = runCatching {
-        api.askProductQuestion(AskQuestionRequest(productId = productId, question = question))
+    suspend fun askProductQuestion(productId: Int, question: String, sessionGeneration: Long) = runCatching {
+        api.askProductQuestion(
+            sessionGeneration = sessionGeneration,
+            body = AskQuestionRequest(productId = productId, question = question)
+        )
     }
 
     suspend fun getProductQuestions(productId: Int) = runCatching {

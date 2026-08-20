@@ -1,3 +1,4 @@
+import com.android.build.api.variant.HasUnitTestBuilder
 import org.gradle.api.GradleException
 import java.util.Properties
 
@@ -30,6 +31,18 @@ val missingReleaseSigningKeys = listOfNotNull(
     "NOVASTORE_RELEASE_KEY_ALIAS or keystore.properties keyAlias".takeIf { releaseKeyAlias == null },
     "NOVASTORE_RELEASE_KEY_PASSWORD or keystore.properties keyPassword".takeIf { releaseKeyPassword == null },
 )
+
+fun buildConfigString(value: String): String =
+    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val qaBuildLabel = providers.gradleProperty("novastoreQaBuildLabel")
+    .orElse("unrecorded-source")
+    .map { raw ->
+        raw.trim()
+            .take(160)
+            .replace(Regex("[^A-Za-z0-9._/@:+-]"), "_")
+            .ifBlank { "unrecorded-source" }
+    }
 
 gradle.taskGraph.whenReady {
     val releaseSigningRequired = allTasks.any { task ->
@@ -76,9 +89,26 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            buildConfigField(
+                "String",
+                "API_BASE_URL",
+                buildConfigString("http://10.0.2.2:5000/")
+            )
+            buildConfigField(
+                "String",
+                "QA_BUILD_LABEL",
+                buildConfigString(qaBuildLabel.get())
+            )
+        }
         release {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
+            buildConfigField(
+                "String",
+                "API_BASE_URL",
+                buildConfigString("https://novastore.tr/")
+            )
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -89,6 +119,16 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    testOptions {
+        animationsDisabled = true
+    }
+}
+
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) { variantBuilder ->
+        (variantBuilder as HasUnitTestBuilder).enableUnitTest = true
     }
 }
 
@@ -105,7 +145,10 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.extended)
+    implementation(libs.haze)
+    implementation(libs.haze.blur)
     debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
 
     // Activity
     implementation(libs.activity.compose)
@@ -154,4 +197,8 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit)
+    androidTestImplementation(composeBom)
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.espresso.core)
 }

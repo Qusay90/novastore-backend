@@ -8,6 +8,7 @@ import com.novastore.app.data.model.Product
 import com.novastore.app.data.model.ProductQuestion
 import com.novastore.app.data.model.AccountCoupon
 import com.novastore.app.data.repository.AccountRepository
+import com.novastore.app.data.repository.AuthRepository
 import com.novastore.app.data.repository.CartRepository
 import com.novastore.app.data.repository.CustomerLocalRepository
 import com.novastore.app.data.repository.ProductRepository
@@ -48,6 +49,7 @@ data class ProductDetailUiState(
 class ProductDetailViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val accountRepository: AccountRepository,
+    private val authRepository: AuthRepository,
     private val cartRepository: CartRepository,
     private val customerLocalRepository: CustomerLocalRepository
 ) : ViewModel() {
@@ -234,6 +236,11 @@ class ProductDetailViewModel @Inject constructor(
 
     fun submitQuestion(question: String, onResult: (Boolean, String) -> Unit) {
         val product = _uiState.value.product ?: return
+        val owner = authRepository.captureSession()
+        if (owner == null) {
+            onResult(false, "Soru sormak için giriş yapmalısın.")
+            return
+        }
         val trimmedQuestion = question.trim()
         if (trimmedQuestion.isBlank()) {
             onResult(false, "Lütfen sorunuzu yazın.")
@@ -243,7 +250,15 @@ class ProductDetailViewModel @Inject constructor(
 
         _uiState.update { it.copy(questionSending = true) }
         viewModelScope.launch {
-            val result = productRepository.askProductQuestion(product.id, trimmedQuestion)
+            if (!authRepository.isSessionCurrent(owner)) {
+                _uiState.update { it.copy(questionSending = false) }
+                return@launch
+            }
+            val result = productRepository.askProductQuestion(product.id, trimmedQuestion, owner.generation)
+            if (!authRepository.isSessionCurrent(owner)) {
+                _uiState.update { it.copy(questionSending = false) }
+                return@launch
+            }
             if (result.isSuccess) {
                 val message = result.getOrNull()?.message ?: result.getOrNull()?.mesaj
                     ?: "Sorunuz satıcıya iletildi."

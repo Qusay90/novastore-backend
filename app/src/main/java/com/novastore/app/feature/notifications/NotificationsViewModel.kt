@@ -6,20 +6,27 @@ import com.novastore.app.data.model.AccountCoupon
 import com.novastore.app.data.model.AccountMessage
 import com.novastore.app.data.model.AccountOrder
 import com.novastore.app.data.model.CartItem
+import com.novastore.app.data.model.CustomerNotificationTarget
 import com.novastore.app.data.model.CustomerAddress
 import com.novastore.app.data.model.Notification
 import com.novastore.app.data.model.ProductQuestion
+import com.novastore.app.data.model.ReviewPermission
 import com.novastore.app.data.model.SecurityStatus
+import com.novastore.app.data.model.UserReview
+import com.novastore.app.data.model.customerTargetOrNull
+import com.novastore.app.data.model.resolvedProductId
 import com.novastore.app.data.repository.AccountRepository
 import com.novastore.app.data.repository.AuthRepository
 import com.novastore.app.data.repository.CartRepository
 import com.novastore.app.data.repository.CustomerLocalRepository
 import com.novastore.app.data.repository.NotificationRepository
+import com.novastore.app.data.repository.ProductRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import retrofit2.HttpException
@@ -44,8 +51,14 @@ data class NotificationsUiState(
     val productQuestions: List<ProductQuestion> = emptyList(),
     val productQuestionsError: String? = null,
     val reviewsLoading: Boolean = false,
-    val reviews: List<com.novastore.app.data.model.UserReview> = emptyList(),
+    val reviews: List<UserReview> = emptyList(),
     val reviewsError: String? = null,
+    val reviewPermissionLoading: Boolean = false,
+    val reviewPermission: ReviewPermission? = null,
+    val reviewSubmissionLoading: Boolean = false,
+    val reviewSubmissionMessage: String? = null,
+    val notificationDestination: CustomerNotificationDestination? = null,
+    val notificationTargetLoading: Boolean = false,
     val actionMessage: String? = null,
     val profileVersion: Int = 0,
     val securityLoading: Boolean = false,
@@ -61,17 +74,26 @@ data class NotificationsUiState(
     val addressError: String? = null
 )
 
+internal fun isLatestNotificationTargetRequest(
+    requestId: Long,
+    latestRequestId: Long,
+    sessionCurrent: Boolean
+): Boolean = requestId == latestRequestId && sessionCurrent
+
 @HiltViewModel
 class NotificationsViewModel @Inject constructor(
     private val notificationRepository: NotificationRepository,
     private val accountRepository: AccountRepository,
     private val authRepository: AuthRepository,
     private val cartRepository: CartRepository,
-    private val customerLocalRepository: CustomerLocalRepository
+    private val customerLocalRepository: CustomerLocalRepository,
+    private val productRepository: ProductRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NotificationsUiState())
     val uiState: StateFlow<NotificationsUiState> = _uiState.asStateFlow()
+    private var notificationTargetJob: Job? = null
+    private var notificationTargetRequestId = 0L
     val favoriteIds = customerLocalRepository.favoriteIds
     val addresses = customerLocalRepository.addresses
 
@@ -88,6 +110,10 @@ class NotificationsViewModel @Inject constructor(
         get() = authRepository.currentUserId
 
     fun loadAccount() {
+        notificationTargetJob?.cancel()
+        notificationTargetRequestId += 1
+        customerLocalRepository.refreshSessionScopedState()
+        _uiState.value = NotificationsUiState()
         refreshUserProfile()
         loadAddresses()
         loadNotifications()
@@ -96,9 +122,11 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun loadAddresses() {
+        val owner = authRepository.captureSession() ?: return
         _uiState.update { it.copy(addressLoading = true, addressError = null) }
         viewModelScope.launch {
             val result = customerLocalRepository.refreshAddresses()
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 it.copy(
                     addressLoading = false,
@@ -109,16 +137,18 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun refreshUserProfile() {
-        if (authRepository.currentUserId == -1) return
+        val owner = authRepository.captureSession() ?: return
         viewModelScope.launch {
             authRepository.refreshUserProfile()
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update { it.copy(profileVersion = it.profileVersion + 1) }
         }
     }
 
     fun loadNotifications() {
+        val owner = authRepository.captureSession()
         val userId = authRepository.currentUserId
-        if (userId == -1) {
+        if (owner == null || userId == -1) {
             _uiState.update { it.copy(isLoading = false, notifications = emptyList()) }
             return
         }
@@ -126,6 +156,7 @@ class NotificationsViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             val result = notificationRepository.getNotifications(userId)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             if (result.isSuccess) {
                 val list = result.getOrDefault(emptyList())
                 Timber.d("Notifications loaded successfully: size=${list.size}")
@@ -139,8 +170,10 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun markAsRead(id: Int) {
+        val owner = authRepository.captureSession() ?: return
         viewModelScope.launch {
-            val result = notificationRepository.markAsRead(id)
+            val result = notificationRepository.markAsRead(id, owner.generation)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             if (result.isSuccess) {
                 Timber.d("Notification marked as read: id=$id")
                 // Refresh list locally
@@ -155,10 +188,12 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun markAllAsRead() {
+        val owner = authRepository.captureSession()
         val userId = authRepository.currentUserId
-        if (userId == -1) return
+        if (owner == null || userId == -1) return
         viewModelScope.launch {
-            val result = notificationRepository.markAllAsRead(userId)
+            val result = notificationRepository.markAllAsRead(userId, owner.generation)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             if (result.isSuccess) {
                 _uiState.update { state ->
                     state.copy(
@@ -173,8 +208,9 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun loadOrders() {
+        val owner = authRepository.captureSession()
         val userId = authRepository.currentUserId
-        if (userId == -1) {
+        if (owner == null || userId == -1) {
             _uiState.update { it.copy(ordersLoading = false, orders = emptyList()) }
             return
         }
@@ -182,6 +218,7 @@ class NotificationsViewModel @Inject constructor(
         _uiState.update { it.copy(ordersLoading = true, ordersError = null) }
         viewModelScope.launch {
             val result = accountRepository.getOrders(userId)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 if (result.isSuccess) {
                     it.copy(ordersLoading = false, orders = result.getOrDefault(emptyList()))
@@ -193,9 +230,11 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun loadCoupons() {
+        val owner = authRepository.captureSession() ?: return
         _uiState.update { it.copy(couponsLoading = true, couponsError = null) }
         viewModelScope.launch {
             val result = accountRepository.getCoupons()
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 if (result.isSuccess) {
                     it.copy(couponsLoading = false, coupons = result.getOrDefault(emptyList()))
@@ -207,6 +246,7 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun loadSecurityStatus(preserveActionState: Boolean = false) {
+        val owner = authRepository.captureSession() ?: return
         _uiState.update {
             if (preserveActionState) {
                 it.copy(securityLoading = true, securityError = null)
@@ -216,6 +256,7 @@ class NotificationsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             val result = accountRepository.getSecurityStatus()
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 if (result.isSuccess) {
                     it.copy(securityLoading = false, securityStatus = result.getOrNull(), securityError = null)
@@ -232,9 +273,11 @@ class NotificationsViewModel @Inject constructor(
             _uiState.update { it.copy(securityActionMessage = validation, passwordChanged = false) }
             return
         }
+        val owner = authRepository.captureSession() ?: return
         _uiState.update { it.copy(securityActionLoading = true, securityActionMessage = null, passwordChanged = false) }
         viewModelScope.launch {
-            val result = accountRepository.changePassword(currentPassword, newPassword)
+            val result = accountRepository.changePassword(currentPassword, newPassword, owner.generation)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 if (result.isSuccess) {
                     it.copy(
@@ -278,9 +321,11 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun sendPhoneVerification(phone: String?) {
+        val owner = authRepository.captureSession() ?: return
         _uiState.update { it.copy(securityActionLoading = true, securityActionMessage = null, passwordChanged = false) }
         viewModelScope.launch {
-            val result = accountRepository.sendPhoneCode(phone)
+            val result = accountRepository.sendPhoneCode(phone, owner.generation)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 it.copy(
                     securityActionLoading = false,
@@ -296,9 +341,11 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun sendEmailVerification() {
+        val owner = authRepository.captureSession() ?: return
         _uiState.update { it.copy(securityActionLoading = true, securityActionMessage = null, passwordChanged = false) }
         viewModelScope.launch {
-            val result = accountRepository.sendEmailVerification()
+            val result = accountRepository.sendEmailVerification(owner.generation)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 it.copy(
                     securityActionLoading = false,
@@ -314,29 +361,23 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun setupTwoFactor() {
-        _uiState.update { it.copy(securityActionLoading = true, securityActionMessage = null, passwordChanged = false) }
-        viewModelScope.launch {
-            val result = accountRepository.setupTwoFactor()
-            _uiState.update {
-                it.copy(
-                    securityActionLoading = false,
-                    securityActionMessage = if (result.isSuccess) {
-                        result.getOrNull()?.message ?: "İki adımlı doğrulama kurulumu başlatıldı."
-                    } else {
-                        "İki adımlı doğrulama altyapısı henüz yapılandırılmadı."
-                    },
-                    passwordChanged = false
-                )
-            }
+        _uiState.update {
+            it.copy(
+                securityActionLoading = false,
+                securityActionMessage = "İki adımlı doğrulama müşteriler için henüz kullanılamıyor.",
+                passwordChanged = false
+            )
         }
     }
 
     fun loadMessages() {
+        val owner = authRepository.captureSession()
         val userId = authRepository.currentUserId
-        if (userId == -1) return
+        if (owner == null || userId == -1) return
         _uiState.update { it.copy(messagesLoading = true, messagesError = null) }
         viewModelScope.launch {
             val result = accountRepository.getMessages(userId)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 if (result.isSuccess) {
                     it.copy(messagesLoading = false, messages = result.getOrDefault(emptyList()))
@@ -348,10 +389,11 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun loadProductQuestions() {
-        if (authRepository.currentUserId == -1) return
+        val owner = authRepository.captureSession() ?: return
         _uiState.update { it.copy(productQuestionsLoading = true, productQuestionsError = null) }
         viewModelScope.launch {
             val result = accountRepository.getProductQuestions()
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 if (result.isSuccess) {
                     it.copy(productQuestionsLoading = false, productQuestions = result.getOrDefault(emptyList()))
@@ -365,8 +407,11 @@ class NotificationsViewModel @Inject constructor(
     fun sendSupportMessage(message: String) {
         val trimmed = message.trim()
         if (trimmed.isEmpty()) return
+        val owner = authRepository.captureSession() ?: return
         viewModelScope.launch {
-            val result = accountRepository.sendMessage(trimmed)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
+            val result = accountRepository.sendMessage(trimmed, owner.generation)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             if (result.isSuccess) {
                 val sent = result.getOrThrow()
                 _uiState.update { it.copy(messages = it.messages + sent, actionMessage = "Mesaj gönderildi.") }
@@ -378,11 +423,13 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun loadReviews() {
+        val owner = authRepository.captureSession()
         val userId = authRepository.currentUserId
-        if (userId == -1) return
+        if (owner == null || userId == -1) return
         _uiState.update { it.copy(reviewsLoading = true, reviewsError = null) }
         viewModelScope.launch {
             val result = accountRepository.getReviews(userId)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 if (result.isSuccess) {
                     it.copy(reviewsLoading = false, reviews = result.getOrDefault(emptyList()))
@@ -393,11 +440,148 @@ class NotificationsViewModel @Inject constructor(
         }
     }
 
+    fun prepareReview(productId: Int) {
+        val owner = authRepository.captureSession() ?: return
+        if (productId <= 0) return
+        _uiState.update {
+            it.copy(
+                reviewPermissionLoading = true,
+                reviewPermission = null,
+                reviewSubmissionMessage = null
+            )
+        }
+        viewModelScope.launch {
+            val result = accountRepository.getReviewPermission(productId)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
+            _uiState.update {
+                it.copy(
+                    reviewPermissionLoading = false,
+                    reviewPermission = result.getOrNull(),
+                    reviewSubmissionMessage = result.exceptionOrNull()?.toReviewMessage()
+                )
+            }
+        }
+    }
+
+    fun submitReview(productId: Int, rating: Int, comment: String) {
+        val owner = authRepository.captureSession() ?: return
+        val normalizedComment = comment.trim()
+        if (rating !in 1..5 || normalizedComment.length > 2000) {
+            _uiState.update { it.copy(reviewSubmissionMessage = "Puan 1–5 arasında, yorum en fazla 2000 karakter olmalıdır.") }
+            return
+        }
+        _uiState.update { it.copy(reviewSubmissionLoading = true, reviewSubmissionMessage = null) }
+        viewModelScope.launch {
+            val result = accountRepository.submitReview(productId, rating, normalizedComment, owner.generation)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
+            _uiState.update {
+                it.copy(
+                    reviewSubmissionLoading = false,
+                    reviewPermission = if (result.isSuccess) {
+                        ReviewPermission(false, false, "ALREADY_REVIEWED", "Değerlendirmen yayın incelemesine gönderildi.")
+                    } else {
+                        it.reviewPermission
+                    },
+                    reviewSubmissionMessage = result.getOrNull()?.mesaj ?: result.exceptionOrNull().toReviewMessage()
+                )
+            }
+            if (result.isSuccess) loadReviews()
+        }
+    }
+
+    fun clearReviewComposer() {
+        _uiState.update {
+            it.copy(
+                reviewPermissionLoading = false,
+                reviewPermission = null,
+                reviewSubmissionLoading = false,
+                reviewSubmissionMessage = null
+            )
+        }
+    }
+
+    fun openNotification(notification: Notification) {
+        markAsRead(notification.id)
+        val owner = authRepository.captureSession()
+        val target = notification.customerTargetOrNull()
+        if (owner == null || target == null) {
+            notificationTargetJob?.cancel()
+            notificationTargetRequestId += 1
+            _uiState.update { it.copy(actionMessage = "Bu bildirim için güvenli bir hedef bulunamadı.") }
+            return
+        }
+
+        val userId = authRepository.currentUserId
+        notificationTargetJob?.cancel()
+        val requestId = ++notificationTargetRequestId
+        _uiState.update {
+            it.copy(
+                notificationTargetLoading = true,
+                notificationDestination = null,
+                actionMessage = null
+            )
+        }
+        notificationTargetJob = viewModelScope.launch {
+            val destination = when (target) {
+                is CustomerNotificationTarget.Product -> productRepository
+                    .getProduct(target.entityId.toInt(), forceRefresh = true)
+                    .getOrNull()
+                    ?.let { CustomerNotificationDestination.Product(it.id) }
+
+                is CustomerNotificationTarget.Order -> accountRepository.getOrders(userId)
+                    .getOrNull()
+                    ?.firstOrNull { it.id.toLong() == target.entityId }
+                    ?.let(CustomerNotificationDestination::Order)
+
+                is CustomerNotificationTarget.ProductQuestion -> accountRepository.getProductQuestions()
+                    .getOrNull()
+                    ?.firstOrNull { it.id.toLong() == target.entityId }
+                    ?.let { CustomerNotificationDestination.ProductQuestion(target.entityId) }
+
+                is CustomerNotificationTarget.ReturnRequest -> accountRepository.getReturnRequest(target.entityId)
+                    .getOrNull()
+                    ?.let(CustomerNotificationDestination::ReturnRequest)
+
+                is CustomerNotificationTarget.Review -> accountRepository.getReviews(userId)
+                    .getOrNull()
+                    ?.firstOrNull { it.id.toLong() == target.entityId }
+                    ?.let { CustomerNotificationDestination.Review(target.entityId) }
+
+                is CustomerNotificationTarget.SupportThread -> accountRepository.getMessages(userId)
+                    .getOrNull()
+                    ?.firstOrNull { it.supportThreadId == target.entityId }
+                    ?.let { CustomerNotificationDestination.SupportThread(target.entityId) }
+            }
+            if (!isLatestNotificationTargetRequest(
+                    requestId = requestId,
+                    latestRequestId = notificationTargetRequestId,
+                    sessionCurrent = authRepository.isSessionCurrent(owner)
+                )
+            ) return@launch
+            _uiState.update {
+                it.copy(
+                    notificationTargetLoading = false,
+                    notificationDestination = destination,
+                    actionMessage = if (destination == null) {
+                        "İlgili kayıt bulunamadı veya artık erişilebilir değil."
+                    } else {
+                        null
+                    }
+                )
+            }
+        }
+    }
+
+    fun consumeNotificationDestination() {
+        _uiState.update { it.copy(notificationDestination = null) }
+    }
+
     fun repeatOrder(order: AccountOrder) {
+        val owner = authRepository.captureSession() ?: return
         viewModelScope.launch {
             var added = 0
             order.items.orEmpty().forEach { item ->
-                val productId = item.id ?: return@forEach
+                val productId = item.resolvedProductId() ?: return@forEach
                 val result = cartRepository.addToCart(
                     CartItem(
                         productId = productId,
@@ -405,49 +589,69 @@ class NotificationsViewModel @Inject constructor(
                         price = item.price ?: item.lineTotal ?: 0.0,
                         imageUrl = item.image,
                         quantity = item.quantity?.coerceAtLeast(1) ?: 1
-                    )
+                    ),
+                    owner
                 )
                 if (result.isSuccess) added += 1
             }
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update { it.copy(actionMessage = if (added > 0) "Ürünler sepete eklendi." else "Sepete eklenecek ürün bulunamadı.") }
         }
     }
 
     fun cancelOrder(orderId: Int) {
+        val owner = authRepository.captureSession() ?: return
         viewModelScope.launch {
-            val result = accountRepository.cancelOrder(orderId)
+            val result = accountRepository.cancelOrder(orderId, sessionGeneration = owner.generation)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update { it.copy(actionMessage = if (result.isSuccess) "Sipariş iptal edildi." else "Sipariş iptal edilemedi.") }
             if (result.isSuccess) loadOrders()
         }
     }
 
     fun updateProfile(fullName: String, phone: String?) {
+        val owner = authRepository.captureSession() ?: return
+        val normalizedName = fullName.trim().ifBlank { authRepository.currentUserName.orEmpty() }
+        val normalizedPhone = phone?.filter { it.isDigit() || it == '+' }?.take(16)
         viewModelScope.launch {
-            val normalizedName = fullName.trim().ifBlank { authRepository.currentUserName.orEmpty() }
-            val normalizedPhone = phone?.filter { it.isDigit() || it == '+' }?.take(16)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update { it.copy(profileSaving = true, profileSaved = false, profileError = null) }
 
-            val result = accountRepository.updateProfile(normalizedName, normalizedPhone)
+            val result = accountRepository.updateProfile(normalizedName, normalizedPhone, owner.generation)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             if (result.isSuccess) {
                 val user = result.getOrThrow().user
-                authRepository.updateCachedProfile(user.fullName, user.phone)
-                _uiState.update {
-                    it.copy(
-                        actionMessage = null,
-                        profileVersion = it.profileVersion + 1,
-                        profileSaving = false,
-                        profileSaved = true,
-                        profileError = null
+                if (!authRepository.updateCachedProfileIfCurrent(
+                        owner,
+                        user.fullName,
+                        user.phone
                     )
+                ) return@launch
+                _uiState.update {
+                    if (!authRepository.isSessionCurrent(owner)) {
+                        it
+                    } else {
+                        it.copy(
+                            actionMessage = null,
+                            profileVersion = it.profileVersion + 1,
+                            profileSaving = false,
+                            profileSaved = true,
+                            profileError = null
+                        )
+                    }
                 }
             } else {
                 Timber.w(result.exceptionOrNull(), "Profile update endpoint failed.")
                 _uiState.update {
-                    it.copy(
-                        profileSaving = false,
-                        profileSaved = false,
-                        profileError = result.exceptionOrNull().toSecurityMessage("Profil kaydedilemedi. Lütfen tekrar dene.")
-                    )
+                    if (!authRepository.isSessionCurrent(owner)) {
+                        it
+                    } else {
+                        it.copy(
+                            profileSaving = false,
+                            profileSaved = false,
+                            profileError = result.exceptionOrNull().toSecurityMessage("Profil kaydedilemedi. Lütfen tekrar dene.")
+                        )
+                    }
                 }
             }
         }
@@ -458,9 +662,11 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun saveAddress(address: CustomerAddress) {
+        val owner = authRepository.captureSession() ?: return
         _uiState.update { it.copy(addressLoading = true, addressError = null) }
         viewModelScope.launch {
             val result = customerLocalRepository.saveAddressSynced(address)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 it.copy(
                     addressLoading = false,
@@ -472,9 +678,11 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun deleteAddress(id: Long) {
+        val owner = authRepository.captureSession() ?: return
         _uiState.update { it.copy(addressLoading = true, addressError = null) }
         viewModelScope.launch {
             val result = customerLocalRepository.deleteAddressSynced(id)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 it.copy(
                     addressLoading = false,
@@ -486,9 +694,11 @@ class NotificationsViewModel @Inject constructor(
     }
 
     fun selectAddress(id: Long) {
+        val owner = authRepository.captureSession() ?: return
         _uiState.update { it.copy(addressLoading = true, addressError = null) }
         viewModelScope.launch {
             val result = customerLocalRepository.selectAddressSynced(id)
+            if (!authRepository.isSessionCurrent(owner)) return@launch
             _uiState.update {
                 it.copy(
                     addressLoading = false,
@@ -505,13 +715,6 @@ class NotificationsViewModel @Inject constructor(
 
     fun clearSecurityActionMessage() {
         _uiState.update { it.copy(securityActionMessage = null, passwordChanged = false) }
-    }
-
-    fun logout() {
-        viewModelScope.launch {
-            val result = authRepository.logout()
-            _uiState.update { it.copy(securityActionMessage = result.warning) }
-        }
     }
 
     private fun validatePasswordChange(currentPassword: String, newPassword: String, repeatPassword: String): String? {
@@ -537,6 +740,28 @@ class NotificationsViewModel @Inject constructor(
                 parsed?.takeIf { it.isNotBlank() } ?: fallback
             }
             else -> fallback
+        }
+    }
+
+    private fun Throwable?.toReviewMessage(): String {
+        return when (this) {
+            null -> "Değerlendirme durumu alınamadı."
+            is IOException -> "İnternet bağlantını kontrol edip tekrar dene."
+            is HttpException -> {
+                val body = response()?.errorBody()?.string()
+                val parsed = runCatching {
+                    val json = JSONObject(body.orEmpty())
+                    json.optString("error").ifBlank { json.optString("message") }
+                }.getOrNull()
+                parsed?.takeIf { it.isNotBlank() } ?: when (code()) {
+                    401 -> "Değerlendirme yapmak için giriş yapmalısın."
+                    403 -> "Bu ürün için değerlendirme yetkin bulunmuyor."
+                    404 -> "Ürün artık erişilebilir değil."
+                    409 -> "Bu ürünü zaten değerlendirdin."
+                    else -> "Değerlendirme işlemi tamamlanamadı."
+                }
+            }
+            else -> "Değerlendirme işlemi tamamlanamadı."
         }
     }
 }

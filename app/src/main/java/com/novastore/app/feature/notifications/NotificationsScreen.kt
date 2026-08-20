@@ -1,5 +1,8 @@
 package com.novastore.app.feature.notifications
 
+import android.content.Intent
+import android.net.Uri
+
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
@@ -26,9 +29,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -48,7 +51,6 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.LocalShipping
@@ -56,7 +58,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.ReceiptLong
@@ -100,6 +101,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -108,34 +110,47 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.novastore.app.R
+import com.novastore.app.core.design.CustomerColors
+import com.novastore.app.core.design.CustomerGlassState
+import com.novastore.app.core.design.CustomerSpacing
+import com.novastore.app.core.navigation.safeHttpsTrackingUrl
+import com.novastore.app.core.ui.components.CustomerTopBar
 import com.novastore.app.data.model.AccountCoupon
 import com.novastore.app.data.model.AccountMessage
 import com.novastore.app.data.model.AccountOrder
+import com.novastore.app.data.model.AccountOrderItem
+import com.novastore.app.data.model.CustomerQuestionState
 import com.novastore.app.data.model.CustomerAddress
 import com.novastore.app.data.model.Notification
 import com.novastore.app.data.model.ProductQuestion
+import com.novastore.app.data.model.ReturnRequestDetails
+import com.novastore.app.data.model.customerState
+import com.novastore.app.data.model.customerTargetOrNull
+import com.novastore.app.data.model.resolvedProductId
 import coil3.compose.AsyncImage
 import java.text.NumberFormat
-import java.time.OffsetDateTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.delay
 
-private val PrimaryBlue = Color(0xFF0D4B7A)
-private val DarkBlue = Color(0xFF08365C)
-private val OrangeAccent = Color(0xFFF28C18)
-private val LightBackground = Color(0xFFF7F8FA)
-private val BorderColor = Color(0xFFEEF0F3)
-private val SuccessGreen = Color(0xFF28C76F)
-private val ErrorRed = Color(0xFFEA5455)
-private val MutedText = Color(0xFF6B7280)
+private val PrimaryBlue = CustomerColors.Navy
+private val DarkBlue = CustomerColors.NavyDeep
+private val OrangeAccent = CustomerColors.Orange
+private val LightBackground = CustomerColors.Page
+private val BorderColor = CustomerColors.Divider
+private val SuccessGreen = CustomerColors.Success
+private val ErrorRed = CustomerColors.Error
+private val MutedText = CustomerColors.TextSecondary
 
-private enum class AccountPage(@StringRes val titleRes: Int) {
+internal enum class AccountPage(@StringRes val titleRes: Int) {
     Center(R.string.account_center),
     Orders(R.string.account_orders),
     OrderDetail(R.string.account_order_detail),
@@ -158,6 +173,16 @@ private enum class AccountPage(@StringRes val titleRes: Int) {
     Privacy(R.string.account_privacy),
     Terms(R.string.account_terms)
 }
+
+internal fun accountBackDestination(
+    currentPage: AccountPage,
+    notificationReturnPage: AccountPage?
+): AccountPage = notificationReturnPage
+    ?.takeIf { currentPage != it }
+    ?: AccountPage.Center
+
+internal fun AccountOrderItem.canOpenReviewFor(order: AccountOrder): Boolean =
+    order.isDelivered() && resolvedProductId() != null
 
 private enum class HelpArticle(
     val title: String,
@@ -187,7 +212,7 @@ private enum class HelpArticle(
     PaymentShipping(
         title = "Ödeme ve teslimat",
         summary = "Ödeme, fatura, kargo ve takip numarası konularında doğru ekrana ilerle.",
-        icon = Icons.Default.Payment
+        icon = Icons.Default.CreditCard
     ),
     Account(
         title = "Hesap ve güvenlik",
@@ -206,16 +231,25 @@ fun NotificationsScreen(
     onNavigateFavorites: () -> Unit = {},
     onNavigateCart: () -> Unit = {},
     onNavigateSupport: () -> Unit = {},
+    onNavigateProduct: (Int) -> Unit = {},
+    onNavigateNotificationProduct: (Int) -> Unit = onNavigateProduct,
+    systemBackEnabled: Boolean = true,
+    glassState: CustomerGlassState? = null,
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val favoriteIds by viewModel.favoriteIds.collectAsState()
     val addresses by viewModel.addresses.collectAsState()
+    val accountListState = rememberLazyListState()
     var page by rememberSaveable {
         mutableStateOf(if (initialSection == AccountPage.Notifications.name) AccountPage.Notifications else AccountPage.Center)
     }
     var selectedOrder by remember { mutableStateOf<AccountOrder?>(null) }
     var selectedMessage by remember { mutableStateOf<AccountMessage?>(null) }
+    var selectedReviewItem by remember { mutableStateOf<AccountOrderItem?>(null) }
+    var selectedReturn by remember { mutableStateOf<ReturnRequestDetails?>(null) }
+    var highlightedEntityId by remember { mutableStateOf<Long?>(null) }
+    var notificationReturnPage by remember { mutableStateOf<AccountPage?>(null) }
     var selectedArticle by rememberSaveable { mutableStateOf(HelpArticle.Orders) }
     var selectedCoupon by remember { mutableStateOf<AccountCoupon?>(null) }
 
@@ -227,6 +261,10 @@ fun NotificationsScreen(
             page = AccountPage.Center
             selectedOrder = null
             selectedMessage = null
+            selectedReviewItem = null
+            selectedReturn = null
+            highlightedEntityId = null
+            notificationReturnPage = null
             selectedCoupon = null
             viewModel.clearProfileSaveState()
             viewModel.clearSecurityActionMessage()
@@ -243,6 +281,7 @@ fun NotificationsScreen(
     }
     LaunchedEffect(uiState.actionMessage) {
         if (uiState.actionMessage != null) {
+            accountListState.scrollToItem(0)
             delay(1800)
             viewModel.clearActionMessage()
         }
@@ -253,6 +292,40 @@ fun NotificationsScreen(
             viewModel.clearSecurityActionMessage()
         }
     }
+    LaunchedEffect(uiState.notificationDestination) {
+        when (val destination = uiState.notificationDestination) {
+            is CustomerNotificationDestination.Product -> onNavigateNotificationProduct(destination.productId)
+            is CustomerNotificationDestination.Order -> {
+                notificationReturnPage = page.takeIf { it == AccountPage.Notifications }
+                selectedOrder = destination.order
+                highlightedEntityId = destination.order.id.toLong()
+                page = AccountPage.OrderDetail
+            }
+            is CustomerNotificationDestination.ProductQuestion -> {
+                notificationReturnPage = page.takeIf { it == AccountPage.Notifications }
+                highlightedEntityId = destination.questionId
+                page = AccountPage.Questions
+            }
+            is CustomerNotificationDestination.ReturnRequest -> {
+                notificationReturnPage = page.takeIf { it == AccountPage.Notifications }
+                selectedReturn = destination.details
+                highlightedEntityId = destination.details.id
+                page = AccountPage.Returns
+            }
+            is CustomerNotificationDestination.Review -> {
+                notificationReturnPage = page.takeIf { it == AccountPage.Notifications }
+                highlightedEntityId = destination.reviewId
+                page = AccountPage.Reviews
+            }
+            is CustomerNotificationDestination.SupportThread -> {
+                notificationReturnPage = page.takeIf { it == AccountPage.Notifications }
+                highlightedEntityId = destination.threadId
+                page = AccountPage.Tickets
+            }
+            null -> Unit
+        }
+        if (uiState.notificationDestination != null) viewModel.consumeNotificationDestination()
+    }
 
     val name = viewModel.currentUserName ?: "NovaStore Kullanıcısı"
     val email = viewModel.currentUserEmail ?: "novastore@hesap.com"
@@ -260,8 +333,14 @@ fun NotificationsScreen(
     val activeOrder = uiState.orders.firstOrNull { it.isActiveOrder() } ?: uiState.orders.firstOrNull()
     val canGoBack = page != AccountPage.Center
 
-    BackHandler(enabled = page != AccountPage.Center) {
-        page = AccountPage.Center
+    fun navigateBackWithinAccount() {
+        val destination = accountBackDestination(page, notificationReturnPage)
+        page = destination
+        if (destination == notificationReturnPage) notificationReturnPage = null
+    }
+
+    BackHandler(enabled = systemBackEnabled && page != AccountPage.Center) {
+        navigateBackWithinAccount()
     }
 
     Column(
@@ -272,15 +351,19 @@ fun NotificationsScreen(
         AccountHeader(
             title = stringResource(page.titleRes),
             canGoBack = canGoBack,
-            onBack = { page = AccountPage.Center },
-            onNotificationsClick = { page = AccountPage.Notifications },
+            onBack = ::navigateBackWithinAccount,
+            onNotificationsClick = {
+                notificationReturnPage = null
+                page = AccountPage.Notifications
+            },
             onLogoutClick = {
-                viewModel.logout()
                 onLogoutClick()
-            }
+            },
+            glassState = glassState
         )
         LazyColumn(
             modifier = Modifier.weight(1f),
+            state = accountListState,
             contentPadding = PaddingValues(bottom = 96.dp)
         ) {
         item {
@@ -313,7 +396,12 @@ fun NotificationsScreen(
                     onRepeat = viewModel::repeatOrder,
                     onCancel = { viewModel.cancelOrder(it.id) },
                     onSupport = onNavigateSupport,
-                    onReview = { page = AccountPage.Reviews }
+                    onReview = { item ->
+                        selectedReviewItem = item
+                        item.resolvedProductId()?.let(viewModel::prepareReview)
+                        page = AccountPage.Reviews
+                    },
+                    onProductClick = onNavigateProduct
                 )
                 AccountPage.Addresses -> AddressesPage(
                     addresses = addresses,
@@ -353,21 +441,26 @@ fun NotificationsScreen(
                     currentUserId = viewModel.currentUserId,
                     onTicketClick = { selectedMessage = it; page = AccountPage.TicketDetail },
                     onSend = viewModel::sendSupportMessage,
-                    onSupport = onNavigateSupport
+                    onSupport = onNavigateSupport,
+                    highlightedThreadId = highlightedEntityId
                 )
                 AccountPage.TicketDetail -> TicketDetailPage(
                     message = selectedMessage,
                     currentUserId = viewModel.currentUserId,
                     onSend = viewModel::sendSupportMessage
                 )
-                AccountPage.Questions -> ProductQuestionsPage(state = uiState)
+                AccountPage.Questions -> ProductQuestionsPage(
+                    state = uiState,
+                    highlightedQuestionId = highlightedEntityId
+                )
                 AccountPage.HelpCenter -> HelpCenterPage(
                     state = uiState,
                     onArticle = { selectedArticle = it; page = AccountPage.Article },
                     onOrders = { page = AccountPage.Orders },
                     onReturns = { page = AccountPage.Returns },
                     onTickets = { page = AccountPage.Tickets },
-                    onSupport = onNavigateSupport
+                    onSupport = onNavigateSupport,
+                    onSecurity = { page = AccountPage.Security }
                 )
                 AccountPage.Article -> ArticlePage(
                     article = selectedArticle,
@@ -380,14 +473,18 @@ fun NotificationsScreen(
                 )
                 AccountPage.Notifications -> NotificationsPage(
                     state = uiState,
-                    onMarkRead = viewModel::markAsRead,
+                    onOpen = viewModel::openNotification,
                     onReadAll = viewModel::markAllAsRead
                 )
                 AccountPage.Returns -> ReturnsPage(
                     orders = uiState.orders,
-                    onOrderClick = { selectedOrder = it; page = AccountPage.OrderDetail }
+                    onOrderClick = { selectedOrder = it; page = AccountPage.OrderDetail },
+                    selectedReturn = selectedReturn
                 )
-                AccountPage.Reviews -> ReviewsPage(state = uiState)
+                AccountPage.Reviews -> ReviewsPage(
+                    state = uiState,
+                    highlightedReviewId = highlightedEntityId
+                )
                 AccountPage.Invoices -> InvoicesPage(orders = uiState.orders)
                 AccountPage.NotificationSettings -> NotificationSettingsPage()
                 AccountPage.Language -> LegalPage(
@@ -419,6 +516,20 @@ fun NotificationsScreen(
             }
         )
     }
+
+    selectedReviewItem?.let { item ->
+        ReviewSubmissionDialog(
+            item = item,
+            state = uiState,
+            onSubmit = { rating, comment ->
+                item.resolvedProductId()?.let { viewModel.submitReview(it, rating, comment) }
+            },
+            onDismiss = {
+                selectedReviewItem = null
+                viewModel.clearReviewComposer()
+            }
+        )
+    }
 }
 
 @Composable
@@ -427,40 +538,32 @@ private fun AccountHeader(
     canGoBack: Boolean,
     onBack: () -> Unit,
     onNotificationsClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    glassState: CustomerGlassState?
 ) {
-    Row(
+    CustomerTopBar(
+        title = title,
+        onBack = onBack.takeIf { canGoBack },
+        glassState = glassState,
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
-            .background(PrimaryBlue)
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = CustomerSpacing.ScreenHorizontal, vertical = CustomerSpacing.Xs)
     ) {
-        if (canGoBack) {
-            IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Geri", tint = Color.White, modifier = Modifier.size(30.dp))
-            }
-        } else {
-            Icon(painterResource(id = R.drawable.support_novastore), contentDescription = "NovaStore", tint = Color.Unspecified, modifier = Modifier.size(42.dp))
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            title,
-            modifier = Modifier.weight(1f),
-            color = Color.White,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = if (title.length > 16) 21.sp else 26.sp,
-            lineHeight = 23.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
         IconButton(onClick = onNotificationsClick) {
-            Icon(Icons.Default.Notifications, contentDescription = "Bildirimler", tint = Color.White, modifier = Modifier.size(25.dp))
+            Icon(
+                Icons.Default.Notifications,
+                contentDescription = "Bildirimler",
+                tint = CustomerColors.Navy,
+                modifier = Modifier.size(22.dp)
+            )
         }
         IconButton(onClick = onLogoutClick) {
-            Icon(Icons.Default.ExitToApp, contentDescription = "Çıkış Yap", tint = Color.White, modifier = Modifier.size(25.dp))
+            Icon(
+                Icons.Default.ExitToApp,
+                contentDescription = "Çıkış Yap",
+                tint = CustomerColors.Navy,
+                modifier = Modifier.size(22.dp)
+            )
         }
     }
 }
@@ -542,7 +645,7 @@ private fun AccountCenterContent(
             items = listOf(
                 MenuItemSpec(Icons.Default.Person, stringResource(R.string.account_profile)) { onPage(AccountPage.Profile) },
                 MenuItemSpec(Icons.Default.LocationOn, stringResource(R.string.account_addresses), badge = addressCount.takeIf { it > 0 }) { onPage(AccountPage.Addresses) },
-                MenuItemSpec(Icons.Default.Payment, stringResource(R.string.account_payments)) { onPage(AccountPage.Payments) },
+                MenuItemSpec(Icons.Default.CreditCard, stringResource(R.string.account_payments)) { onPage(AccountPage.Payments) },
                 MenuItemSpec(Icons.Default.ReceiptLong, stringResource(R.string.account_invoices)) { onPage(AccountPage.Invoices) },
                 MenuItemSpec(Icons.Default.Lock, stringResource(R.string.account_security)) { onPage(AccountPage.Security) }
             )
@@ -575,7 +678,12 @@ private fun ProfileCard(name: String, email: String, phone: String, onEdit: () -
     AccountCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(OrangeAccent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                Text(name.firstOrNull()?.uppercaseChar()?.toString() ?: "N", color = OrangeAccent, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp)
+                Icon(
+                    painter = painterResource(R.drawable.ic_customer_user),
+                    contentDescription = null,
+                    tint = OrangeAccent,
+                    modifier = Modifier.size(36.dp)
+                )
             }
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -584,8 +692,8 @@ private fun ProfileCard(name: String, email: String, phone: String, onEdit: () -
                 Text(phone, color = MutedText)
             }
         }
-        Button(onClick = onEdit, colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().height(44.dp).padding(top = 8.dp)) {
-            Text("Profili Düzenle", fontWeight = FontWeight.Bold)
+        Button(onClick = onEdit, colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue, contentColor = Color.White), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(44.dp)) {
+            Text("Profili Düzenle", color = Color.White, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -647,8 +755,8 @@ private fun OrderSummaryCard(order: AccountOrder, onOrders: () -> Unit) {
         } else {
             ProgressTimeline(activeStage = order.stage())
         }
-        Button(onClick = onOrders, colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().height(44.dp).padding(top = 8.dp)) {
-            Text("Siparişlerimi Gör", fontWeight = FontWeight.Bold)
+        Button(onClick = onOrders, colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue, contentColor = Color.White), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(44.dp)) {
+            Text("Siparişlerimi Gör", color = Color.White, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -783,7 +891,8 @@ private fun OrderDetailPage(
     onRepeat: (AccountOrder) -> Unit,
     onCancel: (AccountOrder) -> Unit,
     onSupport: () -> Unit,
-    onReview: () -> Unit
+    onReview: (AccountOrderItem) -> Unit,
+    onProductClick: (Int) -> Unit
 ) {
     if (order == null) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -793,6 +902,8 @@ private fun OrderDetailPage(
     }
 
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        val context = LocalContext.current
+        val safeTrackingUrl = safeHttpsTrackingUrl(order.trackingUrl)
         AccountCard {
             Text(order.displayNo(), color = DarkBlue, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
             Text("${order.formatDate()} • ${order.formatAmount()}", color = MutedText)
@@ -814,19 +925,67 @@ private fun OrderDetailPage(
         AccountCard {
             Text("Ürünler", color = DarkBlue, fontWeight = FontWeight.ExtraBold)
             order.items.orEmpty().forEach { item ->
-                Text("${item.quantity ?: 1} x ${item.name ?: "NovaStore Ürünü"}", color = DarkBlue, modifier = Modifier.padding(top = 8.dp))
-                Text(formatCurrency(item.lineTotal ?: ((item.price ?: 0.0) * (item.quantity ?: 1))), color = MutedText)
+                val productId = item.resolvedProductId()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("${item.quantity ?: 1} x ${item.name ?: "NovaStore Ürünü"}", color = DarkBlue)
+                        Text(formatCurrency(item.lineTotal ?: ((item.price ?: 0.0) * (item.quantity ?: 1))), color = MutedText)
+                    }
+                    if (productId != null) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(
+                                onClick = { onProductClick(productId) },
+                                border = BorderStroke(1.dp, OrangeAccent),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Ürüne Git", color = OrangeAccent, fontWeight = FontWeight.Bold)
+                            }
+                            if (item.canOpenReviewFor(order)) {
+                                Button(
+                                    onClick = { onReview(item) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Değerlendir", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
-        InfoCard("Ödeme", "${order.paymentStatus ?: "Bilinmiyor"} • ${order.paymentMethod ?: "Yöntem yok"}", Icons.Default.Payment, success = order.paymentStatus == "PAID")
+        InfoCard("Ödeme", "${order.paymentStatus ?: "Bilinmiyor"} • ${order.paymentMethod ?: "Yöntem yok"}", Icons.Default.CreditCard, success = order.paymentStatus == "PAID")
         InfoCard("Teslimat", order.shipmentText(), Icons.Default.LocalShipping, warning = order.trackingNo.isNullOrBlank().not())
+        if (safeTrackingUrl != null) {
+            OutlinedButton(
+                onClick = {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(safeTrackingUrl)))
+                },
+                border = BorderStroke(1.dp, PrimaryBlue),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Icon(Icons.Default.LocalShipping, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Kargoyu Güvenle Takip Et", color = PrimaryBlue, fontWeight = FontWeight.Bold)
+            }
+        } else if (!order.trackingUrl.isNullOrBlank()) {
+            Text(
+                "Kargo durumu burada güncellenir. Harici takip bağlantısı doğrulanmış taşıyıcı sözleşmesi tamamlanana kadar kapalıdır.",
+                color = MutedText,
+                fontSize = 12.sp
+            )
+        }
         InfoCard("Fatura", if (order.paymentStatus == "PAID") "Fatura ödeme tamamlandıktan sonra yönetim panelinde oluşturulur." else "Fatura ödeme tamamlanınca hazırlanır.", Icons.Default.ReceiptLong)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = { onRepeat(order) }, colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue), shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).height(44.dp)) {
-                Text("Tekrar Sipariş Ver", fontSize = 12.sp)
-            }
-            Button(onClick = onReview, enabled = order.isDelivered(), colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent), shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).height(44.dp)) {
-                Text("Değerlendir", fontSize = 12.sp)
+            Button(onClick = { onRepeat(order) }, colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue, contentColor = Color.White), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().height(44.dp)) {
+                Text("Tekrar Sipariş Ver", color = Color.White, fontSize = 12.sp)
             }
         }
         if (order.canCancel()) {
@@ -990,7 +1149,12 @@ private fun CouponsComingSoonPage() {
 @Composable
 private fun CouponsPage(state: NotificationsUiState, onCouponClick: (AccountCoupon) -> Unit) {
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SegmentHeader(listOf("Aktif", "Kullanılmış", "Süresi Dolmuş"))
+        SegmentHeader(listOf("Aktif kuponlar"))
+        Text(
+            "Kupon uygunluğu ve indirim tutarı ödeme adımında sunucu tarafından belirlenir.",
+            color = MutedText,
+            fontSize = 12.sp
+        )
         when {
             state.couponsLoading -> LoadingCard("Kuponlar yükleniyor")
             state.couponsError != null -> StateCard(Icons.Default.Warning, "Kuponlar yüklenemedi", state.couponsError, danger = true)
@@ -1088,8 +1252,12 @@ private fun SecurityPage(
         SecurityActionCard(
             icon = Icons.Default.Shield,
             title = "İki Adımlı Doğrulama",
-            description = "Hesabına ekstra güvenlik katmanı ekle.",
-            status = if (status?.twoFactorEnabled == true) "Aktif" else "Pasif",
+            description = if (status?.twoFactorEnabled == true) {
+                "Hesabında ek giriş güvenliği etkin."
+            } else {
+                "Müşteri hesapları için henüz kullanılamıyor."
+            },
+            status = if (status?.twoFactorEnabled == true) "Aktif" else "Henüz kullanılamıyor",
             statusColor = if (status?.twoFactorEnabled == true) SuccessGreen else MutedText,
             onClick = { dialog = SecurityDialog.TwoFactor }
         )
@@ -1128,8 +1296,8 @@ private fun SecurityPage(
         )
         SecurityDialog.TwoFactor -> ServiceActionDialog(
             title = "İki Adımlı Doğrulama",
-            description = "Authenticator uygulamasıyla giriş güvenliğini artırmak için kurulum başlatılacak.",
-            action = "Kurulumu Başlat",
+            description = "Bu özellik müşteri hesapları için henüz kullanılamıyor. Mevcut oturumun açık kalacak.",
+            action = "Anladım",
             loading = state.securityActionLoading,
             onDismiss = { dialog = null },
             onAction = {
@@ -1591,23 +1759,24 @@ private fun ProfileSaveButton(loading: Boolean, saved: Boolean, modifier: Modifi
 }
 
 @Composable
-private fun ProductQuestionsPage(state: NotificationsUiState) {
+private fun ProductQuestionsPage(state: NotificationsUiState, highlightedQuestionId: Long?) {
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         when {
             state.productQuestionsLoading -> LoadingCard("Soruların yükleniyor")
             state.productQuestionsError != null -> StateCard(Icons.Default.Warning, "Sorular yüklenemedi", state.productQuestionsError, danger = true)
             state.productQuestions.isEmpty() -> StateCard(Icons.Default.Help, "Henüz ürün sorusu yok", "Ürün detayından satıcıya soru sorduğunda yanıtları burada takip edebilirsin.")
             else -> state.productQuestions.forEach { question ->
-                AccountProductQuestionCard(question)
+                AccountProductQuestionCard(question, highlighted = question.id.toLong() == highlightedQuestionId)
             }
         }
     }
 }
 
 @Composable
-private fun AccountProductQuestionCard(question: ProductQuestion) {
-    val answered = !question.answer.isNullOrBlank()
-    AccountCard {
+private fun AccountProductQuestionCard(question: ProductQuestion, highlighted: Boolean) {
+    val questionState = question.customerState()
+    val answered = questionState == CustomerQuestionState.Answered
+    AccountCard(modifier = if (highlighted) Modifier.border(2.dp, OrangeAccent, RoundedCornerShape(12.dp)) else Modifier) {
         Row(verticalAlignment = Alignment.Top) {
             AsyncImage(
                 model = question.productImage,
@@ -1625,8 +1794,16 @@ private fun AccountProductQuestionCard(question: ProductQuestion) {
             }
             Surface(color = if (answered) SuccessGreen.copy(alpha = 0.12f) else OrangeAccent.copy(alpha = 0.12f), shape = RoundedCornerShape(999.dp)) {
                 Text(
-                    if (answered) "Yanıtlandı" else "Bekliyor",
-                    color = if (answered) SuccessGreen else OrangeAccent,
+                    when (questionState) {
+                        CustomerQuestionState.Answered -> "Yanıtlandı"
+                        CustomerQuestionState.Pending -> "Bekliyor"
+                        CustomerQuestionState.Invalid -> "Durum alınamadı"
+                    },
+                    color = when (questionState) {
+                        CustomerQuestionState.Answered -> SuccessGreen
+                        CustomerQuestionState.Pending -> OrangeAccent
+                        CustomerQuestionState.Invalid -> ErrorRed
+                    },
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -1640,7 +1817,16 @@ private fun AccountProductQuestionCard(question: ProductQuestion) {
         Surface(color = Color(0xFFF8FAFC), border = BorderStroke(1.dp, BorderColor), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text("NovaStore Yanıtı", color = DarkBlue, fontWeight = FontWeight.ExtraBold)
-                Text(question.answer ?: "Satıcı henüz yanıtlamadı.", color = if (answered) DarkBlue else MutedText, lineHeight = 21.sp, modifier = Modifier.padding(top = 4.dp))
+                Text(
+                    when (questionState) {
+                        CustomerQuestionState.Answered -> question.answer.orEmpty()
+                        CustomerQuestionState.Pending -> "NovaStore henüz yanıtlamadı."
+                        CustomerQuestionState.Invalid -> "Yanıt durumu doğrulanamadı. Daha sonra tekrar dene."
+                    },
+                    color = if (answered) DarkBlue else MutedText,
+                    lineHeight = 21.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
         }
     }
@@ -1652,7 +1838,8 @@ private fun SupportTicketsPage(
     currentUserId: Int,
     onTicketClick: (AccountMessage) -> Unit,
     onSend: (String) -> Unit,
-    onSupport: () -> Unit
+    onSupport: () -> Unit,
+    highlightedThreadId: Long?
 ) {
     var message by remember { mutableStateOf("") }
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1662,12 +1849,21 @@ private fun SupportTicketsPage(
             state.messagesError != null -> StateCard(Icons.Default.Warning, "Mesajlar yüklenemedi", state.messagesError, danger = true)
             state.messages.isEmpty() -> StateCard(Icons.Default.Article, "Destek talebin yok", "Mesaj göndererek müşteri hizmetleriyle gerçek bir destek kaydı başlatabilirsin.")
             else -> state.messages.asReversed().take(10).forEach { msg ->
-                AccountCard(modifier = Modifier.clickable { onTicketClick(msg) }) {
+                AccountCard(
+                    modifier = Modifier
+                        .then(
+                            if (msg.supportThreadId == highlightedThreadId) {
+                                Modifier.border(2.dp, OrangeAccent, RoundedCornerShape(12.dp))
+                            } else Modifier
+                        )
+                        .clickable { onTicketClick(msg) }
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Article, contentDescription = null, tint = OrangeAccent, modifier = Modifier.size(28.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(if (msg.senderId == currentUserId) "Sen" else "NovaStore Destek", color = DarkBlue, fontWeight = FontWeight.ExtraBold)
+                            msg.supportThreadId?.let { Text("Destek kaydı #$it", color = OrangeAccent, fontSize = 12.sp) }
                             Text(msg.message, color = MutedText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(formatDate(msg.createdAt), color = MutedText, fontSize = 12.sp)
                         }
@@ -1714,7 +1910,8 @@ private fun HelpCenterPage(
     onOrders: () -> Unit,
     onReturns: () -> Unit,
     onTickets: () -> Unit,
-    onSupport: () -> Unit
+    onSupport: () -> Unit,
+    onSecurity: () -> Unit
 ) {
     val activeOrder = state.orders.firstOrNull { it.isActiveOrder() } ?: state.orders.firstOrNull()
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1764,7 +1961,9 @@ private fun HelpCenterPage(
                 title = article.title,
                 text = article.summary,
                 icon = article.icon,
-                onClick = { onArticle(article) }
+                onClick = {
+                    if (article == HelpArticle.Account) onSecurity() else onArticle(article)
+                }
             )
         }
     }
@@ -1834,7 +2033,7 @@ private fun ArticlePage(
                 HelpStepCard("1", "Ödeme durumunu sipariş detayında kontrol et.", "Ödeme başarılıysa fatura bilgisi ve sipariş toplamı aynı yerde görünür.")
                 HelpStepCard("2", "Kargo bilgisini takip et.", "Takip numarası oluştuğunda teslimat kartında gösterilir.")
                 latestOrder?.let { order ->
-                    InfoCard("Ödeme: ${order.paymentStatus ?: "Bilinmiyor"}", order.shipmentText(), Icons.Default.LocalShipping, onClick = { onOrderClick(order) })
+                    InfoCard("Ödeme: ${order.paymentStatus ?: "Bilinmiyor"}", order.shipmentText(), Icons.Default.CreditCard, onClick = { onOrderClick(order) })
                 }
                 HelpPrimaryButton("Sipariş Detayına Git", Icons.Default.ReceiptLong) {
                     latestOrder?.let(onOrderClick) ?: onOrders()
@@ -1886,7 +2085,7 @@ private fun HelpPrimaryButton(text: String, icon: ImageVector, onClick: () -> Un
 }
 
 @Composable
-private fun NotificationsPage(state: NotificationsUiState, onMarkRead: (Int) -> Unit, onReadAll: () -> Unit) {
+private fun NotificationsPage(state: NotificationsUiState, onOpen: (Notification) -> Unit, onReadAll: () -> Unit) {
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SegmentHeader(listOf("Sipariş", "Kampanya", "Sistem"))
         Button(onClick = onReadAll, colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().height(44.dp)) {
@@ -1896,18 +2095,37 @@ private fun NotificationsPage(state: NotificationsUiState, onMarkRead: (Int) -> 
             state.isLoading -> LoadingCard("Bildirimler yükleniyor")
             state.error != null -> StateCard(Icons.Default.Warning, "Bildirimler yüklenemedi", state.error, danger = true)
             state.notifications.isEmpty() -> StateCard(Icons.Default.Notifications, "Henüz bildirimin yok", "Sipariş ve kampanya güncellemeleri burada görünecek.")
-            else -> state.notifications.forEach { NotificationCard(it, onClick = { onMarkRead(it.id) }) }
+            else -> state.notifications.forEach {
+                NotificationCard(
+                    notification = it,
+                    enabled = !state.notificationTargetLoading,
+                    onClick = { onOpen(it) }
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
+internal fun NotificationCard(
+    notification: Notification,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
     val meta = notificationMeta(notification.type)
+    val hasTarget = notification.customerTargetOrNull() != null
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .semantics {
+                role = Role.Button
+                stateDescription = if (notification.isRead) "Okundu" else "Okunmadı"
+            }
+            .clickable(
+                enabled = enabled,
+                onClickLabel = if (hasTarget) "Bildirimi aç" else "Okundu olarak işaretle",
+                onClick = onClick
+            ),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = if (notification.isRead) Color.White else meta.color.copy(alpha = 0.08f)),
         border = BorderStroke(1.dp, if (notification.isRead) BorderColor else meta.color.copy(alpha = 0.35f)),
@@ -1921,6 +2139,7 @@ private fun NotificationCard(notification: Notification, onClick: () -> Unit) {
                 Text(notification.message, color = MutedText, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(formatDate(notification.createdAt), color = MutedText, fontSize = 12.sp)
             }
+            if (hasTarget) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = meta.color)
             if (!notification.isRead) Badge(containerColor = OrangeAccent, contentColor = Color.White) { Text("Yeni") }
         }
     }
@@ -1939,9 +2158,21 @@ private fun notificationMeta(type: String): NotificationMeta = when (type) {
 }
 
 @Composable
-private fun ReturnsPage(orders: List<AccountOrder>, onOrderClick: (AccountOrder) -> Unit) {
+private fun ReturnsPage(
+    orders: List<AccountOrder>,
+    onOrderClick: (AccountOrder) -> Unit,
+    selectedReturn: ReturnRequestDetails?
+) {
     val returnOrders = orders.filter { it.refundStatus != null && it.refundStatus != "NONE" || it.displayStatus().contains("İade", true) }
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        selectedReturn?.let { details ->
+            InfoCard(
+                "İade talebi #${details.id}",
+                "Durum: ${details.status ?: "Bilinmiyor"}${details.note?.let { " • $it" }.orEmpty()}",
+                Icons.Default.AssignmentReturn,
+                warning = details.status !in setOf("APPROVED", "COMPLETED")
+            )
+        }
         if (returnOrders.isEmpty()) {
             StateCard(Icons.Default.AssignmentReturn, "Aktif iade yok", "Yeni iade talebi güvenli geri ödeme ve stok akışı tamamlanana kadar geçici olarak kapalıdır; destek kanalını kullanabilirsin.")
         } else {
@@ -1951,22 +2182,110 @@ private fun ReturnsPage(orders: List<AccountOrder>, onOrderClick: (AccountOrder)
 }
 
 @Composable
-private fun ReviewsPage(state: NotificationsUiState) {
+private fun ReviewsPage(state: NotificationsUiState, highlightedReviewId: Long?) {
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         when {
             state.reviewsLoading -> LoadingCard("Değerlendirmeler yükleniyor")
             state.reviewsError != null -> StateCard(Icons.Default.Warning, "Değerlendirmeler yüklenemedi", state.reviewsError, danger = true)
             state.reviews.isEmpty() -> StateCard(Icons.Default.Reviews, "Değerlendirme yok", "Teslim edilen ürünlerin için sipariş detayından değerlendirme akışını başlatabilirsin.")
             else -> state.reviews.forEach { review ->
-                AccountCard {
+                AccountCard(
+                    modifier = if (review.id.toLong() == highlightedReviewId) {
+                        Modifier.border(2.dp, OrangeAccent, RoundedCornerShape(12.dp))
+                    } else Modifier
+                ) {
                     Text(review.productName ?: "Ürün #${review.productId ?: "-"}", color = DarkBlue, fontWeight = FontWeight.ExtraBold)
                     Text("${review.rating ?: 0}/5", color = OrangeAccent, fontWeight = FontWeight.Bold)
                     Text(review.comment ?: "Yorum eklenmemiş.", color = MutedText)
+                    ReviewStatusBadge(review.status)
                     Text(formatDate(review.createdAt), color = MutedText, fontSize = 12.sp)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ReviewStatusBadge(status: String?) {
+    val (label, color) = when (status?.trim()?.uppercase()) {
+        "PENDING" -> "Yayın incelemesinde" to OrangeAccent
+        "PUBLISHED" -> "Yayında" to SuccessGreen
+        "HIDDEN" -> "Yayından kaldırıldı" to MutedText
+        else -> "Durum alınamadı" to ErrorRed
+    }
+    Surface(color = color.copy(alpha = 0.12f), shape = RoundedCornerShape(999.dp)) {
+        Text(
+            label,
+            color = color,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+        )
+    }
+}
+
+@Composable
+private fun ReviewSubmissionDialog(
+    item: AccountOrderItem,
+    state: NotificationsUiState,
+    onSubmit: (Int, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var rating by rememberSaveable(item.resolvedProductId()) { mutableStateOf(5) }
+    var comment by rememberSaveable(item.resolvedProductId()) { mutableStateOf("") }
+    val permission = state.reviewPermission
+    val canSubmit = permission?.canReview == true && !state.reviewSubmissionLoading
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(item.name ?: "Ürünü değerlendir", color = DarkBlue, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                when {
+                    state.reviewPermissionLoading -> LoadingCard("Değerlendirme uygunluğu kontrol ediliyor")
+                    permission == null -> Text(
+                        state.reviewSubmissionMessage ?: "Uygunluk durumu alınamadı.",
+                        color = ErrorRed
+                    )
+                    !permission.canReview -> StateCard(
+                        Icons.Default.Reviews,
+                        "Değerlendirme kapalı",
+                        permission.message ?: permission.code,
+                        danger = permission.code == "PRODUCT_NOT_FOUND"
+                    )
+                    else -> {
+                        Text("Puan: $rating / 5", color = DarkBlue, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            (1..5).forEach { value ->
+                                OutlinedButton(
+                                    onClick = { rating = value },
+                                    modifier = Modifier.size(48.dp),
+                                    contentPadding = PaddingValues(0.dp),
+                                    border = BorderStroke(1.dp, if (rating == value) OrangeAccent else BorderColor)
+                                ) { Text(value.toString(), color = if (rating == value) OrangeAccent else DarkBlue) }
+                            }
+                        }
+                        OutlinedTextField(
+                            value = comment,
+                            onValueChange = { comment = it.take(2000) },
+                            label = { Text("Yorum (isteğe bağlı)") },
+                            supportingText = { Text("${comment.length}/2000") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                state.reviewSubmissionMessage?.let { Text(it, color = if (permission?.canReview == false) MutedText else SuccessGreen) }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSubmit(rating, comment) },
+                enabled = canSubmit,
+                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+            ) { Text(if (state.reviewSubmissionLoading) "Gönderiliyor" else "İncelemeye Gönder") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Kapat") } }
+    )
 }
 
 @Composable
@@ -2128,7 +2447,9 @@ private fun AccountOrder.stage(): Int {
     }
 }
 
-private fun AccountOrder.isDelivered(): Boolean = displayStatus().contains("Teslim", ignoreCase = true)
+private fun AccountOrder.isDelivered(): Boolean =
+    status.equals("DELIVERED", ignoreCase = true) ||
+        displayStatus().contains("Teslim", ignoreCase = true)
 
 private fun AccountOrder.isActiveOrder(): Boolean {
     val normalized = displayStatus().lowercase(Locale("tr", "TR"))
@@ -2197,9 +2518,8 @@ private fun formatCurrency(value: Double): String {
 
 private fun formatDate(raw: String?): String {
     if (raw.isNullOrBlank()) return "Tarih yok"
-    return runCatching {
-        OffsetDateTime.parse(raw).format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale("tr", "TR")))
-    }.getOrElse {
-        raw.take(16).replace("T", " ")
-    }
+    val match = Regex("""^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})""").find(raw)
+        ?: return raw.take(16).replace("T", " ")
+    val (year, month, day, hour, minute) = match.destructured
+    return "$day.$month.$year $hour:$minute"
 }

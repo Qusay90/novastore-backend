@@ -14,6 +14,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+internal fun customerScopedPreferenceKey(base: String, userId: Int?): String =
+    userId?.let { "${base}_$it" } ?: base
+
+internal fun isCurrentCustomerOwner(
+    expectedUserId: Int?,
+    expectedGeneration: Long,
+    currentUserId: Int?,
+    currentGeneration: Long
+): Boolean = expectedUserId == currentUserId && expectedGeneration == currentGeneration
+
+internal fun shouldPersistCustomerAddressState(userId: Int?): Boolean = userId != null
+
 @Singleton
 class CustomerLocalRepository @Inject constructor(
     @ApplicationContext context: Context,
@@ -23,18 +35,30 @@ class CustomerLocalRepository @Inject constructor(
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
 
-    private val _favoriteIds = MutableStateFlow(readFavoriteIds())
+    private var favoriteOwnerId: Int? = activeUserId()
+    private val _favoriteIds = MutableStateFlow(readFavoriteIdsForUser(favoriteOwnerId))
     val favoriteIds: StateFlow<Set<Int>> = _favoriteIds.asStateFlow()
 
-    private val _addresses = MutableStateFlow(readAddresses())
+    private val startupAddressOwnerId = activeUserId()
+    private val startupAddressState = initializeAddressScope(startupAddressOwnerId)
+    private var addressOwnerId: Int? = startupAddressOwnerId
+    private val _addresses = MutableStateFlow(startupAddressState.addresses)
     val addresses: StateFlow<List<CustomerAddress>> = _addresses.asStateFlow()
 
-    private val _selectedAddressId = MutableStateFlow(prefs.getLong(KEY_SELECTED_ADDRESS_ID, NO_ADDRESS_ID))
+    private val _selectedAddressId = MutableStateFlow(startupAddressState.selectedAddressId)
     val selectedAddressId: StateFlow<Long> = _selectedAddressId.asStateFlow()
 
+    fun refreshSessionScopedState() {
+        switchAddressOwnerIfNeeded()
+        switchFavoriteOwnerIfNeeded()
+    }
+
     val selectedAddress: CustomerAddress?
-        get() = _addresses.value.firstOrNull { it.id == _selectedAddressId.value }
+        get() {
+            switchAddressOwnerIfNeeded()
+            return _addresses.value.firstOrNull { it.id == _selectedAddressId.value }
             ?: _addresses.value.firstOrNull()
+        }
 
     fun toggleFavorite(productId: Int) {
         setFavoriteLocal(productId, !_favoriteIds.value.contains(productId))
@@ -45,7 +69,8 @@ class CustomerLocalRepository @Inject constructor(
     }
 
     suspend fun refreshFavorites(allowMigration: Boolean = true): Result<Set<Int>> = runCatching {
-        val userId = activeUserId()
+        val owner = captureCustomerOwner()
+        val userId = owner.userId
         if (userId == null) {
             val guestFavorites = readFavoriteIdsForUser(null)
             _favoriteIds.value = guestFavorites
@@ -57,18 +82,24 @@ class CustomerLocalRepository @Inject constructor(
         val migrationFavorites = (localUserFavorites + legacyFavorites).toSet()
 
         if (allowMigration && !isFavoriteMigrationComplete(userId) && migrationFavorites.isNotEmpty()) {
-            api.syncFavorites(FavoriteSyncRequest(migrationFavorites.sorted()))
+            api.syncFavorites(
+                sessionGeneration = owner.generation,
+                body = FavoriteSyncRequest(migrationFavorites.sorted())
+            )
+            ensureCustomerOwnerCurrent(owner)
             markFavoriteMigrationComplete(userId)
             prefs.edit().remove(KEY_FAVORITES).apply()
         } else if (allowMigration && !isFavoriteMigrationComplete(userId)) {
+            ensureCustomerOwnerCurrent(owner)
             markFavoriteMigrationComplete(userId)
         }
 
-        val remoteFavorites = api.getFavorites().normalizedProductIds
+        val remoteFavorites = api.getFavorites(owner.generation).normalizedProductIds
+        ensureCustomerOwnerCurrent(owner)
         saveFavoriteIds(remoteFavorites, userId)
         remoteFavorites
     }.onFailure {
-        _favoriteIds.value = readFavoriteIdsForUser(activeUserId())
+        refreshSessionScopedState()
     }
 
     suspend fun toggleFavoriteSynced(productId: Int): Result<Boolean> {
@@ -77,7 +108,8 @@ class CustomerLocalRepository @Inject constructor(
     }
 
     suspend fun setFavoriteSynced(productId: Int, isFavorite: Boolean): Result<Unit> = runCatching {
-        val userId = activeUserId()
+        val owner = captureCustomerOwner()
+        val userId = owner.userId
         if (userId == null) {
             setFavoriteLocal(productId, isFavorite)
             return@runCatching
@@ -87,20 +119,24 @@ class CustomerLocalRepository @Inject constructor(
         setFavoriteLocal(productId, isFavorite, userId)
         try {
             if (isFavorite) {
-                api.addFavorite(productId)
+                api.addFavorite(productId, owner.generation)
             } else {
-                api.removeFavorite(productId)
+                api.removeFavorite(productId, owner.generation)
             }
+            ensureCustomerOwnerCurrent(owner)
             refreshFavorites(allowMigration = false).getOrThrow()
+            ensureCustomerOwnerCurrent(owner)
         } catch (error: Throwable) {
-            saveFavoriteIds(previous, userId)
+            if (isCustomerOwnerCurrent(owner)) saveFavoriteIds(previous, userId)
             throw error
         }
     }.onFailure {
-        _favoriteIds.value = readFavoriteIdsForUser(activeUserId())
+        refreshSessionScopedState()
     }
 
     private fun setFavoriteLocal(productId: Int, isFavorite: Boolean, userId: Int? = activeUserId()) {
+        switchFavoriteOwnerIfNeeded()
+        check(userId == favoriteOwnerId) { "Customer session changed before favorite update." }
         val updated = _favoriteIds.value.toMutableSet().apply {
             if (isFavorite) add(productId) else remove(productId)
         }
@@ -108,101 +144,153 @@ class CustomerLocalRepository @Inject constructor(
     }
 
     fun saveAddress(address: CustomerAddress) {
+        val owner = captureCustomerOwner()
         val normalized = if (address.id == 0L) address.copy(id = System.currentTimeMillis()) else address
         val updated = _addresses.value
             .filterNot { it.id == normalized.id }
             .plus(normalized)
             .ensureSingleDefault(normalized.id.takeIf { normalized.isDefault })
-        saveAddresses(updated)
+        saveAddresses(updated, owner.userId)
 
         if (_selectedAddressId.value == NO_ADDRESS_ID) {
-            selectAddress(normalized.id)
+            selectAddressForOwner(normalized.id, owner.userId)
         }
     }
 
     fun deleteAddress(id: Long) {
+        val owner = captureCustomerOwner()
         val updated = _addresses.value.filterNot { it.id == id }
-        saveAddresses(updated)
+        saveAddresses(updated, owner.userId)
 
         if (_selectedAddressId.value == id) {
-            selectAddress(updated.firstOrNull()?.id ?: NO_ADDRESS_ID)
+            selectAddressForOwner(updated.firstOrNull()?.id ?: NO_ADDRESS_ID, owner.userId)
         }
     }
 
     fun selectAddress(id: Long) {
-        prefs.edit().putLong(KEY_SELECTED_ADDRESS_ID, id).apply()
-        _selectedAddressId.value = id
+        val owner = captureCustomerOwner()
+        selectAddressForOwner(id, owner.userId)
     }
 
     suspend fun refreshAddresses(allowMigration: Boolean = true): Result<List<CustomerAddress>> = runCatching {
+        val owner = captureCustomerOwner()
         val localBeforeRefresh = _addresses.value
         var remote = api.getAddresses().normalizedDefaultOrder()
-        val canMigrateLocal = allowMigration && !isAddressMigrationComplete()
+        ensureCustomerOwnerCurrent(owner)
+        val canMigrateLocal = allowMigration && !isAddressMigrationComplete(owner.userId)
         if (remote.isEmpty() && localBeforeRefresh.isNotEmpty() && canMigrateLocal) {
             localBeforeRefresh.forEach { local ->
                 runCatching {
-                    api.createAddress(local.copy(id = 0L, isDefault = local.id == _selectedAddressId.value))
+                    api.createAddress(
+                        sessionGeneration = owner.generation,
+                        body = local.copy(id = 0L, isDefault = local.id == _selectedAddressId.value)
+                    )
                 }
             }
-            markAddressMigrationComplete()
+            ensureCustomerOwnerCurrent(owner)
+            markAddressMigrationComplete(owner.userId)
             remote = api.getAddresses().normalizedDefaultOrder()
+            ensureCustomerOwnerCurrent(owner)
         }
-        saveAddresses(remote)
+        saveAddresses(remote, owner.userId)
         val defaultId = remote.firstOrNull { it.isDefault }?.id ?: remote.firstOrNull()?.id ?: NO_ADDRESS_ID
-        selectAddress(defaultId)
-        markAddressMigrationComplete()
+        selectAddressForOwner(defaultId, owner.userId)
+        markAddressMigrationComplete(owner.userId)
         remote
+    }.onFailure {
+        switchAddressOwnerIfNeeded()
     }
 
-    suspend fun saveAddressSynced(address: CustomerAddress): Result<CustomerAddress> = runCatching {
+    suspend fun saveAddressSynced(address: CustomerAddress): Result<CustomerAddress> {
+        val owner = captureCustomerOwner()
+        return runCatching {
         val saved = if (address.id == 0L) {
-            api.createAddress(address.copy(isDefault = _addresses.value.isEmpty()))
+            api.createAddress(
+                sessionGeneration = owner.generation,
+                body = address.copy(isDefault = _addresses.value.isEmpty())
+            )
         } else {
-            api.updateAddress(address.id, address)
+            api.updateAddress(address.id, sessionGeneration = owner.generation, body = address)
         }
+        ensureCustomerOwnerCurrent(owner)
         refreshAddresses().getOrNull()
-        markAddressMigrationComplete()
+        ensureCustomerOwnerCurrent(owner)
+        markAddressMigrationComplete(owner.userId)
         if (_selectedAddressId.value == NO_ADDRESS_ID || saved.isDefault) {
-            selectAddress(saved.id)
+            selectAddressForOwner(saved.id, owner.userId)
         }
         saved
     }.onFailure {
-        saveAddress(address)
+            if (isCustomerOwnerCurrent(owner)) saveAddressForOwner(address, owner.userId)
+        }
     }
 
-    suspend fun deleteAddressSynced(id: Long): Result<Unit> = runCatching {
-        api.deleteAddress(id)
-        deleteAddress(id)
-        markAddressMigrationComplete()
+    suspend fun deleteAddressSynced(id: Long): Result<Unit> {
+        val owner = captureCustomerOwner()
+        return runCatching {
+        api.deleteAddress(id, sessionGeneration = owner.generation)
+        ensureCustomerOwnerCurrent(owner)
+        deleteAddressForOwner(id, owner.userId)
+        markAddressMigrationComplete(owner.userId)
         refreshAddresses(allowMigration = false).getOrNull()
         Unit
     }.onFailure {
-        deleteAddress(id)
+            if (isCustomerOwnerCurrent(owner)) deleteAddressForOwner(id, owner.userId)
+        }
     }
 
-    suspend fun selectAddressSynced(id: Long): Result<CustomerAddress?> = runCatching {
-        val selected = api.setDefaultAddress(id)
+    suspend fun selectAddressSynced(id: Long): Result<CustomerAddress?> {
+        val owner = captureCustomerOwner()
+        return runCatching {
+        val selected = api.setDefaultAddress(id, sessionGeneration = owner.generation)
+        ensureCustomerOwnerCurrent(owner)
         refreshAddresses().getOrNull()
-        selectAddress(selected.id)
+        ensureCustomerOwnerCurrent(owner)
+        selectAddressForOwner(selected.id, owner.userId)
         selected
     }.onFailure {
-        selectAddress(id)
+            if (isCustomerOwnerCurrent(owner)) selectAddressForOwner(id, owner.userId)
+        }
     }
 
-    private fun saveAddresses(addresses: List<CustomerAddress>) {
-        prefs.edit().putString(KEY_ADDRESSES, gson.toJson(addresses)).apply()
+    private fun saveAddressForOwner(address: CustomerAddress, userId: Int?) {
+        val normalized = if (address.id == 0L) address.copy(id = System.currentTimeMillis()) else address
+        val updated = (if (userId == null) _addresses.value else readAddressesForUser(userId))
+            .filterNot { it.id == normalized.id }
+            .plus(normalized)
+            .ensureSingleDefault(normalized.id.takeIf { normalized.isDefault })
+        saveAddresses(updated, userId)
+    }
+
+    private fun deleteAddressForOwner(id: Long, userId: Int?) {
+        val updated = (if (userId == null) _addresses.value else readAddressesForUser(userId))
+            .filterNot { it.id == id }
+        saveAddresses(updated, userId)
+        val selectedId = if (userId == null) _selectedAddressId.value else readSelectedAddressId(userId)
+        if (selectedId == id) {
+            selectAddressForOwner(updated.firstOrNull()?.id ?: NO_ADDRESS_ID, userId)
+        }
+    }
+
+    private fun saveAddresses(addresses: List<CustomerAddress>, userId: Int?) {
+        if (shouldPersistCustomerAddressState(userId)) {
+            prefs.edit().putString(addressKey(userId), gson.toJson(addresses)).apply()
+        }
         _addresses.value = addresses
     }
 
-    private fun isAddressMigrationComplete(): Boolean =
-        prefs.getBoolean(KEY_ADDRESS_MIGRATION_COMPLETE, false)
-
-    private fun markAddressMigrationComplete() {
-        prefs.edit().putBoolean(KEY_ADDRESS_MIGRATION_COMPLETE, true).apply()
+    private fun selectAddressForOwner(id: Long, userId: Int?) {
+        if (shouldPersistCustomerAddressState(userId)) {
+            prefs.edit().putLong(selectedAddressKey(userId), id).apply()
+        }
+        _selectedAddressId.value = id
     }
 
-    private fun readFavoriteIds(): Set<Int> {
-        return readFavoriteIdsForUser(activeUserId())
+    private fun isAddressMigrationComplete(userId: Int?): Boolean =
+        prefs.getBoolean(addressMigrationKey(userId), false)
+
+    private fun markAddressMigrationComplete(userId: Int?) {
+        prefs.edit().putBoolean(addressMigrationKey(userId), true).apply()
     }
 
     private fun readFavoriteIdsForUser(userId: Int?): Set<Int> {
@@ -232,13 +320,85 @@ class CustomerLocalRepository @Inject constructor(
         prefs.edit().putBoolean(favoriteMigrationKey(userId), true).apply()
     }
 
-    private fun readAddresses(): List<CustomerAddress> {
-        val raw = prefs.getString(KEY_ADDRESSES, null) ?: return emptyList()
+    private fun readAddressesForUser(userId: Int?): List<CustomerAddress> {
+        if (userId == null) return emptyList()
+        val raw = prefs.getString(addressKey(userId), null) ?: return emptyList()
         return runCatching {
             val type = object : TypeToken<List<CustomerAddress>>() {}.type
             gson.fromJson<List<CustomerAddress>>(raw, type).orEmpty()
         }.getOrDefault(emptyList())
     }
+
+    private data class CustomerOwner(val userId: Int?, val generation: Long)
+
+    private data class StartupAddressState(
+        val addresses: List<CustomerAddress>,
+        val selectedAddressId: Long
+    )
+
+    /** Legacy address data has no provable owner and is removed rather than reassigned. */
+    private fun initializeAddressScope(userId: Int?): StartupAddressState {
+        if (
+            prefs.contains(KEY_ADDRESSES) ||
+            prefs.contains(KEY_SELECTED_ADDRESS_ID) ||
+            prefs.contains(KEY_ADDRESS_MIGRATION_COMPLETE)
+        ) {
+            prefs.edit()
+                .remove(KEY_ADDRESSES)
+                .remove(KEY_SELECTED_ADDRESS_ID)
+                .remove(KEY_ADDRESS_MIGRATION_COMPLETE)
+                .apply()
+        }
+        return StartupAddressState(
+            addresses = readAddressesForUser(userId),
+            selectedAddressId = readSelectedAddressId(userId)
+        )
+    }
+
+    private fun captureCustomerOwner(): CustomerOwner {
+        switchAddressOwnerIfNeeded()
+        switchFavoriteOwnerIfNeeded()
+        return CustomerOwner(activeUserId(), sessionManager.generation)
+    }
+
+    private fun isCustomerOwnerCurrent(owner: CustomerOwner): Boolean =
+        isCurrentCustomerOwner(
+            expectedUserId = owner.userId,
+            expectedGeneration = owner.generation,
+            currentUserId = activeUserId(),
+            currentGeneration = sessionManager.generation
+        )
+
+    private fun ensureCustomerOwnerCurrent(owner: CustomerOwner) {
+        check(isCustomerOwnerCurrent(owner)) { "Customer session changed during customer operation." }
+    }
+
+    private fun switchAddressOwnerIfNeeded() {
+        val currentOwnerId = activeUserId()
+        if (currentOwnerId == addressOwnerId) return
+        addressOwnerId = currentOwnerId
+        _addresses.value = readAddressesForUser(currentOwnerId)
+        _selectedAddressId.value = readSelectedAddressId(currentOwnerId)
+    }
+
+    private fun switchFavoriteOwnerIfNeeded() {
+        val currentOwnerId = activeUserId()
+        if (currentOwnerId == favoriteOwnerId) return
+        favoriteOwnerId = currentOwnerId
+        _favoriteIds.value = readFavoriteIdsForUser(currentOwnerId)
+    }
+
+    private fun addressKey(userId: Int?): String =
+        customerScopedPreferenceKey(KEY_ADDRESSES, userId)
+
+    private fun selectedAddressKey(userId: Int?): String =
+        customerScopedPreferenceKey(KEY_SELECTED_ADDRESS_ID, userId)
+
+    private fun addressMigrationKey(userId: Int?): String =
+        customerScopedPreferenceKey(KEY_ADDRESS_MIGRATION_COMPLETE, userId)
+
+    private fun readSelectedAddressId(userId: Int?): Long =
+        userId?.let { prefs.getLong(selectedAddressKey(it), NO_ADDRESS_ID) } ?: NO_ADDRESS_ID
 
     companion object {
         private const val PREFS_NAME = "novastore_customer_local_prefs"
