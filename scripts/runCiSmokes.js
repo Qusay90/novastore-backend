@@ -8,6 +8,7 @@ const smokeTests = [
     'tests/sharedStateSmoke.js',
     'tests/paymentProviderConfigSmoke.js',
     'tests/categoryPlpStorefrontSmoke.js',
+    'tests/supabaseLegacyDriftReconciliationContractSmoke.js',
     'tests/supabaseRlsQuarantineContractSmoke.js'
 ];
 
