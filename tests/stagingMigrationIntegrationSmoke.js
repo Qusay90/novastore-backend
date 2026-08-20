@@ -140,9 +140,13 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
     ]) await assertUnmanagedRejection(probe);
 
     await resetPublic();
-    const mediaMigration = registry.at(-1);
+    const mediaMigrationIndex = registry.findIndex(
+        (migration) => migration.id === '20260813_04_product_media_operations'
+    );
+    assert.ok(mediaMigrationIndex > 0, 'Product media migration must follow its prerequisites.');
+    const mediaMigration = registry[mediaMigrationIndex];
     assert.equal(mediaMigration.id, '20260813_04_product_media_operations');
-    const preMediaRegistry = registry.slice(0, -1);
+    const preMediaRegistry = registry.slice(0, mediaMigrationIndex);
     const preMediaApply = await runApply({ env, registry: preMediaRegistry, output: silent });
     assert.deepEqual(preMediaApply.applied, preMediaRegistry.map((entry) => entry.id));
     const legacyVideoProduct = await admin.query(
@@ -193,6 +197,17 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'returns', 'review_media', 'reviews', 'shipments', 'stores',
         'support_thread_events', 'support_threads', 'template_attributes', 'user_shared_state', 'users', 'visitor_sessions',
         'admin_coupon_audit_events',
+        'seller_audit_events', 'seller_bootstrap_operator_authorizations',
+        'seller_fulfillment_packages', 'seller_inventory_items', 'seller_inventory_movements',
+        'seller_invitations', 'seller_ledger_entries', 'seller_membership_store_scopes',
+        'seller_memberships', 'seller_mutation_receipts', 'seller_offer_variants',
+        'seller_offers', 'seller_order_items', 'seller_order_transitions', 'seller_orders',
+        'seller_organizations', 'seller_outbox_delivery_attempts', 'seller_outbox_events',
+        'seller_permissions', 'seller_refresh_token_families', 'seller_refresh_tokens',
+        'seller_returns', 'seller_role_permissions', 'seller_roles', 'seller_sessions',
+        'seller_settlements', 'seller_step_up_challenges', 'seller_store_profiles',
+        'seller_stores', 'seller_support_conversations', 'seller_support_messages',
+        'seller_support_ratings',
         'webhook_events', LEDGER_TABLE
     ].sort();
     const tables = await admin.query(
@@ -243,10 +258,14 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
               'trg_customer_operation_audit_append_only',
               'trg_admin_coupon_audit_append_only',
               'trg_coupons_reject_hard_delete',
-              'trg_support_thread_events_append_only'
+              'trg_support_thread_events_append_only',
+              'trg_seller_memberships_no_hard_delete',
+              'trg_seller_audit_events_append_only',
+              'trg_seller_outbox_events_append_only',
+              'trg_seller_support_messages_append_only'
            )`
     );
-    assert.equal(new Set(triggers.rows.map((row) => row.trigger_name)).size, 7);
+    assert.equal(new Set(triggers.rows.map((row) => row.trigger_name)).size, 11);
 
     const requiredConstraints = [
         'chk_reviews_operational_status', 'chk_reviews_revision_positive',
@@ -264,6 +283,7 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'chk_coupons_discount_value_positive', 'chk_coupons_amount_bounds', 'chk_coupons_usage_bounds',
         'chk_coupons_date_range', 'chk_admin_coupon_audit_actor_role', 'chk_admin_coupon_audit_action',
         'chk_admin_coupon_audit_revision', 'chk_admin_coupon_audit_metadata_object',
+        'uq_seller_memberships_organization_id_id_user_id', 'fk_seller_sessions_membership_user',
         'chk_product_media_type', 'chk_product_media_image_cover',
         'chk_product_media_video_publication_disabled', 'chk_products_image_url_not_video'
     ].sort();
@@ -306,6 +326,33 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
     assert.equal((await admin.query('SELECT COUNT(*)::INTEGER AS count FROM users')).rows[0].count, 0);
     assert.equal((await admin.query('SELECT COUNT(*)::INTEGER AS count FROM coupons')).rows[0].count, 0);
     assert.equal((await admin.query('SELECT COUNT(*)::INTEGER AS count FROM campaign_configs')).rows[0].count, 0);
+
+    await admin.query('BEGIN');
+    try {
+        await admin.query(
+            "INSERT INTO users (id, email, password) VALUES (91001, 'main6t-binding-a@local.invalid', 'not-used'), (91002, 'main6t-binding-b@local.invalid', 'not-used')"
+        );
+        const bindingOrganization = await admin.query(
+            "INSERT INTO seller_organizations (external_key, display_name) VALUES ('91000000-0000-4000-8000-000000000001', 'Main-6T binding probe') RETURNING id"
+        );
+        const bindingRole = await admin.query(
+            "SELECT id FROM seller_roles WHERE organization_id IS NULL AND code = 'manager'"
+        );
+        const bindingMembership = await admin.query(
+            "INSERT INTO seller_memberships (organization_id, user_id, role_id, security_stamp) VALUES ($1, 91002, $2, '91000000-0000-4000-8000-000000000002') RETURNING id",
+            [bindingOrganization.rows[0].id, bindingRole.rows[0].id]
+        );
+        await assert.rejects(
+            admin.query(
+                "INSERT INTO seller_sessions (id, user_id, organization_id, membership_id, membership_revision, security_stamp, expires_at) VALUES ('91000000-0000-4000-8000-000000000003', 91001, $1, $2, 1, '91000000-0000-4000-8000-000000000002', CURRENT_TIMESTAMP + INTERVAL '1 hour')",
+                [bindingOrganization.rows[0].id, bindingMembership.rows[0].id]
+            ),
+            (error) => error?.code === '23503',
+            'Seller session must not bind one valid user to another valid user membership.'
+        );
+    } finally {
+        await admin.query('ROLLBACK');
+    }
 
     const statusAfter = await runStatus({ env, registry, output: silent });
     assert.equal(statusAfter.filter((entry) => entry.status === 'applied').length, registry.length);

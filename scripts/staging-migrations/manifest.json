@@ -105,6 +105,41 @@
     "transactionWrapper": false
   },
   {
+    "id": "20260730_01_seller_f1_organizations_roles_memberships",
+    "path": "migrations/20260730_seller_f1_organizations_roles_memberships.sql",
+    "sha256": "85fabd7bd8d5c2928edf9c106d2d122e41111f685b88562b516c5565e2910374",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260730_02_seller_f1_store_bindings_invitations",
+    "path": "migrations/20260730_seller_f1_store_bindings_invitations.sql",
+    "sha256": "6dd588c002184f325f7334d180f9633fcc9d2d5077f4e0333f7f81c9778579be",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260730_03_seller_f1_sessions_audit_outbox",
+    "path": "migrations/20260730_seller_f1_sessions_audit_outbox.sql",
+    "sha256": "6b31ff5cea93d3ee2440ef4b78bb4df170267805508c6862ec20fe522ff5a152",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260806_01_seller_f1b_bootstrap_operator_authorizations",
+    "path": "migrations/20260806_seller_f1b_bootstrap_operator_authorizations.sql",
+    "sha256": "d589ea48291cfff1c337a3dc6ffca3c114a417c447c224026c8328ebad3aa84c",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260806_02_seller_wave3_business_verticals",
+    "path": "migrations/20260806_seller_wave3_business_verticals.sql",
+    "sha256": "601da619c629ac8a98b86468eb2df2d1d62ab5464d9df5e35573edc401532993",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
     "id": "20260813_01_review_question_operations",
     "path": "migrations/20260813_01_review_question_operations.sql",
     "sha256": "c684be9d778d566acbd2de6f9212d479f8dcaedd35eefd04557af40fb6290ad3",
@@ -129,6 +164,13 @@
     "id": "20260813_04_product_media_operations",
     "path": "migrations/20260813_04_product_media_operations.sql",
     "sha256": "3ed7088af058096d81302950af2d0566b0d846af7fe28e02d6236186a6fb7e4e",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260820_01_main6t_seller_session_membership_binding",
+    "path": "migrations/20260820_01_main6t_seller_session_membership_binding.sql",
+    "sha256": "c441f4889a5fa9eff757ac03b5affa8a75897e0954492878b238abbbe4e1c1b0",
     "mode": "transactional",
     "transactionWrapper": true
   }

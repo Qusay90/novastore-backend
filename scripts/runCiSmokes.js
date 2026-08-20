@@ -28,6 +28,8 @@ const smokeTests = [
     'tests/notificationTargetRoutingSmoke.mjs',
     'tests/reviewPublicationVisibilitySmoke.js',
     'tests/localMain6sSchemaInitSmoke.js',
+    'tests/main6tCombinedIntegrationSmoke.js',
+    'tests/sellerLoginRateLimitSmoke.js',
     'tests/stagingMigrationFoundationSmoke.js'
 ];
 

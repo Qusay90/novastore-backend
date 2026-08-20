@@ -388,6 +388,92 @@ const merchantRoutes = require('./routes/merchantRoutes');
 app.use('/api/merchant', merchantRoutes);
 app.use('/merchant', merchantRoutes);
 
+const localSellerApiEnabled = String(process.env.SELLER_API_V1_ENABLED || '').toLowerCase() === 'true' &&
+    String(process.env.SELLER_API_V1_LOCAL_ONLY || '').toLowerCase() === 'true';
+const localSellerFeature = (name) => localSellerApiEnabled &&
+    String(process.env[name] || '').toLowerCase() === 'true';
+
+if (localSellerApiEnabled) {
+    if (!startupSafety.safeLocalDatabase) throw new Error('Seller API local mode requires a named loopback database.');
+
+    const { createSellerContextRouter } = require('./routes/sellerContextRoutes');
+    const { createSellerAuthRouter } = require('./routes/sellerAuthRoutes');
+    const { createSellerBusinessRouter } = require('./routes/sellerBusinessRoutes');
+    const { createSellerAuthMiddleware } = require('./middlewares/sellerAuthMiddleware');
+    const { createSellerTenantContextMiddleware } = require('./middlewares/sellerTenantContext');
+    const { createSellerAccessTokenService } = require('./services/sellerAccessTokenService');
+    const loginService = require('./services/sellerLoginService');
+    const { createSellerAuthController } = require('./controllers/sellerAuthController');
+    const { createSellerContextController } = require('./controllers/sellerContextController');
+    const { createSellerBusinessController } = require('./controllers/sellerBusinessController');
+    const storeService = require('./services/sellerStoreService');
+    const offerInventoryService = require('./services/sellerOfferInventoryService');
+    const orderService = require('./services/sellerOrderFulfillmentService');
+    const financeService = require('./services/sellerFinanceService');
+    const supportService = require('./services/sellerSupportService');
+    const { listMembersForStoreScope } = require('./services/sellerTeamReadService');
+
+    app.locals.sellerDatabase = pool;
+    const sellerE2eTraceEnabled = localSellerFeature('SELLER_E2E_TRACE_ENABLED') &&
+        String(process.env.NODE_ENV || '').toLowerCase() === 'development' &&
+        String(process.env.NOVASTORE_SAFE_LOCAL_BACKEND || '').toLowerCase() === 'true' &&
+        String(process.env.NOVASTORE_ALLOW_REMOTE_DB || '').toLowerCase() !== 'true';
+    const tokenService = createSellerAccessTokenService({
+        secret: process.env.SELLER_ACCESS_TOKEN_SECRET,
+        expiresIn: sellerE2eTraceEnabled
+            ? (process.env.SELLER_E2E_ACCESS_TOKEN_EXPIRES_IN || '15m')
+            : '15m'
+    });
+    const auth = createSellerAuthMiddleware({ verifyAccessToken: tokenService.verify });
+    const tenant = createSellerTenantContextMiddleware();
+    const contextController = createSellerContextController({
+        readOrganization: async (context) => (
+            await pool.query(
+                'SELECT id, external_key, display_name, status FROM seller_organizations WHERE id = $1 AND status = $2',
+                [context.organizationId, 'active']
+            )
+        ).rows[0],
+        listRoles: async (context) => (
+            await pool.query(
+                'SELECT id, code, name, is_assignable FROM seller_roles WHERE id = $1 AND is_active = TRUE',
+                [context.roleId]
+            )
+        ).rows,
+        listMembers: (context, options) => listMembersForStoreScope(pool, context, options)
+    });
+    const businessController = createSellerBusinessController({
+        storeService,
+        offerInventoryService,
+        orderService,
+        financeService,
+        supportService
+    });
+    const authController = createSellerAuthController({ loginService, tokenService });
+
+    if (sellerE2eTraceEnabled) {
+        app.use('/api/seller/v1', (req, res, next) => {
+            res.once('finish', () => {
+                console.log(`SELLER_E2E_HTTP ${req.method} ${req.path} ${res.statusCode}`);
+            });
+            next();
+        });
+    }
+
+    app.use('/api/seller/v1', createSellerAuthRouter({ auth, controller: authController }));
+    app.use('/api/seller/v1', createSellerContextRouter({ enabled: true, auth, tenant, controller: contextController }));
+    app.use('/api/seller/v1', createSellerBusinessRouter({
+        enabled: true,
+        auth,
+        tenant,
+        controller: businessController,
+        features: Object.freeze({
+            offerWrite: localSellerFeature('SELLER_OFFER_WRITE_ENABLED'),
+            orderWrite: localSellerFeature('SELLER_ORDER_WRITE_ENABLED'),
+            financeRead: localSellerFeature('SELLER_FINANCE_READ_ENABLED')
+        })
+    }));
+}
+
 app.use((err, req, res, next) => {
     if (err && err.code === 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED') {
         return res.status(503).json({
@@ -428,16 +514,24 @@ const prepareDatabase = async (startupSafety) => {
     const {
         applyLocalMain6sOperationMigrations
     } = require('./models/applyLocalMain6sOperationMigrations');
+    const {
+        applyLocalSellerMigrations
+    } = require('./models/applyLocalSellerMigrations');
 
     await createCoreSchema();
     await createNotificationsTable();
     await createCommerceSchema();
     await createAnalyticsSchema();
+    if (localSellerApiEnabled) await applyLocalSellerMigrations();
     await applyLocalMain6sOperationMigrations();
 };
 
 const start = async () => {
+    const configuredBindHost = String(process.env.NOVASTORE_BIND_HOST || '').trim();
     try {
+        if (localSellerApiEnabled && configuredBindHost !== '127.0.0.1') {
+            throw new Error('Seller API local mode requires NOVASTORE_BIND_HOST=127.0.0.1.');
+        }
         console.log(`Veritabani hedefi: ${startupSafety.target.label}`);
         await prepareDatabase(startupSafety);
         if (!startupSafety.localPreviewMode) await socketRevocationService.start();
@@ -449,7 +543,8 @@ const start = async () => {
 
     // Sunucu
     const PORT = process.env.PORT || 5000;
-    server.listen(PORT, () => {
+    const bindHost = configuredBindHost || undefined;
+    server.listen(PORT, bindHost, () => {
         console.log(`NovaStore sunucusu ${PORT} portunda baslatildi.`);
         console.log('Socket.io hazir!');
     });

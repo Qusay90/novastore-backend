@@ -335,21 +335,25 @@ const readChangedPaths = (cwd, sha) => {
     return bytes.toString('utf8').split('\0').filter(Boolean).sort();
 };
 
-const readRawDiff = (cwd, parent, sha) => gitBuffer(cwd, [
-    'diff',
-    '--no-ext-diff',
-    '--no-textconv',
-    '--no-renames',
-    '--binary',
-    '--abbrev=7',
-    '--diff-algorithm=myers',
-    '--indent-heuristic',
-    '--unified=3',
-    '--src-prefix=a/',
-    '--dst-prefix=b/',
-    parent,
-    sha
-]);
+const readRawDiff = (cwd, parent, sha) => gitBuffer(
+    cwd,
+    [
+        'diff',
+        '--no-ext-diff',
+        '--no-textconv',
+        '--no-renames',
+        '--binary',
+        '--abbrev=7',
+        '--diff-algorithm=myers',
+        '--indent-heuristic',
+        '--unified=3',
+        '--src-prefix=a/',
+        '--dst-prefix=b/',
+        parent,
+        sha
+    ],
+    { maxBuffer: 128 * 1024 * 1024 }
+);
 
 const readNativePatchId = (cwd, rawDiff) => {
     const result = runGit(
