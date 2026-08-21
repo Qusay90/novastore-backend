@@ -184,7 +184,7 @@
   {
     "id": "20260821_02_seller_applications",
     "path": "migrations/20260821_02_seller_applications.sql",
-    "sha256": "f1349b21e632e9edd2c31152269549ecfe1edc4a63df800d0b925f4d9c5a3c97",
+    "sha256": "4f274fd1d35c912606b0b6492b7590ab7c25808729e7c6854270670d8dd0ab9c",
     "mode": "transactional",
     "transactionWrapper": true
   }

@@ -27,9 +27,9 @@ const hmacHex = (secret, namespace, value) => crypto
     .update(`${namespace}\u0000${value}`, 'utf8')
     .digest('hex');
 
-const hmacToken = (secret, applicationId, idempotencyKey) => `nova_app_${crypto
+const hmacToken = (secret, applicationId, applicantSecret) => `nova_app_${crypto
     .createHmac('sha256', secret)
-    .update(`seller-applicant-session-v1\u0000${applicationId}\u0000${idempotencyKey}`, 'utf8')
+    .update(`seller-applicant-session-v1\u0000${applicationId}\u0000${applicantSecret}`, 'utf8')
     .digest('base64url')}`;
 
 const stable = (value) => {
@@ -73,6 +73,13 @@ const idempotencyKey = (value) => {
     const key = cleanText(value, { min: 16, max: 160, code: 'IDEMPOTENCY_KEY_REQUIRED' });
     if (!/^[A-Za-z0-9._:-]+$/u.test(key)) throw new SellerApplicationError('IDEMPOTENCY_KEY_REQUIRED', 400);
     return key;
+};
+
+const applicantAuthority = (value) => {
+    if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{43}$/u.test(value)) {
+        throw new SellerApplicationError('APPLICANT_AUTH_REQUIRED', 401);
+    }
+    return value;
 };
 
 const revision = (value) => {
@@ -131,7 +138,7 @@ const mapApplication = (row, currentTermsRevision = null) => {
     });
 };
 
-const applicationSelect = "SELECT id, applicant_identity_hash, applicant_email, applicant_phone, applicant_display_name, status, revision, current_step, next_allowed_step, correction_steps, terms_revision, step_payload, verification_state, creation_idempotency_key_hash, creation_request_fingerprint, submitted_at, created_at, updated_at FROM seller_applications";
+const applicationSelect = "SELECT id, applicant_authority_hash, applicant_identity_hash, applicant_email, applicant_phone, applicant_display_name, status, revision, current_step, next_allowed_step, correction_steps, terms_revision, step_payload, verification_state, creation_idempotency_key_hash, creation_request_fingerprint, submitted_at, created_at, updated_at FROM seller_applications";
 
 const recordEvent = (client, row, eventType, fromStatus, resultCode, metadata = {}) => client.query(
     'INSERT INTO seller_application_events (application_id, event_type, from_status, to_status, application_revision, result_code, metadata_redacted) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)',
@@ -220,32 +227,42 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
     const effectiveSecret = requireSecret(secret);
     const effectiveTermsRevision = typeof termsRevision === 'string' && termsRevision.trim() ? termsRevision.trim() : null;
 
-    const create = async (body, rawIdempotencyKey) => {
+    const create = async (body, rawIdempotencyKey, rawApplicantSecret) => {
         const identity = validateCreate(body);
         const key = idempotencyKey(rawIdempotencyKey);
+        const bootstrapSecret = applicantAuthority(rawApplicantSecret);
         const keyHash = hmacHex(effectiveSecret, 'seller-application-idempotency-v1', key);
         const requestFingerprint = fingerprint(identity);
         const identityHash = hmacHex(effectiveSecret, 'seller-application-identity-v1', identity.email);
+        const authorityHash = hmacHex(effectiveSecret, 'seller-applicant-authority-v1', bootstrapSecret);
         const createdAt = now();
         return withTransaction(database, async (client) => {
-            await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [identityHash]);
+            await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [authorityHash]);
             const replayResult = await client.query(`${applicationSelect} WHERE creation_idempotency_key_hash = $1 FOR UPDATE`, [keyHash]);
             const replay = replayResult.rows?.[0];
             if (replay) {
+                if (replay.applicant_authority_hash !== authorityHash) throw new SellerApplicationError('APPLICANT_AUTH_REQUIRED', 401);
                 if (replay.creation_request_fingerprint !== requestFingerprint) throw new SellerApplicationError('IDEMPOTENCY_CONFLICT', 409);
-                return Object.freeze({ application: mapApplication(replay, effectiveTermsRevision), applicant_token: hmacToken(effectiveSecret, replay.id, key), token_type: 'Applicant' });
+                const replayToken = hmacToken(effectiveSecret, replay.id, bootstrapSecret);
+                const replayTokenHash = hmacHex(effectiveSecret, 'seller-applicant-token-v1', replayToken);
+                const activeSession = await client.query(
+                    "SELECT id FROM seller_applicant_sessions WHERE application_id = $1 AND token_hash = $2 AND status = 'active' AND expires_at > CURRENT_TIMESTAMP",
+                    [replay.id, replayTokenHash]
+                );
+                if (!activeSession.rows?.length) throw new SellerApplicationError('APPLICANT_AUTH_REQUIRED', 401);
+                return Object.freeze({ application: mapApplication(replay, effectiveTermsRevision), applicant_token: replayToken, token_type: 'Applicant' });
             }
-            const active = await client.query("SELECT id FROM seller_applications WHERE applicant_identity_hash = $1 AND status NOT IN ('REJECTED', 'WITHDRAWN') FOR UPDATE", [identityHash]);
+            const active = await client.query("SELECT id FROM seller_applications WHERE applicant_authority_hash = $1 AND status NOT IN ('REJECTED', 'WITHDRAWN') FOR UPDATE", [authorityHash]);
             if (active.rows?.length) throw new SellerApplicationError('APPLICATION_ALREADY_EXISTS', 409);
             const applicationId = randomUUID();
-            const applicantToken = hmacToken(effectiveSecret, applicationId, key);
+            const applicantToken = hmacToken(effectiveSecret, applicationId, bootstrapSecret);
             const tokenHash = hmacHex(effectiveSecret, 'seller-applicant-token-v1', applicantToken);
             const sessionId = randomUUID();
             const expiresAt = new Date(createdAt.getTime() + APPLICATION_SESSION_TTL_MS);
             const steps = { identity: { email: identity.email, full_name: identity.full_name, phone: identity.phone, verification: 'provider_pending' } };
             const inserted = await client.query(
-                "INSERT INTO seller_applications (id, applicant_identity_hash, applicant_email, applicant_phone, applicant_display_name, status, revision, current_step, next_allowed_step, step_payload, creation_idempotency_key_hash, creation_request_fingerprint, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, 'IN_PROGRESS', 1, 'identity', 'business', $6::jsonb, $7, $8, $9, $9) RETURNING *",
-                [applicationId, identityHash, identity.email, identity.phone, identity.full_name, JSON.stringify(steps), keyHash, requestFingerprint, createdAt]
+                "INSERT INTO seller_applications (id, applicant_authority_hash, applicant_identity_hash, applicant_email, applicant_phone, applicant_display_name, status, revision, current_step, next_allowed_step, step_payload, creation_idempotency_key_hash, creation_request_fingerprint, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, 'IN_PROGRESS', 1, 'identity', 'business', $7::jsonb, $8, $9, $10, $10) RETURNING *",
+                [applicationId, authorityHash, identityHash, identity.email, identity.phone, identity.full_name, JSON.stringify(steps), keyHash, requestFingerprint, createdAt]
             );
             await client.query(
                 'INSERT INTO seller_applicant_sessions (id, application_id, token_hash, expires_at, issued_at) VALUES ($1, $2, $3, $4, $5)',
@@ -286,11 +303,11 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
             const keyHash = hmacHex(effectiveSecret, 'seller-application-idempotency-v1', key);
             const requestFingerprint = fingerprint({ expected_revision: expectedRevision });
             return withTransaction(database, async (client) => {
-                const replay = await receiptReplay(client, applicant.applicationId, 'submit', keyHash, requestFingerprint);
-                if (replay) return replay;
                 const result = await client.query(`${applicationSelect} WHERE id = $1 FOR UPDATE`, [applicant.applicationId]);
                 const row = result.rows?.[0];
                 if (!row) throw new SellerApplicationError('APPLICATION_NOT_FOUND', 404);
+                const replay = await receiptReplay(client, applicant.applicationId, 'submit', keyHash, requestFingerprint);
+                if (replay) return replay;
                 if (Number(row.revision) !== expectedRevision) throw new SellerApplicationError('REVISION_CONFLICT', 409);
                 if (!EDITABLE_STATUSES.has(row.status) || row.next_allowed_step !== 'submission') throw new SellerApplicationError('INVALID_STATE_TRANSITION', 409);
                 const steps = parseJsonObject(row.step_payload);
@@ -346,11 +363,11 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
         const requestFingerprint = fingerprint({ channel, command: 'request', expected_revision: expectedRevision });
         return withTransaction(database, async (client) => {
             const operation = `verification:${channel}:request`;
-            const replay = await receiptReplay(client, applicant.applicationId, operation, keyHash, requestFingerprint);
-            if (replay) return replay;
             const result = await client.query(`${applicationSelect} WHERE id = $1 FOR UPDATE`, [applicant.applicationId]);
             const row = result.rows?.[0];
             if (!row) throw new SellerApplicationError('APPLICATION_NOT_FOUND', 404);
+            const replay = await receiptReplay(client, applicant.applicationId, operation, keyHash, requestFingerprint);
+            if (replay) return replay;
             if (Number(row.revision) !== expectedRevision) throw new SellerApplicationError('REVISION_CONFLICT', 409);
             if (TERMINAL_STATUSES.has(row.status)) throw new SellerApplicationError('INVALID_STATE_TRANSITION', 409);
             const existing = await client.query(
@@ -446,6 +463,7 @@ module.exports = Object.freeze({
     APPLICATION_SESSION_TTL_MS,
     STEP_ORDER,
     SellerApplicationError,
+    applicantAuthority,
     createSellerApplicationService,
     toSafeApplicationError
 });

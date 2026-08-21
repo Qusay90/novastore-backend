@@ -28,6 +28,7 @@ const assertPlainObject = (value, keys) => {
 const normalizeIdentifier = (value) => {
     if (typeof value !== 'string') throw new SellerPasswordRecoveryError('VALIDATION_FAILED', 400);
     const normalized = value.trim().toLocaleLowerCase('tr-TR');
+    if (!normalized || normalized.length > 320) throw new SellerPasswordRecoveryError('VALIDATION_FAILED', 400);
     const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(normalized);
     const phone = /^\+?[1-9]\d{9,14}$/u.test(normalized.replace(/[\s()-]/gu, ''));
     if (!email && !phone) throw new SellerPasswordRecoveryError('VALIDATION_FAILED', 400);
@@ -266,7 +267,15 @@ const createSellerPasswordRecoveryService = ({
                 [challengeId, consumedAt]
             );
             if (consumed.rows?.length !== 1) throw new SellerPasswordRecoveryError('RESET_AUTHORITY_INVALID', 401);
-            await event(client, challengeId, 'seller.password_recovery.reset_completed', 'success', { revoked_session_count: revokedIds.length, auto_login: false });
+            const superseded = await client.query(
+                "UPDATE seller_password_recovery_challenges SET status = 'superseded', reset_token_hash = NULL, updated_at = $2 WHERE user_id = $1 AND id <> $3 AND status IN ('pending', 'verified') RETURNING id",
+                [row.user_id, consumedAt, challengeId]
+            );
+            await event(client, challengeId, 'seller.password_recovery.reset_completed', 'success', {
+                revoked_session_count: revokedIds.length,
+                superseded_challenge_count: superseded.rows?.length || 0,
+                auto_login: false
+            });
             return Object.freeze({ password_reset: true, auto_login: false, revoked_session_count: revokedIds.length });
         });
     };

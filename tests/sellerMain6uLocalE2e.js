@@ -44,13 +44,14 @@ app.use('/api/seller/v1', createSellerApplicationRouter({
 }));
 const server = http.createServer(app);
 
-const request = async (base, method, path, { body, token, idempotency } = {}) => {
+const request = async (base, method, path, { applicantSecret, body, token, idempotency } = {}) => {
     const response = await fetch(`${base}${path}`, {
         method,
         headers: {
             ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            ...(idempotency ? { 'Idempotency-Key': idempotency } : {})
+            ...(idempotency ? { 'Idempotency-Key': idempotency } : {}),
+            ...(applicantSecret ? { 'Applicant-Secret': applicantSecret } : {})
         },
         body: body === undefined ? undefined : JSON.stringify(body),
         redirect: 'error'
@@ -154,6 +155,22 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     assert.equal(resetSuccess.auto_login, false);
     assert.equal(resetSuccess.revoked_session_count, 1);
     assert.equal((await request(base, 'POST', '/api/seller/v1/auth/password/reset', { body: resetBody })).status, 401);
+    assert.equal((await request(base, 'POST', '/api/seller/v1/auth/password/reset', {
+        body: {
+            challenge_id: verified.body.recovery_authority.challenge_id,
+            reset_token: verified.body.recovery_authority.reset_token,
+            new_password: 'Stale!SellerPassword8'
+        }
+    })).status, 401);
+    const supersededRecovery = (await pool.query(
+        'SELECT status, reset_token_hash FROM seller_password_recovery_challenges WHERE id = $1',
+        [verified.body.recovery_authority.challenge_id]
+    )).rows[0];
+    assert.deepEqual(supersededRecovery, { status: 'superseded', reset_token_hash: null });
+    assert.equal(Number((await pool.query(
+        "SELECT COUNT(*) FROM seller_password_recovery_challenges WHERE user_id = $1 AND status IN ('pending', 'verified')",
+        [user.id]
+    )).rows[0].count), 0);
     const securityState = (await pool.query(
         'SELECT user_row.password, session.status AS session_status, family.status AS family_status FROM users user_row JOIN seller_sessions session ON session.user_id = user_row.id JOIN seller_refresh_token_families family ON family.session_id = session.id WHERE user_row.id = $1',
         [user.id]
@@ -166,14 +183,44 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     assert.equal(persistedRecovery.includes(resetAuthority.reset_token), false);
 
     const firstCreateBody = { identity: { email: `applicant-${suffix}@example.test`, full_name: 'Başvuru Sahibi', phone: '+905551112233' } };
-    const firstCreate = await request(base, 'POST', '/api/seller/v1/applications', { body: firstCreateBody, idempotency: `create-main6u-${suffix}` });
+    const applicantBootstrapSecret = crypto.randomBytes(32).toString('base64url');
+    const wrongBootstrapSecret = crypto.randomBytes(32).toString('base64url');
+    const firstCreate = await request(base, 'POST', '/api/seller/v1/applications', {
+        applicantSecret: applicantBootstrapSecret,
+        body: firstCreateBody,
+        idempotency: `create-main6u-${suffix}`
+    });
     assert.equal(firstCreate.status, 201);
     const applicantToken = firstCreate.body.applicant_token;
     const applicationId = firstCreate.body.application.id;
-    const createReplay = await request(base, 'POST', '/api/seller/v1/applications', { body: firstCreateBody, idempotency: `create-main6u-${suffix}` });
+    assert.equal((await request(base, 'POST', '/api/seller/v1/applications', {
+        body: firstCreateBody,
+        idempotency: `create-main6u-${suffix}`
+    })).status, 401);
+    assert.equal((await request(base, 'POST', '/api/seller/v1/applications', {
+        applicantSecret: wrongBootstrapSecret,
+        body: firstCreateBody,
+        idempotency: `create-main6u-${suffix}`
+    })).status, 401);
+    const createReplay = await request(base, 'POST', '/api/seller/v1/applications', {
+        applicantSecret: applicantBootstrapSecret,
+        body: firstCreateBody,
+        idempotency: `create-main6u-${suffix}`
+    });
     assert.equal(createReplay.body.application.id, applicationId);
     assert.equal(createReplay.body.applicant_token, applicantToken);
-    assert.equal((await request(base, 'POST', '/api/seller/v1/applications', { body: firstCreateBody, idempotency: `different-main6u-${suffix}` })).status, 409);
+    assert.equal((await request(base, 'POST', '/api/seller/v1/applications', {
+        applicantSecret: applicantBootstrapSecret,
+        body: firstCreateBody,
+        idempotency: `different-main6u-${suffix}`
+    })).status, 409);
+    const sameUnverifiedEmail = await request(base, 'POST', '/api/seller/v1/applications', {
+        applicantSecret: crypto.randomBytes(32).toString('base64url'),
+        body: firstCreateBody,
+        idempotency: `independent-main6u-${suffix}`
+    });
+    assert.equal(sameUnverifiedEmail.status, 201);
+    assert.notEqual(sameUnverifiedEmail.body.application.id, applicationId);
     assert.equal((await request(base, 'GET', '/api/seller/v1/applications/current', { token: resetAuthority.reset_token })).status, 401);
     assert.equal((await request(base, 'GET', '/api/seller/v1/applications/current', { token: 'customer.jwt.token' })).status, 401);
     let current = await request(base, 'GET', '/api/seller/v1/applications/current', { token: applicantToken });
@@ -181,6 +228,7 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     assert.equal(current.body.application.next_allowed_step, 'business');
 
     const foreignCreate = await request(base, 'POST', '/api/seller/v1/applications', {
+        applicantSecret: crypto.randomBytes(32).toString('base64url'),
         body: { identity: { email: `foreign-${suffix}@example.test`, full_name: 'Yabancı Başvuru' } },
         idempotency: `create-foreign-${suffix}`
     });
@@ -209,20 +257,34 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     const payout = await update('payout', { expected_revision: documents.body.application.revision, account_holder: 'Başvuru Sahibi', iban_last4: '1234' });
     const beforeCounts = (await pool.query('SELECT (SELECT COUNT(*) FROM seller_organizations) AS organizations, (SELECT COUNT(*) FROM seller_stores) AS stores, (SELECT COUNT(*) FROM seller_memberships) AS memberships')).rows[0];
     const submitBody = { expected_revision: payout.body.application.revision };
-    const submitted = await request(base, 'PATCH', '/api/seller/v1/applications/current/steps/submission', { token: applicantToken, body: submitBody, idempotency: `submit-main6u-${suffix}` });
-    assert.equal(submitted.status, 200);
+    const submitRace = await Promise.all([
+        request(base, 'PATCH', '/api/seller/v1/applications/current/steps/submission', { token: applicantToken, body: submitBody, idempotency: `submit-main6u-${suffix}` }),
+        request(base, 'PATCH', '/api/seller/v1/applications/current/steps/submission', { token: applicantToken, body: submitBody, idempotency: `submit-main6u-${suffix}` })
+    ]);
+    assert.deepEqual(submitRace.map((entry) => entry.status), [200, 200]);
+    assert.deepEqual(submitRace[0].body, submitRace[1].body);
+    const submitted = submitRace[0];
     assert.equal(submitted.body.application.status, 'AWAITING_EXTERNAL_VERIFICATION');
     assert.equal(submitted.body.auto_approved, false);
     const submitReplay = await request(base, 'PATCH', '/api/seller/v1/applications/current/steps/submission', { token: applicantToken, body: submitBody, idempotency: `submit-main6u-${suffix}` });
     assert.deepEqual(submitReplay.body, submitted.body);
     const afterCounts = (await pool.query('SELECT (SELECT COUNT(*) FROM seller_organizations) AS organizations, (SELECT COUNT(*) FROM seller_stores) AS stores, (SELECT COUNT(*) FROM seller_memberships) AS memberships')).rows[0];
     assert.deepEqual(afterCounts, beforeCounts);
-    const verification = await request(base, 'POST', '/api/seller/v1/applications/current/verifications/identity/commands', {
-        token: applicantToken,
-        body: { command: 'request', expected_revision: submitted.body.application.revision },
-        idempotency: `verify-main6u-${suffix}`
-    });
-    assert.equal(verification.status, 200);
+    const verificationRace = await Promise.all([
+        request(base, 'POST', '/api/seller/v1/applications/current/verifications/identity/commands', {
+            token: applicantToken,
+            body: { command: 'request', expected_revision: submitted.body.application.revision },
+            idempotency: `verify-main6u-${suffix}`
+        }),
+        request(base, 'POST', '/api/seller/v1/applications/current/verifications/identity/commands', {
+            token: applicantToken,
+            body: { command: 'request', expected_revision: submitted.body.application.revision },
+            idempotency: `verify-main6u-${suffix}`
+        })
+    ]);
+    assert.deepEqual(verificationRace.map((entry) => entry.status), [200, 200]);
+    assert.deepEqual(verificationRace[0].body, verificationRace[1].body);
+    const verification = verificationRace[0];
     assert.deepEqual(verification.body.verification, { channel: 'identity', status: 'provider_unavailable', verified: false });
     const verificationReplay = await request(base, 'POST', '/api/seller/v1/applications/current/verifications/identity/commands', {
         token: applicantToken,
@@ -288,7 +350,10 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     console.log('SELLER_MAIN6U_LOCAL_E2E=PASS');
     console.log('PASSWORD_ENUMERATION_RESPONSE_PARITY=PASS');
     console.log('RESET_CONCURRENCY_SINGLE_SUCCESS=PASS');
+    console.log('RESET_SIBLING_AUTHORITY_SUPERSESSION=PASS');
     console.log('SELLER_SESSION_REVOCATION=PASS');
+    console.log('APPLICANT_BOOTSTRAP_AUTHORITY=PASS');
+    console.log('UNVERIFIED_IDENTITY_SQUATTING_PREVENTION=PASS');
     console.log('APPLICATION_IDOR=PASS');
     console.log('APPLICATION_REVISION_IDEMPOTENCY=PASS');
     console.log('APPLICATION_CORRECTION_CYCLE=PASS');

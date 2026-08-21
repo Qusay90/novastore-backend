@@ -5,6 +5,7 @@ SET LOCAL statement_timeout = '30s';
 
 CREATE TABLE IF NOT EXISTS seller_applications (
     id UUID NOT NULL,
+    applicant_authority_hash CHAR(64) NOT NULL,
     applicant_identity_hash CHAR(64) NOT NULL,
     applicant_email VARCHAR(320) NOT NULL,
     applicant_phone VARCHAR(32),
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS seller_applications (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_seller_applications PRIMARY KEY (id),
     CONSTRAINT uq_seller_applications_creation_idempotency UNIQUE (creation_idempotency_key_hash),
+    CONSTRAINT chk_seller_applications_authority_hash CHECK (applicant_authority_hash ~ '^[A-Fa-f0-9]{64}$'),
     CONSTRAINT chk_seller_applications_identity_hash CHECK (applicant_identity_hash ~ '^[A-Fa-f0-9]{64}$'),
     CONSTRAINT chk_seller_applications_creation_key_hash CHECK (creation_idempotency_key_hash ~ '^[A-Fa-f0-9]{64}$'),
     CONSTRAINT chk_seller_applications_creation_fingerprint CHECK (creation_request_fingerprint ~ '^[A-Fa-f0-9]{64}$'),
@@ -43,8 +45,8 @@ CREATE TABLE IF NOT EXISTS seller_applications (
     CONSTRAINT chk_seller_applications_withdrawn_state CHECK ((status = 'WITHDRAWN' AND withdrawn_at IS NOT NULL) OR status <> 'WITHDRAWN')
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_seller_applications_active_identity
-    ON seller_applications (applicant_identity_hash)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_seller_applications_active_authority
+    ON seller_applications (applicant_authority_hash)
     WHERE status NOT IN ('REJECTED', 'WITHDRAWN');
 
 CREATE INDEX IF NOT EXISTS idx_seller_applications_status_updated

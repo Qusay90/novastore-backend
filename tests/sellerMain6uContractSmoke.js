@@ -8,7 +8,7 @@ const {
     normalizeIdentifier,
     validatePassword
 } = require('../services/sellerPasswordRecoveryService');
-const { createSellerApplicationService, STEP_ORDER } = require('../services/sellerApplicationService');
+const { applicantAuthority, createSellerApplicationService, STEP_ORDER } = require('../services/sellerApplicationService');
 const { SELLER_APPLICATION_PATHS } = require('../routes/sellerApplicationRoutes');
 
 assert.deepEqual(normalizeIdentifier(' Seller@Example.Test '), { channel: 'email', value: 'seller@example.test' });
@@ -20,6 +20,10 @@ for (const weak of ['short', 'onlylowercase9!', 'ONLYUPPERCASE9!', 'NoNumber!Pas
 }
 assert.throws(() => createSellerPasswordRecoveryService({ secret: 'short' }), /SELLER_PASSWORD_RECOVERY_SECRET_REQUIRED/);
 assert.throws(() => createSellerApplicationService({ secret: 'short' }), /SELLER_APPLICATION_AUTH_SECRET_REQUIRED/);
+assert.equal(applicantAuthority('A'.repeat(43)), 'A'.repeat(43));
+for (const invalid of [undefined, '', 'short', 'A'.repeat(42), 'A'.repeat(44), 'A'.repeat(42) + '=']) {
+    assert.throws(() => applicantAuthority(invalid), /APPLICANT_AUTH_REQUIRED/);
+}
 assert.deepEqual(STEP_ORDER, ['identity', 'business', 'contact', 'agreements', 'documents', 'payout', 'submission']);
 assert.deepEqual(SELLER_APPLICATION_PATHS, [
     '/applications',
@@ -48,11 +52,19 @@ assert.ok(Number(limited.headers['Retry-After']) >= 1);
 
 const recoverySource = fs.readFileSync('services/sellerPasswordRecoveryService.js', 'utf8');
 const applicationSource = fs.readFileSync('services/sellerApplicationService.js', 'utf8');
+const applicationControllerSource = fs.readFileSync('controllers/sellerApplicationController.js', 'utf8');
+const applicationMigrationSource = fs.readFileSync('migrations/20260821_02_seller_applications.sql', 'utf8');
 assert.doesNotMatch(recoverySource, /\baccess_token\b|jwt\.sign|redirect|https?:\/\//iu);
 assert.doesNotMatch(recoverySource, /console\.(?:log|error|warn)/u);
 assert.doesNotMatch(applicationSource, /INSERT INTO seller_(?:organizations|stores|memberships)/u);
 assert.doesNotMatch(applicationSource, /https?:\/\/|redirect_url|callback_url/iu);
 assert.match(applicationSource, /auto_approved: false/u);
 assert.match(applicationSource, /provider_unavailable/u);
+assert.match(applicationSource, /seller-applicant-authority-v1/u);
+assert.match(applicationSource, /applicant_authority_hash/u);
+assert.match(applicationControllerSource, /Applicant-Secret/u);
+assert.match(applicationMigrationSource, /uq_seller_applications_active_authority/u);
+assert.doesNotMatch(applicationMigrationSource, /uq_seller_applications_active_identity/u);
+assert.match(recoverySource, /status = 'superseded'/u);
 
 console.log('seller Main-6U contract smoke passed: recovery=bounded application=revisioned authority=isolated');
