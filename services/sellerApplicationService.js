@@ -1,6 +1,10 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const {
+    normalizeSellerApplicationTermsGeneration,
+    normalizeSellerApplicationTermsRevision
+} = require('../config/sellerApplicationTerms');
 
 const APPLICATION_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const EDITABLE_STATUSES = new Set(['DRAFT', 'IN_PROGRESS', 'NEEDS_CORRECTION']);
@@ -124,7 +128,7 @@ const mapApplication = (row, currentTermsRevision = null) => {
         current_step: row.current_step,
         next_allowed_step: row.next_allowed_step,
         correction_steps: Object.freeze(Array.isArray(row.correction_steps) ? row.correction_steps : []),
-        terms_revision: row.terms_revision || null,
+        terms_revision: currentTermsRevision || null,
         steps: Object.freeze(steps),
         verification_state: Object.freeze(verificationState),
         submission_eligibility: Object.freeze({
@@ -223,11 +227,93 @@ const saveReceipt = (client, applicationId, operation, keyHash, requestFingerpri
     [applicationId, operation, keyHash, requestFingerprint, JSON.stringify(response)]
 );
 
-const createSellerApplicationService = ({ database, secret, termsRevision = null, now = () => new Date(), randomUUID = crypto.randomUUID } = {}) => {
+const normalizeTermsAuthority = (value) => {
+    if (value === undefined || value === null) return null;
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some((key) => !['revision', 'generation'].includes(key))) {
+        throw new SellerApplicationError('TERMS_REVISION_UNAVAILABLE', 503);
+    }
+    const revisionValue = normalizeSellerApplicationTermsRevision(value.revision);
+    const generationValue = normalizeSellerApplicationTermsGeneration(value.generation);
+    if (!revisionValue || !generationValue) throw new SellerApplicationError('TERMS_REVISION_UNAVAILABLE', 503);
+    return Object.freeze({ revision: revisionValue, generation: generationValue });
+};
+
+const createSellerApplicationService = ({ database, secret, termsAuthority = null, now = () => new Date(), randomUUID = crypto.randomUUID } = {}) => {
     const effectiveSecret = requireSecret(secret);
-    const effectiveTermsRevision = typeof termsRevision === 'string' && termsRevision.trim() ? termsRevision.trim() : null;
+    const configuredTermsAuthority = normalizeTermsAuthority(termsAuthority);
+    const requireConfiguredTermsAuthority = () => {
+        if (!configuredTermsAuthority) throw new SellerApplicationError('TERMS_REVISION_UNAVAILABLE', 503);
+        return configuredTermsAuthority;
+    };
+    const promoteConfiguredTermsAuthority = async (client) => {
+        const configured = requireConfiguredTermsAuthority();
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended('seller-application-terms-authority-v1', 0))");
+        const result = await client.query(
+            'SELECT active_revision, generation FROM seller_application_terms_authority WHERE authority_key = 1 FOR UPDATE'
+        );
+        const row = result.rows?.[0];
+        if (!row) {
+            const activatedAt = now();
+            const inserted = await client.query(
+                'INSERT INTO seller_application_terms_authority (authority_key, active_revision, generation, activated_at, updated_at) VALUES (1, $1, $2, $3, $3) RETURNING active_revision, generation',
+                [configured.revision, configured.generation, activatedAt]
+            );
+            await client.query(
+                'INSERT INTO seller_application_terms_authority_events (generation, active_revision, previous_generation, previous_revision, activated_at) VALUES ($1, $2, NULL, NULL, $3)',
+                [configured.generation, configured.revision, activatedAt]
+            );
+            return Object.freeze({ revision: inserted.rows[0].active_revision, generation: Number(inserted.rows[0].generation) });
+        }
+        const activeGeneration = Number(row.generation);
+        if (!Number.isSafeInteger(activeGeneration) || activeGeneration < 1) {
+            throw new SellerApplicationError('TERMS_REVISION_AUTHORITY_CONFLICT', 503);
+        }
+        if (activeGeneration > configured.generation) {
+            throw new SellerApplicationError('TERMS_REVISION_AUTHORITY_STALE', 503);
+        }
+        if (activeGeneration === configured.generation) {
+            if (row.active_revision !== configured.revision) {
+                throw new SellerApplicationError('TERMS_REVISION_AUTHORITY_CONFLICT', 503);
+            }
+            return Object.freeze({ revision: row.active_revision, generation: activeGeneration });
+        }
+        const activatedAt = now();
+        const updated = await client.query(
+            'UPDATE seller_application_terms_authority SET active_revision = $1, generation = $2, activated_at = $3, updated_at = $3 WHERE authority_key = 1 AND generation = $4 RETURNING active_revision, generation',
+            [configured.revision, configured.generation, activatedAt, activeGeneration]
+        );
+        if (updated.rows?.length !== 1) throw new SellerApplicationError('TERMS_REVISION_AUTHORITY_CONFLICT', 503);
+        await client.query(
+            'INSERT INTO seller_application_terms_authority_events (generation, active_revision, previous_generation, previous_revision, activated_at) VALUES ($1, $2, $3, $4, $5)',
+            [configured.generation, configured.revision, activeGeneration, row.active_revision, activatedAt]
+        );
+        return Object.freeze({ revision: updated.rows[0].active_revision, generation: Number(updated.rows[0].generation) });
+    };
+    const activateConfiguredTermsAuthority = async () => {
+        requireConfiguredTermsAuthority();
+        return withTransaction(database, promoteConfiguredTermsAuthority);
+    };
+    const lockActiveTermsAuthority = async (client) => {
+        const configured = requireConfiguredTermsAuthority();
+        const result = await client.query(
+            'SELECT active_revision, generation FROM seller_application_terms_authority WHERE authority_key = 1 FOR SHARE'
+        );
+        const row = result.rows?.[0];
+        const activeGeneration = Number(row?.generation);
+        if (!row || !Number.isSafeInteger(activeGeneration) || activeGeneration < 1) {
+            throw new SellerApplicationError('TERMS_REVISION_AUTHORITY_CONFLICT', 503);
+        }
+        if (activeGeneration > configured.generation) {
+            throw new SellerApplicationError('TERMS_REVISION_AUTHORITY_STALE', 503);
+        }
+        if (activeGeneration < configured.generation || row.active_revision !== configured.revision) {
+            throw new SellerApplicationError('TERMS_REVISION_AUTHORITY_CONFLICT', 503);
+        }
+        return Object.freeze({ revision: row.active_revision, generation: activeGeneration });
+    };
 
     const create = async (body, rawIdempotencyKey, rawApplicantSecret) => {
+        requireConfiguredTermsAuthority();
         const identity = validateCreate(body);
         const key = idempotencyKey(rawIdempotencyKey);
         const bootstrapSecret = applicantAuthority(rawApplicantSecret);
@@ -236,7 +322,9 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
         const identityHash = hmacHex(effectiveSecret, 'seller-application-identity-v1', identity.email);
         const authorityHash = hmacHex(effectiveSecret, 'seller-applicant-authority-v1', bootstrapSecret);
         const createdAt = now();
+        await activateConfiguredTermsAuthority();
         return withTransaction(database, async (client) => {
+            const activeTermsRevision = (await lockActiveTermsAuthority(client)).revision;
             await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [authorityHash]);
             const replayResult = await client.query(`${applicationSelect} WHERE creation_idempotency_key_hash = $1 FOR UPDATE`, [keyHash]);
             const replay = replayResult.rows?.[0];
@@ -250,7 +338,7 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
                     [replay.id, replayTokenHash]
                 );
                 if (!activeSession.rows?.length) throw new SellerApplicationError('APPLICANT_AUTH_REQUIRED', 401);
-                return Object.freeze({ application: mapApplication(replay, effectiveTermsRevision), applicant_token: replayToken, token_type: 'Applicant' });
+                return Object.freeze({ application: mapApplication(replay, activeTermsRevision), applicant_token: replayToken, token_type: 'Applicant' });
             }
             const active = await client.query("SELECT id FROM seller_applications WHERE applicant_authority_hash = $1 AND status NOT IN ('REJECTED', 'WITHDRAWN') FOR UPDATE", [authorityHash]);
             if (active.rows?.length) throw new SellerApplicationError('APPLICATION_ALREADY_EXISTS', 409);
@@ -269,7 +357,7 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
                 [sessionId, applicationId, tokenHash, expiresAt, createdAt]
             );
             await recordEvent(client, inserted.rows[0], 'seller.application.created', null, 'success', { applicant_authority: 'APPLICATION_BOUND', auto_approved: false });
-            return Object.freeze({ application: mapApplication(inserted.rows[0], effectiveTermsRevision), applicant_token: applicantToken, token_type: 'Applicant', expires_in: Math.ceil(APPLICATION_SESSION_TTL_MS / 1000) });
+            return Object.freeze({ application: mapApplication(inserted.rows[0], activeTermsRevision), applicant_token: applicantToken, token_type: 'Applicant', expires_in: Math.ceil(APPLICATION_SESSION_TTL_MS / 1000) });
         });
     };
 
@@ -288,12 +376,18 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
     };
 
     const current = async (applicant) => {
-        const result = await database.query(`${applicationSelect} WHERE id = $1`, [applicant.applicationId]);
-        if (!result.rows?.[0]) throw new SellerApplicationError('APPLICATION_NOT_FOUND', 404);
-        return mapApplication(result.rows[0], effectiveTermsRevision);
+        requireConfiguredTermsAuthority();
+        await activateConfiguredTermsAuthority();
+        return withTransaction(database, async (client) => {
+            const activeTermsRevision = (await lockActiveTermsAuthority(client)).revision;
+            const result = await client.query(`${applicationSelect} WHERE id = $1`, [applicant.applicationId]);
+            if (!result.rows?.[0]) throw new SellerApplicationError('APPLICATION_NOT_FOUND', 404);
+            return mapApplication(result.rows[0], activeTermsRevision);
+        });
     };
 
     const updateStep = async (applicant, stepValue, body, rawIdempotencyKey = null) => {
+        requireConfiguredTermsAuthority();
         const step = cleanText(stepValue, { max: 40 }).toLocaleLowerCase('en-US');
         if (!STEP_ORDER.includes(step)) throw new SellerApplicationError('APPLICATION_STEP_INVALID', 400);
         const expectedRevision = revision(body?.expected_revision);
@@ -302,7 +396,9 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
             const key = idempotencyKey(rawIdempotencyKey);
             const keyHash = hmacHex(effectiveSecret, 'seller-application-idempotency-v1', key);
             const requestFingerprint = fingerprint({ expected_revision: expectedRevision });
+            await activateConfiguredTermsAuthority();
             return withTransaction(database, async (client) => {
+                const activeTermsRevision = (await lockActiveTermsAuthority(client)).revision;
                 const result = await client.query(`${applicationSelect} WHERE id = $1 FOR UPDATE`, [applicant.applicationId]);
                 const row = result.rows?.[0];
                 if (!row) throw new SellerApplicationError('APPLICATION_NOT_FOUND', 404);
@@ -312,47 +408,64 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
                 if (!EDITABLE_STATUSES.has(row.status) || row.next_allowed_step !== 'submission') throw new SellerApplicationError('INVALID_STATE_TRANSITION', 409);
                 const steps = parseJsonObject(row.step_payload);
                 if (!STEP_ORDER.slice(0, -1).every((requiredStep) => Boolean(steps[requiredStep]))) throw new SellerApplicationError('APPLICATION_INCOMPLETE', 409);
-                if (!effectiveTermsRevision) throw new SellerApplicationError('TERMS_REVISION_UNAVAILABLE', 503);
-                if (row.terms_revision !== effectiveTermsRevision || steps.agreements?.terms_revision !== effectiveTermsRevision) throw new SellerApplicationError('TERMS_REVISION_MISMATCH', 409);
+                if (row.terms_revision !== activeTermsRevision || steps.agreements?.terms_revision !== activeTermsRevision) throw new SellerApplicationError('TERMS_REVISION_MISMATCH', 409);
                 const updated = await client.query(
                     "UPDATE seller_applications SET status = 'AWAITING_EXTERNAL_VERIFICATION', revision = revision + 1, current_step = 'submission', next_allowed_step = 'external_verification', submitted_at = $2, updated_at = $2 WHERE id = $1 AND revision = $3 RETURNING *",
                     [applicant.applicationId, now(), expectedRevision]
                 );
                 if (updated.rows?.length !== 1) throw new SellerApplicationError('REVISION_CONFLICT', 409);
-                const response = Object.freeze({ application: mapApplication(updated.rows[0], effectiveTermsRevision), submitted: true, auto_approved: false });
+                const response = Object.freeze({ application: mapApplication(updated.rows[0], activeTermsRevision), submitted: true, auto_approved: false });
                 await recordEvent(client, updated.rows[0], 'seller.application.submitted', row.status, 'pending_external_verification', { auto_approved: false, organization_created: false, store_created: false, membership_created: false });
                 await saveReceipt(client, applicant.applicationId, 'submit', keyHash, requestFingerprint, response);
                 return response;
             });
         }
 
-        const payload = validateStepPayload(step, body, effectiveTermsRevision);
+        await activateConfiguredTermsAuthority();
         return withTransaction(database, async (client) => {
+            const activeTermsRevision = (await lockActiveTermsAuthority(client)).revision;
+            const payload = validateStepPayload(step, body, activeTermsRevision);
             const result = await client.query(`${applicationSelect} WHERE id = $1 FOR UPDATE`, [applicant.applicationId]);
             const row = result.rows?.[0];
             if (!row) throw new SellerApplicationError('APPLICATION_NOT_FOUND', 404);
             if (Number(row.revision) !== expectedRevision) throw new SellerApplicationError('REVISION_CONFLICT', 409);
             if (!EDITABLE_STATUSES.has(row.status)) throw new SellerApplicationError('INVALID_STATE_TRANSITION', 409);
             const corrections = Array.isArray(row.correction_steps) ? row.correction_steps : [];
-            if (row.next_allowed_step !== step && !corrections.includes(step)) throw new SellerApplicationError('STEP_SEQUENCE_CONFLICT', 409);
+            const staleTermsReacceptance = step === 'agreements' && Boolean(row.terms_revision) && row.terms_revision !== activeTermsRevision;
+            if (row.next_allowed_step !== step && !corrections.includes(step) && !staleTermsReacceptance) {
+                throw new SellerApplicationError('STEP_SEQUENCE_CONFLICT', 409);
+            }
             const steps = parseJsonObject(row.step_payload);
             const effectivePayload = step === 'identity' ? Object.freeze({ ...payload, email: row.applicant_email }) : payload;
             steps[step] = effectivePayload;
             const remainingCorrections = corrections.filter((entry) => entry !== step);
             const nextIndex = STEP_ORDER.indexOf(step) + 1;
-            const nextStep = remainingCorrections[0] || (corrections.length > 0 ? 'submission' : STEP_ORDER[nextIndex]);
-            const nextStatus = remainingCorrections.length > 0 ? 'NEEDS_CORRECTION' : 'IN_PROGRESS';
+            const nextStep = remainingCorrections[0] || (staleTermsReacceptance
+                ? row.next_allowed_step
+                : (corrections.length > 0 ? 'submission' : STEP_ORDER[nextIndex]));
+            const nextStatus = remainingCorrections.length > 0
+                ? 'NEEDS_CORRECTION'
+                : (staleTermsReacceptance && row.status !== 'NEEDS_CORRECTION' ? row.status : 'IN_PROGRESS');
             const updated = await client.query(
                 'UPDATE seller_applications SET status = $2, revision = revision + 1, current_step = $3, next_allowed_step = $4, correction_steps = $5::text[], terms_revision = CASE WHEN $12::boolean THEN $6 ELSE terms_revision END, step_payload = $7::jsonb, applicant_phone = CASE WHEN $13::boolean THEN $8 ELSE applicant_phone END, applicant_display_name = CASE WHEN $13::boolean THEN $9 ELSE applicant_display_name END, updated_at = $10 WHERE id = $1 AND revision = $11 RETURNING *',
-                [applicant.applicationId, nextStatus, step, nextStep, remainingCorrections, step === 'agreements' ? effectiveTermsRevision : null, JSON.stringify(steps), step === 'identity' ? effectivePayload.phone : null, step === 'identity' ? effectivePayload.full_name : null, now(), expectedRevision, step === 'agreements', step === 'identity']
+                [applicant.applicationId, nextStatus, step, nextStep, remainingCorrections, step === 'agreements' ? activeTermsRevision : null, JSON.stringify(steps), step === 'identity' ? effectivePayload.phone : null, step === 'identity' ? effectivePayload.full_name : null, now(), expectedRevision, step === 'agreements', step === 'identity']
             );
             if (updated.rows?.length !== 1) throw new SellerApplicationError('REVISION_CONFLICT', 409);
-            await recordEvent(client, updated.rows[0], 'seller.application.step_updated', row.status, 'success', { step, verification_claimed: false });
-            return Object.freeze({ application: mapApplication(updated.rows[0], effectiveTermsRevision) });
+            await recordEvent(client, updated.rows[0], 'seller.application.step_updated', row.status, 'success', {
+                step,
+                verification_claimed: false,
+                ...(step === 'agreements' ? {
+                    previous_terms_revision: row.terms_revision || null,
+                    accepted_terms_revision: activeTermsRevision,
+                    terms_revision_rotated: staleTermsReacceptance
+                } : {})
+            });
+            return Object.freeze({ application: mapApplication(updated.rows[0], activeTermsRevision) });
         });
     };
 
     const verificationCommand = async (applicant, channelValue, body, rawIdempotencyKey) => {
+        requireConfiguredTermsAuthority();
         const channel = cleanText(channelValue, { max: 24 }).toLocaleLowerCase('en-US');
         if (!VERIFICATION_CHANNELS.has(channel)) throw new SellerApplicationError('VERIFICATION_CHANNEL_INVALID', 400);
         plainObject(body, ['command', 'expected_revision']);
@@ -361,7 +474,9 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
         const key = idempotencyKey(rawIdempotencyKey);
         const keyHash = hmacHex(effectiveSecret, 'seller-application-idempotency-v1', key);
         const requestFingerprint = fingerprint({ channel, command: 'request', expected_revision: expectedRevision });
+        await activateConfiguredTermsAuthority();
         return withTransaction(database, async (client) => {
+            const activeTermsRevision = (await lockActiveTermsAuthority(client)).revision;
             const operation = `verification:${channel}:request`;
             const result = await client.query(`${applicationSelect} WHERE id = $1 FOR UPDATE`, [applicant.applicationId]);
             const row = result.rows?.[0];
@@ -389,7 +504,7 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
                 [applicant.applicationId, JSON.stringify(verificationState), now(), expectedRevision]
             );
             if (updated.rows?.length !== 1) throw new SellerApplicationError('REVISION_CONFLICT', 409);
-            const response = Object.freeze({ application: mapApplication(updated.rows[0], effectiveTermsRevision), verification: Object.freeze({ channel, status: 'provider_unavailable', verified: false }) });
+            const response = Object.freeze({ application: mapApplication(updated.rows[0], activeTermsRevision), verification: Object.freeze({ channel, status: 'provider_unavailable', verified: false }) });
             await recordEvent(client, updated.rows[0], 'seller.application.verification_requested', row.status, 'provider_unavailable', { channel, verified: false, provider_called: false });
             await saveReceipt(client, applicant.applicationId, operation, keyHash, requestFingerprint, response);
             return response;
@@ -397,6 +512,7 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
     };
 
     const reviewDecision = async (reviewer, input) => {
+        requireConfiguredTermsAuthority();
         if (reviewer?.authority !== 'ADMIN_REVIEW' || !Number.isSafeInteger(Number(reviewer.userId)) || Number(reviewer.userId) < 1) {
             throw new SellerApplicationError('ADMIN_REVIEW_AUTHORITY_REQUIRED', 403);
         }
@@ -410,7 +526,9 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
         if (!['start_review', 'request_correction', 'approve', 'reject'].includes(command)) {
             throw new SellerApplicationError('REVIEW_COMMAND_INVALID', 400);
         }
+        await activateConfiguredTermsAuthority();
         return withTransaction(database, async (client) => {
+            const activeTermsRevision = (await lockActiveTermsAuthority(client)).revision;
             const result = await client.query(`${applicationSelect} WHERE id = $1 FOR UPDATE`, [applicationId]);
             const row = result.rows?.[0];
             if (!row) throw new SellerApplicationError('APPLICATION_NOT_FOUND', 404);
@@ -448,7 +566,7 @@ const createSellerApplicationService = ({ database, secret, termsRevision = null
             );
             if (updated.rows?.length !== 1) throw new SellerApplicationError('REVISION_CONFLICT', 409);
             await recordEvent(client, updated.rows[0], `seller.application.review.${command}`, row.status, 'success', { reviewer_user_id: Number(reviewer.userId), provider_verified: nextStatus === 'APPROVED' });
-            return Object.freeze({ application: mapApplication(updated.rows[0], effectiveTermsRevision) });
+            return Object.freeze({ application: mapApplication(updated.rows[0], activeTermsRevision) });
         });
     };
 

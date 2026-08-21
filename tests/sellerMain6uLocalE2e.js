@@ -15,6 +15,7 @@ const { createSellerApplicationService } = require('../services/sellerApplicatio
 const { createSellerApplicationController } = require('../controllers/sellerApplicationController');
 const { createSellerApplicantAuth } = require('../middlewares/sellerApplicantAuth');
 const { createSellerApplicationRouter } = require('../routes/sellerApplicationRoutes');
+const { getSellerApplicationTermsAuthority } = require('../config/sellerApplicationTerms');
 
 const connectionString = process.env.MAIN6U_DATABASE_URL;
 if (!connectionString) throw new Error('MAIN6U_DATABASE_URL_REQUIRED');
@@ -25,11 +26,15 @@ if (!['127.0.0.1', 'localhost', '::1'].includes(parsed.hostname) || !parsed.path
 
 const RECOVERY_SECRET = 'local-main6u-recovery-secret-0000000000000001';
 const APPLICATION_SECRET = 'local-main6u-application-secret-0000000000001';
-const TERMS_REVISION = 'LOCAL-TERMS-2026-08-21';
+const TERMS_AUTHORITY = getSellerApplicationTermsAuthority();
+const TERMS_REVISION = TERMS_AUTHORITY?.revision;
+if (TERMS_REVISION !== 'seller-terms-local-test-v1' || TERMS_AUTHORITY.generation !== 1) {
+    throw new Error('MAIN6U_EXPLICIT_LOCAL_TERMS_AUTHORITY_REQUIRED');
+}
 const pool = new Pool({ connectionString, ssl: false, application_name: 'novastore_main6u_local_e2e' });
 const deliveryBoundary = createSellerPasswordRecoveryDeliveryBoundary({ syntheticEnabled: true });
 const recoveryService = createSellerPasswordRecoveryService({ database: pool, secret: RECOVERY_SECRET, deliveryBoundary: deliveryBoundary.deliver });
-const applicationService = createSellerApplicationService({ database: pool, secret: APPLICATION_SECRET, termsRevision: TERMS_REVISION });
+const applicationService = createSellerApplicationService({ database: pool, secret: APPLICATION_SECRET, termsAuthority: TERMS_AUTHORITY });
 
 const app = express();
 app.use(express.json({ limit: '32kb' }));
@@ -64,6 +69,12 @@ const forgot = (base, identifier) => request(base, 'POST', '/api/seller/v1/auth/
 const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v1/auth/password/challenges/${challengeId}/verify`, { body: { code } });
 
 (async () => {
+    const unavailableTermsService = createSellerApplicationService({ database: pool, secret: APPLICATION_SECRET });
+    await assert.rejects(
+        unavailableTermsService.current({ applicationId: crypto.randomUUID() }),
+        (error) => error.code === 'TERMS_REVISION_UNAVAILABLE' && error.statusCode === 503
+    );
+
     const suffix = crypto.randomBytes(6).toString('hex');
     const existingEmail = `main6u-${suffix}@example.test`;
     const oldPassword = 'Old!SellerPassword9';
@@ -191,6 +202,8 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
         idempotency: `create-main6u-${suffix}`
     });
     assert.equal(firstCreate.status, 201);
+    assert.equal(firstCreate.body.application.terms_revision, TERMS_REVISION);
+    assert.equal(firstCreate.body.application.submission_eligibility.terms_current, false);
     const applicantToken = firstCreate.body.applicant_token;
     const applicationId = firstCreate.body.application.id;
     assert.equal((await request(base, 'POST', '/api/seller/v1/applications', {
@@ -209,6 +222,7 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     });
     assert.equal(createReplay.body.application.id, applicationId);
     assert.equal(createReplay.body.applicant_token, applicantToken);
+    assert.equal(createReplay.body.application.terms_revision, TERMS_REVISION);
     assert.equal((await request(base, 'POST', '/api/seller/v1/applications', {
         applicantSecret: applicantBootstrapSecret,
         body: firstCreateBody,
@@ -221,11 +235,19 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     });
     assert.equal(sameUnverifiedEmail.status, 201);
     assert.notEqual(sameUnverifiedEmail.body.application.id, applicationId);
+    assert.equal(sameUnverifiedEmail.body.application.terms_revision, TERMS_REVISION);
+    const rotatedTermsService = createSellerApplicationService({
+        database: pool,
+        secret: APPLICATION_SECRET,
+        termsAuthority: { revision: 'seller-terms-local-test-v2', generation: 2 }
+    });
     assert.equal((await request(base, 'GET', '/api/seller/v1/applications/current', { token: resetAuthority.reset_token })).status, 401);
     assert.equal((await request(base, 'GET', '/api/seller/v1/applications/current', { token: 'customer.jwt.token' })).status, 401);
     let current = await request(base, 'GET', '/api/seller/v1/applications/current', { token: applicantToken });
     assert.equal(current.body.application.id, applicationId);
     assert.equal(current.body.application.next_allowed_step, 'business');
+    assert.equal(current.body.application.terms_revision, TERMS_REVISION);
+    assert.equal((await pool.query('SELECT terms_revision FROM seller_applications WHERE id = $1', [applicationId])).rows[0].terms_revision, null);
 
     const foreignCreate = await request(base, 'POST', '/api/seller/v1/applications', {
         applicantSecret: crypto.randomBytes(32).toString('base64url'),
@@ -250,11 +272,45 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     const business = await update('business', { expected_revision: 1, legal_name: 'Main6U Company', store_name: 'Main6U Store', business_type: 'company' });
     assert.equal((await update('contact', { expected_revision: 1, address_line: 'Test Cadde 1', city: 'İstanbul', district: 'Kadıköy', postal_code: '34710' }, 409)).body.code, 'REVISION_CONFLICT');
     const contact = await update('contact', { expected_revision: business.body.application.revision, address_line: 'Test Cadde 1', city: 'İstanbul', district: 'Kadıköy', postal_code: '34710' });
+    assert.equal((await update('agreements', { expected_revision: contact.body.application.revision, accepted: true, terms_revision: null }, 400)).body.code, 'VALIDATION_FAILED');
+    assert.equal((await update('agreements', { expected_revision: contact.body.application.revision, accepted: true, terms_revision: '' }, 400)).body.code, 'VALIDATION_FAILED');
     assert.equal((await update('agreements', { expected_revision: contact.body.application.revision, accepted: true, terms_revision: 'STALE' }, 409)).body.code, 'TERMS_REVISION_MISMATCH');
+    assert.equal((await update('agreements', { expected_revision: contact.body.application.revision, accepted: true, terms_revision: 'client-invented-v1' }, 409)).body.code, 'TERMS_REVISION_MISMATCH');
     const agreements = await update('agreements', { expected_revision: contact.body.application.revision, accepted: true, terms_revision: TERMS_REVISION });
+    assert.equal(agreements.body.application.terms_revision, TERMS_REVISION);
+    assert.equal((await pool.query('SELECT terms_revision FROM seller_applications WHERE id = $1', [applicationId])).rows[0].terms_revision, TERMS_REVISION);
     const documents = await update('documents', { expected_revision: agreements.body.application.revision, items: [{ kind: 'identity', document_reference: `local-doc-${suffix}` }] });
     assert.equal(documents.body.application.steps.documents.items[0].state, 'uploaded_unverified');
     const payout = await update('payout', { expected_revision: documents.body.application.revision, account_holder: 'Başvuru Sahibi', iban_last4: '1234' });
+
+    const rotationApplicant = { applicationId: sameUnverifiedEmail.body.application.id };
+    let rotationApplication = await applicationService.updateStep(rotationApplicant, 'business', {
+        expected_revision: sameUnverifiedEmail.body.application.revision,
+        legal_name: 'Rotation Company',
+        store_name: 'Rotation Store',
+        business_type: 'company'
+    });
+    rotationApplication = await applicationService.updateStep(rotationApplicant, 'contact', {
+        expected_revision: rotationApplication.application.revision,
+        address_line: 'Rotation Cadde 1',
+        city: 'İstanbul',
+        district: 'Kadıköy',
+        postal_code: '34710'
+    });
+    rotationApplication = await applicationService.updateStep(rotationApplicant, 'agreements', {
+        expected_revision: rotationApplication.application.revision,
+        accepted: true,
+        terms_revision: TERMS_REVISION
+    });
+    rotationApplication = await applicationService.updateStep(rotationApplicant, 'documents', {
+        expected_revision: rotationApplication.application.revision,
+        items: [{ kind: 'identity', document_reference: `rotation-doc-${suffix}` }]
+    });
+    rotationApplication = await applicationService.updateStep(rotationApplicant, 'payout', {
+        expected_revision: rotationApplication.application.revision,
+        account_holder: 'Rotation Applicant',
+        iban_last4: '5678'
+    });
     const beforeCounts = (await pool.query('SELECT (SELECT COUNT(*) FROM seller_organizations) AS organizations, (SELECT COUNT(*) FROM seller_stores) AS stores, (SELECT COUNT(*) FROM seller_memberships) AS memberships')).rows[0];
     const submitBody = { expected_revision: payout.body.application.revision };
     const submitRace = await Promise.all([
@@ -347,6 +403,183 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     const auditCount = Number((await pool.query('SELECT COUNT(*) FROM seller_application_events WHERE application_id = $1', [applicationId])).rows[0].count);
     assert.ok(auditCount >= 10);
 
+    await assert.rejects(
+        rotatedTermsService.updateStep(
+            rotationApplicant,
+            'submission',
+            { expected_revision: rotationApplication.application.revision },
+            `submit-rotated-direct-main6u-${suffix}`
+        ),
+        (error) => error.code === 'TERMS_REVISION_MISMATCH'
+    );
+    const authorityAfterRejectedDirectSubmit = (await pool.query(
+        'SELECT active_revision, generation FROM seller_application_terms_authority WHERE authority_key = 1'
+    )).rows[0];
+    assert.deepEqual(authorityAfterRejectedDirectSubmit, {
+        active_revision: 'seller-terms-local-test-v2',
+        generation: '2'
+    });
+    assert.equal(Number((await pool.query(
+        'SELECT COUNT(*) FROM seller_application_terms_authority_events WHERE generation = 2'
+    )).rows[0].count), 1);
+    const rotatedAccepted = await rotatedTermsService.current(rotationApplicant);
+    assert.equal(rotatedAccepted.terms_revision, 'seller-terms-local-test-v2');
+    assert.equal(rotatedAccepted.steps.agreements.terms_revision, TERMS_REVISION);
+    assert.equal(rotatedAccepted.submission_eligibility.terms_current, false);
+    await assert.rejects(
+        applicationService.current(rotationApplicant),
+        (error) => error.code === 'TERMS_REVISION_AUTHORITY_STALE' && error.statusCode === 503
+    );
+    await assert.rejects(
+        applicationService.updateStep(rotationApplicant, 'agreements', {
+            expected_revision: rotationApplication.application.revision,
+            accepted: true,
+            terms_revision: TERMS_REVISION
+        }),
+        (error) => error.code === 'TERMS_REVISION_AUTHORITY_STALE' && error.statusCode === 503
+    );
+    await assert.rejects(
+        applicationService.updateStep(
+            rotationApplicant,
+            'submission',
+            { expected_revision: rotationApplication.application.revision },
+            `submit-stale-replica-main6u-${suffix}`
+        ),
+        (error) => error.code === 'TERMS_REVISION_AUTHORITY_STALE' && error.statusCode === 503
+    );
+    const conflictingReplicaService = createSellerApplicationService({
+        database: pool,
+        secret: APPLICATION_SECRET,
+        termsAuthority: { revision: 'seller-terms-conflicting-v2', generation: 2 }
+    });
+    await assert.rejects(
+        conflictingReplicaService.current(rotationApplicant),
+        (error) => error.code === 'TERMS_REVISION_AUTHORITY_CONFLICT' && error.statusCode === 503
+    );
+    await assert.rejects(
+        rotatedTermsService.updateStep(
+            rotationApplicant,
+            'submission',
+            { expected_revision: rotationApplication.application.revision },
+            `submit-rotated-main6u-${suffix}`
+        ),
+        (error) => error.code === 'TERMS_REVISION_MISMATCH'
+    );
+    const reacceptedRotation = await rotatedTermsService.updateStep(rotationApplicant, 'agreements', {
+        expected_revision: rotationApplication.application.revision,
+        accepted: true,
+        terms_revision: 'seller-terms-local-test-v2'
+    });
+    assert.equal(reacceptedRotation.application.next_allowed_step, 'submission');
+    assert.equal(reacceptedRotation.application.terms_revision, 'seller-terms-local-test-v2');
+    assert.equal(reacceptedRotation.application.steps.agreements.terms_revision, 'seller-terms-local-test-v2');
+    const rotationEvent = (await pool.query(
+        "SELECT metadata_redacted FROM seller_application_events WHERE application_id = $1 AND event_type = 'seller.application.step_updated' AND metadata_redacted ->> 'step' = 'agreements' ORDER BY id DESC LIMIT 1",
+        [rotationApplicant.applicationId]
+    )).rows[0].metadata_redacted;
+    assert.deepEqual(rotationEvent, {
+        step: 'agreements',
+        verification_claimed: false,
+        previous_terms_revision: TERMS_REVISION,
+        accepted_terms_revision: 'seller-terms-local-test-v2',
+        terms_revision_rotated: true
+    });
+    const rotatedSubmission = await rotatedTermsService.updateStep(
+        rotationApplicant,
+        'submission',
+        { expected_revision: reacceptedRotation.application.revision },
+        `submit-rotated-current-main6u-${suffix}`
+    );
+    assert.equal(rotatedSubmission.application.status, 'AWAITING_EXTERNAL_VERIFICATION');
+    const authority = (await pool.query(
+        'SELECT active_revision, generation FROM seller_application_terms_authority WHERE authority_key = 1'
+    )).rows[0];
+    assert.deepEqual(authority, { active_revision: 'seller-terms-local-test-v2', generation: '2' });
+    const authorityEvents = (await pool.query(
+        'SELECT generation, active_revision, previous_generation, previous_revision FROM seller_application_terms_authority_events ORDER BY generation'
+    )).rows;
+    assert.deepEqual(authorityEvents, [
+        { generation: '1', active_revision: TERMS_REVISION, previous_generation: null, previous_revision: null },
+        { generation: '2', active_revision: 'seller-terms-local-test-v2', previous_generation: '1', previous_revision: TERMS_REVISION }
+    ]);
+    await assert.rejects(
+        pool.query('UPDATE seller_application_terms_authority_events SET active_revision = active_revision WHERE generation = 2'),
+        (error) => error.code === '55000'
+    );
+    await assert.rejects(
+        pool.query('DELETE FROM seller_application_terms_authority_events WHERE generation = 2'),
+        (error) => error.code === '55000'
+    );
+    await assert.rejects(
+        pool.query('TRUNCATE TABLE seller_application_terms_authority_events'),
+        (error) => error.code === '55000'
+    );
+
+    const generationThreeService = createSellerApplicationService({
+        database: pool,
+        secret: APPLICATION_SECRET,
+        termsAuthority: { revision: 'seller-terms-local-test-v3', generation: 3 }
+    });
+    const generationFourService = createSellerApplicationService({
+        database: pool,
+        secret: APPLICATION_SECRET,
+        termsAuthority: { revision: 'seller-terms-local-test-v4', generation: 4 }
+    });
+    const generationRace = await Promise.allSettled([
+        generationThreeService.current(rotationApplicant),
+        generationFourService.current(rotationApplicant)
+    ]);
+    assert.equal(generationRace[1].status, 'fulfilled');
+    if (generationRace[0].status === 'rejected') {
+        assert.equal(generationRace[0].reason.code, 'TERMS_REVISION_AUTHORITY_STALE');
+    }
+    assert.deepEqual((await pool.query(
+        'SELECT active_revision, generation FROM seller_application_terms_authority WHERE authority_key = 1'
+    )).rows[0], { active_revision: 'seller-terms-local-test-v4', generation: '4' });
+    const concurrentGenerationEvents = (await pool.query(
+        'SELECT generation, previous_generation FROM seller_application_terms_authority_events WHERE generation IN (3, 4) ORDER BY generation'
+    )).rows;
+    assert.ok(concurrentGenerationEvents.length === 1 || concurrentGenerationEvents.length === 2);
+    assert.equal(concurrentGenerationEvents.at(-1).generation, '4');
+    if (concurrentGenerationEvents.length === 1) {
+        assert.deepEqual(concurrentGenerationEvents[0], { generation: '4', previous_generation: '2' });
+    } else {
+        assert.deepEqual(concurrentGenerationEvents, [
+            { generation: '3', previous_generation: '2' },
+            { generation: '4', previous_generation: '3' }
+        ]);
+    }
+
+    const generationFiveA = createSellerApplicationService({
+        database: pool,
+        secret: APPLICATION_SECRET,
+        termsAuthority: { revision: 'seller-terms-local-test-v5-a', generation: 5 }
+    });
+    const generationFiveB = createSellerApplicationService({
+        database: pool,
+        secret: APPLICATION_SECRET,
+        termsAuthority: { revision: 'seller-terms-local-test-v5-b', generation: 5 }
+    });
+    const conflictingGenerationRace = await Promise.allSettled([
+        generationFiveA.current(rotationApplicant),
+        generationFiveB.current(rotationApplicant)
+    ]);
+    assert.deepEqual(conflictingGenerationRace.map((entry) => entry.status).sort(), ['fulfilled', 'rejected']);
+    const rejectedGenerationFive = conflictingGenerationRace.find((entry) => entry.status === 'rejected');
+    assert.equal(rejectedGenerationFive.reason.code, 'TERMS_REVISION_AUTHORITY_CONFLICT');
+    const generationFiveAuthority = (await pool.query(
+        'SELECT active_revision, generation FROM seller_application_terms_authority WHERE authority_key = 1'
+    )).rows[0];
+    assert.equal(generationFiveAuthority.generation, '5');
+    assert.ok(['seller-terms-local-test-v5-a', 'seller-terms-local-test-v5-b'].includes(generationFiveAuthority.active_revision));
+    assert.equal(Number((await pool.query(
+        'SELECT COUNT(*) FROM seller_application_terms_authority_events WHERE generation = 5'
+    )).rows[0].count), 1);
+    await assert.rejects(
+        generationFourService.current(rotationApplicant),
+        (error) => error.code === 'TERMS_REVISION_AUTHORITY_STALE'
+    );
+
     console.log('SELLER_MAIN6U_LOCAL_E2E=PASS');
     console.log('PASSWORD_ENUMERATION_RESPONSE_PARITY=PASS');
     console.log('RESET_CONCURRENCY_SINGLE_SUCCESS=PASS');
@@ -356,6 +589,8 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     console.log('UNVERIFIED_IDENTITY_SQUATTING_PREVENTION=PASS');
     console.log('APPLICATION_IDOR=PASS');
     console.log('APPLICATION_REVISION_IDEMPOTENCY=PASS');
+    console.log('AUTHORITATIVE_TERMS_REVISION=PASS');
+    console.log('TERMS_REVISION_ROTATION_FAIL_CLOSED=PASS');
     console.log('APPLICATION_CORRECTION_CYCLE=PASS');
     console.log('AUTO_APPROVAL_PREVENTION=PASS');
     console.log('EXTERNAL_PROVIDER_BOUNDARY=PASS');

@@ -187,5 +187,12 @@
     "sha256": "4f274fd1d35c912606b0b6492b7590ab7c25808729e7c6854270670d8dd0ab9c",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260822_01_seller_application_terms_authority",
+    "path": "migrations/20260822_01_seller_application_terms_authority.sql",
+    "sha256": "0c8963fba61340b53fe1855361c36454fa7316ae5dbcff68e3114614415b7898",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

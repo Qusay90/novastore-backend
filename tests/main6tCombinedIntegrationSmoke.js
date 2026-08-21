@@ -15,7 +15,7 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
 
 (async () => {
     const registry = loadRegistry();
-    assert.equal(registry.length, 27);
+    assert.equal(registry.length, 28);
 
     const sellerMigrations = selectSellerMigrations({ registry });
     assert.deepEqual(
@@ -35,7 +35,8 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
             ...sellerMigrations.map((migration) => migration.path),
             'migrations/20260820_01_main6t_seller_session_membership_binding.sql',
             'migrations/20260821_01_seller_password_recovery.sql',
-            'migrations/20260821_02_seller_applications.sql'
+            'migrations/20260821_02_seller_applications.sql',
+            'migrations/20260822_01_seller_application_terms_authority.sql'
         ]
     );
 
@@ -61,8 +62,8 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
     };
     const applied = await applyLocalSellerMigrations({ database, registry, output: () => {} });
     assert.deepEqual(applied, localSellerMigrations.map((migration) => migration.id));
-    assert.equal(statements.filter((sql) => sql === 'BEGIN').length, 8);
-    assert.equal(statements.filter((sql) => sql === 'COMMIT').length, 8);
+    assert.equal(statements.filter((sql) => sql === 'BEGIN').length, 9);
+    assert.equal(statements.filter((sql) => sql === 'COMMIT').length, 9);
     assert.equal(statements.filter((sql) => sql === 'ROLLBACK').length, 0);
     assert.equal(released, true);
 
@@ -107,7 +108,7 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
     assert.equal(count(settings, /include\(":app"\)/g), 1);
     assert.equal(count(settings, /include\(":seller-app"\)/g), 1);
 
-    console.log('main6t combined integration smoke passed: migrations=27 seller=5 binding=1 main6u=2 listeners=1 routes=38');
+    console.log('main6t combined integration smoke passed: migrations=28 seller=5 binding=1 main6u=3 listeners=1 routes=38');
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;

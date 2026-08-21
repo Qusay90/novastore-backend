@@ -197,12 +197,17 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'returns', 'review_media', 'reviews', 'shipments', 'stores',
         'support_thread_events', 'support_threads', 'template_attributes', 'user_shared_state', 'users', 'visitor_sessions',
         'admin_coupon_audit_events',
+        'seller_applicant_sessions', 'seller_application_command_receipts',
+        'seller_application_events', 'seller_application_verification_requests',
+        'seller_application_terms_authority', 'seller_application_terms_authority_events',
+        'seller_applications',
         'seller_audit_events', 'seller_bootstrap_operator_authorizations',
         'seller_fulfillment_packages', 'seller_inventory_items', 'seller_inventory_movements',
         'seller_invitations', 'seller_ledger_entries', 'seller_membership_store_scopes',
         'seller_memberships', 'seller_mutation_receipts', 'seller_offer_variants',
         'seller_offers', 'seller_order_items', 'seller_order_transitions', 'seller_orders',
         'seller_organizations', 'seller_outbox_delivery_attempts', 'seller_outbox_events',
+        'seller_password_recovery_challenges', 'seller_password_recovery_events',
         'seller_permissions', 'seller_refresh_token_families', 'seller_refresh_tokens',
         'seller_returns', 'seller_role_permissions', 'seller_roles', 'seller_sessions',
         'seller_settlements', 'seller_step_up_challenges', 'seller_store_profiles',
@@ -242,10 +247,14 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
               ('notifications', 'entity_id'),
               ('messages', 'support_thread_id'),
               ('coupons', 'revision'),
-              ('product_media', 'media_type')
+              ('product_media', 'media_type'),
+              ('seller_application_terms_authority', 'active_revision'),
+              ('seller_application_terms_authority', 'generation'),
+              ('seller_application_terms_authority_events', 'active_revision'),
+              ('seller_application_terms_authority_events', 'generation')
            )`
     );
-    assert.equal(requiredColumns.rowCount, 20);
+    assert.equal(requiredColumns.rowCount, 24);
 
     const triggers = await admin.query(
         `SELECT trigger_name
@@ -262,10 +271,19 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
               'trg_seller_memberships_no_hard_delete',
               'trg_seller_audit_events_append_only',
               'trg_seller_outbox_events_append_only',
-              'trg_seller_support_messages_append_only'
+              'trg_seller_support_messages_append_only',
+              'trg_seller_application_terms_authority_events_append_only'
            )`
     );
-    assert.equal(new Set(triggers.rows.map((row) => row.trigger_name)).size, 11);
+    assert.equal(new Set(triggers.rows.map((row) => row.trigger_name)).size, 12);
+    const truncateTrigger = await admin.query(
+        `SELECT t.tgname
+         FROM pg_trigger t
+         WHERE t.tgrelid = 'seller_application_terms_authority_events'::regclass
+           AND t.tgname = 'trg_seller_application_terms_authority_events_no_truncate'
+           AND NOT t.tgisinternal`
+    );
+    assert.equal(truncateTrigger.rowCount, 1);
 
     const requiredConstraints = [
         'chk_reviews_operational_status', 'chk_reviews_revision_positive',
@@ -285,7 +303,11 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'chk_admin_coupon_audit_revision', 'chk_admin_coupon_audit_metadata_object',
         'uq_seller_memberships_organization_id_id_user_id', 'fk_seller_sessions_membership_user',
         'chk_product_media_type', 'chk_product_media_image_cover',
-        'chk_product_media_video_publication_disabled', 'chk_products_image_url_not_video'
+        'chk_product_media_video_publication_disabled', 'chk_products_image_url_not_video',
+        'chk_seller_application_terms_authority_singleton',
+        'chk_seller_application_terms_authority_generation',
+        'chk_seller_application_terms_authority_event_generation',
+        'chk_seller_application_terms_authority_event_previous'
     ].sort();
     const constraints = await admin.query(
         `SELECT conname

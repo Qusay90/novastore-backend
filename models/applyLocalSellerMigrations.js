@@ -7,7 +7,8 @@ const MAIN6T_SESSION_BINDING_ID = '20260820_01_main6t_seller_session_membership_
 const MAIN6T_SESSION_BINDING_PATH = 'migrations/20260820_01_main6t_seller_session_membership_binding.sql';
 const MAIN6U_MIGRATIONS = Object.freeze([
     Object.freeze({ id: '20260821_01_seller_password_recovery', path: 'migrations/20260821_01_seller_password_recovery.sql' }),
-    Object.freeze({ id: '20260821_02_seller_applications', path: 'migrations/20260821_02_seller_applications.sql' })
+    Object.freeze({ id: '20260821_02_seller_applications', path: 'migrations/20260821_02_seller_applications.sql' }),
+    Object.freeze({ id: '20260822_01_seller_application_terms_authority', path: 'migrations/20260822_01_seller_application_terms_authority.sql' })
 ]);
 
 const selectSellerMigrations = ({

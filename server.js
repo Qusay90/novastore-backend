@@ -420,6 +420,7 @@ if (localSellerApiEnabled) {
     const { createSellerPasswordRecoveryService } = require('./services/sellerPasswordRecoveryService');
     const { createSellerPasswordRecoveryDeliveryBoundary } = require('./services/sellerPasswordRecoveryDeliveryBoundary');
     const { createSellerApplicationService } = require('./services/sellerApplicationService');
+    const { getSellerApplicationTermsAuthority } = require('./config/sellerApplicationTerms');
 
     app.locals.sellerDatabase = pool;
     const sellerE2eTraceEnabled = localSellerFeature('SELLER_E2E_TRACE_ENABLED') &&
@@ -446,7 +447,7 @@ if (localSellerApiEnabled) {
     const applicationService = createSellerApplicationService({
         database: pool,
         secret: process.env.SELLER_APPLICATION_AUTH_SECRET,
-        termsRevision: process.env.SELLER_APPLICATION_TERMS_REVISION
+        termsAuthority: getSellerApplicationTermsAuthority()
     });
     const applicantAuth = createSellerApplicantAuth({ service: applicationService });
     const tenant = createSellerTenantContextMiddleware();
