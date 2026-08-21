@@ -30,6 +30,7 @@ const smokeTests = [
     'tests/localMain6sSchemaInitSmoke.js',
     'tests/main6tCombinedIntegrationSmoke.js',
     'tests/sellerLoginRateLimitSmoke.js',
+    'tests/sellerMain6uContractSmoke.js',
     'tests/stagingMigrationFoundationSmoke.js'
 ];
 

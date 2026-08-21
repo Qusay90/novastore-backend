@@ -82,4 +82,40 @@ const createSellerLoginRateLimit = ({
     };
 };
 
-module.exports = Object.freeze({ createSellerLoginRateLimit, normalizeIdentifier });
+const createSellerRecoveryRateLimit = ({
+    windowMs = 10 * 60 * 1000,
+    ipMaxRequests = 30,
+    identifierMaxRequests = 3,
+    now = Date.now
+} = {}) => {
+    const effectiveWindowMs = boundedPositiveInteger(windowMs, 10 * 60 * 1000, 'windowMs');
+    const effectiveIpMax = boundedPositiveInteger(ipMaxRequests, 30, 'ipMaxRequests');
+    const effectiveIdentifierMax = boundedPositiveInteger(identifierMaxRequests, 3, 'identifierMaxRequests');
+    if (typeof now !== 'function') throw new TypeError('now must be a function.');
+    const buckets = new Map();
+    const bucket = (key, timestamp) => {
+        const existing = buckets.get(key);
+        if (existing && existing.expiresAt > timestamp) return existing;
+        const created = { count: 0, expiresAt: timestamp + effectiveWindowMs };
+        buckets.set(key, created);
+        return created;
+    };
+    return (req, res, next) => {
+        const timestamp = now();
+        for (const [key, value] of buckets.entries()) if (value.expiresAt <= timestamp) buckets.delete(key);
+        const ip = String(req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || 'unknown');
+        const identifier = normalizeIdentifier(req.body?.identifier);
+        const ipBucket = bucket(opaqueKey('seller-recovery-ip', ip), timestamp);
+        const identifierBucket = bucket(opaqueKey('seller-recovery-identifier', identifier), timestamp);
+        if (ipBucket.count >= effectiveIpMax || identifierBucket.count >= effectiveIdentifierMax) {
+            const retryAfterSeconds = Math.max(1, Math.ceil((Math.min(ipBucket.expiresAt, identifierBucket.expiresAt) - timestamp) / 1000));
+            res.set?.('Retry-After', String(retryAfterSeconds));
+            return res.status(202).json({ accepted: true });
+        }
+        ipBucket.count += 1;
+        identifierBucket.count += 1;
+        return next();
+    };
+};
+
+module.exports = Object.freeze({ createSellerLoginRateLimit, createSellerRecoveryRateLimit, normalizeIdentifier });

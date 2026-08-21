@@ -398,12 +398,17 @@ if (localSellerApiEnabled) {
 
     const { createSellerContextRouter } = require('./routes/sellerContextRoutes');
     const { createSellerAuthRouter } = require('./routes/sellerAuthRoutes');
+    const { createSellerPasswordRecoveryRouter } = require('./routes/sellerPasswordRecoveryRoutes');
+    const { createSellerApplicationRouter } = require('./routes/sellerApplicationRoutes');
     const { createSellerBusinessRouter } = require('./routes/sellerBusinessRoutes');
     const { createSellerAuthMiddleware } = require('./middlewares/sellerAuthMiddleware');
+    const { createSellerApplicantAuth } = require('./middlewares/sellerApplicantAuth');
     const { createSellerTenantContextMiddleware } = require('./middlewares/sellerTenantContext');
     const { createSellerAccessTokenService } = require('./services/sellerAccessTokenService');
     const loginService = require('./services/sellerLoginService');
     const { createSellerAuthController } = require('./controllers/sellerAuthController');
+    const { createSellerPasswordRecoveryController } = require('./controllers/sellerPasswordRecoveryController');
+    const { createSellerApplicationController } = require('./controllers/sellerApplicationController');
     const { createSellerContextController } = require('./controllers/sellerContextController');
     const { createSellerBusinessController } = require('./controllers/sellerBusinessController');
     const storeService = require('./services/sellerStoreService');
@@ -412,6 +417,9 @@ if (localSellerApiEnabled) {
     const financeService = require('./services/sellerFinanceService');
     const supportService = require('./services/sellerSupportService');
     const { listMembersForStoreScope } = require('./services/sellerTeamReadService');
+    const { createSellerPasswordRecoveryService } = require('./services/sellerPasswordRecoveryService');
+    const { createSellerPasswordRecoveryDeliveryBoundary } = require('./services/sellerPasswordRecoveryDeliveryBoundary');
+    const { createSellerApplicationService } = require('./services/sellerApplicationService');
 
     app.locals.sellerDatabase = pool;
     const sellerE2eTraceEnabled = localSellerFeature('SELLER_E2E_TRACE_ENABLED') &&
@@ -425,6 +433,22 @@ if (localSellerApiEnabled) {
             : '15m'
     });
     const auth = createSellerAuthMiddleware({ verifyAccessToken: tokenService.verify });
+    const syntheticRecoveryEnabled = localSellerFeature('SELLER_PASSWORD_RECOVERY_SYNTHETIC_DELIVERY') &&
+        ['test', 'development'].includes(String(process.env.NODE_ENV || '').toLowerCase()) &&
+        String(process.env.NOVASTORE_SAFE_LOCAL_BACKEND || '').toLowerCase() === 'true' &&
+        String(process.env.NOVASTORE_ALLOW_REMOTE_DB || '').toLowerCase() !== 'true';
+    const recoveryDelivery = createSellerPasswordRecoveryDeliveryBoundary({ syntheticEnabled: syntheticRecoveryEnabled });
+    const passwordRecoveryService = createSellerPasswordRecoveryService({
+        database: pool,
+        secret: process.env.SELLER_PASSWORD_RECOVERY_SECRET,
+        deliveryBoundary: recoveryDelivery.deliver
+    });
+    const applicationService = createSellerApplicationService({
+        database: pool,
+        secret: process.env.SELLER_APPLICATION_AUTH_SECRET,
+        termsRevision: process.env.SELLER_APPLICATION_TERMS_REVISION
+    });
+    const applicantAuth = createSellerApplicantAuth({ service: applicationService });
     const tenant = createSellerTenantContextMiddleware();
     const contextController = createSellerContextController({
         readOrganization: async (context) => (
@@ -449,6 +473,10 @@ if (localSellerApiEnabled) {
         supportService
     });
     const authController = createSellerAuthController({ loginService, tokenService });
+    const passwordRecoveryController = createSellerPasswordRecoveryController({ service: passwordRecoveryService });
+    const applicationController = createSellerApplicationController({ service: applicationService });
+
+    app.locals.sellerPasswordRecoverySyntheticDelivery = recoveryDelivery;
 
     if (sellerE2eTraceEnabled) {
         app.use('/api/seller/v1', (req, res, next) => {
@@ -460,6 +488,8 @@ if (localSellerApiEnabled) {
     }
 
     app.use('/api/seller/v1', createSellerAuthRouter({ auth, controller: authController }));
+    app.use('/api/seller/v1', createSellerPasswordRecoveryRouter({ controller: passwordRecoveryController }));
+    app.use('/api/seller/v1', createSellerApplicationRouter({ controller: applicationController, applicantAuth }));
     app.use('/api/seller/v1', createSellerContextRouter({ enabled: true, auth, tenant, controller: contextController }));
     app.use('/api/seller/v1', createSellerBusinessRouter({
         enabled: true,
