@@ -5137,3 +5137,62 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* R5 review runtime: final semantic type and interaction layer. */
+html body {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 400;
+}
+
+body :is(p, label, input, textarea, select, small),
+body :is(.breadcrumb, .product-brand, .product-rating, .detail-rating, .delivery-line),
+body :is(.cart-line span, .cart-line__actions b, .site-footer p, .support-thread p) {
+  font-weight: 400;
+}
+
+body :is(.site-header a, .site-footer a, .account-sidebar a, .product-card h3, .product-card h3 a),
+body :is(.help-grid strong, .cart-line strong, .cart-line__product-link strong, .order-card__head strong) {
+  font-weight: 500;
+}
+
+body .connected-form label,
+body .support-composer label {
+  font-weight: 500;
+}
+
+body .connected-form input,
+body .connected-form textarea,
+body .support-composer textarea,
+body .help-grid button > span:not(.nova-service-icon) {
+  font-weight: 400;
+}
+
+body :is(button, .primary-button, .secondary-button, .help-grid button, .quantity-control button),
+body :is(.cart-drawer__footer button, .comparison-open, .account-logout) {
+  font-weight: 600;
+}
+
+body :is(.commerce-page, .product-page, .help-page, .return-exchange-page, .cart-drawer) h1 {
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+
+body :is(.commerce-page, .product-page, .help-page, .return-exchange-page, .cart-drawer) h2,
+body :is(.commerce-page, .product-page, .help-page, .return-exchange-page, .cart-drawer) h3 {
+  font-weight: 600;
+}
+
+body :is(.price-block strong, .detail-price strong, .cart-page-line__end > strong, .order-total dd) {
+  font-weight: 700;
+}
+
+.cart-drawer-overlay {
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.cart-drawer-overlay .cart-drawer {
+  z-index: 1;
+  pointer-events: auto;
+  box-shadow: -18px 0 48px rgba(4, 23, 42, .22);
+}
