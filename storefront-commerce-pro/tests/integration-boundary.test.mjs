@@ -586,6 +586,54 @@ test("commerce runtime gerçek adapterları tek katalog, favori ve sepet durumun
   assert.equal(typeof runtime.refreshCustomerState, "function");
 });
 
+test("Seller müşteri önizlemesi runtime başlangıcında müşteri oturumu, favori veya sepet yan etkisi oluşturmaz", async () => {
+  const storage = createStorage({
+    nova_user_token: "synthetic-customer-session",
+    nova_user_info: JSON.stringify({ id: 77, fullName: "Yerel Müşteri", role: "customer" }),
+    novastore_cart_guest: JSON.stringify([{ productId: 202, quantity: 1 }]),
+  });
+  const initialStorage = storage.snapshot();
+  const requests = [];
+  const root = {
+    localStorage: storage,
+    sessionStorage: createStorage(),
+    location: { origin: "https://novastore.tr", assign: () => assert.fail("preview yönlendirme yapmamalı") },
+    fetch: async (path, options = {}) => {
+      requests.push({ path, method: options.method || "GET" });
+      let payload;
+      if (path === "/api/public/categories?format=tree") payload = categoryTree;
+      else if (path === "/api/products") payload = publicProducts.slice(0, 2);
+      else if (path === "/api/public/collections") payload = [];
+      else if (path === "/api/public/navigation/main") payload = { code: "main", items: [] };
+      else assert.fail(`Salt okunur preview beklenmeyen istek yaptı: ${path}`);
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => {},
+  };
+
+  const runtime = await createCommerceRuntime({ root }).initialize({ readOnlyPreview: true });
+
+  assert.equal(runtime.readOnlyPreview, true);
+  assert.deepEqual(runtime.session, { status: "guest", user: null, warning: null });
+  assert.deepEqual([...runtime.favorites.initialIds], []);
+  assert.deepEqual(runtime.cart.initialItems, []);
+  assert.deepEqual(storage.snapshot(), initialStorage, "preview local müşteri durumunu değiştirmemeli");
+  assert.equal(requests.some(({ path }) => path.startsWith("/api/users/") || path.startsWith("/api/favorites") || path.startsWith("/api/shared-state")), false);
+  assert.equal(requests.every(({ method }) => method === "GET"), true);
+  await assert.rejects(() => runtime.favorites.set(202, true), { code: "PUBLIC_STORE_PREVIEW_READ_ONLY" });
+  await assert.rejects(() => runtime.cart.persist([{ productId: 202, quantity: 1 }]), { code: "PUBLIC_STORE_PREVIEW_READ_ONLY" });
+  await assert.rejects(() => runtime.cart.handoffToCheckout([{ productId: 202, quantity: 1 }]), { code: "PUBLIC_STORE_PREVIEW_READ_ONLY" });
+  const refreshed = await runtime.refreshCustomerState({ cartItems: [{ productId: 202, quantity: 1 }] });
+  assert.deepEqual([...refreshed.favoriteIds], []);
+  assert.deepEqual(refreshed.cartItems, []);
+  assert.deepEqual(storage.snapshot(), initialStorage, "preview engellenen çağrılardan sonra da storage değiştirmemeli");
+});
+
 test("customer HTTP yöntem, rota, sorgu ve müşteri token sınırlarını birlikte uygular", async () => {
   assert.deepEqual(
     normalizeCustomerApiRequest("/api/addresses/12/default", "PATCH", "https://novastore.tr"),

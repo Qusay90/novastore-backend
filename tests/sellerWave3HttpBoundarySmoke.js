@@ -5,6 +5,7 @@ const { SELLER_BUSINESS_PATHS, commandPermission, createSellerBusinessRouter } =
 
 assert.ok(SELLER_BUSINESS_PATHS.includes('/finance/summary'));
 assert.ok(SELLER_BUSINESS_PATHS.includes('/support/messages'));
+assert.ok(SELLER_BUSINESS_PATHS.includes('/stores/:storeId/public-preview'));
 const router = createSellerBusinessRouter();
 const layer = router.stack[0];
 let statusCode = null;
