@@ -7,7 +7,7 @@ import {
   Star,
   User,
   VideoCamera,
-} from "@phosphor-icons/react";
+} from "./CustomerIcon.jsx";
 
 const dateFormatter = new Intl.DateTimeFormat("tr-TR", {
   day: "numeric",

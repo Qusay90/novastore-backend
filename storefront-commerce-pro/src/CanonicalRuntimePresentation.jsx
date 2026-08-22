@@ -1,6 +1,6 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { RuntimeComparisonContext } from "./integration/RuntimeComparisonContext.jsx";
+import { CustomerProductCard } from "./CustomerProductCard.jsx";
 import {
   ArrowLeft,
   ArrowsLeftRight,
@@ -45,7 +45,7 @@ import {
   User,
   Watch,
   X,
-} from "@phosphor-icons/react";
+} from "./CustomerIcon.jsx";
 import {
   buildFacets,
   categories,
@@ -602,37 +602,7 @@ function Breadcrumbs({ category, productName }) {
 }
 
 function ProductCard({ product, favorite, onFavorite, onAdd }) {
-  const soldOut = product.stock <= 0;
-  const comparison = useContext(RuntimeComparisonContext);
-  const compared = comparison.ids.has(product.id);
-  const discount = product.oldPrice ? Math.round((1 - product.price / product.oldPrice) * 100) : 0;
-  return (
-    <article className={cx("product-card", soldOut && "is-sold-out")}>
-      <div className="product-card__media">
-        {product.badge && <span className={cx("product-badge", soldOut && "is-muted")}>{soldOut ? "Tükendi" : product.badge}</span>}
-        <button className={cx("favorite-button", favorite && "is-active")} type="button" onClick={() => onFavorite(product.id)} aria-pressed={favorite} aria-label={favorite ? `${product.name} ürününü favorilerden çıkar` : `${product.name} ürününü favorilere ekle`}>
-          <Heart weight={favorite ? "fill" : "regular"} />
-        </button>
-        <a href={`#/urun/${product.slug}`} aria-label={`${product.name} detayını aç`}><img src={productImage(product)} alt={product.name} /></a>
-      </div>
-      <div className="product-card__body">
-        <span className="product-brand">{product.brand}</span>
-        <h3><a href={`#/urun/${product.slug}`}>{product.name}</a></h3>
-        <div className="product-rating" aria-label={`${product.rating} puan, ${product.reviews} değerlendirme`}><Star weight="fill" /><strong>{product.rating.toFixed(1)}</strong><span>({product.reviews})</span></div>
-        <div className="delivery-line">{soldOut ? <span className="sold-out-copy">Stok bekleniyor</span> : product.fastDelivery ? <><Truck weight="bold" /> Yarın kapında</> : <><Package /> 2–3 iş gününde</>}</div>
-        <div className="product-price-row">
-          <div className="price-block">
-            {product.oldPrice && <span><del>{money.format(product.oldPrice)}</del>{discount > 0 && <b>%{discount}</b>}</span>}
-            <strong>{money.format(product.price)}</strong>
-          </div>
-        </div>
-        <div className="product-card__actions">
-          <button className={cx("compare-button", compared && "is-active")} type="button" aria-pressed={compared} disabled={!comparison.available} onClick={() => comparison.toggle(product.id)} aria-label={compared ? `${product.name} ürününü karşılaştırmadan çıkar` : `${product.name} ürününü karşılaştır`}><ArrowsLeftRight /></button>
-          <button className="card-add-button" type="button" disabled={soldOut} onClick={() => onAdd(product.id)}>{soldOut ? "Tükendi" : <><ShoppingCart /> Sepete ekle</>}</button>
-        </div>
-      </div>
-    </article>
-  );
+  return <CustomerProductCard product={product} favorite={favorite} onFavorite={onFavorite} onAdd={onAdd} mediaFallback={productImage(product)} />;
 }
 
 function ProductGrid({ items, favorites, onFavorite, onAdd, compact = false }) {

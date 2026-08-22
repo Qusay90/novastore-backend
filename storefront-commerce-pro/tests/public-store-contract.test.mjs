@@ -105,9 +105,10 @@ test("müşteri mağaza takip adapterı yalnız public slug ve müşteri-auth y�
 });
 
 test("kanonik mağaza rotası ve preview modu tek PublicStorePage render yolunu kullanır", async () => {
-  const [appSource, pageSource, serverSource, cssSource] = await Promise.all([
+  const [appSource, pageSource, sharedCardSource, serverSource, cssSource] = await Promise.all([
     readFile(new URL("../src/IntegratedApp.jsx", import.meta.url), "utf8"),
     readFile(new URL("../src/PublicStorePage.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/CustomerProductCard.jsx", import.meta.url), "utf8"),
     readFile(new URL("../../server.js", import.meta.url), "utf8"),
     readFile(new URL("../src/integrated.css", import.meta.url), "utf8"),
   ]);
@@ -116,8 +117,9 @@ test("kanonik mağaza rotası ve preview modu tek PublicStorePage render yolunu 
   assert.match(appSource, /query\.get\("mode"\) === "preview"/);
   assert.equal((appSource.match(/<PublicStorePage /g) || []).length, 1, "customer ve preview tek renderer kullanmalı");
   assert.match(serverSource, /kategori\|urun\|koleksiyon\|magaza/);
-  assert.match(pageSource, /previewMode \? \(/);
-  assert.match(pageSource, /Önizlemede işlem yapılamaz/);
+  assert.match(pageSource, /<CustomerProductCard[\s\S]*?previewMode=\{previewMode\}/);
+  assert.match(sharedCardSource, /previewMode \? <span className="customer-card-preview-media/);
+  assert.match(sharedCardSource, /Önizlemede işlem yapılamaz/);
   assert.match(pageSource, /Önizlemede takip kapalı/);
   assert.match(pageSource, /Mağazayı takip et/);
   assert.match(pageSource, /public-store-metrics/);

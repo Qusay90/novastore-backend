@@ -2,11 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowsClockwise,
   CaretRight,
-  Heart,
   Package,
   ShieldCheck,
   ShoppingBagOpen,
-  ShoppingCart,
   Star,
   Storefront,
   Truck,
@@ -14,80 +12,13 @@ import {
   UserPlus,
   Users,
   WarningCircle,
-} from "@phosphor-icons/react";
-
-const money = new Intl.NumberFormat("tr-TR", {
-  style: "currency",
-  currency: "TRY",
-  maximumFractionDigits: 2,
-});
+} from "./CustomerIcon.jsx";
+import { CustomerProductCard } from "./CustomerProductCard.jsx";
 
 const integer = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
-const productImage = (product) => product?.imageUrl || null;
 const isAuthenticatedSession = (session) => (
   session?.status === "authenticated" || session?.status === "unverified"
 );
-
-function StoreProductMedia({ product }) {
-  const image = productImage(product);
-  if (!image) {
-    return (
-      <span className="public-store-product-placeholder" role="img" aria-label={`${product.name} için ürün görseli bulunmuyor`}>
-        <Package weight="duotone" aria-hidden="true" />
-        <small>Ürün görseli hazırlanıyor</small>
-      </span>
-    );
-  }
-  return <img src={image} alt={product.name} loading="lazy" decoding="async" />;
-}
-
-function StoreProductCard({ product, storeName, previewMode, favorite, onFavorite, onAdd }) {
-  const soldOut = product.stock <= 0;
-  const discount = product.oldPrice ? Math.round((1 - product.price / product.oldPrice) * 100) : 0;
-  const media = <StoreProductMedia product={product} />;
-  const name = previewMode
-    ? <span>{product.name}</span>
-    : <a href={`#/urun/${product.slug}`}>{product.name}</a>;
-  return (
-    <article className={`product-card public-store-product-card${soldOut ? " is-sold-out" : ""}`}>
-      <div className="product-card__media">
-        {(soldOut || discount > 0) && <span className={`product-badge${soldOut ? " is-muted" : ""}`}>{soldOut ? "Tükendi" : `%${discount} İndirim`}</span>}
-        {!previewMode && (
-          <button className={`favorite-button${favorite ? " is-active" : ""}`} type="button" onClick={() => onFavorite(product.id)} aria-pressed={favorite} aria-label={favorite ? `${product.name} ürününü favorilerden çıkar` : `${product.name} ürününü favorilere ekle`}>
-            <Heart weight={favorite ? "fill" : "regular"} />
-          </button>
-        )}
-        {previewMode
-          ? <div className="public-store-product-media">{media}</div>
-          : <a href={`#/urun/${product.slug}`} aria-label={`${product.name} detayını aç`}>{media}</a>}
-      </div>
-      <div className="product-card__body">
-        <span className="product-brand">{storeName}</span>
-        <h3>{name}</h3>
-        {product.reviews > 0 ? (
-          <div className="product-rating" role="img" aria-label={`${product.rating} puan, ${product.reviews} değerlendirme`}><Star weight="fill" /><strong>{product.rating.toFixed(1)}</strong><span>({product.reviews})</span></div>
-        ) : (
-          <div className="product-rating public-store-no-rating" role="img" aria-label="Henüz değerlendirme yok"><Star /><span>Henüz değerlendirme yok</span></div>
-        )}
-        <div className="delivery-line">{soldOut ? <span className="sold-out-copy">Stok bekleniyor</span> : <><Package /> Satışa hazır</>}</div>
-        <div className="product-price-row">
-          <div className="price-block">
-            {product.oldPrice && <span><del>{money.format(product.oldPrice)}</del>{discount > 0 && <b>%{discount}</b>}</span>}
-            <strong>{money.format(product.price)}</strong>
-          </div>
-        </div>
-        {previewMode ? (
-          <div className="public-store-readonly-product"><ShieldCheck /> Önizlemede işlem yapılamaz</div>
-        ) : (
-          <div className="product-card__actions public-store-product-actions">
-            <a className="compare-button" href={`#/urun/${product.slug}`} aria-label={`${product.name} ayrıntılarını aç`}><CaretRight /></a>
-            <button className="card-add-button" type="button" disabled={soldOut} onClick={() => onAdd(product.id)}>{soldOut ? "Tükendi" : <><ShoppingCart /> Sepete ekle</>}</button>
-          </div>
-        )}
-      </div>
-    </article>
-  );
-}
 
 function StoreState({ phase, onRetry }) {
   if (phase === "loading") {
@@ -284,7 +215,7 @@ export function PublicStorePage({ slug, previewMode = false, loadStore, followSt
         </div>
         {products.length ? (
           <div className="product-grid public-store-product-grid">
-            {products.map((product) => <StoreProductCard key={product.id} product={product} storeName={store.name} previewMode={previewMode} favorite={favorites.has(product.id)} onFavorite={onFavorite} onAdd={onAdd} />)}
+            {products.map((product) => <CustomerProductCard key={product.id} product={product} brand={store.name} previewMode={previewMode} favorite={favorites.has(product.id)} onFavorite={onFavorite} onAdd={onAdd} className="public-store-product-card" />)}
           </div>
         ) : (
           <div className="empty-state public-store-empty" role="status">
@@ -308,4 +239,4 @@ export function PublicStorePage({ slug, previewMode = false, loadStore, followSt
   );
 }
 
-export const publicStorePageTestUtils = Object.freeze({ isAuthenticatedSession, productImage });
+export const publicStorePageTestUtils = Object.freeze({ isAuthenticatedSession });

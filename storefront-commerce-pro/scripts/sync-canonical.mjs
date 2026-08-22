@@ -25,11 +25,14 @@ export const CANONICAL_BRAND_STAR_MARK = '<StarFour className="brand-mark" weigh
 export const EXPECTED_CANONICAL_HOME_HREF_COUNT = 5;
 export const EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT = 1;
 export const CANONICAL_REACT_IMPORT = 'import { useEffect, useMemo, useRef, useState } from "react";';
-export const RUNTIME_REACT_IMPORT = 'import { useContext, useEffect, useMemo, useRef, useState } from "react";';
+export const RUNTIME_REACT_IMPORT = CANONICAL_REACT_IMPORT;
 export const CANONICAL_PORTAL_IMPORT = 'import { createPortal } from "react-dom";';
+export const CANONICAL_ICON_IMPORT = '} from "@phosphor-icons/react";';
+export const RUNTIME_ICON_IMPORT = '} from "./CustomerIcon.jsx";';
 export const CANONICAL_MODAL_BACKGROUND_QUERY = 'const backgroundNodes = [...document.querySelectorAll("#root > .skip-link, #root > .site-header, #root > main, #root > .site-footer, #root > .mobile-bottom-nav")];';
 export const RUNTIME_MODAL_BACKGROUND_QUERY = 'const backgroundNodes = [...document.querySelectorAll("#root > *")];';
 export const RUNTIME_COMPARISON_IMPORT = 'import { RuntimeComparisonContext } from "./integration/RuntimeComparisonContext.jsx";';
+export const RUNTIME_PRODUCT_CARD_IMPORT = 'import { CustomerProductCard } from "./CustomerProductCard.jsx";';
 export const CANONICAL_COMPARISON_STATE = 'const [compared, setCompared] = useState(false);';
 export const RUNTIME_COMPARISON_STATE = 'const comparison = useContext(RuntimeComparisonContext);\n  const compared = comparison.ids.has(product.id);';
 export const CANONICAL_COMPARISON_TOGGLE = 'onClick={() => setCompared((value) => !value)}';
@@ -48,6 +51,11 @@ export const CANONICAL_REVIEW_TARGET = 'document.getElementById("reviews")';
 export const RUNTIME_REVIEW_TARGET = 'document.getElementById("community-reviews")';
 export const CANONICAL_DESKTOP_ADD_BUTTON = '<button className="primary-button" type="button" disabled={soldOut} onClick={() => onAdd(product.id, quantity)}>';
 export const CANONICAL_MOBILE_PURCHASE = '<div className="mobile-purchase-bar"><div><small>Toplam</small><strong>{money.format(product.price * quantity)}</strong></div><button type="button" disabled={soldOut} onClick={() => onAdd(product.id, quantity)}><ShoppingCart />{soldOut ? "Tükendi" : "Sepete ekle"}</button></div>';
+export const CANONICAL_PRODUCT_CARD_SIGNATURE = 'function ProductCard({ product, favorite, onFavorite, onAdd }) {';
+export const CANONICAL_PRODUCT_GRID_SIGNATURE = 'function ProductGrid({ items, favorites, onFavorite, onAdd, compact = false }) {';
+export const RUNTIME_PRODUCT_CARD = `function ProductCard({ product, favorite, onFavorite, onAdd }) {
+  return <CustomerProductCard product={product} favorite={favorite} onFavorite={onFavorite} onAdd={onAdd} mediaFallback={productImage(product)} />;
+}`;
 
 export const RUNTIME_EXPORTS = `
 export {
@@ -91,6 +99,17 @@ const replaceExactOnce = (source, token, replacement, label) => {
   return source.replace(token, replacement);
 };
 
+const replaceProductCard = (source) => {
+  assertExactCount(source, CANONICAL_PRODUCT_CARD_SIGNATURE, 1, "Canonical product card signature");
+  assertExactCount(source, CANONICAL_PRODUCT_GRID_SIGNATURE, 1, "Canonical product grid signature");
+  const start = source.indexOf(CANONICAL_PRODUCT_CARD_SIGNATURE);
+  const end = source.indexOf(CANONICAL_PRODUCT_GRID_SIGNATURE, start);
+  const block = source.slice(start, end);
+  assertExactCount(block, CANONICAL_COMPARISON_STATE, 1, "Canonical product card comparison state");
+  assertExactCount(block, CANONICAL_COMPARISON_TOGGLE, 1, "Canonical product card comparison toggle");
+  return `${source.slice(0, start)}${RUNTIME_PRODUCT_CARD}\n\n${source.slice(end)}`;
+};
+
 export const createRuntimePresentation = (canonicalApp) => {
   assertExactCount(canonicalApp, CANONICAL_CATALOG_IMPORT, 1, "Canonical catalog import boundary");
   assertExactCount(
@@ -111,6 +130,13 @@ export const createRuntimePresentation = (canonicalApp) => {
 
   runtimePresentation = replaceExactOnce(
     runtimePresentation,
+    CANONICAL_ICON_IMPORT,
+    RUNTIME_ICON_IMPORT,
+    "Canonical icon import boundary",
+  );
+
+  runtimePresentation = replaceExactOnce(
+    runtimePresentation,
     CANONICAL_BRAND_STAR_MARK,
     "",
     "Integrated runtime brand star",
@@ -118,14 +144,8 @@ export const createRuntimePresentation = (canonicalApp) => {
 
   runtimePresentation = replaceExactOnce(
     runtimePresentation,
-    CANONICAL_REACT_IMPORT,
-    RUNTIME_REACT_IMPORT,
-    "Canonical React import boundary",
-  );
-  runtimePresentation = replaceExactOnce(
-    runtimePresentation,
     CANONICAL_PORTAL_IMPORT,
-    `${CANONICAL_PORTAL_IMPORT}\n${RUNTIME_COMPARISON_IMPORT}`,
+    `${CANONICAL_PORTAL_IMPORT}\n${RUNTIME_PRODUCT_CARD_IMPORT}`,
     "Canonical portal import boundary",
   );
   runtimePresentation = replaceExactOnce(
@@ -134,18 +154,7 @@ export const createRuntimePresentation = (canonicalApp) => {
     RUNTIME_MODAL_BACKGROUND_QUERY,
     "Canonical modal background isolation",
   );
-  runtimePresentation = replaceExactOnce(
-    runtimePresentation,
-    CANONICAL_COMPARISON_STATE,
-    RUNTIME_COMPARISON_STATE,
-    "Canonical comparison state owner",
-  );
-  runtimePresentation = replaceExactOnce(
-    runtimePresentation,
-    CANONICAL_COMPARISON_TOGGLE,
-    RUNTIME_COMPARISON_TOGGLE,
-    "Canonical comparison toggle owner",
-  );
+  runtimePresentation = replaceProductCard(runtimePresentation);
   runtimePresentation = replaceExactOnce(
     runtimePresentation,
     CANONICAL_PRODUCT_DETAIL_SIGNATURE,
@@ -267,10 +276,11 @@ export const createRuntimePresentation = (canonicalApp) => {
     EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT,
     "Runtime hash-router mobile home item"
   );
-  assertExactCount(runtimePresentation, RUNTIME_COMPARISON_IMPORT, 1, "Runtime comparison context import");
+  assertExactCount(runtimePresentation, RUNTIME_PRODUCT_CARD_IMPORT, 1, "Runtime shared product card import");
+  assertExactCount(runtimePresentation, RUNTIME_ICON_IMPORT, 1, "Runtime Lucide icon boundary");
   assertExactCount(runtimePresentation, RUNTIME_MODAL_BACKGROUND_QUERY, 1, "Runtime modal background isolation");
-  assertExactCount(runtimePresentation, RUNTIME_COMPARISON_STATE, 1, "Runtime comparison state owner");
-  assertExactCount(runtimePresentation, RUNTIME_COMPARISON_TOGGLE, 1, "Runtime comparison toggle owner");
+  assertExactCount(runtimePresentation, RUNTIME_PRODUCT_CARD, 1, "Runtime shared product card owner");
+  assertExactCount(runtimePresentation, CANONICAL_ICON_IMPORT, 0, "Runtime Phosphor icon import");
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_DETAIL_SIGNATURE, 1, "Runtime product detail boundary");
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_QUANTITY_CONTROL, 1, "Runtime product quantity control");
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_GALLERY_CLASS, 1, "Runtime product gallery class");

@@ -20,15 +20,16 @@
     "verify:all": "npm run build && npm run build:integration && npm test"
   },
   "dependencies": {
-    "@phosphor-icons/react": "^2.1.10",
+    "lucide-react": "1.33.0",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
   "devDependencies": {
+    "@phosphor-icons/react": "2.1.10",
     "@sparticuz/chromium": "^138.0.2",
     "@vitejs/plugin-react": "5.0.4",
     "axe-core": "^4.12.1",
-    "puppeteer-core": "^24.11.1",
+    "puppeteer-core": "25.8.0",
     "vite": "6.4.3",
     "vite-plugin-singlefile": "^2.3.3"
   }

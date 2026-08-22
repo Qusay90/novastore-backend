@@ -7,7 +7,7 @@ import {
   Question,
   Sparkle,
   Truck,
-} from "@phosphor-icons/react";
+} from "./CustomerIcon.jsx";
 
 const ICONS = Object.freeze({
   help: Question,

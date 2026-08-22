@@ -22,18 +22,21 @@ test("runtime corrections preserve the sealed canonical presentation", async () 
   assert.equal(runtimePresentation, createRuntimePresentation(canonicalApp));
 });
 
-test("runtime presentation owns comparison, product media, review anchor, and buy-now behavior", async () => {
-  const [runtimePresentation, integratedApp, integratedCss, comparisonContext, cartAdapter] = await Promise.all([
+test("runtime presentation owns the shared card, product media, review anchor, and buy-now behavior", async () => {
+  const [runtimePresentation, integratedApp, integratedCss, comparisonContext, cartAdapter, sharedCard] = await Promise.all([
     read("src/CanonicalRuntimePresentation.jsx"),
     read("src/IntegratedApp.jsx"),
     read("src/integrated.css"),
     read("src/integration/RuntimeComparisonContext.jsx"),
     read("src/adapters/cartAdapter.js"),
+    read("src/CustomerProductCard.jsx"),
   ]);
 
-  assert.match(runtimePresentation, /useContext\(RuntimeComparisonContext\)/);
+  assert.match(runtimePresentation, /CustomerProductCard/);
   assert.doesNotMatch(runtimePresentation, /\[compared, setCompared\] = useState/);
-  assert.match(runtimePresentation, /disabled=\{!comparison\.available\}/);
+  assert.doesNotMatch(runtimePresentation, /@phosphor-icons\/react/);
+  assert.match(sharedCard, /useContext\(RuntimeComparisonContext\)/);
+  assert.match(sharedCard, /disabled=\{!comparison\.available\}/);
   assert.match(runtimePresentation, /runtime-product-media-stage/);
   assert.match(runtimePresentation, /runtime-product-thumbnails/);
   assert.match(runtimePresentation, /runtime-media-lightbox/);

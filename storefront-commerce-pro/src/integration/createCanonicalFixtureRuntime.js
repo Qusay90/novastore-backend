@@ -6,6 +6,9 @@ import {
   configureRuntimeCatalog,
   getVisibleProducts,
 } from "./runtimeCatalog.js";
+import fixtureIphoneAngle from "../assets/optimized/phone-iphone.webp";
+import fixtureIphonePair from "../assets/optimized/product-phone.webp";
+import fixtureWatch from "../assets/optimized/product-watch.webp";
 
 const cloneCart = (items) => items.map((item) => ({ ...item }));
 
@@ -15,7 +18,16 @@ export function createCanonicalFixtureRuntime({ root = globalThis } = {}) {
     products: canonicalProducts,
   });
 
-  const visibleProducts = getVisibleProducts();
+  const visibleProducts = getVisibleProducts().map((product) => product.id === "NS-1001"
+    ? Object.freeze({
+      ...product,
+      media: Object.freeze([
+        Object.freeze({ id: "fixture-iphone-angle", url: fixtureIphoneAngle, type: "image", isMain: true, sortOrder: 0 }),
+        Object.freeze({ id: "fixture-iphone-pair", url: fixtureIphonePair, type: "image", isMain: false, sortOrder: 1 }),
+        Object.freeze({ id: "fixture-iphone-watch", url: fixtureWatch, type: "image", isMain: false, sortOrder: 2 }),
+      ]),
+    })
+    : product);
   const favoriteIds = new Set(["NS-1001", "NS-1004", "NS-1006", "NS-1007"]);
   let cartItems = [];
   let session = Object.freeze({ status: "guest", user: null, warning: null });

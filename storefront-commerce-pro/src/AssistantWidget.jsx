@@ -11,7 +11,7 @@ import {
   User,
   WarningCircle,
   X,
-} from "@phosphor-icons/react";
+} from "./CustomerIcon.jsx";
 import { NovaServiceIcon } from "./NovaServiceIcon.jsx";
 
 const money = new Intl.NumberFormat("tr-TR", {
