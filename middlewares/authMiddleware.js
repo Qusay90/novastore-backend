@@ -15,7 +15,7 @@ const inferExpectedPrincipal = (req) => {
     const method = String(req.method || 'GET').toUpperCase();
 
     if (/^\/api\/(?:admin(?:\/|$)|auth(?:\/|$)|questions\/admin(?:\/|$))/.test(path)) return 'admin';
-    if (/^\/api\/(?:users|addresses|favorites|shared-state)(?:\/|$)/.test(path)) return 'customer';
+    if (/^\/api\/(?:users|addresses|favorites|shared-state|store-follows)(?:\/|$)/.test(path)) return 'customer';
     if (/^\/api\/payments(?:\/|$)/.test(path)) return 'customer';
     if (path === '/api/reviews' && method === 'POST') return 'customer';
     if (/^\/api\/reviews\/product(?:\/|$)/.test(path)) return 'customer';

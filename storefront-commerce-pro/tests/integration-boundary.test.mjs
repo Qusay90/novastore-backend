@@ -583,6 +583,8 @@ test("commerce runtime gerçek adapterları tek katalog, favori ve sepet durumun
   assert.equal(typeof runtime.checkout.quote, "function");
   assert.equal(typeof runtime.community.load, "function");
   assert.equal(typeof runtime.assistant.chat, "function");
+  assert.equal(typeof runtime.publicStore.follow.load, "function");
+  assert.equal(typeof runtime.publicStore.follow.set, "function");
   assert.equal(typeof runtime.refreshCustomerState, "function");
 });
 
@@ -628,6 +630,8 @@ test("Seller müşteri önizlemesi runtime başlangıcında müşteri oturumu, f
   await assert.rejects(() => runtime.favorites.set(202, true), { code: "PUBLIC_STORE_PREVIEW_READ_ONLY" });
   await assert.rejects(() => runtime.cart.persist([{ productId: 202, quantity: 1 }]), { code: "PUBLIC_STORE_PREVIEW_READ_ONLY" });
   await assert.rejects(() => runtime.cart.handoffToCheckout([{ productId: 202, quantity: 1 }]), { code: "PUBLIC_STORE_PREVIEW_READ_ONLY" });
+  await assert.rejects(() => runtime.publicStore.follow.load("nova-teknoloji"), { code: "PUBLIC_STORE_PREVIEW_READ_ONLY" });
+  await assert.rejects(() => runtime.publicStore.follow.set("nova-teknoloji", true), { code: "PUBLIC_STORE_PREVIEW_READ_ONLY" });
   const refreshed = await runtime.refreshCustomerState({ cartItems: [{ productId: 202, quantity: 1 }] });
   assert.deepEqual([...refreshed.favoriteIds], []);
   assert.deepEqual(refreshed.cartItems, []);
@@ -655,6 +659,12 @@ test("customer HTTP yöntem, rota, sorgu ve müşteri token sınırlarını birl
     normalizeCustomerApiRequest("/api/assistant/chat", "POST", "https://novastore.tr"),
     { path: "/api/assistant/chat", method: "POST", authenticated: "optional" },
   );
+  for (const method of ["GET", "POST", "DELETE"]) {
+    assert.deepEqual(
+      normalizeCustomerApiRequest("/api/store-follows/nova-teknoloji", method, "https://novastore.tr"),
+      { path: "/api/store-follows/nova-teknoloji", method, authenticated: true },
+    );
+  }
 
   for (const [path, method] of [
     ["/api/admin/orders", "GET"],

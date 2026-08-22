@@ -1517,7 +1517,7 @@ export function CommerceProRuntimeApp({ runtime }) {
   let content;
   if (loading) content = <CanonicalLoadingPage />;
   else if (route.type === "home") content = <CanonicalHomePage favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
-  else if (route.type === "public-store") content = <PublicStorePage slug={route.slug} previewMode={route.preview} loadStore={runtime.publicStore.load} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
+  else if (route.type === "public-store") content = <PublicStorePage slug={route.slug} previewMode={route.preview} loadStore={runtime.publicStore.load} followStore={runtime.publicStore.follow} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
   else if (route.type === "product" || route.type === "product-id") {
     const product = route.type === "product"
       ? getVisibleProducts().find((item) => item.slug === route.slug)

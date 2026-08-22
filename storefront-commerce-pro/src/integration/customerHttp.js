@@ -13,6 +13,7 @@ const RULES = Object.freeze([
   { methods: ["GET"], pattern: /^\/api\/orders\/user\/\d+$/, authenticated: true },
   { methods: ["POST"], pattern: /^\/api\/orders\/\d+\/cancel$/, authenticated: true },
   { methods: ["GET"], pattern: /^\/api\/campaigns\/coupons\/active$/, authenticated: true },
+  { methods: ["GET", "POST", "DELETE"], pattern: /^\/api\/store-follows\/[a-z0-9]+(?:-[a-z0-9]+)*$/, authenticated: true },
   { methods: ["POST"], pattern: /^\/api\/campaigns\/quote$/, authenticated: false },
   { methods: ["GET"], pattern: /^\/api\/notifications\/user\/\d+$/, authenticated: true },
   { methods: ["PATCH"], pattern: /^\/api\/notifications\/\d+\/read$/, authenticated: true },

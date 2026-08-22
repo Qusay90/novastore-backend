@@ -21,6 +21,7 @@ const smokeTests = [
     'tests/storefrontR5ReviewContractSmoke.mjs',
     'tests/sellerApplicationSummaryPrivacySmoke.mjs',
     'tests/publicStoreProjectionSmoke.js',
+    'tests/storeFollowSmoke.js',
     'tests/reviewQuestionOperationsSmoke.js',
     'tests/supportNotificationOperationsSmoke.js',
     'tests/couponAdminOperationsSmoke.js',

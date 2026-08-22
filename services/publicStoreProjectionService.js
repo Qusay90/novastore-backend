@@ -1,5 +1,7 @@
 'use strict';
 
+const { ORDER_STATUS, PAYMENT_STATUS } = require('../constants/orderStatus');
+
 const STORE_PUBLIC_KEYS = Object.freeze([
     'slug',
     'name',
@@ -9,6 +11,9 @@ const STORE_PUBLIC_KEYS = Object.freeze([
     'status',
     'rating',
     'review_count',
+    'follower_count',
+    'total_units_sold',
+    'product_count',
     'shipping_summary',
     'return_summary'
 ]);
@@ -161,7 +166,7 @@ const toPublicProduct = (row, mediaRows = []) => {
     });
 };
 
-const serializePublicStore = ({ storeRow, productRows = [], mediaRows = [] } = {}) => {
+const serializePublicStore = ({ storeRow, productRows = [], mediaRows = [], metricsRow = {} } = {}) => {
     if (!storeRow || typeof storeRow !== 'object') failNotFound();
     const mediaByProduct = new Map();
     for (const media of mediaRows) {
@@ -177,8 +182,13 @@ const serializePublicStore = ({ storeRow, productRows = [], mediaRows = [] } = {
             logo_url: null,
             banner_url: null,
             status: 'open',
-            rating: null,
-            review_count: 0,
+            rating: nonNegativeInteger(metricsRow.review_count) > 0
+                ? ratingValue(metricsRow.rating)
+                : null,
+            review_count: nonNegativeInteger(metricsRow.review_count),
+            follower_count: nonNegativeInteger(metricsRow.follower_count),
+            total_units_sold: nonNegativeInteger(metricsRow.total_units_sold),
+            product_count: productRows.length,
             shipping_summary: customerText(storeRow.shipping_policy, 2000),
             return_summary: customerText(storeRow.return_policy, 2000)
         }),
@@ -228,15 +238,56 @@ const loadProducts = async (queryable, platformStoreId) => {
     return Object.freeze({ productRows: productsResult.rows || [], mediaRows: mediaResult.rows || [] });
 };
 
+const loadMetrics = async (queryable, platformStoreId) => {
+    const result = await queryable.query(
+        `SELECT
+            (
+                SELECT COUNT(*)::INTEGER
+                  FROM store_follows store_follow
+                 WHERE store_follow.store_id = $1
+            ) AS follower_count,
+            (
+                SELECT COALESCE(SUM(order_item.quantity), 0)::INTEGER
+                  FROM order_items order_item
+            INNER JOIN orders customer_order
+                    ON customer_order.id = order_item.order_id
+            INNER JOIN products ordered_product
+                    ON ordered_product.id = order_item.product_id
+                   AND ordered_product.store_id = $1
+                 WHERE customer_order.status = $2
+                   AND customer_order.payment_status = $3
+            ) AS total_units_sold,
+            ROUND(COALESCE(AVG(review.rating), 0), 1) AS rating,
+            COUNT(review.id)::INTEGER AS review_count
+           FROM products product
+      LEFT JOIN reviews review
+             ON review.product_id = product.id
+            AND review.status = 'PUBLISHED'
+          WHERE product.store_id = $1
+            AND product.publication_status = 'active'
+            AND product.is_customer_visible = TRUE
+            AND product.deleted_at IS NULL`,
+        [
+            platformStoreId,
+            ORDER_STATUS.TESLIM_EDILDI,
+            PAYMENT_STATUS.PAID
+        ]
+    );
+    return result.rows?.[0] || {};
+};
+
 const loadProjection = async (queryable, storeRows) => {
     if (!Array.isArray(storeRows) || storeRows.length !== 1) failNotFound();
     const storeRow = storeRows[0];
     const platformStoreId = positiveInteger(storeRow.platform_store_id);
-    const products = await loadProducts(queryable, platformStoreId);
-    return serializePublicStore({ storeRow, ...products });
+    const [products, metricsRow] = await Promise.all([
+        loadProducts(queryable, platformStoreId),
+        loadMetrics(queryable, platformStoreId)
+    ]);
+    return serializePublicStore({ storeRow, ...products, metricsRow });
 };
 
-const loadPublicStoreBySlug = async (storeSlug, { queryable = null } = {}) => {
+const loadPublicStoreRowBySlug = async (storeSlug, { queryable = null } = {}) => {
     const database = requireQueryable(queryable || require('../config/db'));
     const slug = normalizeStoreSlug(storeSlug);
     const storeResult = await database.query(
@@ -260,7 +311,14 @@ const loadPublicStoreBySlug = async (storeSlug, { queryable = null } = {}) => {
           LIMIT 2`,
         [slug]
     );
-    return loadProjection(database, storeResult.rows || []);
+    if (!Array.isArray(storeResult.rows) || storeResult.rows.length !== 1) failNotFound();
+    return Object.freeze(storeResult.rows[0]);
+};
+
+const loadPublicStoreBySlug = async (storeSlug, { queryable = null } = {}) => {
+    const database = requireQueryable(queryable || require('../config/db'));
+    const storeRow = await loadPublicStoreRowBySlug(storeSlug, { queryable: database });
+    return loadProjection(database, [storeRow]);
 };
 
 const loadSellerPublicPreview = async (queryable, context, sellerStoreId) => {
@@ -311,6 +369,7 @@ module.exports = Object.freeze({
     customerMediaUrl,
     customerText,
     loadPublicStoreBySlug,
+    loadPublicStoreRowBySlug,
     loadSellerPublicPreview,
     normalizeStoreSlug,
     serializePublicStore,

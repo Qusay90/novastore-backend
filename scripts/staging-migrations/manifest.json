@@ -194,5 +194,12 @@
     "sha256": "0c8963fba61340b53fe1855361c36454fa7316ae5dbcff68e3114614415b7898",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260822_02_public_store_follows",
+    "path": "migrations/20260822_02_public_store_follows.sql",
+    "sha256": "25aa71ba98494d9bc6d81d49132a12be3f5c9e0e7a60cc78d65a70c2a091f02f",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

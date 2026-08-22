@@ -7,6 +7,7 @@ import { createCustomerAccountAdapter } from "../adapters/customerAccountAdapter
 import { createFavoritesAdapter } from "../adapters/favoritesAdapter.js";
 import { createProductCommunityAdapter } from "../adapters/productCommunityAdapter.js";
 import { createPublicStoreAdapter } from "../adapters/publicStoreAdapter.js";
+import { createStoreFollowAdapter } from "../adapters/storeFollowAdapter.js";
 import {
   configureRuntimeCatalog,
   getVisibleProducts,
@@ -58,6 +59,7 @@ export function createCommerceRuntime({
   });
   const productCommunityAdapter = createProductCommunityAdapter({ http: customerHttp });
   const publicStoreAdapter = createPublicStoreAdapter(http);
+  const storeFollowAdapter = createStoreFollowAdapter(customerHttp);
 
   const initialize = async ({ signal, readOnlyPreview = false } = {}) => {
     const catalog = await catalogAdapter.load({ signal });
@@ -138,6 +140,10 @@ export function createCommerceRuntime({
         load: (storeSlug, options = {}) => publicStoreAdapter.load(storeSlug, {
           catalog: runtimeCatalog,
           signal: options.signal,
+        }),
+        follow: Object.freeze({
+          load: readOnlyPreview ? previewMutationBlocked : storeFollowAdapter.load,
+          set: readOnlyPreview ? previewMutationBlocked : storeFollowAdapter.set,
         }),
       }),
       assistant: assistantAdapter,

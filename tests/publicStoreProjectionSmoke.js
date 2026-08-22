@@ -59,6 +59,9 @@ const makeDatabase = ({ storeRows = [storeRow] } = {}) => {
             const source = String(sql);
             calls.push({ source, params });
             if (/FROM stores platform_store/u.test(source) || /FROM seller_stores seller_store/u.test(source)) return { rows: storeRows };
+            if (/AS follower_count/u.test(source) && /AS total_units_sold/u.test(source)) {
+                return { rows: [{ follower_count: 24, total_units_sold: 137, rating: '4.7', review_count: 31 }] };
+            }
             if (/FROM products product/u.test(source)) return { rows: productRows };
             if (/FROM product_media media/u.test(source)) return { rows: mediaRows };
             throw new Error(`UNEXPECTED_SQL: ${source}`);
@@ -83,13 +86,20 @@ const runServiceMatrix = async () => {
     assert.equal(publicProjection.store.shipping_summary, 'Aynı gün kargo');
     assert.equal(publicProjection.store.logo_url, null);
     assert.equal(publicProjection.store.banner_url, null);
-    assert.equal(publicProjection.store.rating, null);
+    assert.equal(publicProjection.store.rating, 4.7);
+    assert.equal(publicProjection.store.review_count, 31);
+    assert.equal(publicProjection.store.follower_count, 24);
+    assert.equal(publicProjection.store.total_units_sold, 137);
+    assert.equal(publicProjection.store.product_count, 2);
     assert.equal(publicProjection.products[0].image_url, 'https://res.cloudinary.com/demo/image/upload/v1/nova-main.webp');
     assert.equal(publicProjection.products[0].media.length, 1, 'güvensiz medya URL satırı DTO dışına atılmalı');
     assert.equal(publicProjection.products[0].is_purchasable, true);
     assert.equal(publicProjection.products[1].is_purchasable, false);
 
-    const productQueries = publicDatabase.calls.filter((call) => /FROM products product|FROM product_media media/u.test(call.source));
+    const productQueries = publicDatabase.calls.filter((call) => (
+        /FROM products product|FROM product_media media/u.test(call.source)
+        && !/AS follower_count/u.test(call.source)
+    ));
     assert.equal(productQueries.length, 2);
     productQueries.forEach((call) => {
         assert.deepEqual(call.params, [101], 'ürün projeksiyonu yalnız server-resolved platform store kimliğiyle sorgulanmalı');
@@ -98,6 +108,12 @@ const runServiceMatrix = async () => {
         assert.match(call.source, /product\.is_customer_visible = TRUE/u);
         assert.match(call.source, /product\.deleted_at IS NULL/u);
     });
+    const metricsQuery = publicDatabase.calls.find((call) => /AS follower_count/u.test(call.source));
+    assert.deepEqual(metricsQuery.params, [101, 'Teslim Edildi', 'PAID']);
+    assert.match(metricsQuery.source, /customer_order\.status = \$2/u);
+    assert.match(metricsQuery.source, /customer_order\.payment_status = \$3/u);
+    assert.match(metricsQuery.source, /review\.status = 'PUBLISHED'/u);
+    assert.match(metricsQuery.source, /product\.publication_status = 'active'/u);
 
     const sellerDatabase = makeDatabase();
     const context = Object.freeze({ organizationId: 10, membershipId: 20, userId: 30, storeIds: [40] });

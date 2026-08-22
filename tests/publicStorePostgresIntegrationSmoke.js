@@ -10,14 +10,14 @@ const {
 } = require('../services/publicStoreProjectionService');
 const sellerStoreService = require('../services/sellerStoreService');
 
-const connectionString = String(process.env.MAIN6V_TEST_DATABASE_URL || '').trim();
-assert(connectionString, 'MAIN6V_TEST_DATABASE_URL is required.');
+const connectionString = String(process.env.MAIN6W_TEST_DATABASE_URL || '').trim();
+assert(connectionString, 'MAIN6W_TEST_DATABASE_URL is required.');
 const parsed = new URL(connectionString);
 const databaseName = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
 assert.ok(['127.0.0.1', 'localhost', '::1'].includes(parsed.hostname), 'Main-6V PostgreSQL target must be loopback.');
-assert.equal(databaseName, 'novastore_main6v_test', 'Main-6V PostgreSQL target must use the named disposable database.');
+assert.equal(databaseName, 'novastore_main6w_test', 'Main-6W PostgreSQL target must use the named disposable database.');
 
-const pool = new Pool({ connectionString, application_name: 'novastore_main6v_public_store_test' });
+const pool = new Pool({ connectionString, application_name: 'novastore_main6w_public_store_test' });
 const runTag = `${process.pid}-${Date.now()}`;
 const fixtureSlugs = Object.freeze({
     a: `main6v-nova-${runTag}`,
@@ -155,6 +155,22 @@ const seed = async () => {
              VALUES ($1, $2, 5, 'Yerel doğrulama yorumu', 'PUBLISHED')`,
             [productByName.get('Zümrüt Krep Ferace Takım'), customerUser]
         );
+        const completedOrder = await client.query(
+            `INSERT INTO orders (user_id, total_amount, status, payment_status, customer_name, email)
+             VALUES ($1, 6999.80, 'Teslim Edildi', 'PAID', 'Main6V Customer', $2)
+             RETURNING id`,
+            [customerUser, `main6v-customer-${runTag}@local.invalid`]
+        );
+        await client.query(
+            `INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, total_price, source_item_index)
+             VALUES ($1, $2, 'Zümrüt Krep Ferace Takım', 2, 3499.90, 6999.80, 0)`,
+            [Number(completedOrder.rows[0].id), productByName.get('Zümrüt Krep Ferace Takım')]
+        );
+        await client.query(
+            `INSERT INTO store_follows (user_id, store_id)
+             VALUES ($1, $2)`,
+            [customerUser, bySlug.get(fixtureSlugs.a)]
+        );
         await client.query('COMMIT');
         return Object.freeze({
             orgA,
@@ -162,6 +178,7 @@ const seed = async () => {
             sellerStoreA,
             sellerStoreB,
             sellerUserA,
+            customerUser,
             platformStoreA: bySlug.get(fixtureSlugs.a),
             platformStoreB: bySlug.get(fixtureSlugs.b)
         });
@@ -194,6 +211,11 @@ const run = async () => {
     const reviewed = publicBefore.products.find((product) => product.name === 'Zümrüt Krep Ferace Takım');
     assert.equal(reviewed.average_rating, 5);
     assert.equal(reviewed.review_count, 1);
+    assert.equal(publicBefore.store.product_count, 3);
+    assert.equal(publicBefore.store.follower_count, 1);
+    assert.equal(publicBefore.store.total_units_sold, 2);
+    assert.equal(publicBefore.store.rating, 5);
+    assert.equal(publicBefore.store.review_count, 1);
 
     const sellerBefore = await loadSellerPublicPreview(pool, contextA, fixture.sellerStoreA);
     assert.deepEqual(sellerBefore, publicBefore);

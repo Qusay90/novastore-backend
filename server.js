@@ -360,6 +360,9 @@ app.use('/api/public/collections', publicCollectionRoutes);
 const publicStoreRoutes = require('./routes/publicStoreRoutes');
 app.use('/api/public/stores', publicStoreRoutes);
 
+const storeFollowRoutes = require('./routes/storeFollowRoutes');
+app.use('/api/store-follows', storeFollowRoutes);
+
 const adminMenuRoutes = require('./routes/adminMenuRoutes');
 app.use('/api/admin', adminMenuRoutes);
 

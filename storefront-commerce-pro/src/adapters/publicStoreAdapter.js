@@ -26,8 +26,11 @@ const normalizeStore = (value) => {
     logoUrl: null,
     bannerUrl: null,
     status: value?.status === "open" ? "open" : "open",
-    rating: null,
-    reviewCount: 0,
+    rating: value?.rating === null ? null : Math.min(5, Math.max(0, Number(value?.rating) || 0)),
+    reviewCount: Math.max(0, Number.parseInt(value?.review_count, 10) || 0),
+    followerCount: Math.max(0, Number.parseInt(value?.follower_count, 10) || 0),
+    totalUnitsSold: Math.max(0, Number.parseInt(value?.total_units_sold, 10) || 0),
+    productCount: Math.max(0, Number.parseInt(value?.product_count, 10) || 0),
     shippingSummary: text(value?.shipping_summary, 2000),
     returnSummary: text(value?.return_summary, 2000),
   });
