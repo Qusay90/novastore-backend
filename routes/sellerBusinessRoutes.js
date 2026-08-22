@@ -4,7 +4,7 @@ const express = require('express');
 const { privateNoStore } = require('../middlewares/privateNoStore');
 
 const SELLER_BUSINESS_PATHS = Object.freeze([
-    '/stores/:storeId', '/offers', '/offers/:offerId', '/offers/:offerId/commands', '/inventory',
+    '/stores/:storeId', '/stores/:storeId/public-preview', '/offers', '/offers/:offerId', '/offers/:offerId/commands', '/inventory',
     '/inventory/adjustments', '/inventory/:inventoryItemId/threshold', '/orders', '/orders/:orderId',
     '/orders/:orderId/commands', '/returns', '/dashboard', '/finance/summary', '/finance/ledger',
     '/finance/settlements', '/support/conversations', '/support/messages', '/support/conversations/:conversationId/rating'
@@ -27,6 +27,7 @@ const createSellerBusinessRouter = ({ enabled = false, auth, tenant, controller,
     const orderWrite = featureGate(features.orderWrite === true);
     const financeRead = featureGate(features.financeRead === true);
     router.get('/stores/:storeId', ...base, tenant.requireSellerPermission('store.read'), controller.getStore);
+    router.get('/stores/:storeId/public-preview', ...base, tenant.requireSellerPermission('store.read'), controller.getStorePublicPreview);
     router.patch('/stores/:storeId', ...base, tenant.requireSellerPermission('store.update'), controller.updateStore);
     router.get('/offers', ...base, tenant.requireSellerPermission('offer.read'), controller.listOffers);
     router.get('/offers/:offerId', ...base, tenant.requireSellerPermission('offer.read'), controller.getOffer);

@@ -71,6 +71,8 @@ import {
 import { ProductCommunity } from "./ProductCommunity.jsx";
 import { AssistantWidget } from "./AssistantWidget.jsx";
 import { NovaServiceIcon } from "./NovaServiceIcon.jsx";
+import { PublicStorePage } from "./PublicStorePage.jsx";
+import { normalizePublicStoreSlug } from "./adapters/publicStoreAdapter.js";
 import { reconcileFinalizedCart } from "./adapters/checkoutAdapter.js";
 import {
   FavoritesPage as CanonicalFavoritesPage,
@@ -281,7 +283,7 @@ function safeDecodeReturn(value, fallback = "/hesabim") {
 function documentRouteRaw() {
   const pathname = window.location.pathname || "/";
   const search = window.location.search || "";
-  if (/^\/(?:kategori|urun|koleksiyon)\//.test(pathname)) return `${pathname}${search}`;
+  if (/^\/(?:kategori|urun|koleksiyon|magaza)\//.test(pathname)) return `${pathname}${search}`;
   if (pathname.endsWith("/login.html")) return `/giris${search}`;
   if (pathname.endsWith("/forgot-password.html")) return `/sifremi-unuttum${search}`;
   if (pathname.endsWith("/reset-password.html")) return `/sifre-sifirla${search}`;
@@ -328,6 +330,11 @@ function parseRoute() {
   if (pathname.startsWith("/koleksiyon/")) {
     const slug = decode(pathname.slice(12));
     return slug === null || !slug || /[/?#\\]/.test(slug) ? { type: "not-found", query } : { type: "collection", slug, query };
+  }
+  if (pathname.startsWith("/magaza/")) {
+    const decoded = decode(pathname.slice(8));
+    const slug = decoded === null || /[/?#\\]/.test(decoded) ? null : normalizePublicStoreSlug(decoded);
+    return slug ? { type: "public-store", slug, preview: query.get("mode") === "preview", query } : { type: "not-found", query };
   }
   if (pathname === "/favoriler") return { type: "favorites", query };
   if (pathname === "/sepet") return { type: "cart-page", query };
@@ -1510,6 +1517,7 @@ export function CommerceProRuntimeApp({ runtime }) {
   let content;
   if (loading) content = <CanonicalLoadingPage />;
   else if (route.type === "home") content = <CanonicalHomePage favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
+  else if (route.type === "public-store") content = <PublicStorePage slug={route.slug} previewMode={route.preview} loadStore={runtime.publicStore.load} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
   else if (route.type === "product" || route.type === "product-id") {
     const product = route.type === "product"
       ? getVisibleProducts().find((item) => item.slug === route.slug)
@@ -1595,7 +1603,12 @@ function IntegrationState({ phase, error, onRetry }) {
 }
 
 export function IntegratedApp() {
-  const resource = useCommerceRuntime();
+  const initialRoute = useMemo(parseRoute, []);
+  const isPublicStoreRoute = initialRoute.type === "public-store";
+  const resource = useCommerceRuntime({
+    allowEmptyCatalog: isPublicStoreRoute,
+    readOnlyPreview: isPublicStoreRoute && initialRoute.preview === true,
+  });
   if (resource.phase !== "ready") {
     return <IntegrationState phase={resource.phase} error={resource.error} onRetry={resource.retry} />;
   }

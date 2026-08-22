@@ -189,7 +189,7 @@ const COMMERCE_PRO_HASH_ROUTES = [
     /^\/odeme\/(?:teslimat|odeme|onay)\/?$/,
     /^\/(?:yardim|siparis-takibi|iletisim)\/?$/
 ];
-const COMMERCE_PRO_DOCUMENT_ROUTES = /^\/(?:kategori|urun|koleksiyon)\/(?:[^/]+(?:\/[^/]+)*)\/?$/;
+const COMMERCE_PRO_DOCUMENT_ROUTES = /^\/(?:kategori|urun|koleksiyon|magaza)\/(?:[^/]+(?:\/[^/]+)*)\/?$/;
 
 const requestSearch = (req) => {
     const queryIndex = req.originalUrl.indexOf('?');
@@ -357,6 +357,9 @@ app.use('/api/public/navigation', publicNavigationRoutes);
 const publicCollectionRoutes = require('./routes/publicCollectionRoutes');
 app.use('/api/public/collections', publicCollectionRoutes);
 
+const publicStoreRoutes = require('./routes/publicStoreRoutes');
+app.use('/api/public/stores', publicStoreRoutes);
+
 const adminMenuRoutes = require('./routes/adminMenuRoutes');
 app.use('/api/admin', adminMenuRoutes);
 
@@ -412,6 +415,7 @@ if (localSellerApiEnabled) {
     const { createSellerContextController } = require('./controllers/sellerContextController');
     const { createSellerBusinessController } = require('./controllers/sellerBusinessController');
     const storeService = require('./services/sellerStoreService');
+    const publicStoreService = require('./services/publicStoreProjectionService');
     const offerInventoryService = require('./services/sellerOfferInventoryService');
     const orderService = require('./services/sellerOrderFulfillmentService');
     const financeService = require('./services/sellerFinanceService');
@@ -468,6 +472,7 @@ if (localSellerApiEnabled) {
     });
     const businessController = createSellerBusinessController({
         storeService,
+        publicStoreService,
         offerInventoryService,
         orderService,
         financeService,

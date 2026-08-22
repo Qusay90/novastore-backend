@@ -6,12 +6,23 @@ import { createCheckoutAdapter } from "../adapters/checkoutAdapter.js";
 import { createCustomerAccountAdapter } from "../adapters/customerAccountAdapter.js";
 import { createFavoritesAdapter } from "../adapters/favoritesAdapter.js";
 import { createProductCommunityAdapter } from "../adapters/productCommunityAdapter.js";
+import { createPublicStoreAdapter } from "../adapters/publicStoreAdapter.js";
 import {
   configureRuntimeCatalog,
   getVisibleProducts,
 } from "./runtimeCatalog.js";
 import { createStorefrontHttp } from "./storefrontHttp.js";
 import { createCustomerHttp } from "./customerHttp.js";
+
+const READ_ONLY_PREVIEW_SESSION = Object.freeze({ status: "guest", user: null, warning: null });
+const READ_ONLY_PREVIEW_IDS = Object.freeze(new Set());
+const READ_ONLY_PREVIEW_ITEMS = Object.freeze([]);
+
+const previewMutationBlocked = async () => {
+  const error = new Error("Müşteri önizlemesi salt okunur modda çalışır.");
+  error.code = "PUBLIC_STORE_PREVIEW_READ_ONLY";
+  throw error;
+};
 
 export function createCommerceRuntime({
   root = globalThis,
@@ -46,30 +57,35 @@ export function createCommerceRuntime({
     location,
   });
   const productCommunityAdapter = createProductCommunityAdapter({ http: customerHttp });
+  const publicStoreAdapter = createPublicStoreAdapter(http);
 
-  const initialize = async ({ signal } = {}) => {
+  const initialize = async ({ signal, readOnlyPreview = false } = {}) => {
     const catalog = await catalogAdapter.load({ signal });
     configureRuntimeCatalog(catalog);
     const visibleProducts = Object.freeze(getVisibleProducts());
     const productById = new Map(visibleProducts.map((product) => [Number(product.id), product]));
     const allowedProductIds = new Set(productById.keys());
-    const favoritesAdapter = createFavoritesAdapter({ root });
-    const cartAdapter = createCartAdapter({
-      root,
-      storage,
-      location,
-      getProduct: (id) => productById.get(Number(id)) || null,
-    });
+    const favoritesAdapter = readOnlyPreview ? null : createFavoritesAdapter({ root });
+    const cartAdapter = readOnlyPreview
+      ? null
+      : createCartAdapter({
+        root,
+        storage,
+        location,
+        getProduct: (id) => productById.get(Number(id)) || null,
+      });
     const assistantAdapter = createAssistantAdapter({
       http: customerHttp,
       getProduct: (id) => productById.get(Number(id)) || null,
     });
 
-    const [favoriteIds, cartItems, session] = await Promise.all([
-      favoritesAdapter.load({ allowedProductIds }),
-      cartAdapter.load({ allowedProductIds }),
-      authAdapter.load({ signal }),
-    ]);
+    const [favoriteIds, cartItems, session] = readOnlyPreview
+      ? [READ_ONLY_PREVIEW_IDS, READ_ONLY_PREVIEW_ITEMS, READ_ONLY_PREVIEW_SESSION]
+      : await Promise.all([
+        favoritesAdapter.load({ allowedProductIds }),
+        cartAdapter.load({ allowedProductIds }),
+        authAdapter.load({ signal }),
+      ]);
 
     const runtimeCatalog = Object.freeze({
       ...catalog,
@@ -85,6 +101,9 @@ export function createCommerceRuntime({
     });
 
     const refreshCustomerState = async ({ cartItems = [] } = {}) => {
+      if (readOnlyPreview) {
+        return Object.freeze({ favoriteIds: READ_ONLY_PREVIEW_IDS, cartItems: READ_ONLY_PREVIEW_ITEMS });
+      }
       const [favoriteIds, refreshedCart] = await Promise.all([
         favoritesAdapter.load({ allowedProductIds }),
         cartAdapter.refreshAfterAuthentication(cartItems, { allowedProductIds }),
@@ -101,22 +120,29 @@ export function createCommerceRuntime({
       warnings: Object.freeze([...(catalog.warnings || []), session.warning].filter(Boolean)),
       favorites: Object.freeze({
         initialIds: favoriteIds,
-        set: favoritesAdapter.set,
+        set: readOnlyPreview ? previewMutationBlocked : favoritesAdapter.set,
       }),
       cart: Object.freeze({
         initialItems: Object.freeze(cartItems),
-        persist: cartAdapter.persist,
-        subscribe: cartAdapter.subscribe,
-        handoffToCheckout: cartAdapter.handoffToCheckout,
+        persist: readOnlyPreview ? previewMutationBlocked : cartAdapter.persist,
+        subscribe: readOnlyPreview ? (() => () => {}) : cartAdapter.subscribe,
+        handoffToCheckout: readOnlyPreview ? previewMutationBlocked : cartAdapter.handoffToCheckout,
       }),
       auth: Object.freeze({
-        openAccount: () => authAdapter.openAccount(session),
+        openAccount: readOnlyPreview ? (() => undefined) : (() => authAdapter.openAccount(session)),
       }),
       customer: customerAccountAdapter,
       checkout: checkoutAdapter,
       community: productCommunityAdapter,
+      publicStore: Object.freeze({
+        load: (storeSlug, options = {}) => publicStoreAdapter.load(storeSlug, {
+          catalog: runtimeCatalog,
+          signal: options.signal,
+        }),
+      }),
       assistant: assistantAdapter,
       refreshCustomerState,
+      readOnlyPreview: readOnlyPreview === true,
     });
   };
 

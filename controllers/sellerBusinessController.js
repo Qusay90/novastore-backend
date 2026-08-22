@@ -1,5 +1,7 @@
 'use strict';
 
+const defaultPublicStoreService = require('../services/publicStoreProjectionService');
+
 const safeError = (res, error) => {
     const statusCode = Number(error?.statusCode);
     const safeStatus = Number.isInteger(statusCode) && statusCode >= 400 && statusCode < 600 ? statusCode : 503;
@@ -18,13 +20,14 @@ const requireDatabase = (req) => {
     return database;
 };
 
-const createSellerBusinessController = ({ storeService, offerInventoryService, orderService, financeService, supportService } = {}) => {
-    if (!storeService || !offerInventoryService || !orderService || !financeService || !supportService) throw new TypeError('Seller business services are required.');
+const createSellerBusinessController = ({ storeService, publicStoreService = defaultPublicStoreService, offerInventoryService, orderService, financeService, supportService } = {}) => {
+    if (!storeService || !publicStoreService || !offerInventoryService || !orderService || !financeService || !supportService) throw new TypeError('Seller business services are required.');
     const respond = (handler) => async (req, res) => {
         try { return res.status(200).json(await handler(req)); } catch (error) { return safeError(res, error); }
     };
     return Object.freeze({
         getStore: respond((req) => storeService.readStore(requireDatabase(req), req.sellerContext, req.params.storeId)),
+        getStorePublicPreview: respond((req) => publicStoreService.loadSellerPublicPreview(requireDatabase(req), req.sellerContext, req.params.storeId)),
         updateStore: respond((req) => storeService.updateStore(requireDatabase(req), req.sellerContext, req.params.storeId, { ...req.body, revision: req.body?.revision, idempotency_key: req.headers['idempotency-key'], step_up_verified: req.sellerStepUpVerified === true })),
         listOffers: respond((req) => offerInventoryService.listOffers(requireDatabase(req), req.sellerContext, req.query)),
         getOffer: respond((req) => offerInventoryService.loadOffer(requireDatabase(req), req.sellerContext, req.params.offerId)),
