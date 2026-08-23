@@ -1,16 +1,21 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import productCardFraming from "../../shared/productCardFraming.js";
 import { RuntimeComparisonContext } from "./integration/RuntimeComparisonContext.jsx";
 import {
   ArrowsLeftRight,
+  Check,
   Heart,
   ImageSquare,
-  Package,
   ShieldCheck,
   ShoppingCart,
   Star,
   Truck,
 } from "./CustomerIcon.jsx";
-import { productCardMediaIndex, resolveCustomerCardImages } from "./customerProductCardModel.js";
+import { resolveCustomerCardMedia } from "./customerProductCardModel.js";
+
+const { cardFramingPresentation } = productCardFraming;
+export const CUSTOMER_CARD_AUTOPLAY_DWELL_MS = 360;
+export const CUSTOMER_CARD_AUTOPLAY_INTERVAL_MS = 1050;
 
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -37,8 +42,16 @@ export function CustomerProductCard({
   const [activeMedia, setActiveMedia] = useState(0);
   const [previewing, setPreviewing] = useState(false);
   const [galleryPrimed, setGalleryPrimed] = useState(false);
-  const images = useMemo(
-    () => resolveCustomerCardImages(product, mediaFallback),
+  const [favoriteMotion, setFavoriteMotion] = useState(false);
+  const [cartPhase, setCartPhase] = useState("idle");
+  const [compareMotion, setCompareMotion] = useState(false);
+  const dwellTimer = useRef(null);
+  const cycleTimer = useRef(null);
+  const favoriteTimer = useRef(null);
+  const cartTimer = useRef(null);
+  const compareTimer = useRef(null);
+  const media = useMemo(
+    () => resolveCustomerCardMedia(product, mediaFallback),
     [mediaFallback, product],
   );
   const soldOut = Number(product?.stock) <= 0;
@@ -54,50 +67,87 @@ export function CustomerProductCard({
     setActiveMedia(0);
     setPreviewing(false);
     setGalleryPrimed(false);
+    setCartPhase("idle");
   }, [product?.id]);
 
   useEffect(() => {
-    if (!galleryPrimed || typeof Image === "undefined") return undefined;
-    const preloads = images.slice(1).map((url) => {
-      const image = new Image();
-      image.decoding = "async";
-      image.src = url;
-      return image;
-    });
-    return () => preloads.forEach((image) => { image.src = ""; });
-  }, [galleryPrimed, images]);
+    return () => {
+      window.clearTimeout(dwellTimer.current);
+      window.clearInterval(cycleTimer.current);
+      window.clearTimeout(favoriteTimer.current);
+      window.clearTimeout(cartTimer.current);
+      window.clearTimeout(compareTimer.current);
+    };
+  }, []);
 
   const handlePointerEnter = (event) => {
-    if (!isFineHover() || images.length <= 1 || event.pointerType === "touch") return;
-    setGalleryPrimed(true);
+    if (!isFineHover() || media.length <= 1 || event.pointerType === "touch") return;
+    window.clearTimeout(dwellTimer.current);
+    window.clearInterval(cycleTimer.current);
     setPreviewing(true);
-  };
-  const handlePointerMove = (event) => {
-    if (!isFineHover() || images.length <= 1 || event.pointerType === "touch") return;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    setPreviewing(true);
-    setActiveMedia(productCardMediaIndex(event.clientX, bounds.left, bounds.width, images.length));
+    dwellTimer.current = window.setTimeout(() => {
+      setGalleryPrimed(true);
+      setActiveMedia((current) => (current + 1) % media.length);
+      cycleTimer.current = window.setInterval(() => {
+        setActiveMedia((current) => (current + 1) % media.length);
+      }, CUSTOMER_CARD_AUTOPLAY_INTERVAL_MS);
+    }, CUSTOMER_CARD_AUTOPLAY_DWELL_MS);
   };
   const resetMedia = () => {
+    window.clearTimeout(dwellTimer.current);
+    window.clearInterval(cycleTimer.current);
     setPreviewing(false);
+    setGalleryPrimed(false);
     setActiveMedia(0);
+  };
+
+  const playTransient = (timer, setter, value = true, duration = 520) => {
+    window.clearTimeout(timer.current);
+    setter(value);
+    timer.current = window.setTimeout(() => setter(value === true ? false : "idle"), duration);
+  };
+
+  const handleFavorite = async () => {
+    try {
+      const result = await onFavorite?.(product.id);
+      if (result !== false) playTransient(favoriteTimer, setFavoriteMotion, true, 320);
+    } catch { /* Runtime owns the visible failure notice. */ }
+  };
+
+  const handleCompare = async () => {
+    try {
+      const result = await comparison.toggle(product.id);
+      if (result !== false) playTransient(compareTimer, setCompareMotion, true, 360);
+    } catch { /* Runtime owns the visible failure notice. */ }
+  };
+
+  const handleAdd = async () => {
+    setCartPhase("pressed");
+    const pressedAt = performance.now();
+    try {
+      const result = await onAdd?.(product.id);
+      const remainingPress = Math.max(0, 140 - (performance.now() - pressedAt));
+      if (remainingPress) await new Promise((resolve) => window.setTimeout(resolve, remainingPress));
+      if (result === false) { setCartPhase("idle"); return; }
+      playTransient(cartTimer, setCartPhase, "success", 760);
+    } catch { setCartPhase("idle"); }
   };
 
   const mediaStage = (
     <span
       className="customer-card-media-stage"
       onPointerEnter={handlePointerEnter}
-      onPointerMove={handlePointerMove}
       onPointerLeave={resetMedia}
       data-active-media={activeMedia}
     >
-      {images.length ? images.filter((url, index) => index === 0 || index === activeMedia).map((url) => {
-        const index = images.indexOf(url);
+      {media.length ? media.filter((item, index) => index === 0 || galleryPrimed || index === activeMedia).map((item) => {
+        const index = media.indexOf(item);
         return (
           <img
-            key={url}
+            key={item.id}
             className={index === activeMedia ? "is-active" : ""}
-            src={url}
+            src={item.url}
+            style={cardFramingPresentation(item.cardFraming)}
             alt={index === 0 ? product.name : ""}
             aria-hidden={index === 0 ? undefined : true}
             loading="lazy"
@@ -111,11 +161,11 @@ export function CustomerProductCard({
           <small>Ürün görseli hazırlanıyor</small>
         </span>
       )}
-      {images.length > 1 && (
+      {media.length > 1 && (
         <>
-          <span className="customer-card-media-cue" aria-hidden="true">{images.length} görsel</span>
+          <span className="customer-card-media-cue" aria-hidden="true">{media.length} görsel · otomatik</span>
           <span className="customer-card-media-zones" aria-hidden="true">
-            {images.map((url, index) => <i key={url} className={index === activeMedia ? "is-active" : ""} />)}
+            {media.map((item, index) => <i key={item.id} className={index === activeMedia ? "is-active" : ""} />)}
           </span>
         </>
       )}
@@ -124,11 +174,9 @@ export function CustomerProductCard({
 
   const rating = Math.min(5, Math.max(0, Number(product?.rating) || 0));
   const reviews = Math.max(0, Number(product?.reviews) || 0);
-  const delivery = soldOut
-    ? "Stok bekleniyor"
-    : product?.fastDelivery
-      ? "Yarın kapında"
-      : String(product?.deliveryLabel || "Teslimat bilgisi ürün detayında");
+  const delivery = typeof product?.deliveryLabel === "string" && product.deliveryLabel.trim()
+    ? product.deliveryLabel.trim()
+    : null;
 
   return (
     <article className={`product-card customer-product-card${className ? ` ${className}` : ""}${soldOut ? " is-sold-out" : ""}${previewing ? " is-media-previewing" : ""}`}>
@@ -139,7 +187,7 @@ export function CustomerProductCard({
           </span>
         )}
         {!previewMode && typeof onFavorite === "function" && (
-          <button className={`favorite-button${favorite ? " is-active" : ""}`} type="button" onClick={() => onFavorite(product.id)} aria-pressed={favorite} aria-label={favorite ? `${product.name} ürününü favorilerden çıkar` : `${product.name} ürününü favorilere ekle`}>
+          <button className={`favorite-button${favorite ? " is-active" : ""}${favoriteMotion ? " is-confirmed" : ""}`} type="button" onClick={handleFavorite} aria-pressed={favorite} aria-label={favorite ? `${product.name} ürününü favorilerden çıkar` : `${product.name} ürününü favorilere ekle`}>
             <Heart weight={favorite ? "fill" : "regular"} />
           </button>
         )}
@@ -153,7 +201,7 @@ export function CustomerProductCard({
         ) : (
           <div className="product-rating customer-card-no-rating" role="img" aria-label="Henüz değerlendirme yok"><Star /><span>Henüz değerlendirme yok</span></div>
         )}
-        <div className="delivery-line">{soldOut ? <Package /> : product?.fastDelivery ? <Truck /> : <Package />}<span className={soldOut ? "sold-out-copy" : ""}>{delivery}</span></div>
+        {delivery && <div className="delivery-line"><Truck /><span>{delivery}</span></div>}
         <div className="product-price-row">
           <div className="price-block">
             {oldPrice > currentPrice && <span><del>{money.format(oldPrice)}</del>{discount > 0 && <b>%{discount}</b>}</span>}
@@ -164,8 +212,8 @@ export function CustomerProductCard({
           <div className="public-store-readonly-product"><ShieldCheck /> Önizlemede işlem yapılamaz</div>
         ) : (
           <div className="product-card__actions">
-            <button className={`compare-button${compared ? " is-active" : ""}`} type="button" aria-pressed={compared} disabled={!comparison.available} onClick={() => comparison.toggle(product.id)} aria-label={compared ? `${product.name} ürününü karşılaştırmadan çıkar` : `${product.name} ürününü karşılaştır`}><ArrowsLeftRight /></button>
-            <button className="card-add-button" type="button" disabled={soldOut || typeof onAdd !== "function"} onClick={() => onAdd?.(product.id)}>{soldOut ? "Tükendi" : <><ShoppingCart /> Sepete ekle</>}</button>
+            <button className={`compare-button${compared ? " is-active" : ""}${compareMotion ? " is-confirmed" : ""}`} type="button" aria-pressed={compared} disabled={!comparison.available} onClick={handleCompare} aria-label={compared ? `${product.name} ürününü karşılaştırmadan çıkar` : `${product.name} ürününü karşılaştır`}><ArrowsLeftRight /></button>
+            <button className={`card-add-button is-${cartPhase}`} type="button" disabled={soldOut || typeof onAdd !== "function"} onClick={handleAdd}>{soldOut ? "Tükendi" : cartPhase === "success" ? <><Check /> Eklendi</> : <><ShoppingCart /> Sepete ekle</>}</button>
           </div>
         )}
       </div>

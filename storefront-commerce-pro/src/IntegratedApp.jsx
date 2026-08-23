@@ -382,9 +382,9 @@ function useRoute() {
   return { route, loading: false };
 }
 
-function Logo({ onClick }) {
+function Logo({ onClick, surface = "dark" }) {
   return (
-    <a className="brand" href="#/" aria-label="NovaStore ana sayfa" onClick={onClick}>
+    <a className={`brand brand--${surface}-surface`} href="#/" aria-label="NovaStore ana sayfa" onClick={onClick}>
       <span>Nova</span><strong>Store</strong>
     </a>
   );
@@ -630,7 +630,7 @@ function Header({ cartCount, favoriteCount, onCartOpen, onMobileOpen, onAccountO
       <TrustBar />
       <div className="shell main-header">
         <button className="mobile-menu-trigger" type="button" onClick={onMobileOpen} aria-label="Kategorileri aç" aria-haspopup="dialog" aria-expanded={mobileMenuOpen} aria-controls="category-drawer"><List /></button>
-        <Logo />
+        <Logo surface="dark" />
         <SearchBox onSearch={(term) => navigate(`/arama?q=${encodeURIComponent(term)}`)} />
         <div className="header-actions">
           <HeaderAction icon={User} label="Hesabım" detail={accountDetail} onClick={onAccountOpen} />
@@ -682,7 +682,7 @@ function MobileCategoryDrawer({ open, onClose, returnFocusRef }) {
     <div className="overlay-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeDrawer()}>
       <div id="category-drawer" ref={dialogRef} className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Kategori menüsü" tabIndex="-1">
         <div className="drawer-head">
-          {current ? <button type="button" onClick={() => setStack((value) => value.slice(0, -1))}><ArrowLeft /> Geri</button> : <Logo onClick={closeDrawer} />}
+          {current ? <button type="button" onClick={() => setStack((value) => value.slice(0, -1))}><ArrowLeft /> Geri</button> : <Logo surface="light" onClick={closeDrawer} />}
           <button ref={closeRef} className="icon-button" type="button" onClick={closeDrawer} aria-label="Menüyü kapat"><X /></button>
         </div>
         <div className="mobile-drawer__body">
@@ -1041,8 +1041,26 @@ function ProductRoute({ summary, loadProduct, favorite, favorites, onFavorite, o
 
   return <>
     <CanonicalProductDetail key={state.product.id} product={state.product} favorite={favorite} favorites={favorites} onFavorite={onFavorite} onAdd={onAdd} onBuyNow={onBuyNow} buyNowPending={buyNowPending} />
+    <PdpStoreAttribution product={state.product} />
     <div className="shell integration-community-shell"><ProductCommunity productId={state.product.id} productName={state.product.name} session={session} community={community} sectionId="community-reviews" /></div>
   </>;
+}
+
+function PdpStoreAttribution({ product }) {
+  const [target, setTarget] = useState(null);
+  useEffect(() => {
+    setTarget(document.querySelector(".product-page .product-summary"));
+  }, [product?.id]);
+  const store = product?.store;
+  if (!target || !store?.name || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(store.slug || ""))) return null;
+  return createPortal(
+    <aside className="pdp-store-attribution" aria-label="Satıcı mağaza">
+      <span className="pdp-store-attribution__icon" aria-hidden="true"><Storefront /></span>
+      <span><small>Satıcı mağaza</small><strong>{store.name}</strong></span>
+      <a href={`#/magaza/${store.slug}`}>Mağazaya Git <CaretRight /></a>
+    </aside>,
+    target,
+  );
 }
 
 function CollectionRoute({ slug, title: titleOverride, loadCollection, favorites, onFavorite, onAdd }) {
@@ -1104,7 +1122,7 @@ function CartPage({ items, onQuantity, onRemove, onCheckout }) {
                       ? <small className="cart-stock-status is-unavailable"><WarningCircle weight="fill" /> Bu ürün şu anda stokta değil</small>
                       : quantity > product.stock
                         ? <small className="cart-stock-status is-unavailable"><WarningCircle weight="fill" /> Yalnız {product.stock} adet stokta; miktarı azalt</small>
-                        : <small><CheckCircle weight="fill" /> {product.deliveryLabel || "Teslimat bilgisi ürün detayında"}</small>}
+                        : product.deliveryLabel ? <small><CheckCircle weight="fill" /> {product.deliveryLabel}</small> : null}
                     <button type="button" onClick={() => onRemove(product.id)}><Trash /> Kaldır</button>
                   </div>
                   <div className="cart-page-line__end">
@@ -1154,7 +1172,7 @@ function HelpPage() {
     setHelpQuery(topicQuery(title));
     window.requestAnimationFrame(() => document.getElementById("help-faqs")?.scrollIntoView({ behavior: motionBehavior(), block: "start" }));
   };
-  return <main id="main-content" className="page help-page"><div className="shell"><Breadcrumbs /><div className="help-hero"><NovaServiceIcon /><span className="section-kicker">Yardım merkezi</span><h1>Nasıl yardımcı olabiliriz?</h1><p>Sipariş, teslimat, iade ve ödeme konularındaki işlem noktalarını keşfet.</p><form role="search" onSubmit={(event) => event.preventDefault()}><MagnifyingGlass /><input aria-label="Yardım konularında ara" placeholder="Bir konu ara" value={helpQuery} onChange={(event) => setHelpQuery(event.target.value)} /><button type="submit">Ara</button></form></div><div className="help-grid" aria-live="polite">{visibleTopics.map(([,title,copy]) => <button type="button" onClick={() => selectTopic(title)} key={title}><NovaServiceIcon kind={title === "Siparişler" ? "orders" : title === "Teslimat" ? "delivery" : title === "Ödeme" ? "payment" : "returns"} /><strong>{title}</strong><span>{copy}</span><CaretRight /></button>)}</div><section className="faq-list" id="help-faqs"><h2>Sık sorulan sorular</h2>{visibleFaqs.length ? visibleFaqs.map(({ question, answer }) => <details key={question}><summary>{question}<CaretDown /></summary><p>{answer}</p></details>) : <p role="status">Bu aramayla eşleşen yardım konusu bulunamadı.</p>}</section></div></main>;
+  return <main id="main-content" className="page help-page"><div className="shell"><Breadcrumbs /><div className="help-hero"><NovaServiceIcon kind="help" /><span className="section-kicker">Yardım merkezi</span><h1>Nasıl yardımcı olabiliriz?</h1><p>Sipariş, teslimat, iade ve ödeme konularındaki işlem noktalarını keşfet.</p><form role="search" onSubmit={(event) => event.preventDefault()}><MagnifyingGlass /><input aria-label="Yardım konularında ara" placeholder="Bir konu ara" value={helpQuery} onChange={(event) => setHelpQuery(event.target.value)} /><button type="submit">Ara</button></form></div><div className="help-grid" aria-live="polite">{visibleTopics.map(([,title,copy]) => <button type="button" onClick={() => selectTopic(title)} key={title}><NovaServiceIcon kind={title === "Siparişler" ? "orders" : title === "Teslimat" ? "delivery" : title === "Ödeme" ? "payment" : "returns"} /><strong>{title}</strong><span>{copy}</span><CaretRight /></button>)}</div><section className="faq-list" id="help-faqs"><h2>Sık sorulan sorular</h2>{visibleFaqs.length ? visibleFaqs.map(({ question, answer }) => <details key={question}><summary>{question}<CaretDown /></summary><p>{answer}</p></details>) : <p role="status">Bu aramayla eşleşen yardım konusu bulunamadı.</p>}</section></div></main>;
 }
 
 function ReturnExchangePage() {
@@ -1309,15 +1327,17 @@ export function CommerceProRuntimeApp({ runtime }) {
     cartRef.current = normalized;
     setCart(normalized);
     if (persist) {
-      runtime.cart.persist(normalized).catch(() => {
+      return runtime.cart.persist(normalized).then(() => true).catch(() => {
         notify("Sepet sunucuya aktarılamadı; yerel değişikliğin korunuyor.");
+        return false;
       });
     }
+    return Promise.resolve(true);
   }
 
   async function toggleFavorite(productId) {
     const product = products.find((item) => item.id === productId);
-    if (!product) return;
+    if (!product) return false;
     const previous = new Set(favoritesRef.current);
     const next = new Set(previous);
     const shouldFavorite = !next.has(productId);
@@ -1328,16 +1348,18 @@ export function CommerceProRuntimeApp({ runtime }) {
     try {
       await runtime.favorites.set(productId, shouldFavorite);
       notify(`${product.name} ${shouldFavorite ? "favorilere eklendi" : "favorilerden çıkarıldı"}`);
+      return true;
     } catch {
       favoritesRef.current = previous;
       setFavorites(previous);
       notify("Favori işlemi tamamlanamadı; seçimin değiştirilmedi.");
+      return false;
     }
   }
 
-  function addToCart(productId, quantity = 1) {
+  async function addToCart(productId, quantity = 1) {
     const product = products.find((item) => item.id === productId);
-    if (!product || product.stock <= 0) { notify("Bu ürün şu anda stokta değil"); return; }
+    if (!product || product.stock <= 0) { notify("Bu ürün şu anda stokta değil"); return false; }
     const current = cartRef.current;
     const existing = current.find((item) => item.productId === productId);
     const requestedQuantity = Math.max(1, Number(quantity) || 1);
@@ -1345,17 +1367,19 @@ export function CommerceProRuntimeApp({ runtime }) {
     const nextQuantity = Math.min(product.stock, currentQuantity + requestedQuantity);
     if (nextQuantity === currentQuantity) {
       notify(`${product.name} için sepetindeki adet mevcut stoğa ulaştı.`);
-      return;
+      return false;
     }
     const next = existing
       ? current.map((item) => item.productId === productId
         ? { ...item, quantity: nextQuantity }
         : item)
       : [...current, { productId, quantity: nextQuantity }];
-    replaceCart(next);
+    const persisted = await replaceCart(next);
+    if (!persisted) return false;
     notify(nextQuantity - currentQuantity < requestedQuantity
       ? `${product.name} mevcut stok sınırına göre sepete eklendi.`
       : `${product.name} sepete eklendi`);
+    return true;
   }
 
   async function buyNow(productId, quantity = 1) {
@@ -1402,20 +1426,15 @@ export function CommerceProRuntimeApp({ runtime }) {
 
   function toggleComparison(productId) {
     const product = products.find((item) => item.id === productId);
-    if (!product) return;
-    setComparisonIds((current) => {
-      const next = new Set(current);
-      if (next.has(productId)) {
-        next.delete(productId);
-        return next;
-      }
-      if (next.size >= 3) {
-        notify("Aynı anda en fazla 3 ürünü karşılaştırabilirsin.");
-        return current;
-      }
-      next.add(productId);
-      return next;
-    });
+    if (!product) return false;
+    const next = new Set(comparisonIds);
+    if (next.has(productId)) next.delete(productId);
+    else if (next.size >= 3) {
+      notify("Aynı anda en fazla 3 ürünü karşılaştırabilirsin.");
+      return false;
+    } else next.add(productId);
+    setComparisonIds(next);
+    return true;
   }
 
   async function handoffToCheckout() {

@@ -1,6 +1,7 @@
 'use strict';
 
 const { ORDER_STATUS, PAYMENT_STATUS } = require('../constants/orderStatus');
+const { cardFramingFromStorage } = require('../shared/productCardFraming');
 
 const STORE_PUBLIC_KEYS = Object.freeze([
     'slug',
@@ -35,7 +36,8 @@ const MEDIA_PUBLIC_KEYS = Object.freeze([
     'media_url',
     'media_type',
     'is_main',
-    'sort_order'
+    'sort_order',
+    'card_framing'
 ]);
 const CLOUDINARY_HOST = 'res.cloudinary.com';
 const LOCAL_PRODUCT_MEDIA_PATTERN = /^\/uploads\/local-products\/[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/u;
@@ -138,7 +140,8 @@ const toPublicMedia = (row) => {
         media_url: mediaUrl,
         media_type: 'image',
         is_main: row.is_main === true,
-        sort_order: nonNegativeInteger(row.sort_order)
+        sort_order: nonNegativeInteger(row.sort_order),
+        card_framing: cardFramingFromStorage(row)
     });
 };
 
@@ -223,7 +226,8 @@ const loadProducts = async (queryable, platformStoreId) => {
         [platformStoreId]
     );
     const mediaResult = await queryable.query(
-        `SELECT media.id, media.product_id, media.media_url, media.media_type, media.is_main, media.sort_order
+        `SELECT media.id, media.product_id, media.media_url, media.media_type, media.is_main, media.sort_order,
+                media.card_focal_x, media.card_focal_y, media.card_zoom
            FROM product_media media
      INNER JOIN products product
              ON product.id = media.product_id

@@ -82,7 +82,7 @@ assert.match(community, /state\.phase === "error"[\s\S]*?id=\{activePanelId\}[\s
 for (const kind of ["help", "orders", "delivery", "returns", "payment", "support", "bot"]) {
   assert.match(icon, new RegExp(`${kind}:`));
 }
-assert.match(app, /<NovaServiceIcon \/>/);
+assert.match(app, /<NovaServiceIcon kind="help" \/>/);
 assert.match(app, /<NovaServiceIcon kind="returns" \/>/);
 assert.match(connected, /<NovaServiceIcon kind="delivery" \/>/);
 assert.match(connected, /<NovaServiceIcon kind="support" \/>/);

@@ -51,6 +51,7 @@ const catalogDetailPayload = {
       media_type: "image",
       is_main: true,
       sort_order: 0,
+      card_framing: null,
     }],
     category_ids: [4],
     primary_category_id: 4,

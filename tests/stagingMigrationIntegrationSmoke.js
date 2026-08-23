@@ -194,7 +194,7 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'order_events', 'order_item_backfill_issues', 'order_items', 'orders',
         'page_visits', 'payments', 'product_actions', 'product_attribute_values',
         'product_categories', 'product_media', 'product_questions', 'products',
-        'returns', 'review_media', 'reviews', 'shipments', 'stores',
+        'returns', 'review_media', 'reviews', 'shipments', 'store_follows', 'stores',
         'support_thread_events', 'support_threads', 'template_attributes', 'user_shared_state', 'users', 'visitor_sessions',
         'admin_coupon_audit_events',
         'seller_applicant_sessions', 'seller_application_command_receipts',
@@ -248,13 +248,16 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
               ('messages', 'support_thread_id'),
               ('coupons', 'revision'),
               ('product_media', 'media_type'),
+              ('product_media', 'card_focal_x'),
+              ('product_media', 'card_focal_y'),
+              ('product_media', 'card_zoom'),
               ('seller_application_terms_authority', 'active_revision'),
               ('seller_application_terms_authority', 'generation'),
               ('seller_application_terms_authority_events', 'active_revision'),
               ('seller_application_terms_authority_events', 'generation')
            )`
     );
-    assert.equal(requiredColumns.rowCount, 24);
+    assert.equal(requiredColumns.rowCount, 27);
 
     const triggers = await admin.query(
         `SELECT trigger_name
@@ -302,7 +305,7 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'chk_coupons_date_range', 'chk_admin_coupon_audit_actor_role', 'chk_admin_coupon_audit_action',
         'chk_admin_coupon_audit_revision', 'chk_admin_coupon_audit_metadata_object',
         'uq_seller_memberships_organization_id_id_user_id', 'fk_seller_sessions_membership_user',
-        'chk_product_media_type', 'chk_product_media_image_cover',
+        'chk_product_media_type', 'chk_product_media_image_cover', 'chk_product_media_card_framing',
         'chk_product_media_video_publication_disabled', 'chk_products_image_url_not_video',
         'chk_seller_application_terms_authority_singleton',
         'chk_seller_application_terms_authority_generation',
@@ -337,6 +340,22 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         safetyIndexes.rows.find((row) => row.indexname === 'idx_product_media_one_main').indexdef,
         /WHERE \(is_main = true\)/i
     );
+    const framingProduct = await admin.query(
+        `INSERT INTO products (name, price)
+         VALUES ('Main-6Y partial framing probe', 1)
+         RETURNING id`
+    );
+    await assert.rejects(
+        admin.query(
+            `INSERT INTO product_media
+                (product_id, media_url, media_type, card_focal_x, card_focal_y, card_zoom)
+             VALUES ($1, '/uploads/local-products/main6y-partial-framing.jpg', 'image', 0.2, NULL, 1.2)`,
+            [framingProduct.rows[0].id]
+        ),
+        (error) => error?.code === '23514' && error?.constraint === 'chk_product_media_card_framing',
+        'Partial-null product card framing must be rejected by PostgreSQL.'
+    );
+    await admin.query('DELETE FROM products WHERE id = $1', [framingProduct.rows[0].id]);
     const platformStore = await admin.query(
         `SELECT COUNT(*)::INTEGER AS count
          FROM stores

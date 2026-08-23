@@ -449,7 +449,7 @@ try {
     assert.ok(measurements.overflow <= 1, `${width}px must not overflow.`);
     measurements.cards.forEach((card) => {
       assert.ok(Math.abs(card.mediaRatio - 1) <= 0.01, `${width}px media stage must remain square.`);
-      assert.equal(card.objectFit, "contain");
+      assert.equal(card.objectFit, "cover");
       assert.equal(card.imageLoaded, true);
       assert.ok(Math.abs(card.contentLeft - card.titleLeft) <= 1);
       assert.ok(Math.abs(card.contentLeft - card.priceLeft) <= 1);
@@ -478,17 +478,17 @@ try {
   });
   assert.ok(initialGeometry.imageCount >= 3);
   const hoverFrames = [];
-  for (const [label, fraction, expected] of [["Sol bölge", 0.12, 0], ["Orta bölge", 0.5, 2], ["Sağ bölge", 0.88, 3]]) {
-    const box = await iphoneCard.$eval(".customer-card-media-stage", (node) => { const rect = node.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; });
-    await page.mouse.move(box.x + box.width * fraction, box.y + box.height * 0.5);
-    await delay(110);
+  const box = await iphoneCard.$eval(".customer-card-media-stage", (node) => { const rect = node.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; });
+  await page.mouse.move(box.x + box.width * .5, box.y + box.height * .5);
+  for (const [label, wait] of [["Dwell sonrası", 520], ["Otomatik döngü", 1100], ["Döngü devam", 1100]]) {
+    await delay(wait);
     const state = await iphoneCard.$eval(".customer-card-media-stage", (node) => ({ active: Number(node.dataset.activeMedia), cue: getComputedStyle(node.querySelector(".customer-card-media-cue")).opacity, loaded: [...node.querySelectorAll("img")].every((image) => image.complete && image.naturalWidth > 0), hash: location.hash }));
-    assert.equal(state.active, expected);
     assert.equal(state.loaded, true);
     assert.equal(state.hash, initialGeometry.hash);
     assert.ok(Number(state.cue) > 0);
     hoverFrames.push({ label, caption: `aktif medya ${state.active + 1}/${initialGeometry.imageCount}`, buffer: Buffer.from(await iphoneCard.screenshot({ type: "png" })) });
   }
+  assert.ok(new Set(hoverFrames.map((frame) => frame.caption)).size >= 3);
   fs.writeFileSync(path.join(evidenceDirectory, "14-MULTI-IMAGE-PRODUCT-HOVER-MIDDLE.png"), hoverFrames[1].buffer);
   record("14-MULTI-IMAGE-PRODUCT-HOVER-MIDDLE.png", { state: "hover-middle", product: "owner-hover-dort-gorsel" });
   fs.writeFileSync(path.join(evidenceDirectory, "15-MULTI-IMAGE-PRODUCT-HOVER-END.png"), hoverFrames[2].buffer);
@@ -505,8 +505,8 @@ try {
   assert.equal(await iphoneCard.$eval(".customer-card-media-stage", (node) => Number(node.dataset.activeMedia)), 0);
   await renderContactSheet(browser, {
     fileName: "CUSTOMER-CARD-MULTI-IMAGE-HOVER-CONTACT-SHEET.png",
-    title: "Çoklu görsel yatay hover bölgeleri",
-    subtitle: `${initialGeometry.imageCount} medya · işaretçi niyeti sonrası sınırlı ön yükleme · tıklama/navigasyon yok · geometri sabit · ayrılınca kapak sıfırlanıyor`,
+    title: "Çoklu görsel dwell autoplay",
+    subtitle: `${initialGeometry.imageCount} medya · 360 ms işaretçi niyeti sonrası 1050 ms otomatik döngü · tıklama/navigasyon yok · geometri sabit · ayrılınca kapak sıfırlanıyor`,
     entries: [{ label: "Başlangıç / kapak", caption: "aktif medya 1", buffer: initialCard }, ...hoverFrames],
     metadata: { imageCount: initialGeometry.imageCount, initialGeometry, finalGeometry },
   });
@@ -624,13 +624,13 @@ try {
   await renderContactSheet(browser, {
     fileName: "CUSTOMER-MAIN6X-OWNER-CONTACT-SHEET.png",
     title: "NovaStore Main6X · owner visual gate",
-    subtitle: "tek ortak kart · hizalı CTA · contain medya · yatay hover · Lucide · indirim hiyerarşisi · 320–1440 px",
+    subtitle: "tek ortak kart · hizalı CTA · kontrollü cover kadraj · dwell autoplay · Lucide · indirim hiyerarşisi · 320–1440 px",
     entries: [
       { label: "Masaüstü 1440", fileName: "CUSTOMER-CARD-LIVE-DESKTOP-1440.png" },
       { label: "Mobil 390", fileName: "CUSTOMER-CARD-LIVE-MOBILE-390.png" },
       { label: "Mobil 320", fileName: "CUSTOMER-CARD-LIVE-MOBILE-320.png" },
       { label: "6W / 6X", fileName: "CUSTOMER-CARD-ALIGNMENT-BEFORE-AFTER.png" },
-      { label: "Çoklu medya hover", fileName: "CUSTOMER-CARD-MULTI-IMAGE-HOVER-CONTACT-SHEET.png" },
+      { label: "Çoklu medya dwell autoplay", fileName: "CUSTOMER-CARD-MULTI-IMAGE-HOVER-CONTACT-SHEET.png" },
       { label: "Lucide sistem", fileName: "CUSTOMER-LUCIDE-ICON-SYSTEM-CONTACT-SHEET.png" },
       { label: "Lucide durumları", fileName: "CUSTOMER-LUCIDE-ICON-HOVER-STATES.png" },
       { label: "İndirim hiyerarşisi", fileName: "CUSTOMER-DISCOUNT-HIERARCHY-CONTACT-SHEET.png" },
@@ -697,7 +697,7 @@ try {
   await renderContactSheet(browser, {
     fileName: "MAIN6X-R1-PUBLIC-STORE-CARD-PARITY.png",
     title: "Kategori / public mağaza ortak kart paritesi",
-    subtitle: "Aynı gerçek ürün DTO'ları · aynı CustomerProductCard · aynı medya, hizalama, indirim ve hover davranışı",
+    subtitle: "Aynı gerçek ürün DTO'ları · aynı CustomerProductCard · aynı medya, hizalama, indirim ve dwell autoplay davranışı",
     entries: [
       { label: "Kategori · CustomerProductCard", caption: "Gerçek Karaca ürünü, ortak medya ve CTA yapısı", buffer: readable.categoryCard },
       { label: "Public mağaza · CustomerProductCard", caption: "Aynı bileşen, aynı ürün, aynı hizalama ve hover", buffer: readable.publicStoreCard },

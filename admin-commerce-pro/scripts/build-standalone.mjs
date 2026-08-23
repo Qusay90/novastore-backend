@@ -88,7 +88,7 @@ const contentSecurityPolicy = [
   "default-src 'none'",
   "script-src 'unsafe-inline'",
   "style-src 'unsafe-inline'",
-  "img-src data:",
+  "img-src data: https://res.cloudinary.com",
   "font-src data:",
   `connect-src ${connectPolicy}`,
   "object-src 'none'",

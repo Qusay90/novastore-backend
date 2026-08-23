@@ -3,13 +3,13 @@ import {
   ChatCircleText,
   CreditCard,
   Headphones,
+  LifeBuoy,
   Package,
-  Question,
   Truck,
 } from "./CustomerIcon.jsx";
 
 const ICONS = Object.freeze({
-  help: Question,
+  help: LifeBuoy,
   orders: Package,
   delivery: Truck,
   returns: ArrowsClockwise,

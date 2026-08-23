@@ -14,13 +14,17 @@ export const safeCustomerMediaUrl = (value) => {
 };
 
 export const resolveCustomerCardImages = (product, fallback) => {
+  return Object.freeze(resolveCustomerCardMedia(product, fallback).map((item) => item.url));
+};
+
+export const resolveCustomerCardMedia = (product, fallback) => {
   const seen = new Set();
   const images = [];
-  const add = (value) => {
+  const add = (value, cardFraming = null, id = null) => {
     const url = safeCustomerMediaUrl(value);
     if (!url || seen.has(url)) return;
     seen.add(url);
-    if (images.length < CUSTOMER_CARD_MEDIA_LIMIT) images.push(url);
+    if (images.length < CUSTOMER_CARD_MEDIA_LIMIT) images.push(Object.freeze({ url, cardFraming, id: id || url }));
   };
   (Array.isArray(product?.media) ? product.media : [])
     .filter((item) => item?.type === "image")
@@ -29,9 +33,9 @@ export const resolveCustomerCardImages = (product, fallback) => {
       || Number(left?.sortOrder || 0) - Number(right?.sortOrder || 0)
       || String(left?.id || "").localeCompare(String(right?.id || ""))
     ))
-    .forEach((item) => add(item?.url));
-  add(product?.imageUrl);
-  add(fallback);
+    .forEach((item) => add(item?.url, item?.cardFraming || null, item?.id));
+  add(product?.imageUrl, null, `${product?.id || "product"}-primary`);
+  add(fallback, null, `${product?.id || "product"}-fallback`);
   return Object.freeze(images);
 };
 

@@ -1,3 +1,7 @@
+import productCardFraming from "../../../shared/productCardFraming.js";
+
+const { normalizeCardFraming } = productCardFraming;
+
 const asArray = (value) => Array.isArray(value) ? value : [];
 const asId = (value) => String(value ?? "").trim();
 const finiteNumber = (value, fallback = 0) => {
@@ -31,6 +35,20 @@ const productMediaType = (item, url) => {
     : "image";
 };
 
+const safeCardFraming = (value) => {
+  try { return normalizeCardFraming(value); }
+  catch { return null; }
+};
+
+const safePublicStore = (value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const slug = String(value.slug || "").trim().toLocaleLowerCase("tr-TR");
+  const name = String(value.name || "").trim();
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && name
+    ? Object.freeze({ slug, name: name.slice(0, 160) })
+    : null;
+};
+
 const normalizeProductMedia = (product, fallbackImageUrl) => {
   const seen = new Set();
   const items = asArray(product?.media).map((item, index) => {
@@ -43,6 +61,7 @@ const normalizeProductMedia = (product, fallbackImageUrl) => {
       type: productMediaType(item, url),
       isMain: item?.is_main === true || item?.isMain === true,
       sortOrder: nonNegativeInteger(item?.sort_order ?? item?.sortOrder ?? index),
+      cardFraming: safeCardFraming(item?.card_framing ?? item?.cardFraming),
     });
   }).filter(Boolean);
 
@@ -54,6 +73,7 @@ const normalizeProductMedia = (product, fallbackImageUrl) => {
       type: "image",
       isMain: items.length === 0,
       sortOrder: items.length,
+      cardFraming: null,
     }));
   }
 
@@ -249,12 +269,13 @@ const normalizeProducts = (payload, categories, collectionDetails) => {
       reviews: nonNegativeInteger(product.review_count ?? product.reviews),
       stock,
       fastDelivery: false,
-      deliveryLabel: stock > 0 ? "Teslimat bilgisi ürün detayında" : "Stok bekleniyor",
+      deliveryLabel: null,
       color: product.color || attributeValueByCode(attributes, ["renk", "color"]) || null,
       storage: product.storage || attributeValueByCode(attributes, ["kapasite", "depolama", "storage"]) || null,
       badge: stock <= 0 ? "Tükendi" : discount > 0 ? `%${discount} İndirim` : "",
       imageUrl,
       media,
+      store: safePublicStore(product.store),
       imageKey: null,
       description: String(product.description || "").trim(),
       features: Object.freeze(normalizeAttributeFeatures(attributes)),
@@ -430,6 +451,8 @@ export const catalogAdapterTestUtils = Object.freeze({
   normalizeCategories,
   normalizeProducts,
   normalizeProductMedia,
+  safeCardFraming,
+  safePublicStore,
   formatAttributeValue,
   attributeValueByCode,
   categoryNavigationFallback,

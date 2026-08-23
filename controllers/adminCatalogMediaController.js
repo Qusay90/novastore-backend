@@ -4,6 +4,7 @@ const {
     listProductMedia,
     registerProductMedia,
     reorderProductMedia,
+    updateProductMediaCardFraming,
     deleteProductMediaRecord
 } = require('../services/adminCatalogMediaService');
 
@@ -31,6 +32,17 @@ const handlers = {
     reorderAdminCatalogProductMedia: async (req, res) => {
         try {
             return res.status(200).json(await reorderProductMedia(pool, req.params.id, {
+                actor: req.currentAdmin,
+                body: req.body,
+                requestId: requestId(req)
+            }));
+        } catch (error) {
+            return sendCatalogProductError(res, error);
+        }
+    },
+    updateAdminCatalogProductMediaCardFraming: async (req, res) => {
+        try {
+            return res.status(200).json(await updateProductMediaCardFraming(pool, req.params.id, req.params.mediaId, {
                 actor: req.currentAdmin,
                 body: req.body,
                 requestId: requestId(req)

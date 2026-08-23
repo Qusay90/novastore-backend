@@ -67,7 +67,7 @@ const attributeResponseFields = new Set([
   "is_variant_relevant",
   "value",
 ]);
-const mediaResponseFields = new Set(["id", "media_url", "media_type", "is_main", "sort_order"]);
+const mediaResponseFields = new Set(["id", "media_url", "media_type", "is_main", "sort_order", "card_framing"]);
 const createInputFields = new Set([
   "name",
   "description",
@@ -242,6 +242,20 @@ const normalizeOptionValue = (value, field) => {
   });
 };
 
+const normalizeCardFraming = (value, field) => {
+  if (value === null) return null;
+  const framing = requireRecord(value, field);
+  requireExactFields(framing, new Set(["focal_x", "focal_y", "zoom"]), field);
+  const focalX = Number(framing.focal_x);
+  const focalY = Number(framing.focal_y);
+  const zoom = Number(framing.zoom);
+  if (![focalX, focalY, zoom].every(Number.isFinite)
+    || focalX < 0 || focalX > 1 || focalY < 0 || focalY > 1 || zoom < 1 || zoom > 3) {
+    throw new TypeError(`${field} izin verilen kadraj aralığında olmalıdır.`);
+  }
+  return Object.freeze({ focal_x: focalX, focal_y: focalY, zoom });
+};
+
 const normalizeAttributeValue = (type, value, field) => {
   if (value === null) return null;
   if (type === "text") return requireText(value, field, { max: 2000 });
@@ -356,6 +370,7 @@ export function normalizeAdminCatalogProductDetail(payload) {
       mediaType: value.media_type,
       isCover: requireBoolean(value.is_main, `product.media[${index}].is_main`),
       sortOrder: requireNonNegativeInteger(value.sort_order, `product.media[${index}].sort_order`),
+      cardFraming: normalizeCardFraming(value.card_framing, `product.media[${index}].card_framing`),
     });
   });
   if (new Set(media.map((entry) => entry.id)).size !== media.length

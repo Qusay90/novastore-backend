@@ -374,3 +374,52 @@
 @media (prefers-reduced-motion: reduce) {
   .live-loader { animation: none; border-top-color: var(--line); }
 }
+/* Main-6Y: shared non-destructive 1:1 card framing editor. */
+.catalog-card-framing {
+  display: grid;
+  grid-template-columns: minmax(240px, 330px) minmax(220px, 300px);
+  gap: 20px 24px;
+  align-items: center;
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid #dbe5ec;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.catalog-card-framing__copy,
+.catalog-card-framing__controls { grid-column: 1; }
+.catalog-card-framing__copy h3 { margin: 4px 0 7px; }
+.catalog-card-framing__copy p { margin: 0; color: #536879; line-height: 1.5; }
+
+.catalog-card-framing__preview {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 2px solid #f27a0a;
+  border-radius: 14px;
+  background: #edf2f5;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.catalog-card-framing__preview:active { cursor: grabbing; }
+.catalog-card-framing__preview img { width: 100%; height: 100%; display: block; pointer-events: none; }
+.catalog-card-framing__controls label { display: grid; gap: 8px; font-weight: 700; }
+.catalog-card-framing__controls input[type="range"] { width: 100%; accent-color: #f27a0a; }
+.catalog-card-framing__controls p { color: #536879; }
+.catalog-card-framing__controls > div { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.catalog-media-cell { display: inline-flex; align-items: center; gap: 10px; }
+.catalog-media-cell img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: #edf2f5; }
+
+@media (max-width: 760px) {
+  .catalog-card-framing { grid-template-columns: 1fr; }
+  .catalog-card-framing__copy,
+  .catalog-card-framing__controls,
+  .catalog-card-framing__preview { grid-column: 1; grid-row: auto; }
+  .catalog-card-framing__preview { width: min(100%, 320px); }
+}

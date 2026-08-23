@@ -7,6 +7,7 @@ const { applyMenuCollectionSchema } = require('./menuCollectionSchema');
 const { applyAttributeSchema } = require('./attributeSchema');
 const { applyAdminCatalogAuditSchema } = require('./adminCatalogAuditSchema');
 const { applyProductCommerceSchema } = require('./productCommerceSchema');
+const { applyProductCardFramingSchema } = require('./productCardFramingSchema');
 const { applyAuthSessionSchema } = require('./authSessionSchema');
 
 const createCoreSchema = async () => {
@@ -148,12 +149,14 @@ const createCoreSchema = async () => {
             id SERIAL PRIMARY KEY,
             product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
             media_url TEXT NOT NULL,
+            media_type VARCHAR(20) NOT NULL DEFAULT 'image',
             is_main BOOLEAN DEFAULT FALSE,
             sort_order INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
         ALTER TABLE product_media ADD COLUMN IF NOT EXISTS is_main BOOLEAN DEFAULT FALSE;
+        ALTER TABLE product_media ADD COLUMN IF NOT EXISTS media_type VARCHAR(20) NOT NULL DEFAULT 'image';
         ALTER TABLE product_media ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
         ALTER TABLE product_media ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
         ALTER TABLE product_media ADD COLUMN IF NOT EXISTS media_url TEXT;
@@ -174,6 +177,7 @@ const createCoreSchema = async () => {
     await applyAttributeSchema(pool);
     await applyAdminCatalogAuditSchema(pool);
     await applyProductCommerceSchema(pool);
+    await applyProductCardFramingSchema(pool);
     await applyAuthSessionSchema(pool);
     console.log('Temel veritabani schema hazir.');
 };

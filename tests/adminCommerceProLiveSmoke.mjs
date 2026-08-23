@@ -94,9 +94,11 @@ assert.match(
 );
 assert.match(
   integratedAppSource,
-  /const closeMediaOperation = \(\) => \{\s*setOperation\(null\);\s*onRefresh\(\);\s*\}/,
-  "medya özeti yalnız diyalog kapatılırken yenilenmeli",
+  /const closeMediaOperation = \(\) => \{[\s\S]{0,300}pendingMediaFocusRef\.current = \{[\s\S]{0,180}setOperation\(null\);\s*onRefresh\(\);/,
+  "medya özeti yalnız diyalog kapatılırken yenilenmeli ve odak dönüş hedefi korunmalı",
 );
+assert.match(integratedAppSource, /data-catalog-operation="media" data-product-id=\{product\.rawId\}/);
+assert.match(integratedAppSource, /target\.focus\(\);\s*pendingMediaFocusRef\.current = null;/);
 assert.match(
   integratedAppSource,
   /active: coupon\?\.active \?\? false/,
@@ -156,8 +158,13 @@ assert.match(source, /Şablonlar/);
 assert.match(source, /Koleksiyonlar/);
 assert.match(source, /Menüler/);
 assert.doesNotMatch(source, /Yayın bekliyor/);
-assert.doesNotMatch(integratedAppSource, /<img|image_url|imageUrl/);
-assert.doesNotMatch(integratedAppSource, /<input[^>]+type=["']file|FormData/i, "canlı ürün CRUD medya veya multipart kontrolü içermemeli");
+const catalogProductFormSource = integratedAppSource.match(
+  /function CatalogProductFormDialog[\s\S]*?function CatalogProductArchiveDialog/,
+)?.[0] || "";
+assert.ok(catalogProductFormSource, "ürün JSON CRUD form sınırı bulunmalı");
+assert.doesNotMatch(catalogProductFormSource, /<img|image_url|imageUrl/);
+assert.doesNotMatch(catalogProductFormSource, /<input[^>]+type=["']file|FormData/i, "canlı ürün JSON CRUD formu medya veya multipart kontrolü içermemeli");
+assert.match(integratedAppSource, /function CatalogMediaDialog[\s\S]*?<img src=\{entry\.mediaUrl\} alt=""/);
 assert.match(integratedAppSource, /getCatalogProduct\(\{ productId: summary\.rawId \}\)/, "edit/archive özetten alan tahmin etmeden tam DTO çekmeli");
 assert.match(integratedAppSource, /Boolean\(error\) \|\| refreshing \|\| sessionRefreshing/, "stale katalog veya oturum yenilemesi yazmaları fail-closed kapatmalı");
 assert.match(integratedAppSource, /if \(!writesBlocked \|\| !operation\) return;/, "açık ürün modalı yazma sınırı kaybolduğunda kapanmalı");

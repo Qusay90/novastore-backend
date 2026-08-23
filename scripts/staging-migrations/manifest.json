@@ -201,5 +201,12 @@
     "sha256": "25aa71ba98494d9bc6d81d49132a12be3f5c9e0e7a60cc78d65a70c2a091f02f",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260823_01_product_media_card_framing",
+    "path": "migrations/20260823_01_product_media_card_framing.sql",
+    "sha256": "46f6945048265cdf8500045ec080ece781d79818ecc3a30e7a6e3e3d5d90667f",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

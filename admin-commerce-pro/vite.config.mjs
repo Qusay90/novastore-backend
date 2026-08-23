@@ -28,6 +28,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: outputDirectory,
       emptyOutDir: true,
+      commonjsOptions: { include: [/node_modules/, /shared/] },
       rollupOptions: {
         input: path.join(root, integrated ? "integrated.html" : "index.html"),
       },

@@ -163,6 +163,17 @@ export function createSameOriginAdapter(http) {
         });
         return actions.getCatalogProduct({ productId, signal });
       };
+      actions.updateCatalogMediaCardFraming = async ({ productId, mediaId, expectedRevision, cardFraming, signal } = {}) => {
+        await http.request(`/api/admin/catalog/products/${encodeURIComponent(String(productId))}/media/${encodeURIComponent(String(mediaId))}/framing`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            expected_revision: expectedRevision,
+            card_framing: cardFraming,
+          }),
+          signal,
+        });
+        return actions.getCatalogProduct({ productId, signal });
+      };
       actions.deleteCatalogMedia = async ({ productId, mediaId, expectedRevision, signal } = {}) => {
         await http.request(`/api/admin/catalog/products/${encodeURIComponent(String(productId))}/media/${encodeURIComponent(String(mediaId))}`, {
           method: "DELETE",

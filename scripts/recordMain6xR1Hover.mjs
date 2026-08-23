@@ -86,13 +86,13 @@ try {
   const recorder = await page.screencast({ path: sourceWebm, format: "webm", ffmpegPath, fps: 30, quality: 20 });
   await delay(1200);
 
-  const samples = [["left", .10, 0], ["middle", .55, 2], ["right", .90, 3]];
-  for (const [label, fraction, expected] of samples) {
-    await page.mouse.move(metrics.clientLeft + metrics.width * fraction, metrics.clientTop + metrics.height * .52, { steps: 16 });
-    await delay(1700);
-    const active = await card.$eval(".customer-card-media-stage", (node) => Number(node.dataset.activeMedia));
-    assert.equal(active, expected, `${label} pointer zone must activate media ${expected + 1}.`);
+  await page.mouse.move(metrics.clientLeft + metrics.width * .5, metrics.clientTop + metrics.height * .52, { steps: 16 });
+  const samples = [];
+  for (let index = 0; index < 4; index += 1) {
+    await delay(index === 0 ? 520 : 1080);
+    samples.push(await card.$eval(".customer-card-media-stage", (node) => Number(node.dataset.activeMedia)));
   }
+  assert.ok(new Set(samples).size >= 3, `Dwell autoplay must cycle multiple media: ${samples.join(",")}`);
   await page.mouse.move(5, 5, { steps: 16 });
   await delay(1700);
   assert.equal(await card.$eval(".customer-card-media-stage", (node) => Number(node.dataset.activeMedia)), 0);

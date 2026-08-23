@@ -1,6 +1,7 @@
 const { PLATFORM_STORE } = require('./categoryV2BackfillService');
 const { AdminCatalogMutationError } = require('./adminCatalogMutationPolicy');
 const { executeAdminCatalogMutation } = require('./adminCatalogMutationService');
+const { cardFramingFromStorage, normalizeCardFraming } = require('../shared/productCardFraming');
 
 const MAX_PRODUCT_MEDIA = 10;
 const CLOUDINARY_HOST = 'res.cloudinary.com';
@@ -83,7 +84,8 @@ const listProductMedia = async (database, rawProductId) => {
     const productId = normalizePositiveId(rawProductId, 'Ürün kimliği');
     await loadFirstPartyProduct(database, productId);
     const result = await database.query(
-        `SELECT id, product_id, media_url, media_type, is_main, sort_order, created_at
+        `SELECT id, product_id, media_url, media_type, is_main, sort_order,
+                card_focal_x, card_focal_y, card_zoom, created_at
          FROM product_media
          WHERE product_id = $1
          ORDER BY is_main DESC, sort_order ASC, id ASC`,
@@ -96,8 +98,50 @@ const listProductMedia = async (database, rawProductId) => {
         mediaType: row.media_type || 'image',
         isCover: row.is_main === true,
         sortOrder: Number(row.sort_order || 0),
+        cardFraming: cardFramingFromStorage(row),
         createdAt: row.created_at || null
     })));
+};
+
+const updateProductMediaCardFraming = async (database, rawProductId, rawMediaId, { actor, body, requestId = null }) => {
+    const productId = normalizePositiveId(rawProductId, 'Ürün kimliği');
+    const mediaId = normalizePositiveId(rawMediaId, 'Medya kimliği');
+    let framing;
+    try {
+        framing = normalizeCardFraming(body?.card_framing ?? body?.cardFraming ?? null);
+    } catch (error) {
+        invalidMedia(error.message, 'ADMIN_CATALOG_MEDIA_CARD_FRAMING_INVALID');
+    }
+    const executed = await executeAdminCatalogMutation({
+        database,
+        actor,
+        entityType: 'product',
+        entityKey: String(productId),
+        action: 'update',
+        expectedRevision: body?.expected_revision ?? body?.expectedRevision,
+        changedFields: ['product_media.card_framing'],
+        requestId,
+        metadata: { source: 'admin-commerce-pro', operation: 'media_card_framing', storage_mutation: false },
+        authorizeLockedTarget: authorizeFirstPartyMediaTarget,
+        applyMutation: async (client) => {
+            const updated = await client.query(
+                `UPDATE product_media
+                    SET card_focal_x = $1,
+                        card_focal_y = $2,
+                        card_zoom = $3
+                  WHERE id = $4
+                    AND product_id = $5
+                    AND media_type = 'image'
+                RETURNING id`,
+                [framing?.focal_x ?? null, framing?.focal_y ?? null, framing?.zoom ?? null, mediaId, productId]
+            );
+            if (!updated.rows?.length) {
+                invalidMedia('Ürüne ait görsel medya kaydı bulunamadı.', 'ADMIN_CATALOG_MEDIA_NOT_FOUND', 404);
+            }
+            return { id: productId };
+        }
+    });
+    return toEnvelope(database, productId, executed);
 };
 
 const toEnvelope = async (database, productId, executed) => Object.freeze({
@@ -286,5 +330,6 @@ module.exports = {
     listProductMedia,
     registerProductMedia,
     reorderProductMedia,
+    updateProductMediaCardFraming,
     deleteProductMediaRecord
 };

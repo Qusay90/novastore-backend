@@ -6,6 +6,7 @@ export default defineConfig({
   build: {
     assetsInlineLimit: 30_000_000,
     cssCodeSplit: false,
+    commonjsOptions: { include: [/node_modules/, /shared/] },
   },
   optimizeDeps: {
     include: ["react", "react-dom/client"],

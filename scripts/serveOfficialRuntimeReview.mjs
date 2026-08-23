@@ -37,8 +37,8 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const storefrontSha256 = sha256(storefrontArtifact);
 const adminSha256 = sha256(adminArtifact);
 const expectedArtifactSha256 = Object.freeze({
-  storefront: "afc022dfc7bcad6336b1f10ce8ae2881fd023c3a5975ddfce6fc966f777fa6ee",
-  admin: "63d33d8bd3e4befd59b1ad60bb65404b12bec38389e4a70e4f3e284b62fab431",
+  storefront: "adda553972c7bbcd2ff3d095b3ec3f1212b7939c6d83bbb675354a7c25f628aa",
+  admin: "092400f0c52fea975369fb19fe2ee2b9060acdf1892f8e365834edf79b26f0e2",
 });
 if (storefrontSha256 !== expectedArtifactSha256.storefront) {
   throw new Error("Storefront artifact beklenen resmî inceleme digest'iyle eşleşmiyor.");
@@ -125,7 +125,8 @@ const canonicalPublicProducts = Object.freeze(products.filter((product) => isStr
   primary_category_id: product.categoryId,
   image_url: numericProductId(product.id) === 1001 ? "/review-media/iphone-15-angle.svg" : `/review-assets/${imageNameByKey[product.imageKey] || "product-phone.webp"}`,
   media: (reviewMediaByProductId[numericProductId(product.id)] || [imageNameByKey[product.imageKey] || "product-phone.webp"])
-    .map((fileName, index) => ({ id: `${numericProductId(product.id)}-media-${index + 1}`, media_url: fileName.startsWith("/") ? fileName : `/review-assets/${fileName}`, media_type: "image", is_main: index === 0, sort_order: index })),
+    .map((fileName, index) => ({ id: `${numericProductId(product.id)}-media-${index + 1}`, media_url: fileName.startsWith("/") ? fileName : `/review-assets/${fileName}`, media_type: "image", is_main: index === 0, sort_order: index, card_framing: null })),
+  store: { slug: "owner-main6x-r1", name: "NovaStore Owner Canlı Ürün İncelemesi" },
   attributes: (product.features || []).map((value, index) => ({ code: `feature-${index + 1}`, name: `Özellik ${index + 1}`, value })),
 })).filter((product) => Number.isInteger(product.id)));
 
@@ -163,6 +164,7 @@ const sanitizeOwnerProduct = (product, index) => {
       media_type: "image",
       is_main: item?.is_main === true || mediaIndex === 0,
       sort_order: Number.isFinite(Number(item?.sort_order)) ? Number(item.sort_order) : mediaIndex,
+      card_framing: null,
     }))
     .filter((item) => item.media_url)
     .slice(0, 8);
@@ -184,6 +186,7 @@ const sanitizeOwnerProduct = (product, index) => {
     primary_category_id: "home-living",
     image_url: imageUrl,
     media,
+    store: { slug: "owner-main6x-r1", name: "NovaStore Owner Canlı Ürün İncelemesi" },
     attributes: [],
     owner_fixture_rank: index + 1,
   });
@@ -229,12 +232,20 @@ const deterministicOwnerProduct = Object.freeze({
   category_ids: ["home-living"],
   primary_category_id: "home-living",
   image_url: "/review-media/iphone-15-angle.svg",
-  media: reviewMediaByProductId[1001].map((mediaUrl, index) => ({ id: `900001-media-${index + 1}`, media_url: mediaUrl, media_type: "image", is_main: index === 0, sort_order: index })),
+  media: reviewMediaByProductId[1001].map((mediaUrl, index) => ({ id: `900001-media-${index + 1}`, media_url: mediaUrl, media_type: "image", is_main: index === 0, sort_order: index, card_framing: index === 0 ? { focal_x: 0.32, focal_y: 0.46, zoom: 1.38 } : null })),
+  store: { slug: "owner-main6x-r1", name: "NovaStore Owner Canlı Ürün İncelemesi" },
   attributes: [],
 });
 const publicProducts = Object.freeze(ownerLiveProductsFile
   ? [...liveOwnerProducts, deterministicOwnerProduct]
   : canonicalPublicProducts);
+const reviewFramingByMediaId = new Map(publicProducts.flatMap((product) => product.media.map((media) => [String(media.id), media.card_framing || null])));
+let reviewCatalogRevision = 1;
+const withReviewFraming = (product) => ({
+  ...product,
+  media: product.media.map((media) => ({ ...media, card_framing: reviewFramingByMediaId.get(String(media.id)) || null })),
+});
+const customerReviewProducts = () => publicProducts.map(withReviewFraming);
 
 const productCountForCategory = (category) => publicProducts.filter((product) => {
   const assigned = categories.find((candidate) => candidate.id === product.primary_category_id);
@@ -511,9 +522,9 @@ const storefrontServer = http.createServer((request, response) => {
   }
   if (url.pathname === "/api/public/categories") return sendJson(request, response, 200, categoryTree(), mode);
   if (url.pathname === "/api/public/navigation/main") return sendJson(request, response, 200, publicNavigation, mode);
-  if (url.pathname === "/api/products") return sendJson(request, response, 200, publicProducts, mode);
+  if (url.pathname === "/api/products") return sendJson(request, response, 200, customerReviewProducts(), mode);
   if (/^\/api\/products\/\d+$/.test(url.pathname)) {
-    const product = publicProducts.find((candidate) => candidate.id === Number(url.pathname.split("/").pop()));
+    const product = customerReviewProducts().find((candidate) => candidate.id === Number(url.pathname.split("/").pop()));
     return product ? sendJson(request, response, 200, product, mode) : sendJson(request, response, 404, { error: "Ürün bulunamadı." }, mode);
   }
   if (url.pathname.startsWith("/owner-live-media/")) {
@@ -536,11 +547,11 @@ const storefrontServer = http.createServer((request, response) => {
       shipping_summary: "Teslimat bilgisi ürün ve adres adımında doğrulanır.",
       return_summary: "İade koşulları NovaStore destek akışında doğrulanır.",
     },
-    products: publicProducts,
+    products: customerReviewProducts(),
   }, mode);
   if (url.pathname === "/api/public/collections") return sendJson(request, response, 200, [{ id: 1, slug: "indirim", name: "Günün fırsatları", show_on_home: true }], mode);
   if (["/api/public/collections/indirim", "/api/public/collections/firsatlar"].includes(url.pathname)) {
-    const discountedProducts = publicProducts.filter((product) => Number(product.old_price) > Number(product.price));
+    const discountedProducts = customerReviewProducts().filter((product) => Number(product.old_price) > Number(product.price));
     return sendJson(request, response, 200, {
       collection: { id: 1, slug: "indirim", name: "Günün fırsatları" },
       products: discountedProducts,
@@ -550,7 +561,7 @@ const storefrontServer = http.createServer((request, response) => {
   if (url.pathname === "/api/public/navigation/main") return sendJson(request, response, 200, publicNavigation, mode);
   const productMatch = url.pathname.match(/^\/api\/products\/(\d+)$/);
   if (productMatch) {
-    const product = publicProducts.find((item) => item.id === Number(productMatch[1]));
+    const product = customerReviewProducts().find((item) => item.id === Number(productMatch[1]));
     return product ? sendJson(request, response, 200, product, mode) : sendJson(request, response, 404, { error: "Ürün bulunamadı." }, mode);
   }
   if (/^\/api\/reviews\/product\/\d+$/.test(url.pathname)) return sendJson(request, response, 200, [], mode);
@@ -749,10 +760,81 @@ const storefrontServer = http.createServer((request, response) => {
   return send(request, response, 200, storefrontArtifact, "text/html; charset=utf-8", commonHeaders(mode, storefrontSha256));
 });
 
-const adminBootstrap = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>NovaStore yerel Admin inceleme girişi</title></head><body><p>Yerel, salt okunur Admin inceleme oturumu hazırlanıyor…</p><script>localStorage.setItem("nova_admin_token",${JSON.stringify(adminToken)});location.replace("/admin-commerce-pro-live.html#/sellerApplications");</script></body></html>`;
+const adminBootstrap = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>NovaStore yerel Admin kadraj incelemesi</title></head><body><p>Yerel Admin ürün kadraj incelemesi hazırlanıyor…</p><script>localStorage.setItem("nova_admin_token",${JSON.stringify(adminToken)});location.replace("/admin-commerce-pro-live.html#/catalog");</script></body></html>`;
+const reviewAdminProductSource = rawOwnerLiveProducts[0] || deterministicOwnerProduct;
+const reviewAdminCustomerProduct = publicProducts.find((product) => product.id === reviewAdminProductSource.id) || deterministicOwnerProduct;
+const reviewAdminSourceMedia = (rawOwnerLiveProducts[0]?.media || []).filter((media) => String(media.media_url || "").startsWith("https://"));
+const reviewAdminMedia = (reviewAdminSourceMedia.length ? reviewAdminSourceMedia : [{ id: 990001, media_url: "https://res.cloudinary.com/demo/image/upload/sample.jpg", is_main: true, sort_order: 0 }])
+  .slice(0, 8)
+  .map((media, index) => ({
+    id: Number.isSafeInteger(Number(media.id)) && Number(media.id) > 0 ? Number(media.id) : 990001 + index,
+    media_url: media.media_url,
+    media_type: "image",
+    is_main: index === 0,
+    sort_order: index,
+    customer_media_id: reviewAdminCustomerProduct.media[index]?.id || reviewAdminCustomerProduct.media[0]?.id,
+  }));
+const reviewAdminSummary = () => ({
+  id: reviewAdminCustomerProduct.id,
+  name: reviewAdminCustomerProduct.name,
+  price: reviewAdminCustomerProduct.price,
+  old_price: reviewAdminCustomerProduct.old_price,
+  currency: "TRY",
+  stock: reviewAdminCustomerProduct.stock,
+  publication_status: "active",
+  is_customer_visible: true,
+  created_at: "2026-08-23T09:00:00.000Z",
+  updated_at: "2026-08-23T09:00:00.000Z",
+  deleted_at: null,
+  revision: reviewCatalogRevision,
+  primary_category_id: 1,
+  primary_category_name: "Ev ve Yaşam",
+  primary_category_path: "ev-yasam",
+  category_count: 1,
+  has_media: true,
+});
+const reviewAdminDetail = () => ({
+  catalogMode: "first_party",
+  product: {
+    id: reviewAdminCustomerProduct.id,
+    name: reviewAdminCustomerProduct.name,
+    description: reviewAdminCustomerProduct.description || "Yerel owner inceleme ürünü.",
+    price: reviewAdminCustomerProduct.price,
+    old_price: reviewAdminCustomerProduct.old_price,
+    currency: "TRY",
+    stock: reviewAdminCustomerProduct.stock,
+    sku: null,
+    brand: reviewAdminCustomerProduct.brand || null,
+    product_type: null,
+    vat_rate: null,
+    vat_rate_source: null,
+    weight_grams: null,
+    desi: null,
+    publication_status: "active",
+    is_customer_visible: true,
+    deleted_at: null,
+    created_at: "2026-08-23T09:00:00.000Z",
+    updated_at: "2026-08-23T09:00:00.000Z",
+    revision: reviewCatalogRevision,
+    has_media: true,
+    media: reviewAdminMedia.map((media) => ({
+      id: media.id,
+      media_url: media.media_url,
+      media_type: "image",
+      is_main: media.is_main,
+      sort_order: media.sort_order,
+      card_framing: reviewFramingByMediaId.get(String(media.customer_media_id)) || null,
+    })),
+    category_ids: [1],
+    primary_category_id: 1,
+    categories: [{ id: 1, name: "Ev ve Yaşam", path: "ev-yasam", is_primary: true }],
+    attributes: [],
+  },
+});
+const allowAdminReviewMutation = (methodKey) => /^PATCH \/api\/admin\/catalog\/products\/\d+\/media\/\d+\/framing$/u.test(methodKey);
 const adminServer = http.createServer((request, response) => {
   const mode = "INTEGRATED_COMMERCE_PRO_ADMIN";
-  if (!validateRequest(request, response, adminPort, mode)) return;
+  if (!validateRequest(request, response, adminPort, mode, allowAdminReviewMutation)) return;
   const url = new URL(request.url, `http://127.0.0.1:${adminPort}`);
 
   if (url.pathname === "/__review/meta") return sendJson(request, response, 200, { mode, artifactSha256: adminSha256, sourceEntry: "admin-commerce-pro/src/main-integrated.jsx", localData: "deterministic-platform-admin-store-summary-detail", counters }, mode);
@@ -764,7 +846,7 @@ const adminServer = http.createServer((request, response) => {
     user: { id: 17, role: "admin" },
     commerceMode: "single_vendor",
     apiVersion: "2026-08-09-local-review",
-    capabilities: { dashboardRead: true, storesRead: true },
+    capabilities: { dashboardRead: true, storesRead: true, firstPartyCatalogRead: true, firstPartyCatalogWrite: true },
   }, mode);
   if (url.pathname === "/api/admin/stats") return sendJson(request, response, 200, {
     totalRevenue: 0,
@@ -774,6 +856,33 @@ const adminServer = http.createServer((request, response) => {
     dataScope: "local_review_no_finance_order_user_data",
   }, mode);
   if (url.pathname === "/api/admin/stores/summary") return sendJson(request, response, 200, { items: storeSummaries, limit: 100, hasMore: false }, mode);
+  if (url.pathname === "/api/admin/catalog/products/summary") return sendJson(request, response, 200, { catalogMode: "first_party", items: [reviewAdminSummary()], limit: 100, hasMore: false }, mode);
+  const adminCatalogProductMatch = url.pathname.match(/^\/api\/admin\/catalog\/products\/(\d+)$/);
+  if (adminCatalogProductMatch && request.method === "GET") {
+    return Number(adminCatalogProductMatch[1]) === reviewAdminCustomerProduct.id
+      ? sendJson(request, response, 200, reviewAdminDetail(), mode)
+      : sendJson(request, response, 404, { error: "Ürün bulunamadı." }, mode);
+  }
+  const adminFramingMatch = url.pathname.match(/^\/api\/admin\/catalog\/products\/(\d+)\/media\/(\d+)\/framing$/);
+  if (adminFramingMatch && request.method === "PATCH") {
+    if (Number(adminFramingMatch[1]) !== reviewAdminCustomerProduct.id) return sendJson(request, response, 404, { error: "Ürün bulunamadı." }, mode);
+    const media = reviewAdminMedia.find((entry) => entry.id === Number(adminFramingMatch[2]));
+    if (!media) return sendJson(request, response, 404, { error: "Medya bulunamadı." }, mode);
+    return readJsonBody(request).then((body) => {
+      if (Number(body?.expected_revision) !== reviewCatalogRevision) return sendJson(request, response, 409, { error: "Ürün revizyonu güncel değil." }, mode);
+      const framing = body?.card_framing;
+      const valid = framing === null || (framing && typeof framing === "object" && !Array.isArray(framing)
+        && Object.keys(framing).length === 3
+        && ["focal_x", "focal_y", "zoom"].every((key) => Object.prototype.hasOwnProperty.call(framing, key))
+        && Number.isFinite(Number(framing.focal_x)) && Number(framing.focal_x) >= 0 && Number(framing.focal_x) <= 1
+        && Number.isFinite(Number(framing.focal_y)) && Number(framing.focal_y) >= 0 && Number(framing.focal_y) <= 1
+        && Number.isFinite(Number(framing.zoom)) && Number(framing.zoom) >= 1 && Number(framing.zoom) <= 3);
+      if (!valid) return sendJson(request, response, 400, { error: "Kadraj aralık dışında." }, mode);
+      reviewFramingByMediaId.set(String(media.customer_media_id), framing === null ? null : { focal_x: Number(framing.focal_x), focal_y: Number(framing.focal_y), zoom: Number(framing.zoom) });
+      reviewCatalogRevision += 1;
+      return sendJson(request, response, 200, { productId: reviewAdminCustomerProduct.id, revision: reviewCatalogRevision, media: reviewAdminDetail().product.media, storageMutation: false, localOnly: true }, mode);
+    }).catch(() => sendJson(request, response, 400, { error: "Geçersiz yerel kadraj verisi." }, mode));
+  }
   const storeMatch = url.pathname.match(/^\/api\/admin\/stores\/(\d+)$/);
   if (storeMatch) {
     const detail = storeDetails[Number(storeMatch[1])];
@@ -789,7 +898,7 @@ const listen = (server, port) => new Promise((resolve, reject) => {
 await Promise.all([listen(storefrontServer, storefrontPort), listen(adminServer, adminPort)]);
 console.log(`OFFICIAL_STOREFRONT_URL=http://127.0.0.1:${storefrontPort}/`);
 console.log(`OFFICIAL_ADMIN_BOOTSTRAP_URL=http://127.0.0.1:${adminPort}/`);
-console.log(`OFFICIAL_ADMIN_URL=http://127.0.0.1:${adminPort}/admin-commerce-pro-live.html#/sellerApplications`);
+console.log(`OFFICIAL_ADMIN_URL=http://127.0.0.1:${adminPort}/admin-commerce-pro-live.html#/catalog`);
 console.log(`SERVED_STOREFRONT_ARTIFACT_SHA256=${storefrontSha256}`);
 console.log(`SERVED_ADMIN_ARTIFACT_SHA256=${adminSha256}`);
 console.log("REMOTE_DATABASE_CONNECTION_COUNT=0");

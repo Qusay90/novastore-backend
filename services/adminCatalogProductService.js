@@ -19,6 +19,7 @@ const {
     normalizeUpdateProductPayload,
     normalizeArchiveProductPayload
 } = require('./adminCatalogProductPolicy');
+const { cardFramingFromStorage } = require('../shared/productCardFraming');
 
 const CATALOG_MODE = 'first_party';
 const CURRENCY = 'TRY';
@@ -88,7 +89,8 @@ const toProductDetail = (row, categoryRows, attributes, mediaRows = []) => Objec
         media_url: media.media_url,
         media_type: media.media_type || 'image',
         is_main: media.is_main === true,
-        sort_order: Number(media.sort_order || 0)
+        sort_order: Number(media.sort_order || 0),
+        card_framing: cardFramingFromStorage(media)
     }))),
     category_ids: Object.freeze(categoryRows.map((category) => Number(category.id))),
     primary_category_id: (() => {
@@ -164,7 +166,8 @@ const readAdminCatalogProductDetail = async (database, rawId) => {
     const [attributes, mediaResult] = await Promise.all([
         getProductAttributeValues(database, id),
         database.query(
-            `SELECT id, media_url, media_type, is_main, sort_order
+            `SELECT id, media_url, media_type, is_main, sort_order,
+                    card_focal_x, card_focal_y, card_zoom
              FROM product_media
              WHERE product_id = $1
              ORDER BY is_main DESC, sort_order ASC, id ASC`,

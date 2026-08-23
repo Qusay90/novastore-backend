@@ -73,6 +73,7 @@ export default defineConfig({
   build: {
     assetsInlineLimit: 30_000_000,
     cssCodeSplit: false,
+    commonjsOptions: { include: [/node_modules/, /shared/] },
     emptyOutDir: true,
     manifest: false,
     minify: "esbuild",

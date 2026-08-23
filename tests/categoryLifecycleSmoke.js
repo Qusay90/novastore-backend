@@ -63,6 +63,15 @@ const statsFor = async (categoryId) => {
 
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await createCoreSchema();
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS seller_stores (
+            legacy_store_id INTEGER,
+            display_name TEXT,
+            status TEXT,
+            closed_at TIMESTAMP
+        )
+    `);
+    await pool.query("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED'");
 
     const rootResult = await pool.query(`
         INSERT INTO categories (name, slug, path, depth)
@@ -236,11 +245,22 @@ const statsFor = async (categoryId) => {
     assert.strictEqual((await statsFor(rootId)).subtree_visible_product_count, 1);
     assert.strictEqual((await statsFor(rootId)).subtree_sellable_product_count, 0);
 
+    await pool.query(
+        `INSERT INTO product_media
+            (product_id, media_url, media_type, is_main, sort_order, card_focal_x, card_focal_y, card_zoom)
+         VALUES ($1, '/uploads/local-products/lifecycle-framed.jpg', 'image', TRUE, 0, 0.35, 0.43, 1.65)`,
+        [productId]
+    );
+
     const publicDetail = await invoke(getProductById, { params: { id: productId } });
     assert.strictEqual(publicDetail.statusCode, 200);
     assert.strictEqual(publicDetail.body.is_purchasable, false);
     for (const field of ['sku', 'normalized_sku', 'vat_rate', 'vat_rate_source', 'weight_grams', 'desi']) {
         assert(!Object.hasOwn(publicDetail.body, field), `public detail ${field} alanını taşımamalı`);
+    }
+    assert.deepStrictEqual(publicDetail.body.media[0].card_framing, { focal_x: 0.35, focal_y: 0.43, zoom: 1.65 });
+    for (const field of ['card_focal_x', 'card_focal_y', 'card_zoom']) {
+        assert(!Object.hasOwn(publicDetail.body.media[0], field), `public detail media ${field} alanını taşımamalı`);
     }
 
     const restockClient = await pool.connect();
@@ -275,6 +295,7 @@ const statsFor = async (categoryId) => {
     for (const field of ['sku', 'normalized_sku', 'vat_rate', 'vat_rate_source', 'weight_grams', 'desi']) {
         assert(!Object.hasOwn(publicList.body[0], field), `public list ${field} alanını taşımamalı`);
     }
+    assert.deepStrictEqual(publicList.body[0].media[0].card_framing, { focal_x: 0.35, focal_y: 0.43, zoom: 1.65 });
 
     const rootCategoryProducts = await invoke(getAllProducts, {
         query: { categorySlug: 'lifecycle-root' }

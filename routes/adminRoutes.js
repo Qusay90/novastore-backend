@@ -27,6 +27,7 @@ const {
     getAdminCatalogProductMedia,
     registerAdminCatalogProductMedia,
     reorderAdminCatalogProductMedia,
+    updateAdminCatalogProductMediaCardFraming,
     deleteAdminCatalogProductMedia
 } = require('../controllers/adminCatalogMediaController');
 
@@ -48,6 +49,7 @@ router.get('/catalog/products/:id', ...integratedAdminRead, getAdminCatalogProdu
 router.get('/catalog/products/:id/media', ...integratedAdminRead, getAdminCatalogProductMedia);
 router.post('/catalog/products/:id/media', ...integratedAdminProductWrite, registerAdminCatalogProductMedia);
 router.put('/catalog/products/:id/media/order', ...integratedAdminProductWrite, reorderAdminCatalogProductMedia);
+router.patch('/catalog/products/:id/media/:mediaId/framing', ...integratedAdminProductWrite, updateAdminCatalogProductMediaCardFraming);
 router.delete('/catalog/products/:id/media/:mediaId', ...integratedAdminProductWrite, deleteAdminCatalogProductMedia);
 router.post('/catalog/products', ...integratedAdminProductWrite, createAdminCatalogProduct);
 router.patch('/catalog/products/:id/archive', ...integratedAdminProductWrite, archiveAdminCatalogProduct);

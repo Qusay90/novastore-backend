@@ -20,6 +20,7 @@ const {
     listPublicCategories
 } = require('../services/categoryService');
 const { normalizeLegacyCategoryName } = require('../services/categoryV2BackfillService');
+const { cardFramingFromStorage } = require('../shared/productCardFraming');
 const DEFAULT_PRODUCT_CATEGORY = 'Kategorisiz';
 const BACKGROUND_REMOVAL_TRANSFORMATION = [
     { effect: 'background_removal' },
@@ -162,12 +163,20 @@ const normalizeProductRow = (product = {}, { includeCommerceOps = false } = {}) 
     };
     delete normalized.normalized_sku;
     if (!includeCommerceOps) {
+        const publicStoreSlug = String(product.public_store_slug || '').trim().toLocaleLowerCase('tr-TR');
+        const publicStoreName = String(product.public_store_name || '').trim();
+        normalized.store = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(publicStoreSlug) && publicStoreName
+            ? Object.freeze({ slug: publicStoreSlug, name: publicStoreName.slice(0, 160) })
+            : null;
+        delete normalized.store_id;
         delete normalized.sku;
         delete normalized.vat_rate;
         delete normalized.vat_rate_source;
         delete normalized.weight_grams;
         delete normalized.desi;
     }
+    delete normalized.public_store_slug;
+    delete normalized.public_store_name;
     return normalized;
 };
 
@@ -586,7 +595,20 @@ const buildProductPayload = async (body, files, existingProduct = null) => {
     };
 };
 
-const buildProductMediaMap = (mediaRows) => {
+const toProductMediaDto = (mediaRow, { includeCommerceOps = false } = {}) => ({
+    id: Number(mediaRow.id),
+    media_url: mediaRow.media_url,
+    media_type: mediaRow.media_type || 'image',
+    is_main: mediaRow.is_main === true,
+    sort_order: Number(mediaRow.sort_order || 0),
+    card_framing: cardFramingFromStorage(mediaRow),
+    ...(includeCommerceOps ? {
+        product_id: Number(mediaRow.product_id),
+        created_at: mediaRow.created_at || null
+    } : {})
+});
+
+const buildProductMediaMap = (mediaRows, options = {}) => {
     const mediaByProductId = new Map();
 
     mediaRows.forEach((mediaRow) => {
@@ -594,7 +616,7 @@ const buildProductMediaMap = (mediaRows) => {
         if (!mediaByProductId.has(productId)) {
             mediaByProductId.set(productId, []);
         }
-        mediaByProductId.get(productId).push(mediaRow);
+        mediaByProductId.get(productId).push(toProductMediaDto(mediaRow, options));
     });
 
     return mediaByProductId;
@@ -750,16 +772,27 @@ const getAllProducts = async (req, res) => {
         const [productsResult, mediaResult, categoryLinksResult] = await Promise.all([
             pool.query(`
                 SELECT p.*,
+                       canonical_store.slug AS public_store_slug,
+                       seller_store.display_name AS public_store_name,
                        ROUND(COALESCE(AVG(r.rating), 0), 1) AS average_rating,
                        CAST(COUNT(r.id) AS INTEGER) AS review_count
                 FROM products p
+                LEFT JOIN stores canonical_store
+                       ON canonical_store.id = p.store_id
+                      AND canonical_store.is_active = TRUE
+                      AND canonical_store.deleted_at IS NULL
+                LEFT JOIN seller_stores seller_store
+                       ON seller_store.legacy_store_id = canonical_store.id
+                      AND seller_store.status = 'active'
+                      AND seller_store.closed_at IS NULL
                 LEFT JOIN reviews r ON p.id = r.product_id AND r.status = 'PUBLISHED'
                 ${visibilityWhere}
-                GROUP BY p.id
+                GROUP BY p.id, canonical_store.slug, seller_store.display_name
                 ORDER BY ${isAdmin ? '' : 'CASE WHEN p.stock > 0 THEN 0 ELSE 1 END,'} p.created_at DESC
             `, productQueryParams),
             pool.query(`
-                SELECT *
+                SELECT id, product_id, media_url, media_type, is_main, sort_order,
+                       card_focal_x, card_focal_y, card_zoom, created_at
                 FROM product_media
                 ORDER BY product_id ASC, is_main DESC, sort_order ASC, id ASC
             `),
@@ -772,7 +805,7 @@ const getAllProducts = async (req, res) => {
                 : Promise.resolve({ rows: [] })
         ]);
 
-        const mediaByProductId = buildProductMediaMap(mediaResult.rows);
+        const mediaByProductId = buildProductMediaMap(mediaResult.rows, { includeCommerceOps: isAdmin });
         const categoriesByProductId = new Map();
         categoryLinksResult.rows.forEach((link) => {
             const productId = Number(link.product_id);
@@ -924,11 +957,22 @@ const getProductById = async (req, res) => {
 
         const isAdmin = (await getUserFromRequestIfAny(req))?.role === 'admin';
         const result = await pool.query(
-            `SELECT * FROM products
-             WHERE id = $1
-             ${isAdmin ? '' : `AND publication_status = 'active'
-                 AND is_customer_visible = TRUE
-                 AND deleted_at IS NULL`}`,
+            `SELECT product.*,
+                    canonical_store.slug AS public_store_slug,
+                    seller_store.display_name AS public_store_name
+               FROM products product
+          LEFT JOIN stores canonical_store
+                 ON canonical_store.id = product.store_id
+                AND canonical_store.is_active = TRUE
+                AND canonical_store.deleted_at IS NULL
+          LEFT JOIN seller_stores seller_store
+                 ON seller_store.legacy_store_id = canonical_store.id
+                AND seller_store.status = 'active'
+                AND seller_store.closed_at IS NULL
+              WHERE product.id = $1
+             ${isAdmin ? '' : `AND product.publication_status = 'active'
+                 AND product.is_customer_visible = TRUE
+                 AND product.deleted_at IS NULL`}`,
             [id]
         );
         if (result.rows.length === 0) {
@@ -936,12 +980,16 @@ const getProductById = async (req, res) => {
         }
 
         const mediaResult = await pool.query(
-            'SELECT * FROM product_media WHERE product_id = $1 ORDER BY is_main DESC, sort_order ASC, id ASC',
+            `SELECT id, product_id, media_url, media_type, is_main, sort_order,
+                    card_focal_x, card_focal_y, card_zoom, created_at
+             FROM product_media
+             WHERE product_id = $1
+             ORDER BY is_main DESC, sort_order ASC, id ASC`,
             [id]
         );
 
         const product = normalizeProductRow(result.rows[0], { includeCommerceOps: isAdmin });
-        product.media = mediaResult.rows;
+        product.media = mediaResult.rows.map((mediaRow) => toProductMediaDto(mediaRow, { includeCommerceOps: isAdmin }));
         const categoryLinks = await getProductCategoryLinks(pool, id);
         product.categoryIds = categoryLinks.map((item) => item.categoryId);
         product.primaryCategoryId = categoryLinks.find((item) => item.isPrimary)?.categoryId || null;

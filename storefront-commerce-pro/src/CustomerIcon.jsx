@@ -24,6 +24,7 @@ import {
   Key as LucideKey,
   Laptop as LucideLaptop,
   List as LucideList,
+  LifeBuoy as LucideLifeBuoy,
   LockKeyhole,
   LogOut,
   Mail,
@@ -96,6 +97,7 @@ export const House = adapt(LucideHouse);
 export const ImageSquare = adapt(LucideImage);
 export const Laptop = adapt(LucideLaptop);
 export const List = adapt(LucideList);
+export const LifeBuoy = adapt(LucideLifeBuoy);
 export const MagnifyingGlass = adapt(Search);
 export const MapPin = adapt(LucideMapPin);
 export const Minus = adapt(LucideMinus);
@@ -137,6 +139,6 @@ export const CUSTOMER_ICON_SEMANTICS = Object.freeze({
   navigation: Object.freeze({ back: ArrowLeft, forward: CaretRight, expand: CaretDown, home: House }),
   commerce: Object.freeze({ cart: ShoppingCart, bag: ShoppingBag, compare: ArrowsLeftRight, discount: BadgePercent }),
   account: Object.freeze({ profile: User, signOut: SignOut, security: ShieldCheck, notification: Bell }),
-  service: Object.freeze({ help: Question, support: Headphones, delivery: Truck, return: ArrowsClockwise }),
+  service: Object.freeze({ help: LifeBuoy, support: Headphones, delivery: Truck, return: ArrowsClockwise }),
   feedback: Object.freeze({ success: CheckCircle, warning: WarningCircle, close: X, favorite: Heart }),
 });

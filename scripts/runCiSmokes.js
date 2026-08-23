@@ -26,6 +26,7 @@ const smokeTests = [
     'tests/supportNotificationOperationsSmoke.js',
     'tests/couponAdminOperationsSmoke.js',
     'tests/adminCatalogMediaOperationsSmoke.js',
+    'tests/main6yProductCardFramingSmoke.js',
     'tests/adminOperationsContractSmoke.mjs',
     'tests/notificationTargetRoutingSmoke.mjs',
     'tests/reviewPublicationVisibilitySmoke.js',

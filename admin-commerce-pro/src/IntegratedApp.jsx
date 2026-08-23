@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import productCardFraming from "../../shared/productCardFraming.js";
 import { createSameOriginAdapter } from "./adapters/sameOriginAdapter.js";
 import { hasCapability } from "./integration/capabilities.js";
 import {
@@ -803,6 +804,25 @@ function CatalogMediaDialog({ product: initialProduct, actions, onClose, onCompl
   const [isCover, setIsCover] = useState(initialProduct.media.length === 0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const initialFramingMedia = initialProduct.media.find((entry) => entry.isCover && entry.mediaType === "image")
+    || initialProduct.media.find((entry) => entry.mediaType === "image")
+    || null;
+  const [framingMediaId, setFramingMediaId] = useState(initialFramingMedia?.id || null);
+  const [draftFraming, setDraftFraming] = useState(initialFramingMedia?.cardFraming || null);
+  const [framingStatus, setFramingStatus] = useState("INITIAL_DEFAULT");
+  const framingPreviewRef = useRef(null);
+  const dragRef = useRef(null);
+  const { cardFramingPresentation, panCardFraming, resolveCardFraming } = productCardFraming;
+  const framingMedia = product.media.find((entry) => entry.id === framingMediaId && entry.mediaType === "image") || null;
+  const resolvedFraming = resolveCardFraming(draftFraming);
+
+  useEffect(() => {
+    if (!framingMedia) return;
+    setDraftFraming(framingMedia.cardFraming || null);
+    setFramingStatus((current) => current === "SAVED"
+      ? current
+      : framingMedia.cardFraming ? "RELOADED" : "INITIAL_DEFAULT");
+  }, [framingMedia?.cardFraming, framingMedia?.id]);
 
   const run = async (operation) => {
     setBusy(true);
@@ -860,6 +880,44 @@ function CatalogMediaDialog({ product: initialProduct, actions, onClose, onCompl
     expectedRevision: product.revision,
   }));
 
+  const selectFramingMedia = (entry) => {
+    setFramingMediaId(entry.id);
+    setDraftFraming(entry.cardFraming || null);
+    setFramingStatus(entry.cardFraming ? "RELOADED" : "INITIAL_DEFAULT");
+  };
+
+  const startFramingDrag = (event) => {
+    if (!framingPreviewRef.current) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragRef.current = { x: event.clientX, y: event.clientY, framing: resolvedFraming };
+  };
+
+  const moveFramingDrag = (event) => {
+    if (!dragRef.current || !framingPreviewRef.current) return;
+    const bounds = framingPreviewRef.current.getBoundingClientRect();
+    setDraftFraming(panCardFraming(
+      dragRef.current.framing,
+      event.clientX - dragRef.current.x,
+      event.clientY - dragRef.current.y,
+      bounds.width,
+      bounds.height,
+    ));
+    setFramingStatus("DRAGGED");
+  };
+
+  const stopFramingDrag = () => { dragRef.current = null; };
+
+  const saveFraming = async () => {
+    if (!framingMedia || typeof actions.updateCatalogMediaCardFraming !== "function") return;
+    const next = await run(() => actions.updateCatalogMediaCardFraming({
+      productId: product.rawId,
+      mediaId: framingMedia.id,
+      expectedRevision: product.revision,
+      cardFraming: draftFraming,
+    }));
+    if (next) setFramingStatus("SAVED");
+  };
+
   return (
     <OperationDialog title={`${product.name} · medya kayıtları`} busy={busy} onClose={onClose} testId="catalog-media-dialog" wide>
       <section className="notice-card live-boundary-notice" role="note"><Icon name="shield" /><div><strong>Sağlayıcıya çağrı yapılmaz</strong><p>Bu ekran yalnız doğrulanmış HTTPS Cloudinary varlıklarını kataloğa kaydeder, sıralar ve kapak seçer. Silme yalnız katalog kaydını kaldırır; sağlayıcı varlığının silinmesi ayrı yayın kapısıdır.</p></div></section>
@@ -870,14 +928,34 @@ function CatalogMediaDialog({ product: initialProduct, actions, onClose, onCompl
         <label className="check-row"><input type="checkbox" checked={isCover} onChange={(event) => setIsCover(event.target.checked)} disabled={mediaType !== "image"} /><span>{mediaType === "image" ? "Kapak yap" : "Video kapak olamaz"}</span></label>
         <button className="primary-button" type="submit" disabled={busy || !mediaUrl.trim()}>Medya kaydını ekle</button>
       </form>
+      {framingMedia && <section className="catalog-card-framing" aria-labelledby="catalog-card-framing-title">
+        <div className="catalog-card-framing__copy"><span className="section-kicker">1:1 müşteri kartı</span><h3 id="catalog-card-framing-title">Ürün kartı kadrajı</h3><p>Orijinal medya değişmez. Sürükleyerek odağı, kaydırıcıyla yakınlığı ayarla; ürün detay sayfası tam görseli göstermeye devam eder.</p></div>
+        <div
+          ref={framingPreviewRef}
+          className="catalog-card-framing__preview"
+          onPointerDown={startFramingDrag}
+          onPointerMove={moveFramingDrag}
+          onPointerUp={stopFramingDrag}
+          onPointerCancel={stopFramingDrag}
+          role="img"
+          aria-label={`${product.name} müşteri kartı kadraj önizlemesi`}
+        ><img src={framingMedia.mediaUrl} alt="" style={cardFramingPresentation(draftFraming)} draggable="false" /></div>
+        <div className="catalog-card-framing__controls">
+          <label><span>Yakınlaştırma · {resolvedFraming.zoom.toFixed(2)}×</span><input type="range" min="1" max="3" step="0.05" value={resolvedFraming.zoom} onChange={(event) => { setDraftFraming({ ...resolvedFraming, zoom: Number(event.target.value) }); setFramingStatus("ZOOMED"); }} /></label>
+          <label><span>Yatay odak · %{Math.round(resolvedFraming.focal_x * 100)}</span><input type="range" min="0" max="1" step="0.01" value={resolvedFraming.focal_x} onChange={(event) => { setDraftFraming({ ...resolvedFraming, focal_x: Number(event.target.value) }); setFramingStatus("DRAGGED"); }} /></label>
+          <label><span>Dikey odak · %{Math.round(resolvedFraming.focal_y * 100)}</span><input type="range" min="0" max="1" step="0.01" value={resolvedFraming.focal_y} onChange={(event) => { setDraftFraming({ ...resolvedFraming, focal_y: Number(event.target.value) }); setFramingStatus("DRAGGED"); }} /></label>
+          <p role="status">Durum: <strong>{framingStatus}</strong> · Odak {Math.round(resolvedFraming.focal_x * 100)}% / {Math.round(resolvedFraming.focal_y * 100)}%</p>
+          <div><button className="secondary-button" type="button" disabled={busy} onClick={() => { setDraftFraming(null); setFramingStatus("RESET"); }}>Varsayılana dön</button><button className="primary-button" type="button" disabled={busy || typeof actions.updateCatalogMediaCardFraming !== "function"} onClick={saveFraming}>{busy ? "Kaydediliyor…" : "Kadrajı kaydet"}</button></div>
+        </div>
+      </section>}
       <div className="table-scroll" tabIndex="0" role="region" aria-label="Ürün medya sırası">
         <table className="data-table"><thead><tr><th>Medya</th><th>Tür</th><th>Kapak</th><th>Sıra</th><th>İşlem</th></tr></thead><tbody>
           {product.media.map((entry, index) => <tr key={entry.id}>
-            <td><a href={entry.mediaUrl} target="_blank" rel="noreferrer">Medya #{entry.id}</a></td>
+            <td><span className="catalog-media-cell">{entry.mediaType === "image" && <img src={entry.mediaUrl} alt="" />}<a href={entry.mediaUrl} target="_blank" rel="noreferrer">Medya #{entry.id}</a></span></td>
             <td>{entry.mediaType === "video" ? "Video" : "Görsel"}</td>
             <td><button className="secondary-button small" type="button" disabled={busy || entry.isCover || entry.mediaType !== "image"} onClick={() => setCover(entry.id)}>{entry.isCover ? "Kapak" : entry.mediaType === "image" ? "Kapak yap" : "Yalnız görsel"}</button></td>
             <td><span className="live-operation-buttons"><button className="secondary-button small" type="button" disabled={busy || index === 0} onClick={() => reorder(entry.id, -1)} aria-label={`Medya ${entry.id} yukarı taşı`}>↑</button><button className="secondary-button small" type="button" disabled={busy || index === product.media.length - 1} onClick={() => reorder(entry.id, 1)} aria-label={`Medya ${entry.id} aşağı taşı`}>↓</button></span></td>
-            <td><button className="danger-button small" type="button" disabled={busy} onClick={() => remove(entry.id)}>Kaydı kaldır</button></td>
+            <td><span className="live-operation-buttons">{entry.mediaType === "image" && <button className="secondary-button small" type="button" disabled={busy} onClick={() => selectFramingMedia(entry)}>{entry.id === framingMediaId ? "Kadraj açık" : "Kadraj"}</button>}<button className="danger-button small" type="button" disabled={busy} onClick={() => remove(entry.id)}>Kaydı kaldır</button></span></td>
           </tr>)}
           {product.media.length === 0 && <tr><td colSpan="5">Henüz medya kaydı yok.</td></tr>}
         </tbody></table>
@@ -896,6 +974,7 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
   const [openingProductId, setOpeningProductId] = useState(null);
   const [operationNotice, setOperationNotice] = useState(null);
   const [suppressedMutationActions, setSuppressedMutationActions] = useState(null);
+  const pendingMediaFocusRef = useRef(null);
   const writesSuppressed = suppressedMutationActions === mutationActions;
   const writeCapabilityEnabled = typeof mutationActions.getCatalogProduct === "function"
     && typeof mutationActions.createCatalogProduct === "function"
@@ -917,6 +996,21 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
       message: "Katalog veya admin oturumu değiştiği için açık ürün işlemi kapatıldı. Güncel veri doğrulanmadan yazma yapılmadı.",
     });
   }, [operation, writesBlocked]);
+
+  useEffect(() => {
+    const pending = pendingMediaFocusRef.current;
+    if (!pending || refreshing || sessionRefreshing || openingProductId !== null || operation) return undefined;
+    const remainingDelay = Math.max(0, pending.earliestAt - Date.now());
+    const timer = window.setTimeout(() => {
+      const selector = `[data-catalog-operation="media"][data-product-id="${pending.productId}"]`;
+      const target = document.querySelector(selector);
+      if (target instanceof HTMLButtonElement && !target.disabled) {
+        target.focus();
+        pendingMediaFocusRef.current = null;
+      }
+    }, remainingDelay);
+    return () => window.clearTimeout(timer);
+  }, [openingProductId, operation, products, refreshing, sessionRefreshing]);
 
   const resetFilters = () => {
     setQuery("");
@@ -1011,6 +1105,12 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
     }
   };
   const closeMediaOperation = () => {
+    if (operation?.kind === "media") {
+      pendingMediaFocusRef.current = {
+        productId: operation.product.rawId,
+        earliestAt: Date.now() + 250,
+      };
+    }
     setOperation(null);
     onRefresh();
   };
@@ -1106,7 +1206,7 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
                     <td><span className={`status ${customerVisible ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{customerVisible ? "Görünür" : "Görünmez"}</span>{!customerVisible && product.customerVisible && <small className="live-status-note">Ham bayrak açık; yayın veya arşiv durumu vitrine kapatır.</small>}</td>
                     <td><span className={`live-media-presence ${product.hasMedia ? "has-media" : "no-media"}`}><Icon name={product.hasMedia ? "check" : "warning"} />{product.hasMedia ? "Mevcut" : "Yok"}</span></td>
                     <td><span className="live-customer-cell"><strong>{dateTime(product.updatedAt || product.createdAt)}</strong><small>{product.updatedAt ? "Son güncelleme" : product.createdAt ? "Oluşturulma" : "Tarih bilgisi yok"}</small></span></td>
-                    {writeCapabilityEnabled && <td>{archivedProduct(product) ? <span className="live-archived-lock"><Icon name="shield" />Arşivli · kilitli</span> : <span className="live-operation-buttons"><button type="button" className="secondary-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("edit", product)}>{openingProductId === product.rawId ? "Tam DTO alınıyor…" : "Düzenle"}</button><button type="button" className="secondary-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("media", product)}>Medya</button><button type="button" className="danger-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("archive", product)}>Arşivle</button></span>}</td>}
+                    {writeCapabilityEnabled && <td>{archivedProduct(product) ? <span className="live-archived-lock"><Icon name="shield" />Arşivli · kilitli</span> : <span className="live-operation-buttons"><button type="button" className="secondary-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("edit", product)}>{openingProductId === product.rawId ? "Tam DTO alınıyor…" : "Düzenle"}</button><button type="button" className="secondary-button small" data-catalog-operation="media" data-product-id={product.rawId} disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("media", product)}>Medya</button><button type="button" className="danger-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("archive", product)}>Arşivle</button></span>}</td>}
                   </tr>
                 );
               })}</tbody>
