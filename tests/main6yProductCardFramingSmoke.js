@@ -25,6 +25,12 @@ assert.deepStrictEqual(framing.panCardFraming({ focal_x: 0.5, focal_y: 0.5, zoom
     focal_y: 0.75,
     zoom: 1
 });
+assert.strictEqual(framing.CARD_VIEWPORT_ASPECT_RATIO, 1);
+assert.strictEqual(framing.classifyCardFramingNeed({ width: 1200, height: 1200 }).state, framing.CARD_FRAMING_STATES.NO_FRAMING_NEEDED);
+assert.strictEqual(framing.classifyCardFramingNeed({ width: 800, height: 1200 }).state, framing.CARD_FRAMING_STATES.FRAMING_RECOMMENDED);
+assert.strictEqual(framing.classifyCardFramingNeed({ width: 1600, height: 900 }).state, framing.CARD_FRAMING_STATES.FRAMING_RECOMMENDED);
+assert.strictEqual(framing.classifyCardFramingNeed({ width: 1200, height: 1200, cardFraming: { focal_x: 0.4, focal_y: 0.6, zoom: 1.2 } }).state, framing.CARD_FRAMING_STATES.CUSTOM_FRAMING_SAVED);
+assert.strictEqual(framing.classifyCardFramingNeed({ width: 320, height: 320 }).lowResolution, true);
 
 const migration = read('migrations/20260823_01_product_media_card_framing.sql');
 for (const column of ['card_focal_x', 'card_focal_y', 'card_zoom']) assert.ok(migration.includes(column));
@@ -50,12 +56,24 @@ assert.match(productController, /card_framing: cardFramingFromStorage\(mediaRow\
 assert.doesNotMatch(productController, /product\.media = mediaResult\.rows;/u);
 
 const customerCard = read('storefront-commerce-pro/src/CustomerProductCard.jsx');
-assert.match(customerCard, /CUSTOMER_CARD_AUTOPLAY_DWELL_MS = 360/u);
-assert.match(customerCard, /CUSTOMER_CARD_AUTOPLAY_INTERVAL_MS = 1050/u);
+assert.match(customerCard, /CUSTOMER_CARD_AUTOPLAY_DWELL_MS = 500/u);
+assert.match(customerCard, /CUSTOMER_CARD_AUTOPLAY_INTERVAL_MS = 1650/u);
 assert.match(customerCard, /window\.clearInterval\(cycleTimer\.current\)/u);
 assert.match(customerCard, /cardFramingPresentation\(item\.cardFraming\)/u);
+assert.match(customerCard, /productCardMediaIndex\(event\.clientX/u);
+assert.doesNotMatch(customerCard, /görsel · otomatik|customer-card-media-cue/u);
+const lightbox = read('storefront-commerce-pro/src/ProductMediaLightbox.jsx');
+assert.match(lightbox, /PDP_LIGHTBOX_ZOOM_MAX = 4/u);
+assert.match(lightbox, /Önceki medyayı göster/u);
+assert.match(lightbox, /Sonraki medyayı göster/u);
+const adminApp = read('admin-commerce-pro/src/IntegratedApp.jsx');
+assert.match(adminApp, /classifyCardFramingNeed/u);
+assert.match(adminApp, /Kart kadrajını özelleştir/u);
+assert.match(adminApp, /Görseli sürükleyerek konumlandır/u);
+assert.match(adminApp, /CARD_VIEWPORT_ASPECT_RATIO/u);
+assert.doesNotMatch(adminApp, /Yatay odak ·|Dikey odak ·/u);
 const removedDeliveryCopy = ['Teslimat bilgisi', 'ürün detayında'].join(' ');
 assert.equal(customerCard.includes(removedDeliveryCopy), false);
 assert.equal(read('storefront-commerce-pro/src/adapters/catalogAdapter.js').includes(removedDeliveryCopy), false);
 
-console.log('main6y product card framing smoke passed: normalized=PASS bounds=PASS IDOR=PASS autoplay=PASS delivery=PASS');
+console.log('main6y R1 framing smoke passed: normalized=PASS bounds=PASS IDOR=PASS detection=PASS direct-editor=PASS lightbox=PASS autoplay-scrub=PASS');

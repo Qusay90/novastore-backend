@@ -57,19 +57,26 @@ test("yatay işaretçi bölgeleri tüm medya indekslerini deterministik seçer",
   assert.equal(productCardMediaIndex(399, 100, 400, 4), 2);
   assert.equal(productCardMediaIndex(500, 100, 400, 4), 3);
   assert.equal(productCardMediaIndex(-100, 100, 400, 4), 0);
+  for (const count of [1, 2, 3, 4, 8]) {
+    const indexes = Array.from({ length: count }, (_, index) => (
+      productCardMediaIndex(index * 100 + 50, 0, count * 100, count)
+    ));
+    assert.deepEqual(indexes, Array.from({ length: count }, (_, index) => index), `${count} medya bölgesi`);
+  }
 });
 
 test("aktif storefront tek ortak kart ve merkezi Lucide ikon sınırını kullanır", async () => {
-  const [card, icons, generated, integrated, publicStore, css, packageSource] = await Promise.all([
+  const [card, icons, lightbox, generated, integrated, publicStore, css, packageSource] = await Promise.all([
     read("src/CustomerProductCard.jsx"),
     read("src/CustomerIcon.jsx"),
+    read("src/ProductMediaLightbox.jsx"),
     read("src/CanonicalRuntimePresentation.jsx"),
     read("src/IntegratedApp.jsx"),
     read("src/PublicStorePage.jsx"),
     read("src/integrated.css"),
     read("package.json"),
   ]);
-  const activeSources = [card, icons, generated, integrated, publicStore].join("\n");
+  const activeSources = [card, icons, lightbox, generated, integrated, publicStore].join("\n");
   const packageJson = JSON.parse(packageSource);
 
   assert.doesNotMatch(activeSources, /@phosphor-icons\/react/);
@@ -81,17 +88,33 @@ test("aktif storefront tek ortak kart ve merkezi Lucide ikon sınırını kullan
   assert.match(generated, /CustomerProductCard/);
   assert.match(integrated, /CustomerProductCard/);
   assert.match(publicStore, /CustomerProductCard/);
-  assert.match(card, /CUSTOMER_CARD_AUTOPLAY_DWELL_MS = 360/);
-  assert.match(card, /CUSTOMER_CARD_AUTOPLAY_INTERVAL_MS = 1050/);
+  assert.match(card, /CUSTOMER_CARD_AUTOPLAY_DWELL_MS = 500/);
+  assert.match(card, /CUSTOMER_CARD_AUTOPLAY_INTERVAL_MS = 1650/);
   assert.match(card, /window\.setInterval/);
+  assert.match(card, /onPointerMove=\{handlePointerMove\}/);
+  assert.match(card, /productCardMediaIndex\(event\.clientX, bounds\.left, bounds\.width, media\.length\)/);
+  assert.match(card, /scheduleAutoplay\(\)/);
   assert.match(card, /onPointerLeave=\{resetMedia\}/);
   assert.match(card, /setActiveMedia\(0\)/);
   assert.match(card, /setGalleryPrimed\(true\)/);
   assert.match(card, /window\.clearInterval\(cycleTimer\.current\)/);
   assert.match(card, /referrerPolicy="no-referrer"/);
+  assert.doesNotMatch(card, /görsel · otomatik|customer-card-media-cue/);
   assert.doesNotMatch(card, /loading=\{index === 0 \? "lazy" : "eager"\}/);
   assert.doesNotMatch(card, /onClick=\{[^}]*setActiveMedia/);
   assert.match(css, /\.customer-card-media-stage[\s\S]*?padding: 0/);
+  assert.match(css, /\.customer-card-media-zones\s*\{[\s\S]*?bottom: 9px;[\s\S]*?left: 50%;/);
+  assert.match(css, /\.customer-card-media-zones i\.is-active\s*\{[\s\S]*?width: 9px;[\s\S]*?background: #f27a0a/);
   assert.match(css, /object-fit: cover/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(generated, /ProductMediaLightbox/);
+  assert.match(lightbox, /PDP_LIGHTBOX_ZOOM_MAX = 4/);
+  assert.match(lightbox, /object-fit: contain|runtime-media-lightbox__viewport/);
+  assert.match(lightbox, /event\.key === "ArrowLeft"/);
+  assert.match(lightbox, /event\.key === "ArrowRight"/);
+  assert.match(lightbox, /event\.key === "Escape"/);
+  assert.match(lightbox, /event\.key === "0"/);
+  assert.match(lightbox, /Önceki medyayı göster/);
+  assert.match(lightbox, /Sonraki medyayı göster/);
+  assert.match(lightbox, /returnFocusRef\?\.current\?\.focus\(\)/);
 });

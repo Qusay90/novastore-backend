@@ -25,6 +25,7 @@ import {
   RUNTIME_PRODUCT_DETAIL_SIGNATURE,
   RUNTIME_PRODUCT_CARD,
   RUNTIME_PRODUCT_CARD_IMPORT,
+  RUNTIME_PRODUCT_MEDIA_LIGHTBOX_IMPORT,
   RUNTIME_PRODUCT_GALLERY_CLASS,
   RUNTIME_REACT_IMPORT,
   countExactOccurrences,
@@ -38,7 +39,7 @@ const canonicalAppPath = path.join(root, "src", "App.jsx");
 const runtimePresentationPath = path.join(root, "src", "CanonicalRuntimePresentation.jsx");
 const EXPECTED_SHA256 = "8b6301362b6c01b649db1d7cfa4dc00d5b4392309e4ece2c7c14870cab0f2b0d";
 const EXPECTED_APP_SHA256 = "d31e7642f6bccb75094361be3dc2dd3b85cc38a4d968bbfd57ee3ee7ffd80fb6";
-const EXPECTED_RUNTIME_SHA256 = "ff59382b4aa889e81e0bddb20aa765c5d88e63af0e3663d6ff9edbc415087522";
+const EXPECTED_RUNTIME_SHA256 = "100277e2cd8a794d1242ae8aef3a346d2ac7783743e7c77135b7d301d7f06c62";
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const NON_HOME_HASH_ROUTES = Object.freeze([
   "#/kategori/",
@@ -93,9 +94,10 @@ test("canonical preview is self-contained and isolated", async () => {
 });
 
 test("runtime presentation is generated directly from canonical App.jsx", async () => {
-  const [canonicalApp, runtimePresentation] = await Promise.all([
+  const [canonicalApp, runtimePresentation, lightbox] = await Promise.all([
     readFile(canonicalAppPath, "utf8"),
     readFile(runtimePresentationPath, "utf8"),
+    readFile(path.join(root, "src", "ProductMediaLightbox.jsx"), "utf8"),
   ]);
   assert.equal(sha256(canonicalApp), EXPECTED_APP_SHA256);
   assert.equal(
@@ -123,6 +125,7 @@ test("runtime presentation is generated directly from canonical App.jsx", async 
   assert.equal(countExactOccurrences(runtimePresentation, CANONICAL_ICON_IMPORT), 0);
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_ICON_IMPORT), 1);
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_CARD_IMPORT), 1);
+  assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_MEDIA_LIGHTBOX_IMPORT), 1);
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_CARD), 1);
   assert.equal(countExactOccurrences(canonicalApp, CANONICAL_PRODUCT_DETAIL_SIGNATURE), 1);
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_DETAIL_SIGNATURE), 1);
@@ -130,11 +133,11 @@ test("runtime presentation is generated directly from canonical App.jsx", async 
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_GALLERY_CLASS), 1);
   assert.equal(countExactOccurrences(canonicalApp, CANONICAL_PRODUCT_IMAGE), 1);
   assert.match(runtimePresentation, /runtime-product-media-stage/);
-  assert.match(runtimePresentation, /runtime-media-lightbox/);
-  assert.match(runtimePresentation, /document\.querySelectorAll\("#root > \*"\)/);
-  assert.match(runtimePresentation, /isolatePageFromModal\(\)/);
-  assert.match(runtimePresentation, /keepFocusInDialog\(event, mediaDialogRef\.current\)/);
-  assert.match(runtimePresentation, /restoreFocus\(mediaTriggerRef\)/);
+  assert.match(runtimePresentation, /ProductMediaLightbox/);
+  assert.match(lightbox, /runtime-media-lightbox/);
+  assert.match(lightbox, /document\.querySelectorAll\("#root > \*"\)/);
+  assert.match(lightbox, /keepFocusInDialog\(event, dialogRef\.current\)/);
+  assert.match(lightbox, /returnFocusRef\?\.current\?\.focus\(\)/);
   assert.match(runtimePresentation, /quantity >= maxQuantity/);
   assert.match(runtimePresentation, /document\.getElementById\("community-reviews"\)/);
   assert.match(runtimePresentation, /buyNowPending \? "Hazırlanıyor" : "Hemen Al"/);

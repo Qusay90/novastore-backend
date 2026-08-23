@@ -23,8 +23,9 @@ test("runtime corrections preserve the sealed canonical presentation", async () 
 });
 
 test("runtime presentation owns the shared card, product media, review anchor, and buy-now behavior", async () => {
-  const [runtimePresentation, integratedApp, integratedCss, comparisonContext, cartAdapter, sharedCard] = await Promise.all([
+  const [runtimePresentation, lightbox, integratedApp, integratedCss, comparisonContext, cartAdapter, sharedCard] = await Promise.all([
     read("src/CanonicalRuntimePresentation.jsx"),
+    read("src/ProductMediaLightbox.jsx"),
     read("src/IntegratedApp.jsx"),
     read("src/integrated.css"),
     read("src/integration/RuntimeComparisonContext.jsx"),
@@ -39,12 +40,15 @@ test("runtime presentation owns the shared card, product media, review anchor, a
   assert.match(sharedCard, /disabled=\{!comparison\.available\}/);
   assert.match(runtimePresentation, /runtime-product-media-stage/);
   assert.match(runtimePresentation, /runtime-product-thumbnails/);
-  assert.match(runtimePresentation, /runtime-media-lightbox/);
-  assert.match(runtimePresentation, /document\.querySelectorAll\("#root > \*"\)/);
-  assert.match(runtimePresentation, /isolatePageFromModal\(\)/);
-  assert.match(runtimePresentation, /keepFocusInDialog\(event, mediaDialogRef\.current\)/);
-  assert.match(runtimePresentation, /restoreFocus\(mediaTriggerRef\)/);
-  assert.match(runtimePresentation, /document\.body\.classList\.add\("is-locked"\)/);
+  assert.match(runtimePresentation, /ProductMediaLightbox/);
+  assert.match(lightbox, /runtime-media-lightbox/);
+  assert.match(lightbox, /document\.querySelectorAll\("#root > \*"\)/);
+  assert.match(lightbox, /keepFocusInDialog\(event, dialogRef\.current\)/);
+  assert.match(lightbox, /returnFocusRef\?\.current\?\.focus\(\)/);
+  assert.match(lightbox, /document\.body\.classList\.add\("is-locked"\)/);
+  assert.match(lightbox, /PDP_LIGHTBOX_ZOOM_MAX = 4/);
+  assert.match(lightbox, /event\.key === "ArrowLeft"/);
+  assert.match(lightbox, /event\.key === "ArrowRight"/);
   assert.match(runtimePresentation, /quantity >= maxQuantity/);
   assert.match(runtimePresentation, /Math\.min\(maxQuantity, value \+ 1\)/);
   assert.match(runtimePresentation, /buyNowPending \? "Hazırlanıyor" : "Hemen Al"/);
