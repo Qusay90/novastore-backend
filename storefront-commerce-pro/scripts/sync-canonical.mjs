@@ -44,6 +44,7 @@ export const CANONICAL_MODAL_BACKGROUND_QUERY = 'const backgroundNodes = [...doc
 export const RUNTIME_MODAL_BACKGROUND_QUERY = 'const backgroundNodes = [...document.querySelectorAll("#root > *")];';
 export const RUNTIME_COMPARISON_IMPORT = 'import { RuntimeComparisonContext } from "./integration/RuntimeComparisonContext.jsx";';
 export const RUNTIME_PRODUCT_CARD_IMPORT = 'import { CustomerProductCard } from "./CustomerProductCard.jsx";';
+export const RUNTIME_FAVORITE_BUTTON_IMPORT = 'import { CustomerFavoriteButton } from "./CustomerFavoriteButton.jsx";';
 export const RUNTIME_PRODUCT_MEDIA_LIGHTBOX_IMPORT = 'import { ProductMediaLightbox } from "./ProductMediaLightbox.jsx";';
 export const CANONICAL_COMPARISON_STATE = 'const [compared, setCompared] = useState(false);';
 export const RUNTIME_COMPARISON_STATE = 'const comparison = useContext(RuntimeComparisonContext);\n  const compared = comparison.ids.has(product.id);';
@@ -58,7 +59,10 @@ export const CANONICAL_PRODUCT_QUANTITY_CONTROL = '<div className="quantity-cont
 export const RUNTIME_PRODUCT_QUANTITY_CONTROL = '<div className="quantity-control"><button type="button" disabled={soldOut || quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" disabled={soldOut || quantity >= maxQuantity} onClick={() => setQuantity((value) => Math.min(maxQuantity, value + 1))} aria-label="Adedi artır"><Plus /></button></div>';
 export const CANONICAL_PRODUCT_GALLERY_CLASS = 'className="product-gallery"';
 export const RUNTIME_PRODUCT_GALLERY_CLASS = 'className="product-gallery runtime-product-gallery"';
-export const CANONICAL_PRODUCT_IMAGE = '<Heart weight={favorite ? "fill" : "regular"} /></button><img src={productImage(product)} alt={product.name} />';
+export const CANONICAL_PRODUCT_FAVORITE_BUTTON = '<button className={cx("favorite-button", favorite && "is-active")} type="button" onClick={() => onFavorite(product.id)} aria-pressed={favorite} aria-label={favorite ? "Favorilerden çıkar" : "Favorilere ekle"}><Heart weight={favorite ? "fill" : "regular"} /></button>';
+export const RUNTIME_PRODUCT_FAVORITE_BUTTON = '<CustomerFavoriteButton productId={product.id} productName={product.name} favorite={favorite} onFavorite={onFavorite} />';
+export const CANONICAL_PRODUCT_IMAGE = '<img src={productImage(product)} alt={product.name} />';
+export const RUNTIME_PRODUCT_IMAGE_BOUNDARY = `${RUNTIME_PRODUCT_FAVORITE_BUTTON}${CANONICAL_PRODUCT_IMAGE}`;
 export const CANONICAL_PRODUCT_ZOOM_NOTE = '<span className="zoom-note"><span>Görseli büyütmek için üzerine gel</span><b>Dokunarak büyüt</b></span>';
 export const RUNTIME_PRODUCT_ZOOM_NOTE = '<span className="zoom-note"><span>Tam görsel için tıkla</span><b>Dokunarak büyüt</b></span>';
 export const CANONICAL_REVIEW_TARGET = 'document.getElementById("reviews")';
@@ -166,7 +170,7 @@ export const createRuntimePresentation = (canonicalApp) => {
   runtimePresentation = replaceExactOnce(
     runtimePresentation,
     CANONICAL_PORTAL_IMPORT,
-    `${CANONICAL_PORTAL_IMPORT}\n${RUNTIME_PRODUCT_CARD_IMPORT}\n${RUNTIME_PRODUCT_MEDIA_LIGHTBOX_IMPORT}`,
+    `${CANONICAL_PORTAL_IMPORT}\n${RUNTIME_PRODUCT_CARD_IMPORT}\n${RUNTIME_FAVORITE_BUTTON_IMPORT}\n${RUNTIME_PRODUCT_MEDIA_LIGHTBOX_IMPORT}`,
     "Canonical portal import boundary",
   );
   runtimePresentation = replaceExactOnce(
@@ -221,8 +225,14 @@ export const createRuntimePresentation = (canonicalApp) => {
   );
   runtimePresentation = replaceExactOnce(
     runtimePresentation,
-    CANONICAL_PRODUCT_IMAGE,
-    `<Heart weight={favorite ? "fill" : "regular"} /></button><button ref={mediaTriggerRef} className="runtime-product-media-stage" type="button" onClick={() => setMediaOpen(true)} aria-label={\`${"${product.name}"} medyasını büyüt\`}>
+    CANONICAL_PRODUCT_FAVORITE_BUTTON,
+    RUNTIME_PRODUCT_FAVORITE_BUTTON,
+    "Canonical product detail favorite owner",
+  );
+  runtimePresentation = replaceExactOnce(
+    runtimePresentation,
+    RUNTIME_PRODUCT_IMAGE_BOUNDARY,
+    `${RUNTIME_PRODUCT_FAVORITE_BUTTON}<button ref={mediaTriggerRef} className="runtime-product-media-stage" type="button" onClick={() => setMediaOpen(true)} aria-label={\`${"${product.name}"} medyasını büyüt\`}>
               {activeMedia?.type === "video"
                 ? <video src={activeMedia.url} muted playsInline preload="metadata" />
                 : <img src={activeMedia?.url || productImage(product)} alt={product.name} />}
@@ -280,6 +290,7 @@ export const createRuntimePresentation = (canonicalApp) => {
     "Runtime hash-router mobile home item"
   );
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_CARD_IMPORT, 1, "Runtime shared product card import");
+  assertExactCount(runtimePresentation, RUNTIME_FAVORITE_BUTTON_IMPORT, 1, "Runtime shared favorite button import");
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_MEDIA_LIGHTBOX_IMPORT, 1, "Runtime product media lightbox import");
   assertExactCount(runtimePresentation, RUNTIME_ICON_IMPORT, 1, "Runtime Lucide icon boundary");
   assertExactCount(runtimePresentation, RUNTIME_MODAL_BACKGROUND_QUERY, 1, "Runtime modal background isolation");
@@ -288,6 +299,7 @@ export const createRuntimePresentation = (canonicalApp) => {
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_DETAIL_SIGNATURE, 1, "Runtime product detail boundary");
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_QUANTITY_CONTROL, 1, "Runtime product quantity control");
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_GALLERY_CLASS, 1, "Runtime product gallery class");
+  assertExactCount(runtimePresentation, RUNTIME_PRODUCT_FAVORITE_BUTTON, 1, "Runtime shared product detail favorite owner");
   assertExactCount(runtimePresentation, RUNTIME_REVIEW_TARGET, 1, "Runtime review anchor");
 
   return `${runtimePresentation.trimEnd()}\n${RUNTIME_EXPORTS}`;

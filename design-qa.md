@@ -62,3 +62,17 @@
 - Axe serious/critical findings: 0.
 
 final result: passed
+
+# Main-6Y R2 Design QA
+
+Compared the accepted R1 storefront, the supplied owner favorite-motion recording, and the final real-Chrome R2 evidence board.
+
+- Favorite: compact neutral surface at rest; restrained red halo on confirmed add; solid red active surface with a white filled Lucide heart; symmetric remove transition; no stars, sparkles, or particles.
+- Favorite placement: the 44 px target is positioned 4 px from the media top and 3 px from the media right; its visible 32 px surface sits 10 px from the top and 9 px from the right.
+- PDP parity: product cards and the canonical product-detail gallery render the same shared favorite control, motion, pending guard, labeling, and authoritative-success behavior.
+- Store metrics: one green backlight belongs to the enclosing metrics panel and remains outside it; individual cells do not emit or contain green light.
+- Desktop motion: only the hovered metric lifts 3 px; the separate Açık status treatment lifts 2 px; both reset without layout shift.
+- Mobile and reduced motion: the panel light is static, hover movement is suppressed, and the layout remains overflow-free at the required widths.
+- Canonical parity: normal public store and Seller read-only preview use the same renderer; preview keeps favorite, cart, and follow mutations unavailable.
+
+passed

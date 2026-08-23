@@ -1338,20 +1338,17 @@ export function CommerceProRuntimeApp({ runtime }) {
   async function toggleFavorite(productId) {
     const product = products.find((item) => item.id === productId);
     if (!product) return false;
-    const previous = new Set(favoritesRef.current);
-    const next = new Set(previous);
+    const next = new Set(favoritesRef.current);
     const shouldFavorite = !next.has(productId);
     if (shouldFavorite) next.add(productId);
     else next.delete(productId);
-    favoritesRef.current = next;
-    setFavorites(next);
     try {
       await runtime.favorites.set(productId, shouldFavorite);
+      favoritesRef.current = next;
+      setFavorites(next);
       notify(`${product.name} ${shouldFavorite ? "favorilere eklendi" : "favorilerden çıkarıldı"}`);
       return true;
     } catch {
-      favoritesRef.current = previous;
-      setFavorites(previous);
       notify("Favori işlemi tamamlanamadı; seçimin değiştirilmedi.");
       return false;
     }

@@ -12,8 +12,8 @@ import {
   CANONICAL_HOME_HREF,
   CANONICAL_MOBILE_HOME_ITEM,
   CANONICAL_PRODUCT_DETAIL_SIGNATURE,
+  CANONICAL_PRODUCT_FAVORITE_BUTTON,
   CANONICAL_PRODUCT_GALLERY_CLASS,
-  CANONICAL_PRODUCT_IMAGE,
   CANONICAL_REACT_IMPORT,
   EXPECTED_CANONICAL_HOME_HREF_COUNT,
   EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT,
@@ -25,6 +25,8 @@ import {
   RUNTIME_PRODUCT_DETAIL_SIGNATURE,
   RUNTIME_PRODUCT_CARD,
   RUNTIME_PRODUCT_CARD_IMPORT,
+  RUNTIME_FAVORITE_BUTTON_IMPORT,
+  RUNTIME_PRODUCT_FAVORITE_BUTTON,
   RUNTIME_PRODUCT_MEDIA_LIGHTBOX_IMPORT,
   RUNTIME_PRODUCT_GALLERY_CLASS,
   RUNTIME_REACT_IMPORT,
@@ -39,7 +41,7 @@ const canonicalAppPath = path.join(root, "src", "App.jsx");
 const runtimePresentationPath = path.join(root, "src", "CanonicalRuntimePresentation.jsx");
 const EXPECTED_SHA256 = "8b6301362b6c01b649db1d7cfa4dc00d5b4392309e4ece2c7c14870cab0f2b0d";
 const EXPECTED_APP_SHA256 = "d31e7642f6bccb75094361be3dc2dd3b85cc38a4d968bbfd57ee3ee7ffd80fb6";
-const EXPECTED_RUNTIME_SHA256 = "100277e2cd8a794d1242ae8aef3a346d2ac7783743e7c77135b7d301d7f06c62";
+const EXPECTED_RUNTIME_SHA256 = "cd8156acb7b65a0d07b09ae6bed8cbb41618e35609728c712e9303b4e600054b";
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const NON_HOME_HASH_ROUTES = Object.freeze([
   "#/kategori/",
@@ -125,13 +127,15 @@ test("runtime presentation is generated directly from canonical App.jsx", async 
   assert.equal(countExactOccurrences(runtimePresentation, CANONICAL_ICON_IMPORT), 0);
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_ICON_IMPORT), 1);
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_CARD_IMPORT), 1);
+  assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_FAVORITE_BUTTON_IMPORT), 1);
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_MEDIA_LIGHTBOX_IMPORT), 1);
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_CARD), 1);
   assert.equal(countExactOccurrences(canonicalApp, CANONICAL_PRODUCT_DETAIL_SIGNATURE), 1);
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_DETAIL_SIGNATURE), 1);
   assert.equal(countExactOccurrences(canonicalApp, CANONICAL_PRODUCT_GALLERY_CLASS), 1);
   assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_GALLERY_CLASS), 1);
-  assert.equal(countExactOccurrences(canonicalApp, CANONICAL_PRODUCT_IMAGE), 1);
+  assert.equal(countExactOccurrences(canonicalApp, CANONICAL_PRODUCT_FAVORITE_BUTTON), 1);
+  assert.equal(countExactOccurrences(runtimePresentation, RUNTIME_PRODUCT_FAVORITE_BUTTON), 1);
   assert.match(runtimePresentation, /runtime-product-media-stage/);
   assert.match(runtimePresentation, /ProductMediaLightbox/);
   assert.match(lightbox, /runtime-media-lightbox/);
@@ -175,7 +179,7 @@ test("runtime presentation is generated directly from canonical App.jsx", async 
     /Canonical product card comparison state drifted; expected 1 exact occurrence\(s\), found 0/,
   );
   assert.throws(
-    () => createRuntimePresentation(canonicalApp.replace(CANONICAL_PRODUCT_IMAGE, "<span />")),
-    /Canonical product image owner drifted; expected 1 exact occurrence\(s\), found 0/,
+    () => createRuntimePresentation(canonicalApp.replace(CANONICAL_PRODUCT_FAVORITE_BUTTON, "<span />")),
+    /Canonical product detail favorite owner drifted; expected 1 exact occurrence\(s\), found 0/,
   );
 });

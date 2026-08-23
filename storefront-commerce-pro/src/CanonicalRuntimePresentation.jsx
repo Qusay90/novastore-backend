@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CustomerProductCard } from "./CustomerProductCard.jsx";
+import { CustomerFavoriteButton } from "./CustomerFavoriteButton.jsx";
 import { ProductMediaLightbox } from "./ProductMediaLightbox.jsx";
 import {
   ArrowLeft,
@@ -904,7 +905,7 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyN
     <main id="main-content" className="page product-page">
       <div className="shell"><Breadcrumbs category={category} productName={product.name} />
         <div className="product-detail-grid">
-          <section className="product-gallery runtime-product-gallery" aria-label="Ürün görseli"><span className="product-badge">{soldOut ? "Tükendi" : product.badge}</span><button className={cx("favorite-button", favorite && "is-active")} type="button" onClick={() => onFavorite(product.id)} aria-pressed={favorite} aria-label={favorite ? "Favorilerden çıkar" : "Favorilere ekle"}><Heart weight={favorite ? "fill" : "regular"} /></button><button ref={mediaTriggerRef} className="runtime-product-media-stage" type="button" onClick={() => setMediaOpen(true)} aria-label={`${product.name} medyasını büyüt`}>
+          <section className="product-gallery runtime-product-gallery" aria-label="Ürün görseli"><span className="product-badge">{soldOut ? "Tükendi" : product.badge}</span><CustomerFavoriteButton productId={product.id} productName={product.name} favorite={favorite} onFavorite={onFavorite} /><button ref={mediaTriggerRef} className="runtime-product-media-stage" type="button" onClick={() => setMediaOpen(true)} aria-label={`${product.name} medyasını büyüt`}>
               {activeMedia?.type === "video"
                 ? <video src={activeMedia.url} muted playsInline preload="metadata" />
                 : <img src={activeMedia?.url || productImage(product)} alt={product.name} />}

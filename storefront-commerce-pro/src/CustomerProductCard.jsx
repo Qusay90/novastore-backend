@@ -4,7 +4,6 @@ import { RuntimeComparisonContext } from "./integration/RuntimeComparisonContext
 import {
   ArrowsLeftRight,
   Check,
-  Heart,
   ImageSquare,
   ShieldCheck,
   ShoppingCart,
@@ -12,6 +11,7 @@ import {
   Truck,
 } from "./CustomerIcon.jsx";
 import { productCardMediaIndex, resolveCustomerCardMedia } from "./customerProductCardModel.js";
+import { CustomerFavoriteButton } from "./CustomerFavoriteButton.jsx";
 
 const { CARD_VIEWPORT_ASPECT_RATIO, cardFramingPresentation } = productCardFraming;
 export const CUSTOMER_CARD_AUTOPLAY_DWELL_MS = 500;
@@ -42,13 +42,11 @@ export function CustomerProductCard({
   const [activeMedia, setActiveMedia] = useState(0);
   const [previewing, setPreviewing] = useState(false);
   const [galleryPrimed, setGalleryPrimed] = useState(false);
-  const [favoriteMotion, setFavoriteMotion] = useState("idle");
   const [cartPhase, setCartPhase] = useState("idle");
   const [compareMotion, setCompareMotion] = useState(false);
   const dwellTimer = useRef(null);
   const cycleTimer = useRef(null);
   const activeMediaRef = useRef(0);
-  const favoriteTimer = useRef(null);
   const cartTimer = useRef(null);
   const compareTimer = useRef(null);
   const media = useMemo(
@@ -76,7 +74,6 @@ export function CustomerProductCard({
     return () => {
       window.clearTimeout(dwellTimer.current);
       window.clearInterval(cycleTimer.current);
-      window.clearTimeout(favoriteTimer.current);
       window.clearTimeout(cartTimer.current);
       window.clearTimeout(compareTimer.current);
     };
@@ -129,13 +126,6 @@ export function CustomerProductCard({
     window.clearTimeout(timer.current);
     setter(value);
     timer.current = window.setTimeout(() => setter(value === true ? false : "idle"), duration);
-  };
-
-  const handleFavorite = async () => {
-    try {
-      const result = await onFavorite?.(product.id);
-      if (result !== false) playTransient(favoriteTimer, setFavoriteMotion, favorite ? "off" : "on", 560);
-    } catch { /* Runtime owns the visible failure notice. */ }
   };
 
   const handleCompare = async () => {
@@ -209,9 +199,7 @@ export function CustomerProductCard({
           </span>
         )}
         {!previewMode && typeof onFavorite === "function" && (
-          <button className={`favorite-button${favorite ? " is-active" : ""}${favoriteMotion !== "idle" ? ` is-confirmed-${favoriteMotion}` : ""}`} type="button" onClick={handleFavorite} aria-pressed={favorite} aria-label={favorite ? `${product.name} ürününü favorilerden çıkar` : `${product.name} ürününü favorilere ekle`}>
-            <Heart weight={favorite ? "fill" : "regular"} />
-          </button>
+          <CustomerFavoriteButton productId={product.id} productName={product.name} favorite={favorite} onFavorite={onFavorite} />
         )}
         {previewMode ? <span className="customer-card-preview-media public-store-product-media">{mediaStage}</span> : <a href={detailHref} aria-label={`${product.name} detayını aç`}>{mediaStage}</a>}
       </div>
