@@ -44,6 +44,7 @@ export const CANONICAL_MODAL_BACKGROUND_QUERY = 'const backgroundNodes = [...doc
 export const RUNTIME_MODAL_BACKGROUND_QUERY = 'const backgroundNodes = [...document.querySelectorAll("#root > *")];';
 export const RUNTIME_COMPARISON_IMPORT = 'import { RuntimeComparisonContext } from "./integration/RuntimeComparisonContext.jsx";';
 export const RUNTIME_PRODUCT_CARD_IMPORT = 'import { CustomerProductCard } from "./CustomerProductCard.jsx";';
+export const RUNTIME_PRODUCT_MEDIA_LIGHTBOX_IMPORT = 'import { ProductMediaLightbox } from "./ProductMediaLightbox.jsx";';
 export const CANONICAL_COMPARISON_STATE = 'const [compared, setCompared] = useState(false);';
 export const RUNTIME_COMPARISON_STATE = 'const comparison = useContext(RuntimeComparisonContext);\n  const compared = comparison.ids.has(product.id);';
 export const CANONICAL_COMPARISON_TOGGLE = 'onClick={() => setCompared((value) => !value)}';
@@ -58,6 +59,8 @@ export const RUNTIME_PRODUCT_QUANTITY_CONTROL = '<div className="quantity-contro
 export const CANONICAL_PRODUCT_GALLERY_CLASS = 'className="product-gallery"';
 export const RUNTIME_PRODUCT_GALLERY_CLASS = 'className="product-gallery runtime-product-gallery"';
 export const CANONICAL_PRODUCT_IMAGE = '<Heart weight={favorite ? "fill" : "regular"} /></button><img src={productImage(product)} alt={product.name} />';
+export const CANONICAL_PRODUCT_ZOOM_NOTE = '<span className="zoom-note"><span>Görseli büyütmek için üzerine gel</span><b>Dokunarak büyüt</b></span>';
+export const RUNTIME_PRODUCT_ZOOM_NOTE = '<span className="zoom-note"><span>Tam görsel için tıkla</span><b>Dokunarak büyüt</b></span>';
 export const CANONICAL_REVIEW_TARGET = 'document.getElementById("reviews")';
 export const RUNTIME_REVIEW_TARGET = 'document.getElementById("community-reviews")';
 export const CANONICAL_DESKTOP_ADD_BUTTON = '<button className="primary-button" type="button" disabled={soldOut} onClick={() => onAdd(product.id, quantity)}>';
@@ -163,7 +166,7 @@ export const createRuntimePresentation = (canonicalApp) => {
   runtimePresentation = replaceExactOnce(
     runtimePresentation,
     CANONICAL_PORTAL_IMPORT,
-    `${CANONICAL_PORTAL_IMPORT}\n${RUNTIME_PRODUCT_CARD_IMPORT}`,
+    `${CANONICAL_PORTAL_IMPORT}\n${RUNTIME_PRODUCT_CARD_IMPORT}\n${RUNTIME_PRODUCT_MEDIA_LIGHTBOX_IMPORT}`,
     "Canonical portal import boundary",
   );
   runtimePresentation = replaceExactOnce(
@@ -201,37 +204,13 @@ export const createRuntimePresentation = (canonicalApp) => {
   const [activeMediaId, setActiveMediaId] = useState(() => runtimeMedia[0]?.id);
   const [mediaOpen, setMediaOpen] = useState(false);
   const mediaTriggerRef = useRef(null);
-  const mediaDialogRef = useRef(null);
-  const mediaCloseRef = useRef(null);
   const activeMedia = runtimeMedia.find((item) => item.id === activeMediaId) || runtimeMedia[0];
 
   useEffect(() => {
     setActiveMediaId(runtimeMedia[0]?.id);
     setMediaOpen(false);
     setQuantity((current) => Math.min(maxQuantity, Math.max(1, current)));
-  }, [maxQuantity, product.id, runtimeMedia]);
-
-  useEffect(() => {
-    if (!mediaOpen) return undefined;
-    const restorePage = isolatePageFromModal();
-    document.body.classList.add("is-locked");
-    window.requestAnimationFrame(() => mediaCloseRef.current?.focus());
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setMediaOpen(false);
-        return;
-      }
-      keepFocusInDialog(event, mediaDialogRef.current);
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.classList.remove("is-locked");
-      restorePage();
-      restoreFocus(mediaTriggerRef);
-    };
-  }, [mediaOpen]);`,
+  }, [maxQuantity, product.id, runtimeMedia]);`,
     "Canonical product quantity state",
   );
   runtimePresentation = replaceExactOnce(
@@ -249,7 +228,7 @@ export const createRuntimePresentation = (canonicalApp) => {
                 : <img src={activeMedia?.url || productImage(product)} alt={product.name} />}
             </button>
             {runtimeMedia.length > 1 && <div className="runtime-product-thumbnails" aria-label="Ürün medyaları">{runtimeMedia.map((item, index) => <button key={item.id} className={cx(item.id === activeMedia?.id && "is-active")} type="button" aria-label={\`${"${index + 1}"}. medyayı göster\`} aria-pressed={item.id === activeMedia?.id} onClick={() => setActiveMediaId(item.id)}>{item.type === "video" ? <video src={item.url} muted playsInline preload="metadata" /> : <img src={item.url} alt="" />}</button>)}</div>}
-            {mediaOpen && activeMedia && createPortal(<div className="runtime-media-lightbox" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setMediaOpen(false)}><div ref={mediaDialogRef} className="runtime-media-lightbox__dialog" role="dialog" aria-modal="true" aria-label={\`${"${product.name}"} medya önizlemesi\`} tabIndex="-1"><button ref={mediaCloseRef} className="runtime-media-lightbox__close" type="button" onClick={() => setMediaOpen(false)} aria-label="Medya önizlemesini kapat"><X /></button>{activeMedia.type === "video" ? <video src={activeMedia.url} controls autoPlay playsInline /> : <img src={activeMedia.url} alt={product.name} />}</div></div>, document.body)}`,
+            <ProductMediaLightbox activeMediaId={activeMedia?.id} media={runtimeMedia} onActiveMediaIdChange={setActiveMediaId} onClose={() => setMediaOpen(false)} open={mediaOpen} productName={product.name} returnFocusRef={mediaTriggerRef} />`,
     "Canonical product image owner",
   );
   runtimePresentation = replaceExactOnce(
@@ -257,6 +236,12 @@ export const createRuntimePresentation = (canonicalApp) => {
     CANONICAL_PRODUCT_QUANTITY_CONTROL,
     RUNTIME_PRODUCT_QUANTITY_CONTROL,
     "Canonical product quantity control",
+  );
+  runtimePresentation = replaceExactOnce(
+    runtimePresentation,
+    CANONICAL_PRODUCT_ZOOM_NOTE,
+    RUNTIME_PRODUCT_ZOOM_NOTE,
+    "Runtime product zoom note",
   );
   runtimePresentation = replaceExactOnce(
     runtimePresentation,
@@ -295,6 +280,7 @@ export const createRuntimePresentation = (canonicalApp) => {
     "Runtime hash-router mobile home item"
   );
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_CARD_IMPORT, 1, "Runtime shared product card import");
+  assertExactCount(runtimePresentation, RUNTIME_PRODUCT_MEDIA_LIGHTBOX_IMPORT, 1, "Runtime product media lightbox import");
   assertExactCount(runtimePresentation, RUNTIME_ICON_IMPORT, 1, "Runtime Lucide icon boundary");
   assertExactCount(runtimePresentation, RUNTIME_MODAL_BACKGROUND_QUERY, 1, "Runtime modal background isolation");
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_CARD, 1, "Runtime shared product card owner");

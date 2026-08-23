@@ -7,6 +7,7 @@ import {
   Bot as LucideBot,
   Check as LucideCheck,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   CircleAlert,
   CircleCheck,
@@ -37,6 +38,7 @@ import {
   Plus as LucidePlus,
   Receipt as LucideReceipt,
   RefreshCw,
+  RotateCcw,
   Search,
   Send,
   ShieldCheck as LucideShieldCheck,
@@ -58,6 +60,8 @@ import {
   Video as LucideVideo,
   Watch as LucideWatch,
   X as LucideX,
+  ZoomIn as LucideZoomIn,
+  ZoomOut as LucideZoomOut,
 } from "lucide-react";
 
 const adapt = (Icon) => function CustomerIcon({ weight, fill, strokeWidth, ...props }) {
@@ -82,6 +86,7 @@ export const Baby = adapt(LucideBaby);
 export const Bell = adapt(LucideBell);
 export const Bot = adapt(LucideBot);
 export const CaretDown = adapt(ChevronDown);
+export const CaretLeft = adapt(ChevronLeft);
 export const CaretRight = adapt(ChevronRight);
 export const Check = adapt(LucideCheck);
 export const CheckCircle = adapt(CircleCheck);
@@ -106,6 +111,7 @@ export const PersonSimpleRun = adapt(PersonStanding);
 export const Plus = adapt(LucidePlus);
 export const Question = adapt(CircleHelp);
 export const Receipt = adapt(LucideReceipt);
+export const ResetView = adapt(RotateCcw);
 export const ShieldCheck = adapt(LucideShieldCheck);
 export const ShoppingBag = adapt(LucideShoppingBag);
 export const ShoppingBagOpen = adapt(LucideShoppingBag);
@@ -122,6 +128,8 @@ export const User = adapt(LucideUser);
 export const Watch = adapt(LucideWatch);
 export const WarningCircle = adapt(CircleAlert);
 export const X = adapt(LucideX);
+export const ZoomIn = adapt(LucideZoomIn);
+export const ZoomOut = adapt(LucideZoomOut);
 export const VideoCamera = adapt(LucideVideo);
 export const ChatCircleText = adapt(MessageCircle);
 export const Clock = adapt(LucideClock);

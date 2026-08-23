@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CustomerProductCard } from "./CustomerProductCard.jsx";
+import { ProductMediaLightbox } from "./ProductMediaLightbox.jsx";
 import {
   ArrowLeft,
   ArrowsLeftRight,
@@ -865,8 +866,6 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyN
   const [activeMediaId, setActiveMediaId] = useState(() => runtimeMedia[0]?.id);
   const [mediaOpen, setMediaOpen] = useState(false);
   const mediaTriggerRef = useRef(null);
-  const mediaDialogRef = useRef(null);
-  const mediaCloseRef = useRef(null);
   const activeMedia = runtimeMedia.find((item) => item.id === activeMediaId) || runtimeMedia[0];
 
   useEffect(() => {
@@ -874,28 +873,6 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyN
     setMediaOpen(false);
     setQuantity((current) => Math.min(maxQuantity, Math.max(1, current)));
   }, [maxQuantity, product.id, runtimeMedia]);
-
-  useEffect(() => {
-    if (!mediaOpen) return undefined;
-    const restorePage = isolatePageFromModal();
-    document.body.classList.add("is-locked");
-    window.requestAnimationFrame(() => mediaCloseRef.current?.focus());
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setMediaOpen(false);
-        return;
-      }
-      keepFocusInDialog(event, mediaDialogRef.current);
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.classList.remove("is-locked");
-      restorePage();
-      restoreFocus(mediaTriggerRef);
-    };
-  }, [mediaOpen]);
   const storageOptions = product.storage ? [product.storage] : [];
   const colorOptions = product.color ? [product.color] : [];
   const [selectedStorage, setSelectedStorage] = useState(storageOptions[0] || "Standart");
@@ -933,7 +910,7 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyN
                 : <img src={activeMedia?.url || productImage(product)} alt={product.name} />}
             </button>
             {runtimeMedia.length > 1 && <div className="runtime-product-thumbnails" aria-label="Ürün medyaları">{runtimeMedia.map((item, index) => <button key={item.id} className={cx(item.id === activeMedia?.id && "is-active")} type="button" aria-label={`${index + 1}. medyayı göster`} aria-pressed={item.id === activeMedia?.id} onClick={() => setActiveMediaId(item.id)}>{item.type === "video" ? <video src={item.url} muted playsInline preload="metadata" /> : <img src={item.url} alt="" />}</button>)}</div>}
-            {mediaOpen && activeMedia && createPortal(<div className="runtime-media-lightbox" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setMediaOpen(false)}><div ref={mediaDialogRef} className="runtime-media-lightbox__dialog" role="dialog" aria-modal="true" aria-label={`${product.name} medya önizlemesi`} tabIndex="-1"><button ref={mediaCloseRef} className="runtime-media-lightbox__close" type="button" onClick={() => setMediaOpen(false)} aria-label="Medya önizlemesini kapat"><X /></button>{activeMedia.type === "video" ? <video src={activeMedia.url} controls autoPlay playsInline /> : <img src={activeMedia.url} alt={product.name} />}</div></div>, document.body)}<span className="zoom-note"><span>Görseli büyütmek için üzerine gel</span><b>Dokunarak büyüt</b></span></section>
+            <ProductMediaLightbox activeMediaId={activeMedia?.id} media={runtimeMedia} onActiveMediaIdChange={setActiveMediaId} onClose={() => setMediaOpen(false)} open={mediaOpen} productName={product.name} returnFocusRef={mediaTriggerRef} /><span className="zoom-note"><span>Tam görsel için tıkla</span><b>Dokunarak büyüt</b></span></section>
           <section className="product-summary">
             <span className="product-brand">{product.brand}</span><h1>{product.name}</h1>
             <div className="detail-rating"><span><Star weight="fill" /> {product.rating.toFixed(1)}</span><button type="button" onClick={() => document.getElementById("community-reviews")?.scrollIntoView({ behavior: "smooth", block: "start" })}>{product.reviews} değerlendirme</button><small>Ürün kodu: {product.id}</small></div>

@@ -11,11 +11,11 @@ import {
   Star,
   Truck,
 } from "./CustomerIcon.jsx";
-import { resolveCustomerCardMedia } from "./customerProductCardModel.js";
+import { productCardMediaIndex, resolveCustomerCardMedia } from "./customerProductCardModel.js";
 
-const { cardFramingPresentation } = productCardFraming;
-export const CUSTOMER_CARD_AUTOPLAY_DWELL_MS = 360;
-export const CUSTOMER_CARD_AUTOPLAY_INTERVAL_MS = 1050;
+const { CARD_VIEWPORT_ASPECT_RATIO, cardFramingPresentation } = productCardFraming;
+export const CUSTOMER_CARD_AUTOPLAY_DWELL_MS = 500;
+export const CUSTOMER_CARD_AUTOPLAY_INTERVAL_MS = 1650;
 
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -42,11 +42,12 @@ export function CustomerProductCard({
   const [activeMedia, setActiveMedia] = useState(0);
   const [previewing, setPreviewing] = useState(false);
   const [galleryPrimed, setGalleryPrimed] = useState(false);
-  const [favoriteMotion, setFavoriteMotion] = useState(false);
+  const [favoriteMotion, setFavoriteMotion] = useState("idle");
   const [cartPhase, setCartPhase] = useState("idle");
   const [compareMotion, setCompareMotion] = useState(false);
   const dwellTimer = useRef(null);
   const cycleTimer = useRef(null);
+  const activeMediaRef = useRef(0);
   const favoriteTimer = useRef(null);
   const cartTimer = useRef(null);
   const compareTimer = useRef(null);
@@ -64,6 +65,7 @@ export function CustomerProductCard({
   const detailHref = `#/urun/${product.slug}`;
 
   useEffect(() => {
+    activeMediaRef.current = 0;
     setActiveMedia(0);
     setPreviewing(false);
     setGalleryPrimed(false);
@@ -80,24 +82,46 @@ export function CustomerProductCard({
     };
   }, []);
 
-  const handlePointerEnter = (event) => {
-    if (!isFineHover() || media.length <= 1 || event.pointerType === "touch") return;
+  const selectActiveMedia = (nextIndex) => {
+    if (activeMediaRef.current === nextIndex) return false;
+    activeMediaRef.current = nextIndex;
+    setActiveMedia(nextIndex);
+    return true;
+  };
+
+  const scheduleAutoplay = () => {
     window.clearTimeout(dwellTimer.current);
     window.clearInterval(cycleTimer.current);
-    setPreviewing(true);
     dwellTimer.current = window.setTimeout(() => {
       setGalleryPrimed(true);
-      setActiveMedia((current) => (current + 1) % media.length);
+      selectActiveMedia((activeMediaRef.current + 1) % media.length);
       cycleTimer.current = window.setInterval(() => {
-        setActiveMedia((current) => (current + 1) % media.length);
+        selectActiveMedia((activeMediaRef.current + 1) % media.length);
       }, CUSTOMER_CARD_AUTOPLAY_INTERVAL_MS);
     }, CUSTOMER_CARD_AUTOPLAY_DWELL_MS);
   };
+
+  const handlePointerEnter = (event) => {
+    if (!isFineHover() || media.length <= 1 || event.pointerType === "touch") return;
+    setPreviewing(true);
+    scheduleAutoplay();
+  };
+
+  const handlePointerMove = (event) => {
+    if (!previewing || !isFineHover() || media.length <= 1 || event.pointerType === "touch") return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const nextIndex = productCardMediaIndex(event.clientX, bounds.left, bounds.width, media.length);
+    if (!selectActiveMedia(nextIndex)) return;
+    setGalleryPrimed(true);
+    scheduleAutoplay();
+  };
+
   const resetMedia = () => {
     window.clearTimeout(dwellTimer.current);
     window.clearInterval(cycleTimer.current);
     setPreviewing(false);
     setGalleryPrimed(false);
+    activeMediaRef.current = 0;
     setActiveMedia(0);
   };
 
@@ -110,7 +134,7 @@ export function CustomerProductCard({
   const handleFavorite = async () => {
     try {
       const result = await onFavorite?.(product.id);
-      if (result !== false) playTransient(favoriteTimer, setFavoriteMotion, true, 320);
+      if (result !== false) playTransient(favoriteTimer, setFavoriteMotion, favorite ? "off" : "on", 560);
     } catch { /* Runtime owns the visible failure notice. */ }
   };
 
@@ -137,6 +161,7 @@ export function CustomerProductCard({
     <span
       className="customer-card-media-stage"
       onPointerEnter={handlePointerEnter}
+      onPointerMove={handlePointerMove}
       onPointerLeave={resetMedia}
       data-active-media={activeMedia}
     >
@@ -162,12 +187,9 @@ export function CustomerProductCard({
         </span>
       )}
       {media.length > 1 && (
-        <>
-          <span className="customer-card-media-cue" aria-hidden="true">{media.length} görsel · otomatik</span>
-          <span className="customer-card-media-zones" aria-hidden="true">
-            {media.map((item, index) => <i key={item.id} className={index === activeMedia ? "is-active" : ""} />)}
-          </span>
-        </>
+        <span className="customer-card-media-zones" aria-hidden="true">
+          {media.map((item, index) => <i key={item.id} className={index === activeMedia ? "is-active" : ""} />)}
+        </span>
       )}
     </span>
   );
@@ -180,14 +202,14 @@ export function CustomerProductCard({
 
   return (
     <article className={`product-card customer-product-card${className ? ` ${className}` : ""}${soldOut ? " is-sold-out" : ""}${previewing ? " is-media-previewing" : ""}`}>
-      <div className="product-card__media">
+      <div className="product-card__media" style={{ aspectRatio: CARD_VIEWPORT_ASPECT_RATIO }}>
         {(soldOut || discount > 0 || product?.badge) && (
           <span className={`product-badge${soldOut ? " is-muted" : discount > 0 ? " is-discount" : ""}`}>
             {soldOut ? "Tükendi" : discount > 0 ? `%${discount} İndirim` : product.badge}
           </span>
         )}
         {!previewMode && typeof onFavorite === "function" && (
-          <button className={`favorite-button${favorite ? " is-active" : ""}${favoriteMotion ? " is-confirmed" : ""}`} type="button" onClick={handleFavorite} aria-pressed={favorite} aria-label={favorite ? `${product.name} ürününü favorilerden çıkar` : `${product.name} ürününü favorilere ekle`}>
+          <button className={`favorite-button${favorite ? " is-active" : ""}${favoriteMotion !== "idle" ? ` is-confirmed-${favoriteMotion}` : ""}`} type="button" onClick={handleFavorite} aria-pressed={favorite} aria-label={favorite ? `${product.name} ürününü favorilerden çıkar` : `${product.name} ürününü favorilere ekle`}>
             <Heart weight={favorite ? "fill" : "regular"} />
           </button>
         )}

@@ -37,8 +37,8 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const storefrontSha256 = sha256(storefrontArtifact);
 const adminSha256 = sha256(adminArtifact);
 const expectedArtifactSha256 = Object.freeze({
-  storefront: "adda553972c7bbcd2ff3d095b3ec3f1212b7939c6d83bbb675354a7c25f628aa",
-  admin: "092400f0c52fea975369fb19fe2ee2b9060acdf1892f8e365834edf79b26f0e2",
+  storefront: "55b9e1caa786f32080a73f1c1733613ea123d2b08c19c2203ed81e9d4e405872",
+  admin: "1068c7698821d259b8dd01d6039fc3be6cf1dfe599e3fc029da56ae33b48cfa5",
 });
 if (storefrontSha256 !== expectedArtifactSha256.storefront) {
   throw new Error("Storefront artifact beklenen resmî inceleme digest'iyle eşleşmiyor.");
@@ -764,7 +764,11 @@ const adminBootstrap = `<!doctype html><html lang="tr"><head><meta charset="utf-
 const reviewAdminProductSource = rawOwnerLiveProducts[0] || deterministicOwnerProduct;
 const reviewAdminCustomerProduct = publicProducts.find((product) => product.id === reviewAdminProductSource.id) || deterministicOwnerProduct;
 const reviewAdminSourceMedia = (rawOwnerLiveProducts[0]?.media || []).filter((media) => String(media.media_url || "").startsWith("https://"));
-const reviewAdminMedia = (reviewAdminSourceMedia.length ? reviewAdminSourceMedia : [{ id: 990001, media_url: "https://res.cloudinary.com/demo/image/upload/sample.jpg", is_main: true, sort_order: 0 }])
+const reviewAdminLandscapeMedia = Object.freeze({ id: 990099, media_url: "https://res.cloudinary.com/demo/image/upload/sample.jpg", is_main: false, sort_order: 99 });
+const reviewAdminMedia = [
+  ...(reviewAdminSourceMedia.length ? reviewAdminSourceMedia : [{ id: 990001, media_url: "https://res.cloudinary.com/demo/image/upload/sample.jpg", is_main: true, sort_order: 0 }]),
+  ...(reviewAdminSourceMedia.some((media) => media.media_url === reviewAdminLandscapeMedia.media_url) ? [] : [reviewAdminLandscapeMedia]),
+]
   .slice(0, 8)
   .map((media, index) => ({
     id: Number.isSafeInteger(Number(media.id)) && Number(media.id) > 0 ? Number(media.id) : 990001 + index,
@@ -772,7 +776,7 @@ const reviewAdminMedia = (reviewAdminSourceMedia.length ? reviewAdminSourceMedia
     media_type: "image",
     is_main: index === 0,
     sort_order: index,
-    customer_media_id: reviewAdminCustomerProduct.media[index]?.id || reviewAdminCustomerProduct.media[0]?.id,
+    customer_media_id: reviewAdminCustomerProduct.media[index]?.id || `admin-only-${index + 1}`,
   }));
 const reviewAdminSummary = () => ({
   id: reviewAdminCustomerProduct.id,

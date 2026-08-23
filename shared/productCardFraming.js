@@ -2,6 +2,15 @@
 
 const CARD_FRAMING_DEFAULT = Object.freeze({ focal_x: 0.5, focal_y: 0.5, zoom: 1 });
 const CARD_FRAMING_LIMITS = Object.freeze({ focalMin: 0, focalMax: 1, zoomMin: 1, zoomMax: 3 });
+const CARD_VIEWPORT_ASPECT_RATIO = 1;
+const CARD_VIEWPORT_BORDER_RADIUS_PX = 14;
+const CARD_VIEWPORT_ASPECT_TOLERANCE = 0.08;
+const CARD_VIEWPORT_MIN_SOURCE_DIMENSION = 600;
+const CARD_FRAMING_STATES = Object.freeze({
+    NO_FRAMING_NEEDED: 'NO_FRAMING_NEEDED',
+    FRAMING_RECOMMENDED: 'FRAMING_RECOMMENDED',
+    CUSTOM_FRAMING_SAVED: 'CUSTOM_FRAMING_SAVED'
+});
 
 const finiteNumber = (value) => {
     if (value === null || value === undefined || value === '') return null;
@@ -77,11 +86,42 @@ const panCardFraming = (value, deltaX, deltaY, stageWidth, stageHeight) => {
     });
 };
 
+const classifyCardFramingNeed = ({ width, height, cardFraming = null } = {}) => {
+    const sourceWidth = finiteNumber(width);
+    const sourceHeight = finiteNumber(height);
+    const dimensionsKnown = sourceWidth !== null && sourceHeight !== null && sourceWidth > 0 && sourceHeight > 0;
+    const storedFraming = normalizeCardFraming(cardFraming, { nullable: true, strict: false });
+    const sourceAspectRatio = dimensionsKnown ? sourceWidth / sourceHeight : null;
+    const aspectMismatch = dimensionsKnown
+        ? Math.abs(sourceAspectRatio - CARD_VIEWPORT_ASPECT_RATIO) / CARD_VIEWPORT_ASPECT_RATIO > CARD_VIEWPORT_ASPECT_TOLERANCE
+        : false;
+    return Object.freeze({
+        state: storedFraming
+            ? CARD_FRAMING_STATES.CUSTOM_FRAMING_SAVED
+            : aspectMismatch
+                ? CARD_FRAMING_STATES.FRAMING_RECOMMENDED
+                : CARD_FRAMING_STATES.NO_FRAMING_NEEDED,
+        dimensionsKnown,
+        sourceWidth,
+        sourceHeight,
+        sourceAspectRatio: sourceAspectRatio === null ? null : rounded(sourceAspectRatio, 4),
+        aspectMismatch,
+        lowResolution: dimensionsKnown
+            && Math.min(sourceWidth, sourceHeight) < CARD_VIEWPORT_MIN_SOURCE_DIMENSION
+    });
+};
+
 module.exports = Object.freeze({
     CARD_FRAMING_DEFAULT,
     CARD_FRAMING_LIMITS,
+    CARD_FRAMING_STATES,
+    CARD_VIEWPORT_ASPECT_RATIO,
+    CARD_VIEWPORT_ASPECT_TOLERANCE,
+    CARD_VIEWPORT_BORDER_RADIUS_PX,
+    CARD_VIEWPORT_MIN_SOURCE_DIMENSION,
     cardFramingPresentation,
     cardFramingFromStorage,
+    classifyCardFramingNeed,
     normalizeCardFraming,
     panCardFraming,
     resolveCardFraming

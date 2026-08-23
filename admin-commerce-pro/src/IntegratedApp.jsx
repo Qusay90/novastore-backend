@@ -810,19 +810,60 @@ function CatalogMediaDialog({ product: initialProduct, actions, onClose, onCompl
   const [framingMediaId, setFramingMediaId] = useState(initialFramingMedia?.id || null);
   const [draftFraming, setDraftFraming] = useState(initialFramingMedia?.cardFraming || null);
   const [framingStatus, setFramingStatus] = useState("INITIAL_DEFAULT");
+  const [framingDimensions, setFramingDimensions] = useState(null);
+  const [framingEditorOpen, setFramingEditorOpen] = useState(Boolean(initialFramingMedia?.cardFraming));
   const framingPreviewRef = useRef(null);
+  const framingMeasurementRef = useRef(null);
   const dragRef = useRef(null);
-  const { cardFramingPresentation, panCardFraming, resolveCardFraming } = productCardFraming;
+  const {
+    CARD_FRAMING_LIMITS,
+    CARD_FRAMING_STATES,
+    CARD_VIEWPORT_ASPECT_RATIO,
+    CARD_VIEWPORT_BORDER_RADIUS_PX,
+    cardFramingPresentation,
+    classifyCardFramingNeed,
+    panCardFraming,
+    resolveCardFraming,
+  } = productCardFraming;
   const framingMedia = product.media.find((entry) => entry.id === framingMediaId && entry.mediaType === "image") || null;
   const resolvedFraming = resolveCardFraming(draftFraming);
+  const framingAssessment = classifyCardFramingNeed({
+    width: framingDimensions?.width,
+    height: framingDimensions?.height,
+    cardFraming: framingMedia?.cardFraming || null,
+  });
+  const framingState = framingAssessment.dimensionsKnown || framingMedia?.cardFraming
+    ? framingAssessment.state
+    : "ANALYZING_SOURCE";
 
   useEffect(() => {
     if (!framingMedia) return;
+    setFramingDimensions(null);
     setDraftFraming(framingMedia.cardFraming || null);
     setFramingStatus((current) => current === "SAVED"
       ? current
       : framingMedia.cardFraming ? "RELOADED" : "INITIAL_DEFAULT");
   }, [framingMedia?.cardFraming, framingMedia?.id]);
+
+  useEffect(() => {
+    const image = framingMeasurementRef.current;
+    if (!image) return undefined;
+    const capture = () => {
+      const width = Number(image.naturalWidth);
+      const height = Number(image.naturalHeight);
+      if (width > 0 && height > 0) setFramingDimensions({ width, height });
+    };
+    capture();
+    image.addEventListener("load", capture);
+    return () => image.removeEventListener("load", capture);
+  }, [framingMedia?.id, framingMedia?.mediaUrl]);
+
+  useEffect(() => {
+    if (framingAssessment.dimensionsKnown
+      && framingAssessment.state === CARD_FRAMING_STATES.FRAMING_RECOMMENDED) {
+      setFramingEditorOpen(true);
+    }
+  }, [CARD_FRAMING_STATES.FRAMING_RECOMMENDED, framingAssessment.dimensionsKnown, framingAssessment.state]);
 
   const run = async (operation) => {
     setBusy(true);
@@ -882,12 +923,15 @@ function CatalogMediaDialog({ product: initialProduct, actions, onClose, onCompl
 
   const selectFramingMedia = (entry) => {
     setFramingMediaId(entry.id);
+    setFramingDimensions(null);
     setDraftFraming(entry.cardFraming || null);
     setFramingStatus(entry.cardFraming ? "RELOADED" : "INITIAL_DEFAULT");
+    setFramingEditorOpen(true);
   };
 
   const startFramingDrag = (event) => {
-    if (!framingPreviewRef.current) return;
+    if (!framingPreviewRef.current || event.button !== 0) return;
+    event.preventDefault();
     event.currentTarget.setPointerCapture?.(event.pointerId);
     dragRef.current = { x: event.clientX, y: event.clientY, framing: resolvedFraming };
   };
@@ -905,7 +949,43 @@ function CatalogMediaDialog({ product: initialProduct, actions, onClose, onCompl
     setFramingStatus("DRAGGED");
   };
 
-  const stopFramingDrag = () => { dragRef.current = null; };
+  const stopFramingDrag = (event) => {
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    dragRef.current = null;
+  };
+
+  const adjustFramingZoom = (amount) => {
+    setDraftFraming({
+      ...resolvedFraming,
+      zoom: Math.min(CARD_FRAMING_LIMITS.zoomMax, Math.max(CARD_FRAMING_LIMITS.zoomMin, Number((resolvedFraming.zoom + amount).toFixed(2)))),
+    });
+    setFramingStatus(amount > 0 ? "ZOOMED_IN" : "ZOOMED_OUT");
+  };
+
+  const resetFraming = () => {
+    setDraftFraming(null);
+    setFramingStatus("RESET");
+  };
+
+  const closeFramingEditor = () => {
+    setDraftFraming(framingMedia?.cardFraming || null);
+    setFramingStatus(framingMedia?.cardFraming ? "RELOADED" : "INITIAL_DEFAULT");
+    setFramingEditorOpen(false);
+  };
+
+  const handleFramingKeyDown = (event) => {
+    const focalStep = event.shiftKey ? 0.05 : 0.015;
+    if (["+", "="].includes(event.key)) adjustFramingZoom(0.1);
+    else if (["-", "_"].includes(event.key)) adjustFramingZoom(-0.1);
+    else if (event.key === "0") resetFraming();
+    else if (event.key === "ArrowLeft") setDraftFraming({ ...resolvedFraming, focal_x: Math.max(0, resolvedFraming.focal_x - focalStep) });
+    else if (event.key === "ArrowRight") setDraftFraming({ ...resolvedFraming, focal_x: Math.min(1, resolvedFraming.focal_x + focalStep) });
+    else if (event.key === "ArrowUp") setDraftFraming({ ...resolvedFraming, focal_y: Math.max(0, resolvedFraming.focal_y - focalStep) });
+    else if (event.key === "ArrowDown") setDraftFraming({ ...resolvedFraming, focal_y: Math.min(1, resolvedFraming.focal_y + focalStep) });
+    else return;
+    event.preventDefault();
+    if (event.key.startsWith("Arrow")) setFramingStatus("KEYBOARD_PANNED");
+  };
 
   const saveFraming = async () => {
     if (!framingMedia || typeof actions.updateCatalogMediaCardFraming !== "function") return;
@@ -918,6 +998,20 @@ function CatalogMediaDialog({ product: initialProduct, actions, onClose, onCompl
     if (next) setFramingStatus("SAVED");
   };
 
+  const captureFramingDimensions = (event) => {
+    const width = Number(event.currentTarget.naturalWidth);
+    const height = Number(event.currentTarget.naturalHeight);
+    if (width > 0 && height > 0) setFramingDimensions({ width, height });
+  };
+
+  const framingStateCopy = framingState === CARD_FRAMING_STATES.CUSTOM_FRAMING_SAVED
+    ? { label: "Özel kart kadrajı kayıtlı", tone: "saved" }
+    : framingState === CARD_FRAMING_STATES.FRAMING_RECOMMENDED
+      ? { label: "Kart kadrajı öneriliyor", tone: "recommended" }
+      : framingState === CARD_FRAMING_STATES.NO_FRAMING_NEEDED
+        ? { label: "Kadraj gerekmiyor", tone: "ready" }
+        : { label: "Görsel oranı inceleniyor", tone: "analyzing" };
+
   return (
     <OperationDialog title={`${product.name} · medya kayıtları`} busy={busy} onClose={onClose} testId="catalog-media-dialog" wide>
       <section className="notice-card live-boundary-notice" role="note"><Icon name="shield" /><div><strong>Sağlayıcıya çağrı yapılmaz</strong><p>Bu ekran yalnız doğrulanmış HTTPS Cloudinary varlıklarını kataloğa kaydeder, sıralar ve kapak seçer. Silme yalnız katalog kaydını kaldırır; sağlayıcı varlığının silinmesi ayrı yayın kapısıdır.</p></div></section>
@@ -928,25 +1022,49 @@ function CatalogMediaDialog({ product: initialProduct, actions, onClose, onCompl
         <label className="check-row"><input type="checkbox" checked={isCover} onChange={(event) => setIsCover(event.target.checked)} disabled={mediaType !== "image"} /><span>{mediaType === "image" ? "Kapak yap" : "Video kapak olamaz"}</span></label>
         <button className="primary-button" type="submit" disabled={busy || !mediaUrl.trim()}>Medya kaydını ekle</button>
       </form>
-      {framingMedia && <section className="catalog-card-framing" aria-labelledby="catalog-card-framing-title">
-        <div className="catalog-card-framing__copy"><span className="section-kicker">1:1 müşteri kartı</span><h3 id="catalog-card-framing-title">Ürün kartı kadrajı</h3><p>Orijinal medya değişmez. Sürükleyerek odağı, kaydırıcıyla yakınlığı ayarla; ürün detay sayfası tam görseli göstermeye devam eder.</p></div>
-        <div
-          ref={framingPreviewRef}
-          className="catalog-card-framing__preview"
-          onPointerDown={startFramingDrag}
-          onPointerMove={moveFramingDrag}
-          onPointerUp={stopFramingDrag}
-          onPointerCancel={stopFramingDrag}
-          role="img"
-          aria-label={`${product.name} müşteri kartı kadraj önizlemesi`}
-        ><img src={framingMedia.mediaUrl} alt="" style={cardFramingPresentation(draftFraming)} draggable="false" /></div>
-        <div className="catalog-card-framing__controls">
-          <label><span>Yakınlaştırma · {resolvedFraming.zoom.toFixed(2)}×</span><input type="range" min="1" max="3" step="0.05" value={resolvedFraming.zoom} onChange={(event) => { setDraftFraming({ ...resolvedFraming, zoom: Number(event.target.value) }); setFramingStatus("ZOOMED"); }} /></label>
-          <label><span>Yatay odak · %{Math.round(resolvedFraming.focal_x * 100)}</span><input type="range" min="0" max="1" step="0.01" value={resolvedFraming.focal_x} onChange={(event) => { setDraftFraming({ ...resolvedFraming, focal_x: Number(event.target.value) }); setFramingStatus("DRAGGED"); }} /></label>
-          <label><span>Dikey odak · %{Math.round(resolvedFraming.focal_y * 100)}</span><input type="range" min="0" max="1" step="0.01" value={resolvedFraming.focal_y} onChange={(event) => { setDraftFraming({ ...resolvedFraming, focal_y: Number(event.target.value) }); setFramingStatus("DRAGGED"); }} /></label>
-          <p role="status">Durum: <strong>{framingStatus}</strong> · Odak {Math.round(resolvedFraming.focal_x * 100)}% / {Math.round(resolvedFraming.focal_y * 100)}%</p>
-          <div><button className="secondary-button" type="button" disabled={busy} onClick={() => { setDraftFraming(null); setFramingStatus("RESET"); }}>Varsayılana dön</button><button className="primary-button" type="button" disabled={busy || typeof actions.updateCatalogMediaCardFraming !== "function"} onClick={saveFraming}>{busy ? "Kaydediliyor…" : "Kadrajı kaydet"}</button></div>
+      {framingMedia && <section className="catalog-card-framing" aria-labelledby="catalog-card-framing-title" data-framing-state={framingState} data-editor-status={framingStatus}>
+        <img ref={framingMeasurementRef} className="catalog-card-framing__measurement" src={framingMedia.mediaUrl} alt="" aria-hidden="true" onLoad={captureFramingDimensions} draggable="false" />
+        <div className="catalog-card-framing__heading">
+          <div className="catalog-card-framing__copy"><span className="section-kicker">Müşteri ürün kartı</span><h3 id="catalog-card-framing-title">Ürün kartı kadrajı</h3><p>Bu ayar yalnız ürün kartında görünümü değiştirir. Ürün detayında orijinal görselin tamamı gösterilir.</p></div>
+          <span className={`catalog-card-framing__state is-${framingStateCopy.tone}`} role="status">{framingStateCopy.label}</span>
         </div>
+        {framingState === CARD_FRAMING_STATES.FRAMING_RECOMMENDED && <p className="catalog-card-framing__recommendation" role="note"><Icon name="info" /><span><strong>Bu görsel ürün kartı oranından farklı.</strong> Kart görünümünü aşağıdaki gerçek kart alanında ayarlayın; orijinal görsel değişmez.</span></p>}
+        {framingAssessment.lowResolution && <p className="catalog-card-framing__quality" role="alert"><Icon name="warning" /><span><strong>Kaynak çözünürlüğü düşük olabilir.</strong> Kadraj ayarı görüntü kalitesini artırmaz; daha yüksek çözünürlüklü kaynak önerilir.</span></p>}
+        {!framingEditorOpen && <button className="secondary-button catalog-card-framing__customize" type="button" disabled={busy} onClick={() => setFramingEditorOpen(true)}><Icon name="sliders" /> Kart kadrajını özelleştir</button>}
+        {framingEditorOpen && <div className="catalog-card-framing__editor">
+          <div className="catalog-card-framing__workspace" style={{ "--card-viewport-aspect": CARD_VIEWPORT_ASPECT_RATIO, "--card-viewport-radius": `${CARD_VIEWPORT_BORDER_RADIUS_PX}px` }}>
+            <img className="catalog-card-framing__source" src={framingMedia.mediaUrl} alt="" onLoad={captureFramingDimensions} draggable="false" />
+            <div
+              ref={framingPreviewRef}
+              className="catalog-card-framing__preview"
+              style={{ aspectRatio: CARD_VIEWPORT_ASPECT_RATIO, borderRadius: CARD_VIEWPORT_BORDER_RADIUS_PX }}
+              onPointerDown={startFramingDrag}
+              onPointerMove={moveFramingDrag}
+              onPointerUp={stopFramingDrag}
+              onPointerCancel={stopFramingDrag}
+              onKeyDown={handleFramingKeyDown}
+              role="group"
+              tabIndex="0"
+              aria-label={`${product.name} müşteri kartı kadrajı. Görseli sürükleyin veya ok tuşlarıyla konumlandırın.`}
+            >
+              <img src={framingMedia.mediaUrl} alt="" style={cardFramingPresentation(draftFraming)} draggable="false" />
+              <span className="catalog-card-framing__drag-hint">Görseli sürükleyerek konumlandır</span>
+            </div>
+          </div>
+          <div className="catalog-card-framing__controls">
+            <div className="catalog-card-framing__zoom" role="group" aria-label="Kart kadrajı yakınlaştırma">
+              <button type="button" disabled={busy || resolvedFraming.zoom <= CARD_FRAMING_LIMITS.zoomMin} onClick={() => adjustFramingZoom(-0.1)} aria-label="Kart görselini uzaklaştır"><Icon name="minus" /></button>
+              <span aria-live="polite">Yakınlaştırma %{Math.round(resolvedFraming.zoom * 100)}</span>
+              <button type="button" disabled={busy || resolvedFraming.zoom >= CARD_FRAMING_LIMITS.zoomMax} onClick={() => adjustFramingZoom(0.1)} aria-label="Kart görselini yakınlaştır"><Icon name="plus" /></button>
+            </div>
+            <p className="catalog-card-framing__interaction-help">Görseli doğrudan sürükleyin. Klavyede ok tuşlarıyla konumlandırabilir; +, − ve 0 ile yakınlaştırma görünümünü yönetebilirsiniz.</p>
+            <div className="catalog-card-framing__actions">
+              <button className="secondary-button" type="button" disabled={busy} onClick={resetFraming}><Icon name="refresh" /> Sıfırla</button>
+              <button className="secondary-button" type="button" disabled={busy} onClick={closeFramingEditor}><Icon name="close" /> Vazgeç</button>
+              <button className="primary-button" type="button" disabled={busy || typeof actions.updateCatalogMediaCardFraming !== "function"} onClick={saveFraming}><Icon name="save" /> {busy ? "Kaydediliyor…" : "Kart kadrajını kaydet"}</button>
+            </div>
+          </div>
+        </div>}
       </section>}
       <div className="table-scroll" tabIndex="0" role="region" aria-label="Ürün medya sırası">
         <table className="data-table"><thead><tr><th>Medya</th><th>Tür</th><th>Kapak</th><th>Sıra</th><th>İşlem</th></tr></thead><tbody>
