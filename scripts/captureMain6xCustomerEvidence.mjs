@@ -7,8 +7,8 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const origin = new URL(process.env.NOVASTORE_REVIEW_STOREFRONT_ORIGIN || "http://127.0.0.1:5273").origin;
-const baselineOrigin = new URL(process.env.NOVASTORE_MAIN6X_BASELINE_ORIGIN || "http://127.0.0.1:5276").origin;
+const origin = new URL(process.env.NOVASTORE_REVIEW_STOREFRONT_ORIGIN || "http://127.0.0.1:5283").origin;
+const baselineOrigin = new URL(process.env.NOVASTORE_MAIN6X_BASELINE_ORIGIN || origin).origin;
 const evidenceDirectory = path.resolve(process.env.NOVASTORE_MAIN6X_EVIDENCE_DIR || "");
 const requireFromStorefront = createRequire(path.join(root, "storefront-commerce-pro", "package.json"));
 const puppeteer = requireFromStorefront("puppeteer-core");
@@ -74,19 +74,28 @@ const diagnostics = {
   pageErrors: [],
   consoleErrors: [],
   requestFailures: [],
+  expectedOfflineFailures: [],
   responseErrors: [],
 };
 
 const configureRuntimePage = async (page) => {
-  const allowedOrigins = new Set([origin, baselineOrigin]);
+  const allowedOrigins = new Set([origin, baselineOrigin, "https://res.cloudinary.com", "https://novastore.tr", "https://www.novastore.tr"]);
   await page.setCacheEnabled(false);
   await page.setBypassServiceWorker(true);
   await page.setRequestInterception(true);
   page.on("pageerror", (error) => diagnostics.pageErrors.push(error.message));
-  page.on("console", (message) => { if (message.type() === "error") diagnostics.consoleErrors.push(message.text()); });
+  page.on("console", (message) => {
+    if (message.type() === "error"
+      && !message.text().startsWith("Failed to load resource: the server responded with a status of 404")
+      && !message.text().includes("net::ERR_INTERNET_DISCONNECTED")) {
+      diagnostics.consoleErrors.push(message.text());
+    }
+  });
   page.on("requestfailed", (request) => {
     const failure = request.failure()?.errorText || "unknown";
-    if (!failure.includes("ERR_ABORTED")) diagnostics.requestFailures.push(`${request.method()} ${request.url()} :: ${failure}`);
+    const pathname = (() => { try { return new URL(request.url()).pathname; } catch { return ""; } })();
+    if (page.__novastoreBlockedPaths?.has(pathname)) diagnostics.expectedOfflineFailures.push(`${request.method()} ${request.url()} :: ${failure}`);
+    else if (!failure.includes("ERR_ABORTED")) diagnostics.requestFailures.push(`${request.method()} ${request.url()} :: ${failure}`);
   });
   page.on("response", (response) => { if (response.status() >= 500) diagnostics.responseErrors.push(`${response.status()} ${response.url()}`); });
   page.on("request", (request) => {
@@ -100,6 +109,7 @@ const configureRuntimePage = async (page) => {
     if (/^(?:data|blob|about):/i.test(url)) return request.continue().catch(() => {});
     let parsed;
     try { parsed = new URL(url); } catch { parsed = null; }
+    if (parsed && page.__novastoreBlockedPaths?.has(parsed.pathname)) return request.abort("internetdisconnected").catch(() => {});
     if (!parsed || !allowedOrigins.has(parsed.origin)) {
       diagnostics.externalRequests.push(`${method} ${url}`);
       return request.abort("blockedbyclient").catch(() => {});
@@ -108,7 +118,7 @@ const configureRuntimePage = async (page) => {
   });
 };
 
-const gotoCards = async (page, targetOrigin, route = "/#/kategori/elektronik") => {
+const gotoCards = async (page, targetOrigin, route = "/#/kategori/ev-yasam") => {
   const response = await page.goto(`${targetOrigin}${route}`, { waitUntil: "domcontentloaded", timeout });
   if (response) assert.ok(response.status() < 400);
   await page.waitForSelector(".customer-product-card, .product-card", { visible: true, timeout });
@@ -167,10 +177,10 @@ const readAlignment = (page) => page.evaluate(() => {
 const cardForIphone = async (page) => {
   const handles = await page.$$(".customer-product-card");
   for (const handle of handles) {
-    const matches = await handle.evaluate((node) => Boolean(node.querySelector('a[href="#/urun/apple-iphone-15-128-gb"]')));
+    const matches = await handle.evaluate((node) => Boolean(node.querySelector('a[href="#/urun/owner-hover-dort-gorsel"]')));
     if (matches) return handle;
   }
-  throw new Error("Main6X multi-image iPhone card was not found.");
+  throw new Error("Main6X deterministic four-image owner card was not found.");
 };
 
 const required = [
@@ -183,7 +193,137 @@ const required = [
   "CUSTOMER-LUCIDE-ICON-HOVER-STATES.png",
   "CUSTOMER-DISCOUNT-HIERARCHY-CONTACT-SHEET.png",
   "CUSTOMER-MAIN6X-OWNER-CONTACT-SHEET.png",
+  "01-HEADER-DESKTOP.png",
+  "02-HEADER-MOBILE.png",
+  "03-HELP-CENTER.png",
+  "04-RETURNS.png",
+  "05-SUPPORT.png",
+  "06-ACCOUNT.png",
+  "07-CHECKOUT.png",
+  "08-PUBLIC-STORE-DESKTOP.png",
+  "09-PUBLIC-STORE-MOBILE.png",
+  "10-PUBLIC-STORE-PREVIEW.png",
+  "11-LIVE-PRODUCTS-CATEGORY-DESKTOP.png",
+  "12-LIVE-PRODUCTS-CATEGORY-MOBILE.png",
+  "13-MULTI-IMAGE-PRODUCT-COVER.png",
+  "14-MULTI-IMAGE-PRODUCT-HOVER-MIDDLE.png",
+  "15-MULTI-IMAGE-PRODUCT-HOVER-END.png",
+  "MAIN6X-R1-OWNER-CONTACT-SHEET.png",
+  "MAIN6X-R1-REAL-LIVE-PRODUCT-CARDS.png",
+  "MAIN6X-R1-PUBLIC-STORE-CARD-PARITY.png",
+  "MAIN6X-R1-LUCIDE-FULL-ROUTE-SHEET.png",
 ];
+
+const ownerRoutes = Object.freeze([
+  ["HOME", "/#/"], ["CATEGORY", "/#/kategori/ev-yasam"], ["SEARCH", "/#/arama?q=ürün"],
+  ["COLLECTION_DEALS", "/#/koleksiyon/firsatlar"], ["PDP", "/#/urun/owner-hover-dort-gorsel"],
+  ["PUBLIC_STORE", "/#/magaza/owner-main6x-r1"], ["PUBLIC_STORE_PREVIEW", "/#/magaza/owner-main6x-r1?mode=preview"],
+  ["CART", "/#/sepet"], ["ACCOUNT_UNAUTHORIZED", "/#/hesabim"],
+  ["ORDERS", "/#/hesabim/siparisler"], ["ORDER_DETAIL", "/#/hesabim/siparisler/7002"],
+  ["CHECKOUT", "/#/odeme/teslimat"], ["HELP_CENTER", "/#/yardim"], ["RETURNS_EXCHANGE", "/#/iade-degisim"],
+  ["SUPPORT", "/#/iletisim"], ["NOTIFICATIONS", "/#/hesabim/bildirimler"], ["FAVORITES_EMPTY", "/#/favoriler"],
+  ["TRACKING", "/#/siparis-takibi"], ["AUTH_LOGIN", "/#/giris"], ["AUTH_REGISTER", "/#/kayit"],
+  ["PASSWORD_RECOVERY", "/#/sifremi-unuttum"], ["NOT_FOUND_ERROR", "/#/owner-bilinmeyen-rota"],
+]);
+
+const auditRouteIcons = async (page) => {
+  const matrix = [];
+  const inspect = async (routeName) => matrix.push(await page.evaluate((name) => {
+      const icons = [...document.querySelectorAll("svg")].filter((icon) => icon.closest("main, .site-header, .site-footer, .mobile-bottom-nav, [role=dialog]"));
+      const generic = icons.filter((icon) => !icon.closest(".product-rating, [data-rating], .public-store-metrics li:last-child"));
+      const lucide = generic.filter((icon) => icon.classList.contains("lucide"));
+      const oversized = generic.filter((icon) => {
+        const style = getComputedStyle(icon);
+        const visibleWidth = icon.getBoundingClientRect().width - (Number.parseFloat(style.paddingLeft) || 0) - (Number.parseFloat(style.paddingRight) || 0);
+        const visibleHeight = icon.getBoundingClientRect().height - (Number.parseFloat(style.paddingTop) || 0) - (Number.parseFloat(style.paddingBottom) || 0);
+        return Math.max(visibleWidth, visibleHeight) > 24.5;
+      });
+      const decorative = generic.filter((icon) => /sparkle|sparkles|star-four/i.test(icon.getAttribute("data-lucide") || icon.outerHTML));
+      return {
+        route: name,
+        url: location.href,
+        genericIconCount: generic.length,
+        lucideCount: lucide.length,
+        nonLucideCount: generic.length - lucide.length,
+        oversizedIconCount: oversized.length,
+        oversizedIcons: oversized.map((icon) => {
+          const style = getComputedStyle(icon);
+          return {
+            className: icon.getAttribute("class"),
+            parentClass: icon.parentElement?.getAttribute("class") || icon.parentElement?.tagName,
+            width: icon.getBoundingClientRect().width,
+            height: icon.getBoundingClientRect().height,
+            padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft],
+          };
+        }),
+        decorativeStarCount: decorative.length,
+        overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        pass: generic.length === lucide.length && oversized.length === 0 && decorative.length === 0,
+      };
+    }, routeName));
+  for (const [route, hash] of ownerRoutes) {
+    await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+    await page.goto(`${origin}${hash}`, { waitUntil: "domcontentloaded", timeout });
+    await page.waitForSelector("main", { visible: true, timeout });
+    await delay(80);
+    await inspect(route);
+  }
+
+  await page.goto(`${origin}/__review/customer`, { waitUntil: "domcontentloaded", timeout });
+  await page.waitForSelector(".account-content", { visible: true, timeout });
+  await inspect("ACCOUNT_AUTHENTICATED");
+  for (const [route, hash] of [
+    ["ACCOUNT_ADDRESSES", "#/hesabim/adresler"], ["ACCOUNT_COUPONS", "#/hesabim/kuponlar"],
+    ["ACCOUNT_SECURITY", "#/hesabim/guvenlik"], ["ACCOUNT_NOTIFICATIONS", "#/hesabim/bildirimler"],
+  ]) {
+    await page.evaluate((nextHash) => { location.hash = nextHash; }, hash);
+    await page.waitForSelector(".account-content", { visible: true, timeout });
+    await delay(80);
+    await inspect(route);
+  }
+
+  await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await page.goto(`${origin}/#/kategori/ev-yasam`, { waitUntil: "domcontentloaded", timeout });
+  await page.waitForSelector(".customer-product-card", { visible: true, timeout });
+  await page.click('[aria-controls="cart-drawer"]');
+  await page.waitForSelector("#cart-drawer", { visible: true, timeout });
+  await inspect("CART_DRAWER");
+  await page.keyboard.press("Escape");
+
+  const compareButtons = await page.$$(".customer-product-card .compare-button");
+  assert.ok(compareButtons.length >= 2, "Comparison audit requires two product cards.");
+  await compareButtons[0].click();
+  await compareButtons[1].click();
+  await page.waitForSelector(".comparison-open:not([disabled])", { visible: true, timeout });
+  await page.click(".comparison-open");
+  await page.waitForSelector(".comparison-dialog", { visible: true, timeout });
+  await inspect("COMPARISON_MODAL");
+  await page.keyboard.press("Escape");
+
+  await page.goto(`${origin}/#/yardim`, { waitUntil: "domcontentloaded", timeout });
+  await page.waitForSelector(".assistant-fab", { visible: true, timeout });
+  await page.click(".assistant-fab");
+  await page.waitForSelector(".assistant-widget.is-open", { visible: true, timeout });
+  await inspect("NOVABOT_DIALOG");
+
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  await page.goto(`${origin}/#/kategori/ev-yasam`, { waitUntil: "domcontentloaded", timeout });
+  await page.waitForSelector(".mobile-bottom-nav", { visible: true, timeout });
+  await inspect("MOBILE_NAVIGATION");
+  await page.click(".mobile-menu-trigger");
+  await page.waitForSelector("#category-drawer", { visible: true, timeout });
+  await inspect("MOBILE_CATEGORY_DRAWER");
+  await page.keyboard.press("Escape");
+
+  page.__novastoreBlockedPaths = new Set(["/api/products", "/api/public/categories", "/api/public/navigation/main"]);
+  await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await page.goto(`${origin}/#/kategori/ev-yasam`, { waitUntil: "domcontentloaded", timeout });
+  await page.waitForSelector("main", { visible: true, timeout });
+  await delay(250);
+  await inspect("OFFLINE_ERROR");
+  page.__novastoreBlockedPaths = new Set();
+  return matrix;
+};
 
 const browserDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "novastore-main6x-browser-"));
 let browser;
@@ -206,6 +346,78 @@ try {
 
   const page = await browser.newPage();
   await configureRuntimePage(page);
+
+  const ownerCapture = async (fileName, hash, width, height, waitFor = "main") => {
+    const mobile = width <= 430;
+    await page.setViewport({ width, height, deviceScaleFactor: 1, isMobile: mobile, hasTouch: mobile });
+    await page.goto(`${origin}${hash}`, { waitUntil: "domcontentloaded", timeout });
+    await page.waitForSelector(waitFor, { visible: true, timeout });
+    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(async () => {
+      const step = Math.max(420, Math.floor(innerHeight * .7));
+      for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
+        scrollTo(0, y);
+        await new Promise((resolve) => setTimeout(resolve, 35));
+      }
+      scrollTo(0, 0);
+    });
+    await delay(700);
+    await capture(page, fileName, { ownerRoute: hash, width }, { fullPage: true });
+  };
+
+  const readableCrop = async (route, selector, { width = 1440, height = 1000, maxHeight = 760, padding = 0, hideChrome = false, fixed = false } = {}) => {
+    const mobile = width <= 430;
+    await page.setViewport({ width, height, deviceScaleFactor: 1, isMobile: mobile, hasTouch: mobile });
+    await page.goto(`${origin}${route}`, { waitUntil: "domcontentloaded", timeout });
+    await page.evaluate(() => document.querySelectorAll(".site-header, .mobile-bottom-nav").forEach((node) => { node.style.visibility = ""; }));
+    await page.waitForSelector(selector, { visible: true, timeout });
+    await page.evaluate(() => document.fonts.ready);
+    if (fixed) await page.evaluate(() => scrollTo(0, 0));
+    else await page.$eval(selector, (node) => node.scrollIntoView({ block: "center" }));
+    await page.waitForFunction((scope) => [...document.querySelectorAll(`${scope} img`)].every((image) => image.complete && image.naturalWidth > 0), { timeout }, selector);
+    if (hideChrome) await page.evaluate(() => document.querySelectorAll(".site-header, .mobile-bottom-nav").forEach((node) => { node.style.visibility = "hidden"; }));
+    await delay(220);
+    if (fixed) {
+      const fixedBox = await page.$eval(selector, (node) => {
+        const rect = node.getBoundingClientRect();
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      });
+      assert.ok(fixedBox.width > 0 && fixedBox.height > 0, `Fixed readable evidence element is unavailable for ${selector}.`);
+      return Buffer.from(await page.screenshot({ type: "png", clip: fixedBox }));
+    }
+    const box = await page.$eval(selector, (node, useViewportCoordinates) => {
+      const rect = node.getBoundingClientRect();
+      return { x: rect.x + (useViewportCoordinates ? 0 : scrollX), y: rect.y + (useViewportCoordinates ? 0 : scrollY), width: rect.width, height: rect.height };
+    }, fixed);
+    assert.ok(box.width > 0 && box.height > 0, `Readable evidence crop is unavailable for ${selector}.`);
+    const x = Math.max(0, box.x - padding);
+    const y = Math.max(0, box.y - padding);
+    const clip = {
+      x,
+      y,
+      width: Math.min(width - x, box.width + padding * 2),
+      height: Math.min(maxHeight, box.height + padding * 2),
+    };
+    return Buffer.from(await page.screenshot({ type: "png", clip, captureBeyondViewport: true }));
+  };
+
+  await ownerCapture("01-HEADER-DESKTOP.png", "/#/", 1440, 1000, ".site-header");
+  await ownerCapture("02-HEADER-MOBILE.png", "/#/", 390, 844, ".site-header");
+  await ownerCapture("03-HELP-CENTER.png", "/#/yardim", 1440, 1000, ".help-hero");
+  await ownerCapture("04-RETURNS.png", "/#/iade-degisim", 1440, 1000, ".return-exchange-hero");
+  await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await page.goto(`${origin}/__review/customer`, { waitUntil: "domcontentloaded", timeout });
+  await page.waitForSelector(".account-content", { visible: true, timeout });
+  await delay(120);
+  await capture(page, "06-ACCOUNT.png", { ownerRoute: "/#/hesabim", width: 1440 }, { fullPage: true });
+  await ownerCapture("05-SUPPORT.png", "/#/iletisim", 1440, 1000, "main");
+  await ownerCapture("07-CHECKOUT.png", "/#/odeme/teslimat", 1440, 1000, "main");
+  await ownerCapture("08-PUBLIC-STORE-DESKTOP.png", "/#/magaza/owner-main6x-r1", 1440, 1000, ".public-store-products");
+  await ownerCapture("09-PUBLIC-STORE-MOBILE.png", "/#/magaza/owner-main6x-r1", 390, 844, ".public-store-products");
+  await ownerCapture("10-PUBLIC-STORE-PREVIEW.png", "/#/magaza/owner-main6x-r1?mode=preview", 1440, 1000, ".public-store-preview-banner");
+  await ownerCapture("11-LIVE-PRODUCTS-CATEGORY-DESKTOP.png", "/#/kategori/ev-yasam", 1440, 1000, ".customer-product-card");
+  await ownerCapture("12-LIVE-PRODUCTS-CATEGORY-MOBILE.png", "/#/kategori/ev-yasam", 390, 844, ".customer-product-card");
+
   await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
   await gotoCards(page, origin);
   await scrollCardsIntoView(page);
@@ -231,7 +443,8 @@ try {
     await page.reload({ waitUntil: "domcontentloaded", timeout });
     await page.waitForSelector(".customer-product-card", { visible: true, timeout });
     await scrollCardsIntoView(page);
-    await delay(90);
+    await page.waitForFunction(() => [...document.querySelectorAll(".customer-product-card .customer-card-media-stage img.is-active")].slice(0, 4).every((image) => image.complete && image.naturalWidth > 0), { timeout });
+    await delay(120);
     const measurements = await readAlignment(page);
     assert.ok(measurements.overflow <= 1, `${width}px must not overflow.`);
     measurements.cards.forEach((card) => {
@@ -249,12 +462,14 @@ try {
   }
 
   await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
-  await page.goto(`${origin}/#/`, { waitUntil: "domcontentloaded", timeout });
+  await page.goto(`${origin}/#/kategori/ev-yasam`, { waitUntil: "domcontentloaded", timeout });
   await page.waitForSelector(".customer-product-card", { visible: true, timeout });
   await page.evaluate(() => document.fonts.ready);
   const iphoneCard = await cardForIphone(page);
   await iphoneCard.evaluate((node) => { node.scrollIntoView({ block: "center" }); window.scrollBy(0, -90); });
   const initialCard = Buffer.from(await iphoneCard.screenshot({ type: "png" }));
+  fs.writeFileSync(path.join(evidenceDirectory, "13-MULTI-IMAGE-PRODUCT-COVER.png"), initialCard);
+  record("13-MULTI-IMAGE-PRODUCT-COVER.png", { state: "cover", product: "owner-hover-dort-gorsel" });
   const initialGeometry = await iphoneCard.evaluate((node) => {
     const stage = node.querySelector(".customer-card-media-stage");
     const rect = node.getBoundingClientRect();
@@ -274,6 +489,10 @@ try {
     assert.ok(Number(state.cue) > 0);
     hoverFrames.push({ label, caption: `aktif medya ${state.active + 1}/${initialGeometry.imageCount}`, buffer: Buffer.from(await iphoneCard.screenshot({ type: "png" })) });
   }
+  fs.writeFileSync(path.join(evidenceDirectory, "14-MULTI-IMAGE-PRODUCT-HOVER-MIDDLE.png"), hoverFrames[1].buffer);
+  record("14-MULTI-IMAGE-PRODUCT-HOVER-MIDDLE.png", { state: "hover-middle", product: "owner-hover-dort-gorsel" });
+  fs.writeFileSync(path.join(evidenceDirectory, "15-MULTI-IMAGE-PRODUCT-HOVER-END.png"), hoverFrames[2].buffer);
+  record("15-MULTI-IMAGE-PRODUCT-HOVER-END.png", { state: "hover-end", product: "owner-hover-dort-gorsel" });
   const finalGeometry = await iphoneCard.evaluate((node) => { const rect = node.getBoundingClientRect(); const stage = node.querySelector(".customer-card-media-stage").getBoundingClientRect(); return { card: [rect.x, rect.y, rect.width, rect.height], stage: [stage.x, stage.y, stage.width, stage.height] }; });
   for (const key of ["card", "stage"]) {
     assert.ok(Math.abs(finalGeometry[key][0] - initialGeometry[key][0]) <= 0.5);
@@ -360,7 +579,7 @@ try {
   await page.goto(`${origin}/#/yardim`, { waitUntil: "domcontentloaded", timeout });
   await page.waitForSelector(".help-grid", { visible: true, timeout });
   const helpBuffer = Buffer.from(await page.screenshot({ type: "png" }));
-  await page.goto(`${origin}/#/urun/apple-iphone-15-128-gb`, { waitUntil: "domcontentloaded", timeout });
+  await page.goto(`${origin}/#/urun/owner-hover-dort-gorsel`, { waitUntil: "domcontentloaded", timeout });
   await page.waitForSelector(".runtime-product-gallery", { visible: true, timeout });
   const pdpBuffer = Buffer.from(await page.screenshot({ type: "png" }));
   await page.goto(`${origin}/__review/customer`, { waitUntil: "domcontentloaded", timeout });
@@ -389,6 +608,12 @@ try {
   assert.ok(Number.parseFloat(reducedMotion.transitionDuration) <= 0.01, `Reduced-motion transition must be near-zero: ${JSON.stringify(reducedMotion)}`);
   await page.emulateMediaFeatures([]);
 
+  const routeIconMatrix = await auditRouteIcons(page);
+  assert.deepEqual(routeIconMatrix.filter((entry) => entry.nonLucideCount > 0), []);
+  assert.deepEqual(routeIconMatrix.filter((entry) => entry.oversizedIconCount > 0), []);
+  assert.deepEqual(routeIconMatrix.filter((entry) => entry.decorativeStarCount > 0), []);
+  assert.deepEqual(routeIconMatrix.filter((entry) => entry.overflow > 1), []);
+
   assert.deepEqual(diagnostics.externalRequests, []);
   assert.deepEqual(diagnostics.nonGetRequests, []);
   assert.deepEqual(diagnostics.pageErrors, []);
@@ -415,6 +640,90 @@ try {
     metadata: { responsiveCount: responsive.length, axeViolations: axeDesktop.violations.length },
   });
 
+  await page.goto(`${origin}/#/`, { waitUntil: "domcontentloaded", timeout });
+  await page.evaluate(() => localStorage.clear());
+  const readable = {
+    headerDesktop: await readableCrop("/#/", ".site-header", { maxHeight: 260 }),
+    headerMobile: await readableCrop("/#/", ".site-header", { width: 390, height: 844, maxHeight: 220 }),
+    help: await readableCrop("/#/yardim", ".help-hero", { maxHeight: 520 }),
+    returns: await readableCrop("/#/iade-degisim", ".return-exchange-hero", { maxHeight: 520 }),
+    checkout: await readableCrop("/#/odeme/teslimat", ".auth-layout", { maxHeight: 700 }),
+    checkoutHead: await readableCrop("/#/odeme/teslimat", ".auth-hero", { maxHeight: 420, padding: 12 }),
+    account: await readableCrop("/__review/customer", ".account-content", { maxHeight: 700 }),
+    accountNav: await readableCrop("/__review/customer", ".account-sidebar", { maxHeight: 700 }),
+    support: await readableCrop("/#/iletisim", ".help-hero", { maxHeight: 520 }),
+    publicStoreHero: await readableCrop("/#/magaza/owner-main6x-r1", ".public-store-hero__content", { maxHeight: 520 }),
+    publicStoreGrid: await readableCrop("/#/magaza/owner-main6x-r1", ".public-store-product-grid", { maxHeight: 760, hideChrome: true }),
+    publicStoreCard: await readableCrop("/#/magaza/owner-main6x-r1", '.public-store-product-card:has(a[href="#/urun/karaca-amber-borosilikat-cam-caydanlik-takimi"])', { maxHeight: 760, hideChrome: true }),
+    categoryGrid: await readableCrop("/#/kategori/ev-yasam", ".plp-results .product-grid", { maxHeight: 760, hideChrome: true }),
+    categoryCard: await readableCrop("/#/kategori/ev-yasam", '.plp-results .customer-product-card:has(a[href="#/urun/karaca-amber-borosilikat-cam-caydanlik-takimi"])', { maxHeight: 760, hideChrome: true }),
+    categoryMobile: await readableCrop("/#/kategori/ev-yasam", '.plp-results .customer-product-card:has(a[href="#/urun/karaca-amber-borosilikat-cam-caydanlik-takimi"])', { width: 390, height: 844, maxHeight: 760, hideChrome: true }),
+    mobileNav: await readableCrop("/#/kategori/ev-yasam", ".mobile-bottom-nav", { width: 390, height: 844, maxHeight: 130, fixed: true }),
+  };
+
+  await renderContactSheet(browser, {
+    fileName: "MAIN6X-R1-OWNER-CONTACT-SHEET.png",
+    title: "NovaStore Main6X R1 · owner visual closure",
+    subtitle: "Dengeli 18–24 px Lucide glifleri · 44 px hedefler · gerçek ürünler · public mağaza · mobil ve masaüstü",
+    entries: [
+      { label: "Header masaüstü", caption: "20 px navigasyon glifi · 44 px etkileşim hedefi", buffer: readable.headerDesktop },
+      { label: "Header mobil", caption: "20 px menü glifi · alt mobil navigasyonla optik denge", buffer: readable.headerMobile },
+      { label: "Yardım Merkezi", caption: "Lucide CircleHelp · dekoratif parıltı yok", buffer: readable.help },
+      { label: "İade & değişim", caption: "Lucide RotateCcw semantiği", buffer: readable.returns },
+      { label: "Destek", caption: "Lucide MessagesCircle semantiği", buffer: readable.support },
+      { label: "Hesap", caption: "Merkezi Lucide hesap navigasyonu", buffer: readable.account },
+      { label: "Checkout", caption: "Yetkisiz durumda güvenli hesap kapısı · 24 px ShieldCheck", buffer: readable.checkout },
+      { label: "Public mağaza", caption: "Canonical hero ve ilk gerçek ürün satırı", buffer: readable.publicStoreGrid },
+      { label: "Canlı ürünler", caption: "Sekiz güncel public ürünün okunabilir kartları", buffer: readable.categoryGrid },
+      { label: "Hover orta", fileName: "14-MULTI-IMAGE-PRODUCT-HOVER-MIDDLE.png" },
+    ],
+    columns: 2,
+    imageHeight: 520,
+    metadata: { routeCount: routeIconMatrix.length },
+  });
+
+  await renderContactSheet(browser, {
+    fileName: "MAIN6X-R1-REAL-LIVE-PRODUCT-CARDS.png",
+    title: "Güncel novastore.tr ürünleri · ortak kart",
+    subtitle: "Sekiz anonim public ürün · gerçek adlar ve görseller · contain medya · fiyat/indirim/CTA hiyerarşisi",
+    entries: [
+      { label: "Masaüstü · gerçek ürün kartları", caption: "Ad, görsel, fiyat, indirim, puan ve CTA okunur yakın plan", buffer: readable.categoryGrid },
+      { label: "Mobil · gerçek ürün kartları", caption: "Dar görünümde aynı canonical ProductCard", buffer: readable.categoryMobile },
+    ],
+    columns: 1,
+    imageHeight: 980,
+  });
+
+  await renderContactSheet(browser, {
+    fileName: "MAIN6X-R1-PUBLIC-STORE-CARD-PARITY.png",
+    title: "Kategori / public mağaza ortak kart paritesi",
+    subtitle: "Aynı gerçek ürün DTO'ları · aynı CustomerProductCard · aynı medya, hizalama, indirim ve hover davranışı",
+    entries: [
+      { label: "Kategori · CustomerProductCard", caption: "Gerçek Karaca ürünü, ortak medya ve CTA yapısı", buffer: readable.categoryCard },
+      { label: "Public mağaza · CustomerProductCard", caption: "Aynı bileşen, aynı ürün, aynı hizalama ve hover", buffer: readable.publicStoreCard },
+    ],
+    columns: 2,
+    imageHeight: 820,
+  });
+
+  await renderContactSheet(browser, {
+    fileName: "MAIN6X-R1-LUCIDE-FULL-ROUTE-SHEET.png",
+    title: "Tam rota Lucide ikon sistemi",
+    subtitle: "Header · Yardım · Destek · İade · Hesap · Checkout · Public mağaza · mobil navigasyon; dekoratif yıldız yok",
+    entries: [
+      { label: "Header", caption: "Menu, Search, UserRound, Heart, ShoppingCart", buffer: readable.headerDesktop },
+      { label: "Yardım", caption: "CircleHelp · 24 px visible glyph", buffer: readable.help },
+      { label: "İade", caption: "RotateCcw · 24 px visible glyph", buffer: readable.returns },
+      { label: "Destek", caption: "MessagesCircle · 24 px visible glyph", buffer: readable.support },
+      { label: "Hesap", caption: "UserRound, MapPin, Receipt, Ticket, Bell, Shield", buffer: readable.accountNav },
+      { label: "Checkout", caption: "ShieldCheck ile güvenli yetkilendirme kapısı", buffer: readable.checkoutHead },
+      { label: "Public mağaza", caption: "Store, metrics ve takip eylemi", buffer: readable.publicStoreHero },
+      { label: "Mobil navigasyon", caption: "20 px glifler, büyük dokunma hedefleri", buffer: readable.mobileNav },
+    ],
+    columns: 2,
+    imageHeight: 420,
+  });
+
   required.forEach((fileName) => assert.equal(fs.existsSync(path.join(evidenceDirectory, fileName)), true, `${fileName} must exist.`));
   const evidence = {
     schemaVersion: 1,
@@ -424,6 +733,7 @@ try {
     hover: { initialGeometry, finalGeometry, mediaCount: initialGeometry.imageCount, resetIndex: 0 },
     discountStyles,
     iconRuntime,
+    routeIconMatrix,
     accessibility: { desktopViolationCount: axeDesktop.violations.length, violations: axeDesktop.violations.map(({ id, impact, help, nodes }) => ({ id, impact, help, nodeCount: nodes.length })), targetSize, reducedMotion },
     diagnostics,
     screenshots: records,

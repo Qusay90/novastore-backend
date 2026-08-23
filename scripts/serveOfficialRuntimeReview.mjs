@@ -37,7 +37,7 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const storefrontSha256 = sha256(storefrontArtifact);
 const adminSha256 = sha256(adminArtifact);
 const expectedArtifactSha256 = Object.freeze({
-  storefront: "0e6fc41c79567d9f99ec52867bcd02b33b4149027d1542991db4aacf7403dfc6",
+  storefront: "afc022dfc7bcad6336b1f10ce8ae2881fd023c3a5975ddfce6fc966f777fa6ee",
   admin: "63d33d8bd3e4befd59b1ad60bb65404b12bec38389e4a70e4f3e284b62fab431",
 });
 if (storefrontSha256 !== expectedArtifactSha256.storefront) {
@@ -47,6 +47,10 @@ if (adminSha256 !== expectedArtifactSha256.admin) {
   throw new Error("Admin artifact beklenen resmî inceleme digest'iyle eşleşmiyor.");
 }
 const counters = { external: 0, mutation: 0, database: 0 };
+const ownerLiveProductsFile = String(process.env.NOVASTORE_OWNER_LIVE_PRODUCTS_FILE || "").trim();
+if (ownerLiveProductsFile && (!path.isAbsolute(ownerLiveProductsFile) || !fs.existsSync(ownerLiveProductsFile))) {
+  throw new Error("Owner live-product fixture must be an existing absolute file.");
+}
 
 const imageFiles = Object.freeze({
   "phone-iphone.webp": path.join(root, "storefront-commerce-pro", "src", "assets", "optimized", "phone-iphone.webp"),
@@ -106,7 +110,7 @@ const isStructurallyPublicCategory = (categoryId) => {
   }
   return visited.size > 0;
 };
-const publicProducts = Object.freeze(products.filter((product) => isStructurallyPublicCategory(product.categoryId)).map((product) => ({
+const canonicalPublicProducts = Object.freeze(products.filter((product) => isStructurallyPublicCategory(product.categoryId)).map((product) => ({
   id: numericProductId(product.id),
   slug: numericProductId(product.id) === 1001 ? "apple-iphone-15-128-gb" : product.slug,
   name: product.name,
@@ -124,6 +128,113 @@ const publicProducts = Object.freeze(products.filter((product) => isStructurally
     .map((fileName, index) => ({ id: `${numericProductId(product.id)}-media-${index + 1}`, media_url: fileName.startsWith("/") ? fileName : `/review-assets/${fileName}`, media_type: "image", is_main: index === 0, sort_order: index })),
   attributes: (product.features || []).map((value, index) => ({ code: `feature-${index + 1}`, name: `Özellik ${index + 1}`, value })),
 })).filter((product) => Number.isInteger(product.id)));
+
+const ownerText = (value, maxLength) => String(value ?? "")
+  .replace(/<[^>]*>/g, " ")
+  .replace(/[\u0000-\u001f\u007f]/g, " ")
+  .replace(/\s+/g, " ")
+  .trim()
+  .slice(0, maxLength);
+const ownerMediaUrl = (value) => {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "https:" && ["res.cloudinary.com", "novastore.tr", "www.novastore.tr"].includes(url.hostname)
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+};
+const ownerSlug = (value, id) => ownerText(value, 160)
+  .toLocaleLowerCase("tr-TR")
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/ı/g, "i")
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-|-$/g, "")
+  .slice(0, 140) || `owner-product-${id}`;
+const sanitizeOwnerProduct = (product, index) => {
+  const id = Number(product?.id);
+  const name = ownerText(product?.name, 240);
+  const media = (Array.isArray(product?.media) ? product.media : [])
+    .map((item, mediaIndex) => ({
+      id: Number(item?.id) || `${id}-live-${mediaIndex + 1}`,
+      media_url: ownerMediaUrl(item?.media_url || item?.url),
+      media_type: "image",
+      is_main: item?.is_main === true || mediaIndex === 0,
+      sort_order: Number.isFinite(Number(item?.sort_order)) ? Number(item.sort_order) : mediaIndex,
+    }))
+    .filter((item) => item.media_url)
+    .slice(0, 8);
+  const imageUrl = ownerMediaUrl(product?.image_url) || media[0]?.media_url || null;
+  if (!Number.isInteger(id) || id <= 0 || !name || !imageUrl) return null;
+  if (!media.length) media.push({ id: `${id}-live-primary`, media_url: imageUrl, media_type: "image", is_main: true, sort_order: 0 });
+  return Object.freeze({
+    id,
+    slug: ownerSlug(product?.slug || name, id),
+    name,
+    description: ownerText(product?.description, 2_000),
+    brand: ownerText(product?.brand, 120),
+    price: Math.max(0, Number(product?.price) || 0),
+    old_price: Number(product?.old_price) > Number(product?.price) ? Number(product.old_price) : null,
+    stock: Math.max(0, Number.parseInt(product?.stock, 10) || 0),
+    average_rating: Math.min(5, Math.max(0, Number(product?.average_rating) || 0)),
+    review_count: Math.max(0, Number.parseInt(product?.review_count, 10) || 0),
+    category_ids: ["home-living"],
+    primary_category_id: "home-living",
+    image_url: imageUrl,
+    media,
+    attributes: [],
+    owner_fixture_rank: index + 1,
+  });
+};
+const rawOwnerLiveProducts = ownerLiveProductsFile
+  ? (() => {
+      const stat = fs.statSync(ownerLiveProductsFile);
+      if (!stat.isFile() || stat.size > 1_000_000) throw new Error("Owner live-product fixture exceeds the local review boundary.");
+      const payload = JSON.parse(fs.readFileSync(ownerLiveProductsFile, "utf8"));
+      const values = Array.isArray(payload) ? payload : Array.isArray(payload?.products) ? payload.products : Array.isArray(payload?.data) ? payload.data : [];
+      return values.map(sanitizeOwnerProduct).filter(Boolean).slice(0, 8);
+    })()
+  : [];
+const ownerMediaCache = new Map();
+const liveOwnerProducts = [];
+for (const product of rawOwnerLiveProducts) {
+  const media = [];
+  for (const [index, item] of product.media.entries()) {
+    const route = `/owner-live-media/${product.id}-${index + 1}`;
+    const remote = await fetch(item.media_url, { method: "GET", redirect: "follow", signal: AbortSignal.timeout(20_000) });
+    const contentType = String(remote.headers.get("content-type") || "").split(";")[0].trim().toLocaleLowerCase("en-US");
+    const length = Number(remote.headers.get("content-length") || 0);
+    if (!remote.ok || !contentType.startsWith("image/") || (length && length > 8_000_000)) continue;
+    const body = Buffer.from(await remote.arrayBuffer());
+    if (!body.length || body.length > 8_000_000) continue;
+    ownerMediaCache.set(route, Object.freeze({ body, contentType }));
+    media.push({ ...item, media_url: route, is_main: media.length === 0 });
+  }
+  if (!media.length) continue;
+  liveOwnerProducts.push(Object.freeze({ ...product, image_url: media[0].media_url, media: Object.freeze(media) }));
+}
+const deterministicOwnerProduct = Object.freeze({
+  id: 900001,
+  slug: "owner-hover-dort-gorsel",
+  name: "Owner İnceleme · Dört Görselli Ürün",
+  description: "Yalnız yerel owner hover incelemesi için deterministik ürün.",
+  brand: "Yerel İnceleme",
+  price: 1499,
+  old_price: 1899,
+  stock: 12,
+  average_rating: 4.8,
+  review_count: 24,
+  category_ids: ["home-living"],
+  primary_category_id: "home-living",
+  image_url: "/review-media/iphone-15-angle.svg",
+  media: reviewMediaByProductId[1001].map((mediaUrl, index) => ({ id: `900001-media-${index + 1}`, media_url: mediaUrl, media_type: "image", is_main: index === 0, sort_order: index })),
+  attributes: [],
+});
+const publicProducts = Object.freeze(ownerLiveProductsFile
+  ? [...liveOwnerProducts, deterministicOwnerProduct]
+  : canonicalPublicProducts);
 
 const productCountForCategory = (category) => publicProducts.filter((product) => {
   const assigned = categories.find((candidate) => candidate.id === product.primary_category_id);
@@ -224,7 +335,7 @@ const renderReviewMedia = ({ source, viewBox, image }) => {
 const isLoopback = (address) => ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(address);
 const commonHeaders = (mode, artifactSha256 = "") => ({
   "Cache-Control": "private, no-store, max-age=0",
-  "Content-Security-Policy": "default-src 'self' data: blob:; img-src 'self' data: blob:; media-src 'self' data: blob:; style-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+  "Content-Security-Policy": "default-src 'self' data: blob:; img-src 'self' data: blob: https://res.cloudinary.com https://novastore.tr https://www.novastore.tr; media-src 'self' data: blob: https://res.cloudinary.com https://novastore.tr https://www.novastore.tr; style-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
   "X-NovaStore-Runtime-Mode": mode,
@@ -376,7 +487,7 @@ const storefrontServer = http.createServer((request, response) => {
   if (!validateRequest(request, response, storefrontPort, mode, isReviewMutationAllowed)) return;
   const url = new URL(request.url, `http://127.0.0.1:${storefrontPort}`);
 
-  if (url.pathname === "/__review/meta") return sendJson(request, response, 200, { mode, artifactSha256: storefrontSha256, sourceEntry: "storefront-commerce-pro/src/main-integrated.jsx", localData: "canonical-local-catalog-through-same-origin-read-api", counters }, mode);
+  if (url.pathname === "/__review/meta") return sendJson(request, response, 200, { mode, artifactSha256: storefrontSha256, sourceEntry: "storefront-commerce-pro/src/main-integrated.jsx", localData: ownerLiveProductsFile ? "sanitized-current-public-products-plus-deterministic-owner-product" : "canonical-local-catalog-through-same-origin-read-api", ownerLiveProductCount: liveOwnerProducts.length, deterministicOwnerProductCount: ownerLiveProductsFile ? 1 : 0, counters }, mode);
   if (url.pathname === "/__review/customer") {
     const reviewSession = createCustomerReviewSession();
     const reviewUserId = String(reviewCustomer.id);
@@ -399,9 +510,36 @@ const storefrontServer = http.createServer((request, response) => {
     return send(request, response, 200, renderReviewMedia(variant), "image/svg+xml; charset=utf-8", commonHeaders(mode));
   }
   if (url.pathname === "/api/public/categories") return sendJson(request, response, 200, categoryTree(), mode);
+  if (url.pathname === "/api/public/navigation/main") return sendJson(request, response, 200, publicNavigation, mode);
   if (url.pathname === "/api/products") return sendJson(request, response, 200, publicProducts, mode);
+  if (/^\/api\/products\/\d+$/.test(url.pathname)) {
+    const product = publicProducts.find((candidate) => candidate.id === Number(url.pathname.split("/").pop()));
+    return product ? sendJson(request, response, 200, product, mode) : sendJson(request, response, 404, { error: "Ürün bulunamadı." }, mode);
+  }
+  if (url.pathname.startsWith("/owner-live-media/")) {
+    const media = ownerMediaCache.get(url.pathname);
+    return media
+      ? send(request, response, 200, media.body, media.contentType, commonHeaders(mode))
+      : sendJson(request, response, 404, { error: "Owner canlı ürün görseli bulunamadı." }, mode);
+  }
+  if (url.pathname === "/api/public/stores/owner-main6x-r1") return sendJson(request, response, 200, {
+    store: {
+      slug: "owner-main6x-r1",
+      name: "NovaStore Owner Canlı Ürün İncelemesi",
+      description: "Güncel anonim public ürünlerin kanonik müşteri kartı ve mağaza görünümünde task-owned yerel incelemesi.",
+      status: "open",
+      rating: 4.8,
+      review_count: 24,
+      follower_count: 1284,
+      total_units_sold: 2861,
+      product_count: publicProducts.length,
+      shipping_summary: "Teslimat bilgisi ürün ve adres adımında doğrulanır.",
+      return_summary: "İade koşulları NovaStore destek akışında doğrulanır.",
+    },
+    products: publicProducts,
+  }, mode);
   if (url.pathname === "/api/public/collections") return sendJson(request, response, 200, [{ id: 1, slug: "indirim", name: "Günün fırsatları", show_on_home: true }], mode);
-  if (url.pathname === "/api/public/collections/indirim") {
+  if (["/api/public/collections/indirim", "/api/public/collections/firsatlar"].includes(url.pathname)) {
     const discountedProducts = publicProducts.filter((product) => Number(product.old_price) > Number(product.price));
     return sendJson(request, response, 200, {
       collection: { id: 1, slug: "indirim", name: "Günün fırsatları" },

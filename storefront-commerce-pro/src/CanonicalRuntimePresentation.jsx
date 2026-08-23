@@ -33,9 +33,9 @@ import {
   ShoppingBag,
   ShoppingCart,
   SlidersHorizontal,
-  Sparkle,
+  BadgePercent,
+  Flower,
   Star,
-  StarFour,
   Storefront,
   Television,
   Ticket,
@@ -116,7 +116,7 @@ const ROOT_ICONS = {
   elektronik: DeviceMobile,
   "moda-giyim": TShirt,
   "ev-yasam": House,
-  "kozmetik-kisisel-bakim": Sparkle,
+  "kozmetik-kisisel-bakim": Flower,
   "spor-outdoor": PersonSimpleRun,
   "anne-cocuk-oyuncak": Baby,
 };
@@ -494,7 +494,7 @@ function CategoryNavigation({ onMobileOpen }) {
             ))}
           </ul>
         </nav>
-        <a className="deals-link" href="#/koleksiyon/firsatlar"><Sparkle weight="fill" /> Fırsatlar</a>
+        <a className="deals-link" href="#/koleksiyon/firsatlar"><BadgePercent /> Fırsatlar</a>
       </div>
       {open && <div className="shell mega-shell"><MegaMenu root={activeRoot} onRootChange={setActiveRoot} onClose={() => setOpen(false)} /></div>}
     </div>
@@ -641,7 +641,7 @@ function HomePage({ favorites, onFavorite, onAdd }) {
         <img src={heroEditorial} alt="Modern telefon, dizüstü bilgisayar, kulaklık ve akıllı saat seçkisi" />
         <div className="home-hero__shade" aria-hidden="true" />
         <div className="home-hero__copy">
-          <span className="section-kicker"><Sparkle weight="fill" /> Nova seçkisi</span>
+          <span className="section-kicker">Nova seçkisi</span>
           <h1>İyi teknoloji,<br />doğru seçimle başlar.</h1>
           <p>İhtiyacına göre düzenlenmiş kategoriler, karşılaştırılabilir ürünler ve güvenli alışveriş deneyimi.</p>
           <div><a className="primary-button" href="#/kategori/elektronik">Elektroniği keşfet <CaretRight /></a><a className="ghost-button" href="#/koleksiyon/firsatlar">Günün fırsatları</a></div>
@@ -1031,7 +1031,7 @@ function AccountSidebar({ section }) {
 function AccountUtilityContent({ section }) {
   if (section === "addresses") return <><div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Adreslerim</h1><p>Teslimat sırasında kullanacağın kayıtlı adresler.</p></div><button className="primary-button" type="button">Yeni adres ekle</button></div><div className="account-utility-grid"><article><MapPin /><h2>Ev Adresim</h2><p>Atatürk Mah. 1234. Sok. No:5 D:7<br />Kadıköy / İstanbul</p><button type="button">Düzenle</button></article><article><MapPin /><h2>İş Adresim</h2><p>Maslak Mah. Büyükdere Cad. No:245<br />Sarıyer / İstanbul</p><button type="button">Düzenle</button></article></div></>;
   if (section === "coupons") return <><div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Kuponlarım</h1><p>Kullanıma hazır iki NovaStore avantajı.</p></div></div><div className="account-utility-grid"><article><Ticket /><h2>NOVA5</h2><p>Sepette %5 indirim · En fazla 500 TL</p><a href="#/sepet">Sepette kullan</a></article><article><Ticket /><h2>ÜCRETSİZKARGO</h2><p>750 TL üzeri siparişlerde ücretsiz standart kargo</p><a href="#/kategori/elektronik">Ürünleri keşfet</a></article></div></>;
-  return <><div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Bildirimlerim</h1><p>Sipariş ve kampanya güncellemelerin.</p></div></div><div className="notification-list"><article><Truck /><span><strong>NS-2026-00702 kargoya verildi</strong><small>Bugün · 10:18</small></span></article><article><Sparkle /><span><strong>Favori ürününde fiyat avantajı var</strong><small>Dün · 18:40</small></span></article><article><Ticket /><span><strong>NOVA5 kuponun kullanıma hazır</strong><small>9 Temmuz · 09:15</small></span></article></div></>;
+  return <><div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Bildirimlerim</h1><p>Sipariş ve kampanya güncellemelerin.</p></div></div><div className="notification-list"><article><Truck /><span><strong>NS-2026-00702 kargoya verildi</strong><small>Bugün · 10:18</small></span></article><article><BadgePercent /><span><strong>Favori ürününde fiyat avantajı var</strong><small>Dün · 18:40</small></span></article><article><Ticket /><span><strong>NOVA5 kuponun kullanıma hazır</strong><small>9 Temmuz · 09:15</small></span></article></div></>;
 }
 
 function AccountPage({ section = "overview", orderId, favoriteCount = 0 }) {

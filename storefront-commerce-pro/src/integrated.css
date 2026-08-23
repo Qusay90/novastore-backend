@@ -3763,6 +3763,105 @@ body :is(.price-block strong, .detail-price strong, .cart-page-line__end > stron
   font-weight: 700;
 }
 
+/* Main6X R1 owner correction: glyph size and target size are independent. */
+:root {
+  --customer-icon-glyph-compact: 18px;
+  --customer-icon-glyph-standard: 20px;
+  --customer-icon-glyph-primary-nav: 20px;
+  --customer-icon-glyph-semantic: 24px;
+  --customer-icon-target: 44px;
+}
+
+.mobile-menu-trigger > svg,
+.all-categories-button > svg,
+.header-action__icon > svg,
+.drawer-head button > svg,
+.back-link > svg,
+.mobile-bottom-nav svg {
+  width: var(--customer-icon-glyph-primary-nav);
+  height: var(--customer-icon-glyph-primary-nav);
+  flex: 0 0 var(--customer-icon-glyph-primary-nav);
+}
+
+.icon-button > svg,
+.favorite-button > svg,
+.compare-button > svg,
+.quantity-control button > svg,
+.customer-product-card .card-add-button > svg {
+  width: var(--customer-icon-glyph-compact);
+  height: var(--customer-icon-glyph-compact);
+}
+
+.nova-service-icon {
+  width: 48px;
+  height: 48px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+
+.nova-service-icon .nova-service-icon__glyph {
+  width: var(--customer-icon-glyph-semantic);
+  height: var(--customer-icon-glyph-semantic);
+}
+
+.help-grid .nova-service-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.help-grid .nova-service-icon .nova-service-icon__glyph,
+.nova-service-icon.is-compact .nova-service-icon__glyph {
+  width: var(--customer-icon-glyph-standard);
+  height: var(--customer-icon-glyph-standard);
+}
+
+:is(button, a, summary):not(:disabled, [aria-disabled="true"]):hover > svg.lucide,
+:is(button, a):not(:disabled, [aria-disabled="true"]):hover .nova-service-icon svg.lucide {
+  transform: scale(1.04);
+}
+
+:is(button, a, summary):not(:disabled, [aria-disabled="true"]):active > svg.lucide,
+:is(button, a):not(:disabled, [aria-disabled="true"]):active .nova-service-icon svg.lucide {
+  transform: scale(.97);
+}
+
+.help-hero > .nova-service-icon,
+.return-exchange-hero > .nova-service-icon {
+  margin-bottom: 13px;
+}
+
+.public-store-emblem > svg {
+  width: var(--customer-icon-glyph-semantic);
+  height: var(--customer-icon-glyph-semantic);
+}
+
+.public-store-metrics li > svg {
+  width: var(--customer-icon-glyph-semantic);
+  height: var(--customer-icon-glyph-semantic);
+}
+
+.public-store-policy-grid article > svg {
+  width: 52px;
+  height: 52px;
+  padding: 14px;
+}
+
+.large-empty > svg {
+  width: 68px;
+  height: 68px;
+  padding: 22px;
+}
+
+@media (max-width: 620px) {
+  .mobile-menu-trigger > svg,
+  .header-action__icon > svg,
+  .mobile-bottom-nav svg {
+    width: var(--customer-icon-glyph-standard);
+    height: var(--customer-icon-glyph-standard);
+  }
+}
+
 .cart-drawer-overlay {
   z-index: 1000;
   pointer-events: auto;
@@ -3772,6 +3871,44 @@ body :is(.price-block strong, .detail-price strong, .cart-page-line__end > stron
   z-index: 1;
   pointer-events: auto;
   box-shadow: -18px 0 48px rgba(4, 23, 42, .22);
+}
+
+/* Owner Main6X R1: preserve semantic containers without oversized silhouettes. */
+.auth-hero > svg {
+  width: 58px;
+  height: 58px;
+  padding: 17px;
+}
+
+.connected-coupon-grid article > svg,
+.security-form.connected-form > svg {
+  width: 48px;
+  height: 48px;
+  padding: 12px;
+}
+
+.cart-empty > svg {
+  width: 54px;
+  height: 54px;
+  padding: 15px;
+}
+
+.integration-state-card > svg {
+  width: 52px;
+  height: 52px;
+  padding: 14px;
+}
+
+/* Main6X R1 final optical overrides must follow the public-store layer. */
+body .public-store-emblem > svg {
+  width: var(--customer-icon-glyph-semantic);
+  height: var(--customer-icon-glyph-semantic);
+}
+
+body .public-store-policy-grid article > svg {
+  width: 52px;
+  height: 52px;
+  padding: 14px;
 }
 
 .cart-line > a {
@@ -5190,7 +5327,8 @@ body {
   transition: opacity 160ms ease;
 }
 
-.customer-card-media-stage > img.is-active {
+.customer-card-media-stage > img.is-active,
+.customer-product-card.public-store-product-card .customer-card-media-stage > img.is-active {
   z-index: 1;
   opacity: 1;
 }

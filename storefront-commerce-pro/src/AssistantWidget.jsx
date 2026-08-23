@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
   CaretRight,
+  Bot,
   ChatCircleText,
   CheckCircle,
   Headphones,
   Heart,
   PaperPlaneTilt,
   ShoppingCart,
-  Sparkle,
   User,
   WarningCircle,
   X,
@@ -151,10 +151,10 @@ export function AssistantWidget({
 
   return <div className={`assistant-widget${open ? " is-open" : ""}${raised ? " has-comparison" : ""}`}>
     {open && <section className="assistant-window" role="dialog" aria-label="NovaBot alışveriş asistanı">
-      <header><span><i><Sparkle weight="fill" /></i><span><strong>NovaBot</strong><small>{phase === "submitting" ? "Yanıt hazırlanıyor…" : "Canlı katalog asistanı"}</small></span></span><button type="button" aria-label="NovaBot penceresini kapat" onClick={() => { setOpen(false); window.requestAnimationFrame(() => fabRef.current?.focus()); }}><X /></button></header>
+      <header><span><i><Bot /></i><span><strong>NovaBot</strong><small>{phase === "submitting" ? "Yanıt hazırlanıyor…" : "Canlı katalog asistanı"}</small></span></span><button type="button" aria-label="NovaBot penceresini kapat" onClick={() => { setOpen(false); window.requestAnimationFrame(() => fabRef.current?.focus()); }}><X /></button></header>
       <div className="assistant-mode"><span><CheckCircle weight="fill" /> {mode === "friendly" ? "Samimi mod" : mode}</span><a href="#/iletisim"><Headphones /> Destek ekibi</a></div>
       <div className="assistant-thread" ref={threadRef} aria-live="polite">
-        {messages.map((message) => <article key={message.id} className={`assistant-message is-${message.role}`}><div className="assistant-message__icon">{message.role === "user" ? <User /> : <Sparkle weight="fill" />}</div><div className="assistant-message__body"><p>{message.text}</p><AssistantResponseExtras messageId={message.id} response={message.response} authenticated={authenticated} favorites={favorites} onFavorite={onFavorite} onAdd={onAdd} getProductImage={getProductImage} onConfirm={confirm} actionPhase={actionPhase} />{message.response?.suggestions?.length > 0 && <div className="assistant-suggestions">{message.response.suggestions.map((suggestion) => <button key={suggestion} type="button" disabled={phase === "submitting"} onClick={() => send(suggestion)}>{suggestion}</button>)}</div>}</div></article>)}
+        {messages.map((message) => <article key={message.id} className={`assistant-message is-${message.role}`}><div className="assistant-message__icon">{message.role === "user" ? <User /> : <Bot />}</div><div className="assistant-message__body"><p>{message.text}</p><AssistantResponseExtras messageId={message.id} response={message.response} authenticated={authenticated} favorites={favorites} onFavorite={onFavorite} onAdd={onAdd} getProductImage={getProductImage} onConfirm={confirm} actionPhase={actionPhase} />{message.response?.suggestions?.length > 0 && <div className="assistant-suggestions">{message.response.suggestions.map((suggestion) => <button key={suggestion} type="button" disabled={phase === "submitting"} onClick={() => send(suggestion)}>{suggestion}</button>)}</div>}</div></article>)}
         {phase === "submitting" && <div className="assistant-typing" role="status"><span /><span /><span /><b>NovaBot düşünüyor</b></div>}
         {error && <div className="assistant-error" role="alert"><WarningCircle />{error}<button type="button" onClick={() => setError("")} aria-label="Hatayı kapat"><X /></button></div>}
       </div>

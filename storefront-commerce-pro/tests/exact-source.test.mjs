@@ -38,7 +38,7 @@ const canonicalAppPath = path.join(root, "src", "App.jsx");
 const runtimePresentationPath = path.join(root, "src", "CanonicalRuntimePresentation.jsx");
 const EXPECTED_SHA256 = "8b6301362b6c01b649db1d7cfa4dc00d5b4392309e4ece2c7c14870cab0f2b0d";
 const EXPECTED_APP_SHA256 = "d31e7642f6bccb75094361be3dc2dd3b85cc38a4d968bbfd57ee3ee7ffd80fb6";
-const EXPECTED_RUNTIME_SHA256 = "21591a911b6cf65ec87e287b6149e93400958a5f572635c89d06bbd7bc2b19d2";
+const EXPECTED_RUNTIME_SHA256 = "ff59382b4aa889e81e0bddb20aa765c5d88e63af0e3663d6ff9edbc415087522";
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const NON_HOME_HASH_ROUTES = Object.freeze([
   "#/kategori/",

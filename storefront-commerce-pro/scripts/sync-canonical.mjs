@@ -29,6 +29,17 @@ export const RUNTIME_REACT_IMPORT = CANONICAL_REACT_IMPORT;
 export const CANONICAL_PORTAL_IMPORT = 'import { createPortal } from "react-dom";';
 export const CANONICAL_ICON_IMPORT = '} from "@phosphor-icons/react";';
 export const RUNTIME_ICON_IMPORT = '} from "./CustomerIcon.jsx";';
+export const CANONICAL_SPARKLE_IMPORT = '  Sparkle,\n';
+export const RUNTIME_SEMANTIC_IMPORTS = '  BadgePercent,\n  Flower,\n';
+export const CANONICAL_STAR_FOUR_IMPORT = '  StarFour,\n';
+export const CANONICAL_COSMETICS_ICON = '  "kozmetik-kisisel-bakim": Sparkle,';
+export const RUNTIME_COSMETICS_ICON = '  "kozmetik-kisisel-bakim": Flower,';
+export const CANONICAL_DEALS_ICON = '<a className="deals-link" href="#/koleksiyon/firsatlar"><Sparkle weight="fill" /> Fırsatlar</a>';
+export const RUNTIME_DEALS_ICON = '<a className="deals-link" href="#/koleksiyon/firsatlar"><BadgePercent /> Fırsatlar</a>';
+export const CANONICAL_HOME_DECORATION = '<span className="section-kicker"><Sparkle weight="fill" /> Nova seçkisi</span>';
+export const RUNTIME_HOME_DECORATION = '<span className="section-kicker">Nova seçkisi</span>';
+export const CANONICAL_PRICE_NOTIFICATION_ICON = '<article><Sparkle /><span><strong>Favori ürününde fiyat avantajı var</strong>';
+export const RUNTIME_PRICE_NOTIFICATION_ICON = '<article><BadgePercent /><span><strong>Favori ürününde fiyat avantajı var</strong>';
 export const CANONICAL_MODAL_BACKGROUND_QUERY = 'const backgroundNodes = [...document.querySelectorAll("#root > .skip-link, #root > .site-header, #root > main, #root > .site-footer, #root > .mobile-bottom-nav")];';
 export const RUNTIME_MODAL_BACKGROUND_QUERY = 'const backgroundNodes = [...document.querySelectorAll("#root > *")];';
 export const RUNTIME_COMPARISON_IMPORT = 'import { RuntimeComparisonContext } from "./integration/RuntimeComparisonContext.jsx";';
@@ -134,6 +145,13 @@ export const createRuntimePresentation = (canonicalApp) => {
     RUNTIME_ICON_IMPORT,
     "Canonical icon import boundary",
   );
+
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_SPARKLE_IMPORT, RUNTIME_SEMANTIC_IMPORTS, "Canonical decorative sparkle import");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_STAR_FOUR_IMPORT, "", "Canonical decorative brand icon import");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_COSMETICS_ICON, RUNTIME_COSMETICS_ICON, "Canonical cosmetics semantic icon");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_DEALS_ICON, RUNTIME_DEALS_ICON, "Canonical deals semantic icon");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_HOME_DECORATION, RUNTIME_HOME_DECORATION, "Canonical home decorative sparkle");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_PRICE_NOTIFICATION_ICON, RUNTIME_PRICE_NOTIFICATION_ICON, "Canonical notification semantic icon");
 
   runtimePresentation = replaceExactOnce(
     runtimePresentation,

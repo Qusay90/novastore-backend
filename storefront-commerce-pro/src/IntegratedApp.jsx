@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowsLeftRight,
   ArrowsClockwise,
+  BadgePercent,
   Baby,
   CaretDown,
   CaretRight,
@@ -13,6 +14,7 @@ import {
   CreditCard,
   DeviceMobile,
   Funnel,
+  Flower,
   GridFour,
   Headphones,
   Heart,
@@ -29,9 +31,7 @@ import {
   ShoppingBag,
   ShoppingCart,
   SlidersHorizontal,
-  Sparkle,
   Star,
-  StarFour,
   Storefront,
   Television,
   Trash,
@@ -141,7 +141,7 @@ const ROOT_ICONS = {
   elektronik: DeviceMobile,
   "moda-giyim": TShirt,
   "ev-yasam": House,
-  "kozmetik-kisisel-bakim": Sparkle,
+  "kozmetik-kisisel-bakim": Flower,
   "spor-outdoor": PersonSimpleRun,
   "anne-cocuk-oyuncak": Baby,
 };
@@ -617,7 +617,7 @@ function CategoryNavigation({ onMobileOpen, drawerOpen }) {
             ))}
           </ul>
         </nav>
-        <a className="deals-link" href="#/koleksiyon/firsatlar" onClick={() => setOpen(false)}><Sparkle weight="fill" /> Fırsatlar</a>
+        <a className="deals-link" href="#/koleksiyon/firsatlar" onClick={() => setOpen(false)}><BadgePercent /> Fırsatlar</a>
       </div>
       {open && <div className="shell mega-shell"><MegaMenu root={activeRoot} onRootChange={setActiveRoot} onClose={() => setOpen(false)} /></div>}
     </div>
@@ -766,7 +766,7 @@ function HomePage({ favorites, onFavorite, onAdd }) {
         <img src={heroEditorial} alt="Modern telefon, dizüstü bilgisayar, kulaklık ve akıllı saat seçkisi" />
         <div className="home-hero__shade" aria-hidden="true" />
         <div className="home-hero__copy">
-          <span className="section-kicker"><Sparkle weight="fill" /> Nova seçkisi</span>
+          <span className="section-kicker">Nova seçkisi</span>
           <h1>İyi teknoloji,<br />doğru seçimle başlar.</h1>
           <p>İhtiyacına göre düzenlenmiş kategoriler, karşılaştırılabilir ürünler ve güvenli alışveriş deneyimi.</p>
           <div><a className="primary-button" href={primaryRoot ? `#/kategori/${primaryRoot.canonicalPath}` : "#/"}>{primaryRoot ? `${primaryRoot.name} kategorisini keşfet` : "Ürünleri keşfet"} <CaretRight /></a><a className="ghost-button" href="#/koleksiyon/firsatlar">Günün fırsatları</a></div>

@@ -39,7 +39,9 @@ assert.match(server, /const expandReviewItems = \(items\)/);
 assert.match(server, /PUT \/api\/shared-state\/cart/);
 assert.match(server, /POST \/api\/campaigns\/quote/);
 assert.match(server, /unexpected|Yerel inceleme çalışma zamanı salt okunurdur/);
-assert.doesNotMatch(server, /postgres|DATABASE_URL|supabase|cloudinary|resend|paytr/i);
+assert.doesNotMatch(server, /postgres|DATABASE_URL|supabase|resend|paytr/i);
+assert.match(server, /ownerMediaUrl[\s\S]*?res\.cloudinary\.com/);
+assert.doesNotMatch(server, /CLOUDINARY_URL|cloudinary\.v2|from ["']cloudinary["']|require\(["']cloudinary["']\)/i);
 
 assert.match(server, /1001: Object\.freeze\(\[/);
 assert.match(server, /numericProductId\(product\.id\) === 1001 \? "\/review-media\/iphone-15-angle\.svg"/);

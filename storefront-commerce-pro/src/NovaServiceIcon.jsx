@@ -5,7 +5,6 @@ import {
   Headphones,
   Package,
   Question,
-  Sparkle,
   Truck,
 } from "./CustomerIcon.jsx";
 
@@ -23,8 +22,7 @@ export function NovaServiceIcon({ kind = "help", compact = false }) {
   const Icon = ICONS[kind] || ICONS.help;
   return (
     <span className={`nova-service-icon${compact ? " is-compact" : ""}`} aria-hidden="true">
-      <Icon className="nova-service-icon__glyph" weight="duotone" />
-      <Sparkle className="nova-service-icon__accent" weight="fill" />
+      <Icon className="nova-service-icon__glyph" />
     </span>
   );
 }

@@ -1,8 +1,10 @@
 import {
   ArrowLeft as LucideArrowLeft,
   ArrowLeftRight,
+  BadgePercent as LucideBadgePercent,
   Baby as LucideBaby,
   Bell as LucideBell,
+  Bot as LucideBot,
   Check as LucideCheck,
   ChevronDown,
   ChevronRight,
@@ -13,6 +15,7 @@ import {
   Copy as LucideCopy,
   CreditCard as LucideCreditCard,
   Funnel as LucideFunnel,
+  Flower2,
   Grid2X2,
   Headphones as LucideHeadphones,
   Heart as LucideHeart,
@@ -41,8 +44,6 @@ import {
   ShoppingCart as LucideShoppingCart,
   SlidersHorizontal as LucideSlidersHorizontal,
   Smartphone,
-  Sparkle as LucideSparkle,
-  Sparkles,
   Star as LucideStar,
   Store,
   Ticket as LucideTicket,
@@ -75,8 +76,10 @@ const adapt = (Icon) => function CustomerIcon({ weight, fill, strokeWidth, ...pr
 export const ArrowLeft = adapt(LucideArrowLeft);
 export const ArrowsLeftRight = adapt(ArrowLeftRight);
 export const ArrowsClockwise = adapt(RefreshCw);
+export const BadgePercent = adapt(LucideBadgePercent);
 export const Baby = adapt(LucideBaby);
 export const Bell = adapt(LucideBell);
+export const Bot = adapt(LucideBot);
 export const CaretDown = adapt(ChevronDown);
 export const CaretRight = adapt(ChevronRight);
 export const Check = adapt(LucideCheck);
@@ -85,6 +88,7 @@ export const CreditCard = adapt(LucideCreditCard);
 export const DeviceMobile = adapt(Smartphone);
 export const EnvelopeSimple = adapt(Mail);
 export const Funnel = adapt(LucideFunnel);
+export const Flower = adapt(Flower2);
 export const GridFour = adapt(Grid2X2);
 export const Headphones = adapt(LucideHeadphones);
 export const Heart = adapt(LucideHeart);
@@ -105,9 +109,7 @@ export const ShoppingBag = adapt(LucideShoppingBag);
 export const ShoppingBagOpen = adapt(LucideShoppingBag);
 export const ShoppingCart = adapt(LucideShoppingCart);
 export const SlidersHorizontal = adapt(LucideSlidersHorizontal);
-export const Sparkle = adapt(Sparkles);
 export const Star = adapt(LucideStar);
-export const StarFour = adapt(LucideSparkle);
 export const Storefront = adapt(Store);
 export const Television = adapt(Tv);
 export const Ticket = adapt(LucideTicket);
@@ -133,7 +135,7 @@ export const Users = adapt(LucideUsers);
 
 export const CUSTOMER_ICON_SEMANTICS = Object.freeze({
   navigation: Object.freeze({ back: ArrowLeft, forward: CaretRight, expand: CaretDown, home: House }),
-  commerce: Object.freeze({ cart: ShoppingCart, bag: ShoppingBag, compare: ArrowsLeftRight, discount: Ticket }),
+  commerce: Object.freeze({ cart: ShoppingCart, bag: ShoppingBag, compare: ArrowsLeftRight, discount: BadgePercent }),
   account: Object.freeze({ profile: User, signOut: SignOut, security: ShieldCheck, notification: Bell }),
   service: Object.freeze({ help: Question, support: Headphones, delivery: Truck, return: ArrowsClockwise }),
   feedback: Object.freeze({ success: CheckCircle, warning: WarningCircle, close: X, favorite: Heart }),
