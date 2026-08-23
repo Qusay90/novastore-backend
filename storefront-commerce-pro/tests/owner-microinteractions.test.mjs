@@ -91,3 +91,14 @@ test("public store metric panel owns one outside-only green backlight while hove
   assert.match(r2Css, /@media \(max-width: 380px\)[\s\S]*?grid-template-columns: 21px minmax\(0, 1fr\)[\s\S]*?overflow-wrap: anywhere/);
   assert.doesNotMatch(r2Css, /cursor:\s*pointer/);
 });
+
+test("PDP benefit cells lift only their icon and copy for fine pointers", async () => {
+  const cssSource = await read("../src/integrated.css");
+  const followUpCss = cssSource.slice(cssSource.indexOf("/* Main-6Y R2 owner follow-up:"));
+
+  assert.match(followUpCss, /\.product-page \.detail-benefits > div > svg,[\s\S]*?\.product-page \.detail-benefits > div > span \{[\s\S]*?transition: transform 190ms/);
+  assert.match(followUpCss, /@media \(hover: hover\) and \(pointer: fine\)[\s\S]*?\.product-page \.detail-benefits > div:hover > svg,[\s\S]*?\.product-page \.detail-benefits > div:hover > span \{[\s\S]*?translateY\(-3px\)/);
+  assert.match(followUpCss, /@media \(max-width: 760px\)[\s\S]*?\.product-page \.detail-benefits > div:hover > span \{[\s\S]*?transform: none/);
+  assert.match(followUpCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.product-page \.detail-benefits > div:hover > span \{[\s\S]*?transform: none/);
+  assert.doesNotMatch(followUpCss, /\.detail-benefits(?::hover)?\s*\{[^}]*(?:transform|cursor)/);
+});

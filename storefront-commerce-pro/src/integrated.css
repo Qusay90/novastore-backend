@@ -6131,6 +6131,44 @@ body :is(.price-block strong, .detail-price strong, .cart-page-line__end > stron
   }
 }
 
+/* Main-6Y R2 owner follow-up: PDP benefit copy lifts without moving its shared frame. */
+.product-page .detail-benefits > div > svg,
+.product-page .detail-benefits > div > span {
+  transform: translateY(0);
+  transition: transform 190ms cubic-bezier(.2, .72, .24, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .product-page .detail-benefits > div:hover > svg,
+  .product-page .detail-benefits > div:hover > span {
+    transform: translateY(-3px);
+  }
+}
+
+@media (max-width: 760px) {
+  .product-page .detail-benefits > div > svg,
+  .product-page .detail-benefits > div > span {
+    transition: none;
+  }
+
+  .product-page .detail-benefits > div:hover > svg,
+  .product-page .detail-benefits > div:hover > span {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-page .detail-benefits > div > svg,
+  .product-page .detail-benefits > div > span {
+    transition: none;
+  }
+
+  .product-page .detail-benefits > div:hover > svg,
+  .product-page .detail-benefits > div:hover > span {
+    transform: none;
+  }
+}
+
 @media (hover: none), (pointer: coarse) {
   .public-store-metrics {
     box-shadow: 0 22px 52px rgb(0 0 0 / 16%), 0 0 0 1px rgb(84 223 140 / 10%), 0 17px 46px rgb(21 148 90 / 25%);

@@ -76,3 +76,69 @@ Compared the accepted R1 storefront, the supplied owner favorite-motion recordin
 - Canonical parity: normal public store and Seller read-only preview use the same renderer; preview keeps favorite, cart, and follow mutations unavailable.
 
 passed
+
+# Main-6Y R2 PDP Benefit Hover Follow-up Design QA
+
+**Findings**
+
+- No actionable P0, P1, or P2 visual mismatch remains.
+- The shared delivery/return/warranty frame and its two separators remain fixed. On a fine-pointer desktop, only the icon and copy inside the hovered cell rise by 3 px; the other two cells remain at rest.
+- The cells retain an `auto` cursor and no click semantics, so the response reads as restrained informational polish rather than a new control.
+- At the mobile breakpoint, the transition and hover transform are suppressed and horizontal overflow remains 0 px. The reduced-motion rule likewise removes the transition and transform.
+
+**Open Questions**
+
+- None blocking. The supplied screenshot is a resting-state composition reference; the requested hover state is defined by the owner's accompanying instruction, so motion was verified through the rendered before/after frames and computed browser state rather than claiming a hover pose from the source image.
+
+**Implementation Checklist**
+
+- [x] Keep the enclosing frame and separators stationary.
+- [x] Lift only the hovered cell's Lucide icon and text by 3 px.
+- [x] Leave the other two cells unchanged.
+- [x] Preserve informational semantics and the default cursor.
+- [x] Disable movement at 760 px and below and under reduced motion.
+- [x] Verify all three desktop hover targets in the Codex in-app browser.
+- [x] Verify mobile stability, zero horizontal overflow, and browser console state.
+
+**Follow-up Polish**
+
+- No required follow-up for this scoped owner request.
+
+## Visual truth and implementation evidence
+
+- Source visual truth: `C:\Users\kusay\AppData\Local\Temp\codex-clipboard-176c0f37-35a9-4632-9fb2-adc23aa68db2.png` (1126 × 595 px).
+- Resting implementation: `C:\Users\kusay\AppData\Local\Temp\novastore-pc1-main6y-r2-pdp-benefit-hover-20260824T001951\PDP-BENEFITS-REST.png` (1111 × 587 px).
+- Hovered implementation: `C:\Users\kusay\AppData\Local\Temp\novastore-pc1-main6y-r2-pdp-benefit-hover-20260824T001951\PDP-BENEFITS-HOVER-EASY-RETURN.png` (1111 × 587 px).
+- Focused evidence was evaluated from the same full-view captures because the in-app browser's sticky header is intentionally included when a document-coordinate clip is requested; the full captures keep the actual viewport state authoritative.
+
+## Viewport and normalization
+
+- Source: 1126 × 595 px screenshot.
+- Implementation: temporary 1126 × 595 browser viewport override, 1111 × 587 captured client area, 1111 × 595 CSS client viewport before browser chrome subtraction, device scale factor 1.
+- Normalization: same desktop breakpoint and density; comparison is scoped to the visible PDP information strip, with the 15 px scrollbar/client-width difference treated as browser chrome rather than layout drift.
+- State: canonical product-detail route, local read-only review runtime, desktop fine pointer, `Kolay iade` hovered after the 190 ms transition completed.
+
+## Required fidelity surfaces
+
+- Fonts and typography: existing NovaStore type family, weights, sizes, line heights, wrapping, and Turkish copy are unchanged.
+- Spacing and layout rhythm: the outer 12 px radius, 1 px border, separators, cell padding, and overall strip position are unchanged; only hovered child content translates vertically.
+- Colors and visual tokens: no color, shadow, gradient, or semantic-token change was introduced.
+- Image quality and asset fidelity: product imagery is unchanged; the existing Lucide delivery, return, and warranty icons remain the only icons used.
+- Copy and content: `Ücretsiz teslimat`, `Kolay iade`, `2 yıl garanti`, and their supporting lines remain unchanged.
+
+## Comparison history
+
+1. Initial rendered rest/hover comparison confirmed that the shared frame matched the supplied resting composition and that the requested response was intentionally subtle.
+2. Computed browser evidence confirmed `translateY(-3px)` on only the hovered icon and copy, identity transforms on the neighboring cells, and unchanged frame geometry.
+3. Mobile verification at a 390 px browser override confirmed `transition: none`, no hover transform, and 0 px horizontal overflow. No P0/P1/P2 correction loop was required.
+
+## Runtime QA
+
+- Desktop hover: all three cells independently reached `matrix(1, 0, 0, 1, 0, -3)` for both icon and copy while their siblings remained at identity.
+- Desktop leave/reset: all child transforms returned to identity.
+- Mobile: hovered middle cell remained untransformed, transition was `none`, and horizontal overflow was 0 px.
+- Reduced motion: covered by the targeted contract test and the explicit `prefers-reduced-motion: reduce` rule; the active browser preference was not reduced motion.
+- Browser: Codex in-app browser against the pinned local official artifact.
+- Browser console warnings/errors: 0.
+
+final result: passed
