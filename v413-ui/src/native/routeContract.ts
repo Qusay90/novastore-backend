@@ -40,6 +40,9 @@ const canonicalNativeRouteKeys = new Set<string>(
   CANONICAL_NATIVE_ROUTE_TUPLES.map(([cal, tab, view]) => `${cal}\u0000${tab}\u0000${view}`),
 );
 
+const STORE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const PRODUCT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
 function safeNativeRoute() {
   return new URLSearchParams({ cal: "CAL-02", tab: "home", shell: "native" });
 }
@@ -57,6 +60,30 @@ export function canonicalNativeRoute(search: URLSearchParams) {
 
   const result = new URLSearchParams({ cal, tab });
   if (view) result.set("view", view);
+  const isStoreRoute = cal === "CAL-04" && tab === "home" && view === "store";
+  const isProductRoute = cal === "CAL-06" && tab === "home" && view === "";
+  const rawStoreSlug = search.get("storeSlug");
+  const rawProductId = search.get("productId");
+  const rawMode = search.get("mode");
+  if (rawStoreSlug !== null) {
+    const storeSlug = rawStoreSlug.trim().toLocaleLowerCase("en-US");
+    if ((!isStoreRoute && !isProductRoute) || storeSlug.length > 160 || !STORE_SLUG_PATTERN.test(storeSlug)) {
+      return null;
+    }
+    result.set("storeSlug", storeSlug);
+  }
+  if (rawProductId !== null) {
+    const productId = rawProductId.trim();
+    if (!isProductRoute || !PRODUCT_ID_PATTERN.test(productId)) return null;
+    result.set("productId", productId);
+  }
+  if (rawMode !== null) {
+    if ((!isStoreRoute && !isProductRoute) || (rawMode !== "customer" && rawMode !== "preview")) {
+      return null;
+    }
+    if (rawMode === "preview" && !result.has("storeSlug")) return null;
+    result.set("mode", rawMode);
+  }
   result.set("shell", "native");
   return result;
 }

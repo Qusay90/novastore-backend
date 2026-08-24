@@ -10,6 +10,7 @@ android {
         versionCode 41300
         versionName "4.13.0-owner-preview"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "String", "NOVASTORE_API_BASE_URL", '"https://novastore.tr/"'
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -20,24 +21,23 @@ android {
         debug {
             applicationIdSuffix ".v413preview"
             versionNameSuffix "-debug"
+            buildConfigField "String", "NOVASTORE_API_BASE_URL", '"http://10.0.2.2:5000/"'
             resValue "string", "app_name", "NovaStore V4.13 Önizleme"
             resValue "string", "title_activity_main", "NovaStore V4.13 Önizleme"
         }
         release {
             minifyEnabled false
+            buildConfigField "String", "NOVASTORE_API_BASE_URL", '"https://novastore.tr/"'
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-}
-
-// The embedded UI is an owner-preview fixture build. Production package and
-// signing are a separate owner-approved phase, so fail closed by not creating
-// a release variant from this source set.
-androidComponents {
-    beforeVariants(selector().withBuildType("release")) { variantBuilder ->
-        variantBuilder.enable = false
+    buildFeatures {
+        buildConfig true
     }
 }
+
+// Release exists only for the required compile/unit gates. Producing, signing,
+// publishing, or installing a release artifact remains separately authorized.
 
 repositories {
     flatDir{

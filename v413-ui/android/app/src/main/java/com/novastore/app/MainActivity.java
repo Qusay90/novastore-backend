@@ -16,6 +16,7 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(NovaInsetsPlugin.class);
         registerPlugin(NovaPrintPlugin.class);
+        registerPlugin(NovaPublicStorePlugin.class);
         registerPlugin(NovaSharePlugin.class);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         super.onCreate(savedInstanceState);
@@ -41,7 +42,9 @@ public class MainActivity extends BridgeActivity {
         settings.setAllowContentAccess(false);
         settings.setAllowFileAccessFromFileURLs(false);
         settings.setAllowUniversalAccessFromFileURLs(false);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        settings.setMixedContentMode(BuildConfig.DEBUG
+            ? WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            : WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setJavaScriptCanOpenWindowsAutomatically(false);
         settings.setSupportMultipleWindows(false);
         settings.setGeolocationEnabled(false);

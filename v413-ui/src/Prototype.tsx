@@ -51,6 +51,15 @@ import {
 import { Amex as AmexLogo, Mastercard as MastercardLogo, Visa as VisaLogo } from "react-payment-logos/dist/logo";
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 import { BottomSheet, Carousel, KeyboardInput, KeyboardTextarea, MobileScroll, useKeyboard } from "./mobile";
+import {
+  DEFAULT_PUBLIC_STORE_SLUG,
+  loadCanonicalPublicStore,
+  orderedCustomerCardMedia,
+  orderedCustomerOriginalMediaUrls,
+  type CustomerCardFraming,
+  type CustomerPublicStoreProjection,
+  type CustomerStorePresentationMode,
+} from "./adapters";
 import { hasAppOwnedBackEntry, nativeHistoryDepth } from "./native/nativeNavigation";
 import { canonicalNativeRoute, canonicalNativeRouteOrSafeDefault } from "./native/routeContract";
 import "./prototype.css";
@@ -63,7 +72,12 @@ type CalId =
   | "CAL-07" | "CAL-08" | "CAL-09" | "CAL-10" | "CAL-11" | "CAL-12";
 type TabId = "home" | "categories" | "favorites" | "cart" | "support" | "account";
 type ViewId = "" | "login" | "forgot" | "register" | "returns" | "faq" | "history" | "live" | "address" | "addresses" | "notifications" | "success" | "search" | "profile" | "payments" | "coupons" | "reviews" | "questions" | "security" | "settings" | "invoice" | "tracking" | "store";
-type Route = { cal: CalId; tab: TabId; view: ViewId };
+type RouteContext = {
+  storeSlug?: string;
+  productId?: string;
+  mode?: CustomerStorePresentationMode;
+};
+type Route = { cal: CalId; tab: TabId; view: ViewId } & RouteContext;
 type RefreshSource = "pull" | "reselect";
 type RefreshRequest = { id: number; source: RefreshSource };
 type RefreshPhase = "idle" | "pulling" | "armed" | "refreshing" | "complete";
@@ -78,6 +92,36 @@ const PRODUCT_GALLERY = [
   `${A}/generated/nova-pulse-anc-ivory-side-v1.png`,
   `${A}/generated/nova-pulse-anc-ivory-detail-v1.png`,
 ];
+
+type ProductCardAsset = Readonly<{
+  id: string;
+  url: string;
+  cardFraming: CustomerCardFraming | null;
+}>;
+
+type Product = {
+  id: string;
+  name: string;
+  store: string;
+  price: string;
+  old?: string;
+  image: string;
+  images?: readonly string[];
+  badge?: string;
+  rating?: number;
+  reviewCount?: number;
+  stock?: number;
+  amount?: number;
+  oldAmount?: number;
+  storeSlug?: string;
+  storeLogoUrl?: string | null;
+  storeRating?: number | null;
+  shippingSummary?: string;
+  returnSummary?: string;
+  cardMedia?: readonly ProductCardAsset[];
+  isPurchasable?: boolean;
+  isPublicProjection?: boolean;
+};
 
 type SavedAddress = {
   id: string;
@@ -145,6 +189,7 @@ type CommerceState = {
   cartLines: CartLine[];
   appliedCoupon: string;
   selectedProductId: string;
+  publicProducts: Record<string, Product>;
   addresses: SavedAddress[];
   paymentMethods: SavedPaymentMethod[];
   productReviews: ProductReview[];
@@ -161,6 +206,7 @@ type CommerceState = {
   clearCart: () => void;
   applyCartCoupon: (code: string) => void;
   selectProduct: (id: string) => void;
+  registerPublicProducts: (products: readonly Product[]) => void;
   addAddress: (address: Omit<SavedAddress, "id" | "isDefault">) => void;
   updateAddress: (id: string, address: Omit<SavedAddress, "id" | "isDefault">) => void;
   removeAddress: (id: string) => void;
@@ -218,11 +264,18 @@ const navItems: Array<{ id: TabId; label: string; asset: string; cal: CalId }> =
 ];
 
 function routeFromCanonicalNativeParams(params: URLSearchParams): Route {
-  return {
+  const route: Route = {
     cal: params.get("cal") as CalId,
     tab: params.get("tab") as TabId,
     view: (params.get("view") ?? "") as ViewId,
   };
+  const storeSlug = params.get("storeSlug");
+  const productId = params.get("productId");
+  const mode = params.get("mode");
+  if (storeSlug) route.storeSlug = storeSlug;
+  if (productId) route.productId = productId;
+  if (mode === "customer" || mode === "preview") route.mode = mode;
+  return route;
 }
 
 function canonicalizeNativeLocation(params: URLSearchParams, route: Route) {
@@ -252,7 +305,21 @@ function readRoute(): Route {
   const rawView = params.get("view") as ViewId | null;
   const allowedViews: ViewId[] = ["", "login", "forgot", "register", "returns", "faq", "history", "live", "address", "addresses", "notifications", "success", "search", "profile", "payments", "coupons", "reviews", "questions", "security", "settings", "invoice", "tracking", "store"];
   const view = rawView && allowedViews.includes(rawView) ? rawView : "";
-  return { cal, tab, view };
+  const route: Route = { cal, tab, view };
+  const contextRoute = (cal === "CAL-04" && view === "store") || cal === "CAL-06";
+  const storeSlug = params.get("storeSlug")?.trim().toLocaleLowerCase("en-US");
+  const productId = params.get("productId")?.trim();
+  const mode = params.get("mode");
+  if (contextRoute && storeSlug && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(storeSlug) && storeSlug.length <= 160) {
+    route.storeSlug = storeSlug;
+  }
+  if (cal === "CAL-06" && productId && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(productId)) {
+    route.productId = productId;
+  }
+  if (contextRoute && (mode === "customer" || mode === "preview") && (mode !== "preview" || route.storeSlug)) {
+    route.mode = mode;
+  }
+  return route;
 }
 
 export default function Prototype() {
@@ -266,6 +333,7 @@ export default function Prototype() {
   ]);
   const [appliedCoupon, setAppliedCoupon] = useState("NOVAYAZ");
   const [selectedProductId, setSelectedProductId] = useState("pulse-anc");
+  const [publicProducts, setPublicProducts] = useState<Record<string, Product>>({});
   const [addresses, setAddresses] = useState<SavedAddress[]>([
     { id: "home", label: "Ev", recipient: "Kullanıcı Adı", line: "Atakum Mah. Cumhuriyet Cad. No: 58 D: 12", city: "Samsun / Atakum", postalCode: "55200", isDefault: true },
   ]);
@@ -326,10 +394,25 @@ export default function Prototype() {
     setRefreshRequest((current) => ({ id: current.id + 1, source }));
   }, [keyboard]);
 
-  const go = (next: CalId, tab = initialTab[next], view: ViewId = "") => {
+  const registerPublicProducts = useCallback((incoming: readonly Product[]) => {
+    setPublicProducts((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const product of incoming) {
+        if (next[product.id] !== product) changed = true;
+        next[product.id] = product;
+      }
+      return changed ? next : current;
+    });
+  }, []);
+
+  const go = (next: CalId, tab = initialTab[next], view: ViewId = "", context: RouteContext = {}) => {
     keyboard.hide();
-    const nextRoute = { cal: next, tab, view };
-    if (route.cal === nextRoute.cal && route.tab === nextRoute.tab && route.view === nextRoute.view) {
+    const nextRoute: Route = { cal: next, tab, view, ...context };
+    if (
+      route.cal === nextRoute.cal && route.tab === nextRoute.tab && route.view === nextRoute.view &&
+      route.storeSlug === nextRoute.storeSlug && route.productId === nextRoute.productId && route.mode === nextRoute.mode
+    ) {
       setNavigationRevision((current) => current + 1);
       setContentRevision((current) => current + 1);
       return;
@@ -342,6 +425,10 @@ export default function Prototype() {
       url.searchParams.set("cal", next);
       url.searchParams.set("tab", tab);
       if (view) url.searchParams.set("view", view); else url.searchParams.delete("view");
+      for (const key of ["storeSlug", "productId", "mode"] as const) {
+        const value = nextRoute[key];
+        if (value) url.searchParams.set(key, value); else url.searchParams.delete(key);
+      }
       const currentDepth = typeof window.history.state?.novastoreDepth === "number"
         ? window.history.state.novastoreDepth
         : 0;
@@ -350,7 +437,7 @@ export default function Prototype() {
   };
   const showNav = !["CAL-01", "CAL-06"].includes(route.cal);
   const hasFixedAppHeader = route.cal !== "CAL-06";
-  const routeIdentity = `${route.cal}:${route.tab}:${route.view || "root"}`;
+  const routeIdentity = `${route.cal}:${route.tab}:${route.view || "root"}:${route.storeSlug || "local"}:${route.productId || "none"}:${route.mode || "customer"}`;
   const scrollSurfaceIdentity = route.cal === "CAL-08" ? `${route.cal}:${route.tab}` : routeIdentity;
   const scrollSurfaceKey = `${scrollSurfaceIdentity}:${contentRevision}:${refreshRequest.id}`;
   const cartCount = cartLines.reduce((total, line) => total + line.quantity, 0);
@@ -360,6 +447,7 @@ export default function Prototype() {
     cartLines,
     appliedCoupon,
     selectedProductId,
+    publicProducts,
     addresses,
     paymentMethods,
     productReviews,
@@ -384,6 +472,7 @@ export default function Prototype() {
     clearCart: () => setCartLines([]),
     applyCartCoupon: (code) => setAppliedCoupon(code.trim().toLocaleUpperCase("tr-TR")),
     selectProduct: setSelectedProductId,
+    registerPublicProducts,
     addAddress: (address) => setAddresses((current) => [...current, { ...address, id: `address-${Date.now()}`, isDefault: current.length === 0 }]),
     updateAddress: (id, address) => setAddresses((current) => current.map((item) => item.id === id ? { ...item, ...address } : item)),
     removeAddress: (id) => setAddresses((current) => {
@@ -410,7 +499,7 @@ export default function Prototype() {
     selectCatalog: (category, subcategory = category) => setCatalogSelection({ category, subcategory }),
     applyCatalogFilters: (filters) => setCatalogFilters({ ...filters, applied: true }),
     setCatalogSort,
-  }), [favoriteIds, cartCount, cartLines, appliedCoupon, selectedProductId, addresses, paymentMethods, productReviews, productQuestions, readNotificationIds, notificationPreferences, catalogSelection, catalogFilters, catalogSort]);
+  }), [favoriteIds, cartCount, cartLines, appliedCoupon, selectedProductId, publicProducts, addresses, paymentMethods, productReviews, productQuestions, readNotificationIds, notificationPreferences, catalogSelection, catalogFilters, catalogSort, registerPublicProducts]);
 
   return (
     <CommerceContext.Provider value={commerce}>
@@ -439,7 +528,7 @@ export default function Prototype() {
           refreshRequest={refreshRequest}
           onRefresh={requestRefresh}
         >
-          {route.cal === "CAL-06" ? <ProductDetailScreen key={scrollSurfaceKey} go={go} /> : (
+          {route.cal === "CAL-06" ? <ProductDetailScreen key={scrollSurfaceKey} go={go} route={route} /> : (
             <MobileScroll key={scrollSurfaceKey} className={`cal-scroll${showNav ? " with-bottom-nav" : ""}`}>
               <main className={`cal-screen screen-${route.cal.toLowerCase()}${hasFixedAppHeader ? " has-fixed-topbar" : ""}`} aria-label={`${route.cal} ${CAL_TITLES[route.cal]}`}>
                 <Screen route={route} go={go} searchQuery={searchQuery} setSearchQuery={setSearchQuery} searchPanelOpen={searchPanelOpen} setSearchPanelOpen={setSearchPanelOpen} />
@@ -673,7 +762,7 @@ function RefreshableRouteStage({ resetKey, refreshRequest, onRefresh, children }
   );
 }
 
-type Go = (next: CalId, tab?: TabId, view?: ViewId) => void;
+type Go = (next: CalId, tab?: TabId, view?: ViewId, context?: RouteContext) => void;
 
 function RouteTopbar({ route, go, query, setQuery, setSearchPanelOpen }: { route: Route; go: Go; query: string; setQuery: (value: string) => void; setSearchPanelOpen: (open: boolean) => void }) {
   const commerceActions = {
@@ -691,7 +780,7 @@ function RouteTopbar({ route, go, query, setQuery, setSearchPanelOpen }: { route
   const openSearch = () => { setSearchPanelOpen(true); go("CAL-02", "home", "search"); };
   if (route.cal === "CAL-02") return <TopActions {...commerceActions} onSearch={openSearch} />;
   if (route.cal === "CAL-03") return <TopActions {...commerceActions} onSearch={openSearch} />;
-  if (route.cal === "CAL-04" && route.view === "store") return <TopActions title="Mağaza" back={() => goBackOr(() => go("CAL-06", "home"))} plainEnd />;
+  if (route.cal === "CAL-04" && route.view === "store") return <TopActions title="Mağaza" back={() => goBackOr(() => go("CAL-06", "home", "", { storeSlug: route.storeSlug, mode: route.mode }))} plainEnd />;
   if (route.cal === "CAL-04") return <TopActions {...commerceActions} title={route.tab === "favorites" ? "Favorilerim" : "Kablosuz Kulaklık"} back={() => route.tab === "favorites" ? go("CAL-02", "home") : go("CAL-03")} />;
   if (route.cal === "CAL-05") return <TopActions {...commerceActions} title="Kulaklıklar" back={() => go("CAL-04")} />;
   if (route.cal === "CAL-07") return <TopActions {...commerceActions} onSearch={openSearch} />;
@@ -724,9 +813,9 @@ function Screen({ route, go, searchQuery, setSearchQuery, searchPanelOpen, setSe
     case "CAL-01": return <LoginScreen go={go} view={route.view} />;
     case "CAL-02": return route.view === "search" ? <SearchScreen go={go} query={searchQuery} setQuery={setSearchQuery} panelOpen={searchPanelOpen} setPanelOpen={setSearchPanelOpen} /> : <HomeScreen go={go} />;
     case "CAL-03": return <CategoriesScreen go={go} />;
-    case "CAL-04": return route.view === "store" ? <StorefrontScreen go={go} /> : <PlpScreen go={go} favoritesOnly={route.tab === "favorites"} />;
+    case "CAL-04": return route.view === "store" ? <StorefrontScreen go={go} route={route} /> : <PlpScreen go={go} favoritesOnly={route.tab === "favorites"} />;
     case "CAL-05": return <FilterScreen go={go} />;
-    case "CAL-06": return <ProductDetailScreen go={go} />;
+    case "CAL-06": return <ProductDetailScreen go={go} route={route} />;
     case "CAL-07": return <CartScreen go={go} />;
     case "CAL-08": return <CheckoutScreen go={go} view={route.view} />;
     case "CAL-09": return <OrderDetailScreen go={go} view={route.view} />;
@@ -769,8 +858,8 @@ function SearchTopbar({ query, setQuery, onBack, onActivate }: { query: string; 
   );
 }
 
-function IconButton({ label, onClick, children, className = "", pressed }: { label: string; onClick?: () => void; children: ReactNode; className?: string; pressed?: boolean }) {
-  return <button type="button" className={`icon-button ${className}`} aria-label={label} aria-pressed={pressed} onClick={onClick}>{children}</button>;
+function IconButton({ label, onClick, children, className = "", pressed, disabled = false }: { label: string; onClick?: () => void; children: ReactNode; className?: string; pressed?: boolean; disabled?: boolean }) {
+  return <button type="button" className={`icon-button ${className}`} aria-label={label} aria-pressed={pressed} disabled={disabled} onClick={onClick}>{children}</button>;
 }
 
 function goBackOr(fallback: () => void) {
@@ -1121,7 +1210,7 @@ function CategoriesScreen({ go }: { go: Go }) {
   );
 }
 
-const products = [
+const products: Product[] = [
   { id: "pulse-anc", name: "Nova Pulse ANC Kulaklık", store: "Nova Audio Mağazası", price: "₺4.299", old: "₺5.199", image: PRODUCT_HERO, images: PRODUCT_GALLERY, badge: "%17" },
   { id: "sound-n1", name: "NovaSound N1 Kulaklık", store: "NovaSound", price: "₺1.299", old: "₺1.499", image: `${A}/extracts/order-headphones.png`, badge: "%13" },
   { id: "travel-case", name: "Nova Seyahat Valizi", store: "Nova Travel", price: "₺3.249", old: "₺3.799", image: `${A}/extracts/product-luggage-clean.png`, badge: "%14" },
@@ -1136,7 +1225,55 @@ const products = [
   { id: "barista-touch", name: "Nova Barista Touch", store: "Brewista Store", price: "₺8.299", old: "₺8.999", image: `${A}/extracts/product-coffee-clean.png`, badge: "%8" },
 ];
 
-type Product = (typeof products)[number];
+function formatCatalogPrice(value: number) {
+  return `₺${value.toLocaleString("tr-TR", {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+type ProductCardPriceFit = "regular" | "compact" | "tight";
+
+function productCardPriceFit(formattedPrice: string): ProductCardPriceFit {
+  const digitCount = formattedPrice.replace(/\D/g, "").length;
+  if (digitCount >= 10) return "tight";
+  if (digitCount >= 8) return "compact";
+  return "regular";
+}
+
+function productsFromPublicProjection(projection: CustomerPublicStoreProjection): Product[] {
+  return projection.products.map((source) => {
+    const originals = orderedCustomerOriginalMediaUrls(source);
+    const cardMedia = orderedCustomerCardMedia(source);
+    const image = originals[0] ?? source.imageUrl ?? LOGO;
+    const discount = source.oldPrice && source.oldPrice > source.price
+      ? Math.max(1, Math.round((1 - source.price / source.oldPrice) * 100))
+      : 0;
+    return {
+      id: source.id,
+      name: source.name,
+      store: projection.store.name,
+      price: formatCatalogPrice(source.price),
+      old: source.oldPrice === null ? undefined : formatCatalogPrice(source.oldPrice),
+      image,
+      images: originals.length ? originals : [image],
+      badge: discount ? `%${discount}` : undefined,
+      rating: source.averageRating,
+      reviewCount: source.reviewCount,
+      stock: source.stock,
+      amount: source.price,
+      oldAmount: source.oldPrice ?? undefined,
+      storeSlug: projection.store.slug,
+      storeLogoUrl: projection.store.logoUrl,
+      storeRating: projection.store.rating,
+      shippingSummary: projection.store.shippingSummary,
+      returnSummary: projection.store.returnSummary,
+      cardMedia,
+      isPurchasable: projection.store.status === "open" && source.isPurchasable,
+      isPublicProjection: true,
+    };
+  });
+}
 
 const CATEGORY_PRODUCT_IDS: Record<string, string[]> = {
   "Elektronik": ["pulse-anc", "sound-n1", "travel-case", "barista-pro", "pulse-studio", "sound-air-2", "cabin-light", "barista-mini", "pulse-office", "sound-move", "travel-pro", "barista-touch"],
@@ -1148,7 +1285,7 @@ const CATEGORY_PRODUCT_IDS: Record<string, string[]> = {
 };
 
 function productAmount(product: Product) {
-  return Number(product.price.replace(/\D/g, ""));
+  return product.amount ?? Number(product.price.replace(/\D/g, ""));
 }
 
 function productBrand(product: Product) {
@@ -1211,8 +1348,8 @@ const SORT_OPTIONS: Array<{ key: CatalogSortKey; label: string }> = [
 function sortProducts(source: Product[], sort: CatalogSortKey) {
   if (sort === "featured") return source;
   return [...source].sort((a, b) => {
-    const metaA = PRODUCT_SORT_META[a.id];
-    const metaB = PRODUCT_SORT_META[b.id];
+    const metaA = PRODUCT_SORT_META[a.id] ?? { bestSelling: a.reviewCount ?? 0, newest: 0, rating: a.rating ?? 0, reviews: a.reviewCount ?? 0 };
+    const metaB = PRODUCT_SORT_META[b.id] ?? { bestSelling: b.reviewCount ?? 0, newest: 0, rating: b.rating ?? 0, reviews: b.reviewCount ?? 0 };
     const primary = sort === "price-asc" ? productAmount(a) - productAmount(b)
       : sort === "price-desc" ? productAmount(b) - productAmount(a)
         : sort === "best-selling" ? metaB.bestSelling - metaA.bestSelling
@@ -1259,8 +1396,9 @@ function PlpScreen({ go, favoritesOnly = false }: { go: Go; favoritesOnly?: bool
 
 const STORE_SORT_OPTIONS = SORT_OPTIONS.filter((option) => ["featured", "best-selling", "newest", "price-asc", "price-desc", "rating"].includes(option.key));
 
-function StorefrontScreen({ go }: { go: Go }) {
+function StorefrontScreen({ go, route }: { go: Go; route: Route }) {
   const keyboard = useKeyboard();
+  const { registerPublicProducts, selectProduct } = useCommerce();
   const [following, setFollowing] = useState(false);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<"products" | "deals" | "profile">("products");
@@ -1269,11 +1407,51 @@ function StorefrontScreen({ go }: { go: Go }) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [discountOnly, setDiscountOnly] = useState(false);
   const [highRatedOnly, setHighRatedOnly] = useState(false);
-  const storeProducts = products.filter((product) => product.store === productDetailData.seller.name);
+  const [projection, setProjection] = useState<CustomerPublicStoreProjection | null>(null);
+  const [loadState, setLoadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [loadRevision, setLoadRevision] = useState(0);
+  const mode = route.mode ?? "customer";
+  const readOnlyPreview = mode === "preview";
+  const liveStore = NATIVE_SHELL || readOnlyPreview || new URLSearchParams(window.location.search).get("publicStore") === "1";
+  const requestedSlug = route.storeSlug ?? DEFAULT_PUBLIC_STORE_SLUG;
+
+  useEffect(() => {
+    if (!liveStore) {
+      setProjection(null);
+      setLoadState("idle");
+      return;
+    }
+    let active = true;
+    setLoadState("loading");
+    loadCanonicalPublicStore(requestedSlug)
+      .then((value) => {
+        if (!active) return;
+        setProjection(value);
+        setLoadState("ready");
+      })
+      .catch(() => {
+        if (!active) return;
+        setProjection(null);
+        setLoadState("error");
+      });
+    return () => { active = false; };
+  }, [liveStore, loadRevision, requestedSlug]);
+
+  const projectedProducts = useMemo(
+    () => projection ? productsFromPublicProjection(projection) : [],
+    [projection],
+  );
+  useEffect(() => {
+    if (projectedProducts.length) registerPublicProducts(projectedProducts);
+  }, [projectedProducts, registerPublicProducts]);
+
+  const storeProducts = liveStore
+    ? projectedProducts
+    : products.filter((product) => product.store === productDetailData.seller.name);
   const normalizedQuery = query.trim().toLocaleLowerCase("tr-TR");
   const queryFiltered = storeProducts.filter((product) => !normalizedQuery || product.name.toLocaleLowerCase("tr-TR").includes(normalizedQuery));
   const filterSource = tab === "deals" || discountOnly ? queryFiltered.filter((product) => Number(product.badge?.replace("%", "") || 0) >= 15) : queryFiltered;
-  const ratingFiltered = highRatedOnly ? filterSource.filter((product) => (PRODUCT_SORT_META[product.id]?.rating ?? 0) >= 4.8) : filterSource;
+  const ratingFiltered = highRatedOnly ? filterSource.filter((product) => (product.rating ?? PRODUCT_SORT_META[product.id]?.rating ?? 0) >= 4.8) : filterSource;
   const visibleProducts = sortProducts(ratingFiltered, sort);
   const activeFilterCount = Number(discountOnly) + Number(highRatedOnly);
   const sortLabel = STORE_SORT_OPTIONS.find((option) => option.key === sort)?.label ?? STORE_SORT_OPTIONS[0].label;
@@ -1282,27 +1460,54 @@ function StorefrontScreen({ go }: { go: Go }) {
     { id: "deals" as const, label: "Fırsatlar" },
     { id: "profile" as const, label: "Satıcı Hakkında" },
   ];
+  const storeName = projection?.store.name ?? (liveStore ? "NovaStore Mağaza" : "Nova Audio Mağazası");
+  const storeDescription = projection?.store.description || (liveStore ? "Güncel public mağaza kaydı" : "Güvenilir satıcı · Hızlı gönderici");
+  const storeRating = projection
+    ? projection.store.rating === null ? "—" : `${(projection.store.rating * 2).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} / 10`
+    : liveStore ? "—" : "9,6 / 10";
+  const storeFollowers = projection
+    ? projection.store.followerCount.toLocaleString("tr-TR")
+    : liveStore ? "—" : following ? "18,5 bin" : "18,4 bin";
+  const storeProductCount = projection?.store.productCount ?? (liveStore ? 0 : storeProducts.length);
+  const storeLogo = projection?.store.logoUrl ?? LOGO;
+  const storeCover = projection?.store.bannerUrl ?? (liveStore ? LOGO : PRODUCT_HERO);
+  const storeSearchPrompt = projection
+    ? `${storeName} içinde ara`
+    : liveStore ? "Mağazada ara" : "Nova Audio mağazasında ara";
+  const openProduct = (product: Product) => {
+    selectProduct(product.id);
+    if (product.isPublicProjection) {
+      go("CAL-06", "home", "", {
+        storeSlug: product.storeSlug ?? requestedSlug,
+        productId: product.id,
+        mode,
+      });
+    } else {
+      go("CAL-06", "home");
+    }
+  };
 
   return (
     <>
       <div className="root-layout store-layout" data-testid="storefront-screen">
+        {readOnlyPreview && <p className="preview-readonly-disclosure" data-testid="store-preview-read-only" role="status"><LockClosedIcon /> Satıcı önizlemesi · alışveriş işlemleri kapalıdır</p>}
         <section className="store-hero" aria-labelledby="store-name">
-          <div className="store-cover"><img src={PRODUCT_HERO} alt="" /></div>
+          <div className="store-cover"><img src={storeCover} alt="" /></div>
           <div className="store-profile-row">
-            <img className="store-logo" src={LOGO} alt="Nova Audio mağaza logosu" />
-            <div className="store-profile-copy"><h1 id="store-name"><span>Nova Audio Mağazası</span><SealCheckIcon weight="fill" aria-label="Doğrulanmış mağaza" /></h1><p>Güvenilir satıcı · Hızlı gönderici</p></div>
-            <button type="button" className={following ? "following" : ""} aria-pressed={following} onClick={() => setFollowing(!following)}>{following ? <><CheckIcon /> Takip ediliyor</> : <><PlusIcon /> Takip et</>}</button>
+            <img className="store-logo" src={storeLogo} alt={`${storeName} mağaza logosu`} />
+            <div className="store-profile-copy"><h1 id="store-name"><span>{storeName}</span>{!projection && <SealCheckIcon weight="fill" aria-label="Doğrulanmış mağaza" />}</h1><p>{storeDescription}</p></div>
+            <button type="button" className={following ? "following" : ""} aria-pressed={following} disabled={readOnlyPreview} aria-label={readOnlyPreview ? "Takip et · önizlemede kapalı" : undefined} onClick={() => setFollowing(!following)}>{following ? <><CheckIcon /> Takip ediliyor</> : <><PlusIcon /> Takip et</>}</button>
           </div>
-          <dl className="store-stats"><div><dt>Mağaza puanı</dt><dd>9,6 / 10</dd></div><div><dt>Takipçi</dt><dd>{following ? "18,5 bin" : "18,4 bin"}</dd></div><div><dt>Ürün</dt><dd>{storeProducts.length}</dd></div></dl>
+          <dl className="store-stats"><div><dt>Mağaza puanı</dt><dd>{storeRating}</dd></div><div><dt>Takipçi</dt><dd>{storeFollowers}</dd></div><div><dt>Ürün</dt><dd>{storeProductCount}</dd></div></dl>
         </section>
 
-        <label className="store-search-field"><MagnifyingGlassIcon /><KeyboardInput aria-label="Nova Audio mağazasında ara" placeholder="Nova Audio mağazasında ara" value={query} onChange={(event) => setQuery(event.target.value)} />{query && <button type="button" aria-label="Mağaza aramasını temizle" onClick={() => setQuery("")}><Cross1Icon /></button>}</label>
+        <label className="store-search-field"><MagnifyingGlassIcon /><KeyboardInput aria-label={storeSearchPrompt} placeholder={storeSearchPrompt} value={query} onChange={(event) => setQuery(event.target.value)} />{query && <button type="button" aria-label="Mağaza aramasını temizle" onClick={() => setQuery("")}><Cross1Icon /></button>}</label>
 
         <nav className="store-tabs" role="tablist" aria-label="Mağaza bölümleri">
           {tabs.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} key={item.id}>{item.label}</button>)}
         </nav>
 
-        {tab === "profile" ? <section className="store-about" aria-labelledby="store-about-title"><StorefrontIcon weight="duotone" /><div><h2 id="store-about-title">Nova Audio hakkında</h2><p>Kulaklık ve kişisel ses ürünlerine odaklanan doğrulanmış NovaStore satıcısıdır. Siparişler güvenli ödeme ve NovaStore müşteri desteği kapsamındadır.</p></div><dl><div><dt>Satıcı tipi</dt><dd>Yetkili satıcı</dd></div><div><dt>Fatura</dt><dd>E-arşiv fatura</dd></div><div><dt>Ortalama yanıt</dt><dd>2 saat içinde</dd></div></dl></section> : <section className="store-catalog" aria-labelledby="store-products-title">
+        {tab === "profile" ? <section className="store-about" aria-labelledby="store-about-title"><StorefrontIcon weight="duotone" /><div><h2 id="store-about-title">{storeName} hakkında</h2><p>{storeDescription}</p></div><dl><div><dt>Mağaza durumu</dt><dd>{projection?.store.status === "closed" ? "Kapalı" : "Açık"}</dd></div><div><dt>Teslimat</dt><dd>{projection?.store.shippingSummary || "Adres ve hazırlık süresine göre hesaplanır"}</dd></div><div><dt>İade</dt><dd>{projection?.store.returnSummary || "Koşullar ürün sayfasında gösterilir"}</dd></div></dl></section> : <section className="store-catalog" aria-labelledby="store-products-title">
           <header className="store-results-heading"><div><h2 id="store-products-title">{tab === "deals" ? "Fırsatlar" : "Tüm ürünler"}</h2><p>{visibleProducts.length} ürün gösteriliyor</p></div><div className="store-catalog-controls" aria-label="Mağaza liste araçları">
             <button type="button" aria-label="Filtrele" title={activeFilterCount > 0 ? `Filtrele · ${activeFilterCount} etkin` : "Filtrele"} aria-haspopup="dialog" onClick={() => { keyboard.hide(); setFilterOpen(true); }}><MixerHorizontalIcon /><span className="visually-hidden">Filtrele</span>{activeFilterCount > 0 && <b>{activeFilterCount}</b>}</button>
             <button type="button" aria-label="Sırala" title={`Sırala · ${sortLabel}`} aria-haspopup="dialog" onClick={() => { keyboard.hide(); setSortOpen(true); }}><PinLeftIcon /><span className="visually-hidden">Sırala</span></button>
@@ -1312,11 +1517,11 @@ function StorefrontScreen({ go }: { go: Go }) {
             <button type="button" className={highRatedOnly ? "selected" : ""} aria-pressed={highRatedOnly} onClick={() => setHighRatedOnly(!highRatedOnly)}>{highRatedOnly && <CheckIcon />} 4,8★ ve üzeri</button>
             <span aria-live="polite">{sortLabel}</span>
           </div>
-          {visibleProducts.length ? <div className="product-grid plp-products store-products-grid">{visibleProducts.map((product, index) => <ProductCard key={product.id} {...product} testId={`store-product-${index}`} onClick={() => go("CAL-06", "home")} />)}</div> : <div className="store-empty"><MagnifyingGlassIcon /><h2>Bu seçimde ürün bulunamadı</h2><p>Aramayı veya filtreleri temizleyerek tüm mağaza ürünlerine dönebilirsin.</p><button type="button" className="primary navy" onClick={() => { setQuery(""); setDiscountOnly(false); setHighRatedOnly(false); setTab("products"); }}>Tüm ürünleri göster</button></div>}
+          {liveStore && loadState === "loading" ? <div className="store-load-state" data-testid="public-store-loading" role="status"><ReloadIcon /><h2>Mağaza yükleniyor</h2><p>Güncel public mağaza bilgileri hazırlanıyor.</p></div> : liveStore && loadState === "error" ? <div className="store-load-state error" data-testid="public-store-error" role="alert"><StorefrontIcon /><h2>Mağaza şu anda yüklenemedi</h2><p>Bağlantını kontrol edip güvenli biçimde yeniden deneyebilirsin.</p><button type="button" className="primary navy" onClick={() => setLoadRevision((value) => value + 1)}>Yeniden Dene</button></div> : visibleProducts.length ? <div className="product-grid plp-products store-products-grid">{visibleProducts.map((product, index) => <ProductCard key={product.id} {...product} readOnlyPreview={readOnlyPreview} testId={`store-product-${index}`} onClick={() => openProduct(product)} />)}</div> : <div className="store-empty"><MagnifyingGlassIcon /><h2>Bu seçimde ürün bulunamadı</h2><p>Aramayı veya filtreleri temizleyerek tüm mağaza ürünlerine dönebilirsin.</p><button type="button" className="primary navy" onClick={() => { setQuery(""); setDiscountOnly(false); setHighRatedOnly(false); setTab("products"); }}>Tüm ürünleri göster</button></div>}
         </section>}
       </div>
 
-      <BottomSheet open={sortOpen} onOpenChange={setSortOpen} title="Mağazada sırala" description="Nova Audio ürünlerinin sırasını seç">
+      <BottomSheet open={sortOpen} onOpenChange={setSortOpen} title="Mağazada sırala" description={`${storeName} ürünlerinin sırasını seç`}>
         <div className="sort-options" role="radiogroup" aria-label="Mağaza ürün sıralaması">
           {STORE_SORT_OPTIONS.map((option) => <button type="button" role="radio" aria-checked={sort === option.key} className={sort === option.key ? "selected" : ""} onClick={() => { setSort(option.key); setSortOpen(false); }} key={option.key}><span>{option.label}</span><i>{sort === option.key && <CheckIcon />}</i></button>)}
         </div>
@@ -1333,17 +1538,21 @@ function StorefrontScreen({ go }: { go: Go }) {
   );
 }
 
-function ProductCard({ id, name, store, price, old, image, images, badge, onClick, testId }: { id: string; name: string; store: string; price: string; old?: string; image: string; images?: string[]; badge?: string; onClick: () => void; testId?: string }) {
+function ProductCard({ id, name, store, price, old, image, images, badge, rating = 4.8, reviewCount = 326, cardMedia, isPurchasable = true, readOnlyPreview = false, onClick, testId }: Product & { onClick: () => void; testId?: string; readOnlyPreview?: boolean }) {
   const { favoriteIds, toggleFavorite, addToCart, selectProduct } = useCommerce();
   const favorite = favoriteIds.has(id);
   const [added, setAdded] = useState(false);
   const [cartAnnouncement, setCartAnnouncement] = useState("");
   const [activeImage, setActiveImage] = useState(0);
   const [favoriteMotion, setFavoriteMotion] = useState<"add" | "remove" | null>(null);
+  const priceFit = productCardPriceFit(price);
+  const oldPriceFit = old ? productCardPriceFit(old) : undefined;
   const resetTimer = useRef<number | null>(null);
   const announcementTimer = useRef<number | null>(null);
   const favoriteTimer = useRef<number | null>(null);
-  const mediaImages = images?.length ? images : [image];
+  const mediaAssets: readonly ProductCardAsset[] = cardMedia?.length
+    ? cardMedia
+    : (images?.length ? images : [image]).map((url, index) => ({ id: `${id}-local-${index}`, url, cardFraming: null }));
   useEffect(() => () => {
     if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
     if (announcementTimer.current !== null) window.clearTimeout(announcementTimer.current);
@@ -1351,7 +1560,7 @@ function ProductCard({ id, name, store, price, old, image, images, badge, onClic
   }, []);
   useEffect(() => setActiveImage(0), [id]);
   const handleAdd = () => {
-    if (added) return;
+    if (added || readOnlyPreview || !isPurchasable) return;
     addToCart(id);
     setAdded(true);
     setCartAnnouncement(`${name} sepete eklendi`);
@@ -1361,6 +1570,7 @@ function ProductCard({ id, name, store, price, old, image, images, badge, onClic
     announcementTimer.current = window.setTimeout(() => setCartAnnouncement(""), 2_000);
   };
   const handleFavorite = () => {
+    if (readOnlyPreview) return;
     if (favoriteTimer.current !== null) window.clearTimeout(favoriteTimer.current);
     if (favorite) {
       setFavoriteMotion("remove");
@@ -1374,7 +1584,7 @@ function ProductCard({ id, name, store, price, old, image, images, badge, onClic
     toggleFavorite(id);
     favoriteTimer.current = window.setTimeout(() => setFavoriteMotion(null), 520);
   };
-  const showMediaImage = (index: number) => setActiveImage(Math.max(0, Math.min(mediaImages.length - 1, index)));
+  const showMediaImage = (index: number) => setActiveImage(Math.max(0, Math.min(mediaAssets.length - 1, index)));
   const openProduct = () => {
     selectProduct(id);
     onClick();
@@ -1383,42 +1593,56 @@ function ProductCard({ id, name, store, price, old, image, images, badge, onClic
     <article className="product-card" data-testid={testId} data-product-id={id} data-card-wave="css" data-card-cutout="gray-recess" data-card-cutout-fit="equal-top-left">
       <div className="product-media">
         <Carousel paged page={activeImage} onPageChange={setActiveImage} className="product-media-carousel" contentClassName="product-media-track" ariaLabel={`${name} ürün fotoğrafları`}>
-          {mediaImages.map((source, index) => (
+          {mediaAssets.map((asset, index) => (
             <button
               type="button"
               className="product-open-media product-media-slide"
               onClick={openProduct}
               aria-label={index === activeImage ? `${name} detayını aç` : `${name} ${index + 1}. ürün fotoğrafı`}
               tabIndex={index === activeImage ? 0 : -1}
-              key={`${id}-media-${index}`}
+              key={`${id}-media-${asset.id}`}
             >
-              <img src={source} alt={index === 0 ? name : `${name} · Görsel ${index + 1}`} draggable="false" />
+              <img
+                src={asset.url}
+                alt={index === 0 ? name : `${name} · Görsel ${index + 1}`}
+                draggable="false"
+                data-card-framing={asset.cardFraming ? "applied" : "none"}
+                data-card-focal-x={asset.cardFraming?.focalX}
+                data-card-focal-y={asset.cardFraming?.focalY}
+                data-card-zoom={asset.cardFraming?.zoom}
+                style={asset.cardFraming ? {
+                  objectPosition: `${asset.cardFraming.focalX * 100}% ${asset.cardFraming.focalY * 100}%`,
+                  transform: `scale(${asset.cardFraming.zoom})`,
+                  transformOrigin: `${asset.cardFraming.focalX * 100}% ${asset.cardFraming.focalY * 100}%`,
+                } : undefined}
+              />
             </button>
           ))}
         </Carousel>
-        {mediaImages.length > 1 && (
+        {mediaAssets.length > 1 && (
           <>
             <div className="product-gallery-arrows" role="group" aria-label={`${name} görsel geçişleri`}>
               <button type="button" className="previous" aria-label="Önceki ürün görseli" disabled={activeImage === 0} onClick={() => showMediaImage(Math.max(0, activeImage - 1))}><CaretRightIcon /></button>
-              <button type="button" className="next" aria-label="Sonraki ürün görseli" disabled={activeImage === mediaImages.length - 1} onClick={() => showMediaImage(Math.min(mediaImages.length - 1, activeImage + 1))}><CaretRightIcon /></button>
+              <button type="button" className="next" aria-label="Sonraki ürün görseli" disabled={activeImage === mediaAssets.length - 1} onClick={() => showMediaImage(Math.min(mediaAssets.length - 1, activeImage + 1))}><CaretRightIcon /></button>
             </div>
             <div className="product-media-position" role="group" aria-label={`${name} görsel seçici`}>
-              {mediaImages.map((_, index) => <button type="button" className={index === activeImage ? "active" : ""} aria-label={`${index + 1}. görseli göster`} aria-pressed={index === activeImage} onClick={() => showMediaImage(index)} key={`${id}-position-${index}`} />)}
+              {mediaAssets.map((asset, index) => <button type="button" className={index === activeImage ? "active" : ""} aria-label={`${index + 1}. görseli göster`} aria-pressed={index === activeImage} onClick={() => showMediaImage(index)} key={`${id}-position-${asset.id}`} />)}
             </div>
           </>
         )}
-        <span className="visually-hidden" role="status" aria-live="polite">Görsel {activeImage + 1} / {mediaImages.length}</span>
+        <span className="visually-hidden" role="status" aria-live="polite">Görsel {activeImage + 1} / {mediaAssets.length}</span>
         {badge && <b className="discount-badge"><span>{badge}</span></b>}
         <IconButton
           label={favorite ? "Favoriden çıkar" : "Favoriye ekle"}
           pressed={favorite}
+          disabled={readOnlyPreview}
           onClick={handleFavorite}
           className={`${favorite ? "favorite-active " : ""}${favoriteMotion ? `favorite-motion-${favoriteMotion}` : ""}`.trim()}
         >
           <PhosphorHeartIcon weight={favorite ? "fill" : "regular"} />
         </IconButton>
       </div>
-      <div className="product-copy"><span className="cart-cutout-shadow" aria-hidden="true"><i /></span><span className="bestseller"><img src={`${A}/extracts/bestseller-flame-source.png`} alt="" />Çok Satan</span><small>{store}</small><button type="button" className="product-title-action" onClick={openProduct}>{name}</button><div className="rating"><span className="rating-stars"><StarFilledIcon /><StarFilledIcon /><StarFilledIcon /><StarFilledIcon /><StarFilledIcon /></span><b>4,8</b><span>(326)</span></div><hr /><div className="price"><strong>{price}</strong>{old && <del>{old}</del>}</div><button type="button" className={`add-cart${added ? " feedback" : ""}`} data-state={added ? "confirmed" : "idle"} aria-label={added ? `${name} sepete eklendi` : `${name} sepete ekle`} aria-pressed={added} aria-disabled={added} onClick={handleAdd}><span className="add-cart-visual"><span className="cart-idle-glyph"><ShoppingCartSimpleIcon className="cart-resting-icon" weight="regular" /><PlusIcon className="cart-state-mark" /></span><CheckIcon className="cart-confirm-check" /></span></button><span className="visually-hidden" role="status" aria-live="polite">{cartAnnouncement}</span></div>
+      <div className="product-copy"><span className="cart-cutout-shadow" aria-hidden="true"><i /></span><span className="bestseller"><img src={`${A}/extracts/bestseller-flame-source.png`} alt="" />Çok Satan</span><small>{store}</small><button type="button" className="product-title-action" onClick={openProduct}>{name}</button><div className="rating"><span className="rating-stars"><StarFilledIcon /><StarFilledIcon /><StarFilledIcon /><StarFilledIcon /><StarFilledIcon /></span><b>{rating.toLocaleString("tr-TR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</b><span>({reviewCount})</span></div><hr /><div className="price" data-price-fit={priceFit} data-old-price-fit={oldPriceFit}><strong>{price}</strong>{old && <del>{old}</del>}</div><button type="button" className={`add-cart${added ? " feedback" : ""}`} data-state={added ? "confirmed" : "idle"} aria-label={readOnlyPreview ? `${name} sepete ekle · önizlemede kapalı` : added ? `${name} sepete eklendi` : !isPurchasable ? `${name} şu anda satın alınamaz` : `${name} sepete ekle`} aria-pressed={added} disabled={readOnlyPreview || !isPurchasable || added} aria-disabled={readOnlyPreview || !isPurchasable || added} onClick={handleAdd}><span className="add-cart-visual"><span className="cart-idle-glyph"><ShoppingCartSimpleIcon className="cart-resting-icon" weight="regular" /><PlusIcon className="cart-state-mark" /></span><CheckIcon className="cart-confirm-check" /></span></button><span className="visually-hidden" role="status" aria-live="polite">{cartAnnouncement}</span></div>
     </article>
   );
 }
@@ -1487,18 +1711,69 @@ const productDetailData = {
   campaign: "Sepette ek %5 indirim — kampanya koşulları ödeme adımında gösterilir.",
 };
 
-function ProductDetailScreen({ go }: { go: Go }) {
+function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   const keyboard = useKeyboard();
-  const { favoriteIds, toggleFavorite, addToCart, selectedProductId, productReviews, productQuestions, publishReview, submitProductQuestion } = useCommerce();
-  const catalogProduct = products.find((product) => product.id === selectedProductId) || products[0];
+  const { favoriteIds, toggleFavorite, addToCart, selectedProductId, selectProduct, publicProducts, registerPublicProducts, productReviews, productQuestions, publishReview, submitProductQuestion } = useCommerce();
+  const readOnlyPreview = route.mode === "preview";
+  const routedProduct = route.productId ? publicProducts[route.productId] : undefined;
+  const catalogProduct = routedProduct || publicProducts[selectedProductId] || products.find((product) => product.id === selectedProductId) || products[0];
+  const [remoteLoadState, setRemoteLoadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [remoteLoadRevision, setRemoteLoadRevision] = useState(0);
+
+  useEffect(() => {
+    if (!route.storeSlug || !route.productId || publicProducts[route.productId]) {
+      setRemoteLoadState("idle");
+      return;
+    }
+    let active = true;
+    setRemoteLoadState("loading");
+    loadCanonicalPublicStore(route.storeSlug)
+      .then((projection) => {
+        if (!active) return;
+        const incoming = productsFromPublicProjection(projection);
+        const target = incoming.find((product) => product.id === route.productId);
+        if (!target) throw new Error("PUBLIC_PRODUCT_NOT_FOUND");
+        registerPublicProducts(incoming);
+        selectProduct(target.id);
+        setRemoteLoadState("ready");
+      })
+      .catch(() => {
+        if (active) setRemoteLoadState("error");
+      });
+    return () => { active = false; };
+  }, [publicProducts, registerPublicProducts, remoteLoadRevision, route.productId, route.storeSlug, selectProduct]);
+
   const detail = useMemo(() => ({
     ...productDetailData,
     id: catalogProduct.id,
+    category: catalogProduct.isPublicProjection ? "Ürün" : productDetailData.category,
     name: catalogProduct.name,
     price: catalogProduct.price,
     oldPrice: catalogProduct.old,
+    discount: catalogProduct.badge ?? "",
+    rating: (catalogProduct.rating ?? 4.8).toLocaleString("tr-TR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+    reviewCount: catalogProduct.reviewCount ?? productDetailData.reviewCount,
     gallery: catalogProduct.images ?? [catalogProduct.image],
-    seller: { ...productDetailData.seller, name: catalogProduct.store },
+    seller: {
+      ...productDetailData.seller,
+      name: catalogProduct.store,
+      score: catalogProduct.storeRating === null || catalogProduct.storeRating === undefined
+        ? productDetailData.seller.score
+        : (catalogProduct.storeRating * 2).toLocaleString("tr-TR", { maximumFractionDigits: 1 }),
+    },
+    stock: catalogProduct.stock === undefined
+      ? productDetailData.stock
+      : catalogProduct.stock > 0 ? `Stokta · ${catalogProduct.stock} ürün` : "Stokta yok",
+    description: catalogProduct.isPublicProjection
+      ? "Bu ürünün güncel fiyat, stok ve medya bilgileri satıcının public mağaza kaydından gösteriliyor."
+      : productDetailData.description,
+    specs: catalogProduct.isPublicProjection
+      ? [["Ürün kodu", catalogProduct.id], ["Stok", String(catalogProduct.stock ?? 0)]]
+      : productDetailData.specs,
+    policies: catalogProduct.isPublicProjection
+      ? [["Teslimat", catalogProduct.shippingSummary || "Adres ve hazırlık süresine göre hesaplanır"], ["İade", catalogProduct.returnSummary || "Koşullar ödeme öncesinde gösterilir"]]
+      : productDetailData.policies,
+    campaign: catalogProduct.isPublicProjection ? "" : productDetailData.campaign,
   }), [catalogProduct]);
   const [color, setColor] = useState("Kırık Beyaz");
   const [qty, setQty] = useState(1);
@@ -1522,9 +1797,22 @@ function ProductDetailScreen({ go }: { go: Go }) {
   const favorite = favoriteIds.has(detail.id);
   const reviewsForProduct = productReviews.filter((review) => review.productId === detail.id);
   const ownReview = reviewsForProduct.find((review) => review.ownerId === CURRENT_MOCK_USER_ID);
-  const canReview = detail.id === "pulse-anc" && !ownReview;
-  const visibleQuestions = productQuestions.filter((question) => question.productId === detail.id && (question.status === "answered" || question.ownerId === CURRENT_MOCK_USER_ID));
+  const canReview = !readOnlyPreview && detail.id === "pulse-anc" && !ownReview;
+  const visibleQuestions = catalogProduct.isPublicProjection
+    ? []
+    : productQuestions.filter((question) => question.productId === detail.id && (question.status === "answered" || question.ownerId === CURRENT_MOCK_USER_ID));
   const displayedReviewCount = detail.reviewCount + reviewsForProduct.filter((review) => review.ownerId === CURRENT_MOCK_USER_ID).length;
+  const recommendationProducts = catalogProduct.isPublicProjection
+    ? Object.values(publicProducts).filter((product) => product.storeSlug === catalogProduct.storeSlug && product.id !== detail.id)
+    : products.filter((product) => product.id !== detail.id);
+  const openRecommendation = (product: Product) => {
+    selectProduct(product.id);
+    if (product.isPublicProjection) {
+      go("CAL-06", "home", "", { storeSlug: product.storeSlug, productId: product.id, mode: route.mode });
+      return;
+    }
+    go("CAL-06", "home");
+  };
 
   useEffect(() => () => { if (resetTimer.current !== null) window.clearTimeout(resetTimer.current); }, []);
   useEffect(() => {
@@ -1550,18 +1838,20 @@ function ProductDetailScreen({ go }: { go: Go }) {
     if (page !== boundedPage) setGalleryBoundaryRevision((revision) => revision + 1);
   };
   const handleAdd = () => {
+    if (readOnlyPreview || catalogProduct.isPurchasable === false) return;
     addToCart(detail.id, qty);
     setAdded(true);
     if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
     resetTimer.current = window.setTimeout(() => setAdded(false), 950);
   };
   const handleBuyNow = () => {
+    if (readOnlyPreview || catalogProduct.isPurchasable === false) return;
     addToCart(detail.id, qty);
     go("CAL-08", "cart");
   };
   const submitReview = (event: FormEvent) => {
     event.preventDefault();
-    if (!reviewDraft.trim()) return;
+    if (readOnlyPreview || !reviewDraft.trim()) return;
     keyboard.hide();
     publishReview(detail.id, reviewRating, reviewDraft);
     setReviewDraft("");
@@ -1570,6 +1860,7 @@ function ProductDetailScreen({ go }: { go: Go }) {
   };
   const submitQuestion = (event: FormEvent) => {
     event.preventDefault();
+    if (readOnlyPreview) return;
     const clean = questionDraft.trim();
     if (!clean) return;
     keyboard.hide();
@@ -1578,13 +1869,21 @@ function ProductDetailScreen({ go }: { go: Go }) {
     setQuestionOpen(false);
   };
   const openSellerQuestion = () => {
+    if (readOnlyPreview) return;
     setQuestionOpen(true);
     window.requestAnimationFrame(() => questionSection.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
+  if (route.storeSlug && route.productId && !publicProducts[route.productId] && remoteLoadState === "loading") {
+    return <div className="pdp-contract-load-state" data-testid="public-product-loading" role="status"><ReloadIcon /><h1>Ürün yükleniyor</h1><p>Güncel public ürün bilgileri hazırlanıyor.</p></div>;
+  }
+  if (route.storeSlug && route.productId && !publicProducts[route.productId] && remoteLoadState === "error") {
+    return <div className="pdp-contract-load-state error" data-testid="public-product-error" role="alert"><StorefrontIcon /><h1>Ürün şu anda yüklenemedi</h1><p>Güvenli bağlantıyı yeniden deneyebilirsin.</p><button type="button" className="primary navy" onClick={() => setRemoteLoadRevision((value) => value + 1)}>Yeniden Dene</button></div>;
+  }
+
   return (
     <>
       <header className="pdp-topbar" data-testid="app-topbar">
-        <IconButton label="Geri" onClick={() => go("CAL-04")}><img className="repo-icon" src={`${A}/official/nav/ic_customer_caret_left.svg`} alt="" /></IconButton>
+        <IconButton label="Geri" onClick={() => goBackOr(() => go("CAL-04", "home", "store", { storeSlug: route.storeSlug, mode: route.mode }))}><img className="repo-icon" src={`${A}/official/nav/ic_customer_caret_left.svg`} alt="" /></IconButton>
         <h1>NovaStore</h1>
         <div>
           <IconButton label="Paylaş" pressed={shared} onClick={() => {
@@ -1593,13 +1892,14 @@ function ProductDetailScreen({ go }: { go: Go }) {
             }
             setShared(true);
           }}><Share1Icon /></IconButton>
-          <IconButton label={favorite ? "Favoriden çıkar" : "Favoriye ekle"} pressed={favorite} onClick={() => toggleFavorite(detail.id)} className={favorite ? "favorite-active" : ""}><PhosphorHeartIcon weight={favorite ? "fill" : "regular"} /></IconButton>
+          <IconButton label={readOnlyPreview ? "Favoriye ekle · önizlemede kapalı" : favorite ? "Favoriden çıkar" : "Favoriye ekle"} pressed={favorite} disabled={readOnlyPreview} onClick={() => toggleFavorite(detail.id)} className={favorite ? "favorite-active" : ""}><PhosphorHeartIcon weight={favorite ? "fill" : "regular"} /></IconButton>
         </div>
         {shared && <span className="pdp-action-status" role="status">Paylaşım hazır</span>}
       </header>
       <MobileScroll className="cal-scroll pdp-scroll">
         <main className="cal-screen screen-cal-06 has-fixed-pdp-topbar" aria-label="CAL-06 Ürün Detayı">
-          <div className="detail-layout product-detail-layout" data-product-id={detail.id}>
+          <div className="detail-layout product-detail-layout" data-testid="product-detail-screen" data-product-id={detail.id} data-product-source={catalogProduct.isPublicProjection ? "public-store" : "local-calibration"}>
+            {readOnlyPreview && <p className="preview-readonly-disclosure pdp-preview-disclosure" data-testid="pdp-preview-read-only"><LockClosedIcon /> Satıcı önizlemesi · favori, sepet, ödeme, değerlendirme ve soru işlemleri kapalıdır</p>}
             <div className="pdp-grid">
               <section className="pdp-gallery">
                 <div className="pdp-media-shell">
@@ -1613,11 +1913,11 @@ function ProductDetailScreen({ go }: { go: Go }) {
               <section className="pdp-info">
                 <small>{detail.category}</small><h1>{detail.name}</h1>
                 <div className="rating large"><StarFilledIcon /><b>{detail.rating}</b><i /><button type="button" onClick={() => reviewSection.current?.scrollIntoView({ behavior: "smooth", block: "center" })}>{displayedReviewCount} değerlendirme</button></div>
-                <div className="price large"><strong>{detail.price}</strong><del>{detail.oldPrice}</del><span>{detail.discount}</span></div>
+                <div className="price large"><strong>{detail.price}</strong>{detail.oldPrice && <del>{detail.oldPrice}</del>}{detail.discount && <span>{detail.discount}</span>}</div>
                 <div className="variant"><h2>Renk</h2><div>{[{ label: "Kırık Beyaz", className: "cream" }, { label: "Gece Mavisi", className: "navy" }].map((item) => <button type="button" aria-label={item.label} aria-pressed={color === item.label} className={`${item.className}${color === item.label ? " active" : ""}`} onClick={() => setColor(item.label)} key={item.label}><i /><span>{item.label}</span></button>)}</div><small className="variant-selection">Seçim: {color} · {color === "Kırık Beyaz" ? "NS-PA-IV" : "NS-PA-NV"}</small></div>
-                <section className="pdp-seller-panel" aria-labelledby="pdp-seller-title"><h2 id="pdp-seller-title"><StorefrontIcon weight="duotone" /> Satıcı Bilgisi</h2><div className="pdp-seller-identity"><img src={LOGO} alt="" /><div><strong>{detail.seller.name} <SealCheckIcon weight="fill" aria-label="Doğrulanmış satıcı" /></strong><span>Güvenilir satıcı · Hızlı gönderici</span></div><b>{detail.seller.score}</b></div><div className="pdp-seller-actions"><button type="button" onClick={() => go("CAL-04", "home", "store")}>Mağazaya Git</button><button type="button" onClick={openSellerQuestion}>Satıcıya Sor</button></div></section>
+                <section className="pdp-seller-panel" aria-labelledby="pdp-seller-title"><h2 id="pdp-seller-title"><StorefrontIcon weight="duotone" /> Satıcı Bilgisi</h2><div className="pdp-seller-identity"><img src={catalogProduct.storeLogoUrl ?? LOGO} alt="" /><div><strong>{detail.seller.name} {!catalogProduct.isPublicProjection && <SealCheckIcon weight="fill" aria-label="Doğrulanmış satıcı" />}</strong><span>{catalogProduct.isPublicProjection ? "Public mağaza kaydı" : "Güvenilir satıcı · Hızlı gönderici"}</span></div><b>{detail.seller.score}</b></div><div className="pdp-seller-actions"><button type="button" onClick={() => go("CAL-04", "home", "store", { storeSlug: catalogProduct.storeSlug ?? route.storeSlug, mode: route.mode })}>Mağazaya Git</button><button type="button" disabled={readOnlyPreview} onClick={openSellerQuestion}>Satıcıya Sor</button></div></section>
                 <div className="pdp-stock"><CheckCircleIcon weight="fill" /><div><strong>{detail.stock}</strong><span>{detail.seller.invoice}</span></div></div>
-                <p className="campaign-note"><b>Kampanya</b>{detail.campaign}</p>
+                {detail.campaign && <p className="campaign-note"><b>Kampanya</b>{detail.campaign}</p>}
                 <section className={`pdp-description-section${readableText ? " is-readable" : ""}`} aria-labelledby="pdp-description-title">
                   <div className="pdp-description-heading"><h2 id="pdp-description-title">Ürün açıklaması ve özellikleri</h2><button type="button" className="pdp-text-size-toggle" aria-pressed={readableText} onClick={() => setReadableText(!readableText)}><TextAaIcon /> {readableText ? "Yazıları küçült" : "Yazıları büyüt"}</button></div>
                   <button type="button" className="pdp-description-toggle" aria-expanded={descriptionExpanded} aria-controls="pdp-description-copy" onClick={() => setDescriptionExpanded(!descriptionExpanded)}>
@@ -1636,16 +1936,16 @@ function ProductDetailScreen({ go }: { go: Go }) {
                 <div className="review-list">{reviewsForProduct.slice(0, reviewsExpanded ? reviewsForProduct.length : 2).map((review) => <article className="review-preview" key={review.id}><span className="review-avatar" aria-hidden="true"><PersonIcon /></span><div><header><b>{review.authorMasked}</b>{review.verified && <em><CheckIcon /> Doğrulanmış alışveriş</em>}</header><span>{review.copy}</span></div></article>)}</div>
                 {reviewOpen && <form className="pdp-inline-form review-form" onSubmit={submitReview}><h3>Ürünü değerlendir</h3><div className="review-stars" aria-label="Puan seç">{[1, 2, 3, 4, 5].map((value) => <button type="button" key={value} aria-label={`${value} yıldız`} aria-pressed={reviewRating === value} onClick={() => setReviewRating(value)}><StarFilledIcon /></button>)}</div><KeyboardTextarea aria-label="Değerlendirmen" value={reviewDraft} onChange={(event) => setReviewDraft(event.target.value)} placeholder="Deneyimini paylaş" /><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setReviewOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={!reviewDraft.trim()}>Gönder</button></div></form>}
               </article>
-              <article className="pdp-question-card" ref={questionSection}><div className="pdp-question-summary"><div><h2>Ürün soruları</h2><p>Ürünle ilgili merak ettiğini satıcıya sor.</p></div><button type="button" className="secondary" onClick={() => setQuestionOpen(!questionOpen)}>Soru Sor</button></div>{questionOpen && <form className="pdp-inline-form" onSubmit={submitQuestion}><KeyboardTextarea aria-label="Ürün hakkında sorun" maxLength={300} value={questionDraft} onChange={(event) => setQuestionDraft(event.target.value)} placeholder="Sorunu yaz" /><small>{questionDraft.length}/300</small><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setQuestionOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={!questionDraft.trim()}>Satıcıya Gönder</button></div></form>}<div className="question-thread-list">{visibleQuestions.map((question) => <article className="question-thread" data-status={question.status} key={question.id}><div className="question-block"><b>Soru · {question.authorMasked}</b><p>{question.question}</p></div>{question.status === "answered" ? <div className="answer-block"><b>Satıcı yanıtı</b><p>{question.answer}</p></div> : <small role="status"><ClockIcon /> Satıcı yanıtı bekleniyor · yalnızca sen görebilirsin</small>}</article>)}</div></article>
-              <section className="recommendations"><div className="section-title"><h2>Benzer ürünler</h2><button type="button" onClick={() => go("CAL-04")}>Tümünü Gör <ArrowRightIcon /></button></div><Carousel ariaLabel="Benzer ürünler" className="recommendation-carousel" contentClassName="recommendation-track">{products.filter((product) => product.id !== detail.id).slice(0, 5).map((product) => <ProductCard key={`recommend-${product.id}`} {...product} onClick={() => go("CAL-06", "home")} />)}</Carousel></section>
+              <article className="pdp-question-card" ref={questionSection}><div className="pdp-question-summary"><div><h2>Ürün soruları</h2><p>{readOnlyPreview ? "Satıcı önizlemesinde soru gönderimi kapalıdır." : "Ürünle ilgili merak ettiğini satıcıya sor."}</p></div><button type="button" className="secondary" disabled={readOnlyPreview} onClick={() => setQuestionOpen(!questionOpen)}>Soru Sor</button></div>{questionOpen && !readOnlyPreview && <form className="pdp-inline-form" onSubmit={submitQuestion}><KeyboardTextarea aria-label="Ürün hakkında sorun" maxLength={300} value={questionDraft} onChange={(event) => setQuestionDraft(event.target.value)} placeholder="Sorunu yaz" /><small>{questionDraft.length}/300</small><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setQuestionOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={!questionDraft.trim()}>Satıcıya Gönder</button></div></form>}<div className="question-thread-list">{visibleQuestions.map((question) => <article className="question-thread" data-status={question.status} key={question.id}><div className="question-block"><b>Soru · {question.authorMasked}</b><p>{question.question}</p></div>{question.status === "answered" ? <div className="answer-block"><b>Satıcı yanıtı</b><p>{question.answer}</p></div> : <small role="status"><ClockIcon /> Satıcı yanıtı bekleniyor · yalnızca sen görebilirsin</small>}</article>)}</div></article>
+              <section className="recommendations"><div className="section-title"><h2>Benzer ürünler</h2><button type="button" onClick={() => go("CAL-04", "home", catalogProduct.isPublicProjection ? "store" : "", { storeSlug: catalogProduct.storeSlug, mode: route.mode })}>Tümünü Gör <ArrowRightIcon /></button></div><Carousel ariaLabel="Benzer ürünler" className="recommendation-carousel" contentClassName="recommendation-track">{recommendationProducts.slice(0, 5).map((product) => <ProductCard key={`recommend-${product.id}`} {...product} readOnlyPreview={readOnlyPreview} onClick={() => openRecommendation(product)} />)}</Carousel></section>
             </section>
           </div>
         </main>
       </MobileScroll>
-      <footer className="pdp-footer" data-testid="pdp-sticky-footer">
-        <div className="quantity"><button aria-label="Adedi azalt" onClick={() => setQty(Math.max(1, qty - 1))}><MinusIcon /></button><b>{qty}</b><button aria-label="Adedi artır" onClick={() => setQty(qty + 1)}><PlusIcon /></button></div>
-        <button className={`pdp-add-to-cart${added ? " feedback" : ""}`} aria-label={added ? "Sepete eklendi" : "Sepete Ekle"} aria-pressed={added} disabled={added} onClick={handleAdd}>{added ? <CheckIcon className="pdp-confirm-check" /> : <ShoppingCartSimpleIcon weight="bold" />}<span>Sepete Ekle</span></button>
-        <button className="pdp-buy-now" onClick={handleBuyNow}>Hemen Al</button>
+      <footer className={`pdp-footer${readOnlyPreview ? " preview-readonly-footer" : ""}`} data-testid="pdp-sticky-footer">
+        {readOnlyPreview ? <p data-testid="pdp-preview-read-only-bar"><LockClosedIcon /> Salt okunur satıcı önizlemesi</p> : <><div className="quantity"><button aria-label="Adedi azalt" disabled={catalogProduct.isPurchasable === false} onClick={() => setQty(Math.max(1, qty - 1))}><MinusIcon /></button><b>{qty}</b><button aria-label="Adedi artır" disabled={catalogProduct.isPurchasable === false} onClick={() => setQty(qty + 1)}><PlusIcon /></button></div>
+        <button className={`pdp-add-to-cart${added ? " feedback" : ""}`} aria-label={added ? "Sepete eklendi" : catalogProduct.isPurchasable === false ? "Ürün şu anda satın alınamaz" : "Sepete Ekle"} aria-pressed={added} disabled={added || catalogProduct.isPurchasable === false} onClick={handleAdd}>{added ? <CheckIcon className="pdp-confirm-check" /> : <ShoppingCartSimpleIcon weight="bold" />}<span>Sepete Ekle</span></button>
+        <button className="pdp-buy-now" disabled={catalogProduct.isPurchasable === false} onClick={handleBuyNow}>Hemen Al</button></>}
       </footer>
       {viewerOpen && <section className="pdp-image-viewer" role="dialog" aria-modal="true" aria-label={`${detail.name} görsel görüntüleyici`}>
         <header><button type="button" aria-label="Görsel görüntüleyiciyi kapat" onClick={() => setViewerOpen(false)}><Cross1Icon /></button><b>{gallery + 1} / {detail.gallery.length}</b><span>1×–4× yakınlaştır</span></header>
@@ -1688,10 +1988,10 @@ function RecommendationCard({ product, go }: { product: (typeof products)[number
 }
 
 function CartScreen({ go }: { go: Go }) {
-  const { cartLines, cartCount, appliedCoupon, applyCartCoupon, changeCartQuantity, removeCartLine } = useCommerce();
+  const { cartLines, cartCount, appliedCoupon, applyCartCoupon, changeCartQuantity, removeCartLine, publicProducts } = useCommerce();
   const [coupon, setCoupon] = useState(appliedCoupon);
   const items = cartLines.flatMap((line) => {
-    const product = products.find((candidate) => candidate.id === line.productId);
+    const product = publicProducts[line.productId] ?? products.find((candidate) => candidate.id === line.productId);
     return product ? [{ ...line, product }] : [];
   });
   const subtotal = items.reduce((total, item) => total + productAmount(item.product) * item.quantity, 0);
@@ -1713,7 +2013,7 @@ function SummaryRows({ subtotal, discount, total }: { subtotal: number; discount
 }
 
 function CheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
-  const { addresses, cartLines, cartCount, appliedCoupon, clearCart } = useCommerce();
+  const { addresses, cartLines, cartCount, appliedCoupon, clearCart, publicProducts } = useCommerce();
   const [paid, setPaid] = useState(view === "success");
   const [cardholder, setCardholder] = useState("EBU ABDULLAH");
   const [cardNumber, setCardNumber] = useState("••••  ••••  ••••  4242");
@@ -1726,7 +2026,7 @@ function CheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
   const [draftAddress, setDraftAddress] = useState(customAddress);
   const selectedAddress = addresses.find((address) => address.id === selectedAddressId);
   const checkoutItems = cartLines.flatMap((line) => {
-    const product = products.find((candidate) => candidate.id === line.productId);
+    const product = publicProducts[line.productId] ?? products.find((candidate) => candidate.id === line.productId);
     return product ? [{ ...line, product }] : [];
   });
   const subtotal = checkoutItems.reduce((sum, item) => sum + productAmount(item.product) * item.quantity, 0);
