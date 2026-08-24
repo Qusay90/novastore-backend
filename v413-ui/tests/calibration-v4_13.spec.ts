@@ -132,8 +132,8 @@ test("PDP wave is a continuous curve and the 1x viewer recenters after vertical 
   expect(Math.abs(geometry.shellHeight - geometry.expectedHeroHeight)).toBeLessThanOrEqual(1);
   expect(Math.abs(geometry.carouselHeight - geometry.shellHeight)).toBeLessThanOrEqual(.5);
   expect(Math.abs(geometry.imageHeight - geometry.shellHeight)).toBeLessThanOrEqual(.5);
-  expect(geometry.imageObjectFit).toBe("cover");
-  expect(geometry.imageObjectPosition).toBe("50% 0%");
+  expect(geometry.imageObjectFit).toBe("contain");
+  expect(geometry.imageObjectPosition).toBe("50% 50%");
   expect(geometry.infoOverlap).toBeCloseTo(1, 0);
   expect(geometry.overlapHeight).toBe("16px");
   expect(geometry.overlapBackground).toBe("rgb(246, 240, 235)");

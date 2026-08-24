@@ -188,6 +188,8 @@ test("first product exposes a protected three-photo card carousel", () => {
   assert.doesNotMatch(prototype, /handleMediaScroll|mediaSettleTimer|settledImage/);
   assert.match(prototype, /className="product-gallery-arrows"/);
   assert.doesNotMatch(css, /scroll-snap/);
+  assert.match(rule(".product-media-carousel"), /container-type: inline-size/);
+  assert.match(rule(".product-media-slide"), /overflow: hidden/);
   const indicator = rule(".product-media-position button.active::after");
   assert.match(indicator, /width: 7px/);
   assert.match(indicator, /height: 7px/);

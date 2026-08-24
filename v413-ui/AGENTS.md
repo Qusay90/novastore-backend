@@ -208,6 +208,15 @@ The owner's August 24, 2026 product-card crop adds one narrow refinement without
 - Audit product-card typography against the accepted new-theme screenshots only on the canonical Android review profile (`font_scale=1.0`). Treat a larger emulator font scale as environment drift; preserve the accepted source hierarchy and avoid compensating for that drift with an app-wide or card-local font reduction.
 - Keep the product-card price row inside the cart-safe text column. Ordinary prices retain the accepted size; longer current prices step down only as much as needed, while an old struck-through price wraps below when the pair cannot share the row. Do not let either price enter the cart recess, clip a valid catalog value, or shrink unrelated card typography.
 
+## V4.13 R8-R2 Media Integrity
+
+The owner's August 24, 2026 Android recording adds these media requirements without changing the accepted V4.13 visual family or the R8-R1 product-card geometry:
+
+- Every paged ProductCard, PDP, and full-screen viewer media item owns exactly one carousel viewport. Bind slide sizing to that carousel's own inline-size coordinate system and clip each slide so adjacent media cannot paint into a settled viewport.
+- Product-card `card_framing { focal_x, focal_y, zoom }` remains valid, but its transform is isolated inside that individual card slide. It must never transform the track or bleed into another media item.
+- PDP and full-screen viewer media use the ordered original source with `object-fit: contain`; natural empty space is preferable to cropping. Card framing must never leak into either surface.
+- At fit/1×, a deliberate horizontal swipe changes exactly one media item. Above 1×, the zoomed image owns pan and the carousel is locked. Reset and media changes restore that media item's centered fit baseline before swipe navigation resumes.
+
 ## Keyboard Rule
 
 The simulated keyboard is a separate top-layer component. Before presenting anything that behaves like iOS navigation or modal UI, dismiss it first.

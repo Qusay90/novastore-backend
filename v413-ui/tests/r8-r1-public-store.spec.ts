@@ -103,6 +103,7 @@ test("new-theme cards apply framing while PDP and viewer keep original media", a
   await expect(page.getByTestId("pdp-preview-read-only-bar")).toBeVisible();
   const pdpImage = page.locator(".pdp-main-media img").first();
   await expect(pdpImage).toHaveAttribute("src", /\/media\/product-main\.png$/);
+  await expect(pdpImage).toHaveCSS("object-fit", "contain");
   await expect(pdpImage).toHaveCSS("transform", "none");
   await expect(page.locator(".pdp-main-media img")).toHaveCount(3);
 });
