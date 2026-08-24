@@ -35,6 +35,10 @@ html[data-novastore-runtime="native"] #root {
 }
 
 .native-mobile-screen {
+  top: var(--novastore-safe-top);
+  bottom: 0;
+  height: auto;
+  background: #f8f8f9;
   isolation: isolate;
 }
 
@@ -43,8 +47,8 @@ html[data-novastore-runtime="native"] #root {
 }
 
 .native-mobile-runtime .cal-app {
-  --shell-status-safe-top: var(--novastore-safe-top);
-  --shell-content-top: max(34px, calc(var(--novastore-safe-top) + 8px));
+  --shell-status-safe-top: 0px;
+  --shell-content-top: max(8px, calc(34px - var(--novastore-safe-top)));
   --shell-safe-bottom: var(--novastore-safe-bottom);
   --shell-content-bottom-reserve: calc(83px + var(--novastore-safe-bottom));
   --shell-sticky-bottom: calc(8px + var(--novastore-safe-bottom));

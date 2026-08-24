@@ -9,6 +9,9 @@ import static androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom;
 
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
+import android.view.View;
+import android.view.WindowInsetsController;
 import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -33,15 +36,45 @@ public class NativeShellInstrumentedTest {
     @Test
     public void localBundleUsesAuthoritativeUiWithoutFakeDeviceChrome() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            AtomicReference<Boolean> darkStatusIconsRef = new AtomicReference<>(false);
+            scenario.onActivity(activity -> {
+                boolean darkStatusIcons;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    darkStatusIcons = (activity.getWindow().getInsetsController().getSystemBarsAppearance()
+                        & WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS) != 0;
+                } else {
+                    darkStatusIcons = (activity.getWindow().getDecorView().getSystemUiVisibility()
+                        & View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR) != 0;
+                }
+                darkStatusIconsRef.set(darkStatusIcons);
+            });
+
             JSONObject state = evaluateJson(scenario,
-                "(() => ({" +
+                "(() => {" +
+                    "const root=document.querySelector('.native-mobile-runtime');" +
+                    "const screen=document.querySelector('[data-testid=native-mobile-screen]');" +
+                    "const topbar=document.querySelector('.fixed-app-header,.pdp-topbar');" +
+                    "const safeTop=Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--novastore-safe-top'))||0;" +
+                    "const screenRect=screen.getBoundingClientRect();" +
+                    "const topHit=document.elementFromPoint(innerWidth/2,Math.max(1,safeTop/2));" +
+                    "return {" +
                     "ready: document.readyState," +
                     "href: location.href," +
                     "runtime: document.documentElement.dataset.novastoreRuntime," +
                     "calibrationApps: document.querySelectorAll('[data-testid=calibration-app]').length," +
                     "fakeChrome: document.querySelectorAll('.phone-stage,.phone-bezel,.device-screen,.status-bar,.home-indicator-svg,.android-navigation-bar,.keyboard-dock').length," +
-                    "switchers: document.querySelectorAll('.cal-switcher').length" +
-                "}))()"
+                    "switchers: document.querySelectorAll('.cal-switcher').length," +
+                    "safeTop," +
+                    "screenTop:screenRect.top," +
+                    "screenBottom:screenRect.bottom," +
+                    "viewportBottom:innerHeight," +
+                    "topHitInsideScreen:screen.contains(topHit)," +
+                    "topHitIsMedia:Boolean(topHit?.closest('img,video,.product-card-media,.pdp-media'))," +
+                    "rootBackground:getComputedStyle(root).backgroundColor," +
+                    "physicalContentTop:topbar.getBoundingClientRect().top," +
+                    "expectedContentTop:Math.max(34,safeTop+8)" +
+                    "};" +
+                "})()"
             );
 
             assertEquals("complete", state.getString("ready"));
@@ -50,6 +83,14 @@ public class NativeShellInstrumentedTest {
             assertEquals(1, state.getInt("calibrationApps"));
             assertEquals(0, state.getInt("fakeChrome"));
             assertEquals(0, state.getInt("switchers"));
+            assertTrue(state.getDouble("safeTop") > 0);
+            assertEquals(state.getDouble("safeTop"), state.getDouble("screenTop"), 1.0);
+            assertEquals(state.getDouble("viewportBottom"), state.getDouble("screenBottom"), 1.0);
+            assertFalse(state.getBoolean("topHitInsideScreen"));
+            assertFalse(state.getBoolean("topHitIsMedia"));
+            assertEquals("rgb(248, 248, 249)", state.getString("rootBackground"));
+            assertEquals(state.getDouble("expectedContentTop"), state.getDouble("physicalContentTop"), 1.0);
+            assertTrue(darkStatusIconsRef.get());
         }
     }
 

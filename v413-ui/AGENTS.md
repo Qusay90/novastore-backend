@@ -226,6 +226,13 @@ The owner's August 24, 2026 final carousel decision adds one navigation rule whi
 - The counter, dots, active media control, and any thumbnail state follow the completed logical index. Endpoint arrows stay enabled, and viewer ArrowLeft/ArrowRight navigation uses the same modulo contract while Escape and zoom controls remain intact.
 - Preserve the accepted intentional-swipe threshold, one-neighbor settle, exact measured slide alignment, card-only framing, PDP/viewer original-media `contain`, and fit-versus-zoomed-pan ownership. One-media galleries do not synthesize movement; two-media galleries remain stable in both directions.
 
+## V4.13 R8-R4 Native Status-Bar Safe Area
+
+The owner's August 24, 2026 Android review adds one native-window rule without changing the accepted V4.13 page geometry, bottom navigation, keyboard, or media behavior:
+
+- Reserve the real Android top system-bar inset as an opaque Nova light surface. Customer content and media must begin below it and must never paint behind the clock, notification, network, or battery indicators.
+- Use dark Android status-bar indicators on that light surface. Preserve edge-to-edge handling for the navigation/gesture area and compensate the app-shell top offset so accepted toolbar positions do not move downward a second time.
+
 ## Keyboard Rule
 
 The simulated keyboard is a separate top-layer component. Before presenting anything that behaves like iOS navigation or modal UI, dismiss it first.
