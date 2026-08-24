@@ -1,0 +1,13 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+.playwright-cli/
+output/
+artifacts-v413-*
+android/.gradle/
+android/**/build/
+android/local.properties
+*.apk
+*.aab
+*.log

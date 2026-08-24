@@ -1,0 +1,4 @@
+Source: ../sources/product-card.png
+Crop: 190x190+575+1415
+Purpose: source-authoritative navy cart orb and organic card cut-out edge.
+The measured crop is scaled only into the matching product-card action slot.

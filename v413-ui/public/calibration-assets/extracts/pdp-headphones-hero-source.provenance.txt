@@ -1,0 +1,5 @@
+Source: 00_sources/SRC-13__ürün-detayı-bağlayıcı.png
+Source SHA-256: 47307314fa90538fcf39ea10d87335630602d5805a5ae4d4a917ac460a65c179
+Crop rectangle: x=0, y=78, width=759, height=650
+Palette adaptation: source purple cast selectively neutralized to the accepted NovaStore warm-neutral family; product pixels and geometry retained.
+Purpose: CAL-06 product-only hero visual (product, backdrop and light ring); UI controls remain live HTML.

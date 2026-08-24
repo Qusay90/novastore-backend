@@ -1,0 +1,4 @@
+Source: ../sources/product-card.png
+Crop: 64x64+85+1141
+Purpose: source-authoritative “Çok Satan” flame badge used by product cards.
+No generated or substitute artwork is used.

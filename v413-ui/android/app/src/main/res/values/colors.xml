@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#061E45</color>
+    <color name="colorPrimaryDark">#061E45</color>
+    <color name="colorAccent">#FE5A02</color>
+    <color name="novastore_page">#F8F8F9</color>
+</resources>

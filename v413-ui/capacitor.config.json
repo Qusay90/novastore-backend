@@ -1,0 +1,34 @@
+{
+  "appId": "com.novastore.app",
+  "appName": "NovaStore V4.13",
+  "webDir": "dist/native",
+  "loggingBehavior": "none",
+  "backgroundColor": "#f8f8f9",
+  "zoomEnabled": false,
+  "initialFocus": true,
+  "android": {
+    "path": "android",
+    "backgroundColor": "#f8f8f9",
+    "zoomEnabled": false,
+    "allowMixedContent": false,
+    "captureInput": false,
+    "webContentsDebuggingEnabled": false,
+    "loggingBehavior": "none",
+    "useLegacyBridge": false,
+    "resolveServiceWorkerRequests": false,
+    "includePlugins": ["@capacitor/app"]
+  },
+  "server": {
+    "hostname": "localhost",
+    "androidScheme": "https",
+    "cleartext": false,
+    "allowNavigation": []
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "disable",
+      "style": "DARK",
+      "hidden": false
+    }
+  }
+}
