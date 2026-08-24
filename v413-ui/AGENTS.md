@@ -200,6 +200,14 @@ The owner's August 13, 2026 follow-up extends V4.12 without weakening its seller
 - The white PDP detail cap uses one continuous responsive Bézier wave: the left side rises gently, the deeper trough sits toward the right, and the far-right edge returns with one small smooth lift. Linear ledges, polygon kinks, flat right notches, and skewed protrusions are forbidden.
 - The requested A–Z product audit is an evidence/reporting task. It must distinguish working local behavior, demo/status-only behavior, broken or no-op controls, and production/backend integration requirements; it does not authorize production credentials, migrations, payments, deploys, or remote mutations.
 
+## V4.13 R8-R1 Owner Refinement
+
+The owner's August 24, 2026 product-card crop adds one narrow refinement without weakening any existing V4.13 geometry, media, interaction, or accessibility contract:
+
+- Keep the cart recess shape and navy cart control unchanged, but reduce the recess-to-button clearance by only about one CSS pixel at phone card sizes so the gray/white cutout sits a little closer to the cart. Do not close the gap completely or move the button off its canonical center.
+- Audit product-card typography against the accepted new-theme screenshots only on the canonical Android review profile (`font_scale=1.0`). Treat a larger emulator font scale as environment drift; preserve the accepted source hierarchy and avoid compensating for that drift with an app-wide or card-local font reduction.
+- Keep the product-card price row inside the cart-safe text column. Ordinary prices retain the accepted size; longer current prices step down only as much as needed, while an old struck-through price wraps below when the pair cannot share the row. Do not let either price enter the cart recess, clip a valid catalog value, or shrink unrelated card typography.
+
 ## Keyboard Rule
 
 The simulated keyboard is a separate top-layer component. Before presenting anything that behaves like iOS navigation or modal UI, dismiss it first.

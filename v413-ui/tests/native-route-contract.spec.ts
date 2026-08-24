@@ -98,6 +98,29 @@ test("native route parser rejects illegal combinations and strips debug or secre
   expect(clean?.toString()).toBe("cal=CAL-06&tab=home&shell=native");
 });
 
+test("public store and PDP route context is typed, bounded, and preview fails closed", () => {
+  expect(canonicalNativeRoute(new URLSearchParams(
+    "cal=CAL-04&tab=home&view=store&storeSlug=main6v-nova-teknoloji&mode=preview&token=secret",
+  ))?.toString()).toBe(
+    "cal=CAL-04&tab=home&view=store&storeSlug=main6v-nova-teknoloji&mode=preview&shell=native",
+  );
+  expect(canonicalNativeRoute(new URLSearchParams(
+    "cal=CAL-06&tab=home&storeSlug=main6v-nova-teknoloji&productId=201&mode=customer",
+  ))?.toString()).toBe(
+    "cal=CAL-06&tab=home&storeSlug=main6v-nova-teknoloji&productId=201&mode=customer&shell=native",
+  );
+
+  for (const query of [
+    "cal=CAL-04&tab=home&view=store&storeSlug=../admin",
+    "cal=CAL-04&tab=home&view=store&productId=201",
+    "cal=CAL-04&tab=home&view=store&mode=preview",
+    "cal=CAL-06&tab=home&storeSlug=main6v-nova-teknoloji&productId=../../secret",
+    "cal=CAL-02&tab=home&storeSlug=main6v-nova-teknoloji",
+  ]) {
+    expect(canonicalNativeRoute(new URLSearchParams(query)), query).toBeNull();
+  }
+});
+
 test("deep links are origin and path constrained for cold and warm launch", () => {
   expect(nativeRouteFromAppUrl("https://novastore.tr/app/customer?cal=CAL-04&tab=home&view=store"))
     .not.toBeNull();

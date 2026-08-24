@@ -69,7 +69,10 @@ public class NativeShellInstrumentedTest {
             assertFalse(settings.getAllowContentAccess());
             assertFalse(settings.getAllowFileAccessFromFileURLs());
             assertFalse(settings.getAllowUniversalAccessFromFileURLs());
-            assertEquals(WebSettings.MIXED_CONTENT_NEVER_ALLOW, settings.getMixedContentMode());
+            assertEquals(
+                BuildConfig.DEBUG ? WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE : WebSettings.MIXED_CONTENT_NEVER_ALLOW,
+                settings.getMixedContentMode()
+            );
             assertFalse(settings.getJavaScriptCanOpenWindowsAutomatically());
             assertFalse(settings.supportMultipleWindows());
             assertTrue(settings.getMediaPlaybackRequiresUserGesture());
@@ -81,6 +84,7 @@ public class NativeShellInstrumentedTest {
                     "insets: Capacitor.isPluginAvailable('NovaInsets')," +
                     "print: Capacitor.isPluginAvailable('NovaPrint')," +
                     "share: Capacitor.isPluginAvailable('NovaShare')," +
+                    "publicStore: Capacitor.isPluginAvailable('NovaPublicStore')," +
                     "http: Capacitor.isPluginAvailable('CapacitorHttp')," +
                     "cookies: Capacitor.isPluginAvailable('CapacitorCookies')," +
                     "webview: Capacitor.isPluginAvailable('WebView')," +
@@ -92,6 +96,7 @@ public class NativeShellInstrumentedTest {
             assertTrue(bridge.getBoolean("insets"));
             assertTrue(bridge.getBoolean("print"));
             assertTrue(bridge.getBoolean("share"));
+            assertTrue(bridge.getBoolean("publicStore"));
             assertFalse(bridge.getBoolean("http"));
             assertFalse(bridge.getBoolean("cookies"));
             assertFalse(bridge.getBoolean("webview"));
@@ -263,6 +268,35 @@ public class NativeShellInstrumentedTest {
             );
             assertTrue(refresh.getInt("id") > 0);
             assertEquals("pull", refresh.getString("source"));
+        }
+    }
+
+    @Test
+    public void legacyMain6sNotificationAssertionIsStaleAndAuthoritativeSupportEscalationWorks() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            evaluate(scenario,
+                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-12&tab=support&shell=native');" +
+                    "dispatchEvent(new PopStateEvent('popstate'));true"
+            );
+            Thread.sleep(300);
+            JSONObject before = evaluateJson(scenario,
+                "(() => {const app=document.querySelector('[data-testid=calibration-app]');return {" +
+                    "cal:app?.dataset.calId||'',legacy:(app?.innerText||'').includes('Destek kaydın temsilciye aktarıldı.')," +
+                    "button:!!app?.querySelector('.escalate')};})()"
+            );
+            assertEquals("CAL-12", before.getString("cal"));
+            assertFalse(before.getBoolean("legacy"));
+            assertTrue(before.getBoolean("button"));
+
+            evaluate(scenario, "document.querySelector('.escalate')?.click();true");
+            Thread.sleep(200);
+            JSONObject after = evaluateJson(scenario,
+                "(() => {const text=document.querySelector('[data-testid=calibration-app]')?.innerText||'';return {" +
+                    "authoritative:text.includes('Seni canlı destek sırasına aldım.')," +
+                    "legacy:text.includes('Destek kaydın temsilciye aktarıldı.')};})()"
+            );
+            assertTrue(after.getBoolean("authoritative"));
+            assertFalse(after.getBoolean("legacy"));
         }
     }
 

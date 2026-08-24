@@ -28,7 +28,7 @@ test("cart recess derives equal top and left clearance from one radius", () => {
   assert.match(card, /--cart-edge-offset:/);
   assert.match(card, /--cart-visual-size:/);
   assert.match(card, /--cart-cradle-gap:/);
-  assert.match(card, /--cart-cradle-gap: clamp\(5px, 1\.3cqw, 6px\)/);
+  assert.match(card, /--cart-cradle-gap: clamp\(4px, 1\.05cqw, 5px\)/);
   assert.match(card, /--cart-cradle-radius: calc\(var\(--cart-visual-size\) \/ 2 \+ var\(--cart-cradle-gap\)\)/);
   assert.match(card, /--cart-center-inset:/);
   assert.match(card, /--cart-cradle-circle-handle: calc\(var\(--cart-cradle-radius\) \* \.55228475\)/);
@@ -61,6 +61,31 @@ test("product information clears the media wave and keeps responsive side paddin
   assert.match(price, /max-width: calc\(100% - var\(--cart-visual-size\) - 3px\)/);
   assert.match(tabletCopy, /padding: calc\(var\(--card-wave-right-lift\) \+ var\(--card-info-top-gap\)\)/);
   assert.doesNotMatch(css, /--card-wave-depth/);
+});
+
+test("long prices remain inside the cart-safe column without shrinking ordinary card copy", () => {
+  const price = rule(".product-copy .price");
+  const currentPrice = rule(".product-copy .price strong");
+  const oldPrice = rule(".product-copy .price del");
+  const compactCurrentPrice = rule('.product-copy .price[data-price-fit="compact"] strong');
+  const tightCurrentPrice = rule('.product-copy .price[data-price-fit="tight"] strong');
+  const compactOldPrice = rule('.product-copy .price[data-old-price-fit="compact"] del');
+
+  assert.match(price, /max-width: calc\(100% - var\(--cart-visual-size\) - 3px\)/);
+  assert.match(price, /flex-wrap: wrap/);
+  assert.match(price, /column-gap: clamp\(3px, 1cqw, 5px\)/);
+  assert.match(currentPrice, /max-width: 100%/);
+  assert.match(currentPrice, /font-size: 17px/);
+  assert.match(currentPrice, /font-variant-numeric: tabular-nums/);
+  assert.match(oldPrice, /max-width: 100%/);
+  assert.match(oldPrice, /font-size: 10px/);
+  assert.match(compactCurrentPrice, /font-size: 15\.5px/);
+  assert.match(tightCurrentPrice, /font-size: 14px/);
+  assert.match(compactOldPrice, /font-size: 9px/);
+  assert.match(prototype, /function productCardPriceFit\(formattedPrice: string\)/);
+  assert.match(prototype, /if \(digitCount >= 10\) return "tight"/);
+  assert.match(prototype, /if \(digitCount >= 8\) return "compact"/);
+  assert.match(prototype, /data-price-fit=\{priceFit\} data-old-price-fit=\{oldPriceFit\}/);
 });
 
 test("peeled white body carries a narrow contact shadow around the full cart cutout", () => {
@@ -145,6 +170,7 @@ test("reference-scaled card chrome stays compact and light", () => {
   assert.match(bestseller, /font-size: 7px/);
   assert.match(store, /font-size: 7\.5px/);
   assert.match(title, /font-weight: 500/);
+  assert.match(title, /font-size: clamp\(9\.2px, 2\.45cqw, 10\.1px\)/);
   assert.match(cartGlyph, /width: clamp\(19px, 5\.1cqw, 22px\)/);
   assert.match(plus, /top: -2px/);
   assert.match(plus, /right: -1px/);
@@ -155,10 +181,10 @@ test("first product exposes a protected three-photo card carousel", () => {
   assert.match(prototype, /const PRODUCT_GALLERY = \[/);
   assert.match(prototype, /images: PRODUCT_GALLERY/);
   assert.match(prototype, /<Carousel paged page=\{activeImage\} onPageChange=\{setActiveImage\} className="product-media-carousel"/);
-  assert.match(prototype, /mediaImages\.map\(\(source, index\)/);
+  assert.match(prototype, /mediaAssets\.map\(\(asset, index\)/);
   assert.match(prototype, /showMediaImage\(index\)/);
   assert.match(prototype, /aria-label=\{`\$\{index \+ 1\}\. görseli göster`\}/);
-  assert.match(prototype, /Görsel \{activeImage \+ 1\} \/ \{mediaImages\.length\}/);
+  assert.match(prototype, /Görsel \{activeImage \+ 1\} \/ \{mediaAssets\.length\}/);
   assert.doesNotMatch(prototype, /handleMediaScroll|mediaSettleTimer|settledImage/);
   assert.match(prototype, /className="product-gallery-arrows"/);
   assert.doesNotMatch(css, /scroll-snap/);
