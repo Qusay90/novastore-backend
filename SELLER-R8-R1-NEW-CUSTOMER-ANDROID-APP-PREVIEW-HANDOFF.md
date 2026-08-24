@@ -1,6 +1,10 @@
 # Seller R8-R1 — New Customer Android App Preview Handoff
 
-Status: `READY_FOR_SEPARATE_SELLER_R8_AUTHORIZATION`
+Status: `SUPERSEDED_BY_R8_R2_MEDIA_FIX`
+
+Successor: `SELLER-R8-R2-NEW-CUSTOMER-ANDROID-APP-PREVIEW-HANDOFF.md`
+
+This R8-R1 identity must not be consumed after the R8-R2 media fix. The historical requirements below remain preserved for audit only.
 
 ## Superseded authority
 
