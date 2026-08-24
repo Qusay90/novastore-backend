@@ -28,7 +28,7 @@ test("cart recess derives equal top and left clearance from one radius", () => {
   assert.match(card, /--cart-edge-offset:/);
   assert.match(card, /--cart-visual-size:/);
   assert.match(card, /--cart-cradle-gap:/);
-  assert.match(card, /--cart-cradle-gap: clamp\(4px, 1\.05cqw, 5px\)/);
+  assert.match(card, /--cart-cradle-gap: clamp\(2px, \.525cqw, 2\.5px\)/);
   assert.match(card, /--cart-cradle-radius: calc\(var\(--cart-visual-size\) \/ 2 \+ var\(--cart-cradle-gap\)\)/);
   assert.match(card, /--cart-center-inset:/);
   assert.match(card, /--cart-cradle-circle-handle: calc\(var\(--cart-cradle-radius\) \* \.55228475\)/);
@@ -139,6 +139,10 @@ test("cart sits at the balanced corner and uses the reference plus badge", () =>
   assert.match(plus, /color: var\(--nova-deep\)/);
   assert.match(plus, /background: #fff/);
   assert.match(check, /color: #35d275/);
+  assert.doesNotMatch(check, /clip-path/);
+  assert.match(rule(".add-cart.feedback:disabled"), /opacity: 1/);
+  assert.match(rule(".add-cart.feedback .cart-idle-glyph"), /animation: cart-fold-into-check \.2s ease-out both/);
+  assert.match(rule(".add-cart.feedback .cart-confirm-check"), /animation: cart-check-morph \.26s cubic-bezier\(\.2,\.82,\.24,1\) both/);
   assert.match(css, /@keyframes cart-fold-into-check/);
   assert.match(css, /@keyframes cart-check-morph/);
   assert.match(prototype, /<span className="add-cart-visual"><span className="cart-idle-glyph">/);

@@ -22,6 +22,11 @@ test("Android branding is generated from the official NovaStore icon", () => {
   const packagedOfficial = readFileSync(join(res, "drawable-nodpi", "novastore_app_icon.png"));
   assert.deepEqual(packagedOfficial, official);
 
+  const launcherForeground = readFileSync(join(res, "drawable", "novastore_launcher_foreground.xml"), "utf8");
+  assert.match(launcherForeground, /android:width="74dp"/);
+  assert.match(launcherForeground, /android:height="74dp"/);
+  assert.match(launcherForeground, /android:src="@drawable\/novastore_app_icon"/);
+
   const expectedPixels = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
   for (const [density, pixels] of Object.entries(expectedPixels)) {
     for (const name of ["ic_launcher.png", "ic_launcher_round.png"]) {

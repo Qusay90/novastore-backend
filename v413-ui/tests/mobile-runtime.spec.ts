@@ -70,6 +70,26 @@ test("vertical intent over a carousel is handed to MobileScroll in both directio
   expect(await parent.evaluate((element) => element.scrollTop)).toBeLessThan(80);
 });
 
+test("initial horizontal finger wobble cannot steal a vertical carousel drag", async ({ page }) => {
+  const card = page.locator(".carousel-card").nth(1);
+  const carousel = page.locator(".fixture-carousel");
+  const parent = page.getByTestId("mobile-scroll");
+  const box = await card.boundingBox();
+  if (!box) throw new Error("Card has no bounding box");
+  const startX = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 9, startY - 8);
+  await page.waitForTimeout(8);
+  await page.mouse.move(startX + 11, startY - 120, { steps: 5 });
+  await page.mouse.up();
+
+  expect(await parent.evaluate((element) => element.scrollTop)).toBeGreaterThan(40);
+  expect(await carousel.evaluate((element) => element.scrollLeft)).toBe(0);
+});
+
 test("tap activates a card but a completed drag does not", async ({ page }) => {
   const firstCard = page.locator(".carousel-card").first();
   await firstCard.click();

@@ -7,7 +7,7 @@
   "src/main.tsx": "99a08fa42b8465aca43ba04ad8641c41d4668e626e5ef1b199d9f4b2a8a3f0bd",
   "src/styles.css": "af491fc801b5b57356ae5af902e8527f23b16a7bab6b8169af3d4ce526414f3f",
   "src/mobile/BottomSheet.tsx": "9230b826eb384f00f03ec916ae50d477afe3f327e75be5b582bc804756e074aa",
-  "src/mobile/Carousel.tsx": "5476a3fb566947c387d7016f1ab354bafaa23ce45cf21c7e4a3181fddba20706",
+  "src/mobile/Carousel.tsx": "97a2b9a72d6ab1d86fd261f5613f5476252f1f6f98410a2b0d4c5f4433ba18d1",
   "src/mobile/Device.tsx": "fcd979b0db02a17b6398de4c014c370dc14191608469db219483d4038d3b124f",
   "src/mobile/FlowStack.tsx": "69122c5070826288d9788fff6332b55e1a7ba109995e0dc38fd07d1778b713af",
   "src/mobile/Keyboard.tsx": "ecb15dfa38261a212f6ab69d6f2527608025fbfbe286a470d98740caa722d809",

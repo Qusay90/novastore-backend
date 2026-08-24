@@ -38,6 +38,7 @@ const physics = {
   maxOverdrag: 96,
   sampleWindow: 100,
   dragThreshold: 8,
+  axisLockRatio: 1.35,
 } as const;
 
 export function pagedCarouselBounds(startPage: number, viewport: number, maximumOffset: number) {
@@ -454,13 +455,20 @@ export function Carousel({
       // Keep the gesture pending until it clears tap slop. Pointer-down and
       // these early moves must bubble so a parent MobileScroll can still win.
       if (Math.max(Math.abs(delta), Math.abs(crossDelta)) < physics.dragThreshold) return;
-      if (Math.abs(crossDelta) > Math.abs(delta)) {
+      const horizontalIntent = (
+        Math.abs(delta) >= physics.dragThreshold &&
+        Math.abs(delta) >= Math.abs(crossDelta) * physics.axisLockRatio
+      );
+      if (!horizontalIntent && Math.abs(crossDelta) >= physics.dragThreshold) {
         // The cross axis won. Abandon this session without capturing or
         // canceling the event so the parent can handle this move and release.
+        // Requiring clear horizontal dominance prevents a small initial finger
+        // wobble from stealing a vertical product-list scroll.
         sessionRef.current = null;
         if (paged) settlePage(node, session.startPage, false);
         return;
       }
+      if (!horizontalIntent) return;
       // The scroller owns the gesture from this move onward. Capture keeps
       // delivery stable outside its bounds; stopping propagation prevents the
       // parent from accumulating vertical drift or release momentum.

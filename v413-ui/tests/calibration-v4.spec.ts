@@ -987,7 +987,8 @@ test.describe("V4.4 screen-specific acceptance guards", () => {
     expect(animationState.state).toBe("confirmed");
     expect(animationState.idle).toBe("cart-fold-into-check");
     expect(animationState.check).toBe("cart-check-morph");
-    await page.waitForTimeout(660);
+    await expect(addToCart).toHaveCSS("opacity", "1");
+    await expect.poll(async () => Number(await addToCart.locator(".cart-confirm-check").evaluate((element) => getComputedStyle(element).opacity)), { timeout: 350 }).toBeGreaterThan(.95);
     await expect(addToCart.locator(".cart-confirm-check")).toHaveCSS("color", "rgb(53, 210, 117)");
     expect(await addToCart.locator(".add-cart-visual").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(shape.orbBackground);
     const confirmingRect = await box(addToCart);
