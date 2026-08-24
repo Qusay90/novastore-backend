@@ -1,6 +1,12 @@
 # Seller R8-R2 — New Customer Android App Preview Handoff
 
-Status: `READY_FOR_SEPARATE_SELLER_R8_AUTHORIZATION`
+Status: `SUPERSEDED_BY_R8_R3_WRAPAROUND`
+
+Successor: `SELLER-R8-R3-NEW-CUSTOMER-ANDROID-APP-PREVIEW-HANDOFF.md`
+
+Seller R8 must not consume this R8-R2 implementation identity. R8-R3 preserves
+the accepted R8-R2 media-integrity contract and adds the owner-required circular
+last-to-first and first-to-last navigation behavior.
 
 ## Superseded authority
 

@@ -19,11 +19,12 @@ Müşteri önizlemesi
 ## Uygulama mağaza görünümü
 
 - Authority is the `NEW CUSTOMER ANDROID THEME` and its canonical new Store presentation.
-- Consume `SELLER-R8-R2-NEW-CUSTOMER-ANDROID-APP-PREVIEW-HANDOFF.md` at presentation implementation commit `72e83aa560ce44ac35dbe72c9abde6a77e4acc1b` / tree `41327e91b936132958252eb452dd989694130801`.
-- `SELLER-R8-R1-NEW-CUSTOMER-ANDROID-APP-PREVIEW-HANDOFF.md` is `SUPERSEDED_BY_R8_R2_MEDIA_FIX` and its old implementation identity must not be consumed.
+- Consume `SELLER-R8-R3-NEW-CUSTOMER-ANDROID-APP-PREVIEW-HANDOFF.md` at presentation implementation commit `ad15931b1a7889316a9f13c299cabfa463036705` / tree `e4c6860070bec2807c55d2e08d4bd1472bcad9df`.
+- `SELLER-R8-R2-NEW-CUSTOMER-ANDROID-APP-PREVIEW-HANDOFF.md` is `SUPERSEDED_BY_R8_R3_WRAPAROUND`; R8-R2 and R8-R1 implementation identities must not be consumed.
 - The old R8 Compose/white-teal Android UI and `SELLER-R8-CUSTOMER-ANDROID-APP-PREVIEW-HANDOFF.md` are `SUPERSEDED_DO_NOT_CONSUME`.
 - Preserve the new V4.13 navy/orange visual family, wave ProductCard, canonical Store/PDP, and rounded/glass navigation treatment.
 - Use normalized `card_framing` only on individually clipped card slides; use full original `contain` media with clean discrete paging and zero settled adjacent bleed on PDP and viewer.
+- Multi-media ProductCard, PDP, and viewer navigation is circular: last → first and first → last in one valid gesture, with counter/dot synchronization and zero endpoint rubber-band or snap-back.
 - Preserve `mode=preview` through Store → product → PDP → Back.
 
 The preferred implementation is an approved interactive host of the shared canonical Customer Android presentation. If a Web host cannot execute that presentation directly, any alternative requires explicit owner approval and must remain deterministically derived from the same public DTO, route identity, visual source, card geometry, framing tuple, original-media rule, and read-only capability matrix.
