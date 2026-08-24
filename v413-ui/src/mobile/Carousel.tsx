@@ -1,12 +1,19 @@
 import {
+  Children,
+  cloneElement,
+  isValidElement,
   useCallback,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type PropsWithChildren,
+  type ReactElement,
+  type ReactNode,
 } from "react";
 
 export type CarouselProps = PropsWithChildren<{
@@ -16,6 +23,7 @@ export type CarouselProps = PropsWithChildren<{
   showScrollbar?: boolean;
   draggingEnabled?: boolean;
   paged?: boolean;
+  circular?: boolean;
   page?: number;
   onPageChange?: (page: number) => void;
 }>;
@@ -72,6 +80,61 @@ export function pagedCarouselSettleProgress(value: number) {
   return 1 - Math.pow(1 - progress, 3);
 }
 
+export function normalizeCircularCarouselPage(value: number, pageCount: number) {
+  const count = Math.max(0, Math.floor(pageCount));
+  if (count <= 1) return 0;
+  const rounded = Math.round(value);
+  return ((rounded % count) + count) % count;
+}
+
+export function circularCarouselPhysicalPage(logicalPage: number, pageCount: number) {
+  const count = Math.max(0, Math.floor(pageCount));
+  return count > 1 ? normalizeCircularCarouselPage(logicalPage, count) + 1 : 0;
+}
+
+export function circularCarouselLogicalPage(physicalPage: number, pageCount: number) {
+  const count = Math.max(0, Math.floor(pageCount));
+  return count > 1 ? normalizeCircularCarouselPage(Math.round(physicalPage) - 1, count) : 0;
+}
+
+export function normalizeCircularCarouselPhysicalPage(physicalPage: number, pageCount: number) {
+  const count = Math.max(0, Math.floor(pageCount));
+  if (count <= 1) return 0;
+  const rounded = Math.round(physicalPage);
+  if (rounded <= 0) return count;
+  if (rounded >= count + 1) return 1;
+  return rounded;
+}
+
+export function circularCarouselControlledPhysicalTarget({
+  currentLogicalPage,
+  requestedLogicalPage,
+  pageCount,
+}: {
+  currentLogicalPage: number;
+  requestedLogicalPage: number;
+  pageCount: number;
+}) {
+  const count = Math.max(0, Math.floor(pageCount));
+  if (count <= 1) return 0;
+  const current = normalizeCircularCarouselPage(currentLogicalPage, count);
+  const requested = normalizeCircularCarouselPage(requestedLogicalPage, count);
+  if (current === count - 1 && requested === 0) return count + 1;
+  if (current === 0 && requested === count - 1) return 0;
+  return circularCarouselPhysicalPage(requested, count);
+}
+
+function cloneCircularEdge(child: ReactNode, edge: "leading" | "trailing") {
+  if (!isValidElement(child)) return child;
+  return cloneElement(child as ReactElement<Record<string, unknown>>, {
+    key: `mobile-carousel-${edge}-clone`,
+    "aria-hidden": true,
+    "data-carousel-clone": edge,
+    inert: true,
+    tabIndex: -1,
+  });
+}
+
 type Sample = { value: number; time: number };
 type DragSession = {
   pointerId: number;
@@ -90,22 +153,40 @@ export function Carousel({
   showScrollbar = false,
   draggingEnabled = true,
   paged = false,
+  circular = false,
   page,
   onPageChange,
   children,
 }: CarouselProps) {
+  const logicalChildren = useMemo(() => Children.toArray(children), [children]);
+  const logicalPageCount = logicalChildren.length;
+  const circularPaged = paged && circular && logicalPageCount > 1;
+  const renderedChildren = useMemo(() => circularPaged
+    ? [
+        cloneCircularEdge(logicalChildren[logicalPageCount - 1], "leading"),
+        ...logicalChildren,
+        cloneCircularEdge(logicalChildren[0], "trailing"),
+      ]
+    : logicalChildren, [circularPaged, logicalChildren, logicalPageCount]);
+  const initialLogicalPage = circularPaged
+    ? normalizeCircularCarouselPage(page ?? 0, logicalPageCount)
+    : Math.max(0, Math.floor(page ?? 0));
+  const initialPhysicalPage = circularPaged
+    ? circularCarouselPhysicalPage(initialLogicalPage, logicalPageCount)
+    : initialLogicalPage;
   const scrollRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<DragSession | null>(null);
   const samplesRef = useRef<Sample[]>([]);
   const frameRef = useRef<number | null>(null);
   const overdragRef = useRef(0);
   const suppressClickRef = useRef(false);
-  const committedPageRef = useRef(Math.max(0, Math.floor(page ?? 0)));
+  const controlledPageRef = useRef(page);
+  const committedPageRef = useRef(initialPhysicalPage);
   const targetPageRef = useRef(committedPageRef.current);
   const onPageChangeRef = useRef(onPageChange);
   const [dragging, setDragging] = useState(false);
   const [settling, setSettling] = useState(false);
-  const [activePage, setActivePage] = useState(committedPageRef.current);
+  const [activePage, setActivePage] = useState(initialLogicalPage);
   const [overdrag, setOverdrag] = useState(0);
   const [thumb, setThumb] = useState({ visible: false, offset: 0, size: 0 });
 
@@ -117,15 +198,40 @@ export function Carousel({
   const scrollSize = useCallback((node: HTMLDivElement) => node.scrollWidth, []);
   const maxOffset = useCallback((node: HTMLDivElement) => Math.max(0, scrollSize(node) - clientSize(node)), [clientSize, scrollSize]);
   const maxPage = useCallback((node: HTMLDivElement) => {
+    if (paged && logicalPageCount > 0) return circularPaged ? logicalPageCount + 1 : logicalPageCount - 1;
     const viewport = clientSize(node);
     return viewport > 0 ? Math.max(0, Math.ceil(maxOffset(node) / viewport)) : 0;
-  }, [clientSize, maxOffset]);
+  }, [circularPaged, clientSize, logicalPageCount, maxOffset, paged]);
   const clampPage = useCallback((node: HTMLDivElement, value: number) => (
     Math.max(0, Math.min(maxPage(node), Math.round(value)))
   ), [maxPage]);
-  const pageOffset = useCallback((node: HTMLDivElement, value: number) => (
-    Math.min(maxOffset(node), clampPage(node, value) * clientSize(node))
-  ), [clampPage, clientSize, maxOffset]);
+  const pageOffset = useCallback((node: HTMLDivElement, value: number) => {
+    const targetPage = clampPage(node, value);
+    const target = node.firstElementChild?.children[targetPage];
+    if (paged && target instanceof HTMLElement) {
+      return Math.max(0, Math.min(maxOffset(node), target.offsetLeft));
+    }
+    return Math.min(maxOffset(node), targetPage * clientSize(node));
+  }, [clampPage, clientSize, maxOffset, offset, paged]);
+  const pageAtOffset = useCallback((node: HTMLDivElement) => {
+    const currentOffset = offset(node);
+    let closestPage = 0;
+    let closestDistance = Number.POSITIVE_INFINITY;
+    for (let candidate = 0; candidate <= maxPage(node); candidate += 1) {
+      const distance = Math.abs(pageOffset(node, candidate) - currentOffset);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestPage = candidate;
+      }
+    }
+    return closestPage;
+  }, [maxPage, offset, pageOffset]);
+  const logicalPageForPhysical = useCallback((physicalPage: number) => circularPaged
+    ? circularCarouselLogicalPage(physicalPage, logicalPageCount)
+    : Math.max(0, Math.round(physicalPage)), [circularPaged, logicalPageCount]);
+  const normalizedPhysicalPage = useCallback((physicalPage: number) => circularPaged
+    ? normalizeCircularCarouselPhysicalPage(physicalPage, logicalPageCount)
+    : Math.max(0, Math.round(physicalPage)), [circularPaged, logicalPageCount]);
 
   const stopMotion = useCallback(() => {
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
@@ -134,6 +240,7 @@ export function Carousel({
   useEffect(() => {
     onPageChangeRef.current = onPageChange;
   }, [onPageChange]);
+  controlledPageRef.current = page;
   const setRubberBand = useCallback((value: number) => {
     const next = Math.max(-physics.maxOverdrag, Math.min(physics.maxOverdrag, value));
     overdragRef.current = next;
@@ -175,7 +282,7 @@ export function Carousel({
 
   const settlePage = useCallback((node: HTMLDivElement, requestedPage: number, notify: boolean) => {
     const target = clampPage(node, requestedPage);
-    const previousPage = committedPageRef.current;
+    const previousLogicalPage = logicalPageForPhysical(committedPageRef.current);
     const start = offset(node);
     const end = pageOffset(node, target);
     const distance = end - start;
@@ -185,12 +292,15 @@ export function Carousel({
 
     const complete = () => {
       setOffset(node, end);
-      committedPageRef.current = target;
-      targetPageRef.current = target;
-      setActivePage(target);
+      const logicalTarget = logicalPageForPhysical(target);
+      const normalizedTarget = normalizedPhysicalPage(target);
+      if (normalizedTarget !== target) setOffset(node, pageOffset(node, normalizedTarget));
+      committedPageRef.current = normalizedTarget;
+      targetPageRef.current = normalizedTarget;
+      setActivePage(logicalTarget);
       setSettling(false);
       updateThumb(true);
-      if (notify && target !== previousPage) onPageChangeRef.current?.(target);
+      if (notify && logicalTarget !== previousLogicalPage) onPageChangeRef.current?.(logicalTarget);
     };
 
     if (Math.abs(distance) < 0.5) {
@@ -215,7 +325,7 @@ export function Carousel({
       frameRef.current = window.requestAnimationFrame(tick);
     };
     frameRef.current = window.requestAnimationFrame(tick);
-  }, [clampPage, offset, pageOffset, setOffset, setRubberBand, stopMotion, updateThumb]);
+  }, [clampPage, logicalPageForPhysical, normalizedPhysicalPage, offset, pageOffset, setOffset, setRubberBand, stopMotion, updateThumb]);
 
   const momentum = useCallback((node: HTMLDivElement, initialVelocity: number) => {
     let velocity = initialVelocity;
@@ -246,6 +356,25 @@ export function Carousel({
     if (Math.abs(velocity) >= physics.velocityTolerance) frameRef.current = window.requestAnimationFrame(tick);
   }, [maxOffset, offset, setOffset, setRubberBand, springBack, updateThumb]);
 
+  useLayoutEffect(() => {
+    const node = scrollRef.current;
+    if (!paged || !node) return;
+    const requested = controlledPageRef.current ?? logicalPageForPhysical(committedPageRef.current);
+    const logicalTarget = circularPaged
+      ? normalizeCircularCarouselPage(requested, logicalPageCount)
+      : clampPage(node, requested);
+    const physicalTarget = circularPaged
+      ? circularCarouselPhysicalPage(logicalTarget, logicalPageCount)
+      : logicalTarget;
+    stopMotion();
+    committedPageRef.current = physicalTarget;
+    targetPageRef.current = physicalTarget;
+    setActivePage(logicalTarget);
+    setSettling(false);
+    setRubberBand(0);
+    setOffset(node, pageOffset(node, physicalTarget));
+  }, [circularPaged, clampPage, logicalPageCount, logicalPageForPhysical, pageOffset, paged, setOffset, setRubberBand, stopMotion]);
+
   useEffect(() => {
     const node = scrollRef.current;
     if (!node) return;
@@ -254,10 +383,11 @@ export function Carousel({
       updateThumb(false);
       if (!paged || frameRef.current !== null) return;
       const target = clampPage(node, targetPageRef.current);
-      targetPageRef.current = target;
-      committedPageRef.current = target;
-      setActivePage(target);
-      setOffset(node, pageOffset(node, target));
+      const normalizedTarget = normalizedPhysicalPage(target);
+      targetPageRef.current = normalizedTarget;
+      committedPageRef.current = normalizedTarget;
+      setActivePage(logicalPageForPhysical(target));
+      setOffset(node, pageOffset(node, normalizedTarget));
     });
     node.addEventListener("scroll", onScroll, { passive: true });
     observer.observe(node);
@@ -268,19 +398,26 @@ export function Carousel({
       observer.disconnect();
       stopMotion();
     };
-  }, [clampPage, pageOffset, paged, setOffset, stopMotion, updateThumb]);
+  }, [clampPage, logicalPageForPhysical, normalizedPhysicalPage, pageOffset, paged, setOffset, stopMotion, updateThumb]);
 
   useEffect(() => {
     const node = scrollRef.current;
     if (!paged || page === undefined || !node) return;
-    const target = clampPage(node, page);
-    const targetOffset = pageOffset(node, target);
-    if (targetPageRef.current === target && (
-      frameRef.current !== null
-      || (committedPageRef.current === target && Math.abs(offset(node) - targetOffset) < 0.5)
-    )) return;
+    const requestedLogicalPage = circularPaged
+      ? normalizeCircularCarouselPage(page, logicalPageCount)
+      : clampPage(node, page);
+    const currentLogicalPage = logicalPageForPhysical(committedPageRef.current);
+    const target = circularPaged
+      ? circularCarouselControlledPhysicalTarget({ currentLogicalPage, requestedLogicalPage, pageCount: logicalPageCount })
+      : requestedLogicalPage;
+    const canonicalTarget = circularPaged
+      ? circularCarouselPhysicalPage(requestedLogicalPage, logicalPageCount)
+      : target;
+    const canonicalOffset = pageOffset(node, canonicalTarget);
+    if (frameRef.current !== null && logicalPageForPhysical(targetPageRef.current) === requestedLogicalPage) return;
+    if (currentLogicalPage === requestedLogicalPage && Math.abs(offset(node) - canonicalOffset) < 0.5) return;
     settlePage(node, target, false);
-  }, [clampPage, offset, page, pageOffset, paged, settlePage]);
+  }, [circularPaged, clampPage, logicalPageCount, logicalPageForPhysical, offset, page, pageOffset, paged, settlePage]);
 
   const primary = (event: ReactPointerEvent<HTMLDivElement>) => event.clientX;
   const cross = (event: ReactPointerEvent<HTMLDivElement>) => event.clientY;
@@ -297,11 +434,12 @@ export function Carousel({
     samplesRef.current = [];
     record(primary(event));
     setRubberBand(0);
-    const startPage = paged ? clampPage(node, Math.round(offset(node) / Math.max(1, clientSize(node)))) : 0;
+    const measuredPage = paged ? pageAtOffset(node) : 0;
+    const startPage = paged ? normalizedPhysicalPage(measuredPage) : 0;
     if (paged) {
       committedPageRef.current = startPage;
       targetPageRef.current = startPage;
-      setActivePage(startPage);
+      setActivePage(logicalPageForPhysical(startPage));
     }
     sessionRef.current = { pointerId: event.pointerId, startPrimary: primary(event), startCross: cross(event), startOffset: offset(node), startPage, captured: false, dragged: false };
   };
@@ -336,12 +474,13 @@ export function Carousel({
     suppressClickRef.current = true;
     record(primary(event));
     const desired = session.startOffset - delta;
-    const maximum = maxOffset(node);
     if (paged) {
-      const [minimumPageOffset, maximumPageOffset] = pagedCarouselBounds(session.startPage, clientSize(node), maximum);
+      const minimumPageOffset = pageOffset(node, session.startPage - 1);
+      const maximumPageOffset = pageOffset(node, session.startPage + 1);
       setOffset(node, Math.max(minimumPageOffset, Math.min(maximumPageOffset, desired)));
       setRubberBand(0);
     } else {
+      const maximum = maxOffset(node);
       setOffset(node, Math.max(0, Math.min(maximum, desired)));
       setRubberBand(desired < 0 ? -desired * physics.overdragScale : desired > maximum ? -(desired - maximum) * physics.overdragScale : 0);
     }
@@ -394,8 +533,11 @@ export function Carousel({
       className={`mobile-carousel ${className ?? ""}`}
       data-dragging={dragging}
       data-paged={paged ? "true" : "false"}
+      data-circular={paged ? (circularPaged ? "true" : "false") : undefined}
       data-page={paged ? activePage : undefined}
-      data-target-page={paged ? targetPageRef.current : undefined}
+      data-target-page={paged ? logicalPageForPhysical(targetPageRef.current) : undefined}
+      data-physical-page={paged ? committedPageRef.current : undefined}
+      data-target-physical-page={paged ? targetPageRef.current : undefined}
       data-settling={paged ? settling : undefined}
       data-overscroll={overdrag.toFixed(2)}
       aria-label={ariaLabel}
@@ -407,7 +549,7 @@ export function Carousel({
       onPointerCancel={(event) => finish(event, true)}
       onClickCapture={onClickCapture}
     >
-      <div className={`mobile-carousel-content ${contentClassName ?? ""}`}>{children}</div>
+      <div className={`mobile-carousel-content ${contentClassName ?? ""}`}>{renderedChildren}</div>
       {showScrollbar ? (
         <div className="mobile-carousel-scrollbar" data-visible={thumb.visible} aria-hidden="true">
           <div className="mobile-carousel-scrollbar-thumb" style={thumbStyle} />

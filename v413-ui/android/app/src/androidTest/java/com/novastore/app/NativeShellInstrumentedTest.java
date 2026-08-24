@@ -272,6 +272,109 @@ public class NativeShellInstrumentedTest {
     }
 
     @Test
+    public void circularPdpAndViewerMediaWrapLogicalStateInsideNativeWebView() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            evaluate(scenario,
+                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-06&tab=home&shell=native');" +
+                    "dispatchEvent(new PopStateEvent('popstate'));true"
+            );
+            Thread.sleep(350);
+
+            evaluate(scenario,
+                "document.querySelectorAll('.gallery-dots button')[2]?.click();true"
+            );
+            Thread.sleep(400);
+            JSONObject pdpLast = evaluateJson(scenario,
+                "(() => {const carousel=document.querySelector('.pdp-media-carousel');return {" +
+                    "logical:Number(carousel?.dataset.page),physical:Number(carousel?.dataset.physicalPage)," +
+                    "counter:document.querySelector('.pdp-gallery-meta>b')?.textContent?.trim()||''," +
+                    "originals:carousel?.querySelectorAll('.pdp-main-media:not([data-carousel-clone])').length||0," +
+                    "clones:carousel?.querySelectorAll('[data-carousel-clone]').length||0," +
+                    "inert:[...(carousel?.querySelectorAll('[data-carousel-clone]')||[])].every(node=>node.inert&&node.getAttribute('aria-hidden')==='true')," +
+                    "arrows:[...document.querySelectorAll('.pdp-gallery-arrows button')].every(button=>!button.disabled)};})()"
+            );
+            assertEquals(2, pdpLast.getInt("logical"));
+            assertEquals(3, pdpLast.getInt("physical"));
+            assertEquals("3 / 3", pdpLast.getString("counter"));
+            assertEquals(3, pdpLast.getInt("originals"));
+            assertEquals(2, pdpLast.getInt("clones"));
+            assertTrue(pdpLast.getBoolean("inert"));
+            assertTrue(pdpLast.getBoolean("arrows"));
+
+            evaluate(scenario, "document.querySelector('.pdp-gallery-arrows button:last-child')?.click();true");
+            Thread.sleep(450);
+            JSONObject pdpFirst = evaluateJson(scenario,
+                "(() => {const carousel=document.querySelector('.pdp-media-carousel');return {" +
+                    "logical:Number(carousel?.dataset.page),physical:Number(carousel?.dataset.physicalPage)," +
+                    "target:Number(carousel?.dataset.targetPage),settling:carousel?.dataset.settling," +
+                    "overscroll:carousel?.dataset.overscroll,counter:document.querySelector('.pdp-gallery-meta>b')?.textContent?.trim()||''};})()"
+            );
+            assertEquals(0, pdpFirst.getInt("logical"));
+            assertEquals(1, pdpFirst.getInt("physical"));
+            assertEquals(0, pdpFirst.getInt("target"));
+            assertEquals("false", pdpFirst.getString("settling"));
+            assertEquals("0.00", pdpFirst.getString("overscroll"));
+            assertEquals("1 / 3", pdpFirst.getString("counter"));
+
+            evaluate(scenario, "document.querySelector('.pdp-gallery-arrows button:first-child')?.click();true");
+            Thread.sleep(450);
+            JSONObject pdpReverse = evaluateJson(scenario,
+                "(() => {const carousel=document.querySelector('.pdp-media-carousel');return {" +
+                    "logical:Number(carousel?.dataset.page),physical:Number(carousel?.dataset.physicalPage)," +
+                    "counter:document.querySelector('.pdp-gallery-meta>b')?.textContent?.trim()||''};})()"
+            );
+            assertEquals(2, pdpReverse.getInt("logical"));
+            assertEquals(3, pdpReverse.getInt("physical"));
+            assertEquals("3 / 3", pdpReverse.getString("counter"));
+
+            evaluate(scenario,
+                "document.querySelectorAll('.pdp-main-media:not([data-carousel-clone])')[2]?.click();true"
+            );
+            Thread.sleep(300);
+            evaluate(scenario, "document.querySelector('.viewer-arrows button:last-child')?.click();true");
+            Thread.sleep(450);
+            JSONObject viewerFirst = evaluateJson(scenario,
+                "(() => {const viewer=document.querySelector('.pdp-image-viewer');const carousel=viewer?.querySelector('.viewer-carousel');return {" +
+                    "open:!!viewer,logical:Number(carousel?.dataset.page),physical:Number(carousel?.dataset.physicalPage)," +
+                    "counter:viewer?.querySelector('header b')?.textContent?.trim()||'',zoomed:viewer?.dataset.viewerZoomed," +
+                    "arrows:[...(viewer?.querySelectorAll('.viewer-arrows button')||[])].every(button=>!button.disabled)};})()"
+            );
+            assertTrue(viewerFirst.getBoolean("open"));
+            assertEquals(0, viewerFirst.getInt("logical"));
+            assertEquals(1, viewerFirst.getInt("physical"));
+            assertEquals("1 / 3", viewerFirst.getString("counter"));
+            assertEquals("false", viewerFirst.getString("zoomed"));
+            assertTrue(viewerFirst.getBoolean("arrows"));
+
+            evaluate(scenario,
+                "window.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));true"
+            );
+            Thread.sleep(450);
+            JSONObject viewerLast = evaluateJson(scenario,
+                "(() => {const viewer=document.querySelector('.pdp-image-viewer');const carousel=viewer?.querySelector('.viewer-carousel');return {" +
+                    "logical:Number(carousel?.dataset.page),physical:Number(carousel?.dataset.physicalPage)," +
+                    "counter:viewer?.querySelector('header b')?.textContent?.trim()||''};})()"
+            );
+            assertEquals(2, viewerLast.getInt("logical"));
+            assertEquals(3, viewerLast.getInt("physical"));
+            assertEquals("3 / 3", viewerLast.getString("counter"));
+
+            evaluate(scenario,
+                "window.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));true"
+            );
+            Thread.sleep(450);
+            JSONObject viewerWrapped = evaluateJson(scenario,
+                "(() => {const viewer=document.querySelector('.pdp-image-viewer');const carousel=viewer?.querySelector('.viewer-carousel');return {" +
+                    "logical:Number(carousel?.dataset.page),physical:Number(carousel?.dataset.physicalPage)," +
+                    "counter:viewer?.querySelector('header b')?.textContent?.trim()||''};})()"
+            );
+            assertEquals(0, viewerWrapped.getInt("logical"));
+            assertEquals(1, viewerWrapped.getInt("physical"));
+            assertEquals("1 / 3", viewerWrapped.getString("counter"));
+        }
+    }
+
+    @Test
     public void legacyMain6sNotificationAssertionIsStaleAndAuthoritativeSupportEscalationWorks() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             evaluate(scenario,

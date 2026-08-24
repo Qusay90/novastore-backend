@@ -26,10 +26,33 @@ const runtimeModule = await import(
 );
 
 const {
+  circularCarouselControlledPhysicalTarget,
+  circularCarouselLogicalPage,
+  circularCarouselPhysicalPage,
+  normalizeCircularCarouselPage,
+  normalizeCircularCarouselPhysicalPage,
   pagedCarouselBounds,
   pagedCarouselSettleProgress,
   resolvePagedCarouselTarget,
 } = runtimeModule;
+
+test("circular logical pages use edge clones and normalize without changing identity", () => {
+  assert.equal(normalizeCircularCarouselPage(3, 3), 0);
+  assert.equal(normalizeCircularCarouselPage(-1, 3), 2);
+  assert.equal(normalizeCircularCarouselPage(14, 3), 2);
+  assert.equal(normalizeCircularCarouselPage(1, 1), 0);
+
+  assert.equal(circularCarouselPhysicalPage(0, 3), 1);
+  assert.equal(circularCarouselPhysicalPage(2, 3), 3);
+  assert.equal(circularCarouselLogicalPage(0, 3), 2);
+  assert.equal(circularCarouselLogicalPage(4, 3), 0);
+  assert.equal(normalizeCircularCarouselPhysicalPage(0, 3), 3);
+  assert.equal(normalizeCircularCarouselPhysicalPage(4, 3), 1);
+
+  assert.equal(circularCarouselControlledPhysicalTarget({ currentLogicalPage: 2, requestedLogicalPage: 0, pageCount: 3 }), 4);
+  assert.equal(circularCarouselControlledPhysicalTarget({ currentLogicalPage: 0, requestedLogicalPage: 2, pageCount: 3 }), 0);
+  assert.equal(circularCarouselControlledPhysicalTarget({ currentLogicalPage: 1, requestedLogicalPage: 2, pageCount: 3 }), 3);
+});
 
 test("paged drag range never exceeds one adjacent viewport", () => {
   assert.deepEqual(pagedCarouselBounds(2, 320, 1280), [320, 960]);

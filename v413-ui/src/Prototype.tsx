@@ -93,6 +93,13 @@ const PRODUCT_GALLERY = [
   `${A}/generated/nova-pulse-anc-ivory-detail-v1.png`,
 ];
 
+function circularMediaIndex(index: number, mediaCount: number) {
+  const count = Math.max(0, Math.floor(mediaCount));
+  if (count <= 1) return 0;
+  const rounded = Math.round(index);
+  return ((rounded % count) + count) % count;
+}
+
 type ProductCardAsset = Readonly<{
   id: string;
   url: string;
@@ -1584,7 +1591,7 @@ function ProductCard({ id, name, store, price, old, image, images, badge, rating
     toggleFavorite(id);
     favoriteTimer.current = window.setTimeout(() => setFavoriteMotion(null), 520);
   };
-  const showMediaImage = (index: number) => setActiveImage(Math.max(0, Math.min(mediaAssets.length - 1, index)));
+  const showMediaImage = (index: number) => setActiveImage(circularMediaIndex(index, mediaAssets.length));
   const openProduct = () => {
     selectProduct(id);
     onClick();
@@ -1592,7 +1599,7 @@ function ProductCard({ id, name, store, price, old, image, images, badge, rating
   return (
     <article className="product-card" data-testid={testId} data-product-id={id} data-card-wave="css" data-card-cutout="gray-recess" data-card-cutout-fit="equal-top-left">
       <div className="product-media">
-        <Carousel paged page={activeImage} onPageChange={setActiveImage} className="product-media-carousel" contentClassName="product-media-track" ariaLabel={`${name} ürün fotoğrafları`}>
+        <Carousel paged circular page={activeImage} onPageChange={setActiveImage} className="product-media-carousel" contentClassName="product-media-track" ariaLabel={`${name} ürün fotoğrafları`}>
           {mediaAssets.map((asset, index) => (
             <button
               type="button"
@@ -1622,8 +1629,8 @@ function ProductCard({ id, name, store, price, old, image, images, badge, rating
         {mediaAssets.length > 1 && (
           <>
             <div className="product-gallery-arrows" role="group" aria-label={`${name} görsel geçişleri`}>
-              <button type="button" className="previous" aria-label="Önceki ürün görseli" disabled={activeImage === 0} onClick={() => showMediaImage(Math.max(0, activeImage - 1))}><CaretRightIcon /></button>
-              <button type="button" className="next" aria-label="Sonraki ürün görseli" disabled={activeImage === mediaAssets.length - 1} onClick={() => showMediaImage(Math.min(mediaAssets.length - 1, activeImage + 1))}><CaretRightIcon /></button>
+              <button type="button" className="previous" aria-label="Önceki ürün görseli" onClick={() => showMediaImage(activeImage - 1)}><CaretRightIcon /></button>
+              <button type="button" className="next" aria-label="Sonraki ürün görseli" onClick={() => showMediaImage(activeImage + 1)}><CaretRightIcon /></button>
             </div>
             <div className="product-media-position" role="group" aria-label={`${name} görsel seçici`}>
               {mediaAssets.map((asset, index) => <button type="button" className={index === activeImage ? "active" : ""} aria-label={`${index + 1}. görseli göster`} aria-pressed={index === activeImage} onClick={() => showMediaImage(index)} key={`${id}-position-${asset.id}`} />)}
@@ -1778,7 +1785,6 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   const [color, setColor] = useState("Kırık Beyaz");
   const [qty, setQty] = useState(1);
   const [gallery, setGallery] = useState(0);
-  const [galleryBoundaryRevision, setGalleryBoundaryRevision] = useState(0);
   const [added, setAdded] = useState(false);
   const [shared, setShared] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
@@ -1801,6 +1807,13 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   const visibleQuestions = catalogProduct.isPublicProjection
     ? []
     : productQuestions.filter((question) => question.productId === detail.id && (question.status === "answered" || question.ownerId === CURRENT_MOCK_USER_ID));
+  const setCircularGalleryPage = useCallback((page: number) => {
+    setGallery(circularMediaIndex(page, detail.gallery.length));
+  }, [detail.gallery.length]);
+  const moveGallery = useCallback((direction: -1 | 1) => {
+    setViewerZoomed(false);
+    setGallery((current) => circularMediaIndex(current + direction, detail.gallery.length));
+  }, [detail.gallery.length]);
   const displayedReviewCount = detail.reviewCount + reviewsForProduct.filter((review) => review.ownerId === CURRENT_MOCK_USER_ID).length;
   const recommendationProducts = catalogProduct.isPublicProjection
     ? Object.values(publicProducts).filter((product) => product.storeSlug === catalogProduct.storeSlug && product.id !== detail.id)
@@ -1817,13 +1830,21 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   useEffect(() => () => { if (resetTimer.current !== null) window.clearTimeout(resetTimer.current); }, []);
   useEffect(() => {
     if (!viewerOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setViewerOpen(false); };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setViewerOpen(false);
+        return;
+      }
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        moveGallery(event.key === "ArrowLeft" ? -1 : 1);
+      }
+    };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [viewerOpen]);
+  }, [moveGallery, viewerOpen]);
   useEffect(() => {
     setGallery(0);
-    setGalleryBoundaryRevision(0);
     setDescriptionExpanded(false);
     setReviewsExpanded(false);
     setReviewOpen(false);
@@ -1832,11 +1853,6 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
     setViewerZoomed(false);
   }, [detail.id]);
 
-  const setBoundedGalleryPage = (page: number) => {
-    const boundedPage = Math.max(0, Math.min(detail.gallery.length - 1, Math.round(page)));
-    setGallery(boundedPage);
-    if (page !== boundedPage) setGalleryBoundaryRevision((revision) => revision + 1);
-  };
   const handleAdd = () => {
     if (readOnlyPreview || catalogProduct.isPurchasable === false) return;
     addToCart(detail.id, qty);
@@ -1903,10 +1919,10 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
             <div className="pdp-grid">
               <section className="pdp-gallery">
                 <div className="pdp-media-shell">
-                  <Carousel key={`pdp-gallery-${detail.id}-${galleryBoundaryRevision}`} paged page={gallery} onPageChange={setBoundedGalleryPage} className="pdp-media-carousel" contentClassName="pdp-media-track" ariaLabel={`${detail.name} ürün görselleri`}>
+                  <Carousel key={`pdp-gallery-${detail.id}`} paged circular page={gallery} onPageChange={setCircularGalleryPage} className="pdp-media-carousel" contentClassName="pdp-media-track" ariaLabel={`${detail.name} ürün görselleri`}>
                     {detail.gallery.map((source, index) => <button type="button" className="pdp-main-media" aria-label={`${index + 1}. görseli tam ekran aç`} onClick={() => { keyboard.hide(); setGallery(index); setViewerOpen(true); }} key={`${detail.id}-gallery-${index}`}><img src={source} alt={`${detail.name} görsel ${index + 1}`} draggable="false" /></button>)}
                   </Carousel>
-                  {detail.gallery.length > 1 && <div className="pdp-gallery-arrows" role="group" aria-label="Ürün görseli geçişleri"><button type="button" aria-label="Önceki görsel" disabled={gallery === 0} onClick={() => setGallery(Math.max(0, gallery - 1))}><CaretRightIcon /></button><button type="button" aria-label="Sonraki görsel" disabled={gallery === detail.gallery.length - 1} onClick={() => setGallery(Math.min(detail.gallery.length - 1, gallery + 1))}><CaretRightIcon /></button></div>}
+                  {detail.gallery.length > 1 && <div className="pdp-gallery-arrows" role="group" aria-label="Ürün görseli geçişleri"><button type="button" aria-label="Önceki görsel" onClick={() => moveGallery(-1)}><CaretRightIcon /></button><button type="button" aria-label="Sonraki görsel" onClick={() => moveGallery(1)}><CaretRightIcon /></button></div>}
                   <div className="pdp-gallery-meta"><div className="gallery-dots" role="group" aria-label={`Görsel ${gallery + 1} / ${detail.gallery.length}`}>{detail.gallery.map((_, index) => <button type="button" className={gallery === index ? "active" : ""} aria-label={`${index + 1}. görseli göster`} aria-pressed={gallery === index} onClick={() => setGallery(index)} key={index} />)}</div><b>{gallery + 1} / {detail.gallery.length}</b></div>
                 </div>
               </section>
@@ -1949,14 +1965,14 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
       </footer>
       {viewerOpen && <section className="pdp-image-viewer" role="dialog" aria-modal="true" aria-label={`${detail.name} görsel görüntüleyici`} data-viewer-zoomed={viewerZoomed}>
         <header><button type="button" aria-label="Görsel görüntüleyiciyi kapat" onClick={() => setViewerOpen(false)}><Cross1Icon /></button><b>{gallery + 1} / {detail.gallery.length}</b><span>1×–4× yakınlaştır</span></header>
-        <Carousel key={`pdp-viewer-${detail.id}-${galleryBoundaryRevision}`} paged page={gallery} onPageChange={(page) => { setBoundedGalleryPage(page); setViewerZoomed(false); }} draggingEnabled={!viewerZoomed} className="viewer-carousel" contentClassName="viewer-track" ariaLabel="Tam ekran ürün görselleri">
+        <Carousel key={`pdp-viewer-${detail.id}`} paged circular page={gallery} onPageChange={(page) => { setCircularGalleryPage(page); setViewerZoomed(false); }} draggingEnabled={!viewerZoomed} className="viewer-carousel" contentClassName="viewer-track" ariaLabel="Tam ekran ürün görselleri">
           {detail.gallery.map((source, index) => <div className="viewer-slide" key={`${detail.id}-viewer-${index}`}>
             <TransformWrapper key={`${detail.id}-viewer-transform-${index}-${gallery}`} minScale={1} maxScale={4} centerOnInit centerZoomedOut disablePadding limitToBounds smooth panning={{ velocityDisabled: true }} onPanningStop={(ref: ReactZoomPanPinchRef) => { if (ref.state.scale <= 1.01) { ref.resetTransform(180, "easeOut"); setViewerZoomed(false); } }} onTransform={(ref: ReactZoomPanPinchRef) => { if (index === gallery) setViewerZoomed(ref.state.scale > 1.01); }} doubleClick={{ mode: "toggle", step: 1.8 }}>
               {({ zoomIn, zoomOut, resetTransform }) => <><div className="viewer-zoom-controls" role="group" aria-label="Yakınlaştırma kontrolleri"><button type="button" aria-label="Uzaklaştır" onClick={() => zoomOut()}><MinusIcon /></button><button type="button" aria-label="Görseli sıfırla" onClick={() => { resetTransform(180, "easeOut"); setViewerZoomed(false); }}>1×</button><button type="button" aria-label="Yakınlaştır" onClick={() => { setViewerZoomed(true); zoomIn(); }}><PlusIcon /></button></div><TransformComponent wrapperClass="viewer-transform-wrapper" contentClass="viewer-transform-content"><img src={source} alt={`${detail.name} tam ekran görsel ${index + 1}`} draggable="false" /></TransformComponent></>}
             </TransformWrapper>
           </div>)}
         </Carousel>
-        {detail.gallery.length > 1 && <div className="viewer-arrows"><button type="button" aria-label="Önceki ürün görseli" disabled={gallery === 0} onClick={() => { setViewerZoomed(false); setGallery(Math.max(0, gallery - 1)); }}><CaretRightIcon /></button><button type="button" aria-label="Sonraki ürün görseli" disabled={gallery === detail.gallery.length - 1} onClick={() => { setViewerZoomed(false); setGallery(Math.min(detail.gallery.length - 1, gallery + 1)); }}><CaretRightIcon /></button></div>}
+        {detail.gallery.length > 1 && <div className="viewer-arrows"><button type="button" aria-label="Önceki ürün görseli" onClick={() => moveGallery(-1)}><CaretRightIcon /></button><button type="button" aria-label="Sonraki ürün görseli" onClick={() => moveGallery(1)}><CaretRightIcon /></button></div>}
         <div className="viewer-dots">{detail.gallery.map((_, index) => <button type="button" className={gallery === index ? "active" : ""} aria-label={`${index + 1}. görsel`} aria-pressed={gallery === index} onClick={() => { setViewerZoomed(false); setGallery(index); }} key={index} />)}</div>
       </section>}
     </>

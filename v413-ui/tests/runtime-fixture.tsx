@@ -86,6 +86,38 @@ function PagedCarouselFixture() {
   );
 }
 
+function CircularCarouselFixture() {
+  const [page, setPage] = useState(0);
+  const move = (direction: -1 | 1) => setPage((current) => (current + direction + 3) % 3);
+
+  return (
+    <MobileRuntime>
+      <main className="paged-carousel-fixture">
+        <Carousel
+          paged
+          circular
+          page={page}
+          onPageChange={setPage}
+          ariaLabel="Circular photos"
+          className="fixture-paged-carousel fixture-circular-carousel"
+          contentClassName="fixture-paged-carousel-track"
+        >
+          {Array.from({ length: 3 }, (_, index) => (
+            <button className="paged-carousel-card" type="button" key={index}>
+              Circular photo {index + 1}
+            </button>
+          ))}
+        </Carousel>
+        <output data-testid="paged-page">{page}</output>
+        <div className="paged-carousel-controls">
+          <button type="button" onClick={() => move(-1)}>Previous page</button>
+          <button type="button" onClick={() => move(1)}>Next page</button>
+        </div>
+      </main>
+    </MobileRuntime>
+  );
+}
+
 function KeyboardFixture() {
   const screen: FlowScreen = {
     id: "keyboard",
@@ -175,6 +207,8 @@ const fixtureElement =
     ? <KeyboardFixture />
     : fixture === "paged-carousel"
       ? <PagedCarouselFixture />
+    : fixture === "circular-carousel"
+      ? <CircularCarouselFixture />
     : fixture === "flow"
       ? <FlowFixture />
       : <CarouselFixture />;

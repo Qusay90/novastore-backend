@@ -300,7 +300,7 @@ test.describe("V3 required interactions", () => {
     await expect(page.getByRole("button", { name: "Favoriden çıkar" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator(".gallery-dots button")).toHaveCount(3);
     await expect(page.getByText("1 / 3", { exact: true })).toBeVisible();
-    expect(await page.locator(".pdp-main-media img").evaluateAll((images) => images.every((image) => /\/generated\//.test(image.getAttribute("src") ?? "")))).toBe(true);
+    expect(await page.locator(".pdp-main-media:not([data-carousel-clone]) img").evaluateAll((images) => images.every((image) => /\/generated\//.test(image.getAttribute("src") ?? "")))).toBe(true);
     await expect(page.getByRole("button", { name: "Kırık Beyaz" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("button", { name: "Gece Mavisi" })).toHaveAttribute("aria-pressed", "false");
     await expect(page.locator(".pdp-seller-panel")).toContainText("Nova Audio Mağazası");

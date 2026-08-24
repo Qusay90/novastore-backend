@@ -70,7 +70,7 @@ test("store follow-up uses a quiet search focus, compact tools, and a lower cove
   await expect(page.getByRole("dialog", { name: "Mağazada sırala" })).toBeVisible();
 });
 
-test("PDP wave is a continuous curve and the 1x viewer recenters after vertical drag", async ({ page }) => {
+test("PDP wave is continuous, carousel wraps, and the 1x viewer recenters after vertical drag", async ({ page }) => {
   await openPhone(page, "CAL-06");
 
   const swipePastEnd = async (carousel: Locator) => {
@@ -149,18 +149,19 @@ test("PDP wave is a continuous curve and the 1x viewer recenters after vertical 
   await expect(pdpCarousel).toHaveAttribute("data-page", "2");
   await expect(page.locator(".pdp-gallery-meta > b")).toHaveText("3 / 3");
   await swipePastEnd(pdpCarousel);
-  await expect(pdpCarousel).toHaveAttribute("data-page", "2");
-  await expect(pdpCarousel).toHaveAttribute("data-target-page", "2");
-  await expect(page.locator(".pdp-gallery-meta > b")).toHaveText("3 / 3");
+  await expect(pdpCarousel).toHaveAttribute("data-page", "0");
+  await expect(pdpCarousel).toHaveAttribute("data-target-page", "0");
+  await expect(page.locator(".pdp-gallery-meta > b")).toHaveText("1 / 3");
 
-  await page.getByRole("button", { name: "3. görseli tam ekran aç", exact: true }).click();
+  await page.getByRole("button", { name: "1. görseli tam ekran aç", exact: true }).click();
   const viewerCarousel = page.locator(".viewer-carousel");
+  await page.locator(".viewer-dots").getByRole("button", { name: "3. görsel", exact: true }).click();
   await expect(viewerCarousel).toHaveAttribute("data-page", "2");
   await swipePastEnd(viewerCarousel);
-  await expect(viewerCarousel).toHaveAttribute("data-page", "2");
-  await expect(viewerCarousel).toHaveAttribute("data-target-page", "2");
-  await expect(page.locator(".pdp-image-viewer > header b")).toHaveText("3 / 3");
-  const activeSlide = page.locator(".viewer-slide").nth(2);
+  await expect(viewerCarousel).toHaveAttribute("data-page", "0");
+  await expect(viewerCarousel).toHaveAttribute("data-target-page", "0");
+  await expect(page.locator(".pdp-image-viewer > header b")).toHaveText("1 / 3");
+  const activeSlide = page.locator(".viewer-slide:not([data-carousel-clone])").nth(0);
   const transform = activeSlide.locator(".viewer-transform-content");
   const wrapper = activeSlide.locator(".viewer-transform-wrapper");
   await expect(transform).toBeVisible();

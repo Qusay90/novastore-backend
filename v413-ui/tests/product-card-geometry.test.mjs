@@ -180,7 +180,7 @@ test("reference-scaled card chrome stays compact and light", () => {
 test("first product exposes a protected three-photo card carousel", () => {
   assert.match(prototype, /const PRODUCT_GALLERY = \[/);
   assert.match(prototype, /images: PRODUCT_GALLERY/);
-  assert.match(prototype, /<Carousel paged page=\{activeImage\} onPageChange=\{setActiveImage\} className="product-media-carousel"/);
+  assert.match(prototype, /<Carousel paged circular page=\{activeImage\} onPageChange=\{setActiveImage\} className="product-media-carousel"/);
   assert.match(prototype, /mediaAssets\.map\(\(asset, index\)/);
   assert.match(prototype, /showMediaImage\(index\)/);
   assert.match(prototype, /aria-label=\{`\$\{index \+ 1\}\. görseli göster`\}/);

@@ -217,6 +217,15 @@ The owner's August 24, 2026 Android recording adds these media requirements with
 - PDP and full-screen viewer media use the ordered original source with `object-fit: contain`; natural empty space is preferable to cropping. Card framing must never leak into either surface.
 - At fit/1×, a deliberate horizontal swipe changes exactly one media item. Above 1×, the zoomed image owns pan and the carousel is locked. Reset and media changes restore that media item's centered fit baseline before swipe navigation resumes.
 
+## V4.13 R8-R3 Circular Media Navigation
+
+The owner's August 24, 2026 final carousel decision adds one navigation rule while preserving every R8-R2 media-integrity requirement:
+
+- Every multi-media ProductCard, PDP gallery, and full-screen viewer is logically circular: next from the final item resolves to the first item, and previous from the first item resolves to the final item after one intentional gesture or control activation.
+- Keep one canonical logical index in `0 .. mediaCount - 1`. Edge clones may exist only as inert, `aria-hidden` physical transition slides; normalize to the corresponding original slide after the transition without reordering media identity or exposing a clone at rest.
+- The counter, dots, active media control, and any thumbnail state follow the completed logical index. Endpoint arrows stay enabled, and viewer ArrowLeft/ArrowRight navigation uses the same modulo contract while Escape and zoom controls remain intact.
+- Preserve the accepted intentional-swipe threshold, one-neighbor settle, exact measured slide alignment, card-only framing, PDP/viewer original-media `contain`, and fit-versus-zoomed-pan ownership. One-media galleries do not synthesize movement; two-media galleries remain stable in both directions.
+
 ## Keyboard Rule
 
 The simulated keyboard is a separate top-layer component. Before presenting anything that behaves like iOS navigation or modal UI, dismiss it first.

@@ -25,6 +25,14 @@ async function drag(
   await page.mouse.up();
 }
 
+async function expectPhysicalPageAligned(carousel: Locator, physicalPage: number) {
+  await expect.poll(() => carousel.evaluate((element, targetPage) => {
+    const target = element.firstElementChild?.children[targetPage];
+    if (!(target instanceof HTMLElement)) return Number.POSITIVE_INFINITY;
+    return Math.abs(target.getBoundingClientRect().left - element.getBoundingClientRect().left);
+  }, physicalPage)).toBeLessThanOrEqual(.55);
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/tests/runtime-fixture.html");
 });
@@ -105,7 +113,7 @@ test("paged Carousel advances one neighbor and uses one bounded settle", async (
   await expect(reportedPage).toHaveText("1");
   await expect(carousel).toHaveAttribute("data-page", "1");
   await expect(carousel).toHaveAttribute("data-settling", "false");
-  await expect.poll(() => carousel.evaluate((element) => element.scrollLeft / element.clientWidth)).toBeCloseTo(1, 2);
+  await expectPhysicalPageAligned(carousel, 1);
 
   const beginTrajectory = async () => {
     await carousel.evaluate((element) => {
@@ -116,8 +124,12 @@ test("paged Carousel advances one neighbor and uses one bounded settle", async (
   };
   const readTrajectory = async () => carousel.evaluate((element) => {
     const target = window as typeof window & { __pagedOffsets?: number[] };
-    return (target.__pagedOffsets ?? []).map((value) => value / element.clientWidth);
+    return target.__pagedOffsets ?? [];
   });
+  const physicalOffset = async (physicalPage: number) => carousel.evaluate((element, targetPage) => {
+    const target = element.firstElementChild?.children[targetPage];
+    return target instanceof HTMLElement ? target.offsetLeft : Number.NaN;
+  }, physicalPage);
   const expectMonotonic = (values: number[], direction: "forward" | "backward") => {
     for (let index = 1; index < values.length; index += 1) {
       const delta = values[index] - values[index - 1];
@@ -132,8 +144,8 @@ test("paged Carousel advances one neighbor and uses one bounded settle", async (
   await expect(carousel).toHaveAttribute("data-page", "2");
   await expect(carousel).toHaveAttribute("data-settling", "false");
   const forward = await readTrajectory();
-  expect(Math.max(...forward), "paged swipe overshot its next neighbor").toBeLessThanOrEqual(2.002);
-  expect(Math.min(...forward), "paged swipe moved behind its starting page").toBeGreaterThanOrEqual(0.998);
+  expect(Math.max(...forward), "paged swipe overshot its next neighbor").toBeLessThanOrEqual(await physicalOffset(2) + .55);
+  expect(Math.min(...forward), "paged swipe moved behind its starting page").toBeGreaterThanOrEqual(await physicalOffset(1) - .55);
   expectMonotonic(forward, "forward");
   expect(Number(await carousel.getAttribute("data-overscroll"))).toBe(0);
 
@@ -143,8 +155,8 @@ test("paged Carousel advances one neighbor and uses one bounded settle", async (
   await expect(carousel).toHaveAttribute("data-page", "1");
   await expect(carousel).toHaveAttribute("data-settling", "false");
   const backward = await readTrajectory();
-  expect(Math.min(...backward), "paged swipe overshot its previous neighbor").toBeGreaterThanOrEqual(0.998);
-  expect(Math.max(...backward), "paged swipe moved beyond its starting page").toBeLessThanOrEqual(2.002);
+  expect(Math.min(...backward), "paged swipe overshot its previous neighbor").toBeGreaterThanOrEqual(await physicalOffset(1) - .55);
+  expect(Math.max(...backward), "paged swipe moved beyond its starting page").toBeLessThanOrEqual(await physicalOffset(2) + .55);
   expectMonotonic(backward, "backward");
 
   await beginTrajectory();
@@ -153,10 +165,51 @@ test("paged Carousel advances one neighbor and uses one bounded settle", async (
   await expect(carousel).toHaveAttribute("data-page", "3");
   await expect(carousel).toHaveAttribute("data-settling", "false");
   const programmed = await readTrajectory();
-  expect(Math.max(...programmed), "programmed page change overshot its target").toBeLessThanOrEqual(3.002);
-  expect(Math.min(...programmed), "programmed page change reversed before settling").toBeGreaterThanOrEqual(0.998);
+  expect(Math.max(...programmed), "programmed page change overshot its target").toBeLessThanOrEqual(await physicalOffset(3) + .55);
+  expect(Math.min(...programmed), "programmed page change reversed before settling").toBeGreaterThanOrEqual(await physicalOffset(1) - .55);
   expectMonotonic(programmed, "forward");
-  await expect.poll(() => carousel.evaluate((element) => element.scrollLeft / element.clientWidth)).toBeCloseTo(3, 2);
+  await expectPhysicalPageAligned(carousel, 3);
+});
+
+test("circular paged Carousel wraps both edges with logical state and no rubber-band", async ({ page }) => {
+  await page.goto("/tests/runtime-fixture.html?fixture=circular-carousel");
+  const carousel = page.locator(".fixture-circular-carousel");
+  const reportedPage = page.getByTestId("paged-page");
+
+  const waitForPage = async (logicalPage: number, physicalPage: number) => {
+    await expect(reportedPage).toHaveText(String(logicalPage));
+    await expect(carousel).toHaveAttribute("data-page", String(logicalPage));
+    await expect(carousel).toHaveAttribute("data-target-page", String(logicalPage));
+    await expect(carousel).toHaveAttribute("data-physical-page", String(physicalPage));
+    await expect(carousel).toHaveAttribute("data-settling", "false");
+    await expect(carousel).toHaveAttribute("data-overscroll", "0.00");
+    await expectPhysicalPageAligned(carousel, physicalPage);
+  };
+
+  await expect(carousel).toHaveAttribute("data-circular", "true");
+  await expect(carousel.locator('[data-carousel-clone="leading"]')).toHaveCount(1);
+  await expect(carousel.locator('[data-carousel-clone="trailing"]')).toHaveCount(1);
+  await expect(carousel.locator('[data-carousel-clone]').first()).toHaveAttribute("aria-hidden", "true");
+  await expect(carousel.locator('[data-carousel-clone]').last()).toHaveAttribute("aria-hidden", "true");
+  await waitForPage(0, 1);
+
+  await drag(page, carousel, 90, 1, 6);
+  await waitForPage(2, 3);
+  await drag(page, carousel, -90, -1, 6);
+  await waitForPage(0, 1);
+
+  for (let transition = 0; transition < 10; transition += 1) {
+    await drag(page, carousel, -90, 1, 6);
+    const logicalPage = (transition + 1) % 3;
+    await waitForPage(logicalPage, logicalPage + 1);
+  }
+
+  await page.getByRole("button", { name: "Previous page" }).click();
+  await waitForPage(0, 1);
+  await page.getByRole("button", { name: "Previous page" }).click();
+  await waitForPage(2, 3);
+  await page.getByRole("button", { name: "Next page" }).click();
+  await waitForPage(0, 1);
 });
 
 test("BottomSheet remains mounted while its default exit animation plays", async ({ page }) => {

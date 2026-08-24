@@ -86,7 +86,7 @@ test("new-theme cards apply framing while PDP and viewer keep original media", a
   await servePublicStore(page);
   await openPublicStore(page, "preview");
 
-  const framedImage = page.getByTestId("store-product-0").locator(".product-open-media img").first();
+  const framedImage = page.getByTestId("store-product-0").locator(".product-open-media:not([data-carousel-clone]) img").first();
   await expect(framedImage).toHaveAttribute("data-card-framing", "applied");
   await expect(framedImage).toHaveAttribute("data-card-focal-x", "0.2");
   await expect(framedImage).toHaveAttribute("data-card-focal-y", "0.7");
@@ -101,11 +101,11 @@ test("new-theme cards apply framing while PDP and viewer keep original media", a
   expect(route.get("productId")).toBe("201");
   expect(route.get("mode")).toBe("preview");
   await expect(page.getByTestId("pdp-preview-read-only-bar")).toBeVisible();
-  const pdpImage = page.locator(".pdp-main-media img").first();
+  const pdpImage = page.locator(".pdp-main-media:not([data-carousel-clone]) img").first();
   await expect(pdpImage).toHaveAttribute("src", /\/media\/product-main\.png$/);
   await expect(pdpImage).toHaveCSS("object-fit", "contain");
   await expect(pdpImage).toHaveCSS("transform", "none");
-  await expect(page.locator(".pdp-main-media img")).toHaveCount(3);
+  await expect(page.locator(".pdp-main-media:not([data-carousel-clone]) img")).toHaveCount(3);
 });
 
 test("customer mode preserves new-theme commerce controls without remote mutation", async ({ page }) => {

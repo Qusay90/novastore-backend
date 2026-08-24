@@ -94,17 +94,19 @@ async function waitForSettledPage(carousel: Locator, index: number) {
 async function settledGeometry(carousel: Locator, slideSelector: string, activeIndex: number) {
   return carousel.evaluate((viewport, input) => {
     const viewportRect = viewport.getBoundingClientRect();
-    const slides = Array.from(viewport.querySelectorAll<HTMLElement>(input.slideSelector));
+    const physicalSlides = Array.from(viewport.querySelectorAll<HTMLElement>(input.slideSelector));
+    const slides = physicalSlides.filter((slide) => !slide.dataset.carouselClone);
     const slideRects = slides.map((slide) => slide.getBoundingClientRect());
-    const imageNodes = slides.map((slide) => slide.querySelector<HTMLImageElement>("img"));
-    const hitMedia = new Set<number>();
+    const physicalRects = physicalSlides.map((slide) => slide.getBoundingClientRect());
+    const imageNodes = physicalSlides.map((slide) => slide.querySelector<HTMLImageElement>("img"));
+    const hitSlides = new Set<number>();
     for (const xRatio of [.04, .15, .3, .5, .7, .85, .96]) {
       for (const yRatio of [.18, .42, .66]) {
         const x = viewportRect.left + viewportRect.width * xRatio;
         const y = viewportRect.top + viewportRect.height * yRatio;
         for (const element of document.elementsFromPoint(x, y)) {
           const mediaIndex = imageNodes.indexOf(element as HTMLImageElement);
-          if (mediaIndex >= 0) hitMedia.add(mediaIndex);
+          if (mediaIndex >= 0) hitSlides.add(mediaIndex);
         }
       }
     }
@@ -121,7 +123,30 @@ async function settledGeometry(carousel: Locator, slideSelector: string, activeI
         width: rect.width,
         overflow: getComputedStyle(slides[index]).overflow,
       })),
-      hitMedia: [...hitMedia].sort((left, right) => left - right),
+      physicalSlides: physicalRects.map((rect, index) => {
+        const slide = physicalSlides[index];
+        const clone = slide.dataset.carouselClone ?? null;
+        const logicalIndex = clone === "leading"
+          ? slides.length - 1
+          : clone === "trailing"
+            ? 0
+            : slides.indexOf(slide);
+        return {
+          logicalIndex,
+          clone,
+          left: rect.left,
+          right: rect.right,
+          overlap: Math.max(0, Math.min(rect.right, viewportRect.right) - Math.max(rect.left, viewportRect.left)),
+        };
+      }),
+      hitSlides: [...hitSlides].sort((left, right) => left - right).map((index) => {
+        const slide = physicalSlides[index];
+        const clone = slide.dataset.carouselClone ?? null;
+        return {
+          logicalIndex: clone === "leading" ? slides.length - 1 : clone === "trailing" ? 0 : slides.indexOf(slide),
+          clone,
+        };
+      }),
     };
   }, { slideSelector, activeIndex });
 }
@@ -138,7 +163,14 @@ async function expectOneSettledMedia(carousel: Locator, slideSelector: string, a
     if (slide.index < activeIndex) expect(slide.right, `previous slide ${slide.index} bleeds into viewport`).toBeLessThanOrEqual(geometry.viewport.left + renderingTolerance);
     if (slide.index > activeIndex) expect(slide.left, `next slide ${slide.index} bleeds into viewport`).toBeGreaterThanOrEqual(geometry.viewport.right - renderingTolerance);
   }
-  expect(geometry.hitMedia.filter((index) => index !== activeIndex), "settled viewport paints adjacent media").toEqual([]);
+  expect(
+    geometry.physicalSlides.filter((slide) => slide.overlap > renderingTolerance).map(({ logicalIndex, clone }) => ({ logicalIndex, clone })),
+    "settled viewport exposes more than one physical media slide",
+  ).toEqual([{ logicalIndex: activeIndex, clone: null }]);
+  expect(
+    geometry.hitSlides.filter((slide) => slide.logicalIndex !== activeIndex || slide.clone !== null),
+    "settled viewport paints adjacent or cloned media",
+  ).toEqual([]);
   return geometry;
 }
 
@@ -181,11 +213,11 @@ test("1/2/3/4-media product cards settle to one clipped framed slide and keep in
     await card.scrollIntoViewIfNeeded();
     const carousel = card.locator(".product-media-carousel");
     const dots = card.locator(".product-media-position button");
-    await expect(card.locator(".product-media-slide")).toHaveCount(mediaCount);
+    await expect(card.locator(".product-media-slide:not([data-carousel-clone])")).toHaveCount(mediaCount);
     await expect(dots).toHaveCount(mediaCount === 1 ? 0 : mediaCount);
     await expectOneSettledMedia(carousel, ".product-media-slide", 0);
-    await expect(card.locator(".product-media-slide img").first()).toHaveAttribute("data-card-framing", "applied");
-    await expect(card.locator(".product-media-slide img").first()).toHaveCSS("object-fit", "cover");
+    await expect(card.locator(".product-media-slide:not([data-carousel-clone]) img").first()).toHaveAttribute("data-card-framing", "applied");
+    await expect(card.locator(".product-media-slide:not([data-carousel-clone]) img").first()).toHaveCSS("object-fit", "cover");
 
     if (mediaCount === 1) continue;
     for (let cycle = 0; cycle < 5; cycle += 1) {
@@ -229,12 +261,12 @@ test("PDP and fullscreen preserve original-media identity, contain fit, clean pa
   test.setTimeout(120_000);
   await openFixtureStore(page);
   const card = page.getByTestId("store-product-2");
-  const cardSources = await card.locator(".product-media-slide img").evaluateAll((images) => images.map((image) => image.getAttribute("src")));
+  const cardSources = await card.locator(".product-media-slide:not([data-carousel-clone]) img").evaluateAll((images) => images.map((image) => image.getAttribute("src")));
   await card.locator(".product-title-action").click();
   await expect(page.getByTestId("product-detail-screen")).toHaveAttribute("data-product-id", "303");
 
   const pdpCarousel = page.locator(".pdp-media-carousel");
-  const pdpImages = page.locator(".pdp-main-media img");
+  const pdpImages = page.locator(".pdp-main-media:not([data-carousel-clone]) img");
   await expect(pdpImages).toHaveCount(3);
   expect(await pdpImages.evaluateAll((images) => images.map((image) => image.getAttribute("src")))).toEqual(cardSources);
   for (let index = 0; index < 3; index += 1) {
@@ -257,7 +289,7 @@ test("PDP and fullscreen preserve original-media identity, contain fit, clean pa
   await page.getByRole("button", { name: "1. görseli tam ekran aç", exact: true }).click();
   const viewer = page.locator(".pdp-image-viewer");
   const viewerCarousel = viewer.locator(".viewer-carousel");
-  const viewerImages = viewer.locator(".viewer-slide img");
+  const viewerImages = viewer.locator(".viewer-slide:not([data-carousel-clone]) img");
   await expect(viewer).toBeVisible();
   expect(await viewerImages.evaluateAll((images) => images.map((image) => image.getAttribute("src")))).toEqual(cardSources);
   await expectOneSettledMedia(viewerCarousel, ".viewer-slide", 0);
@@ -271,10 +303,10 @@ test("PDP and fullscreen preserve original-media identity, contain fit, clean pa
     await expect(viewer.locator(".viewer-dots button").nth(index)).toHaveAttribute("aria-pressed", "true");
   }
 
-  const firstSlide = viewer.locator(".viewer-slide").first();
+  const firstSlide = viewer.locator(".viewer-slide:not([data-carousel-clone])").first();
   const transform = firstSlide.locator(".viewer-transform-content");
   const firstFitTransform = await transform.evaluate((element) => getComputedStyle(element).transform);
-  const secondTransform = viewer.locator(".viewer-slide").nth(1).locator(".viewer-transform-content");
+  const secondTransform = viewer.locator(".viewer-slide:not([data-carousel-clone])").nth(1).locator(".viewer-transform-content");
   const secondFitTransform = await secondTransform.evaluate((element) => getComputedStyle(element).transform);
   await firstSlide.getByRole("button", { name: "Yakınlaştır", exact: true }).click();
   await expect(viewer).toHaveAttribute("data-viewer-zoomed", "true");
@@ -303,4 +335,90 @@ test("PDP and fullscreen preserve original-media identity, contain fit, clean pa
   await expect(viewer).toHaveCount(0);
   await page.getByRole("button", { name: "2. görseli tam ekran aç", exact: true }).click();
   await expectOneSettledMedia(page.locator(".viewer-carousel"), ".viewer-slide", 1);
+});
+
+test("R8-R3 card, PDP, and viewer wrap both boundaries for gestures, arrows, and keyboard", async ({ page }) => {
+  test.setTimeout(180_000);
+  await openFixtureStore(page);
+
+  const card = page.getByTestId("store-product-2");
+  await card.scrollIntoViewIfNeeded();
+  const cardCarousel = card.locator(".product-media-carousel");
+  const cardDots = card.locator(".product-media-position button");
+  await expect(cardCarousel).toHaveAttribute("data-circular", "true");
+  await expect(card.locator(".product-media-slide:not([data-carousel-clone])")).toHaveCount(3);
+  await expect(card.locator(".product-media-slide[data-carousel-clone]")).toHaveCount(2);
+
+  let expectedPage = 0;
+  for (let transition = 0; transition < 10; transition += 1) {
+    expectedPage = (expectedPage + 1) % 3;
+    await mouseSwipe(page, cardCarousel, "next");
+    await expectOneSettledMedia(cardCarousel, ".product-media-slide", expectedPage);
+    await expect(cardDots.nth(expectedPage)).toHaveAttribute("aria-pressed", "true");
+  }
+  for (let transition = 0; transition < 10; transition += 1) {
+    expectedPage = (expectedPage + 2) % 3;
+    await mouseSwipe(page, cardCarousel, "previous");
+    await expectOneSettledMedia(cardCarousel, ".product-media-slide", expectedPage);
+  }
+  await card.hover();
+  await cardDots.nth(2).click();
+  await expectOneSettledMedia(cardCarousel, ".product-media-slide", 2);
+  await card.getByRole("button", { name: "Sonraki ürün görseli", exact: true }).click();
+  await expectOneSettledMedia(cardCarousel, ".product-media-slide", 0);
+  await card.getByRole("button", { name: "Önceki ürün görseli", exact: true }).click();
+  await expectOneSettledMedia(cardCarousel, ".product-media-slide", 2);
+
+  await card.locator(".product-title-action").click();
+  const pdpCarousel = page.locator(".pdp-media-carousel");
+  const pdpDots = page.locator(".gallery-dots button");
+  expectedPage = 0;
+  for (let transition = 0; transition < 10; transition += 1) {
+    expectedPage = (expectedPage + 1) % 3;
+    await mouseSwipe(page, pdpCarousel, "next");
+    await expectOneSettledMedia(pdpCarousel, ".pdp-main-media", expectedPage);
+    await expect(page.locator(".pdp-gallery-meta > b")).toHaveText(`${expectedPage + 1} / 3`);
+    await expect(pdpDots.nth(expectedPage)).toHaveAttribute("aria-pressed", "true");
+  }
+  for (let transition = 0; transition < 10; transition += 1) {
+    expectedPage = (expectedPage + 2) % 3;
+    await mouseSwipe(page, pdpCarousel, "previous");
+    await expectOneSettledMedia(pdpCarousel, ".pdp-main-media", expectedPage);
+  }
+  await pdpDots.nth(2).click();
+  await expectOneSettledMedia(pdpCarousel, ".pdp-main-media", 2);
+  await page.getByRole("button", { name: "Sonraki görsel", exact: true }).click();
+  await expectOneSettledMedia(pdpCarousel, ".pdp-main-media", 0);
+  await page.getByRole("button", { name: "Önceki görsel", exact: true }).click();
+  await expectOneSettledMedia(pdpCarousel, ".pdp-main-media", 2);
+  await pdpDots.nth(0).click();
+  await expectOneSettledMedia(pdpCarousel, ".pdp-main-media", 0);
+
+  await page.getByRole("button", { name: "1. görseli tam ekran aç", exact: true }).click();
+  const viewer = page.locator(".pdp-image-viewer");
+  const viewerCarousel = viewer.locator(".viewer-carousel");
+  const viewerDots = viewer.locator(".viewer-dots button");
+  expectedPage = 0;
+  for (let transition = 0; transition < 10; transition += 1) {
+    expectedPage = (expectedPage + 1) % 3;
+    await mouseSwipe(page, viewerCarousel, "next");
+    await expectOneSettledMedia(viewerCarousel, ".viewer-slide", expectedPage);
+    await expect(viewer.locator("header b")).toHaveText(`${expectedPage + 1} / 3`);
+    await expect(viewerDots.nth(expectedPage)).toHaveAttribute("aria-pressed", "true");
+  }
+  for (let transition = 0; transition < 10; transition += 1) {
+    expectedPage = (expectedPage + 2) % 3;
+    await mouseSwipe(page, viewerCarousel, "previous");
+    await expectOneSettledMedia(viewerCarousel, ".viewer-slide", expectedPage);
+  }
+  await viewerDots.nth(2).click();
+  await expectOneSettledMedia(viewerCarousel, ".viewer-slide", 2);
+  await viewer.getByRole("button", { name: "Sonraki ürün görseli", exact: true }).click();
+  await expectOneSettledMedia(viewerCarousel, ".viewer-slide", 0);
+  await viewer.getByRole("button", { name: "Önceki ürün görseli", exact: true }).click();
+  await expectOneSettledMedia(viewerCarousel, ".viewer-slide", 2);
+  await page.keyboard.press("ArrowRight");
+  await expectOneSettledMedia(viewerCarousel, ".viewer-slide", 0);
+  await page.keyboard.press("ArrowLeft");
+  await expectOneSettledMedia(viewerCarousel, ".viewer-slide", 2);
 });

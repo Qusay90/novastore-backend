@@ -441,7 +441,7 @@ test.describe("V4.10 unified shell, catalog, route reset, and refresh contract",
     await openFluidPhone(page, "CAL-06", 411, 914);
     const pointerTargets = [
       page.getByRole("button", { name: "Paylaş" }),
-      page.locator(".recommendations .product-open-media").first(),
+      page.locator(".recommendations .product-open-media:not([data-carousel-clone])").first(),
     ];
     for (const target of pointerTargets) {
       await expect(target).toBeVisible();
@@ -842,7 +842,7 @@ test.describe("V4.4 screen-specific acceptance guards", () => {
     await expect(card).toHaveAttribute("data-card-wave", "css");
     await expect(card).toHaveAttribute("data-card-cutout", "gray-recess");
     await expect(card).toHaveAttribute("data-card-cutout-fit", "equal-top-left");
-    const cardImages = card.locator(".product-media img");
+    const cardImages = card.locator(".product-media-slide:not([data-carousel-clone]) img");
     await expect(cardImages).toHaveCount(3);
     expect(await cardImages.evaluateAll((images) => images.every((image) => /\/generated\//.test(image.getAttribute("src") ?? "")))).toBe(true);
     await expect(card.locator(".product-media-position button")).toHaveCount(3);
@@ -958,7 +958,11 @@ test.describe("V4.4 screen-specific acceptance guards", () => {
     await page.mouse.up();
     await expect(restoredCard.locator(".product-media .visually-hidden[role=status]")).toHaveText("Görsel 2 / 3");
     await page.waitForTimeout(1_100);
-    expect(await carousel.evaluate((element) => element.scrollLeft / element.clientWidth), "one swipe skipped more than one photograph").toBeLessThanOrEqual(1.05);
+    await expect(carousel).toHaveAttribute("data-page", "1");
+    expect(await carousel.evaluate((element) => {
+      const target = element.querySelectorAll<HTMLElement>(".product-media-slide:not([data-carousel-clone])")[1];
+      return Math.abs(target.getBoundingClientRect().left - element.getBoundingClientRect().left);
+    }), "one swipe did not settle exactly on the second photograph").toBeLessThanOrEqual(1.1);
     expect(Number(await restoredCard.getByRole("button", { name: "Sonraki ürün görseli" }).evaluate((element) => getComputedStyle(element).opacity))).toBeGreaterThan(0);
     await restoredCard.getByRole("button", { name: "Önceki ürün görseli" }).click();
     await expect(restoredCard.locator(".product-media .visually-hidden[role=status]")).toHaveText("Görsel 1 / 3");
@@ -994,7 +998,7 @@ test.describe("V4.4 screen-specific acceptance guards", () => {
     await expect(addToCart).toHaveAttribute("data-state", "idle", { timeout: 1_500 });
 
     await restoredCard.getByRole("button", { name: "Nova Pulse ANC Kulaklık detayını aç" }).click();
-    const pdpImages = page.locator(".pdp-main-media img");
+    const pdpImages = page.locator(".pdp-main-media:not([data-carousel-clone]) img");
     await expect(pdpImages).toHaveCount(3);
     expect(await pdpImages.evaluateAll((images) => images.every((image) => /\/generated\//.test(image.getAttribute("src") ?? "")))).toBe(true);
     await expect(page.locator(".gallery-dots button")).toHaveCount(3);
