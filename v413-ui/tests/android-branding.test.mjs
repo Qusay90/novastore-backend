@@ -22,10 +22,17 @@ test("Android branding is generated from the official NovaStore icon", () => {
   const packagedOfficial = readFileSync(join(res, "drawable-nodpi", "novastore_app_icon.png"));
   assert.deepEqual(packagedOfficial, official);
 
+  const strings = readFileSync(join(res, "values", "strings.xml"), "utf8");
+  assert.match(strings, /<string name="app_name">NovaStore<\/string>/);
+  assert.match(strings, /<string name="title_activity_main">NovaStore<\/string>/);
+  assert.doesNotMatch(strings, /NovaStore V4\.13/);
+
   const launcherForeground = readFileSync(join(res, "drawable", "novastore_launcher_foreground.xml"), "utf8");
-  assert.match(launcherForeground, /android:width="62dp"/);
-  assert.match(launcherForeground, /android:height="62dp"/);
-  assert.match(launcherForeground, /android:src="@drawable\/novastore_app_icon"/);
+  assert.match(launcherForeground, /android:drawable="@drawable\/novastore_app_icon"/);
+  assert.match(launcherForeground, /android:insetBottom="28dp"/);
+  assert.match(launcherForeground, /android:insetLeft="28dp"/);
+  assert.match(launcherForeground, /android:insetRight="28dp"/);
+  assert.match(launcherForeground, /android:insetTop="28dp"/);
 
   const expectedPixels = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
   for (const [density, pixels] of Object.entries(expectedPixels)) {
