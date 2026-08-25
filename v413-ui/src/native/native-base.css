@@ -21,9 +21,10 @@ button { cursor: pointer; }
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
   scrollbar-width: none;
-  touch-action: pan-y;
+  touch-action: none;
   user-select: none;
 }
 .mobile-carousel::-webkit-scrollbar { display: none; }

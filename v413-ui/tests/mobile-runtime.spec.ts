@@ -43,6 +43,8 @@ test("horizontal intent stays in Carousel and cannot create parent momentum", as
   const parent = page.getByTestId("mobile-scroll");
 
   await expect(carousel).not.toHaveAttribute("data-scroll-drag", "ignore");
+  await expect(carousel).toHaveCSS("touch-action", "none");
+  await expect(carousel).toHaveCSS("overscroll-behavior-y", "auto");
   await drag(page, card, -130, 14, 5);
 
   const afterRelease = await carousel.evaluate((element) => element.scrollLeft);
@@ -81,13 +83,35 @@ test("initial horizontal finger wobble cannot steal a vertical carousel drag", a
 
   await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(startX + 9, startY - 8);
+  // Reproduce a real finger path: a short 2:1 horizontal opening wobble that
+  // used to let Carousel capture before the intended vertical list swipe.
+  await page.mouse.move(startX + 20, startY - 10);
   await page.waitForTimeout(8);
-  await page.mouse.move(startX + 11, startY - 120, { steps: 5 });
+  await page.mouse.move(startX + 22, startY - 120, { steps: 5 });
   await page.mouse.up();
 
   expect(await parent.evaluate((element) => element.scrollTop)).toBeGreaterThan(40);
   expect(await carousel.evaluate((element) => element.scrollLeft)).toBe(0);
+});
+
+test("an undecided opening wobble can still resolve to a horizontal carousel drag", async ({ page }) => {
+  const card = page.locator(".carousel-card").nth(1);
+  const carousel = page.locator(".fixture-carousel");
+  const parent = page.getByTestId("mobile-scroll");
+  const box = await card.boundingBox();
+  if (!box) throw new Error("Card has no bounding box");
+  const startX = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX - 20, startY + 10);
+  await page.waitForTimeout(8);
+  await page.mouse.move(startX - 120, startY + 14, { steps: 5 });
+  await page.mouse.up();
+
+  expect(await carousel.evaluate((element) => element.scrollLeft)).toBeGreaterThan(40);
+  expect(await parent.evaluate((element) => element.scrollTop)).toBe(0);
 });
 
 test("tap activates a card but a completed drag does not", async ({ page }) => {

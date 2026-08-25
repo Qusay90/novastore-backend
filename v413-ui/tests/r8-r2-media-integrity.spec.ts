@@ -246,7 +246,8 @@ test("coarse touch owns exactly one discrete card page and cannot activate a sec
   await card.scrollIntoViewIfNeeded();
   const carousel = card.locator(".product-media-carousel");
   await expect(carousel).toHaveAttribute("data-paged", "true");
-  await expect(carousel).toHaveCSS("touch-action", "pan-y");
+  await expect(carousel).toHaveCSS("touch-action", "none");
+  await expect(carousel).toHaveCSS("overscroll-behavior-y", "auto");
   await carousel.hover();
   await page.mouse.move((await carousel.boundingBox())!.x + 12, (await carousel.boundingBox())!.y + 12, { steps: 6 });
   await page.waitForTimeout(450);

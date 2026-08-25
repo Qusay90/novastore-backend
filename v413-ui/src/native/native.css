@@ -61,7 +61,7 @@ html[data-novastore-runtime="native"] #root {
 }
 
 .native-mobile-runtime .mobile-carousel {
-  touch-action: pan-y;
+  touch-action: none;
 }
 
 .native-mobile-runtime .cal-app :focus-visible {

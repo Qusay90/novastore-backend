@@ -23,8 +23,8 @@ test("Android branding is generated from the official NovaStore icon", () => {
   assert.deepEqual(packagedOfficial, official);
 
   const launcherForeground = readFileSync(join(res, "drawable", "novastore_launcher_foreground.xml"), "utf8");
-  assert.match(launcherForeground, /android:width="74dp"/);
-  assert.match(launcherForeground, /android:height="74dp"/);
+  assert.match(launcherForeground, /android:width="62dp"/);
+  assert.match(launcherForeground, /android:height="62dp"/);
   assert.match(launcherForeground, /android:src="@drawable\/novastore_app_icon"/);
 
   const expectedPixels = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
@@ -34,6 +34,31 @@ test("Android branding is generated from the official NovaStore icon", () => {
       assert.deepEqual(pngSize(bytes), { width: pixels, height: pixels });
     }
   }
+});
+
+test("Android launch theme cannot expose a native preview title bar", () => {
+  const manifest = readFileSync(join(project, "android", "app", "src", "main", "AndroidManifest.xml"), "utf8");
+  const styles = readFileSync(join(res, "values", "styles.xml"), "utf8");
+  const activity = readFileSync(join(
+    project,
+    "android",
+    "app",
+    "src",
+    "main",
+    "java",
+    "com",
+    "novastore",
+    "app",
+    "MainActivity.java",
+  ), "utf8");
+
+  assert.match(manifest, /android:theme="@style\/AppTheme\.NoActionBarLaunch"/);
+  assert.match(styles, /<style name="AppTheme" parent="Theme\.AppCompat\.Light\.NoActionBar">/);
+  assert.ok((styles.match(/<item name="windowNoTitle">true<\/item>/g) ?? []).length >= 2);
+  assert.ok((styles.match(/<item name="android:windowNoTitle">true<\/item>/g) ?? []).length >= 2);
+  assert.ok((styles.match(/<item name="windowActionBar">false<\/item>/g) ?? []).length >= 3);
+  assert.ok((styles.match(/<item name="android:windowActionBar">false<\/item>/g) ?? []).length >= 2);
+  assert.match(activity, /SplashScreen\.installSplashScreen\(this\);[\s\S]*super\.onCreate\(savedInstanceState\);/);
 });
 
 test("Android launcher and splash do not retain Capacitor template resources", () => {

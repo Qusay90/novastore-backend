@@ -27,13 +27,14 @@ body,
   min-width: 0;
   max-width: 100%;
   overflow: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
   scrollbar-width: none;
   user-select: none;
 }
 
 .mobile-carousel::-webkit-scrollbar { display: none; }
-.mobile-carousel { overflow-x: auto; overflow-y: hidden; touch-action: pan-y; }
+.mobile-carousel { overflow-x: auto; overflow-y: hidden; touch-action: none; }
 .mobile-carousel[data-dragging="true"] { cursor: none; }
 .mobile-carousel-content { display: flex; width: max-content; min-width: 100%; transform: translateX(var(--mobile-carousel-overdrag)); will-change: transform; }
 .mobile-carousel-scrollbar { position: absolute; z-index: 4; inset: 0; opacity: 0; pointer-events: none; transition: opacity 150ms ease; }

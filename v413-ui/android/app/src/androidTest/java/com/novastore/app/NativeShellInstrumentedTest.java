@@ -7,9 +7,13 @@ import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.Espresso.pressBack;
 import static androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom;
 
+import android.app.Instrumentation;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.os.SystemClock;
+import android.view.InputDevice;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsetsController;
 import android.webkit.CookieManager;
@@ -21,6 +25,7 @@ import androidx.test.espresso.action.Press;
 import androidx.test.espresso.action.Swipe;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -223,8 +228,7 @@ public class NativeShellInstrumentedTest {
         cold.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(cold)) {
-            Thread.sleep(500);
-            JSONObject coldState = routeAndDepth(scenario);
+            JSONObject coldState = waitForRoute(scenario, "CAL-01", "login", 0);
             assertEquals("CAL-01", coldState.getString("cal"));
             assertEquals("login", coldState.getString("view"));
             assertEquals(0, coldState.getInt("depth"));
@@ -236,8 +240,7 @@ public class NativeShellInstrumentedTest {
                 warm.setClass(activity, MainActivity.class);
                 activity.startActivity(warm);
             });
-            Thread.sleep(500);
-            JSONObject warmState = routeAndDepth(scenario);
+            JSONObject warmState = waitForRoute(scenario, "CAL-04", "store", 1);
             assertEquals("CAL-04", warmState.getString("cal"));
             assertEquals("store", warmState.getString("view"));
             assertEquals(1, warmState.getInt("depth"));
@@ -256,8 +259,7 @@ public class NativeShellInstrumentedTest {
             assertEquals(1, rejectedState.getInt("depth"));
 
             pressBack();
-            Thread.sleep(500);
-            JSONObject backState = routeAndDepth(scenario);
+            JSONObject backState = waitForRoute(scenario, "CAL-01", "login", 0);
             assertEquals("CAL-01", backState.getString("cal"));
             assertEquals("login", backState.getString("view"));
             assertEquals(0, backState.getInt("depth"));
@@ -309,6 +311,34 @@ public class NativeShellInstrumentedTest {
             );
             assertTrue(refresh.getInt("id") > 0);
             assertEquals("pull", refresh.getString("source"));
+        }
+    }
+
+    @Test
+    public void productCardImageYieldsHumanWobbleVerticalSwipeToPageScroll() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            evaluate(scenario,
+                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-02&tab=home&shell=native');" +
+                    "dispatchEvent(new PopStateEvent('popstate'));" +
+                    "document.querySelector('.mobile-scroll')?.scrollTo(0,0);true"
+            );
+            Thread.sleep(500);
+
+            JSONObject before = productCardGestureState(scenario);
+            assertEquals(0, before.getInt("scrollTop"));
+            assertEquals(0, before.getInt("page"));
+
+            sendProductCardHumanWobbleVerticalGesture(
+                scenario,
+                (float) before.getDouble("gestureXRatio"),
+                (float) before.getDouble("gestureYRatio")
+            );
+            Thread.sleep(700);
+
+            JSONObject after = productCardGestureState(scenario);
+            assertTrue("vertical swipe beginning on product media did not scroll the page: " + after,
+                after.getInt("scrollTop") > 160);
+            assertEquals("vertical swipe changed the product image", 0, after.getInt("page"));
         }
     }
 
@@ -453,6 +483,76 @@ public class NativeShellInstrumentedTest {
         );
     }
 
+    private static void sendProductCardHumanWobbleVerticalGesture(
+        ActivityScenario<MainActivity> scenario,
+        float xRatio,
+        float yRatio
+    ) throws Exception {
+        AtomicReference<float[]> webViewBounds = new AtomicReference<>();
+        scenario.onActivity(activity -> {
+            WebView webView = activity.getBridge().getWebView();
+            int[] location = new int[2];
+            webView.getLocationOnScreen(location);
+            webViewBounds.set(new float[] {
+                location[0], location[1], webView.getWidth(), webView.getHeight()
+            });
+        });
+
+        float[] bounds = webViewBounds.get();
+        float left = bounds[0];
+        float top = bounds[1];
+        float width = bounds[2];
+        float height = bounds[3];
+        float startX = left + width * xRatio;
+        float startY = top + height * yRatio;
+        long downTime = SystemClock.uptimeMillis();
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+
+        sendFinger(instrumentation, downTime, downTime, MotionEvent.ACTION_DOWN, startX, startY);
+        Thread.sleep(24);
+        sendFinger(instrumentation, downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE,
+            startX + width * 0.02f, startY - height * 0.004f);
+        float wobbleX = startX + width * 0.02f;
+        float wobbleY = startY - height * 0.004f;
+        float endY = top + height * 0.40f;
+        for (int step = 1; step <= 24; step += 1) {
+            Thread.sleep(12);
+            float progress = step / 24f;
+            sendFinger(instrumentation, downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_MOVE,
+                wobbleX + (startX - wobbleX) * progress,
+                wobbleY + (endY - wobbleY) * progress);
+        }
+        Thread.sleep(16);
+        sendFinger(instrumentation, downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP,
+            startX, endY);
+    }
+
+    private static void sendFinger(
+        Instrumentation instrumentation,
+        long downTime,
+        long eventTime,
+        int action,
+        float x,
+        float y
+    ) {
+        MotionEvent event = MotionEvent.obtain(downTime, eventTime, action, x, y, 0);
+        event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        instrumentation.sendPointerSync(event);
+        event.recycle();
+    }
+
+    private static JSONObject productCardGestureState(ActivityScenario<MainActivity> scenario)
+        throws Exception {
+        return evaluateJson(scenario,
+            "(() => {const scroll=document.querySelector('.mobile-scroll');" +
+                "const carousel=document.querySelector('.product-media-carousel');" +
+                "const rect=carousel?.getBoundingClientRect();return {" +
+                "scrollTop:Math.round(scroll?.scrollTop||0),page:Number(carousel?.dataset.page||0)," +
+                "gestureXRatio:rect?(rect.left+rect.width*.5)/innerWidth:.25," +
+                "gestureYRatio:rect?(rect.top+rect.height*.15)/innerHeight:.76};})()"
+        );
+    }
+
     private static JSONObject routeAndDepth(ActivityScenario<MainActivity> scenario) throws Exception {
         return evaluateJson(scenario,
             "(() => {const app=document.querySelector('[data-testid=calibration-app]');return {" +
@@ -461,6 +561,28 @@ public class NativeShellInstrumentedTest {
                 "depth:Number.isSafeInteger(history.state?.novastoreDepth)" +
                     "?history.state.novastoreDepth:-1};})()"
         );
+    }
+
+    private static JSONObject waitForRoute(
+        ActivityScenario<MainActivity> scenario,
+        String expectedCal,
+        String expectedView,
+        int expectedDepth
+    ) throws Exception {
+        long deadline = SystemClock.elapsedRealtime() + TimeUnit.SECONDS.toMillis(WEB_TIMEOUT_SECONDS);
+        JSONObject state;
+        do {
+            state = routeAndDepth(scenario);
+            if (
+                expectedCal.equals(state.getString("cal")) &&
+                expectedView.equals(state.getString("view")) &&
+                expectedDepth == state.getInt("depth")
+            ) {
+                return state;
+            }
+            Thread.sleep(100);
+        } while (SystemClock.elapsedRealtime() < deadline);
+        return state;
     }
 
     private static JSONObject evaluateJson(ActivityScenario<MainActivity> scenario, String script)

@@ -38,6 +38,7 @@ const physics = {
   maxOverdrag: 96,
   sampleWindow: 100,
   dragThreshold: 8,
+  horizontalCommitThreshold: 24,
   axisLockRatio: 1.35,
 } as const;
 
@@ -456,14 +457,18 @@ export function Carousel({
       // these early moves must bubble so a parent MobileScroll can still win.
       if (Math.max(Math.abs(delta), Math.abs(crossDelta)) < physics.dragThreshold) return;
       const horizontalIntent = (
-        Math.abs(delta) >= physics.dragThreshold &&
+        Math.abs(delta) >= physics.horizontalCommitThreshold &&
         Math.abs(delta) >= Math.abs(crossDelta) * physics.axisLockRatio
       );
-      if (!horizontalIntent && Math.abs(crossDelta) >= physics.dragThreshold) {
+      const verticalIntent = (
+        Math.abs(crossDelta) >= physics.dragThreshold &&
+        Math.abs(crossDelta) >= Math.abs(delta)
+      );
+      if (verticalIntent) {
         // The cross axis won. Abandon this session without capturing or
         // canceling the event so the parent can handle this move and release.
-        // Requiring clear horizontal dominance prevents a small initial finger
-        // wobble from stealing a vertical product-list scroll.
+        // Until either axis clearly wins, both nested scrollers remain pending;
+        // this lets an opening finger wobble resolve on its eventual direction.
         sessionRef.current = null;
         if (paged) settlePage(node, session.startPage, false);
         return;

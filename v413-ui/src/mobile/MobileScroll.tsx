@@ -41,6 +41,7 @@ type DragSession = {
   active: boolean;
   captured: boolean;
   pointerId: number | null;
+  startX: number;
   startY: number;
   startScrollTop: number;
   hasDragged: boolean;
@@ -61,6 +62,7 @@ export function MobileScroll({ className, children }: MobileScrollProps) {
     active: false,
     captured: false,
     pointerId: null,
+    startX: 0,
     startY: 0,
     startScrollTop: 0,
     hasDragged: false,
@@ -307,6 +309,7 @@ export function MobileScroll({ className, children }: MobileScrollProps) {
         active: false,
         captured: false,
         pointerId: null,
+        startX: 0,
         startY: 0,
         startScrollTop: 0,
         hasDragged: false,
@@ -335,6 +338,7 @@ export function MobileScroll({ className, children }: MobileScrollProps) {
       active: false,
       captured: false,
       pointerId: null,
+      startX: 0,
       startY: 0,
       startScrollTop: 0,
       hasDragged: false,
@@ -371,6 +375,7 @@ export function MobileScroll({ className, children }: MobileScrollProps) {
       active: true,
       captured: false,
       pointerId: event.pointerId,
+      startX: event.clientX,
       startY: event.clientY,
       startScrollTop: scroll.scrollTop,
       hasDragged: false,
@@ -383,8 +388,17 @@ export function MobileScroll({ className, children }: MobileScrollProps) {
 
     if (!scroll || !session.active || session.pointerId !== event.pointerId) return;
 
+    const movementX = event.clientX - session.startX;
     const movementY = event.clientY - session.startY;
-    if (!session.hasDragged && Math.abs(movementY) < scrollPhysics.tapSlop) return;
+    if (!session.hasDragged) {
+      const horizontalDistance = Math.abs(movementX);
+      const verticalDistance = Math.abs(movementY);
+      if (Math.max(horizontalDistance, verticalDistance) < scrollPhysics.tapSlop) return;
+      // A nested Carousel gets the first chance to commit a clearly horizontal
+      // gesture. Keep this parent pending while horizontal movement leads so a
+      // small opening wobble cannot make both axes race for pointer capture.
+      if (verticalDistance < scrollPhysics.tapSlop || verticalDistance < horizontalDistance) return;
+    }
 
     if (!session.captured) {
       try {
