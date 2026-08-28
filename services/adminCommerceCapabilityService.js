@@ -2,6 +2,7 @@ const ADMIN_COMMERCE_CAPABILITY_DEFAULTS = Object.freeze({
     dashboardRead: true,
     ordersRead: true,
     returnsRead: true,
+    returnWrite: false,
     firstPartyCatalogRead: true,
     catalogStructureRead: true,
     firstPartyCatalogWrite: false,
@@ -31,6 +32,7 @@ const ADMIN_COMMERCE_CAPABILITY_DEFAULTS = Object.freeze({
 const WRITE_CAPABILITY_ENV = Object.freeze({
     firstPartyCatalogWrite: 'NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED',
     catalogStructureWrite: 'NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED',
+    returnWrite: 'NOVASTORE_ADMIN_RETURN_WRITE_ENABLED',
     orderCancelWrite: 'NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED',
     manualShipmentWrite: 'NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED',
     reviewModerationWrite: 'NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED',

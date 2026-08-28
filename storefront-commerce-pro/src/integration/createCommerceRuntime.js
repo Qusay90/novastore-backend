@@ -1,6 +1,7 @@
 import { createAuthAdapter } from "../adapters/authAdapter.js";
 import { createAssistantAdapter } from "../adapters/assistantAdapter.js";
 import { createCartAdapter } from "../adapters/cartAdapter.js";
+import { createBusinessIdentityAdapter } from "../adapters/businessIdentityAdapter.js";
 import { createCatalogAdapter } from "../adapters/catalogAdapter.js";
 import { createCheckoutAdapter } from "../adapters/checkoutAdapter.js";
 import { createCustomerAccountAdapter } from "../adapters/customerAccountAdapter.js";
@@ -38,6 +39,7 @@ export function createCommerceRuntime({
     origin: location?.origin || "http://localhost",
   });
   const catalogAdapter = createCatalogAdapter(http);
+  const businessIdentityAdapter = createBusinessIdentityAdapter(http);
   const authAdapter = createAuthAdapter({ http, storage, location });
   const customerHttp = createCustomerHttp({
     fetchImpl,
@@ -62,7 +64,13 @@ export function createCommerceRuntime({
   const storeFollowAdapter = createStoreFollowAdapter(customerHttp);
 
   const initialize = async ({ signal, readOnlyPreview = false } = {}) => {
-    const catalog = await catalogAdapter.load({ signal });
+    const [catalog, businessIdentity] = await Promise.all([
+      catalogAdapter.load({ signal }),
+      businessIdentityAdapter.load({ signal }).catch(() => Object.freeze({
+        status: "pending_owner_company_formation",
+        identity: null,
+      })),
+    ]);
     configureRuntimeCatalog(catalog);
     const visibleProducts = Object.freeze(getVisibleProducts());
     const productById = new Map(visibleProducts.map((product) => [Number(product.id), product]));
@@ -118,6 +126,7 @@ export function createCommerceRuntime({
 
     return Object.freeze({
       catalog: runtimeCatalog,
+      businessIdentity,
       session,
       warnings: Object.freeze([...(catalog.warnings || []), session.warning].filter(Boolean)),
       favorites: Object.freeze({

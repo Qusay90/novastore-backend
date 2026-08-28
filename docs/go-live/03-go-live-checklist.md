@@ -15,7 +15,8 @@ Durum: **NO-GO**. Bu liste production, uzak DB, migration, gercek odeme veya dep
 - [ ] Commerce schema migrationlari production veritabaninda uygulandi.
 - [ ] Gercek odeme initialize + imzali webhook testleri onayli staging'de gecti; mock/test-token implementasyonlari kaldirildi.
 - [ ] Gercek tasiyici adapteri, label ve tracking callback staging UAT'i gecti. Manuel devir kaydi bu maddeyi karsilamaz.
-- [ ] `RETURN_WRITES_DISABLED` ancak iade, provider refund, stok hareketi ve reconciliation zinciri testlerinden sonra kontrollu yeni kontratla degistirildi.
+- [x] Müşteri iade talebi ve Admin durum geçişi; sahiplik, 14 gün, tek aktif talep, revizyon ve append-only audit ile kontrollü kontrata taşındı.
+- [ ] Gerçek provider refund/idempotency/reconciliation UAT'i tamamlandı. Uygulama bu kapı açılmadan para iadesi yaptığını iddia etmez.
 - [ ] Checkout kupon/kampanya hesaplamasi backend ile uyumlu.
 - [ ] Merchant feed (`/merchant/feed.xml`) dogrulandi.
 

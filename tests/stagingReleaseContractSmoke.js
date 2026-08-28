@@ -80,6 +80,7 @@ const expectedRequiredNames = [
     'NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED',
     'NOVASTORE_ADMIN_COUPON_WRITE_ENABLED',
     'NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED',
+    'NOVASTORE_ADMIN_RETURN_WRITE_ENABLED',
     'NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED',
     'NOVASTORE_ADMIN_SUPPORT_WRITE_ENABLED',
     'NOVASTORE_ALLOW_REMOTE_DB',
@@ -115,6 +116,7 @@ const createValidEnvironment = () => ({
     NOVASTORE_STAGING_EXTERNAL_SIDE_EFFECTS_DISABLED: 'true',
     NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED: 'false',
     NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'false',
+    NOVASTORE_ADMIN_RETURN_WRITE_ENABLED: 'false',
     NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: 'false',
     NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'false',
     NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED: 'false',
@@ -252,9 +254,9 @@ const createFakeGitReader = ({
         assert.equal(FORBIDDEN_PROVIDER_CREDENTIAL_NAMES, FORBIDDEN_PROVIDER_CREDENTIAL_KEYS);
     });
 
-    await check(5, 'migration bytes/checksums 30/30 exact', () => {
+    await check(5, 'migration bytes/checksums 31/31 exact', () => {
         const registry = loadRegistry();
-        assert.equal(registry.length, 30);
+        assert.equal(registry.length, 31);
         for (const migration of registry) {
             const bytes = fs.readFileSync(migration.absolutePath);
             assert.equal(sha256(bytes), migration.sha256);

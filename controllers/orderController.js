@@ -14,6 +14,7 @@ const {
     releaseStockReservation
 } = require('../services/orderService');
 const { consumeCouponUsageIfNeeded } = require('../services/couponUsageService');
+const { releaseCouponReservationForOrder } = require('../services/couponReservationService');
 const {
     OrderLifecycleError,
     evaluateGenericStatusRequest,
@@ -30,14 +31,36 @@ const {
 const { sendDisabledCapability } = require('../middlewares/adminCommerceCapability');
 
 const orderSelectSql = `
-    SELECT o.*, s.tracking_url, s.eta_date
+    SELECT o.*, s.tracking_url, s.eta_date,
+           latest_return.id AS return_id,
+           latest_return.status AS return_status,
+           latest_return.revision AS return_revision,
+           latest_return.decision_note AS return_decision_note
     FROM orders o
     LEFT JOIN shipments s ON s.order_id = o.id
+    LEFT JOIN LATERAL (
+        SELECT r.id, r.status, r.revision, r.decision_note
+        FROM returns r
+        WHERE r.order_id = o.id
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT 1
+    ) latest_return ON TRUE
 `;
 
 const orderSelectFallbackSql = `
-    SELECT o.*
+    SELECT o.*,
+           latest_return.id AS return_id,
+           latest_return.status AS return_status,
+           latest_return.revision AS return_revision,
+           latest_return.decision_note AS return_decision_note
     FROM orders o
+    LEFT JOIN LATERAL (
+        SELECT r.id, r.status, r.revision, r.decision_note
+        FROM returns r
+        WHERE r.order_id = o.id
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT 1
+    ) latest_return ON TRUE
 `;
 
 const runOrderQueryWithFallback = async (client, primaryQuery, params, fallbackQuery) => {
@@ -375,11 +398,13 @@ const cancelOrder = async (req, res) => {
             return res.status(404).json({ error: 'Sipariş bulunamadı.' });
         }
 
-        const isOwner = req.user && Number(order.user_id) === req.user.id;
+        const isOwner = req.user?.principal === 'customer'
+            && req.user?.role === 'customer'
+            && Number(order.user_id) === Number(req.user.id);
         if (!isOwner && !isAdmin) {
             await client.query('ROLLBACK');
             transactionOpen = false;
-            return res.status(403).json({ error: 'Bu siparişi iptal etme yetkiniz yok.' });
+            return res.status(404).json({ error: 'Sipariş bulunamadı.' });
         }
 
         const lockedPayments = await fetchPaymentsForUpdate(client, order);
@@ -433,6 +458,9 @@ const cancelOrder = async (req, res) => {
                 reasonCode
             })
             : null;
+        if (stockRelease) {
+            await releaseCouponReservationForOrder(client, order.id, reasonCode);
+        }
         await markOrderCancelled({
             client,
             order,

@@ -218,7 +218,27 @@ const updateCouponAdminInternal = async (database, couponId, {
                 code: action === 'update' ? 'COUPON_UPDATE_NOOP' : 'COUPON_STATUS_NOOP'
             });
         }
-        mergeAndValidateCoupon(current, materialChanges);
+        const effectiveCoupon = mergeAndValidateCoupon(current, materialChanges);
+        const activeReservations = await client.query(
+            `SELECT COUNT(*)::integer AS count
+             FROM coupon_reservations
+             WHERE coupon_id = $1
+               AND status = 'RESERVED'
+               AND expires_at > NOW()`,
+            [id]
+        );
+        const activeReservationCount = Number(activeReservations.rows?.[0]?.count || 0);
+        if (
+            effectiveCoupon.usage_limit !== null
+            && effectiveCoupon.usage_limit !== undefined
+            && Number(effectiveCoupon.usage_limit) < Number(current.used_count || 0) + activeReservationCount
+        ) {
+            throw new CouponAdminError('usage_limit etkin ödeme rezervasyonlarının altına indirilemez.', {
+                code: 'COUPON_ACTIVE_RESERVATION_CONFLICT',
+                statusCode: 409,
+                details: Object.freeze({ refetchRequired: true })
+            });
+        }
 
         const params = [];
         const assignments = Object.entries(materialChanges).map(([field, value]) => {

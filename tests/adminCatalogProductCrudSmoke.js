@@ -327,6 +327,9 @@ const runQuery = async (sql, params = [], { transaction = false } = {}) => {
     if (/FROM product_categories category_link JOIN categories category/i.test(text)) {
         return { rows: categoryDetailRows(Number(params[0])) };
     }
+    if (/FROM product_media WHERE product_id = \$1/i.test(text)) {
+        return { rows: [] };
+    }
     if (/SELECT id, role, auth_enabled FROM users WHERE id = \$1/i.test(text)) {
         state.currentAdminQueries += 1;
         return { rows: [{ id: 17, role: 'admin', auth_enabled: true }] };
@@ -407,7 +410,7 @@ const assertBoundedProduct = (payload) => {
     assert.equal(payload.catalogMode, 'first_party');
     assert.deepEqual(Object.keys(payload.product).sort(), [
         'attributes', 'brand', 'categories', 'category_ids', 'created_at', 'currency', 'deleted_at',
-        'description', 'desi', 'has_media', 'id', 'is_customer_visible', 'name', 'old_price',
+        'description', 'desi', 'has_media', 'id', 'is_customer_visible', 'media', 'name', 'old_price',
         'price', 'primary_category_id', 'product_type', 'publication_status', 'revision', 'sku',
         'stock', 'updated_at', 'vat_rate', 'vat_rate_source', 'weight_grams'
     ]);

@@ -2,8 +2,12 @@
 
 ## Payments
 - `POST /api/payments/initialize`
+  - Doğrulanmış Customer oturumu zorunludur; sipariş sahibi yalnız oturum kimliğinden alınır.
   - Body: `fullName, email, phone, address, cartItems[], couponCode?, paymentMethod(card|havale)`
-  - Header: `Idempotency-Key` (onerilir)
+  - Header: `Idempotency-Key` zorunlu sözleşme girdisidir; aynı sahibi ve aynı istek gövdesini tek sipariş/ödeme niyetine bağlar.
+  - Ürün fiyatı, kampanya, kupon, kargo ve toplam yalnız sunucuda hesaplanır.
+  - Production kart ödemesi gerçek sağlayıcı aktive edilene kadar fail-closed'dur.
+  - Production havale/EFT, gerçek hesap bilgisine ek olarak mutabakat ve yetkili ödeme-onay operasyonu aktive edilene kadar fail-closed'dur.
 - `POST /api/payments/webhook/iyzico`
   - Body: `eventId, paymentRef, status(SUCCESS|FAILED), providerTransactionId?, reason?`
 
@@ -29,12 +33,16 @@
 
 ## Returns
 - `POST /api/returns`
-  - Gecici guvenlik kilidi: `503 RETURN_WRITES_DISABLED`
+  - Doğrulanmış Customer oturumu ve sipariş sahipliği zorunludur.
+  - Yalnız `Teslim Edildi` + `PAID` siparişte, gerçek `delivered_at` zamanından itibaren 14 gün içinde açılır.
+  - Sipariş başına aynı anda yalnız bir aktif iade talebi bulunabilir.
 - `PATCH /api/returns/:id/status`
-  - Gecici guvenlik kilidi: `503 RETURN_WRITES_DISABLED`
+  - Güncel DB Admin rolü, `returnStatusWrite` capability ve `NOVASTORE_ADMIN_RETURN_WRITE_ENABLED=true` zorunludur.
+  - Body: `status`, `expected_revision`, izinli `reason_code`, müşteri-görünür `decision_note`.
+  - Durum geçişi revizyon kilidi ve append-only denetim olayıyla atomiktir.
 - `GET /api/returns/:id`
-  - Owner/admin icin salt okunur
-  - Tur 2C bu kilidi acmaz; refund/stok/reconciliation modeli ve migration icin ayri onay gerekir.
+  - Owner/admin için salt okunur; başka müşteriye `404` güvenli geri dönüş verir.
+  - Uygulama gerçek sağlayıcı iadesi yapmaz ve açıkça `refundProviderExecuted=false` bildirir. Para iadesi sağlayıcısı ayrı dış kapıdır.
 
 ## Campaigns
 - `POST /api/campaigns/quote`

@@ -172,6 +172,9 @@ const createClient = () => ({
             const coupon = state.coupons.get(Number(params[0]));
             return { rows: coupon ? [clone(coupon)] : [] };
         }
+        if (/SELECT COUNT\(\*\)::integer AS count\s+FROM coupon_reservations/i.test(text)) {
+            return { rows: [{ count: 0 }], rowCount: 1 };
+        }
         if (/^UPDATE coupons/i.test(text) && /revision = revision \+ 1/i.test(text)) {
             const couponId = Number(params.at(-2));
             const expectedRevision = Number(params.at(-1));

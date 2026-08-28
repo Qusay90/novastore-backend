@@ -4,6 +4,7 @@ const {
     resolveStartupSafety
 } = require('../config/startupSafety');
 const { resolveStagingRuntimePolicy } = require('../config/stagingRuntimePolicy');
+const { getPublicBusinessIdentity } = require('../config/businessIdentityConfig');
 
 const LIVE_RESPONSE = Object.freeze({ status: 'live' });
 const READY_RESPONSE = Object.freeze({ status: 'ready' });
@@ -166,7 +167,16 @@ const createRuntimeMetaController = ({ database, environment = process.env } = {
         }
     };
 
-    return { getLive, getReady, getVersion };
+    const getBusinessIdentity = (_req, res) => {
+        res.set('Cache-Control', 'no-store');
+        const projection = getPublicBusinessIdentity(environment);
+        return res.status(200).json({
+            status: projection.status,
+            identity: projection.identity
+        });
+    };
+
+    return { getBusinessIdentity, getLive, getReady, getVersion };
 };
 
 module.exports = {

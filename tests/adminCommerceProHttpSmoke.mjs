@@ -334,7 +334,7 @@ assert.throws(
 );
 
 const returnPage = normalizeReturnSummaryPage({
-  items: [{ id: 3, order_id: 42, customer_name: "Müşteri", reason_code: "HASARLI", status: "REQUESTED", refund_amount: "149.90", currency: "try", order_status: "Teslim Edildi", refund_status: "REQUESTED", payment_status: "PAID", created_at: null, updated_at: null }],
+  items: [{ id: 3, order_id: 42, customer_name: "Müşteri", reason_code: "HASARLI", status: "REQUESTED", refund_amount: "149.90", revision: 1, currency: "try", order_status: "Teslim Edildi", refund_status: "REQUESTED", payment_status: "PAID", created_at: null, updated_at: null }],
   limit: 100,
   hasMore: false,
 });
@@ -342,7 +342,7 @@ assert.equal(returnPage.items[0].id, "RT-000003");
 assert.equal(returnPage.items[0].orderId, "NS-000042");
 assert.equal(returnPage.items[0].refundAmount, 149.9);
 assert.equal(returnPage.items[0].currency, "TRY");
-assert.throws(() => normalizeReturnSummaryPage({ items: [{ id: 1, order_id: 2, refund_amount: -1 }], limit: 100, hasMore: false }), /refund_amount/);
+assert.throws(() => normalizeReturnSummaryPage({ items: [{ id: 1, order_id: 2, refund_amount: -1, revision: 1 }], limit: 100, hasMore: false }), /refund_amount/);
 
 const notificationPage = normalizeNotificationSummaryPage({
   items: [{ id: 5, type: "new_order", message: "Yeni sipariş", is_read: false, entity_type: "order", entity_id: 42, created_at: "2026-07-14T10:00:00.000Z" }],
@@ -523,7 +523,7 @@ const fixtureHttp = {
     if (path === "/api/admin/session") return { user: { id: 7, role: "admin" }, commerceMode: "single_vendor", capabilities: { dashboardRead: true, ordersRead: true, returnsRead: true, notificationsRead: true, firstPartyCatalogRead: true, catalogStructureRead: true } };
     if (path === "/api/admin/stats") return { totalRevenue: "10", totalOrders: 1, totalProducts: 2, totalUsers: 3 };
     if (path === "/api/admin/orders/summary?limit=100") return { items: [{ id: 1, customer_name: "Müşteri", total_amount: "10", status: "Onay Bekliyor", payment_status: "PAID", item_count: 1, created_at: "2026-07-14T10:00:00.000Z" }], limit: 100, hasMore: false };
-    if (path === "/api/admin/returns/summary?limit=100") return { items: [{ id: 1, order_id: 1, reason_code: "DİĞER", status: "REQUESTED", refund_amount: "10", currency: "TRY", payment_status: "PAID" }], limit: 100, hasMore: false };
+    if (path === "/api/admin/returns/summary?limit=100") return { items: [{ id: 1, order_id: 1, reason_code: "DİĞER", status: "REQUESTED", refund_amount: "10", revision: 1, currency: "TRY", payment_status: "PAID" }], limit: 100, hasMore: false };
     if (path === "/api/admin/notifications/summary?limit=50") return { items: [{ id: 1, type: "new_order", message: "Yeni sipariş", is_read: false }], limit: 50, hasMore: false };
     if (path === "/api/admin/catalog/products/summary?limit=100") return {
       catalogMode: "first_party",

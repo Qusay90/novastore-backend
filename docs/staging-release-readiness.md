@@ -54,6 +54,7 @@ Runtime safety names:
 - `NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED`
 - `NOVASTORE_ADMIN_COUPON_WRITE_ENABLED`
 - `NOVASTORE_ADMIN_SUPPORT_WRITE_ENABLED`
+- `NOVASTORE_ADMIN_RETURN_WRITE_ENABLED`
 - `SKIP_SCHEMA_INIT`
 - `NOVASTORE_ALLOW_SCHEMA_INIT`
 
@@ -102,7 +103,7 @@ Presence is a fail-closed condition, including an empty value. `DATABASE_URL`,
 3. Validate the names-only staging contract. Do not dump the environment.
 4. Reject any forbidden provider credential name.
 5. Confirm the access gate and external-side-effect kill switch are enabled; confirm
-   all eight listed admin write capabilities are false and legacy schema init is disabled.
+   all nine listed admin write capabilities are false and legacy schema init is disabled.
 6. Run the offline guarded migration plan.
 7. With read-only database authorization, run guarded migration status.
 8. Only with a separate database mutation approval, run guarded migration apply.
@@ -188,7 +189,7 @@ App rollback rules:
 - Roll back only to a previously verified full commit and tree.
 - Keep the staging access gate enabled.
 - Keep the external-side-effect kill switch enabled.
-- Keep all eight listed admin write capabilities false.
+- Keep all nine listed admin write capabilities false.
 - Keep legacy schema init disabled.
 - Never redirect to production and never reuse production credentials.
 

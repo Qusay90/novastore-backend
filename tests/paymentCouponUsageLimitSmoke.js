@@ -1,4 +1,10 @@
 const assert = require('assert');
+const Module = require('node:module');
+const originalModuleLoad = Module._load;
+Module._load = function patchedLoad(request, parent, isMain) {
+    if (request === '../server' || request.endsWith('/server')) return { io: null };
+    return originalModuleLoad.call(this, request, parent, isMain);
+};
 const { webhookPaytr } = require('../controllers/paymentController');
 const pool = require('../config/db');
 const { PAYMENT_STATUS, ORDER_STATUS } = require('../constants/orderStatus');
@@ -24,6 +30,7 @@ const trackedEnv = [
 
 const originalEnv = Object.fromEntries(trackedEnv.map((key) => [key, process.env[key]]));
 const originalPoolConnect = pool.connect;
+const originalPoolQuery = pool.query;
 
 const restoreState = () => {
     for (const key of trackedEnv) {
@@ -34,6 +41,8 @@ const restoreState = () => {
         }
     }
     pool.connect = originalPoolConnect;
+    pool.query = originalPoolQuery;
+    Module._load = originalModuleLoad;
 };
 
 const applyPaytrEnv = () => {
@@ -150,10 +159,20 @@ const createCouponLimitClient = (state) => ({
             return { rows: [] };
         }
 
-        if (/UPDATE coupons SET used_count = used_count \+/i.test(sql)) {
+        if (/SELECT id, status\s+FROM coupon_reservations/i.test(sql)) {
+            return { rows: [{ id: 9201, status: 'RESERVED' }] };
+        }
+
+        if (/UPDATE coupons\s+SET used_count = used_count \+/i.test(sql)) {
             state.couponAttempts += 1;
             assert.match(sql, /usage_limit IS NULL OR used_count < usage_limit/i);
             return { rows: [], rowCount: 0 };
+        }
+
+        if (/UPDATE coupon_reservations/i.test(sql)) {
+            state.couponReconciliations += 1;
+            assert.equal(params[0], 'RECONCILIATION_REQUIRED');
+            return { rows: [{ id: 9201 }], rowCount: 1 };
         }
 
         if (/UPDATE orders/i.test(sql)) {
@@ -170,9 +189,14 @@ const createCouponLimitClient = (state) => ({
             return { rows: [], rowCount: 0 };
         }
 
-        if (/INSERT INTO order_events|INSERT INTO order_items/i.test(sql)) {
+        if (/INSERT INTO order_events/i.test(sql)) {
             state.lateSideEffects += 1;
             return { rows: [] };
+        }
+
+        if (/INSERT INTO order_items/i.test(sql)) {
+            state.orderItemWrites += 1;
+            return { rows: [{ id: state.orderItemWrites }], rowCount: 1 };
         }
 
         throw new Error(`Unexpected coupon limit query: ${sql}`);
@@ -221,28 +245,33 @@ const createCouponLimitClient = (state) => ({
             stockReservations: 0,
             paymentUpdates: 0,
             couponAttempts: 0,
+            couponReconciliations: 0,
             orderUpdates: 0,
             webhookProcessedUpdates: 0,
             lateSideEffects: 0,
+            orderItemWrites: 0,
             calls: []
         };
         pool.connect = async () => createCouponLimitClient(state);
+        pool.query = async () => ({ rows: [{ id: 9901 }] });
 
         const res = createRes();
         await webhookPaytr({ body: buildPayload() }, res);
 
-        assert.strictEqual(res.code, 409, JSON.stringify({
+        assert.strictEqual(res.code, 200, JSON.stringify({
             body: res.body,
             queries: state.calls.map((call) => call.sql)
         }, null, 2));
-        assert.match(res.body.error, /Kupon kullanım limiti/);
+        assert.strictEqual(res.body, 'OK');
         assert.strictEqual(state.begins, 1);
         assert.strictEqual(state.couponAttempts, 1);
-        assert.strictEqual(state.commits, 0);
-        assert.strictEqual(state.rollbacks, 1);
-        assert.strictEqual(state.orderUpdates, 0);
-        assert.strictEqual(state.webhookProcessedUpdates, 0);
-        assert.strictEqual(state.lateSideEffects, 0);
+        assert.strictEqual(state.couponReconciliations, 1);
+        assert.strictEqual(state.commits, 1);
+        assert.strictEqual(state.rollbacks, 0);
+        assert.strictEqual(state.orderUpdates, 1);
+        assert.strictEqual(state.webhookProcessedUpdates, 1);
+        assert.strictEqual(state.lateSideEffects, 2);
+        assert.strictEqual(state.orderItemWrites, 1);
 
         console.log('payment coupon usage limit smoke passed');
     } finally {

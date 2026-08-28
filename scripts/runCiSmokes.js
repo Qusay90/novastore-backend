@@ -15,6 +15,8 @@ const smokeTests = [
     'tests/webCustomerLogoutSmoke.mjs',
     'tests/sharedStateSmoke.js',
     'tests/paymentProviderConfigSmoke.js',
+    'tests/launchCriticalCommerceContractSmoke.js',
+    'tests/returnWritesDisabledSmoke.js',
     'tests/categoryPlpStorefrontSmoke.js',
     'tests/officialRuntimeVisualContractSmoke.mjs',
     'tests/storefrontR4HumanReviewSmoke.mjs',

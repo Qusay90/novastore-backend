@@ -193,7 +193,8 @@ assert.match(catalogStructureSource, /targetType === "category"[\s\S]*categoryId
 assert.doesNotMatch(catalogStructureSource, /\bseller(?:Id|Name|_id|_name)?\b|\brisk\b|approvalAction|validation_metadata/i);
 assert.doesNotMatch(source, /\/api\/returns\/admin\/all|\/api\/notifications\/admin/);
 assert.doesNotMatch(source, /\/api\/shipments\/[^"']+\/create/);
-assert.doesNotMatch(source, /\/api\/orders\/[^"']+\/status|\/api\/returns\/[^"']+\/status|\/api\/notifications\/[^"']+\/read/);
+assert.doesNotMatch(source, /\/api\/orders\/[^"']+\/status|\/api\/notifications\/[^"']+\/read/);
+assert.match(adapterSource, /hasCapability\(capabilities, "returnWrite"\)[\s\S]*\/api\/returns\/\$\{encodeURIComponent\(String\(returnId\)\)\}\/status[\s\S]*method: "PATCH"[\s\S]*expected_revision: expectedRevision/);
 assert.doesNotMatch(source, /\/api\/payments\/|paytr|iyzico/i);
 const stripInlinePayload = (documentSource) => documentSource
   .replace(/(<style\b[^>]*>)[\s\S]*?(<\/style>)/gi, "$1$2")

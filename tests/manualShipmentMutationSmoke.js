@@ -391,7 +391,7 @@ const runMutation = async (state, requestOptions = {}, dependencies = undefined)
         const getResponse = createResponse();
         await getShipment({
             params: { orderId: '7001' },
-            user: { id: 44, role: 'customer' }
+            user: { id: 44, principal: 'customer', role: 'customer' }
         }, getResponse);
         assert.equal(getResponse.statusCode, 200);
         assert.equal(getResponse.payload.trackingNo, 'NO-LINK-123');

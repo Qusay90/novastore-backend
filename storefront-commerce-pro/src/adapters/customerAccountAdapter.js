@@ -118,6 +118,14 @@ const CANCELLABLE_STATUSES = new Set([
   "Hazırlanıyor",
 ]);
 
+const RETURN_STATUS_LABELS = Object.freeze({
+  REQUESTED: "Talep alındı",
+  IN_REVIEW: "İnceleniyor",
+  APPROVED: "Onaylandı · para iadesi bekleniyor",
+  REJECTED: "Reddedildi",
+  COMPLETED: "Tamamlandı",
+});
+
 export const normalizeCustomerOrder = (value) => {
   if (!value || typeof value !== "object") return null;
   const id = toPositiveInteger(value.id);
@@ -125,6 +133,9 @@ export const normalizeCustomerOrder = (value) => {
   const status = asTrimmedString(value.display_status || value.status) || "Durum bilgisi bekleniyor";
   const total = Number(value.total_amount ?? value.total ?? 0);
   const items = parseArray(value.items).map(normalizeOrderItem).filter(Boolean);
+  const paymentStatus = asTrimmedString(value.payment_status || value.paymentStatus) || null;
+  const returnId = toPositiveInteger(value.return_id || value.returnId);
+  const returnStatus = asTrimmedString(value.return_status || value.returnStatus).toUpperCase() || null;
   return Object.freeze({
     id,
     status,
@@ -137,12 +148,17 @@ export const normalizeCustomerOrder = (value) => {
       value.address || value.shipping_address || value.delivery_address || value.customer_address,
     ) || null,
     paymentMethod: asTrimmedString(value.payment_method || value.paymentMethod) || null,
-    paymentStatus: asTrimmedString(value.payment_status || value.paymentStatus) || null,
+    paymentStatus,
     refundStatus: asTrimmedString(value.refund_status || value.refundStatus) || null,
     trackingNo: asTrimmedString(value.tracking_no || value.trackingNo) || null,
     trackingUrl: asTrimmedString(value.tracking_url || value.trackingUrl) || null,
     etaDate: value.eta_date || value.estimated_delivery_date || value.etaDate || null,
     cancellable: CANCELLABLE_STATUSES.has(status) && value.is_payment_failed !== true,
+    returnId,
+    returnStatus,
+    returnStatusLabel: returnStatus ? (RETURN_STATUS_LABELS[returnStatus] || returnStatus) : null,
+    returnDecisionNote: asTrimmedString(value.return_decision_note || value.returnDecisionNote) || null,
+    returnable: status === "Teslim Edildi" && paymentStatus === "PAID" && !returnId,
   });
 };
 
@@ -444,6 +460,20 @@ export function createCustomerAccountAdapter({
     });
   };
 
+  const createReturnRequest = async (order, options = {}) => {
+    const orderId = toPositiveInteger(order?.id ?? order);
+    if (!orderId) throw new Error("Geçersiz sipariş kimliği.");
+    return http.request("/api/returns", {
+      method: "POST",
+      body: {
+        order_id: orderId,
+        reason_code: asTrimmedString(options.reasonCode).toUpperCase(),
+        note: asTrimmedString(options.note),
+      },
+      signal: options.signal,
+    });
+  };
+
   const listCoupons = async (options = {}) => {
     const payload = await http.request("/api/campaigns/coupons/active", { signal: options.signal });
     return Object.freeze((Array.isArray(payload) ? payload : []).map(normalizeCustomerCoupon).filter(Boolean));
@@ -521,6 +551,7 @@ export function createCustomerAccountAdapter({
     setDefaultAddress,
     listOrders,
     cancelOrder,
+    createReturnRequest,
     listCoupons,
     listNotifications,
     markNotificationRead,

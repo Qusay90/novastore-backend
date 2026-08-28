@@ -149,7 +149,7 @@ const createInitializeClient = ({ existingPaymentRows = [] } = {}) => {
 
             if (/UPDATE products\s+SET stock = stock -/i.test(sql)) {
                 state.stockDecrements += 1;
-                throw new Error('initialize must not reserve stock');
+                return { rows: [{ id: params[1], stock: 4 }] };
             }
 
             if (/UPDATE coupons SET used_count/i.test(sql)) {
@@ -169,6 +169,7 @@ const createInitializeClient = ({ existingPaymentRows = [] } = {}) => {
 };
 
 const makeInitializeReq = () => ({
+    user: { id: 10, role: 'customer', principal: 'customer' },
     headers: {
         'idempotency-key': 'idem-paytr-security',
         'x-forwarded-for': '203.0.113.10'
@@ -210,6 +211,7 @@ const createCallbackState = (overrides = {}) => ({
     stockRestocks: 0,
     couponIncrements: 0,
     couponDecrements: 0,
+    couponReservationStatus: 'RESERVED',
     successNotifications: 0,
     failedNotifications: 0,
     orderEvents: 0,
@@ -238,7 +240,8 @@ const makePaymentRow = (state) => ({
     status: state.paymentStatus,
     raw_request: JSON.stringify({
         coupon: { applied: true, couponId: 901 },
-        stockReserved: false,
+        stockReserved: true,
+        reservationExpiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         finalizesOnWebhook: true
     }),
     items: JSON.stringify([{ id: 101, name: 'Test Telefon', quantity: 1 }]),
@@ -273,17 +276,30 @@ const createCallbackClient = (state) => ({
 
         if (/UPDATE products\s+SET stock = stock \+/i.test(sql)) {
             state.stockRestocks += 1;
-            return { rows: [] };
+            return { rows: [{ id: params[1], stock: 5 }] };
         }
 
-        if (/UPDATE coupons SET used_count = used_count \+/i.test(sql)) {
+        if (/SELECT id, status\s+FROM coupon_reservations/i.test(sql)) {
+            return {
+                rows: state.couponReservationStatus
+                    ? [{ id: 9201, status: state.couponReservationStatus }]
+                    : []
+            };
+        }
+
+        if (/UPDATE coupons\s+SET used_count = used_count \+/i.test(sql)) {
             state.couponIncrements += 1;
-            return { rows: [] };
+            return { rows: [{ id: 901, code: 'TEST10', usage_limit: 100, used_count: 1 }] };
         }
 
-        if (/UPDATE coupons SET used_count = used_count -/i.test(sql)) {
+        if (/UPDATE coupons\s+SET used_count = used_count -/i.test(sql)) {
             state.couponDecrements += 1;
             return { rows: [] };
+        }
+
+        if (/UPDATE coupon_reservations/i.test(sql)) {
+            state.couponReservationStatus = params[0];
+            return { rows: [{ id: 9201 }], rowCount: 1 };
         }
 
         if (/UPDATE payments/i.test(sql)) {
@@ -305,7 +321,7 @@ const createCallbackClient = (state) => ({
                     state.reconciliationMetadataWrites += 1;
                 }
             }
-            return { rows: [] };
+            return { rows: /RETURNING id/i.test(sql) ? [{ id: 5001 }] : [] };
         }
 
         if (/UPDATE orders/i.test(sql)) {
@@ -473,7 +489,7 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
         assert.strictEqual(initRun.res.code, 201);
         assert.strictEqual(initRun.res.body.provider, 'paytr');
         assert.strictEqual(initRun.res.body.paymentStatus, PAYMENT_STATUS.REQUIRES_ACTION);
-        assert.strictEqual(initRun.client.state.stockDecrements, 0);
+        assert.strictEqual(initRun.client.state.stockDecrements, 1);
         assert.strictEqual(initRun.client.state.couponIncrements, 0);
         assert.strictEqual(initRun.client.state.notificationInserts, 0);
         const paymentInsert = initRun.client.state.calls.find((call) => /INSERT INTO payments/i.test(call.sql));
@@ -491,7 +507,7 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
                 payment_ref: initRun.res.body.paymentRef,
                 status: PAYMENT_STATUS.REQUIRES_ACTION,
                 provider: 'paytr',
-                order_user_id: null,
+                order_user_id: 10,
                 raw_request: paymentInsert.params[7]
             }]
         });
@@ -518,12 +534,12 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
         const successState = createCallbackState();
         await withServer(successState, async (server) => {
             const response = await postForm(server, buildPayload({ status: 'success' }));
-            assert.strictEqual(response.statusCode, 200);
+            assert.strictEqual(response.statusCode, 200, response.text);
             assert.strictEqual(response.text, 'OK');
             assert.strictEqual(successState.paymentStatus, PAYMENT_STATUS.PAID);
             assert.strictEqual(successState.orderPaymentStatus, PAYMENT_STATUS.PAID);
             assert.strictEqual(successState.orderStatus, ORDER_STATUS.HAZIRLANIYOR);
-            assert.strictEqual(successState.stockDecrements, 1);
+            assert.strictEqual(successState.stockDecrements, 0);
             assert.strictEqual(successState.couponIncrements, 1);
             assert.strictEqual(successState.paymentSuccessEvents, 1);
             assert.strictEqual(successState.orderItemWrites, 1);
@@ -554,13 +570,13 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
         const failedState = createCallbackState();
         await withServer(failedState, async (server) => {
             const response = await postForm(server, buildPayload({ status: 'failed', failed_reason_code: '99', failed_reason_msg: 'Declined' }));
-            assert.strictEqual(response.statusCode, 200);
+            assert.strictEqual(response.statusCode, 200, response.text);
             assert.strictEqual(response.text, 'OK');
             assert.strictEqual(failedState.paymentStatus, PAYMENT_STATUS.FAILED);
             assert.strictEqual(failedState.orderPaymentStatus, PAYMENT_STATUS.FAILED);
             assert.strictEqual(failedState.orderStatus, ORDER_STATUS.IPTAL_EDILDI);
             assert.strictEqual(failedState.stockDecrements, 0);
-            assert.strictEqual(failedState.stockRestocks, 0);
+            assert.strictEqual(failedState.stockRestocks, 1);
             assert.strictEqual(failedState.couponIncrements, 0);
             assert.strictEqual(failedState.couponDecrements, 0);
             assert.strictEqual(failedState.paymentFailedEvents, 1);

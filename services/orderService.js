@@ -31,6 +31,16 @@ const extractAddressText = (address) => {
     return `${title}${detail}`.trim();
 };
 
+const assertRequestedCouponApplied = (couponCode, coupon) => {
+    if (!String(couponCode || '').trim() || coupon?.applied) return;
+    const error = new Error(coupon?.reason || 'Kupon ödeme tutarına uygulanamadı.');
+    error.code = String(coupon?.reason || '').includes('kullanım limiti')
+        ? 'COUPON_USAGE_LIMIT_RESERVED'
+        : 'COUPON_NOT_APPLIED';
+    error.statusCode = 409;
+    throw error;
+};
+
 const appendOrderEvent = async (client, orderId, eventType, message, payload = null) => {
     await client.query(
         `INSERT INTO order_events (order_id, event_type, message, payload)
@@ -55,7 +65,10 @@ const reserveStock = async (client, pricedItems) => {
         );
 
         if (updateResult.rows.length === 0) {
-            throw new Error(`Stok yetersiz: ${item.name}`);
+            const error = new Error(`Stok yetersiz: ${item.name}`);
+            error.code = 'ORDER_STOCK_UNAVAILABLE';
+            error.statusCode = 409;
+            throw error;
         }
         changedProductIds.push(item.id);
     }
@@ -319,9 +332,11 @@ const createOrderWithReservation = async ({
     address,
     cartItems,
     couponCode = null,
-    paymentMethod = 'card'
+    paymentMethod = 'card',
+    businessIdentitySnapshot = null
 }) => {
     const pricing = await calculatePricing({ cartItems, couponCode, client });
+    assertRequestedCouponApplied(couponCode, pricing.coupon);
 
     await reserveStock(client, pricing.items);
 
@@ -332,9 +347,10 @@ const createOrderWithReservation = async ({
     const orderInsert = await client.query(
         `INSERT INTO orders
             (user_id, total_amount, status, customer_name, email, phone, address, items, payment_status,
-             payment_method, refund_status, shipment_status, currency, analytics_session_key)
+             payment_method, refund_status, shipment_status, currency, analytics_session_key,
+             business_identity_snapshot)
          VALUES
-            ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14)
+            ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15::jsonb)
          RETURNING *`,
         [
             userId,
@@ -350,7 +366,8 @@ const createOrderWithReservation = async ({
             REFUND_STATUS.NONE,
             SHIPMENT_STATUS.NONE,
             pricing.totals.currency,
-            analyticsSessionKey
+            analyticsSessionKey,
+            businessIdentitySnapshot ? JSON.stringify(businessIdentitySnapshot) : null
         ]
     );
 
@@ -380,9 +397,16 @@ const createPendingPaymentOrder = async ({
     address,
     cartItems,
     couponCode = null,
-    paymentMethod = 'card'
+    paymentMethod = 'card',
+    businessIdentitySnapshot = null
 }) => {
     const pricing = await calculatePricing({ cartItems, couponCode, client });
+    assertRequestedCouponApplied(couponCode, pricing.coupon);
+
+    // A paid customer must never discover that the last unit was already sold
+    // only after the provider captured money. The same database transaction
+    // owns pricing, reservation, order and payment-intent creation.
+    await reserveStock(client, pricing.items);
 
     const paymentStatus = paymentMethod === 'havale'
         ? PAYMENT_STATUS.WAITING_TRANSFER
@@ -391,9 +415,10 @@ const createPendingPaymentOrder = async ({
     const orderInsert = await client.query(
         `INSERT INTO orders
             (user_id, total_amount, status, customer_name, email, phone, address, items, payment_status,
-             payment_method, refund_status, shipment_status, currency, analytics_session_key)
+             payment_method, refund_status, shipment_status, currency, analytics_session_key,
+             business_identity_snapshot)
          VALUES
-            ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14)
+            ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15::jsonb)
          RETURNING *`,
         [
             userId,
@@ -409,7 +434,8 @@ const createPendingPaymentOrder = async ({
             REFUND_STATUS.NONE,
             SHIPMENT_STATUS.NONE,
             pricing.totals.currency,
-            analyticsSessionKey
+            analyticsSessionKey,
+            businessIdentitySnapshot ? JSON.stringify(businessIdentitySnapshot) : null
         ]
     );
 
@@ -421,7 +447,7 @@ const createPendingPaymentOrder = async ({
         totals: pricing.totals,
         campaigns: pricing.campaigns,
         coupon: pricing.coupon,
-        stockReserved: false
+        stockReserved: true
     });
 
     return {

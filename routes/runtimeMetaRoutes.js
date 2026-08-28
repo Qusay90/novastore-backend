@@ -8,6 +8,7 @@ const createRuntimeMetaRouter = (options = {}) => {
     router.get('/health/live', controller.getLive);
     router.get('/health/ready', controller.getReady);
     router.get('/version', controller.getVersion);
+    router.get('/business-identity', controller.getBusinessIdentity);
 
     return router;
 };

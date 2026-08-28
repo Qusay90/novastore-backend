@@ -1,3 +1,5 @@
+const crypto = require('node:crypto');
+
 const buckets = new Map();
 
 const cleanup = () => {
@@ -56,7 +58,32 @@ const sanitizeBody = (req, _res, next) => {
     next();
 };
 
+const requestContext = (req, res, next) => {
+    const requestId = crypto.randomUUID();
+    const startedAt = process.hrtime.bigint();
+    req.requestId = requestId;
+    res.setHeader('X-Request-Id', requestId);
+    if (
+        String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production'
+        || String(process.env.NOVASTORE_REQUEST_LOGGING_ENABLED || '').trim().toLowerCase() === 'true'
+    ) {
+        res.once('finish', () => {
+            const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+            console.log(JSON.stringify({
+                type: 'http_request',
+                requestId,
+                method: req.method,
+                path: req.path,
+                statusCode: res.statusCode,
+                durationMs: Math.round(durationMs * 100) / 100
+            }));
+        });
+    }
+    next();
+};
+
 module.exports = {
+    requestContext,
     simpleRateLimit,
     sanitizeBody
 };

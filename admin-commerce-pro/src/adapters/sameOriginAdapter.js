@@ -205,6 +205,20 @@ export function createSameOriginAdapter(http) {
         });
       };
     }
+    if (hasCapability(capabilities, "returnWrite")) {
+      actions.updateReturnStatus = ({ returnId, expectedRevision, status, decisionNote = null, signal } = {}) => http.request(
+        `/api/returns/${encodeURIComponent(String(returnId))}/status`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            status,
+            expected_revision: expectedRevision,
+            decision_note: decisionNote,
+          }),
+          signal,
+        },
+      );
+    }
     if (hasCapability(capabilities, "reviewModerationWrite")) {
       actions.moderateReview = ({ reviewId, expectedRevision, status, moderationNote = null, signal } = {}) => http.request(
         `/api/reviews/admin/${encodeURIComponent(String(reviewId))}/moderation`,

@@ -287,6 +287,14 @@ function ConnectedAccountSidebar({ section, onLogout }) {
 
 const activeOrder = (order) => !["Teslim Edildi", "İptal Edildi", "İade Edildi", "Ödeme Başarısız"].includes(order.status);
 
+const RETURN_REASONS = Object.freeze([
+  ["CHANGED_MIND", "Fikrimi değiştirdim"],
+  ["DAMAGED", "Ürün hasarlı ulaştı"],
+  ["WRONG_ITEM", "Yanlış ürün geldi"],
+  ["NOT_AS_DESCRIBED", "Ürün açıklamayla uyuşmuyor"],
+  ["OTHER", "Diğer"],
+]);
+
 function orderImage(item, productById, getProductImage) {
   if (item.image) return item.image;
   const product = item.id ? productById.get(Number(item.id)) : null;
@@ -346,6 +354,9 @@ function OrdersSection({ session, account, orderId, productById, getProductImage
   const [sort, setSort] = useState("date");
   const [cancelPhase, setCancelPhase] = useState("idle");
   const [cancelError, setCancelError] = useState("");
+  const [returnOpen, setReturnOpen] = useState(false);
+  const [returnPhase, setReturnPhase] = useState("idle");
+  const [returnError, setReturnError] = useState("");
   if (resource.phase !== "ready") return <InlineState phase={resource.phase} error={resource.error} onRetry={resource.reload} />;
   const orders = resource.data;
   const selected = orderId ? orders.find((order) => String(order.id) === String(orderId)) : null;
@@ -365,6 +376,26 @@ function OrdersSection({ session, account, orderId, productById, getProductImage
     }
   };
 
+  const createReturn = async (event, order) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setReturnPhase("submitting");
+    setReturnError("");
+    try {
+      await account.createReturnRequest(order, {
+        reasonCode: form.get("reasonCode"),
+        note: form.get("note"),
+      });
+      setReturnOpen(false);
+      onNotice("İade talebin alındı. Durumu sipariş detayından takip edebilirsin.");
+      resource.reload();
+    } catch (requestError) {
+      setReturnError(errorMessage(requestError, "İade talebi oluşturulamadı."));
+    } finally {
+      setReturnPhase("idle");
+    }
+  };
+
   if (orderId && !selected) return <div className="connected-empty"><Receipt /><h2>Sipariş bulunamadı</h2><p>Bu sipariş hesabına ait olmayabilir veya kayıt artık erişilebilir değildir.</p><a className="primary-button" href="#/hesabim/siparisler">Siparişlerime dön</a></div>;
   if (selected) {
     const trackingUrl = safeTrackingUrl(selected.trackingUrl);
@@ -373,8 +404,12 @@ function OrdersSection({ session, account, orderId, productById, getProductImage
       <div className="commerce-heading"><div><span className="section-kicker">Sipariş detayı</span><h1>Sipariş #{selected.id}</h1><p>{formatDate(selected.createdAt)}</p></div><span className={`status-pill is-${selected.tone}`}>{selected.status}</span></div>
       {selected.statusNote && <div className="form-message is-warning"><WarningCircle />{selected.statusNote}</div>}
       {cancelError && <div className="form-message is-error" role="alert"><WarningCircle />{cancelError}</div>}
+      {returnError && <div className="form-message is-error" role="alert"><WarningCircle />{returnError}</div>}
       <div className="order-detail-products">{selected.items.length ? selected.items.map((item, index) => { const image = orderImage(item, productById, getProductImage); return <div key={`${item.id || item.name}-${index}`}>{image ? <img src={image} alt={item.name} /> : <span className="order-detail-placeholder"><Package /></span>}<span><strong>{item.name}</strong><small>{item.quantity} adet</small></span><b>{money.format(item.price * item.quantity)}</b></div>; }) : <div className="order-items-unavailable"><Package /><span><strong>Ürün özeti alınamadı</strong><small>Sipariş toplamı ve durumu korunuyor.</small></span></div>}</div>
       <div className="order-detail-grid"><div><MapPin /><span><strong>Teslimat adresi</strong><p>{selected.address || "Adres özeti bu sipariş kaydında bulunmuyor."}</p></span></div><div><CreditCard /><span><strong>Ödeme</strong><p>{selected.paymentStatus ? paymentStatusLabel(selected.paymentStatus) : selected.paymentMethod || "Ödeme durumu sipariş kaydında gösterilecek."}</p></span></div>{selected.trackingNo || trackingUrl ? <div><Truck /><span><strong>Kargo takibi</strong><p>{selected.trackingNo ? `Takip no: ${selected.trackingNo}` : "Takip bağlantısı hazır."}{selected.etaDate ? ` · Tahmini teslimat ${formatDate(selected.etaDate, false)}` : ""}</p>{trackingUrl && <a href={trackingUrl} target="_blank" rel="noopener noreferrer">Taşıyıcı sayfasını aç <CaretRight /></a>}</span></div> : null}</div>
+      {selected.returnStatus && <section className="order-return-status" role="status" aria-live="polite"><Receipt /><span><strong>İade durumu: {selected.returnStatusLabel}</strong><small>Talep #{selected.returnId}{selected.returnDecisionNote ? ` · ${selected.returnDecisionNote}` : ""}</small>{selected.returnStatus === "APPROVED" && <small>Onay kaydedildi; para iadesi sağlayıcı işlemi tamamlandığında ayrıca güncellenecek.</small>}</span></section>}
+      {selected.returnable && !returnOpen && <div className="order-return-zone"><span><strong>İade talebi</strong><small>İade uygunluğu ve süre sunucu tarafından doğrulanır. Talep açmak para iadesinin tamamlandığı anlamına gelmez.</small></span><button type="button" onClick={() => { setReturnError(""); setReturnOpen(true); }}>İade talebi oluştur</button></div>}
+      {selected.returnable && returnOpen && <form className="order-return-form connected-form" onSubmit={(event) => createReturn(event, selected)}><div><strong>İade nedenini seç</strong><small>Talebin yalnız bu sipariş için oluşturulur.</small></div><label>Neden<select name="reasonCode" defaultValue="CHANGED_MIND" required>{RETURN_REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Açıklama <span>(isteğe bağlı)</span><textarea name="note" maxLength="1000" rows="4" placeholder="İncelemeye yardımcı olacak kısa bir açıklama ekleyebilirsin." /></label><div className="form-actions"><button type="button" onClick={() => { setReturnOpen(false); setReturnError(""); }} disabled={returnPhase === "submitting"}>Vazgeç</button><button className="primary-button" type="submit" disabled={returnPhase === "submitting"}>{returnPhase === "submitting" ? "Gönderiliyor…" : "Talebi gönder"}</button></div></form>}
       {selected.cancellable && <div className="order-danger-zone"><span><strong>Sipariş iptali</strong><small>İptal ve olası iade koşulları güncel sipariş durumuna göre sunucu tarafından doğrulanır.</small></span><button type="button" disabled={cancelPhase === "submitting"} onClick={() => cancel(selected)}>{cancelPhase === "submitting" ? "İşleniyor…" : "İptal talebi gönder"}</button></div>}
     </>;
   }

@@ -61,7 +61,16 @@ const getActiveCoupons = async (req, res) => {
              WHERE is_active = TRUE
                AND (starts_at IS NULL OR starts_at <= NOW())
                AND (ends_at IS NULL OR ends_at >= NOW())
-               AND (usage_limit IS NULL OR used_count < usage_limit)
+               AND (
+                   usage_limit IS NULL
+                   OR used_count + (
+                       SELECT COUNT(*)
+                       FROM coupon_reservations reservation
+                       WHERE reservation.coupon_id = coupons.id
+                         AND reservation.status = 'RESERVED'
+                         AND reservation.expires_at > NOW()
+                   ) < usage_limit
+               )
              ORDER BY ends_at ASC NULLS LAST, created_at DESC`
         );
 

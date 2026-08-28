@@ -26,7 +26,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { simpleRateLimit, sanitizeBody } = require('./middlewares/securityMiddleware');
+const { requestContext, simpleRateLimit, sanitizeBody } = require('./middlewares/securityMiddleware');
 const {
     createStagingAccessGate,
     createStagingEngineAccessGate
@@ -139,6 +139,7 @@ io.on('connection', (socket) => {
 });
 
 // Middleware
+app.use(requestContext);
 app.use(stagingAccessGate);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
@@ -517,7 +518,8 @@ app.use((err, req, res, next) => {
     if (err && err.code === 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED') {
         return res.status(503).json({
             code: err.code,
-            error: err.publicMessage || 'External side effect is disabled in staging.'
+            error: err.publicMessage || 'External side effect is disabled in staging.',
+            requestId: req.requestId
         });
     }
 
@@ -527,9 +529,12 @@ app.use((err, req, res, next) => {
         return next(err);
     }
 
-    const statusCode = Number(err && (err.statusCode || err.status)) || 500;
-    const message = err && err.message ? err.message : 'Sunucu hatasi meydana geldi.';
-    return res.status(statusCode).json({ error: message });
+    const requestedStatusCode = Number(err && (err.statusCode || err.status)) || 500;
+    const statusCode = requestedStatusCode >= 400 && requestedStatusCode < 600 ? requestedStatusCode : 500;
+    const message = statusCode >= 500
+        ? 'Sunucu hatası meydana geldi.'
+        : (err && err.message ? err.message : 'İstek işlenemedi.');
+    return res.status(statusCode).json({ error: message, requestId: req.requestId });
 });
 
 const prepareDatabase = async (startupSafety) => {

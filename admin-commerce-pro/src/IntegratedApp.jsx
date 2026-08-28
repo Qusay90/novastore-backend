@@ -1534,10 +1534,58 @@ function CatalogStructure({ structure, error, refreshing, onRefresh }) {
   );
 }
 
-function Returns({ returnPage, error, refreshing, onRefresh }) {
+function ReturnDecisionDialog({ operation, action, onClose, onComplete, onConflict, onUnavailable }) {
+  const [decisionNote, setDecisionNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const terminalDecision = operation.targetStatus === "APPROVED" || operation.targetStatus === "REJECTED";
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setError(null);
+    if (terminalDecision && decisionNote.trim().length < 5) {
+      setError("Onay veya red kararı için en az 5 karakterlik açıklama gereklidir.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await action({
+        returnId: operation.item.rawId,
+        expectedRevision: operation.item.revision,
+        status: operation.targetStatus,
+        decisionNote: decisionNote.trim() || null,
+      });
+      onComplete(result);
+    } catch (requestError) {
+      if (requestError?.status === 409) return onConflict(requestError);
+      if (requestError?.status === 403 || requestError?.status === 503) return onUnavailable(requestError);
+      setError(requestError);
+      setBusy(false);
+    }
+  };
+
+  return <OperationDialog title={`${operation.item.id} · ${returnStatusLabels[operation.targetStatus]}`} busy={busy} onClose={onClose} testId="return-operation-dialog">
+    <dl className="detail-list live-operation-summary"><div><dt>İade</dt><dd>{operation.item.id}</dd></div><div><dt>Sipariş</dt><dd>{operation.item.orderId}</dd></div><div><dt>Mevcut durum</dt><dd>{returnStatusLabels[operation.item.status] || operation.item.status}</dd></div><div><dt>Beklenen revizyon</dt><dd>{operation.item.revision}</dd></div><div><dt>Talep tutarı</dt><dd>{operation.item.refundAmount === null ? "Belirtilmedi" : money(operation.item.refundAmount, operation.item.currency)}</dd></div></dl>
+    <form className="modal-form live-operation-form" onSubmit={submit}>
+      <label><span>Operasyon notu{terminalDecision ? " (zorunlu)" : " (isteğe bağlı)"}</span><textarea value={decisionNote} onChange={(event) => { setDecisionNote(event.target.value); setError(null); }} minLength={terminalDecision ? 5 : undefined} maxLength="1000" required={terminalDecision} disabled={busy} rows="4" data-autofocus placeholder="Kararın gerekçesini kişisel veya gizli veri eklemeden yazın." /></label>
+      <p className="form-hint">Bu işlem yalnız NovaStore durumunu ve denetim kaydını günceller. Sağlayıcı refund'u veya para hareketi çalıştırmaz.</p>
+      <OperationError error={error} id="return-operation-error" />
+      <footer><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Vazgeç</button><button type="submit" className={operation.targetStatus === "REJECTED" ? "danger-button" : "primary-button"} disabled={busy}>{busy ? "Kaydediliyor…" : `${returnStatusLabels[operation.targetStatus]} olarak kaydet`}</button></footer>
+    </form>
+  </OperationDialog>;
+}
+
+function Returns({ returnPage, error, refreshing, onRefresh, onReloadCapabilities, mutationActions }) {
   const returns = returnPage.items;
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Tümü");
+  const [operation, setOperation] = useState(null);
+  const [actionError, setActionError] = useState(null);
+  const [actionNotice, setActionNotice] = useState(null);
+  const [writesSuppressed, setWritesSuppressed] = useState(false);
+  const updateAction = writesSuppressed ? null : mutationActions.updateReturnStatus;
+  const writeEnabled = typeof updateAction === "function";
   const statuses = useMemo(() => ["Tümü", ...new Set(returns.map((item) => item.status))], [returns]);
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("tr-TR");
@@ -1548,18 +1596,51 @@ function Returns({ returnPage, error, refreshing, onRefresh }) {
     });
   }, [query, returns, status]);
 
+  const handleConflict = (requestError) => {
+    setOperation(null);
+    setActionNotice(null);
+    setActionError({
+      message: `İade kaydı başka bir işlemle değişti. Liste güncellendi; işlemi yeni revizyonla yeniden başlatın.${requestError?.requestId ? ` İstek kimliği: ${requestError.requestId}` : ""}`,
+    });
+    onRefresh();
+  };
+  const handleUnavailable = (requestError) => {
+    setOperation(null);
+    setActionNotice(null);
+    setWritesSuppressed(true);
+    setActionError({
+      message: `İade yazma yeteneği kapandı veya admin yetkisi değişti. Bu görünümde yazmalar durduruldu.${requestError?.requestId ? ` İstek kimliği: ${requestError.requestId}` : ""}`,
+    });
+    onReloadCapabilities();
+    onRefresh();
+  };
+  const handleComplete = () => {
+    setOperation(null);
+    setActionError(null);
+    setActionNotice("İade durumu ve değiştirilemez denetim olayı kaydedildi. Sağlayıcı refund'u çalıştırılmadı.");
+    onRefresh();
+  };
+
+  const actionButtons = (item) => {
+    if (!writeEnabled) return "Salt okunur";
+    if (item.status === "REQUESTED") return <span className="live-operation-buttons"><button type="button" className="primary-button small" onClick={() => { setActionError(null); setActionNotice(null); setOperation({ item, targetStatus: "IN_REVIEW" }); }}>İncelemeye al</button><button type="button" className="danger-button small" onClick={() => { setActionError(null); setActionNotice(null); setOperation({ item, targetStatus: "REJECTED" }); }}>Reddet</button></span>;
+    if (item.status === "IN_REVIEW") return <span className="live-operation-buttons"><button type="button" className="primary-button small" onClick={() => { setActionError(null); setActionNotice(null); setOperation({ item, targetStatus: "APPROVED" }); }}>Onayla</button><button type="button" className="danger-button small" onClick={() => { setActionError(null); setActionNotice(null); setOperation({ item, targetStatus: "REJECTED" }); }}>Reddet</button></span>;
+    return "Karar verildi";
+  };
+
   return (
     <section className="workspace live-workspace" data-testid="live-returns">
       <header className="workspace-heading operations-heading">
         <div>
-          <span className="eyebrow">Entegre backend · salt okunur</span>
+          <span className="eyebrow">Entegre backend · {writeEnabled ? "capability kontrollü" : "salt okunur"}</span>
           <h2 tabIndex="-1">İade özetleri</h2>
-          <p>En fazla {returnPage.limit} operasyon kaydı gösterilir; onay, red, durum güncelleme veya gerçek refund isteği gönderilmez.</p>
+          <p>En fazla {returnPage.limit} operasyon kaydı gösterilir. Durum geçişleri yalnız açık sunucu capability'si ve güncel revizyonla yapılır; gerçek refund isteği gönderilmez.</p>
         </div>
         <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
       </header>
 
-      <ResourceWarning error={error} onRetry={onRefresh} />
+      <ResourceWarning error={error || actionError} onRetry={onRefresh} />
+      {actionNotice && <section className="notice-card success-card live-operation-notice" role="status"><Icon name="check" /><div><strong>İade işlemi kaydedildi</strong><p>{actionNotice}</p></div></section>}
       <section className="notice-card live-boundary-notice" role="note">
         <Icon name="shield" />
         <div><strong>Finansal işlem kapalı</strong><p>Bu görünüm mevcut yerel iade ve refund durumlarını okur. “Tamamlandı” durumu dahil hiçbir değer sağlayıcı refund'u veya para hareketini kanıtlamaz.</p></div>
@@ -1573,18 +1654,19 @@ function Returns({ returnPage, error, refreshing, onRefresh }) {
         {returns.length === 0 ? <div className="state-panel"><Icon name="refresh" /><h3>Henüz iade kaydı yok</h3><p>Backend boş bir iade özeti döndürdü.</p></div> : filtered.length > 0 ? (
           <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="İade özeti tablosu">
             <table className="data-table live-returns-table">
-              <caption className="sr-only">Entegre backend’den okunan salt-okunur iade özetleri</caption>
-              <thead><tr><th scope="col">İade</th><th scope="col">Sipariş</th><th scope="col">Müşteri</th><th scope="col">İade durumu</th><th scope="col">Neden</th><th scope="col">Talep tutarı</th><th scope="col">Sipariş durumu</th><th scope="col">Tarih</th></tr></thead>
+              <caption className="sr-only">Entegre backend’den okunan iade özetleri ve capability kontrollü işlemler</caption>
+              <thead><tr><th scope="col">İade</th><th scope="col">Sipariş</th><th scope="col">Müşteri</th><th scope="col">İade durumu</th><th scope="col">Neden</th><th scope="col">Talep tutarı</th><th scope="col">Sipariş durumu</th><th scope="col">Tarih</th><th scope="col">İşlem</th></tr></thead>
               <tbody>{filtered.map((item) => <tr key={item.id}>
                 <td><strong>{item.id}</strong></td><td>{item.orderId}</td><td>{item.customerName}</td>
                 <td><span className={`status status-${statusClass(returnStatusLabels[item.status] || item.status)}`}>{returnStatusLabels[item.status] || item.status}</span></td>
                 <td>{item.reasonCode}</td><td><span className="live-customer-cell"><strong>{item.refundAmount === null ? "Belirtilmedi" : money(item.refundAmount, item.currency)}</strong><small>{item.currency} · ödeme {item.paymentStatus}</small><small>Yerel refund: {item.refundStatus} · sağlayıcı/para hareketi doğrulanmadı</small></span></td>
-                <td><span className={`status status-${statusClass(item.orderStatus)}`}>{item.orderStatus}</span></td><td>{dateTime(item.createdAt)}</td>
+                <td><span className={`status status-${statusClass(item.orderStatus)}`}>{item.orderStatus}</span></td><td>{dateTime(item.createdAt)}</td><td>{actionButtons(item)}</td>
               </tr>)}</tbody>
             </table>
           </div>
         ) : <div className="state-panel"><Icon name="refresh" /><h3>Eşleşen iade yok</h3><p>Arama veya durum filtresini değiştirin.</p><button className="secondary-button" onClick={() => { setQuery(""); setStatus("Tümü"); }}>Filtreleri temizle</button></div>}
       </section>
+      {operation && writeEnabled && <ReturnDecisionDialog operation={operation} action={updateAction} onClose={() => setOperation(null)} onComplete={handleComplete} onConflict={handleConflict} onUnavailable={handleUnavailable} />}
     </section>
   );
 }
@@ -2021,7 +2103,7 @@ export function IntegratedApp() {
     pageContent = !returnsEnabled
       ? <StatePanel phase="forbidden" error={returnsUnavailableError} onRetry={returnsResource.reload} />
       : returnsLoaded
-        ? <Returns returnPage={returnsResource.data} error={returnsResource.error} refreshing={returnsResource.refreshing} onRefresh={returnsResource.reload} />
+        ? <Returns returnPage={returnsResource.data} error={returnsResource.error} refreshing={returnsResource.refreshing} onRefresh={returnsResource.reload} onReloadCapabilities={sessionResource.reload} mutationActions={mutationActions} />
         : <StatePanel phase={returnsResource.phase} error={returnsResource.error} onRetry={returnsResource.reload} />;
   } else if (page === "notifications") {
     pageContent = !notificationsEnabled

@@ -134,6 +134,7 @@ const chainFor = (rows, queries) => [
     assert.equal(validAdmin.payload.capabilities.catalogStructureRead, true);
     assert.equal(validAdmin.payload.capabilities.firstPartyCatalogWrite, false);
     assert.equal(validAdmin.payload.capabilities.catalogStructureWrite, false);
+    assert.equal(validAdmin.payload.capabilities.returnWrite, false);
     assert.equal(validAdmin.payload.capabilities.notificationsRead, true);
     assert.equal(validAdmin.payload.capabilities.storesRead, true);
     assert.equal(validAdmin.payload.capabilities.orderStatusWrite, false);
@@ -157,6 +158,7 @@ const chainFor = (rows, queries) => [
         NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'true',
         NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED: 'true',
         NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'true',
+        NOVASTORE_ADMIN_RETURN_WRITE_ENABLED: 'true',
         NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED: 'true',
         NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED: 'true',
         NOVASTORE_ADMIN_COUPON_WRITE_ENABLED: 'true',
@@ -166,6 +168,7 @@ const chainFor = (rows, queries) => [
     assert.equal(enabledWriteCapabilities.manualShipmentWrite, true);
     assert.equal(enabledWriteCapabilities.firstPartyCatalogWrite, true);
     assert.equal(enabledWriteCapabilities.catalogStructureWrite, true);
+    assert.equal(enabledWriteCapabilities.returnWrite, true);
     assert.equal(enabledWriteCapabilities.reviewModerationWrite, true);
     assert.equal(enabledWriteCapabilities.questionAnswerWrite, true);
     assert.equal(enabledWriteCapabilities.couponWrite, true);
@@ -176,6 +179,7 @@ const chainFor = (rows, queries) => [
         NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'yes',
         NOVASTORE_ADMIN_CATALOG_PRODUCT_WRITE_ENABLED: '1',
         NOVASTORE_ADMIN_CATALOG_STRUCTURE_WRITE_ENABLED: 'yes',
+        NOVASTORE_ADMIN_RETURN_WRITE_ENABLED: '1',
         NOVASTORE_ADMIN_REVIEW_MODERATION_WRITE_ENABLED: '1',
         NOVASTORE_ADMIN_QUESTION_ANSWER_WRITE_ENABLED: 'yes',
         NOVASTORE_ADMIN_COUPON_WRITE_ENABLED: '1',
@@ -185,6 +189,7 @@ const chainFor = (rows, queries) => [
     assert.equal(nonExplicitWriteCapabilities.manualShipmentWrite, false);
     assert.equal(nonExplicitWriteCapabilities.firstPartyCatalogWrite, false);
     assert.equal(nonExplicitWriteCapabilities.catalogStructureWrite, false);
+    assert.equal(nonExplicitWriteCapabilities.returnWrite, false);
     assert.equal(nonExplicitWriteCapabilities.reviewModerationWrite, false);
     assert.equal(nonExplicitWriteCapabilities.questionAnswerWrite, false);
     assert.equal(nonExplicitWriteCapabilities.couponWrite, false);

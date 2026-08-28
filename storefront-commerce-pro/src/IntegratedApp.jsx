@@ -1284,8 +1284,9 @@ function LocalReviewPaymentBoundary() {
   return <main id="main-content" className="page success-page"><div className="shell"><section className="success-card connected-payment-result is-info"><div className="success-icon"><ShieldCheck /></div><span className="section-kicker">Yerel inceleme sınırı</span><h1>Bu oturumda ödeme oluşturulmadı</h1><p>Gerçek ödeme sağlayıcısı, sipariş oluşturma ve ödeme durumu sorgusu yerel incelemede devre dışıdır.</p><div className="success-actions"><a className="primary-button" href="#/sepet">Sepete dön</a><a href="#/hesabim/siparisler">Siparişlerime git <CaretRight /></a></div></section></div></main>;
 }
 
-function Footer() {
-  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="#/hesabim">Hesabım</a><a href="#/iletisim">İletişim</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/iade-degisim">İade & değişim</a><a href="#/yardim">Yardım merkezi</a></div><div><strong>Güvenli alışveriş</strong><p>Ödeme bilgileri NovaStore sayfasında toplanmaz; destek kanalları hesabınla korunur.</p></div></div><div className="shell footer-bottom"><span>© 2026 NovaStore.</span><span>Yasal metinler onaylandığında yayımlanacaktır.</span></div></footer>;
+function Footer({ businessIdentity = null }) {
+  const identity = businessIdentity?.status === "configured" ? businessIdentity.identity : null;
+  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="#/hesabim">Hesabım</a><a href="#/iletisim">İletişim</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/iade-degisim">İade & değişim</a><a href="#/yardim">Yardım merkezi</a></div><div><strong>Güvenli alışveriş</strong><p>Ödeme bilgileri NovaStore sayfasında toplanmaz; destek kanalları hesabınla korunur.</p></div>{identity && <address className="footer-business-identity"><strong>{identity.legalCompanyName}</strong><span>VKN: {identity.taxNumber} · MERSİS: {identity.mersisNumber}</span><span>{identity.registeredAddress}</span><a href={`mailto:${identity.kepAddress}`}>KEP: {identity.kepAddress}</a><a href={`tel:${identity.phone}`}>{identity.phone}</a><a href={`mailto:${identity.email}`}>{identity.email}</a></address>}</div><div className="shell footer-bottom"><span>© 2026 NovaStore.</span><span>{identity ? "İşletme kimliği yapılandırılmış public sözleşmeden yayımlanır." : "Şirket kimliği ve onaylı yasal metinler tamamlandığında burada yayımlanacaktır."}</span></div></footer>;
 }
 
 export function CommerceProRuntimeApp({ runtime }) {
@@ -1552,7 +1553,7 @@ export function CommerceProRuntimeApp({ runtime }) {
       {runtime.warnings.length > 0 && <div className="integration-session-warning" role="status">Bazı ikincil mağaza veya oturum verileri geçici olarak alınamadı; erişilebilen gerçek katalog gösteriliyor.</div>}
       {comparisonVisible && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => setComparisonIds(new Set())} onAdd={addToCart} />}
       {content}
-      <Footer />
+      <Footer businessIdentity={runtime.businessIdentity} />
       <MobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={categoryDrawerTriggerRef} />
       <CartDrawer open={cartOpen} items={cartItems} onClose={closeCart} onRemove={removeFromCart} onQuantity={updateCartQuantity} returnFocusRef={cartTriggerRef} />
       <MobileBottomNav route={route} cartCount={cartCount} favoriteCount={favorites.size} />

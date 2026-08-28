@@ -1,6 +1,6 @@
 # NovaStore Dış Servisler ve Entegrasyonlar
 
-Son doğrulama: 29 Haziran 2026
+Son doğrulama: 28 Ağustos 2026
 
 Bu dosya NovaStore'un kullandığı, kullanıma hazır tuttuğu veya canlıya çıkmadan önce bağlaması gereken dış servislerin tek kaynak listesidir. Anahtar, parola, token ve bağlantı şifresi gibi gizli değerler bu dosyaya **asla yazılmaz**.
 
@@ -30,9 +30,11 @@ Bu dosya NovaStore'un kullandığı, kullanıma hazır tuttuğu veya canlıya ç
 | Servis | Durum | Ne işe yarıyor? | Mevcut gerçek durum | Canlı kullanım için gerekenler |
 |---|---|---|---|---|
 | **iyzico** | Hazır / mock | Kart ödeme başlatma, 3D yönlendirme, webhook ile ödeme sonucunu kesinleştirme | `PAYMENT_PROVIDER` tanımlı değilse kod varsayılan olarak iyzico'yu seçiyor; ancak başlatma akışı şu anda gerçek iyzico API çağrısı yapmıyor ve mock davranıyor. Production secret yapılandırması doğrulanmadı. | iyzico production hesabı ve sözleşmesi, gerçek API istemcisi/kimlik bilgileri, callback-webhook ayarları, `IYZICO_WEBHOOK_SECRET`, yalnızca yerel/test simülasyonu için `IYZICO_ALLOW_UNSIGNED_WEBHOOKS`, `IYZICO_MOCK_MODE`, imza doğrulaması ve uçtan uca UAT |
-| **PayTR** | Hazır / staging adayı | iFrame ödeme token'ı, güvenli ödeme sayfası, callback hash doğrulaması ve başarılı/başarısız ödeme finalizasyonu | Backend, web ve Android kodu mevcut; gerekli merchant değişkenleri yerel `.env` içinde tanımlı değil. | `PAYMENT_PROVIDER=paytr`, `PAYTR_MERCHANT_ID`, `PAYTR_MERCHANT_KEY`, `PAYTR_MERCHANT_SALT`, callback/success/fail URL'leri, test sonrası production modu |
+| **PayTR** | Hazır / provider-aktivasyon adayı | iFrame ödeme token'ı, güvenli ödeme sayfası, callback hash doğrulaması ve başarılı/başarısız ödeme finalizasyonu | Backend sözleşmesi mevcut; merchant onayı, gerçek secret ve yetkili provider UAT kanıtı yoktur. İlk güvenli staging sözleşmesi tüm PayTR credential adlarını ve ödeme yan etkilerini özellikle yasaklar. | `PAYMENT_PROVIDER=paytr`, merchant onayı, `PAYTR_MERCHANT_ID`, `PAYTR_MERCHANT_KEY`, `PAYTR_MERCHANT_SALT`, HTTPS callback/success/fail URL'leri ve ayrı yetkilendirilmiş provider sandbox/production UAT'i |
 
 Ödeme finalizasyonunda stok, kupon kullanımı, bildirim, sipariş durumu, sahiplik kontrolü ve idempotency davranışları korunmalıdır. Kart sağlayıcısı değiştirilirken bu yan etkiler istemciye taşınmamalıdır.
+
+İlk güvenli staging ile sağlayıcı UAT ortamı aynı kapı değildir. Sağlayıcı secret'ı ve ödeme çağrısı, yalnız ayrıca yetkilendirilmiş provider UAT çalışma zamanında açılabilir. Mutabakat ve yetkili ödeme-onay operasyonu bulunmadığından production havale/EFT de fail-closed tutulur.
 
 ## Yapay Zekâ Alternatifleri
 

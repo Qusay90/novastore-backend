@@ -189,12 +189,12 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'admin_catalog_audit_events', 'attribute_definitions', 'attribute_options',
         'attribute_templates', 'auth_sessions', 'campaign_configs', 'categories',
         'category_aliases', 'category_stats', 'collection_products', 'collection_rules',
-        'collections', 'coupons', 'customer_addresses', 'customer_operation_audit_events', 'favorites', 'invoices',
+        'collections', 'coupon_reservations', 'coupons', 'customer_addresses', 'customer_operation_audit_events', 'favorites', 'invoices',
         'menu_items', 'menus', 'messages', 'notification_audit_logs', 'notifications',
         'order_events', 'order_item_backfill_issues', 'order_items', 'orders',
         'page_visits', 'payments', 'product_actions', 'product_attribute_values',
         'product_categories', 'product_media', 'product_questions', 'products',
-        'returns', 'review_media', 'reviews', 'shipments', 'store_follows', 'stores',
+        'return_events', 'returns', 'review_media', 'reviews', 'shipments', 'store_follows', 'stores',
         'support_thread_events', 'support_threads', 'template_attributes', 'user_shared_state', 'users', 'visitor_sessions',
         'admin_coupon_audit_events',
         'seller_applicant_sessions', 'seller_application_command_receipts',
@@ -234,6 +234,12 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
               ('categories', 'path'),
               ('categories', 'revision'),
               ('orders', 'analytics_session_key'),
+              ('orders', 'business_identity_snapshot'),
+              ('orders', 'delivered_at'),
+              ('returns', 'revision'),
+              ('returns', 'decision_note'),
+              ('returns', 'decided_by_admin_id'),
+              ('returns', 'decided_at'),
               ('collections', 'show_on_home'),
               ('reviews', 'status'),
               ('reviews', 'revision'),
@@ -254,10 +260,11 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
               ('seller_application_terms_authority', 'active_revision'),
               ('seller_application_terms_authority', 'generation'),
               ('seller_application_terms_authority_events', 'active_revision'),
-              ('seller_application_terms_authority_events', 'generation')
+              ('seller_application_terms_authority_events', 'generation'),
+              ('seller_order_items', 'source_item_index')
            )`
     );
-    assert.equal(requiredColumns.rowCount, 27);
+    assert.equal(requiredColumns.rowCount, 34);
 
     const triggers = await admin.query(
         `SELECT trigger_name
@@ -275,10 +282,11 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
               'trg_seller_audit_events_append_only',
               'trg_seller_outbox_events_append_only',
               'trg_seller_support_messages_append_only',
-              'trg_seller_application_terms_authority_events_append_only'
+              'trg_seller_application_terms_authority_events_append_only',
+              'trg_return_events_append_only'
            )`
     );
-    assert.equal(new Set(triggers.rows.map((row) => row.trigger_name)).size, 12);
+    assert.equal(new Set(triggers.rows.map((row) => row.trigger_name)).size, 13);
     const truncateTrigger = await admin.query(
         `SELECT t.tgname
          FROM pg_trigger t
@@ -310,7 +318,13 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'chk_seller_application_terms_authority_singleton',
         'chk_seller_application_terms_authority_generation',
         'chk_seller_application_terms_authority_event_generation',
-        'chk_seller_application_terms_authority_event_previous'
+        'chk_seller_application_terms_authority_event_previous',
+        'chk_orders_business_identity_snapshot_object',
+        'chk_returns_launch_v1_status', 'chk_returns_revision_positive',
+        'chk_return_events_actor_role', 'chk_return_events_event_type',
+        'chk_return_events_payload_object', 'chk_seller_order_items_source_index',
+        'chk_coupon_reservations_status', 'chk_coupon_reservations_terminal_times',
+        'uq_coupon_reservations_order', 'uq_coupon_reservations_coupon_order'
     ].sort();
     const constraints = await admin.query(
         `SELECT conname

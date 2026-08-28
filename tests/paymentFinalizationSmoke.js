@@ -3,7 +3,6 @@ const { ORDER_STATUS, PAYMENT_STATUS } = require('../constants/orderStatus');
 const { buildPaymentStatusResponse } = require('../controllers/paymentController');
 const {
     createPendingPaymentOrder,
-    reserveStock,
     restockItems
 } = require('../services/orderService');
 
@@ -69,15 +68,8 @@ const createFakeClient = () => {
     assert.strictEqual(pricing.items[0].id, 101);
     assert.strictEqual(
         client.calls.some((call) => /UPDATE products\s+SET stock = stock -/i.test(call.sql)),
-        false,
-        'initialize/pending order must not reserve stock'
-    );
-
-    await reserveStock(client, pricing.items);
-    assert.strictEqual(
-        client.calls.some((call) => /UPDATE products\s+SET stock = stock -/i.test(call.sql)),
         true,
-        'payment success finalization must reserve stock explicitly'
+        'payment initialization must reserve stock atomically before provider handoff'
     );
 
     await restockItems(client, [{ productId: 101, quantity: 1 }]);

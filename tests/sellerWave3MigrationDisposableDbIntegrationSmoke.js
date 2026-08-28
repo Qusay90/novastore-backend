@@ -38,14 +38,49 @@ const anchorSchema = `
 CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, email TEXT, full_name TEXT, name TEXT);
 CREATE TABLE IF NOT EXISTS stores (id BIGINT PRIMARY KEY, owner_user_id INTEGER);
 CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY, user_id INTEGER, total_amount NUMERIC, status TEXT, items JSONB);
+CREATE TABLE IF NOT EXISTS orders (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER,
+    total_amount NUMERIC,
+    status TEXT,
+    items JSONB,
+    payment_status TEXT,
+    shipment_status TEXT,
+    shipment_provider TEXT,
+    tracking_no TEXT,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS returns (id INTEGER PRIMARY KEY, order_id INTEGER, user_id INTEGER, reason_code TEXT, status TEXT);
+CREATE TABLE IF NOT EXISTS shipments (
+    id BIGSERIAL PRIMARY KEY,
+    order_id INTEGER UNIQUE NOT NULL REFERENCES orders(id),
+    provider TEXT NOT NULL,
+    tracking_no TEXT NOT NULL,
+    tracking_url TEXT,
+    shipment_status TEXT,
+    raw_payload JSONB
+);
+CREATE TABLE IF NOT EXISTS order_events (
+    id BIGSERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id),
+    event_type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    payload JSONB
+);
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    entity_type TEXT,
+    entity_id BIGINT
+);
 `;
 const seedFoundation = async (pool) => {
     await query(pool, "INSERT INTO users (id, email, full_name) VALUES (1, 'a@example.test', 'Store A Owner'), (2, 'b@example.test', 'Store B Owner'), (3, 'a-foreign@example.test', 'Store A Foreign Owner')");
     await query(pool, 'INSERT INTO stores (id, owner_user_id) VALUES (101, 1), (202, 2), (303, 3)');
     await query(pool, "INSERT INTO products (id, name) VALUES (1, 'Canonical A'), (2, 'Canonical B')");
-    await query(pool, "INSERT INTO orders (id, user_id, total_amount, status, items) VALUES (1, 1, 100, 'pending', '[]'::jsonb)");
+    await query(pool, "INSERT INTO orders (id, user_id, total_amount, status, items, payment_status, shipment_status) VALUES (1, 1, 100, 'Hazırlanıyor', '[]'::jsonb, 'PAID', 'NONE')");
     await query(pool, "INSERT INTO returns (id, order_id, user_id, reason_code, status) VALUES (1, 1, 1, 'test', 'REQUESTED')");
     const orgA = await query(pool, "INSERT INTO seller_organizations (external_key, display_name) VALUES ('11111111-1111-4111-8111-111111111111', 'Seller A') RETURNING id");
     const orgB = await query(pool, "INSERT INTO seller_organizations (external_key, display_name) VALUES ('22222222-2222-4222-8222-222222222222', 'Seller B') RETURNING id");

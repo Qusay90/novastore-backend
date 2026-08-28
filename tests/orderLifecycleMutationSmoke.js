@@ -118,6 +118,11 @@ const createLifecycleClient = (state) => ({
             return { rows: [{ id: Number(params[1]) }], rowCount: 1 };
         }
 
+        if (/UPDATE coupon_reservations/i.test(text)) {
+            state.couponReservationReleaseCount = (state.couponReservationReleaseCount || 0) + 1;
+            return { rows: [], rowCount: 0 };
+        }
+
         if (/UPDATE orders/i.test(text)) {
             state.orderUpdates += 1;
             state.order = {
@@ -359,7 +364,7 @@ const runCancellation = async (state, body = {}, request = {}) => {
         const customerCancellation = await runCancellation(
             customerCancellationState,
             { expected_status: undefined },
-            { user: { id: 0, role: 'customer' } }
+            { user: { id: 0, principal: 'customer', role: 'customer' } }
         );
         assert.equal(customerCancellation.statusCode, 200);
         assert.equal(customerCancellation.payload.reused, false);
@@ -546,7 +551,7 @@ const runCancellation = async (state, body = {}, request = {}) => {
         assert.match(shipmentRouteSource, /router\.get\('\/:orderId',\s*authenticate,\s*requireCurrentAdminIfClaimed,\s*getShipment\)/);
         assert.match(returnRouteSource, /router\.post\('\/',\s*authenticate,\s*requireCurrentAdminIfClaimed,\s*createReturnRequest\)/);
         assert.match(returnRouteSource, /router\.get\('\/admin\/all',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*getAllReturnRequests\)/);
-        assert.match(returnRouteSource, /router\.patch\('\/:id\/status',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*updateReturnStatus\)/);
+        assert.match(returnRouteSource, /router\.patch\('\/:id\/status',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*requireStagingReturnWrite,\s*updateReturnStatus\)/);
         assert.match(returnRouteSource, /router\.get\('\/:id',\s*authenticate,\s*requireCurrentAdminIfClaimed,\s*getReturnById\)/);
         assert.match(notificationRouteSource, /router\.get\('\/user\/:userId',\s*authenticate,\s*requireSelfOrAdmin\('userId'\),\s*requireCurrentAdminIfClaimed,\s*getUserNotifications\)/);
         assert.match(notificationRouteSource, /router\.get\('\/admin',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*getAdminNotifications\)/);

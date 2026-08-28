@@ -33,6 +33,8 @@ const inferExpectedPrincipal = (req) => {
     if (/^\/api\/orders\/\d+(?:\/status)?\/?$/.test(path) && ['PUT', 'DELETE'].includes(method)) return 'admin';
     if (/^\/api\/returns\/admin(?:\/|$)/.test(path)
         || (/^\/api\/returns\/\d+\/status\/?$/.test(path) && method === 'PATCH')) return 'admin';
+    if ((path === '/api/returns' && method === 'POST')
+        || /^\/api\/returns\/mine\/?$/.test(path)) return 'customer';
     if (/^\/api\/shipments\/\d+\/(?:create|manual)\/?$/.test(path) && method === 'POST') return 'admin';
     return null;
 };

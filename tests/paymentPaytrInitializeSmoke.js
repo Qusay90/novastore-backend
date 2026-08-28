@@ -15,6 +15,7 @@ const trackedEnv = [
     'PAYTR_FAIL_URL',
     'PAYTR_TEST_MODE',
     'PAYTR_DEBUG_ON',
+    'NOVASTORE_REQUIRE_BUSINESS_IDENTITY_FOR_PAYMENT',
     'FREE_SHIPPING_THRESHOLD',
     'DEFAULT_SHIPPING_FEE'
 ];
@@ -117,7 +118,7 @@ const createFakeClient = ({ existingPaymentRows = [] } = {}) => {
             }
 
             if (/UPDATE products\s+SET stock = stock -/i.test(sql)) {
-                throw new Error('initialize must not reserve stock');
+                return { rows: [{ id: params[1], stock: 4 }] };
             }
 
             if (/UPDATE coupons SET used_count/i.test(sql)) {
@@ -131,6 +132,7 @@ const createFakeClient = ({ existingPaymentRows = [] } = {}) => {
 };
 
 const makeReq = ({ body = {}, headers = {} } = {}) => ({
+    user: { id: 10, role: 'customer', principal: 'customer' },
     headers: {
         'idempotency-key': 'idem-paytr-1',
         'x-forwarded-for': '203.0.113.10',
@@ -199,7 +201,8 @@ const findOrderPaymentUpdate = (client) => client.calls.find((call) => /UPDATE o
 
         const rawRequest = JSON.parse(paytrPaymentInsert.params[7]);
         const rawResponse = JSON.parse(paytrPaymentInsert.params[8]);
-        assert.strictEqual(rawRequest.stockReserved, false);
+        assert.strictEqual(rawRequest.stockReserved, true);
+        assert.match(rawRequest.reservationExpiresAt, /^\d{4}-\d{2}-\d{2}T/);
         assert.strictEqual(rawRequest.finalizesOnWebhook, true);
         assert.strictEqual(rawRequest.paytr.merchantOid, paytrRes.body.paymentRef);
         assert.strictEqual(rawRequest.idempotency.key, 'idem-paytr-1');
@@ -219,7 +222,7 @@ const findOrderPaymentUpdate = (client) => client.calls.find((call) => /UPDATE o
         assert.strictEqual(orderUpdate.params[1], PAYMENT_STATUS.REQUIRES_ACTION);
         assert.strictEqual(
             paytrClient.calls.some((call) => /UPDATE products\s+SET stock = stock -/i.test(call.sql)),
-            false
+            true
         );
         assert.strictEqual(
             paytrClient.calls.some((call) => /UPDATE coupons SET used_count/i.test(call.sql)),
@@ -239,7 +242,7 @@ const findOrderPaymentUpdate = (client) => client.calls.find((call) => /UPDATE o
                         payment_ref: paytrRes.body.paymentRef,
                         status: PAYMENT_STATUS.REQUIRES_ACTION,
                         provider: 'paytr',
-                        order_user_id: null,
+                        order_user_id: 10,
                         raw_request: paytrPaymentInsert.params[7]
                     }
                 ]
@@ -250,7 +253,8 @@ const findOrderPaymentUpdate = (client) => client.calls.find((call) => /UPDATE o
         assert.strictEqual(duplicateRun.res.body.provider, 'paytr');
         assert.strictEqual(duplicateRun.res.body.paymentStatus, PAYMENT_STATUS.REQUIRES_ACTION);
         assert.strictEqual(duplicateRun.res.body.paymentRef, paytrRes.body.paymentRef);
-        assert.strictEqual(duplicateRun.client.calls.some((call) => call.sql === 'BEGIN'), false);
+        assert.strictEqual(duplicateRun.client.calls.some((call) => call.sql === 'BEGIN'), true);
+        assert.strictEqual(duplicateRun.client.calls.some((call) => /pg_advisory_xact_lock/i.test(call.sql)), true);
         assert.strictEqual(duplicateRun.client.calls.some((call) => /INSERT INTO orders/i.test(call.sql)), false);
         assert.strictEqual(duplicateRun.client.calls.some((call) => /INSERT INTO payments/i.test(call.sql)), false);
         assert.strictEqual(duplicateRun.client.calls.some((call) => /UPDATE products\s+SET stock = stock -/i.test(call.sql)), false);
@@ -266,7 +270,7 @@ const findOrderPaymentUpdate = (client) => client.calls.find((call) => /UPDATE o
                         payment_ref: paytrRes.body.paymentRef,
                         status: PAYMENT_STATUS.REQUIRES_ACTION,
                         provider: 'paytr',
-                        order_user_id: null,
+                        order_user_id: 10,
                         raw_request: paytrPaymentInsert.params[7]
                     }
                 ]
@@ -286,7 +290,7 @@ const findOrderPaymentUpdate = (client) => client.calls.find((call) => /UPDATE o
                         payment_ref: paytrRes.body.paymentRef,
                         status: PAYMENT_STATUS.REQUIRES_ACTION,
                         provider: 'paytr',
-                        order_user_id: null,
+                        order_user_id: 10,
                         raw_request: paytrPaymentInsert.params[7]
                     }
                 ]
@@ -333,6 +337,25 @@ const findOrderPaymentUpdate = (client) => client.calls.find((call) => /UPDATE o
         assert.strictEqual(missingEnvRun.client.calls.some((call) => /INSERT INTO orders/i.test(call.sql)), false);
         assert.strictEqual(findPaymentInsert(missingEnvRun.client), undefined);
         assert.ok(missingEnvRun.client.calls.some((call) => call.sql === 'ROLLBACK'));
+
+        let missingBusinessIdentityRun;
+        console.error = () => {};
+        try {
+            missingBusinessIdentityRun = await callInitialize({
+                configureEnv: () => {
+                    applyPaytrEnv();
+                    process.env.NOVASTORE_REQUIRE_BUSINESS_IDENTITY_FOR_PAYMENT = 'true';
+                }
+            });
+        } finally {
+            console.error = originalConsoleError;
+        }
+        assert.strictEqual(missingBusinessIdentityRun.res.code, 503);
+        assert.strictEqual(missingBusinessIdentityRun.res.body.code, 'BUSINESS_IDENTITY_INCOMPLETE');
+        assert.match(missingBusinessIdentityRun.res.body.error, /İşletme kimliği/);
+        assert.ok(missingBusinessIdentityRun.res.body.details.includes('BUSINESS_LEGAL_COMPANY_NAME'));
+        assert.strictEqual(missingBusinessIdentityRun.client.calls.some((call) => /INSERT INTO orders/i.test(call.sql)), false);
+        assert.ok(missingBusinessIdentityRun.client.calls.some((call) => call.sql === 'ROLLBACK'));
 
         const originalQuery = pool.query;
         const statusCalls = [];

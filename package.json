@@ -12,6 +12,7 @@
     "test:staging-migrations": "node tests/stagingMigrationFoundationSmoke.js",
     "test:staging-migrations:integration": "node tests/stagingMigrationIntegrationSmoke.js",
     "test:main6s-operations:integration": "node tests/main6sOperationsPostgresSmoke.js",
+    "test:launch-critical:integration": "node tests/launchCriticalCommercePostgresSmoke.js",
     "test:main6t-combined": "node tests/main6tCombinedIntegrationSmoke.js",
     "test:staging-runtime-safety": "node tests/stagingRuntimeSafetySmoke.js",
     "test:staging-access-gate": "node tests/stagingAccessGateHttpSmoke.js",

@@ -2,6 +2,8 @@
 
 const crypto = require('node:crypto');
 const { writeAuditAndOutbox } = require('./sellerAuditOutboxService');
+const { appendOrderEvent } = require('./orderService');
+const { ORDER_STATUS, PAYMENT_STATUS, SHIPMENT_STATUS } = require('../constants/orderStatus');
 
 class SellerOrderFulfillmentError extends Error {
     constructor(code, statusCode = 409) {
@@ -72,6 +74,93 @@ const loadOrder = async (queryable, rawContext, orderId, lock = '') => {
     return safeOrder({ ...row, items: items.rows || [], packages: packages.rows || [] });
 };
 
+const propagateSingleSellerShipment = async (client, sellerOrder, carrierName, trackingNumber) => {
+    const allocationCount = await client.query(
+        'SELECT COUNT(*)::int AS count FROM seller_orders WHERE canonical_order_id = $1',
+        [sellerOrder.canonical_order_id]
+    );
+    if (Number(allocationCount.rows?.[0]?.count) !== 1) {
+        return Object.freeze({ propagated: false, reason: 'MULTI_SELLER_REQUIRES_CONVERGENCE' });
+    }
+
+    const canonicalResult = await client.query(
+        `SELECT id, user_id, status, payment_status, shipment_status, shipment_provider, tracking_no
+         FROM orders
+         WHERE id = $1
+         FOR UPDATE`,
+        [sellerOrder.canonical_order_id]
+    );
+    const canonicalOrder = canonicalResult.rows?.[0];
+    if (!canonicalOrder) fail('CANONICAL_ORDER_NOT_FOUND', 409);
+    if (canonicalOrder.payment_status !== PAYMENT_STATUS.PAID) fail('CANONICAL_ORDER_NOT_PAID', 409);
+    if (![ORDER_STATUS.HAZIRLANIYOR, ORDER_STATUS.KARGOYA_VERILDI].includes(canonicalOrder.status)) {
+        fail('CANONICAL_ORDER_STATE_CONFLICT', 409);
+    }
+
+    const shipmentResult = await client.query(
+        'SELECT id, provider, tracking_no FROM shipments WHERE order_id = $1 FOR UPDATE',
+        [sellerOrder.canonical_order_id]
+    );
+    const existing = shipmentResult.rows?.[0];
+    if (existing && (existing.provider !== carrierName || existing.tracking_no !== trackingNumber)) {
+        fail('CANONICAL_SHIPMENT_CONFLICT', 409);
+    }
+    if (!existing) {
+        await client.query(
+            `INSERT INTO shipments
+                (order_id, provider, tracking_no, tracking_url, shipment_status, raw_payload)
+             VALUES ($1, $2, $3, NULL, $4, $5::jsonb)`,
+            [
+                sellerOrder.canonical_order_id,
+                carrierName,
+                trackingNumber,
+                SHIPMENT_STATUS.IN_TRANSIT,
+                JSON.stringify({ source: 'seller_order_command', carrierApiExecuted: false })
+            ]
+        );
+    }
+
+    await client.query(
+        `UPDATE orders
+         SET status = $1,
+             shipment_status = $2,
+             shipment_provider = $3,
+             tracking_no = $4,
+             updated_at = NOW()
+         WHERE id = $5`,
+        [
+            ORDER_STATUS.KARGOYA_VERILDI,
+            SHIPMENT_STATUS.IN_TRANSIT,
+            carrierName,
+            trackingNumber,
+            sellerOrder.canonical_order_id
+        ]
+    );
+    await appendOrderEvent(
+        client,
+        sellerOrder.canonical_order_id,
+        'SELLER_SHIPMENT_RECORDED',
+        'Satıcı kargo devri müşteri siparişine yansıtıldı.',
+        {
+            sellerOrderId: sellerOrder.id,
+            carrierApiExecuted: false,
+            trackingLast4: trackingNumber.slice(-4)
+        }
+    );
+    if (canonicalOrder.user_id) {
+        await client.query(
+            `INSERT INTO notifications (user_id, type, message, entity_type, entity_id)
+             VALUES ($1, 'order_update', $2, 'order', $3)`,
+            [
+                Number(canonicalOrder.user_id),
+                `Sipariş #${sellerOrder.canonical_order_id} kargoya verildi.`,
+                sellerOrder.canonical_order_id
+            ]
+        );
+    }
+    return Object.freeze({ propagated: true, canonicalOrderId: sellerOrder.canonical_order_id });
+};
+
 const listOrders = async (database, rawContext, query = {}) => {
     const safeContext = context(rawContext);
     if (!query || typeof query !== 'object' || Object.keys(query).some((key) => !['limit', 'status'].includes(key))) fail('VALIDATION_FAILED', 400);
@@ -125,6 +214,9 @@ const orderCommand = async (database, rawContext, orderId, input) => {
             const updated = await client.query('UPDATE seller_orders SET status = $1, revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE organization_id = $2 AND id = $3 AND revision = $4 RETURNING revision', [nextOrderStatus, safeContext.organizationId, integer(orderId), revision]);
             if (!updated.rows?.[0]) fail('REVISION_CONFLICT', 409);
             await client.query('INSERT INTO seller_order_transitions (organization_id, store_id, seller_order_id, package_id, from_status, to_status, command) VALUES ($1, $2, $3, $4, $5, $6, $7)', [safeContext.organizationId, current.store_id, integer(orderId), packageId, fromStatus, nextOrderStatus, command]);
+            if (command === 'ship') {
+                await propagateSingleSellerShipment(client, current, carrierName, trackingNumber);
+            }
             const order = await loadOrder(client, safeContext, orderId);
             await saveReceipt(client, safeContext.organizationId, idempotencyKey, requestFingerprint, orderId, order);
             return Object.freeze({ reused: false, order });
@@ -143,4 +235,4 @@ const listReturns = async (database, rawContext, query = {}) => {
     return Object.freeze((result.rows || []).map((row) => Object.freeze({ id: Number(row.id), seller_order_id: Number(row.seller_order_id), status: String(row.status), revision: Number(row.revision), created_at: row.created_at })));
 };
 
-module.exports = Object.freeze({ SellerOrderFulfillmentError, listOrders, readOrder, orderCommand, listReturns, loadOrder });
+module.exports = Object.freeze({ SellerOrderFulfillmentError, listOrders, readOrder, orderCommand, listReturns, loadOrder, propagateSingleSellerShipment });

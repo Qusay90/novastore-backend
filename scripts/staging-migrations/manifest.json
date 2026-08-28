@@ -208,5 +208,12 @@
     "sha256": "46f6945048265cdf8500045ec080ece781d79818ecc3a30e7a6e3e3d5d90667f",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260828_01_launch_critical_commerce_readiness",
+    "path": "migrations/20260828_01_launch_critical_commerce_readiness.sql",
+    "sha256": "28cc7c35ef6f167fa89abfd0f557688eec2039576c36dcfe7063c51847655959",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

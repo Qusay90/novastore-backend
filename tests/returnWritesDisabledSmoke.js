@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const Module = require('node:module');
 
+process.env.NOVASTORE_ADMIN_RETURN_WRITE_ENABLED = 'false';
+
 const originalLoad = Module._load;
 let databaseCalls = 0;
 
@@ -16,7 +18,7 @@ const fakePool = {
 };
 
 Module._load = function patchedLoad(request, parent, isMain) {
-    if (request === '../config/db' && parent?.filename?.endsWith('/controllers/returnController.js')) {
+    if (request === '../config/db' && /[\\/](?:controllers|services)[\\/]/.test(parent?.filename || '')) {
         return fakePool;
     }
     return originalLoad.call(this, request, parent, isMain);
@@ -45,31 +47,30 @@ const invoke = async (handler, req) => {
 };
 
 (async () => {
-    const invalidCreate = await invoke(createReturnRequest, { body: { order_id: 'not-an-id' } });
+    const invalidCreate = await invoke(createReturnRequest, {
+        user: { id: 71, principal: 'customer', role: 'customer' },
+        body: { order_id: 'not-an-id', reason_code: 'DAMAGED' }
+    });
     assert.equal(invalidCreate.statusCode, 400);
 
-    const disabledCreate = await invoke(createReturnRequest, {
-        body: { order_id: 71, reason_code: 'CUSTOMER_REQUEST', note: null }
+    const wrongRoleCreate = await invoke(createReturnRequest, {
+        user: { id: 1, principal: 'admin', role: 'admin' },
+        body: { order_id: 71, reason_code: 'DAMAGED', note: null }
     });
-    assert.equal(disabledCreate.statusCode, 503);
-    assert.equal(disabledCreate.payload.code, 'RETURN_WRITES_DISABLED');
-
-    const disabledCreateWithoutReason = await invoke(createReturnRequest, { body: { order_id: 72 } });
-    assert.equal(disabledCreateWithoutReason.statusCode, 503);
-    assert.equal(disabledCreateWithoutReason.payload.code, 'RETURN_WRITES_DISABLED');
-
-    const invalidUpdate = await invoke(updateReturnStatus, { params: { id: 'invalid' }, body: {} });
-    assert.equal(invalidUpdate.statusCode, 400);
+    assert.equal(wrongRoleCreate.statusCode, 403);
+    assert.equal(wrongRoleCreate.payload.code, 'RETURN_CUSTOMER_REQUIRED');
 
     const disabledUpdate = await invoke(updateReturnStatus, {
         params: { id: '81' },
-        body: { status: 'COMPLETED' }
+        user: { id: 1, principal: 'admin', role: 'admin' },
+        body: { status: 'IN_REVIEW', expected_revision: 1 }
     });
     assert.equal(disabledUpdate.statusCode, 503);
-    assert.equal(disabledUpdate.payload.code, 'RETURN_WRITES_DISABLED');
+    assert.equal(disabledUpdate.payload.code, 'ADMIN_COMMERCE_CAPABILITY_DISABLED');
+    assert.equal(disabledUpdate.payload.capability, 'returnWrite');
 
-    assert.equal(databaseCalls, 0, 'disabled return writes must be rejected before every database call');
-    console.log('return writes disabled smoke passed');
+    assert.equal(databaseCalls, 0, 'validation, role and disabled admin write gates must precede database access');
+    console.log('return capability guard smoke passed');
 })().catch((error) => {
     Module._load = originalLoad;
     console.error(error);

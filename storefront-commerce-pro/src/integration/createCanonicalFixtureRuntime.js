@@ -72,6 +72,7 @@ export function createCanonicalFixtureRuntime({ root = globalThis } = {}) {
     loadDashboard: async () => Object.freeze({ orders: [], addresses, coupons: [], warnings: [] }),
     listOrders: async () => [],
     cancelOrder: async () => ({ ok: true }),
+    createReturnRequest: async () => ({ reused: false, return: { id: 1, status: "REQUESTED" } }),
     listAddresses: async () => addresses.map((address) => ({ ...address })),
     createAddress: async (value) => {
       const created = { id: Math.max(0, ...addresses.map((item) => Number(item.id) || 0)) + 1, ...value };
@@ -175,6 +176,10 @@ export function createCanonicalFixtureRuntime({ root = globalThis } = {}) {
   });
 
   return Object.freeze({
+    businessIdentity: Object.freeze({
+      status: "pending_owner_company_formation",
+      identity: null,
+    }),
     catalog: Object.freeze({
       categories: canonicalCategories,
       products: visibleProducts,

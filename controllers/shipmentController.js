@@ -37,7 +37,8 @@ const notifyManualShipmentSafely = async (
             Number(userId),
             'order_update',
             `Sipariş #${orderId} kargoya verildi.`,
-            getIoFn()
+            getIoFn(),
+            { entityType: 'order', entityId: Number(orderId) }
         );
         if (!notification) {
             logErrorFn('Manuel kargo kaydı sonrası bildirim hazırlanamadı.');
@@ -130,10 +131,12 @@ const getShipment = async (req, res) => {
 
         const row = shipmentResult.rows[0];
 
-        const isAdmin = req.user.role === 'admin';
-        const isOwner = Number(row.user_id) === req.user.id;
+        const isAdmin = req.user.principal === 'admin' && req.user.role === 'admin';
+        const isOwner = req.user.principal === 'customer'
+            && req.user.role === 'customer'
+            && Number(row.user_id) === Number(req.user.id);
         if (!isAdmin && !isOwner) {
-            return res.status(403).json({ error: 'Bu gönderi kaydına erişim yetkiniz yok.' });
+            return res.status(404).json({ error: 'Sipariş bulunamadı.' });
         }
 
         res.status(200).json({

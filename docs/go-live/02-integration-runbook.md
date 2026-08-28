@@ -30,17 +30,20 @@ Bu dokuman teknik ekip ile partner teknik ekiplerinin ortak UAT ve production cu
 - Gercek tasiyici kriteri: Saglayici sozlesmesi, staging sirri, label/tracking callback adapteri ve ayri acik UAT onayi olmadan yoktur.
 
 ## 3) Iade
-- Aktif endpoint:
+- Aktif müşteri endpointleri:
+  - `POST /api/returns` (Customer sahibi; teslim + PAID + `delivered_at` tabanlı 14 gün kuralı)
   - `GET /api/returns/:id` (owner/admin, salt okunur)
-- Guvenlik kilitleri:
-  - `POST /api/returns` gecici olarak `503 RETURN_WRITES_DISABLED` doner.
-  - `PATCH /api/returns/:id/status` gecici olarak `503 RETURN_WRITES_DISABLED` doner.
-  - Geri odeme, stok geri alma ve durum gecisleri atomik hale gelmeden yazma islemleri acilmaz.
+- Kontrollü Admin operasyonu:
+  - `PATCH /api/returns/:id/status` yalnız güncel DB Admin rolü, `returnStatusWrite` capability ve `NOVASTORE_ADMIN_RETURN_WRITE_ENABLED=true` ile çalışır.
+  - Beklenen revizyon, izinli geçiş, sebep ve müşteri-görünür karar notu zorunlu sözleşmeyle denetlenir.
+- Sağlayıcı sınırı:
+  - Bu akış iş durumu ve audit üretir; gerçek provider refund çağrısı yapmaz ve `refundProviderExecuted=false` döner.
 - Mevcut UAT senaryolari:
-  1. Kullanici yalniz kendi mevcut iade talebini gorebilir.
-  2. Admin mevcut iade taleplerini salt okunur inceleyebilir.
-  3. Yeni talep ve durum degisikligi veri yazmadan guvenlik koduyla reddedilir.
-- Acma kriteri: Tur 2C iade yazimini acmaz. Satir bazli iade, refund idempotency, stok hareketi, reconciliation ve migration tasarimi ayri onaylandiktan sonra yeni tur planlanir.
+  1. Kullanıcı yalnız kendi teslim edilmiş ve ödenmiş siparişinde, 14 gün içinde tek aktif talep açabilir.
+  2. Customer A, Customer B talebini okuyamaz veya değiştiremez.
+  3. Admin bayrağı kapalıyken mutation DB sorgusundan önce reddedilir.
+  4. Bayrak açıkken izinli geçiş tek revizyon ve tek append-only audit olayı üretir; tekrar/stale revizyon `409` verir.
+  5. Müşteri yenileme sonrası güncel iade durumunu görür; provider refund hiçbir testte çağrılmaz.
 
 ## 4) Kampanya Motoru
 - Endpoint: `POST /api/campaigns/quote`

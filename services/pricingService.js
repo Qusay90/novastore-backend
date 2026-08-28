@@ -1,6 +1,10 @@
 const pool = require('../config/db');
 const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 
+const MAX_CART_DISTINCT_PRODUCTS = 20;
+const MAX_CART_QUANTITY_PER_PRODUCT = 20;
+const MAX_CART_TOTAL_QUANTITY = 50;
+
 const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
 const toNumericMap = (rows) => {
@@ -39,24 +43,44 @@ const normalizeCartItems = (cartItems) => {
         throw new Error('Sepet boş olamaz.');
     }
 
-    return cartItems.map((item, index) => {
+    const canonicalByProduct = new Map();
+    for (const [index, item] of cartItems.entries()) {
         const productId = readCartProductId(item, index);
         const quantity = Number(item.quantity || 1);
 
         if (!Number.isInteger(productId) || productId <= 0) {
             throw new Error(`Geçersiz ürün kimliği (index ${index}).`);
         }
-        if (!Number.isInteger(quantity) || quantity <= 0) {
+        if (
+            !Number.isInteger(quantity)
+            || quantity <= 0
+            || quantity > MAX_CART_QUANTITY_PER_PRODUCT
+        ) {
             throw new Error(`Geçersiz ürün adedi (ürün ${productId}).`);
         }
 
-        return {
+        const existing = canonicalByProduct.get(productId);
+        const combinedQuantity = (existing?.quantity || 0) + quantity;
+        if (combinedQuantity > MAX_CART_QUANTITY_PER_PRODUCT) {
+            throw new Error(`Ürün başına en fazla ${MAX_CART_QUANTITY_PER_PRODUCT} adet satın alınabilir (ürün ${productId}).`);
+        }
+        canonicalByProduct.set(productId, {
             id: productId,
-            quantity,
-            image: item.image || item.image_url || item.imageUrl || null,
-            nameHint: item.name || null
-        };
-    });
+            quantity: combinedQuantity,
+            image: existing?.image || item.image || item.image_url || item.imageUrl || null,
+            nameHint: existing?.nameHint || item.name || null
+        });
+    }
+
+    const normalized = [...canonicalByProduct.values()];
+    if (normalized.length > MAX_CART_DISTINCT_PRODUCTS) {
+        throw new Error(`Sepette en fazla ${MAX_CART_DISTINCT_PRODUCTS} farklı ürün bulunabilir.`);
+    }
+    const totalQuantity = normalized.reduce((sum, item) => sum + item.quantity, 0);
+    if (totalQuantity > MAX_CART_TOTAL_QUANTITY) {
+        throw new Error(`Sepette toplam en fazla ${MAX_CART_TOTAL_QUANTITY} adet ürün bulunabilir.`);
+    }
+    return normalized;
 };
 
 const loadProductsForCart = async (cartItems, client = pool) => {
@@ -64,7 +88,7 @@ const loadProductsForCart = async (cartItems, client = pool) => {
     const ids = [...new Set(normalized.map((item) => item.id))];
 
     const result = await client.query(
-        `SELECT id, name, price, old_price, stock, image_url
+        `SELECT id, name, price, old_price, stock, image_url, store_id
          FROM products
          WHERE id = ANY($1::int[])
            AND ${buildPublicProductSqlPredicate('products')}`,
@@ -87,12 +111,20 @@ const resolveCoupon = async (couponCode, subtotal, client = pool) => {
 
     const code = couponCode.trim().toUpperCase();
     const result = await client.query(
-        `SELECT *
+        `SELECT coupons.*,
+                (
+                    SELECT COUNT(*)::integer
+                    FROM coupon_reservations reservation
+                    WHERE reservation.coupon_id = coupons.id
+                      AND reservation.status = 'RESERVED'
+                      AND reservation.expires_at > NOW()
+                ) AS reserved_count
          FROM coupons
          WHERE code = $1
            AND is_active = TRUE
            AND (starts_at IS NULL OR starts_at <= NOW())
-           AND (ends_at IS NULL OR ends_at >= NOW())`,
+           AND (ends_at IS NULL OR ends_at >= NOW())
+         FOR UPDATE`,
         [code]
     );
 
@@ -102,7 +134,10 @@ const resolveCoupon = async (couponCode, subtotal, client = pool) => {
 
     const coupon = result.rows[0];
 
-    if (coupon.usage_limit !== null && Number(coupon.used_count) >= Number(coupon.usage_limit)) {
+    if (
+        coupon.usage_limit !== null
+        && Number(coupon.used_count) + Number(coupon.reserved_count || 0) >= Number(coupon.usage_limit)
+    ) {
         return { applied: false, code, discountAmount: 0, reason: 'Kupon kullanım limiti dolmuş.', couponId: coupon.id };
     }
 
@@ -171,6 +206,9 @@ const calculatePricing = async ({ cartItems, couponCode = null, client = pool })
             price: unitPrice,
             old_price: product.old_price !== null ? Number(product.old_price) : null,
             image: cartItem.image || product.image_url || '',
+            store_id: product.store_id === null || product.store_id === undefined
+                ? null
+                : Number(product.store_id),
             line_total: lineTotal
         };
     });
@@ -210,6 +248,9 @@ const calculatePricing = async ({ cartItems, couponCode = null, client = pool })
 };
 
 module.exports = {
+    MAX_CART_DISTINCT_PRODUCTS,
+    MAX_CART_QUANTITY_PER_PRODUCT,
+    MAX_CART_TOTAL_QUANTITY,
     round2,
     normalizeCartItems,
     loadProductsForCart,

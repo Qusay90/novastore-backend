@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
-const { getUserFromRequestIfAny, sendAuthError } = require('../middlewares/authMiddleware');
+const { sendAuthError } = require('../middlewares/authMiddleware');
 const { createNotification } = require('./notificationController');
 const { initializeIyzicoPayment, verifyWebhookSignature } = require('../services/paymentProviderService');
 const {
@@ -21,7 +21,11 @@ const {
     appendOrderEvent,
     syncOrderItemsForOrder
 } = require('../services/orderService');
-const { consumeCouponUsageIfNeeded } = require('../services/couponUsageService');
+const {
+    consumeCouponReservationIfNeeded,
+    releaseCouponReservationForOrder,
+    reserveCouponUsageForOrder
+} = require('../services/couponReservationService');
 const { PAYMENT_STATUS, ORDER_STATUS, REFUND_STATUS } = require('../constants/orderStatus');
 const {
     PAYMENT_CALLBACK_DECISION,
@@ -36,6 +40,19 @@ const {
     ExternalSideEffectBlockedError,
     assertExternalSideEffectAllowed
 } = require('../config/stagingRuntimePolicy');
+const {
+    PaymentLaunchPolicyError,
+    assertPaymentLaunchPolicy
+} = require('../config/paymentLaunchPolicy');
+const { BusinessIdentityConfigError } = require('../config/businessIdentityConfig');
+const {
+    buildReservationMetadata,
+    releaseExpiredPaymentReservations
+} = require('../services/paymentReservationService');
+const {
+    buildSellerOrderProjection,
+    materializeSellerOrderProjection
+} = require('../services/sellerOrderProjectionService');
 
 const rejectBlockedExternalSideEffect = (res, effect) => {
     try {
@@ -55,11 +72,21 @@ const readIdempotencyKey = (req) => {
     const headerKey = req.headers['idempotency-key'];
     const bodyKey = req.body && req.body.idempotency_key;
     const key = String(headerKey || bodyKey || '').trim();
-    return key || null;
+    if (!key) return null;
+    if (!/^[A-Za-z0-9._:-]{8,120}$/.test(key)) {
+        const error = new Error('Idempotency anahtarı geçersiz.');
+        error.code = 'PAYMENT_IDEMPOTENCY_KEY_INVALID';
+        error.statusCode = 400;
+        throw error;
+    }
+    return key;
 };
 
-const createDeterministicKeyFromBody = (body) => {
+const createDeterministicKeyFromBody = (body, userId = null) => {
     const seed = JSON.stringify({
+        owner: userId
+            ? `user:${Number(userId)}`
+            : `guest:${String(body.analyticsSessionKey || body.email || '').trim().toLowerCase()}`,
         analyticsSessionKey: body.analyticsSessionKey,
         fullName: body.fullName,
         email: body.email,
@@ -152,6 +179,45 @@ const safeJsonParse = (value, fallback = {}) => {
     } catch (_) {
         return fallback;
     }
+};
+
+const finalizeCouponReservationForCapture = async ({
+    client,
+    payment,
+    coupon,
+    provider,
+    providerEventId,
+    paymentRef
+}) => {
+    const result = await consumeCouponReservationIfNeeded(client, coupon, payment.order_id);
+    if (!result.reconciliationRequired) return result;
+
+    const reconciliation = {
+        couponReconciliationRequired: true,
+        couponReconciliationReason: result.reasonCode,
+        couponReconciliationRecordedAt: new Date().toISOString()
+    };
+    await client.query(
+        `UPDATE payments
+         SET raw_request = COALESCE(raw_request, '{}'::jsonb) || $1::jsonb,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [JSON.stringify(reconciliation), payment.id]
+    );
+    await appendOrderEvent(
+        client,
+        payment.order_id,
+        'COUPON_CAPTURE_RECONCILIATION',
+        'Ödeme kaydedildi; kupon kotası manuel uzlaştırma incelemesine alındı.',
+        {
+            provider,
+            providerEventId,
+            paymentRef,
+            reasonCode: result.reasonCode,
+            paymentCapturePreserved: true
+        }
+    );
+    return result;
 };
 
 const normalizePaytrCallbackPayload = (payload = {}) => ({
@@ -275,10 +341,10 @@ const redactPaymentSecretText = (value = '') => {
     return text;
 };
 
-const createPaymentNotificationSafely = async (provider, userId, type, message) => {
+const createPaymentNotificationSafely = async (provider, userId, type, message, target) => {
     try {
         const { io } = require('../server');
-        await createNotification(userId, type, message, io);
+        await createNotification(userId, type, message, io, target);
     } catch (err) {
         console.error(`${provider} notification dispatch failed:`, redactPaymentSecretText(err.message));
     }
@@ -515,7 +581,14 @@ const finalizePaytrCallback = async (payload, callbackOutcome) => {
                 ]
             );
 
-            await consumeCouponUsageIfNeeded(client, rawRequest.coupon);
+            await finalizeCouponReservationForCapture({
+                client,
+                payment,
+                coupon: rawRequest.coupon,
+                provider: 'paytr',
+                providerEventId: eventId,
+                paymentRef: payload.merchant_oid
+            });
             await client.query(
                 `UPDATE orders
                  SET payment_status = $1,
@@ -525,6 +598,11 @@ const finalizePaytrCallback = async (payload, callbackOutcome) => {
                 [PAYMENT_STATUS.PAID, ORDER_STATUS.HAZIRLANIYOR, payment.order_id]
             );
             await syncOrderItemsForOrder(client, payment.order_id, parsedItems);
+            await materializeSellerOrderProjection(
+                client,
+                payment.order_id,
+                Array.isArray(rawRequest.sellerProjection) ? rawRequest.sellerProjection : []
+            );
             await appendOrderEvent(client, payment.order_id, 'PAYMENT_SUCCESS', 'Ödeme başarılı.', {
                 provider: 'paytr',
                 eventId,
@@ -636,6 +714,11 @@ const finalizePaytrCallback = async (payload, callbackOutcome) => {
                     items: parsedItems,
                     reasonCode: 'PAYMENT_CALLBACK_FAILED'
                 });
+                await releaseCouponReservationForOrder(
+                    client,
+                    payment.order_id,
+                    'PAYMENT_CALLBACK_FAILED'
+                );
             }
 
             await appendOrderEvent(
@@ -734,7 +817,8 @@ const webhookPaytr = async (req, res) => {
                         'PayTR',
                         payment.user_id,
                         'order_update',
-                        `Sipariş #${payment.order_id} ödemesi başarıyla alındı.`
+                        `Sipariş #${payment.order_id} ödemesi başarıyla alındı.`,
+                        { entityType: 'order', entityId: Number(payment.order_id) }
                     );
                 }
 
@@ -742,7 +826,8 @@ const webhookPaytr = async (req, res) => {
                     'PayTR',
                     null,
                     'new_order',
-                    `Yeni sipariş kesinleşti (#${payment.order_id}). Müşteri: ${payment.customer_name || 'Bilinmiyor'}`
+                    `Yeni sipariş kesinleşti (#${payment.order_id}). Müşteri: ${payment.customer_name || 'Bilinmiyor'}`,
+                    { entityType: 'order', entityId: Number(payment.order_id) }
                 );
             }
             return res.type('text/plain').status(200).send('OK');
@@ -763,7 +848,8 @@ const webhookPaytr = async (req, res) => {
                     'PayTR',
                     payment.user_id,
                     'order_update',
-                    `Sipariş #${payment.order_id} ödemesi başarısız oldu.`
+                    `Sipariş #${payment.order_id} ödemesi başarısız oldu.`,
+                    { entityType: 'order', entityId: Number(payment.order_id) }
                 );
             }
             return res.type('text/plain').status(200).send('OK');
@@ -791,6 +877,14 @@ const webhookPaytr = async (req, res) => {
 const initializePayment = async (req, res) => {
     if (rejectBlockedExternalSideEffect(res, 'payment_initialize')) return;
 
+    const user = req.user;
+    if (!user || user.principal !== 'customer' || user.role !== 'customer') {
+        return res.status(401).json({
+            code: 'PAYMENT_CUSTOMER_SESSION_REQUIRED',
+            error: 'Ödemeyi başlatmak için doğrulanmış müşteri oturumu gereklidir.'
+        });
+    }
+
     const client = await pool.connect();
 
     try {
@@ -813,15 +907,28 @@ const initializePayment = async (req, res) => {
             return res.status(400).json({ error: 'Sepet bo\u015F olamaz.' });
         }
 
-        const user = await getUserFromRequestIfAny(req);
-        const userId = user ? user.id : null;
+        if (!['card', 'havale'].includes(paymentMethod)) {
+            return res.status(400).json({
+                code: 'PAYMENT_METHOD_INVALID',
+                error: 'Desteklenmeyen ödeme yöntemi.'
+            });
+        }
 
-        const idempotencyKey = readIdempotencyKey(req) || createDeterministicKeyFromBody(req.body);
+        const userId = Number(user.id);
+
+        const idempotencyKey = readIdempotencyKey(req) || createDeterministicKeyFromBody(req.body, userId);
         const idempotencyContext = buildPaymentIdempotencyContext({
             body: req.body,
             userId,
             idempotencyKey
         });
+
+        const selectedCardPaymentProvider = paymentMethod === 'havale' ? null : getPaymentProviderName();
+        const paytrProviderConfig = selectedCardPaymentProvider === 'paytr' ? assertPaytrEnvReady() : null;
+        const launchPolicy = assertPaymentLaunchPolicy({ paymentMethod });
+
+        await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [idempotencyKey]);
 
         const existingPayment = await client.query(
             `SELECT p.*, o.id AS order_id, o.user_id AS order_user_id
@@ -836,6 +943,7 @@ const initializePayment = async (req, res) => {
             const storedIdempotency = readStoredIdempotencyContext(row.raw_request);
 
             if (!idempotencyContextMatches(storedIdempotency, idempotencyContext)) {
+                await client.query('COMMIT');
                 return res.status(409).json({
                     error: 'Idempotency key farklı bir ödeme isteği için kullanılmış.'
                 });
@@ -846,11 +954,13 @@ const initializePayment = async (req, res) => {
                 : Number(row.order_user_id);
 
             if (userId !== null && ownerUserId !== userId) {
+                await client.query('COMMIT');
                 return res.status(409).json({
                     error: 'Idempotency key farklı bir kullanıcıya ait.'
                 });
             }
 
+            await client.query('COMMIT');
             return res.status(200).json({
                 message: 'Idempotent tekrar iste\u011Fi, mevcut \u00F6deme d\u00F6n\u00FCld\u00FC.',
                 orderId: row.order_id,
@@ -862,10 +972,8 @@ const initializePayment = async (req, res) => {
             });
         }
 
-        const selectedCardPaymentProvider = paymentMethod === 'havale' ? null : getPaymentProviderName();
-        const paytrProviderConfig = selectedCardPaymentProvider === 'paytr' ? assertPaytrEnvReady() : null;
-
-        await client.query('BEGIN');
+        await releaseExpiredPaymentReservations(client);
+        const reservationMetadata = buildReservationMetadata({ paymentMethod });
 
         const { order, pricing } = await createPendingPaymentOrder({
             client,
@@ -877,7 +985,14 @@ const initializePayment = async (req, res) => {
             address,
             cartItems,
             couponCode,
-            paymentMethod
+            paymentMethod,
+            businessIdentitySnapshot: launchPolicy.identitySnapshot
+        });
+        const sellerProjection = await buildSellerOrderProjection(client, pricing.items);
+        const couponReservation = await reserveCouponUsageForOrder(client, {
+            coupon: pricing.coupon,
+            orderId: order.id,
+            expiresAt: reservationMetadata.reservationExpiresAt
         });
 
         let paymentProvider = 'iyzico';
@@ -888,9 +1003,18 @@ const initializePayment = async (req, res) => {
             paymentMethod,
             couponCode,
             coupon: pricing.coupon,
-            stockReserved: false,
+            couponReservation: couponReservation.reserved
+                ? {
+                    reservationId: Number(couponReservation.reservation.id),
+                    couponId: Number(couponReservation.reservation.coupon_id),
+                    status: couponReservation.reservation.status,
+                    expiresAt: couponReservation.reservation.expires_at
+                }
+                : null,
+            ...reservationMetadata,
             finalizesOnWebhook: true,
-            idempotency: idempotencyContext
+            idempotency: idempotencyContext,
+            sellerProjection
         };
 
         if (paymentMethod === 'havale') {
@@ -898,8 +1022,8 @@ const initializePayment = async (req, res) => {
             paymentRef = `HVL-${order.id}-${crypto.randomBytes(6).toString('hex')}`;
             paymentStatus = PAYMENT_STATUS.WAITING_TRANSFER;
             providerResponse = {
-                accountName: process.env.HAVALE_ACCOUNT_NAME || 'NovaStore Elektronik',
-                iban: process.env.HAVALE_IBAN || 'TR00 0000 0000 0000 0000 0000 00',
+                accountName: launchPolicy.bankTransfer.accountName,
+                iban: launchPolicy.bankTransfer.iban,
                 dueHours: 24
             };
         } else {
@@ -1013,12 +1137,14 @@ const initializePayment = async (req, res) => {
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
-        const statusCode = err instanceof PaymentProviderConfigError ? err.statusCode : (err.statusCode || 500);
+        const policyError = err instanceof PaymentLaunchPolicyError || err instanceof BusinessIdentityConfigError;
+        if (!policyError && err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
+        const statusCode = err instanceof PaymentProviderConfigError || policyError ? err.statusCode : (err.statusCode || 500);
         console.error('\u00D6deme initialize hatas\u0131:', err.message);
         res.status(statusCode).json({
-            error: err.message || '\u00D6deme ba\u015Flat\u0131lamad\u0131.',
-            details: err instanceof PaymentProviderConfigError ? err.details : undefined
+            code: err.code || undefined,
+            error: policyError ? err.publicMessage : (err.message || '\u00D6deme ba\u015Flat\u0131lamad\u0131.'),
+            details: err instanceof PaymentProviderConfigError || policyError ? err.details : undefined
         });
     } finally {
         client.release();
@@ -1201,7 +1327,14 @@ const webhookIyzico = async (req, res) => {
                 ]
             );
 
-            await consumeCouponUsageIfNeeded(client, rawRequest.coupon);
+            await finalizeCouponReservationForCapture({
+                client,
+                payment,
+                coupon: rawRequest.coupon,
+                provider: 'iyzico',
+                providerEventId: eventId,
+                paymentRef
+            });
 
             await client.query(
                 `UPDATE orders
@@ -1213,6 +1346,11 @@ const webhookIyzico = async (req, res) => {
             );
 
             await syncOrderItemsForOrder(client, payment.order_id, parsedItems);
+            await materializeSellerOrderProjection(
+                client,
+                payment.order_id,
+                Array.isArray(rawRequest.sellerProjection) ? rawRequest.sellerProjection : []
+            );
 
             await appendOrderEvent(client, payment.order_id, 'PAYMENT_SUCCESS', '\u00D6deme ba\u015Far\u0131l\u0131.', {
                 provider: 'iyzico',
@@ -1327,6 +1465,11 @@ const webhookIyzico = async (req, res) => {
                     items: parsedItems,
                     reasonCode: 'PAYMENT_CALLBACK_FAILED'
                 });
+                await releaseCouponReservationForOrder(
+                    client,
+                    payment.order_id,
+                    'PAYMENT_CALLBACK_FAILED'
+                );
             }
 
             await appendOrderEvent(
@@ -1393,7 +1536,8 @@ const webhookIyzico = async (req, res) => {
                 'order_update',
                 shouldNotifyCapture
                     ? `Sipari\u015F #${payment.order_id} \u00F6demesi ba\u015Far\u0131yla al\u0131nd\u0131.`
-                    : `Sipari\u015F #${payment.order_id} \u00F6demesi ba\u015Far\u0131s\u0131z oldu.`
+                    : `Sipari\u015F #${payment.order_id} \u00F6demesi ba\u015Far\u0131s\u0131z oldu.`,
+                { entityType: 'order', entityId: Number(payment.order_id) }
             );
         }
 
@@ -1402,7 +1546,8 @@ const webhookIyzico = async (req, res) => {
                 'Iyzico',
                 null,
                 'new_order',
-                `Yeni sipari\u015F kesinle\u015Fti (#${payment.order_id}). M\u00FC\u015Fteri: ${payment.customer_name || 'Bilinmiyor'}`
+                `Yeni sipari\u015F kesinle\u015Fti (#${payment.order_id}). M\u00FC\u015Fteri: ${payment.customer_name || 'Bilinmiyor'}`,
+                { entityType: 'order', entityId: Number(payment.order_id) }
             );
         }
 

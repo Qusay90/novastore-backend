@@ -39,9 +39,9 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 (async () => {
     assert.equal(validateManifest(manifest), true);
     const registry = loadRegistry();
-    assert.equal(registry.length, 30);
+    assert.equal(registry.length, 31);
     assert.equal(registry[0].id, '20260628_staging_schema_baseline');
-    assert.equal(registry.at(-1).id, '20260823_01_product_media_card_framing');
+    assert.equal(registry.at(-1).id, '20260828_01_launch_critical_commerce_readiness');
     assert.deepEqual(
         registry.filter((entry) => entry.id.startsWith('20260712_')).map((entry) => entry.path),
         [
@@ -52,7 +52,7 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
     );
     assert.equal(new Set(registry.map((entry) => entry.id)).size, registry.length);
     assert.equal(new Set(registry.map((entry) => entry.path)).size, registry.length);
-    assert.equal(registry.filter((entry) => entry.transactionWrapper).length, 24);
+    assert.equal(registry.filter((entry) => entry.transactionWrapper).length, 25);
     assert.deepEqual(
         registry.filter((entry) => entry.id.includes('_seller_')).map((entry) => entry.path),
         [
@@ -295,7 +295,7 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
     assert.doesNotMatch(stagingSources, /require\([^)]*initDb/i);
     assert.doesNotMatch(stagingSources, /dotenv|cloudinary|nodemailer|resend|fetch\s*\(/i);
 
-    console.log('staging migration foundation smoke passed: manifest=30 verified-tls=15 loopback-no-tls=1');
+    console.log('staging migration foundation smoke passed: manifest=31 verified-tls=15 loopback-no-tls=1');
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;
