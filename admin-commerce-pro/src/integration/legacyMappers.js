@@ -166,26 +166,39 @@ export function normalizeNotificationSummary(row) {
   if (rawId < 1) throw new TypeError("notification.id pozitif olmalıdır.");
   const entityType = row.entity_type == null ? null : toLegacyNullableText(row.entity_type, "notification.entity_type", null);
   const entityId = row.entity_id == null ? null : toInteger(row.entity_id, "notification.entity_id");
-  if ((entityType === null) !== (entityId === null) || (entityId !== null && entityId < 1)) {
+  const entityKey = row.entity_key == null ? null : toLegacyNullableText(row.entity_key, "notification.entity_key", null);
+  const sellerApplicationTarget = entityType === "seller_application" && entityId === null && entityKey !== null;
+  const numericTarget = entityType !== null && entityType !== "seller_application" && entityId !== null && entityId > 0 && entityKey === null;
+  const emptyTarget = entityType === null && entityId === null && entityKey === null;
+  if (!emptyTarget && !sellerApplicationTarget && !numericTarget) {
     throw new TypeError("notification hedef kimliği geçersiz.");
   }
   const targetPage = ({
     order: "orders",
+    payment: "orders",
+    shipment: "orders",
     product: "catalog",
     product_question: "questions",
     return_request: "returns",
     review: "reviews",
+    seller_application: "sellerApplications",
+    store: "sellerApplications",
     support_thread: "support",
   })[entityType] || null;
   return Object.freeze({
     id: `NT-${String(rawId).padStart(6, "0")}`,
     rawId,
     type: toLegacyNullableText(row.type, "notification.type", "notification"),
+    title: toLegacyNullableText(row.title, "notification.title", "NovaStore bildirimi"),
     message: toLegacyNullableText(row.message, "notification.message", "Bildirim içeriği yok"),
+    category: toLegacyNullableText(row.category, "notification.category", "ACCOUNT"),
+    priority: toLegacyNullableText(row.priority, "notification.priority", "NORMAL"),
     isRead: toBoolean(row.is_read, "notification.is_read"),
     entityType,
     entityId,
+    entityKey,
     targetPage,
+    readAt: toLegacyNullableDate(row.read_at, "notification.read_at"),
     createdAt: toLegacyNullableDate(row.created_at, "notification.created_at"),
   });
 }
@@ -269,6 +282,13 @@ export function normalizeReturnSummaryPage(payload) {
 }
 
 export function normalizeNotificationSummaryPage(payload) {
+  if (payload?.page && Array.isArray(payload?.items)) {
+    return normalizeSummaryPage({
+      items: payload.items,
+      limit: payload.page.limit,
+      hasMore: payload.page.hasMore,
+    }, normalizeNotificationSummary, "notifications");
+  }
   return normalizeSummaryPage(payload, normalizeNotificationSummary, "notifications");
 }
 

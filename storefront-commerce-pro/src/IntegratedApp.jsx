@@ -7,6 +7,7 @@ import {
   ArrowsClockwise,
   BadgePercent,
   Baby,
+  Bell,
   CaretDown,
   CaretRight,
   Check,
@@ -624,7 +625,7 @@ function CategoryNavigation({ onMobileOpen, drawerOpen }) {
   );
 }
 
-function Header({ cartCount, favoriteCount, onCartOpen, onMobileOpen, onAccountOpen, accountDetail, cartTriggerRef, mobileMenuOpen, cartOpen }) {
+function Header({ cartCount, favoriteCount, notificationUnreadCount, onCartOpen, onMobileOpen, onAccountOpen, accountDetail, cartTriggerRef, mobileMenuOpen, cartOpen }) {
   return (
     <header className="site-header">
       <TrustBar />
@@ -633,6 +634,7 @@ function Header({ cartCount, favoriteCount, onCartOpen, onMobileOpen, onAccountO
         <Logo surface="dark" />
         <SearchBox onSearch={(term) => navigate(`/arama?q=${encodeURIComponent(term)}`)} />
         <div className="header-actions">
+          <HeaderAction icon={Bell} label="Bildirimler" detail={notificationUnreadCount ? `${notificationUnreadCount} okunmamış` : "Güncellemelerim"} badge={notificationUnreadCount} onClick={() => navigate("/hesabim/bildirimler")} />
           <HeaderAction icon={User} label="Hesabım" detail={accountDetail} onClick={onAccountOpen} />
           <HeaderAction icon={Heart} label="Listem" detail="Favorilerim" badge={favoriteCount} onClick={() => navigate("/favoriler")} />
           <HeaderAction icon={ShoppingCart} label="Sepetim" detail={cartCount ? `${cartCount} ürün` : "0 ürün"} badge={cartCount} onClick={onCartOpen} buttonRef={cartTriggerRef} expanded={cartOpen} controls="cart-drawer" />
@@ -1299,6 +1301,7 @@ export function CommerceProRuntimeApp({ runtime }) {
   const favoritesRef = useRef(favorites);
   const [comparisonIds, setComparisonIds] = useState(() => new Set());
   const [session, setSession] = useState(runtime.session);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
   const buyNowPendingRef = useRef(false);
@@ -1466,6 +1469,25 @@ export function CommerceProRuntimeApp({ runtime }) {
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
   const authenticated = session?.status === "authenticated" || session?.status === "unverified";
+  const refreshNotificationUnreadCount = useCallback(async () => {
+    if (!authenticated) { setNotificationUnreadCount(0); return; }
+    try { setNotificationUnreadCount(await runtime.customer.getNotificationUnreadCount()); }
+    catch { setNotificationUnreadCount(0); }
+  }, [authenticated, runtime]);
+  useEffect(() => {
+    if (!authenticated) { setNotificationUnreadCount(0); return undefined; }
+    refreshNotificationUnreadCount();
+    const refresh = () => refreshNotificationUnreadCount();
+    const onVisibility = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("novastore:notification-state-changed", refresh);
+    document.addEventListener("visibilitychange", onVisibility);
+    const interval = window.setInterval(refresh, 30_000);
+    return () => {
+      window.removeEventListener("novastore:notification-state-changed", refresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(interval);
+    };
+  }, [authenticated, refreshNotificationUnreadCount]);
   const localReviewSurface = window.location.protocol === "http:"
     && ["127.0.0.1", "localhost"].includes(window.location.hostname)
     && window.location.port === "5273";
@@ -1549,7 +1571,7 @@ export function CommerceProRuntimeApp({ runtime }) {
   return (
     <RuntimeComparisonContext.Provider value={comparisonContext}>
       <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); focusMainContent({ preventScroll: false }); }}>Ana içeriğe geç</a>
-      <Header cartCount={cartCount} favoriteCount={favorites.size} onCartOpen={openCart} onMobileOpen={openCategoryDrawer} onAccountOpen={() => navigate("/hesabim")} accountDetail={authenticated ? session.user.fullName || "Hesabım" : "Giriş yap"} cartTriggerRef={cartTriggerRef} mobileMenuOpen={mobileMenuOpen} cartOpen={cartOpen} />
+      <Header cartCount={cartCount} favoriteCount={favorites.size} notificationUnreadCount={notificationUnreadCount} onCartOpen={openCart} onMobileOpen={openCategoryDrawer} onAccountOpen={() => navigate("/hesabim")} accountDetail={authenticated ? session.user.fullName || "Hesabım" : "Giriş yap"} cartTriggerRef={cartTriggerRef} mobileMenuOpen={mobileMenuOpen} cartOpen={cartOpen} />
       {runtime.warnings.length > 0 && <div className="integration-session-warning" role="status">Bazı ikincil mağaza veya oturum verileri geçici olarak alınamadı; erişilebilen gerçek katalog gösteriliyor.</div>}
       {comparisonVisible && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => setComparisonIds(new Set())} onAdd={addToCart} />}
       {content}
@@ -1589,11 +1611,27 @@ function IntegrationState({ phase, error, onRetry }) {
 }
 
 export function IntegratedApp() {
-  const initialRoute = useMemo(parseRoute, []);
-  const isPublicStoreRoute = initialRoute.type === "public-store";
+  const [runtimeRoute, setRuntimeRoute] = useState(parseRoute);
+  useEffect(() => {
+    const handleRouteChange = () => setRuntimeRoute(parseRoute());
+    window.addEventListener("hashchange", handleRouteChange);
+    return () => window.removeEventListener("hashchange", handleRouteChange);
+  }, []);
+  const isPublicStoreRoute = runtimeRoute.type === "public-store";
+  const catalogOptionalRoute = [
+    "auth",
+    "password",
+    "account",
+    "checkout",
+    "payment-result",
+    "tracking",
+    "help",
+    "return-exchange",
+    "contact",
+  ].includes(runtimeRoute.type);
   const resource = useCommerceRuntime({
-    allowEmptyCatalog: isPublicStoreRoute,
-    readOnlyPreview: isPublicStoreRoute && initialRoute.preview === true,
+    allowEmptyCatalog: isPublicStoreRoute || catalogOptionalRoute,
+    readOnlyPreview: isPublicStoreRoute && runtimeRoute.preview === true,
   });
   if (resource.phase !== "ready") {
     return <IntegrationState phase={resource.phase} error={resource.error} onRetry={resource.retry} />;

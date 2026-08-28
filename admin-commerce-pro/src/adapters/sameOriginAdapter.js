@@ -64,8 +64,42 @@ export function createSameOriginAdapter(http) {
   );
 
   const notifications = async ({ signal } = {}) => normalizeNotificationSummaryPage(
-    await http.request("/api/admin/notifications/summary?limit=50", { signal }),
+    await http.request("/api/notifications?limit=50", { signal }),
   );
+
+  const notificationUnreadCount = async ({ signal } = {}) => {
+    const payload = await http.request("/api/notifications/unread-count", { signal });
+    const count = Number(payload?.unreadCount);
+    if (!Number.isSafeInteger(count) || count < 0) throw new TypeError("Bildirim okunmamış sayısı geçersiz.");
+    return count;
+  };
+
+  const markNotificationRead = async ({ id, signal } = {}) => http.request(
+    `/api/notifications/${encodeURIComponent(String(id))}/read`,
+    { method: "PATCH", signal },
+  );
+
+  const markAllNotificationsRead = async ({ signal } = {}) => http.request(
+    "/api/notifications/read-all",
+    { method: "PATCH", signal },
+  );
+
+  const webPush = Object.freeze({
+    getConfig: ({ signal } = {}) => http.request("/api/notifications/web-push/config", { signal }),
+    getSubscriptionState: ({ signal } = {}) => http.request("/api/notifications/web-push/subscriptions", { signal }),
+    registerSubscription: (subscription, { signal } = {}) => http.request(
+      "/api/notifications/web-push/subscriptions",
+      { method: "POST", body: JSON.stringify({ subscription }), signal },
+    ),
+    revokeSubscription: ({ endpoint }, { signal } = {}) => http.request(
+      "/api/notifications/web-push/subscriptions",
+      { method: "DELETE", body: JSON.stringify({ endpoint }), signal },
+    ),
+    revokeSession: ({ signal } = {}) => http.request(
+      "/api/notifications/web-push/subscriptions/session",
+      { method: "DELETE", signal },
+    ),
+  });
 
   const catalog = async ({ signal } = {}) => normalizeFirstPartyCatalogPage(
     await http.request("/api/admin/catalog/products/summary?limit=100", { signal }),
@@ -256,5 +290,10 @@ export function createSameOriginAdapter(http) {
     return Object.freeze(actions);
   };
 
-  return Object.freeze({ catalog, catalogStructure, session, dashboard, notifications, orders, returns, stores, storeDetail, reviews, questions, coupons, supportThreads, supportHistory, mutationActions });
+  return Object.freeze({
+    catalog, catalogStructure, session, dashboard, notifications, notificationUnreadCount,
+    markNotificationRead, markAllNotificationsRead, webPush,
+    orders, returns, stores, storeDetail, reviews, questions, coupons,
+    supportThreads, supportHistory, mutationActions,
+  });
 }

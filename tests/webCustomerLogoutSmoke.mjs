@@ -42,11 +42,18 @@ const runCase = async ({ status, throws = false, withToken = true }) => {
   assert.equal(result.warning, result.serverRevocationVerified ? null : warning);
   assert.equal(String(result.warning || "").includes(token), false);
   if (withToken) {
-    assert.equal(requests.length, 1);
-    assert.equal(requests[0].input, "/api/users/logout");
-    assert.equal(requests[0].init.method, "POST");
-    assert.equal(requests[0].init.credentials, "same-origin");
-    assert.equal(requests[0].init.headers.Authorization, `Bearer ${token}`);
+    const expectedRequestCount = status === 401 && !throws ? 1 : 2;
+    assert.equal(requests.length, expectedRequestCount);
+    assert.equal(requests[0].input, "/api/notifications/web-push/subscriptions/session");
+    assert.equal(requests[0].init.method, "DELETE");
+    for (const request of requests) {
+      assert.equal(request.init.credentials, "same-origin");
+      assert.equal(request.init.headers.Authorization, `Bearer ${token}`);
+    }
+    if (requests.length === 2) {
+      assert.equal(requests[1].input, "/api/users/logout");
+      assert.equal(requests[1].init.method, "POST");
+    }
   } else {
     assert.equal(requests.length, 0);
   }
@@ -60,4 +67,4 @@ await runCase({ status: 200 });
 await runCase({ status: 0, throws: true });
 await runCase({ status: 204, withToken: false });
 
-console.log("webCustomerLogoutSmoke: PASS cases=6 exact-204=1 cleanup=6 checkout-preserved=6");
+console.log("webCustomerLogoutSmoke: PASS cases=6 push-revoke-before-session=6 exact-204=1 cleanup=6 checkout-preserved=6");

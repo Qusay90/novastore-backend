@@ -31,6 +31,10 @@ import {
   integratedAdminPageHash,
   resolveIntegratedAdminPage,
 } from "./integration/adminHistory.js";
+import {
+  createWebPushController,
+  WEB_PUSH_STATE,
+} from "../../web-notifications/notificationClient.js";
 
 const money = (value, currency = "TRY") => new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -487,7 +491,7 @@ function ManualShipmentDialog({ operation, action, onClose, onConflict, onUnavai
   );
 }
 
-function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities, mutationActions }) {
+function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities, mutationActions, notificationTarget = null }) {
   const orders = orderPage.items;
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Tümü");
@@ -499,11 +503,16 @@ function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities,
   const operationsEnabled = typeof visibleMutationActions.cancelOrder === "function"
     || typeof visibleMutationActions.createManualShipment === "function";
   const statuses = useMemo(() => ["Tümü", ...new Set(orders.map((order) => order.status))], [orders]);
+  useEffect(() => {
+    if (!notificationTarget?.entityId) return;
+    setQuery(String(notificationTarget.entityId));
+    setStatus("Tümü");
+  }, [notificationTarget?.entityId]);
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("tr-TR");
     return orders.filter((order) => {
       const matchesStatus = status === "Tümü" || order.status === status;
-      const haystack = `${order.id} ${order.customerName} ${order.email}`.toLocaleLowerCase("tr-TR");
+      const haystack = `${order.id} ${order.rawId || ""} ${order.customerName} ${order.email}`.toLocaleLowerCase("tr-TR");
       return matchesStatus && (!normalized || haystack.includes(normalized));
     });
   }, [orders, query, status]);
@@ -1576,7 +1585,7 @@ function ReturnDecisionDialog({ operation, action, onClose, onComplete, onConfli
   </OperationDialog>;
 }
 
-function Returns({ returnPage, error, refreshing, onRefresh, onReloadCapabilities, mutationActions }) {
+function Returns({ returnPage, error, refreshing, onRefresh, onReloadCapabilities, mutationActions, notificationTarget = null }) {
   const returns = returnPage.items;
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Tümü");
@@ -1587,11 +1596,16 @@ function Returns({ returnPage, error, refreshing, onRefresh, onReloadCapabilitie
   const updateAction = writesSuppressed ? null : mutationActions.updateReturnStatus;
   const writeEnabled = typeof updateAction === "function";
   const statuses = useMemo(() => ["Tümü", ...new Set(returns.map((item) => item.status))], [returns]);
+  useEffect(() => {
+    if (!notificationTarget?.entityId) return;
+    setQuery(String(notificationTarget.entityId));
+    setStatus("Tümü");
+  }, [notificationTarget?.entityId]);
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("tr-TR");
     return returns.filter((item) => {
       const matchesStatus = status === "Tümü" || item.status === status;
-      const haystack = `${item.id} ${item.orderId} ${item.customerName} ${item.reasonCode}`.toLocaleLowerCase("tr-TR");
+      const haystack = `${item.id} ${item.rawId || ""} ${item.orderId} ${item.customerName} ${item.reasonCode}`.toLocaleLowerCase("tr-TR");
       return matchesStatus && (!normalized || haystack.includes(normalized));
     });
   }, [query, returns, status]);
@@ -1671,10 +1685,59 @@ function Returns({ returnPage, error, refreshing, onRefresh, onReloadCapabilitie
   );
 }
 
-function Notifications({ notificationPage, error, refreshing, onRefresh, onOpenTarget }) {
+const pushStateCopy = Object.freeze({
+  [WEB_PUSH_STATE.NOT_SUPPORTED]: ["Desteklenmiyor", "Bu tarayıcı Web Push özelliğini desteklemiyor."],
+  [WEB_PUSH_STATE.NOT_REQUESTED]: ["İzin bekleniyor", "Bildirim izni yalnız aşağıdaki düğmeye bastığınızda istenir."],
+  [WEB_PUSH_STATE.ENABLED]: ["Açık", "Bu tarayıcı güvenli Web Push teslimatına bağlı."],
+  [WEB_PUSH_STATE.DENIED]: ["Engellendi", "Tarayıcı bildirim izni engellenmiş. Site izinlerinden değiştirebilirsiniz."],
+  [WEB_PUSH_STATE.ERROR]: ["Hazır değil", "Web Push durumu doğrulanamadı veya sunucu yapılandırması bekleniyor."],
+  [WEB_PUSH_STATE.UNSUBSCRIBED]: ["Kapalı", "Bu tarayıcıda Web Push kapalı."],
+});
+
+function WebPushSettings({ api }) {
+  const controller = useMemo(() => createWebPushController({ api }), [api]);
+  const [status, setStatus] = useState({ state: WEB_PUSH_STATE.NOT_REQUESTED });
+  const [busy, setBusy] = useState(true);
+  const refresh = useCallback(async () => {
+    setBusy(true);
+    setStatus(await controller.getState());
+    setBusy(false);
+  }, [controller]);
+  useEffect(() => { refresh(); }, [refresh]);
+  const mutate = async (action) => {
+    setBusy(true);
+    setStatus(await action());
+    setBusy(false);
+  };
+  const copy = pushStateCopy[status.state] || pushStateCopy[WEB_PUSH_STATE.ERROR];
+  const enabled = status.state === WEB_PUSH_STATE.ENABLED;
+  const unavailable = [WEB_PUSH_STATE.NOT_SUPPORTED, WEB_PUSH_STATE.DENIED].includes(status.state);
+  return (
+    <section className="live-push-settings" aria-labelledby="admin-web-push-title">
+      <Icon name="bell" />
+      <div>
+        <span className="eyebrow">Masaüstü ve telefon tarayıcısı</span>
+        <h3 id="admin-web-push-title">Web Push bildirimleri</h3>
+        <p>{busy ? "Bildirim durumu doğrulanıyor…" : copy[1]}</p>
+        {status.activeDeviceCount > 0 && <small>{status.activeDeviceCount} etkin tarayıcı/cihaz</small>}
+      </div>
+      <div className="live-push-actions">
+        <span className={`status ${enabled ? "status-tamamlandı" : "status-inceleniyor"}`} role="status">{busy ? "Kontrol ediliyor" : copy[0]}</span>
+        {enabled
+          ? <button className="secondary-button" type="button" onClick={() => mutate(controller.disable)} disabled={busy}>Bu cihazda kapat</button>
+          : <button className="primary-button" type="button" onClick={() => mutate(controller.enable)} disabled={busy || unavailable}>Bildirimleri Aç</button>}
+        {status.state === WEB_PUSH_STATE.ERROR && <button className="secondary-button small" type="button" onClick={refresh} disabled={busy}>Tekrar dene</button>}
+      </div>
+    </section>
+  );
+}
+
+function Notifications({ notificationPage, error, refreshing, onRefresh, onOpenTarget, onMarkOne, onMarkAll, webPushApi }) {
   const notifications = notificationPage.items;
   const [query, setQuery] = useState("");
   const [readFilter, setReadFilter] = useState("Tümü");
+  const [actionError, setActionError] = useState("");
+  const [busyId, setBusyId] = useState(null);
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("tr-TR");
     return notifications.filter((item) => {
@@ -1684,21 +1747,37 @@ function Notifications({ notificationPage, error, refreshing, onRefresh, onOpenT
     });
   }, [notifications, query, readFilter]);
 
+  const perform = async (id, action) => {
+    setBusyId(id);
+    setActionError("");
+    try { await action(); }
+    catch (requestError) { setActionError(requestError?.message || "Bildirim durumu güncellenemedi."); }
+    finally { setBusyId(null); }
+  };
+
+  const openTarget = async (item) => {
+    if (!item.targetPage) return;
+    if (!item.isRead) await perform(item.rawId, () => onMarkOne(item.rawId));
+    onOpenTarget(item);
+  };
+
   return (
     <section className="workspace live-workspace" data-testid="live-notifications">
       <header className="workspace-heading operations-heading">
-        <div><span className="eyebrow">Entegre backend · salt okunur</span><h2 tabIndex="-1">Admin bildirimleri</h2><p>En fazla son {notificationPage.limit} admin bildirimi gösterilir; okundu durumu bu turda değiştirilmez.</p></div>
-        <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
+        <div><span className="eyebrow">Birleşik bildirim çekirdeği</span><h2 tabIndex="-1">Admin bildirimleri</h2><p>Son {notificationPage.limit} güvenli bildirimi, okunma durumunu ve ilgili kaydı tek yerde yönetin.</p></div>
+        <div className="live-heading-actions">{notifications.some((item) => !item.isRead) && <button className="secondary-button" type="button" onClick={() => perform("all", onMarkAll)} disabled={busyId !== null}>Tümünü okundu yap</button>}<button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button></div>
       </header>
       <ResourceWarning error={error} onRetry={onRefresh} />
+      {actionError && <div className="live-resource-warning notice-card warning-card" role="alert"><Icon name="warning" /><div><strong>Bildirim işlemi tamamlanamadı</strong><p>{actionError}</p></div></div>}
+      <WebPushSettings api={webPushApi} />
       <section className="table-card">
         <div className="ledger-toolbar filter-toolbar live-filter-toolbar">
           <label className="table-search"><Icon name="search" /><span className="sr-only">Bildirim ara</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Bildirim türü veya içerik ara" /></label>
           <label className="heading-select"><span className="sr-only">Okunma durumuna göre filtrele</span><select value={readFilter} onChange={(event) => setReadFilter(event.target.value)}><option>Tümü</option><option>Okunmadı</option><option>Okundu</option></select></label>
           <span className="live-result-count">{filtered.length} / {notifications.length} kayıt{notificationPage.hasMore ? " · daha eski kayıtlar bu turda gösterilmiyor" : ""}</span>
         </div>
-        {notifications.length === 0 ? <div className="state-panel"><Icon name="bell" /><h3>Henüz admin bildirimi yok</h3><p>Backend boş bir admin bildirimi özeti döndürdü.</p></div> : filtered.length > 0 ? <div className="live-notification-list">{filtered.map((item) => <article className={`live-notification-card ${item.isRead ? "is-read" : "is-unread"}`} key={item.id}>
-          <Icon name="bell" /><div><header><strong>{item.type.replaceAll("_", " ")}</strong><span>{item.isRead ? "Okundu" : "Okunmadı"}</span></header><p>{item.message}</p><small>{item.id} · {dateTime(item.createdAt)}</small>{item.targetPage && <button className="secondary-button small" type="button" onClick={() => onOpenTarget(item.targetPage)}>İlgili kaydı aç</button>}</div>
+        {notifications.length === 0 ? <div className="state-panel"><Icon name="bell" /><h3>Henüz admin bildirimi yok</h3><p>Yeni operasyon bildirimleri burada görünecek.</p></div> : filtered.length > 0 ? <div className="live-notification-list">{filtered.map((item) => <article className={`live-notification-card ${item.isRead ? "is-read" : "is-unread"}`} key={item.id} aria-label={`${item.title}, ${item.isRead ? "okundu" : "okunmadı"}`}>
+          <Icon name="bell" /><div><header><strong>{item.title}</strong><span>{item.isRead ? "Okundu" : "Okunmadı"}</span></header><p>{item.message}</p><small>{item.category} · {item.priority} · {item.id} · {dateTime(item.createdAt)}</small><div className="live-notification-actions">{!item.isRead && <button className="secondary-button small" type="button" onClick={() => perform(item.rawId, () => onMarkOne(item.rawId))} disabled={busyId !== null}>{busyId === item.rawId ? "İşleniyor" : "Okundu işaretle"}</button>}{item.targetPage && <button className="secondary-button small" type="button" onClick={() => openTarget(item)} disabled={busyId !== null}>İlgili kaydı aç</button>}</div></div>
         </article>)}</div> : <div className="state-panel"><Icon name="bell" /><h3>Eşleşen bildirim yok</h3><p>Arama veya okunma filtresini değiştirin.</p><button className="secondary-button" onClick={() => { setQuery(""); setReadFilter("Tümü"); }}>Filtreleri temizle</button></div>}
       </section>
     </section>
@@ -1878,12 +1957,45 @@ const pageCapabilities = Object.freeze({
   support: "supportRead",
 });
 const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler", catalog: "Ürünler", catalogStructure: "Katalog yapısı", sellerApplications: "Satıcı mağazaları", reviews: "Yorumlar", questions: "Sorular", coupons: "Kuponlar", support: "Destek" });
+const notificationTargetPages = Object.freeze({
+  order: "orders",
+  payment: "orders",
+  shipment: "orders",
+  product: "catalog",
+  product_question: "questions",
+  return_request: "returns",
+  review: "reviews",
+  seller_application: "sellerApplications",
+  store: "sellerApplications",
+  support_thread: "support",
+});
+const notificationTargetUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const notificationTargetFromHash = (hash = window.location.hash) => {
+  const query = String(hash).split("?", 2)[1] || "";
+  const params = new URLSearchParams(query);
+  const entityType = String(params.get("notificationTarget") || "").trim().toLowerCase();
+  const page = notificationTargetPages[entityType];
+  if (!page || resolveIntegratedAdminPage(hash) !== page) return null;
+  if (entityType === "seller_application") {
+    const entityKey = String(params.get("notificationTargetKey") || "").trim().toLowerCase();
+    return notificationTargetUuid.test(entityKey) ? Object.freeze({ page, entityType, entityKey }) : null;
+  }
+  const entityId = Number(params.get("notificationTargetId"));
+  return Number.isSafeInteger(entityId) && entityId > 0 ? Object.freeze({ page, entityType, entityId }) : null;
+};
 const readIntegratedPageFromLocation = () => resolveIntegratedAdminPage(window.location.hash);
 const writeIntegratedPageToHistory = (page, { replace = false } = {}) => {
   const nextHash = integratedAdminPageHash(page);
   if (window.location.hash === nextHash) return;
   const method = replace ? "replaceState" : "pushState";
   window.history[method]({ novastoreAdminPage: page }, "", nextHash);
+};
+const writeNotificationTargetToHistory = (target) => {
+  const params = new URLSearchParams({ notificationTarget: target.entityType });
+  if (target.entityKey) params.set("notificationTargetKey", target.entityKey);
+  else params.set("notificationTargetId", String(target.entityId));
+  const nextHash = `${integratedAdminPageHash(target.page)}?${params.toString()}`;
+  window.history.pushState({ novastoreAdminPage: target.page, notificationTarget: target.entityType }, "", nextHash);
 };
 const noSupportedModuleError = Object.freeze({
   message: "Bu admin oturumunda Commerce Pro'nun entegre salt-okunur modülleri açık değil.",
@@ -1912,6 +2024,7 @@ const storesUnavailableError = Object.freeze({
 
 export function IntegratedApp() {
   const [page, setPage] = useState(readIntegratedPageFromLocation);
+  const [notificationTarget, setNotificationTarget] = useState(notificationTargetFromHash);
   const [mobile, setMobile] = useState(() => window.innerWidth <= 760);
   const [contextOpen, setContextOpen] = useState(() => window.innerWidth > 760);
   const [selectedStoreId, setSelectedStoreId] = useState(null);
@@ -1923,6 +2036,7 @@ export function IntegratedApp() {
   const loadSession = useCallback(({ signal }) => adapter.session({ signal }), [adapter]);
   const loadStats = useCallback(({ signal }) => adapter.dashboard({ signal }), [adapter]);
   const loadNotifications = useCallback(({ signal }) => adapter.notifications({ signal }), [adapter]);
+  const loadNotificationUnread = useCallback(({ signal }) => adapter.notificationUnreadCount({ signal }), [adapter]);
   const loadOrders = useCallback(({ signal }) => adapter.orders({ signal }), [adapter]);
   const loadReturns = useCallback(({ signal }) => adapter.returns({ signal }), [adapter]);
   const loadCatalog = useCallback(({ signal }) => adapter.catalog({ signal }), [adapter]);
@@ -1964,6 +2078,7 @@ export function IntegratedApp() {
     && typeof mutationActions.archiveCatalogProduct === "function";
   const statsResource = useResource(loadStats, { enabled: statsEnabled });
   const notificationsResource = useResource(loadNotifications, { enabled: notificationsEnabled });
+  const notificationUnreadResource = useResource(loadNotificationUnread, { enabled: notificationsEnabled });
   const ordersResource = useResource(loadOrders, { enabled: ordersEnabled });
   const returnsResource = useResource(loadReturns, { enabled: returnsEnabled });
   const catalogResource = useResource(loadCatalog, { enabled: catalogEnabled });
@@ -2003,7 +2118,10 @@ export function IntegratedApp() {
   }, []);
 
   useEffect(() => {
-    const synchronizePage = () => setPage(readIntegratedPageFromLocation());
+    const synchronizePage = () => {
+      setPage(readIntegratedPageFromLocation());
+      setNotificationTarget(notificationTargetFromHash());
+    };
     window.addEventListener("popstate", synchronizePage);
     window.addEventListener("hashchange", synchronizePage);
     return () => {
@@ -2061,12 +2179,44 @@ export function IntegratedApp() {
     if (!capability || !hasCapability(capabilities, capability)) return;
     writeIntegratedPageToHistory(next);
     setPage(next);
+    setNotificationTarget(null);
     if (mobile) setContextOpen(false);
+  };
+  const openNotificationTarget = (item) => {
+    const pageForTarget = notificationTargetPages[item?.entityType];
+    const entityId = Number(item?.entityId);
+    const entityKey = String(item?.entityKey || "").trim().toLowerCase();
+    const validIdentity = item?.entityType === "seller_application"
+      ? notificationTargetUuid.test(entityKey)
+      : Number.isSafeInteger(entityId) && entityId > 0 && !entityKey;
+    if (!pageForTarget || pageForTarget !== item?.targetPage || !validIdentity) return;
+    const capability = pageCapabilities[pageForTarget];
+    if (!capability || !hasCapability(capabilities, capability)) return;
+    const target = Object.freeze({
+      page: pageForTarget,
+      entityType: item.entityType,
+      ...(item.entityType === "seller_application" ? { entityKey } : { entityId }),
+    });
+    writeNotificationTargetToHistory(target);
+    setNotificationTarget(target);
+    setPage(pageForTarget);
+    if (mobile) setContextOpen(false);
+  };
+  const markNotificationRead = async (id) => {
+    await adapter.markNotificationRead({ id });
+    notificationsResource.reload();
+    notificationUnreadResource.reload();
+  };
+  const markAllNotificationsRead = async () => {
+    await adapter.markAllNotificationsRead();
+    notificationsResource.reload();
+    notificationUnreadResource.reload();
   };
   const reloadAll = () => {
     sessionResource.reload();
     if (statsEnabled) statsResource.reload();
     if (notificationsEnabled) notificationsResource.reload();
+    if (notificationsEnabled) notificationUnreadResource.reload();
     if (ordersEnabled) ordersResource.reload();
     if (returnsEnabled) returnsResource.reload();
     if (catalogEnabled) catalogResource.reload();
@@ -2078,6 +2228,7 @@ export function IntegratedApp() {
     if (supportEnabled) supportResource.reload();
   };
   const logout = async () => {
+    await adapter.webPush.revokeSession().catch(() => null);
     await http.logout();
     window.location.href = "admin-login.html?next=admin-commerce-pro-live.html";
   };
@@ -2097,19 +2248,19 @@ export function IntegratedApp() {
     pageContent = !ordersEnabled
       ? <StatePanel phase="forbidden" error={ordersUnavailableError} onRetry={ordersResource.reload} />
       : ordersLoaded
-        ? <Orders orderPage={ordersResource.data} error={ordersResource.error} refreshing={ordersResource.refreshing} onRefresh={ordersResource.reload} onReloadCapabilities={sessionResource.reload} mutationActions={mutationActions} />
+        ? <Orders orderPage={ordersResource.data} error={ordersResource.error} refreshing={ordersResource.refreshing} onRefresh={ordersResource.reload} onReloadCapabilities={sessionResource.reload} mutationActions={mutationActions} notificationTarget={notificationTarget} />
         : <StatePanel phase={ordersResource.phase} error={ordersResource.error} onRetry={ordersResource.reload} />;
   } else if (page === "returns") {
     pageContent = !returnsEnabled
       ? <StatePanel phase="forbidden" error={returnsUnavailableError} onRetry={returnsResource.reload} />
       : returnsLoaded
-        ? <Returns returnPage={returnsResource.data} error={returnsResource.error} refreshing={returnsResource.refreshing} onRefresh={returnsResource.reload} onReloadCapabilities={sessionResource.reload} mutationActions={mutationActions} />
+        ? <Returns returnPage={returnsResource.data} error={returnsResource.error} refreshing={returnsResource.refreshing} onRefresh={returnsResource.reload} onReloadCapabilities={sessionResource.reload} mutationActions={mutationActions} notificationTarget={notificationTarget} />
         : <StatePanel phase={returnsResource.phase} error={returnsResource.error} onRetry={returnsResource.reload} />;
   } else if (page === "notifications") {
     pageContent = !notificationsEnabled
       ? <StatePanel phase="forbidden" error={notificationsUnavailableError} onRetry={notificationsResource.reload} />
       : notificationsLoaded
-        ? <Notifications notificationPage={notificationsResource.data} error={notificationsResource.error} refreshing={notificationsResource.refreshing} onRefresh={notificationsResource.reload} onOpenTarget={navigate} />
+        ? <Notifications notificationPage={notificationsResource.data} error={notificationsResource.error} refreshing={notificationsResource.refreshing} onRefresh={notificationsResource.reload} onOpenTarget={openNotificationTarget} onMarkOne={markNotificationRead} onMarkAll={markAllNotificationsRead} webPushApi={adapter.webPush} />
         : <StatePanel phase={notificationsResource.phase} error={notificationsResource.error} onRetry={notificationsResource.reload} />;
   } else if (page === "catalog") {
     pageContent = !catalogEnabled
@@ -2184,7 +2335,7 @@ export function IntegratedApp() {
             <button className={page === "dashboard" ? "active" : ""} onClick={() => navigate("dashboard")} disabled={!hasCapability(capabilities, "dashboardRead")}><Icon name="house" /><span>Genel Bakış</span></button>
             <button className={page === "orders" ? "active" : ""} onClick={() => navigate("orders")} disabled={!hasCapability(capabilities, "ordersRead")}><Icon name="orders" /><span>Siparişler</span><b>{ordersResource.data?.items.length || 0}</b></button>
             <button className={page === "returns" ? "active" : ""} onClick={() => navigate("returns")} disabled={!hasCapability(capabilities, "returnsRead")}><Icon name="refresh" /><span>İadeler</span><b>{returnsResource.data?.items.length || 0}</b></button>
-            <button className={page === "notifications" ? "active" : ""} onClick={() => navigate("notifications")} disabled={!hasCapability(capabilities, "notificationsRead")}><Icon name="bell" /><span>Bildirimler</span><b>{notificationsResource.data?.items.filter((item) => !item.isRead).length || 0}</b></button>
+            <button className={page === "notifications" ? "active" : ""} onClick={() => navigate("notifications")} disabled={!hasCapability(capabilities, "notificationsRead")}><Icon name="bell" /><span>Bildirimler</span><b>{notificationUnreadResource.data || 0}</b></button>
             {reviewsEnabled && <button className={page === "reviews" ? "active" : ""} onClick={() => navigate("reviews")}><Icon name="check" /><span>Yorumlar</span><b>{reviewsResource.data?.items.length || 0}</b></button>}
             {questionsEnabled && <button className={page === "questions" ? "active" : ""} onClick={() => navigate("questions")}><Icon name="help" /><span>Sorular</span><b>{questionsResource.data?.filter((item) => !item.answer).length || 0}</b></button>}
             {couponsEnabled && <button className={page === "coupons" ? "active" : ""} onClick={() => navigate("coupons")}><Icon name="card" /><span>Kuponlar</span><b>{couponsResource.data?.length || 0}</b></button>}
@@ -2209,6 +2360,7 @@ export function IntegratedApp() {
             <div className="breadcrumb"><span>Entegre yönetim</span><Icon name="right" /><strong>{pageLabels[page] || "Modül"}</strong></div>
           </div>
           <div className="command-trigger live-command-status" role="status"><Icon name="shield" /><span>{sessionLoaded ? "Admin oturumu doğrulandı" : "Admin oturumu doğrulanıyor"}</span></div>
+          <button className="icon-button live-notification-bell" type="button" aria-label={`${notificationUnreadResource.data || 0} okunmamış bildirim`} onClick={() => navigate("notifications")} disabled={!notificationsEnabled}><Icon name="bell" />{notificationUnreadResource.data > 0 && <b aria-hidden="true">{notificationUnreadResource.data > 99 ? "99+" : notificationUnreadResource.data}</b>}</button>
           <button className="secondary-button live-refresh" aria-label={sessionResource.refreshing || sessionResource.phase === "loading" ? "Veri yenileniyor" : "Veriyi yenile"} onClick={reloadAll} disabled={sessionResource.refreshing || sessionResource.phase === "loading"}><Icon name="refresh" /><span>Veriyi yenile</span></button>
           <button className="profile-button" onClick={logout}><span className="avatar avatar-small">A</span><span>Çıkış</span></button>
         </header>
@@ -2222,6 +2374,16 @@ export function IntegratedApp() {
         </footer>
       )}
     >
+      {notificationTarget?.page === page && (
+        <section className="notice-card live-notification-target-context" role="status" data-testid="notification-target-context">
+          <Icon name="bell" />
+          <div>
+            <strong>Bildirim hedefi açıldı</strong>
+            <p>{notificationTarget.entityType} · {notificationTarget.entityKey || `#${notificationTarget.entityId}`}. Kayıt verisi yalnız mevcut Admin yetkileriyle yüklenir.</p>
+          </div>
+          <button className="secondary-button small" type="button" onClick={() => navigate(page)}>Hedef görünümünü kapat</button>
+        </section>
+      )}
       {pageContent}
     </AdminPresentationShell>
   );

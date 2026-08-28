@@ -1,3 +1,5 @@
+import { resolveNotificationTarget } from "../../../web-notifications/notificationClient.js";
+
 const TOKEN_KEY = "nova_user_token";
 const USER_KEY = "nova_user_info";
 const LEGACY_ADDRESS_LIST_KEY = "novastore_user_addresses";
@@ -22,22 +24,7 @@ const toPositiveInteger = (value) => {
   return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
 };
 
-const CUSTOMER_NOTIFICATION_TARGETS = Object.freeze({
-  order: (id) => `#/hesabim/siparisler/${id}`,
-  product: (id) => `#/urun-id/${id}`,
-  product_question: () => "#/hesabim",
-  return_request: () => "#/hesabim/siparisler",
-  review: () => "#/hesabim",
-  support_thread: () => "#/iletisim",
-});
-
-export const resolveCustomerNotificationTarget = (value) => {
-  if (!value || typeof value !== "object") return null;
-  const entityType = asTrimmedString(value.entity_type ?? value.entityType).toLowerCase();
-  const entityId = toPositiveInteger(value.entity_id ?? value.entityId);
-  const resolver = CUSTOMER_NOTIFICATION_TARGETS[entityType];
-  return resolver && entityId ? resolver(entityId) : null;
-};
+export const resolveCustomerNotificationTarget = (value) => resolveNotificationTarget(value, "customer");
 
 export const normalizeCustomerUser = (value) => {
   if (!value || typeof value !== "object") return null;
@@ -187,8 +174,12 @@ export const normalizeCustomerNotification = (value) => {
   return Object.freeze({
     id,
     type: asTrimmedString(value.type) || "notification",
+    title: asTrimmedString(value.title) || "NovaStore bildirimi",
     message,
+    category: asTrimmedString(value.category) || "ACCOUNT",
+    priority: asTrimmedString(value.priority) || "NORMAL",
     isRead: value.is_read === true || value.isRead === true,
+    readAt: value.read_at || value.readAt || null,
     createdAt: value.created_at || value.createdAt || null,
     target: resolveCustomerNotificationTarget(value),
   });
@@ -357,6 +348,10 @@ export function createCustomerAccountAdapter({
   const logout = async (options = {}) => {
     let serverRevocationVerified = false;
     try {
+      await http.request("/api/notifications/web-push/subscriptions/session", {
+        method: "DELETE",
+        signal: options.signal,
+      }).catch(() => null);
       await http.request("/api/users/logout", { method: "POST", signal: options.signal });
       serverRevocationVerified = true;
     } catch (_error) {
@@ -480,9 +475,16 @@ export function createCustomerAccountAdapter({
   };
 
   const listNotifications = async (session, options = {}) => {
-    const userId = requireUserId(session);
-    const payload = await http.request(`/api/notifications/user/${userId}`, { signal: options.signal });
-    return Object.freeze((Array.isArray(payload) ? payload : []).map(normalizeCustomerNotification).filter(Boolean));
+    requireUserId(session);
+    const payload = await http.request("/api/notifications?limit=50", { signal: options.signal });
+    return Object.freeze((Array.isArray(payload?.items) ? payload.items : []).map(normalizeCustomerNotification).filter(Boolean));
+  };
+
+  const getNotificationUnreadCount = async (options = {}) => {
+    const payload = await http.request("/api/notifications/unread-count", { signal: options.signal });
+    const count = Number(payload?.unreadCount);
+    if (!Number.isSafeInteger(count) || count < 0) throw new Error("Okunmamış bildirim sayısı doğrulanamadı.");
+    return count;
   };
 
   const markNotificationRead = async (id, options = {}) => {
@@ -494,13 +496,30 @@ export function createCustomerAccountAdapter({
     });
   };
 
-  const markAllNotificationsRead = async (session, options = {}) => {
-    const userId = requireUserId(session);
-    return http.request(`/api/notifications/read-all/${userId}`, {
+  const markAllNotificationsRead = async (_session, options = {}) => http.request(
+    "/api/notifications/read-all",
+    {
       method: "PATCH",
       signal: options.signal,
-    });
-  };
+    },
+  );
+
+  const webPush = Object.freeze({
+    getConfig: (options = {}) => http.request("/api/notifications/web-push/config", { signal: options.signal }),
+    getSubscriptionState: (options = {}) => http.request("/api/notifications/web-push/subscriptions", { signal: options.signal }),
+    registerSubscription: (subscription, options = {}) => http.request(
+      "/api/notifications/web-push/subscriptions",
+      { method: "POST", body: { subscription }, signal: options.signal },
+    ),
+    revokeSubscription: ({ endpoint }, options = {}) => http.request(
+      "/api/notifications/web-push/subscriptions",
+      { method: "DELETE", body: { endpoint }, signal: options.signal },
+    ),
+    revokeSession: (options = {}) => http.request(
+      "/api/notifications/web-push/subscriptions/session",
+      { method: "DELETE", signal: options.signal },
+    ),
+  });
 
   const listSupportMessages = async (session, options = {}) => {
     const userId = requireUserId(session);
@@ -554,8 +573,10 @@ export function createCustomerAccountAdapter({
     createReturnRequest,
     listCoupons,
     listNotifications,
+    getNotificationUnreadCount,
     markNotificationRead,
     markAllNotificationsRead,
+    webPush,
     listSupportMessages,
     sendSupportMessage,
     loadDashboard,

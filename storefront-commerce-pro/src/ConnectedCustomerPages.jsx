@@ -29,6 +29,10 @@ import {
   WarningCircle,
 } from "./CustomerIcon.jsx";
 import { NovaServiceIcon } from "./NovaServiceIcon.jsx";
+import {
+  createWebPushController,
+  WEB_PUSH_STATE,
+} from "../../web-notifications/notificationClient.js";
 
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -504,11 +508,41 @@ function CouponsSection({ account, onNotice }) {
 }
 
 const notificationIcon = (type) => {
-  if (type === "order_update") return Truck;
-  if (type === "new_review" || type === "question_answered") return ChatCircleText;
+  if (/ORDER|SHIPMENT|TRACKING/u.test(type)) return Truck;
+  if (/REVIEW|QUESTION|SUPPORT/u.test(type)) return ChatCircleText;
   if (type === "welcome") return CheckCircle;
   return Bell;
 };
+
+const customerPushCopy = Object.freeze({
+  [WEB_PUSH_STATE.NOT_SUPPORTED]: ["Desteklenmiyor", "Bu tarayıcı Web Push bildirimlerini desteklemiyor."],
+  [WEB_PUSH_STATE.NOT_REQUESTED]: ["İzin bekleniyor", "İzin yalnız “Bildirimleri Aç” düğmesine bastığında istenir."],
+  [WEB_PUSH_STATE.ENABLED]: ["Açık", "Sipariş ve hesap güncellemeleri bu tarayıcıya güvenle gönderilebilir."],
+  [WEB_PUSH_STATE.DENIED]: ["Engellendi", "Bildirim izni tarayıcı ayarlarında engellenmiş."],
+  [WEB_PUSH_STATE.ERROR]: ["Hazır değil", "Web Push durumu doğrulanamadı veya sunucu yapılandırması bekleniyor."],
+  [WEB_PUSH_STATE.UNSUBSCRIBED]: ["Kapalı", "Bu tarayıcıda Web Push kapalı."],
+});
+
+function CustomerWebPushSettings({ api }) {
+  const controller = useMemo(() => createWebPushController({ api }), [api]);
+  const [status, setStatus] = useState({ state: WEB_PUSH_STATE.NOT_REQUESTED });
+  const [busy, setBusy] = useState(true);
+  const refresh = useCallback(async () => {
+    setBusy(true);
+    setStatus(await controller.getState());
+    setBusy(false);
+  }, [controller]);
+  useEffect(() => { refresh(); }, [refresh]);
+  const mutate = async (action) => {
+    setBusy(true);
+    setStatus(await action());
+    setBusy(false);
+  };
+  const copy = customerPushCopy[status.state] || customerPushCopy[WEB_PUSH_STATE.ERROR];
+  const enabled = status.state === WEB_PUSH_STATE.ENABLED;
+  const unavailable = [WEB_PUSH_STATE.NOT_SUPPORTED, WEB_PUSH_STATE.DENIED].includes(status.state);
+  return <section className="customer-push-settings" aria-labelledby="customer-web-push-title"><Bell /><div><span>Tarayıcı bildirimleri</span><h2 id="customer-web-push-title">Web Push</h2><p>{busy ? "Bildirim durumu doğrulanıyor…" : copy[1]}</p>{status.activeDeviceCount > 0 && <small>{status.activeDeviceCount} etkin cihaz</small>}</div><div><b className={enabled ? "is-enabled" : ""} role="status">{busy ? "Kontrol ediliyor" : copy[0]}</b>{enabled ? <button type="button" onClick={() => mutate(controller.disable)} disabled={busy}>Bu cihazda kapat</button> : <button type="button" onClick={() => mutate(controller.enable)} disabled={busy || unavailable}>Bildirimleri Aç</button>}{status.state === WEB_PUSH_STATE.ERROR && <button className="is-quiet" type="button" onClick={refresh} disabled={busy}>Tekrar dene</button>}</div></section>;
+}
 
 function NotificationsSection({ session, account, onNotice }) {
   const resource = useAsyncResource((options) => account.listNotifications(session, options), [account, session]);
@@ -522,6 +556,7 @@ function NotificationsSection({ session, account, onNotice }) {
       if (!item.isRead) {
         await account.markNotificationRead(item.id);
         resource.reload();
+        window.dispatchEvent(new CustomEvent("novastore:notification-state-changed"));
       }
       if (item.target) window.location.hash = item.target.slice(1);
     }
@@ -530,11 +565,11 @@ function NotificationsSection({ session, account, onNotice }) {
   };
   const markAll = async () => {
     setBusy(true); setError("");
-    try { await account.markAllNotificationsRead(session); resource.reload(); onNotice("Tüm bildirimler okundu olarak işaretlendi."); }
+    try { await account.markAllNotificationsRead(session); resource.reload(); window.dispatchEvent(new CustomEvent("novastore:notification-state-changed")); onNotice("Tüm bildirimler okundu olarak işaretlendi."); }
     catch (requestError) { setError(errorMessage(requestError, "Bildirimler güncellenemedi.")); }
     finally { setBusy(false); }
   };
-  return <><div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Bildirimlerim</h1><p>Sipariş ve hesap güncellemelerin.</p></div>{notifications.some((item) => !item.isRead) && <button className="secondary-action" type="button" onClick={markAll} disabled={busy}>Tümünü okundu yap</button>}</div>{error && <div className="form-message is-error"><WarningCircle />{error}</div>}{notifications.length ? <div className="notification-list connected-notifications">{notifications.map((item) => { const Icon = notificationIcon(item.type); return <button key={item.id} type="button" className={item.isRead ? "is-read" : "is-unread"} onClick={() => markOne(item)} disabled={busy}><Icon /><span><strong>{item.message}</strong><small>{formatDate(item.createdAt)}</small></span>{!item.isRead && <i aria-label="Okunmadı" />}</button>; })}</div> : <div className="connected-empty"><Bell /><h2>Henüz bildirimin yok</h2><p>Sipariş ve hesap güncellemeleri burada gösterilecek.</p></div>}</>;
+  return <><div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Bildirimlerim</h1><p>Sipariş ve hesap güncellemelerini tüm cihazlarında aynı okunma durumuyla izle.</p></div>{notifications.some((item) => !item.isRead) && <button className="secondary-action" type="button" onClick={markAll} disabled={busy}>Tümünü okundu yap</button>}</div>{error && <div className="form-message is-error" role="alert"><WarningCircle />{error}</div>}<CustomerWebPushSettings api={account.webPush} />{notifications.length ? <div className="notification-list connected-notifications">{notifications.map((item) => { const Icon = notificationIcon(item.type); return <button key={item.id} type="button" className={item.isRead ? "is-read" : "is-unread"} onClick={() => markOne(item)} disabled={busy} aria-label={`${item.title}, ${item.isRead ? "okundu" : "okunmadı"}`}><Icon /><span><strong>{item.title}</strong><small>{item.message}</small><small>{item.category} · {formatDate(item.createdAt)}</small></span>{!item.isRead && <i aria-label="Okunmadı" />}</button>; })}</div> : <div className="connected-empty"><Bell /><h2>Henüz bildirimin yok</h2><p>Sipariş ve hesap güncellemeleri burada gösterilecek.</p></div>}</>;
 }
 
 function SecuritySection({ account, onNotice, reviewOnly = false }) {
