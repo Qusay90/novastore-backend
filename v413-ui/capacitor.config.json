@@ -16,7 +16,7 @@
     "loggingBehavior": "none",
     "useLegacyBridge": false,
     "resolveServiceWorkerRequests": false,
-    "includePlugins": ["@capacitor/app"]
+    "includePlugins": ["@capacitor/app", "@capacitor/push-notifications"]
   },
   "server": {
     "hostname": "localhost",
@@ -29,6 +29,9 @@
       "insetsHandling": "disable",
       "style": "DARK",
       "hidden": false
+    },
+    "PushNotifications": {
+      "presentationOptions": []
     }
   }
 }

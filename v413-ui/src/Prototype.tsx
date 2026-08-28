@@ -62,6 +62,14 @@ import {
 } from "./adapters";
 import { hasAppOwnedBackEntry, nativeHistoryDepth } from "./native/nativeNavigation";
 import { canonicalNativeRoute, canonicalNativeRouteOrSafeDefault } from "./native/routeContract";
+import {
+  normalizeCustomerNotificationTarget,
+  resolveCustomerNotificationDestination,
+  useCustomerNotificationRuntime,
+  type CustomerNotification,
+  type CustomerNotificationCategory,
+  type CustomerNotificationTarget,
+} from "./notifications";
 import "./prototype.css";
 
 declare const __NOVASTORE_NATIVE__: boolean;
@@ -196,6 +204,7 @@ type CommerceState = {
   cartLines: CartLine[];
   appliedCoupon: string;
   selectedProductId: string;
+  selectedOrderId: number | null;
   publicProducts: Record<string, Product>;
   addresses: SavedAddress[];
   paymentMethods: SavedPaymentMethod[];
@@ -213,6 +222,7 @@ type CommerceState = {
   clearCart: () => void;
   applyCartCoupon: (code: string) => void;
   selectProduct: (id: string) => void;
+  selectOrder: (id: number | null) => void;
   registerPublicProducts: (products: readonly Product[]) => void;
   addAddress: (address: Omit<SavedAddress, "id" | "isDefault">) => void;
   updateAddress: (id: string, address: Omit<SavedAddress, "id" | "isDefault">) => void;
@@ -340,6 +350,7 @@ export default function Prototype() {
   ]);
   const [appliedCoupon, setAppliedCoupon] = useState("NOVAYAZ");
   const [selectedProductId, setSelectedProductId] = useState("pulse-anc");
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [publicProducts, setPublicProducts] = useState<Record<string, Product>>({});
   const [addresses, setAddresses] = useState<SavedAddress[]>([
     { id: "home", label: "Ev", recipient: "Kullanıcı Adı", line: "Atakum Mah. Cumhuriyet Cad. No: 58 D: 12", city: "Samsun / Atakum", postalCode: "55200", isDefault: true },
@@ -366,6 +377,7 @@ export default function Prototype() {
   const [navigationRevision, setNavigationRevision] = useState(0);
   const [contentRevision, setContentRevision] = useState(0);
   const [refreshRequest, setRefreshRequest] = useState<RefreshRequest>({ id: 0, source: "reselect" });
+  const notificationRuntime = useCustomerNotificationRuntime();
   const capture = !NATIVE_SHELL && params.get("capture") === "1";
   const nativeShell = NATIVE_SHELL;
   const layout = NATIVE_SHELL ? "phone" : params.get("layout") === "tablet" ? "tablet" : "phone";
@@ -442,6 +454,20 @@ export default function Prototype() {
       window.history.pushState({ ...nextRoute, novastoreDepth: currentDepth + 1 }, "", url);
     }
   };
+
+  useEffect(() => {
+    const onNotificationOpen = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
+        go("CAL-10", "account", "notifications");
+        return;
+      }
+      const target = normalizeCustomerNotificationTarget((detail as Record<string, unknown>).target);
+      openCustomerNotificationTarget(go, setSelectedProductId, setSelectedOrderId, target);
+    };
+    window.addEventListener("novastore:notification-open", onNotificationOpen);
+    return () => window.removeEventListener("novastore:notification-open", onNotificationOpen);
+  });
   const showNav = !["CAL-01", "CAL-06"].includes(route.cal);
   const hasFixedAppHeader = route.cal !== "CAL-06";
   const routeIdentity = `${route.cal}:${route.tab}:${route.view || "root"}:${route.storeSlug || "local"}:${route.productId || "none"}:${route.mode || "customer"}`;
@@ -454,6 +480,7 @@ export default function Prototype() {
     cartLines,
     appliedCoupon,
     selectedProductId,
+    selectedOrderId,
     publicProducts,
     addresses,
     paymentMethods,
@@ -479,6 +506,7 @@ export default function Prototype() {
     clearCart: () => setCartLines([]),
     applyCartCoupon: (code) => setAppliedCoupon(code.trim().toLocaleUpperCase("tr-TR")),
     selectProduct: setSelectedProductId,
+    selectOrder: setSelectedOrderId,
     registerPublicProducts,
     addAddress: (address) => setAddresses((current) => [...current, { ...address, id: `address-${Date.now()}`, isDefault: current.length === 0 }]),
     updateAddress: (id, address) => setAddresses((current) => current.map((item) => item.id === id ? { ...item, ...address } : item)),
@@ -506,7 +534,7 @@ export default function Prototype() {
     selectCatalog: (category, subcategory = category) => setCatalogSelection({ category, subcategory }),
     applyCatalogFilters: (filters) => setCatalogFilters({ ...filters, applied: true }),
     setCatalogSort,
-  }), [favoriteIds, cartCount, cartLines, appliedCoupon, selectedProductId, publicProducts, addresses, paymentMethods, productReviews, productQuestions, readNotificationIds, notificationPreferences, catalogSelection, catalogFilters, catalogSort, registerPublicProducts]);
+  }), [favoriteIds, cartCount, cartLines, appliedCoupon, selectedProductId, selectedOrderId, publicProducts, addresses, paymentMethods, productReviews, productQuestions, readNotificationIds, notificationPreferences, catalogSelection, catalogFilters, catalogSort, registerPublicProducts]);
 
   return (
     <CommerceContext.Provider value={commerce}>
@@ -527,7 +555,7 @@ export default function Prototype() {
       >
         {hasFixedAppHeader && (
           <div className="fixed-app-header" data-testid="fixed-app-header">
-            <RouteTopbar key={`${route.cal}:${route.tab}:${route.view}`} route={route} go={go} query={searchQuery} setQuery={setSearchQuery} setSearchPanelOpen={setSearchPanelOpen} />
+            <RouteTopbar key={`${route.cal}:${route.tab}:${route.view}:${notificationRuntime?.unreadCount || 0}`} route={route} go={go} query={searchQuery} setQuery={setSearchQuery} setSearchPanelOpen={setSearchPanelOpen} />
           </div>
         )}
         <RefreshableRouteStage
@@ -771,6 +799,13 @@ function RefreshableRouteStage({ resetKey, refreshRequest, onRefresh, children }
 
 type Go = (next: CalId, tab?: TabId, view?: ViewId, context?: RouteContext) => void;
 
+function openCustomerNotificationTarget(go: Go, selectProduct: (id: string) => void, selectOrder: (id: number | null) => void, target: CustomerNotificationTarget | null) {
+  const destination = resolveCustomerNotificationDestination(target);
+  if (destination.productId) selectProduct(destination.productId);
+  selectOrder(target?.entityType === "order" ? target.entityId! : null);
+  go(destination.cal, destination.tab, destination.view, destination.productId ? { productId: destination.productId } : {});
+}
+
 function RouteTopbar({ route, go, query, setQuery, setSearchPanelOpen }: { route: Route; go: Go; query: string; setQuery: (value: string) => void; setSearchPanelOpen: (open: boolean) => void }) {
   const commerceActions = {
     onLocation: () => go("CAL-10", "account", "addresses"),
@@ -845,11 +880,14 @@ function CalibrationSwitcher({ current, go }: { current: CalId; go: Go }) {
 
 function TopActions({ title, back, settings, overflow, compact = false, plainStart = false, plainEnd = false, onSearch, onLocation, onNotifications, onSettings, onOverflow }: { title?: string; back?: () => void; settings?: boolean; overflow?: boolean; compact?: boolean; plainStart?: boolean; plainEnd?: boolean; onSearch?: () => void; onLocation?: () => void; onNotifications?: () => void; onSettings?: () => void; onOverflow?: () => void }) {
   const [activeAction, setActiveAction] = useState("");
+  const notificationRuntime = useCustomerNotificationRuntime();
+  const unreadCount = notificationRuntime?.sessionAvailable ? notificationRuntime.unreadCount : 0;
+  const notificationLabel = unreadCount > 0 ? `Bildirimler, ${unreadCount} okunmamış` : "Bildirimler";
   return (
     <header className={`glass-topbar${compact ? " compact" : ""}`} data-testid="app-topbar">
       {back ? <IconButton label="Geri" onClick={back}><img className="repo-icon" src={`${A}/official/nav/ic_customer_caret_left.svg`} alt="" /></IconButton> : plainStart ? <span aria-hidden="true" /> : <IconButton label="Konum seç" pressed={activeAction === "Konum"} onClick={onLocation || (() => setActiveAction("Konum"))}><MapPinIcon data-icon="location-pin" weight="regular" /></IconButton>}
       {title ? <h1>{title}</h1> : <IconButton label="Ara" pressed={activeAction === "Ara"} onClick={onSearch || (() => setActiveAction("Ara"))}><MagnifyingGlassIcon /></IconButton>}
-      {plainEnd ? <span aria-hidden="true" /> : settings ? <IconButton label="Ayarlar" pressed={activeAction === "Ayarlar"} onClick={onSettings || (() => setActiveAction("Ayarlar"))}><GearIcon /></IconButton> : overflow ? <IconButton label="Diğer işlemler" pressed={activeAction === "Diğer"} onClick={onOverflow || (() => setActiveAction("Diğer"))}><DotsVerticalIcon /></IconButton> : <IconButton label="Bildirimler" pressed={activeAction === "Bildirimler"} onClick={onNotifications || (() => setActiveAction("Bildirimler"))}><BellIcon /></IconButton>}
+      {plainEnd ? <span aria-hidden="true" /> : settings ? <IconButton label="Ayarlar" pressed={activeAction === "Ayarlar"} onClick={onSettings || (() => setActiveAction("Ayarlar"))}><GearIcon /></IconButton> : overflow ? <IconButton label="Diğer işlemler" pressed={activeAction === "Diğer"} onClick={onOverflow || (() => setActiveAction("Diğer"))}><DotsVerticalIcon /></IconButton> : <IconButton label={notificationLabel} pressed={activeAction === "Bildirimler"} onClick={onNotifications || (() => setActiveAction("Bildirimler"))}><BellIcon />{unreadCount > 0 && <span className="notification-badge" aria-hidden="true">{unreadCount > 99 ? "99+" : unreadCount}</span>}</IconButton>}
       {activeAction && <span className="top-action-status" role="status">{activeAction} açıldı</span>}
     </header>
   );
@@ -1027,16 +1065,34 @@ function BrandLockup() {
 }
 
 function LoginScreen({ go, view }: { go: Go; view: ViewId }) {
+  const notificationRuntime = useCustomerNotificationRuntime();
   const [remember, setRemember] = useState(true);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(true);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState("");
   const authView = view === "forgot" || view === "register" ? view : "login";
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (authView === "register" && !termsAccepted) return;
     setSubmitted(true);
-    if (authView === "login") window.setTimeout(() => go("CAL-10", "account"), 180);
+    setAuthError("");
+    if (authView !== "login") return;
+    if (!notificationRuntime) {
+      window.setTimeout(() => go("CAL-10", "account"), 180);
+      return;
+    }
+    const fields = new FormData(event.currentTarget);
+    setAuthBusy(true);
+    try {
+      await notificationRuntime.login(String(fields.get("identifier") || ""), String(fields.get("password") || ""));
+      go("CAL-10", "account");
+    } catch {
+      setAuthError("Giriş yapılamadı. Bilgilerini ve bağlantını kontrol edip tekrar dene.");
+    } finally {
+      setAuthBusy(false);
+    }
   };
   return (
     <form className="login-layout" data-auth-view={authView} onSubmit={submit}>
@@ -1051,7 +1107,8 @@ function LoginScreen({ go, view }: { go: Go; view: ViewId }) {
         </div>}
         {authView === "register" && <button type="button" className={`check-control${termsAccepted ? " checked" : ""}`} aria-pressed={termsAccepted} onClick={() => setTermsAccepted(!termsAccepted)}><span>{termsAccepted && <CheckIcon />}</span>Kullanım koşullarını kabul ediyorum</button>}
       </section>
-      <button className="primary orange" type="submit" disabled={authView === "register" && !termsAccepted}>{authView === "forgot" ? "Sıfırlama Bağlantısı Gönder" : authView === "register" ? "Hesap Oluştur" : "Giriş Yap"}</button>
+      <button className="primary orange" type="submit" disabled={authBusy || (authView === "register" && !termsAccepted)}>{authBusy ? "Giriş yapılıyor…" : authView === "forgot" ? "Sıfırlama Bağlantısı Gönder" : authView === "register" ? "Hesap Oluştur" : "Giriş Yap"}</button>
+      {authError && <p role="alert" className="auth-status auth-error">{authError}</p>}
       {submitted && authView !== "login" && <p role="status" className="auth-status">İşlemin alındı. Sonraki adımlar güvenli kanaldan iletilecek.</p>}
       <p className="center-copy">{authView === "register" ? <>Zaten hesabın var mı? <button type="button" onClick={() => go("CAL-01", "account", "login")}>Giriş Yap</button></> : <>Hesabın yok mu? <button type="button" onClick={() => go("CAL-01", "account", "register")}>Kayıt Ol</button></>}</p>
       <footer className="legal-links">Gizlilik Politikası <b>•</b> Kullanım Koşulları</footer>
@@ -2064,12 +2121,13 @@ function CheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
 }
 
 function OrderDetailScreen({ go, view }: { go: Go; view: ViewId }) {
-  const { selectProduct } = useCommerce();
+  const { selectProduct, selectedOrderId } = useCommerce();
   if (view === "invoice") return <div className="root-layout order-utility-layout"><section className="invoice-preview"><header><BrandLockup /><span>E-Arşiv Fatura</span></header><h1>NovaStore Satış Faturası</h1><p><b>Fatura No</b> NS-2026-001234</p><p><b>Düzenleme</b> 18 Temmuz 2026</p><article><span>NovaSound N1 Kulaklık · 1 adet</span><b>₺1.299,00</b></article><article><span>İndirim</span><b>−₺150,00</b></article><footer><strong>Genel Toplam</strong><strong>₺1.149,00</strong></footer><button className="primary navy" type="button" onClick={() => {
     if (NATIVE_SHELL) window.dispatchEvent(new Event("novastore:print-invoice"));
     else window.print();
   }}>Faturayı Yazdır</button></section></div>;
   if (view === "tracking") return <div className="root-layout order-utility-layout"><section className="tracking-preview"><CubeIcon /><h1>Kargon yolda</h1><p>Takip kodu: <b>NOVA482190</b></p><div><span className="done"><CheckIcon /> Samsun aktarma merkezinden çıktı</span><small>Bugün · 14:20</small><span className="done"><CheckIcon /> Taşıyıcıya teslim edildi</span><small>Bugün · 09:10</small><span><ClockIcon /> Dağıtım şubesine ulaşıyor</span><small>Tahmini yarın</small></div><button className="primary navy" type="button" onClick={() => go("CAL-11", "support", "live")}>Kargo Desteği</button></section></div>;
+  if (selectedOrderId) return <div className="root-layout order-layout notification-order-target" data-testid="notification-order-target" data-order-id={selectedOrderId}><article className="order-card"><header><div><h1>Sipariş #{selectedOrderId}</h1><p>PC1 müşteri hesabın üzerinden doğrulandı</p></div><span><SealCheckIcon weight="fill" /> Yetkili hedef</span></header><section className="notification-authorized-target"><CubeIcon /><h2>Sipariş bildirimi güvenle açıldı</h2><p>Bu hedef yalnız oturumundaki sipariş listesinde bulunduğu için açıldı. Güncel işlem ayrıntılarını hesabındaki sipariş akışından takip edebilirsin.</p><div><button className="secondary" type="button" onClick={() => go("CAL-10", "account", "notifications")}>Bildirimlere Dön</button><button className="primary navy" type="button" onClick={() => go("CAL-11", "support")}>Yardım Al</button></div></section></article></div>;
   const stages = [["Sipariş Alındı", true], ["Hazırlanıyor", true], ["Kargoda", true], ["Teslim Edildi", false]] as const;
   return (
     <div className="root-layout order-layout">
@@ -2083,6 +2141,10 @@ function InfoRow({ icon, title, copy, action, onAction }: { icon: ReactNode; tit
 }
 
 function AccountScreen({ go, view }: { go: Go; view: ViewId }) {
+  const notificationRuntime = useCustomerNotificationRuntime();
+  const { selectOrder } = useCommerce();
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
   if (view === "returns") return <ReturnsScreen go={go} />;
   if (view === "faq" || view === "history") return <AccountUtilityScreen go={go} view={view} />;
   if (view === "addresses") return <AddressBookScreen go={go} />;
@@ -2098,11 +2160,19 @@ function AccountScreen({ go, view }: { go: Go; view: ViewId }) {
   return (
     <div className="root-layout account-layout">
       <article className="profile-card"><div className="avatar"><PersonIcon /></div><div><h1>Kullanıcı Adı</h1><p>Profil bilgilerini görüntüle</p></div><CaretRightIcon /><button onClick={() => go("CAL-10", "account", "profile")}>Profili Düzenle</button></article>
-      <button className="orders-link" onClick={() => go("CAL-09")}><CubeIcon /><span><b>Siparişlerim</b><small>Tüm siparişlerini görüntüle</small></span><CaretRightIcon /></button>
+      <button className="orders-link" onClick={() => { selectOrder(null); go("CAL-09"); }}><CubeIcon /><span><b>Siparişlerim</b><small>Tüm siparişlerini görüntüle</small></span><CaretRightIcon /></button>
       <SectionTitle title="Hesap ve Alışveriş" />
       <div className="account-tiles">{tiles.map(([name, icon, target]) => <button key={name} onClick={() => go("CAL-10", "account", target)}>{icon}<span>{name}</span></button>)}</div>
       <div className="account-list"><button onClick={() => go("CAL-10", "account", "notifications")}><BellIcon /> Bildirimler ve Tercihler <CaretRightIcon /></button><button onClick={() => go("CAL-10", "account", "security")}><LockClosedIcon /> Gizlilik ve Güvenlik <CaretRightIcon /></button><button onClick={() => go("CAL-11", "support")}><QuestionMarkCircledIcon /> Yardım ve Destek <CaretRightIcon /></button><button onClick={() => go("CAL-10", "account", "faq")}><ChatBubbleIcon /> Sıkça Sorulan Sorular <CaretRightIcon /></button></div>
-      <button className="logout" onClick={() => go("CAL-01", "account", "login")}><ArrowRightIcon /> Çıkış Yap</button>
+      <button className="logout" disabled={logoutBusy} onClick={() => {
+        if (!notificationRuntime) { go("CAL-01", "account", "login"); return; }
+        setLogoutError("");
+        setLogoutBusy(true);
+        void notificationRuntime.logout()
+          .then(() => go("CAL-01", "account", "login"))
+          .catch(() => { setLogoutBusy(false); setLogoutError("Bildirim bağlantısı güvenle kaldırılamadığı için çıkış tamamlanmadı. Bağlantını kontrol edip tekrar dene."); });
+      }}><ArrowRightIcon /> {logoutBusy ? "Çıkış yapılıyor…" : "Çıkış Yap"}</button>
+      {logoutError && <p className="account-logout-error" role="alert">{logoutError}</p>}
     </div>
   );
 }
@@ -2261,13 +2331,53 @@ const notificationItems = [
 ];
 
 function NotificationCenterScreen({ go }: { go: Go }) {
-  const { readNotificationIds, notificationPreferences, markNotificationRead, markAllNotificationsRead, toggleNotificationPreference, selectProduct } = useCommerce();
+  const notificationRuntime = useCustomerNotificationRuntime();
+  const { readNotificationIds, notificationPreferences, markNotificationRead, markAllNotificationsRead, toggleNotificationPreference, selectProduct, selectOrder } = useCommerce();
+  const [actionError, setActionError] = useState("");
   const openNotification = (id: string) => {
     markNotificationRead(id);
     if (id === "order") go("CAL-09", "account");
     else if (id === "campaign") { selectProduct("pulse-studio"); go("CAL-06", "home"); }
     else if (id === "question") go("CAL-10", "account", "questions");
   };
+  if (notificationRuntime) {
+    const openRealNotification = async (item: CustomerNotification) => {
+      setActionError("");
+      if (!item.isRead) {
+        try { await notificationRuntime.markRead(item.id); }
+        catch { setActionError("Bildirim okundu olarak eşitlenemedi; hedef güvenli biçimde açıldı."); }
+      }
+      let authorizedTarget: CustomerNotificationTarget | null = null;
+      try { authorizedTarget = await notificationRuntime.authorizeTarget(item.target); }
+      catch { setActionError("Hedef şu anda doğrulanamadı. Yetkisiz yönlendirme yapılmadı."); return; }
+      if (!authorizedTarget) { setActionError("Bu bildirim hedefi artık kullanılamıyor veya hesabına ait değil."); return; }
+      openCustomerNotificationTarget(go, selectProduct, selectOrder, authorizedTarget);
+    };
+    const iconFor = (category: CustomerNotificationCategory) => {
+      if (category === "ORDER" || category === "SHIPPING" || category === "RETURN") return <CubeIcon />;
+      if (category === "PAYMENT") return <CreditCardIcon data-icon="payment-card" />;
+      if (category === "SUPPORT" || category === "QUESTION_REVIEW") return <ChatBubbleIcon />;
+      return <BellIcon />;
+    };
+    const formatCreatedAt = (value: string) => new Intl.DateTimeFormat("tr-TR", {
+      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+    }).format(new Date(value));
+    const enableAction = notificationRuntime.pushState === "not-requested" || notificationRuntime.pushState === "denied";
+    const settingsAction = notificationRuntime.pushState === "settings-required";
+    const disableAction = notificationRuntime.pushState === "enabled";
+    return (
+      <div className="root-layout notification-center-layout" data-testid="notification-center-screen" data-feed-state={notificationRuntime.phase}>
+        <header className="notification-heading"><div><h1>Son bildirimler</h1><p>{notificationRuntime.unreadCount} okunmamış bildirim</p></div>{notificationRuntime.sessionAvailable && notificationRuntime.unreadCount > 0 && <button type="button" onClick={() => { setActionError(""); void notificationRuntime.markAllRead().catch(() => setActionError("Bildirimler topluca eşitlenemedi. Tekrar deneyebilirsin.")); }}>Tümünü okundu işaretle</button>}</header>
+        {notificationRuntime.phase === "guest" && <section className="notification-state" data-testid="notification-login-required"><BellIcon /><h2>Bildirimlerin için giriş yap</h2><p>Sipariş, ödeme, kargo, iade ve destek güncellemelerin hesabına bağlıdır.</p><button className="primary navy" type="button" onClick={() => go("CAL-01", "account", "login")}>Giriş Yap</button></section>}
+        {(notificationRuntime.phase === "idle" || notificationRuntime.phase === "loading") && <section className="notification-state" aria-busy="true" data-testid="notification-loading"><ReloadIcon /><h2>Bildirimler yükleniyor</h2><p>Güncel durum güvenli biçimde alınıyor.</p></section>}
+        {notificationRuntime.phase === "empty" && <section className="notification-state" data-testid="notification-empty"><BellIcon /><h2>Henüz bildirimin yok</h2><p>Yeni bir sipariş veya hesap güncellemesi olduğunda burada göreceksin.</p></section>}
+        {(notificationRuntime.phase === "offline" || notificationRuntime.phase === "error") && <section className="notification-state" role="alert" data-testid={`notification-${notificationRuntime.phase}`}><ReloadIcon /><h2>{notificationRuntime.phase === "offline" ? "Bağlantı bekleniyor" : "Bildirimler yüklenemedi"}</h2><p>{notificationRuntime.errorMessage}</p><button className="secondary" type="button" onClick={() => void notificationRuntime.refresh()}>Tekrar Dene</button></section>}
+        {notificationRuntime.phase === "ready" && <section className="notification-list" aria-label="Bildirim listesi">{notificationRuntime.items.map((item) => <button type="button" className={item.isRead ? "" : "unread"} aria-label={`${item.title}${item.isRead ? " okundu" : " okunmadı"}`} onClick={() => void openRealNotification(item)} key={item.id}><span>{iconFor(item.category)}</span><div><h2>{item.title}</h2><p>{item.body}</p><small>{formatCreatedAt(item.createdAt)}{!item.isRead && <b className="notification-unread-copy"> · Okunmadı</b>}</small></div>{!item.isRead && <i aria-hidden="true" />}</button>)}</section>}
+        {notificationRuntime.sessionAvailable && <section className="notification-preferences notification-system-settings"><h2>Sistem bildirimleri</h2><p>{notificationRuntime.pushStatusText}</p>{enableAction && <button type="button" onClick={() => void notificationRuntime.enablePush()}><span>Bildirimleri Aç</span><BellIcon /></button>}{settingsAction && <button type="button" onClick={() => void notificationRuntime.openPushSettings()}><span>Sistem Ayarlarına Git</span><CaretRightIcon /></button>}{disableAction && <button type="button" onClick={() => void notificationRuntime.disablePush()}><span>Bu Cihazda Kapat</span><Cross1Icon /></button>}</section>}
+        {actionError && <p className="notification-action-error" role="alert">{actionError}</p>}
+      </div>
+    );
+  }
   return (
     <div className="root-layout notification-center-layout" data-testid="notification-center-screen">
       <header className="notification-heading"><div><h1>Son bildirimler</h1><p>{notificationItems.filter((item) => !readNotificationIds.has(item.id)).length} okunmamış bildirim</p></div><button type="button" onClick={markAllNotificationsRead}>Tümünü okundu işaretle</button></header>

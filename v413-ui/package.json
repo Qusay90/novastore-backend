@@ -28,6 +28,7 @@
   "dependencies": {
     "@capacitor/app": "8.1.1",
     "@capacitor/core": "8.4.2",
+    "@capacitor/push-notifications": "8.1.2",
     "@fontsource/roboto": "5.2.10",
     "@phosphor-icons/react": "2.1.10",
     "@radix-ui/react-dialog": "1.1.19",

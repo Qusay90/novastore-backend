@@ -182,6 +182,7 @@ export default function NativeRuntime({ children }: PropsWithChildren) {
 
     void App.addListener("appStateChange", ({ isActive }) => {
       document.documentElement.dataset.novastoreAppActive = isActive ? "true" : "false";
+      if (isActive) window.dispatchEvent(new CustomEvent("novastore:notification-refresh"));
     }).then((handle) => {
       stateHandle = handle;
     });
