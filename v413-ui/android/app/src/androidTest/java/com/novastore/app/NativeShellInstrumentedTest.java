@@ -131,6 +131,8 @@ public class NativeShellInstrumentedTest {
                     "print: Capacitor.isPluginAvailable('NovaPrint')," +
                     "share: Capacitor.isPluginAvailable('NovaShare')," +
                     "publicStore: Capacitor.isPluginAvailable('NovaPublicStore')," +
+                    "notificationApi: Capacitor.isPluginAvailable('NovaNotificationApi')," +
+                    "pushNotifications: Capacitor.isPluginAvailable('PushNotifications')," +
                     "http: Capacitor.isPluginAvailable('CapacitorHttp')," +
                     "cookies: Capacitor.isPluginAvailable('CapacitorCookies')," +
                     "webview: Capacitor.isPluginAvailable('WebView')," +
@@ -143,6 +145,8 @@ public class NativeShellInstrumentedTest {
             assertTrue(bridge.getBoolean("print"));
             assertTrue(bridge.getBoolean("share"));
             assertTrue(bridge.getBoolean("publicStore"));
+            assertTrue(bridge.getBoolean("notificationApi"));
+            assertTrue(bridge.getBoolean("pushNotifications"));
             assertFalse(bridge.getBoolean("http"));
             assertFalse(bridge.getBoolean("cookies"));
             assertFalse(bridge.getBoolean("webview"));
@@ -311,6 +315,31 @@ public class NativeShellInstrumentedTest {
             );
             assertTrue(refresh.getInt("id") > 0);
             assertEquals("pull", refresh.getString("source"));
+        }
+    }
+
+    @Test
+    public void notificationConsumerStartsGuestWithoutRequestingPermission() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            evaluate(scenario,
+                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-10&tab=account&view=notifications&shell=native');" +
+                    "dispatchEvent(new PopStateEvent('popstate'));true"
+            );
+            Thread.sleep(300);
+            JSONObject state = evaluateJson(scenario,
+                "(() => ({" +
+                    "feed:document.querySelector('[data-testid=notification-center-screen]')?.dataset.feedState||''," +
+                    "loginRequired:Boolean(document.querySelector('[data-testid=notification-login-required]'))," +
+                    "permissionRequested:localStorage.getItem('novastore.android.notificationPermissionRequested')," +
+                    "token:localStorage.getItem('novastore.android.fcmToken')," +
+                    "inApp:document.querySelectorAll('.notification-in-app').length" +
+                "}))()"
+            );
+            assertEquals("guest", state.getString("feed"));
+            assertTrue(state.getBoolean("loginRequired"));
+            assertTrue(state.isNull("permissionRequested"));
+            assertTrue(state.isNull("token"));
+            assertEquals(0, state.getInt("inApp"));
         }
     }
 
