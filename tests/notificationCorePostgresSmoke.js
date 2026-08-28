@@ -49,6 +49,13 @@ const subscription = (key) => ({
     endpoint: endpoint(key),
     keys: { p256dh: 'A'.repeat(43), auth: 'B'.repeat(22) }
 });
+const androidToken = (key) => `novastore-fcm-${key}-token-20260828`;
+const androidRegistration = (key, installationId, predecessorKey = null) => ({
+    token: androidToken(key),
+    platform: 'android',
+    installationId,
+    ...(predecessorKey ? { rotationPredecessor: androidToken(predecessorKey) } : {})
+});
 
 const ids = (rows, field = 'id') => rows.map((row) => Number(row[field]));
 const expectCode = (promise, code) => assert.rejects(promise, (error) => error?.code === code);
@@ -97,7 +104,7 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
         await admin.query('DROP SCHEMA public CASCADE');
         await admin.query('CREATE SCHEMA public');
         const registry = loadRegistry();
-        assert.equal(registry.length, 32);
+        assert.equal(registry.length, 33);
         const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
         const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
         assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));
@@ -129,6 +136,19 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
             deliverOneWebPush,
             deliverPendingWebPushBatch
         } = require('../services/notificationDeliveryService');
+        const {
+            getAndroidPushEndpointState,
+            registerAndroidPushEndpoint,
+            revokeAndroidPushEndpoint
+        } = require('../services/androidPushEndpointService');
+        const {
+            AndroidPushProviderError,
+            buildAndroidPushPayload
+        } = require('../services/androidPushProviderService');
+        const {
+            deliverOneAndroidPush,
+            deliverPendingAndroidPushBatch
+        } = require('../services/androidPushDeliveryService');
 
         const testPasswordHash = bcrypt.hashSync('local-notification-uat-only', 10);
         const users = await pool.query(
@@ -269,6 +289,98 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
             authSessionId: null,
             sellerSessionId: sellerA.sessionId
         });
+        const sellerBBinding = Object.freeze({
+            userId: sellerBUser,
+            role: 'seller',
+            organizationId: sellerB.organizationId,
+            authSessionId: null,
+            sellerSessionId: sellerB.sessionId
+        });
+        const customerAAndroidBinding = Object.freeze({ ...customerABinding, application: 'CUSTOMER_ANDROID' });
+        const customerBAndroidBinding = Object.freeze({ ...customerBBinding, application: 'CUSTOMER_ANDROID' });
+        const sellerAAndroidBinding = Object.freeze({ ...sellerABinding, application: 'SELLER_ANDROID' });
+        const sellerBAndroidBinding = Object.freeze({ ...sellerBBinding, application: 'SELLER_ANDROID' });
+
+        const customerInstallationA = crypto.randomUUID();
+        const customerInstallationB = crypto.randomUUID();
+        const customerInstallationTemporary = crypto.randomUUID();
+        const sellerInstallationA = crypto.randomUUID();
+        const customerInitialEndpoint = await registerAndroidPushEndpoint({
+            database: pool,
+            binding: customerAAndroidBinding,
+            registration: androidRegistration('customer-a-old', customerInstallationA)
+        });
+        assert.equal(Object.hasOwn(customerInitialEndpoint, 'token'), false);
+        const customerIdempotentEndpoint = await registerAndroidPushEndpoint({
+            database: pool,
+            binding: customerAAndroidBinding,
+            registration: androidRegistration('customer-a-old', customerInstallationA)
+        });
+        assert.equal(customerIdempotentEndpoint.idempotent, true);
+        assert.equal(customerIdempotentEndpoint.id, customerInitialEndpoint.id);
+        await expectCode(
+            registerAndroidPushEndpoint({
+                database: pool,
+                binding: customerBAndroidBinding,
+                registration: androidRegistration('customer-a-old', customerInstallationA)
+            }),
+            'ANDROID_ENDPOINT_OWNERSHIP_CONFLICT'
+        );
+        const customerRotatedEndpoint = await registerAndroidPushEndpoint({
+            database: pool,
+            binding: customerAAndroidBinding,
+            registration: androidRegistration('customer-a-current', customerInstallationA, 'customer-a-old')
+        });
+        assert.equal(customerRotatedEndpoint.rotated, true);
+        await expectCode(
+            registerAndroidPushEndpoint({
+                database: pool,
+                binding: customerBAndroidBinding,
+                registration: androidRegistration('customer-a-old', crypto.randomUUID())
+            }),
+            'ANDROID_FCM_TOKEN_STALE'
+        );
+        const customerSecondEndpoint = await registerAndroidPushEndpoint({
+            database: pool,
+            binding: customerAAndroidBinding,
+            registration: androidRegistration('customer-a-second', customerInstallationB)
+        });
+        assert.notEqual(customerSecondEndpoint.id, customerRotatedEndpoint.id);
+        const customerTemporaryEndpoint = await registerAndroidPushEndpoint({
+            database: pool,
+            binding: customerAAndroidBinding,
+            registration: androidRegistration('customer-a-temporary', customerInstallationTemporary)
+        });
+        assert.equal((await revokeAndroidPushEndpoint({
+            database: pool,
+            binding: customerBAndroidBinding,
+            revocation: {
+                token: androidToken('customer-a-temporary'),
+                installationId: customerInstallationTemporary
+            }
+        })).revoked, false, 'Customer B must not revoke Customer A endpoint');
+        assert.equal((await revokeAndroidPushEndpoint({
+            database: pool,
+            binding: customerAAndroidBinding,
+            revocation: {
+                token: androidToken('customer-a-temporary'),
+                installationId: customerInstallationTemporary
+            }
+        })).revoked, true);
+        assert.ok(customerTemporaryEndpoint.id);
+        const sellerEndpoint = await registerAndroidPushEndpoint({
+            database: pool,
+            binding: sellerAAndroidBinding,
+            registration: androidRegistration('seller-a-current', sellerInstallationA)
+        });
+        assert.equal((await revokeAndroidPushEndpoint({
+            database: pool,
+            binding: sellerBAndroidBinding,
+            revocation: { token: androidToken('seller-a-current'), installationId: sellerInstallationA }
+        })).revoked, false, 'Seller B must not revoke Seller A endpoint');
+        assert.equal((await getAndroidPushEndpointState({ database: pool, binding: customerAAndroidBinding })).activeDeviceCount, 2);
+        assert.equal((await getAndroidPushEndpointState({ database: pool, binding: sellerAAndroidBinding })).activeDeviceCount, 1);
+        assert.ok(sellerEndpoint.id);
 
         await registerWebPushSubscription({ database: pool, binding: customerABinding, subscription: subscription('customer-a') });
         await registerWebPushSubscription({ database: pool, binding: customerBBinding, subscription: subscription('customer-b') });
@@ -369,6 +481,93 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
              ) duplicate`
         );
         assert.equal(Number(duplicates.rows[0].count), 0);
+        const replayAfterDispatch = await enqueueNotificationEvent(pool, {
+            eventType: 'ORDER_CREATED', aggregateType: 'order', aggregateId: orderA, aggregateRevision: 1,
+            payload: { reasonCode: 'POST_DISPATCH_REPLAY_MUST_NOT_DUPLICATE' }
+        });
+        assert.equal(replayAfterDispatch.inserted, false);
+        assert.equal((await dispatchNotificationOutboxBatch({ database: pool, limit: 5 })).length, 0);
+
+        const androidDeliveryMatrix = await pool.query(
+            `SELECT notification.recipient_role, notification.type, COUNT(*)::INT count
+               FROM notification_deliveries delivery
+               JOIN notifications notification ON notification.id = delivery.notification_id
+              WHERE delivery.channel = 'ANDROID_PUSH'
+              GROUP BY notification.recipient_role, notification.type
+              ORDER BY notification.recipient_role, notification.type`
+        );
+        const androidMatrix = new Map(androidDeliveryMatrix.rows.map((row) => [
+            `${row.recipient_role}:${row.type}`,
+            Number(row.count)
+        ]));
+        assert.equal(androidMatrix.get('customer:ORDER_CREATED'), 2);
+        assert.equal(androidMatrix.get('customer:SUPPORT_REPLY'), 2);
+        assert.equal(androidMatrix.get('customer:QUESTION_ANSWERED'), 2);
+        assert.equal(androidMatrix.get('customer:RETURN_STATUS_CHANGED'), 2);
+        assert.equal(androidMatrix.get('seller:ORDER_CONFIRMED'), 1);
+        assert.equal(androidMatrix.get('seller:RETURN_REQUESTED'), 1);
+        assert.equal(androidMatrix.get('seller:QUESTION_CREATED'), 1);
+        assert.equal(androidMatrix.has('seller:ORDER_CREATED'), false, 'accepted catalog does not route ORDER_CREATED to Seller');
+        assert.equal(androidMatrix.has('seller:SUPPORT_MESSAGE'), false, 'accepted catalog routes SUPPORT_MESSAGE to Admin');
+        const initialAndroidDeliveryCount = [...androidMatrix.values()].reduce((sum, count) => sum + count, 0);
+        assert.equal(initialAndroidDeliveryCount, 14);
+        const duplicateAndroidDeliveries = await pool.query(
+            `SELECT COUNT(*)::INT count FROM (
+                SELECT notification_id, endpoint_key
+                  FROM notification_deliveries
+                 WHERE channel = 'ANDROID_PUSH'
+                 GROUP BY notification_id, endpoint_key
+                HAVING COUNT(*) > 1
+             ) duplicate`
+        );
+        assert.equal(Number(duplicateAndroidDeliveries.rows[0].count), 0);
+
+        const missingConfigAndroidBatch = await deliverPendingAndroidPushBatch({
+            database: pool,
+            provider: { configured: false },
+            limit: 100
+        });
+        assert.equal(missingConfigAndroidBatch.processed, 0);
+        assert.equal(missingConfigAndroidBatch.skipped, 'CONFIGURATION_REQUIRED');
+        const pendingAfterMissingConfig = await pool.query(
+            "SELECT COUNT(*)::INT count FROM notification_deliveries WHERE channel = 'ANDROID_PUSH' AND status = 'PENDING'"
+        );
+        assert.equal(Number(pendingAfterMissingConfig.rows[0].count), initialAndroidDeliveryCount);
+
+        const deliveredAndroidPayloads = [];
+        const acceptingAndroidProvider = {
+            configured: true,
+            send: async ({ endpoint: row, notification }) => {
+                assert.equal(String(row.token).startsWith('novastore-fcm-'), true);
+                const payload = buildAndroidPushPayload(notification);
+                assert.equal(Object.hasOwn(payload, 'url'), false);
+                assert.equal(Object.hasOwn(payload, 'recipientId'), false);
+                deliveredAndroidPayloads.push(payload);
+                return {
+                    accepted: true,
+                    statusCode: 200,
+                    providerMessageId: `projects/local/messages/${row.delivery_id}`
+                };
+            }
+        };
+        const acceptedAndroidBatch = await deliverPendingAndroidPushBatch({
+            database: pool,
+            provider: acceptingAndroidProvider,
+            limit: 100
+        });
+        assert.equal(acceptedAndroidBatch.processed, initialAndroidDeliveryCount);
+        assert.equal(deliveredAndroidPayloads.length, initialAndroidDeliveryCount);
+        assert.equal(deliveredAndroidPayloads.every((payload) => payload.target?.entityType), true);
+        const remainingAndroid = await pool.query(
+            "SELECT COUNT(*)::INT count FROM notification_deliveries WHERE channel = 'ANDROID_PUSH' AND status IN ('PENDING', 'RETRYABLE')"
+        );
+        assert.equal(Number(remainingAndroid.rows[0].count), 0);
+        assert.equal((await revokeAndroidPushEndpoint({
+            database: pool,
+            binding: customerAAndroidBinding,
+            revocation: { token: androidToken('customer-a-second'), installationId: customerInstallationB }
+        })).revoked, true);
+        assert.equal((await getAndroidPushEndpointState({ database: pool, binding: customerAAndroidBinding })).activeDeviceCount, 1);
 
         const customerAScope = { userId: customerA, role: 'customer', organizationId: null, storeIds: [] };
         const customerBScope = { userId: customerB, role: 'customer', organizationId: null, storeIds: [] };
@@ -460,6 +659,39 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
             { attempt_number: 2, outcome: 'RETRYABLE' },
             { attempt_number: 3, outcome: 'FAILED' }
         ]);
+        const retryAndroidProvider = {
+            configured: true,
+            send: async () => {
+                throw new AndroidPushProviderError(
+                    'temporary',
+                    'FCM_PROVIDER_RETRYABLE',
+                    { retryable: true, statusCode: 503 }
+                );
+            }
+        };
+        let retryAndroidDeliveryId = null;
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+            const outcome = await deliverOneAndroidPush({ database: pool, provider: retryAndroidProvider });
+            assert.equal(outcome.status, attempt < 3 ? 'RETRYABLE' : 'FAILED');
+            retryAndroidDeliveryId ||= outcome.deliveryId;
+            assert.equal(outcome.deliveryId, retryAndroidDeliveryId, 'retry must use the same Android delivery record');
+            await pool.query(
+                "UPDATE notification_deliveries SET next_attempt_at = CURRENT_TIMESTAMP WHERE id = $1",
+                [outcome.deliveryId]
+            );
+        }
+        const retryAndroidAttempts = await pool.query(
+            `SELECT attempt_number, outcome
+               FROM notification_delivery_attempts
+              WHERE delivery_id = $1
+              ORDER BY attempt_number`,
+            [retryAndroidDeliveryId]
+        );
+        assert.deepEqual(retryAndroidAttempts.rows, [
+            { attempt_number: 1, outcome: 'RETRYABLE' },
+            { attempt_number: 2, outcome: 'RETRYABLE' },
+            { attempt_number: 3, outcome: 'FAILED' }
+        ]);
 
         await enqueueNotificationEvent(pool, {
             eventType: 'ORDER_STATUS_CHANGED', aggregateType: 'order', aggregateId: orderA,
@@ -475,6 +707,37 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
         assert.equal((await getWebPushSubscriptionState({ database: pool, binding: customerABinding })).enabled, false);
         await registerWebPushSubscription({ database: pool, binding: customerABinding, subscription: subscription('customer-a') });
         assert.equal((await getWebPushSubscriptionState({ database: pool, binding: customerABinding })).enabled, true);
+        const invalidAndroidProvider = {
+            configured: true,
+            send: async () => {
+                throw new AndroidPushProviderError(
+                    'unregistered',
+                    'FCM_ENDPOINT_INVALID',
+                    { invalidEndpoint: true, statusCode: 404, providerCode: 'UNREGISTERED' }
+                );
+            }
+        };
+        const invalidAndroidOutcome = await deliverOneAndroidPush({
+            database: pool,
+            provider: invalidAndroidProvider
+        });
+        assert.equal(invalidAndroidOutcome.status, 'INVALID_SUBSCRIPTION');
+        assert.equal((await getAndroidPushEndpointState({ database: pool, binding: customerAAndroidBinding })).enabled, false);
+        await expectCode(
+            registerAndroidPushEndpoint({
+                database: pool,
+                binding: customerAAndroidBinding,
+                registration: androidRegistration('customer-a-current', customerInstallationA)
+            }),
+            'ANDROID_FCM_TOKEN_INVALIDATED'
+        );
+        const customerPostInvalidEndpoint = await registerAndroidPushEndpoint({
+            database: pool,
+            binding: customerAAndroidBinding,
+            registration: androidRegistration('customer-a-post-invalid', customerInstallationA)
+        });
+        assert.equal(customerPostInvalidEndpoint.status, 'ACTIVE');
+        assert.equal((await getAndroidPushEndpointState({ database: pool, binding: customerAAndroidBinding })).enabled, true);
 
         await pool.query(
             "UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP, revoke_reason = 'NOTIFICATION_CORE_LOGOUT_TEST' WHERE id = $1",
@@ -488,6 +751,12 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
             [customerABinding.authSessionId]
         );
         assert.equal(Number(staleActive.rows[0].count), 0);
+        const staleCustomerAndroid = await pool.query(
+            `SELECT COUNT(*)::INT count FROM android_push_endpoints
+              WHERE auth_session_id = $1 AND status = 'ACTIVE'`,
+            [customerABinding.authSessionId]
+        );
+        assert.equal(Number(staleCustomerAndroid.rows[0].count), 0);
         await enqueueNotificationEvent(pool, {
             eventType: 'ORDER_STATUS_CHANGED', aggregateType: 'order', aggregateId: orderA,
             aggregateRevision: 4, payload: { reasonCode: 'LOGOUT_ISOLATION_PROBE' }
@@ -501,6 +770,14 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
             [`ORDER_STATUS_CHANGED:order:${orderA}:r4`]
         );
         assert.equal(Number(postLogoutDelivery.rows[0].count), 0);
+        const postLogoutAndroidDelivery = await pool.query(
+            `SELECT COUNT(*)::INT count
+               FROM notification_deliveries delivery
+               JOIN notifications notification ON notification.id = delivery.notification_id
+              WHERE notification.source_event_key = $1 AND delivery.channel = 'ANDROID_PUSH'`,
+            [`ORDER_STATUS_CHANGED:order:${orderA}:r4`]
+        );
+        assert.equal(Number(postLogoutAndroidDelivery.rows[0].count), 0);
         const rebound = await registerWebPushSubscription({
             database: pool, binding: customerBBinding, subscription: subscription('customer-a')
         });
@@ -511,6 +788,20 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
         );
         assert.equal(Number(reboundOwner.rows[0].user_id), customerB);
         assert.equal(Number(reboundOwner.rows[0].auth_session_id), customerBBinding.authSessionId);
+        const reboundAndroid = await registerAndroidPushEndpoint({
+            database: pool,
+            binding: customerBAndroidBinding,
+            registration: androidRegistration('customer-a-post-invalid', customerInstallationA)
+        });
+        assert.equal(reboundAndroid.status, 'ACTIVE');
+        const reboundAndroidOwner = await pool.query(
+            `SELECT user_id, auth_session_id, status
+               FROM android_push_endpoints
+              WHERE token_hash = $1`,
+            [crypto.createHash('sha256').update(androidToken('customer-a-post-invalid')).digest('hex')]
+        );
+        assert.equal(Number(reboundAndroidOwner.rows[0].user_id), customerB);
+        assert.equal(Number(reboundAndroidOwner.rows[0].auth_session_id), customerBAndroidBinding.authSessionId);
 
         await pool.query("UPDATE seller_sessions SET status = 'revoked', revoked_at = CURRENT_TIMESTAMP WHERE id = $1", [sellerA.sessionId]);
         const sellerStale = await pool.query(
@@ -518,6 +809,34 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
             [sellerA.sessionId]
         );
         assert.equal(Number(sellerStale.rows[0].count), 0);
+        const sellerAndroidStale = await pool.query(
+            "SELECT COUNT(*)::INT count FROM android_push_endpoints WHERE seller_session_id = $1 AND status = 'ACTIVE'",
+            [sellerA.sessionId]
+        );
+        assert.equal(Number(sellerAndroidStale.rows[0].count), 0);
+        const sellerReboundAndroid = await registerAndroidPushEndpoint({
+            database: pool,
+            binding: sellerBAndroidBinding,
+            registration: androidRegistration('seller-a-current', sellerInstallationA)
+        });
+        assert.equal(sellerReboundAndroid.status, 'ACTIVE');
+        await enqueueNotificationEvent(pool, {
+            eventType: 'RETURN_STATUS_CHANGED',
+            aggregateType: 'return_request',
+            aggregateId: returnA,
+            aggregateRevision: 5,
+            payload: { reasonCode: 'SELLER_LOGOUT_TENANT_ISOLATION_PROBE' }
+        });
+        await dispatchNotificationOutboxBatch({ database: pool, limit: 5 });
+        const sellerCrossTenantAndroidLeak = await pool.query(
+            `SELECT COUNT(*)::INT count
+               FROM notification_deliveries delivery
+               JOIN notifications notification ON notification.id = delivery.notification_id
+              WHERE notification.source_event_key = $1
+                AND delivery.channel = 'ANDROID_PUSH'`,
+            [`RETURN_STATUS_CHANGED:return_request:${returnA}:r5`]
+        );
+        assert.equal(Number(sellerCrossTenantAndroidLeak.rows[0].count), 0);
 
         const truthTables = await pool.query(
             `SELECT table_name FROM information_schema.tables
@@ -579,13 +898,21 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
             eventCounts: eventCounts.rows,
             roleCounts: roleCounts.rows,
             outboxReplayDuplicateCount: Number(duplicates.rows[0].count),
+            duplicateAndroidDeliveryRecordOnReplay: Number(duplicateAndroidDeliveries.rows[0].count),
             lostTransactionalNotificationOnRollbackOrCommit: 0,
             staleLogoutPushLeakCount: Number(staleActive.rows[0].count) + Number(postLogoutDelivery.rows[0].count),
+            staleCustomerTokenLeakCount: Number(staleCustomerAndroid.rows[0].count) + Number(postLogoutAndroidDelivery.rows[0].count),
+            staleSellerTokenLeakCount: Number(sellerAndroidStale.rows[0].count),
             notificationIdorLeakCount: idorLeakCount,
-            crossTenantNotificationLeakCount: sellerBFeed.items.length,
+            crossTenantNotificationLeakCount: sellerBFeed.items.length + Number(sellerCrossTenantAndroidLeak.rows[0].count),
             arbitraryTargetUrlCount: 0,
             acceptedMockWebPushCount: acceptedBatch.processed,
+            acceptedMockAndroidPushCount: acceptedAndroidBatch.processed,
             retryAttempts: retryAttempts.rows.length,
+            androidRetryAttempts: retryAndroidAttempts.rows.length,
+            androidDeviceEndpointIdor: 'PASS',
+            customerAndroidActiveDevicesBeforeRevocation: 2,
+            sellerAndroidActiveDevicesBeforeRevocation: 1,
             concurrentSubscriptionCapacityAccepted: 5,
             concurrentSubscriptionCapacityRejected: 1,
             customerA,

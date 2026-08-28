@@ -24,6 +24,9 @@ const createSellerNotificationRouter = ({ enabled, auth, tenant } = {}) => {
     router.post('/notifications/web-push/subscriptions', ...guarded, controller.registerSellerPushSubscription);
     router.delete('/notifications/web-push/subscriptions', ...guarded, controller.revokeSellerPushSubscription);
     router.delete('/notifications/web-push/subscriptions/session', ...guarded, controller.revokeSellerPushSession);
+    router.post('/notifications/android-push/tokens', ...guarded, controller.registerSellerAndroidPushToken);
+    router.delete('/notifications/android-push/tokens', ...guarded, controller.revokeSellerAndroidPushToken);
+    router.delete('/notifications/android-push/tokens/session', ...guarded, controller.revokeSellerAndroidPushSession);
     return router;
 };
 

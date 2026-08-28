@@ -115,7 +115,7 @@ let pool = null;
     await admin.query('CREATE SCHEMA public');
 
     const registry = loadRegistry();
-    assert.equal(registry.length, 32);
+    assert.equal(registry.length, 33);
     const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));

@@ -172,6 +172,42 @@ const activeSubscriptions = async (queryable, recipient) => {
     return result.rows;
 };
 
+const activeAndroidEndpoints = async (queryable, recipient) => {
+    const application = recipient.role === 'customer'
+        ? 'CUSTOMER_ANDROID'
+        : recipient.role === 'seller'
+            ? 'SELLER_ANDROID'
+            : null;
+    if (!application) return [];
+    const result = await queryable.query(
+        `SELECT endpoint.id
+           FROM android_push_endpoints endpoint
+      LEFT JOIN auth_sessions auth_session
+             ON auth_session.id = endpoint.auth_session_id
+      LEFT JOIN seller_sessions seller_session
+             ON seller_session.id = endpoint.seller_session_id
+          WHERE endpoint.user_id = $1
+            AND endpoint.recipient_role = $2
+            AND COALESCE(endpoint.recipient_organization_id, 0) = COALESCE($3::BIGINT, 0)
+            AND endpoint.application = $4
+            AND endpoint.status = 'ACTIVE'
+            AND (
+                (
+                    endpoint.auth_session_id IS NOT NULL
+                    AND auth_session.revoked_at IS NULL
+                    AND auth_session.expires_at > CURRENT_TIMESTAMP
+                ) OR (
+                    endpoint.seller_session_id IS NOT NULL
+                    AND seller_session.status = 'active'
+                    AND seller_session.expires_at > CURRENT_TIMESTAMP
+                )
+            )
+          ORDER BY endpoint.created_at ASC, endpoint.id ASC`,
+        [recipient.userId, recipient.role, recipient.organizationId, application]
+    );
+    return result.rows;
+};
+
 const persistLogicalNotification = async (queryable, event, eventPolicy, recipient) => {
     const copy = getNotificationCopy(event.event_type, recipient.role);
     const target = makeTarget(eventPolicy, event);
@@ -220,6 +256,16 @@ const persistLogicalNotification = async (queryable, event, eventPolicy, recipie
              VALUES ($1, 'WEB_PUSH', $2, $3, 'PENDING', CURRENT_TIMESTAMP)
              ON CONFLICT (notification_id, channel, endpoint_key) DO NOTHING`,
             [notification.id, String(subscription.id), subscription.id]
+        );
+    }
+    const androidEndpoints = await activeAndroidEndpoints(queryable, recipient);
+    for (const endpoint of androidEndpoints) {
+        await queryable.query(
+            `INSERT INTO notification_deliveries
+                (notification_id, channel, endpoint_key, android_push_endpoint_id, status, next_attempt_at)
+             VALUES ($1, 'ANDROID_PUSH', $2, $3, 'PENDING', CURRENT_TIMESTAMP)
+             ON CONFLICT (notification_id, channel, endpoint_key) DO NOTHING`,
+            [notification.id, String(endpoint.id), endpoint.id]
         );
     }
     return notification;

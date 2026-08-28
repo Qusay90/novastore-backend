@@ -39,7 +39,7 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 (async () => {
     assert.equal(validateManifest(manifest), true);
     const registry = loadRegistry();
-    assert.equal(registry.length, 32);
+    assert.equal(registry.length, 33);
     assert.equal(registry[0].id, '20260628_staging_schema_baseline');
     assert.equal(registry.at(-1).id, '20260828_02_unified_notification_core');
     assert.deepEqual(
@@ -295,7 +295,7 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
     assert.doesNotMatch(stagingSources, /require\([^)]*initDb/i);
     assert.doesNotMatch(stagingSources, /dotenv|cloudinary|nodemailer|resend|fetch\s*\(/i);
 
-    console.log('staging migration foundation smoke passed: manifest=32 verified-tls=15 loopback-no-tls=1');
+    console.log('staging migration foundation smoke passed: manifest=33 verified-tls=15 loopback-no-tls=1');
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;

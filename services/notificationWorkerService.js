@@ -1,6 +1,8 @@
 'use strict';
 
 const pool = require('../config/db');
+const { deliverPendingAndroidPushBatch } = require('./androidPushDeliveryService');
+const { createFcmHttpV1Provider } = require('./androidPushProviderService');
 const { deliverPendingWebPushBatch } = require('./notificationDeliveryService');
 const { dispatchNotificationOutboxBatch } = require('./notificationOutboxService');
 const { createWebPushProvider } = require('./webPushProviderService');
@@ -8,13 +10,28 @@ const { createWebPushProvider } = require('./webPushProviderService');
 let timer = null;
 let running = false;
 
-const runNotificationWorkerCycle = async ({ database = pool, io = null, provider = createWebPushProvider() } = {}) => {
+const runNotificationWorkerCycle = async ({
+    database = pool,
+    io = null,
+    provider = null,
+    webPushProvider = null,
+    androidPushProvider = null
+} = {}) => {
     if (running) return Object.freeze({ skipped: 'ALREADY_RUNNING' });
     running = true;
     try {
         const outbox = await dispatchNotificationOutboxBatch({ database, io, limit: 50 });
-        const webPush = await deliverPendingWebPushBatch({ database, provider, limit: 50 });
-        return Object.freeze({ outboxProcessed: outbox.length, webPush });
+        const webPush = await deliverPendingWebPushBatch({
+            database,
+            provider: webPushProvider || provider || createWebPushProvider(),
+            limit: 50
+        });
+        const androidPush = await deliverPendingAndroidPushBatch({
+            database,
+            provider: androidPushProvider || createFcmHttpV1Provider(),
+            limit: 50
+        });
+        return Object.freeze({ outboxProcessed: outbox.length, webPush, androidPush });
     } finally {
         running = false;
     }

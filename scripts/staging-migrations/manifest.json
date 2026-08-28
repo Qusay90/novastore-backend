@@ -222,5 +222,12 @@
     "sha256": "fb665ef3482395ce63b8854afbc80bf8993457ad0390721d0703fc616df38850",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260828_03_android_fcm_delivery",
+    "path": "migrations/20260828_03_android_fcm_delivery.sql",
+    "sha256": "e06dc4b5182b2e45b9a02ac5cba241848066f4b5778eef96fb5142db8b78f773",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

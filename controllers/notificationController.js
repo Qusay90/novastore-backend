@@ -23,10 +23,23 @@ const {
     sellerBinding
 } = require('../services/webPushSubscriptionService');
 const { publicWebPushConfiguration } = require('../services/webPushProviderService');
+const {
+    AndroidPushEndpointError,
+    regularAndroidBinding,
+    registerAndroidPushEndpoint,
+    revokeAndroidPushEndpoint,
+    revokeAndroidPushEndpointsForSession,
+    sellerAndroidBinding
+} = require('../services/androidPushEndpointService');
 
 const redactKnownSecretText = (value = '') => {
     let text = String(value || '');
-    for (const secret of [process.env.PAYTR_MERCHANT_KEY, process.env.PAYTR_MERCHANT_SALT, process.env.VAPID_PRIVATE_KEY]) {
+    for (const secret of [
+        process.env.PAYTR_MERCHANT_KEY,
+        process.env.PAYTR_MERCHANT_SALT,
+        process.env.VAPID_PRIVATE_KEY,
+        process.env.FIREBASE_PRIVATE_KEY
+    ]) {
         const secretText = String(secret || '').trim();
         if (secretText) text = text.split(secretText).join('[REDACTED]');
     }
@@ -108,7 +121,12 @@ const currentSellerScope = (req) => Object.freeze({
 });
 
 const sendKnownError = (res, error) => {
-    if (error instanceof NotificationReadError || error instanceof WebPushSubscriptionError || error instanceof NotificationTargetError) {
+    if (
+        error instanceof NotificationReadError
+        || error instanceof WebPushSubscriptionError
+        || error instanceof AndroidPushEndpointError
+        || error instanceof NotificationTargetError
+    ) {
         return res.status(error.statusCode || 400).json({ code: error.code, error: error.message });
     }
     console.error('Bildirim isteği hatası:', redactKnownSecretText(error?.code || error?.name || 'NOTIFICATION_REQUEST_FAILED'));
@@ -198,6 +216,42 @@ const makePushRevokeSessionHandler = (bindingFactory) => async (req, res) => {
     }
 };
 
+const makeAndroidPushRegisterHandler = (bindingFactory) => async (req, res) => {
+    try {
+        const endpoint = await registerAndroidPushEndpoint({
+            binding: bindingFactory(req),
+            registration: req.body
+        });
+        return res.status(endpoint.idempotent ? 200 : 201).json({ endpoint });
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
+const makeAndroidPushRevokeHandler = (bindingFactory) => async (req, res) => {
+    try {
+        const result = await revokeAndroidPushEndpoint({
+            binding: bindingFactory(req),
+            revocation: req.body
+        });
+        return res.status(200).json(result);
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
+const makeAndroidPushRevokeSessionHandler = (bindingFactory) => async (req, res) => {
+    try {
+        const revokedCount = await revokeAndroidPushEndpointsForSession({
+            binding: bindingFactory(req),
+            request: req.body || {}
+        });
+        return res.status(200).json({ revokedCount });
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
 const getCurrentNotifications = makeListHandler(currentScope);
 const getCurrentUnreadCount = makeUnreadHandler(currentScope);
 const markAsRead = makeMarkOneHandler(currentScope);
@@ -207,6 +261,9 @@ const getWebPushState = makePushStateHandler(regularBinding);
 const registerPushSubscription = makePushRegisterHandler(regularBinding);
 const revokePushSubscription = makePushRevokeHandler(regularBinding);
 const revokePushSession = makePushRevokeSessionHandler(regularBinding);
+const registerAndroidPushToken = makeAndroidPushRegisterHandler(regularAndroidBinding);
+const revokeAndroidPushToken = makeAndroidPushRevokeHandler(regularAndroidBinding);
+const revokeAndroidPushSession = makeAndroidPushRevokeSessionHandler(regularAndroidBinding);
 
 const getSellerNotifications = makeListHandler(currentSellerScope);
 const getSellerUnreadCount = makeUnreadHandler(currentSellerScope);
@@ -217,6 +274,9 @@ const getSellerWebPushState = makePushStateHandler(sellerBinding);
 const registerSellerPushSubscription = makePushRegisterHandler(sellerBinding);
 const revokeSellerPushSubscription = makePushRevokeHandler(sellerBinding);
 const revokeSellerPushSession = makePushRevokeSessionHandler(sellerBinding);
+const registerSellerAndroidPushToken = makeAndroidPushRegisterHandler(sellerAndroidBinding);
+const revokeSellerAndroidPushToken = makeAndroidPushRevokeHandler(sellerAndroidBinding);
+const revokeSellerAndroidPushSession = makeAndroidPushRevokeSessionHandler(sellerAndroidBinding);
 
 const getUserNotifications = async (req, res) => {
     if (Number(req.params.userId) !== Number(req.user.id) || req.user.principal !== 'customer') {
@@ -259,10 +319,16 @@ module.exports = {
     markAsRead,
     markSellerNotificationRead,
     registerPushSubscription,
+    registerAndroidPushToken,
+    registerSellerAndroidPushToken,
     registerSellerPushSubscription,
+    revokeAndroidPushSession,
+    revokeAndroidPushToken,
     revokePushSession,
     revokePushSubscription,
     revokeSellerPushSession,
     revokeSellerPushSubscription,
+    revokeSellerAndroidPushSession,
+    revokeSellerAndroidPushToken,
     sendTestNotification
 };

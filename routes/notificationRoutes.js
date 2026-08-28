@@ -15,6 +15,10 @@ router.post('/web-push/subscriptions', authenticate, requireCurrentAdminIfClaime
 router.delete('/web-push/subscriptions', authenticate, requireCurrentAdminIfClaimed, controller.revokePushSubscription);
 router.delete('/web-push/subscriptions/session', authenticate, requireCurrentAdminIfClaimed, controller.revokePushSession);
 
+router.post('/android-push/tokens', authenticate, requireCurrentAdminIfClaimed, controller.registerAndroidPushToken);
+router.delete('/android-push/tokens', authenticate, requireCurrentAdminIfClaimed, controller.revokeAndroidPushToken);
+router.delete('/android-push/tokens/session', authenticate, requireCurrentAdminIfClaimed, controller.revokeAndroidPushSession);
+
 router.get('/user/:userId', authenticate, controller.getUserNotifications);
 router.get('/admin', authenticate, requireAdmin, requireCurrentAdmin, controller.getAdminNotifications);
 router.patch('/read-all/:userId', authenticate, requireCurrentAdminIfClaimed, controller.markAllAsReadLegacy);

@@ -16,6 +16,8 @@
     "test:main6t-combined": "node tests/main6tCombinedIntegrationSmoke.js",
     "test:notification-core:unit": "node tests/notificationCoreUnitSmoke.js",
     "test:notification-core:integration": "node tests/notificationCorePostgresSmoke.js",
+    "test:android-fcm:unit": "node tests/androidFcmProviderUnitSmoke.js",
+    "test:android-fcm:integration": "node tests/notificationCorePostgresSmoke.js",
     "test:staging-runtime-safety": "node tests/stagingRuntimeSafetySmoke.js",
     "test:staging-access-gate": "node tests/stagingAccessGateHttpSmoke.js",
     "test:staging-release-readiness": "node tests/stagingReleaseContractSmoke.js && node tests/stagingVerificationHarnessSmoke.js",
