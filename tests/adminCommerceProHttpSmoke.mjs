@@ -517,14 +517,19 @@ assert.throws(() => normalizeAdminSession({ user: { id: 8, role: "customer" } })
 assert.throws(() => normalizeAdminSession({ user: { id: 8, role: "admin" }, commerceMode: "multi_vendor" }), /çalışma modu/);
 
 const fixtureRequests = [];
+const fixtureCalls = [];
 const fixtureHttp = {
-  async request(path) {
+  async request(path, options = {}) {
     fixtureRequests.push(path);
+    fixtureCalls.push({ path, options });
     if (path === "/api/admin/session") return { user: { id: 7, role: "admin" }, commerceMode: "single_vendor", capabilities: { dashboardRead: true, ordersRead: true, returnsRead: true, notificationsRead: true, firstPartyCatalogRead: true, catalogStructureRead: true } };
     if (path === "/api/admin/stats") return { totalRevenue: "10", totalOrders: 1, totalProducts: 2, totalUsers: 3 };
     if (path === "/api/admin/orders/summary?limit=100") return { items: [{ id: 1, customer_name: "Müşteri", total_amount: "10", status: "Onay Bekliyor", payment_status: "PAID", item_count: 1, created_at: "2026-07-14T10:00:00.000Z" }], limit: 100, hasMore: false };
     if (path === "/api/admin/returns/summary?limit=100") return { items: [{ id: 1, order_id: 1, reason_code: "DİĞER", status: "REQUESTED", refund_amount: "10", revision: 1, currency: "TRY", payment_status: "PAID" }], limit: 100, hasMore: false };
-    if (path === "/api/admin/notifications/summary?limit=50") return { items: [{ id: 1, type: "new_order", message: "Yeni sipariş", is_read: false }], limit: 50, hasMore: false };
+    if (path === "/api/notifications?limit=50") return { items: [{ id: 1, type: "ORDER_CREATED", title: "Yeni sipariş", message: "Yeni sipariş", category: "ORDER", priority: "HIGH", is_read: false, entity_type: "order", entity_id: 1, entity_key: null }], page: { limit: 50, hasMore: false } };
+    if (path === "/api/notifications/unread-count") return { unreadCount: 1 };
+    if (path === "/api/notifications/1/read") return { read: true };
+    if (path === "/api/notifications/read-all") return { updatedCount: 1 };
     if (path === "/api/admin/catalog/products/summary?limit=100") return {
       catalogMode: "first_party",
       items: [{
@@ -546,6 +551,11 @@ assert.equal((await adapter.dashboard()).totalRevenue, 10);
 assert.equal((await adapter.orders()).items[0].id, "NS-000001");
 assert.equal((await adapter.returns()).items[0].id, "RT-000001");
 assert.equal((await adapter.notifications()).items[0].id, "NT-000001");
+assert.equal(await adapter.notificationUnreadCount(), 1);
+assert.deepEqual(await adapter.markNotificationRead({ id: 1 }), { read: true });
+assert.deepEqual(await adapter.markAllNotificationsRead(), { updatedCount: 1 });
+assert.equal(fixtureCalls.find((call) => call.path === "/api/notifications/1/read")?.options.method, "PATCH");
+assert.equal(fixtureCalls.find((call) => call.path === "/api/notifications/read-all")?.options.method, "PATCH");
 assert.equal((await adapter.catalog()).items[0].id, "PR-000001");
 assert.equal((await adapter.catalogStructure()).categories.items[0].id, 1);
 assert.equal(fixtureRequests.at(-1), "/api/admin/catalog/structure/summary?limit=100");

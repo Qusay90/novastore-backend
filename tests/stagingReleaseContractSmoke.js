@@ -31,7 +31,7 @@ const {
 } = require('./helpers/stagingReleaseReplayProvenance');
 
 const root = path.resolve(__dirname, '..');
-const packageLockBlobSha = '428b6345147859cde2f3c449fe3e99eda8cf6d1a1cc58d992d826e4298caad33';
+const packageLockBlobSha = '702164e2cd2f4b10c1727f18f7f4d3f8d68933c4bb1d08125dc0fcb002b80b57';
 const results = { pass: 0, fail: 0, skip: 0 };
 
 const runGit = (args, options = {}) => {

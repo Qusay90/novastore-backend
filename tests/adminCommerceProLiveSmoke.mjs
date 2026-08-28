@@ -125,7 +125,7 @@ assert.match(source, /\/api\/admin\/session/);
 assert.match(source, /\/api\/admin\/stats/);
 assert.match(source, /\/api\/admin\/orders\/summary\?limit=100/);
 assert.match(source, /\/api\/admin\/returns\/summary\?limit=100/);
-assert.match(source, /\/api\/admin\/notifications\/summary\?limit=50/);
+assert.match(source, /\/api\/notifications\?limit=50/);
 assert.match(source, /\/api\/admin\/catalog\/products\/summary\?limit=100/);
 assert.match(source, /\/api\/admin\/catalog\/products/);
 assert.match(source, /\/api\/admin\/catalog\/structure\/summary\?limit=100/);
@@ -193,7 +193,8 @@ assert.match(catalogStructureSource, /targetType === "category"[\s\S]*categoryId
 assert.doesNotMatch(catalogStructureSource, /\bseller(?:Id|Name|_id|_name)?\b|\brisk\b|approvalAction|validation_metadata/i);
 assert.doesNotMatch(source, /\/api\/returns\/admin\/all|\/api\/notifications\/admin/);
 assert.doesNotMatch(source, /\/api\/shipments\/[^"']+\/create/);
-assert.doesNotMatch(source, /\/api\/orders\/[^"']+\/status|\/api\/notifications\/[^"']+\/read/);
+assert.doesNotMatch(source, /\/api\/orders\/[^"']+\/status/);
+assert.match(source, /\/api\/notifications\/[^"']+\/read/);
 assert.match(adapterSource, /hasCapability\(capabilities, "returnWrite"\)[\s\S]*\/api\/returns\/\$\{encodeURIComponent\(String\(returnId\)\)\}\/status[\s\S]*method: "PATCH"[\s\S]*expected_revision: expectedRevision/);
 assert.doesNotMatch(source, /\/api\/payments\/|paytr|iyzico/i);
 const stripInlinePayload = (documentSource) => documentSource
