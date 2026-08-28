@@ -115,7 +115,7 @@ let pool = null;
     await admin.query('CREATE SCHEMA public');
 
     const registry = loadRegistry();
-    assert.equal(registry.length, 31);
+    assert.equal(registry.length, 32);
     const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));
@@ -140,6 +140,7 @@ let pool = null;
         readOrder
     } = require('../services/sellerOrderFulfillmentService');
     const { releaseExpiredPaymentReservations } = require('../services/paymentReservationService');
+    const { dispatchNotificationOutboxBatch } = require('../services/notificationOutboxService');
     const { calculatePricing } = require('../services/pricingService');
     const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
     const {
@@ -632,8 +633,9 @@ let pool = null;
     assert.equal(legacyAdminReturns.statusCode, 200);
     assert.equal(Number(legacyAdminReturns.payload[0].revision), 3);
 
+    await dispatchNotificationOutboxBatch({ database: pool, limit: 100 });
     const notificationSnapshot = await pool.query(
-        `SELECT id, type, entity_type, entity_id, message
+        `SELECT id, type, title, entity_type, entity_id, message
          FROM notifications
          ORDER BY id`
     );
@@ -647,7 +649,8 @@ let pool = null;
         notificationSnapshot.rows.some((notification) => (
             notification.entity_type === 'order'
             && Number(notification.entity_id) === canonicalOrderId
-            && /kargoya verildi/i.test(notification.message)
+            && notification.type === 'SHIPMENT_CREATED'
+            && /kargoya verildi/i.test(notification.title)
         )),
         true
     );

@@ -54,6 +54,7 @@ let destroyCalls = 0;
 let connectCalls = 0;
 let reviewInserts = 0;
 let mediaInserts = 0;
+let outboxInserts = 0;
 let notificationInserts = 0;
 let auditInserts = 0;
 
@@ -230,6 +231,27 @@ pool.connect = async () => {
                 return { rows: [] };
             }
 
+            if (/INSERT INTO notification_outbox_events/i.test(text)) {
+                outboxInserts += 1;
+                assert.equal(params[2], 'REVIEW_CREATED');
+                assert.equal(params[3], 'review');
+                assert.equal(params[4], '9001');
+                assert.equal(params[5], 1);
+                return {
+                    rows: [{
+                        id: params[0],
+                        source_event_key: params[1],
+                        event_type: params[2],
+                        aggregate_type: params[3],
+                        aggregate_id: params[4],
+                        aggregate_revision: params[5],
+                        payload: JSON.parse(params[6]),
+                        status: 'PENDING',
+                        inserted: true
+                    }]
+                };
+            }
+
             throw new Error(`Unexpected client query in review upload smoke: ${text}`);
         },
         release() {}
@@ -271,6 +293,8 @@ pool.connect = async () => {
         assert.equal(connectCalls, 1);
         assert.equal(reviewInserts, 1);
         assert.equal(mediaInserts, 1);
+        assert.equal(outboxInserts, 1, 'authorized review should enqueue exactly one transactional notification event');
+        assert.equal(notificationInserts, 0, 'review write path must not insert directly into notification projection');
         assert.equal(destroyCalls, 0);
 
         console.log('reviewUploadAuthorizationSmoke: OK');

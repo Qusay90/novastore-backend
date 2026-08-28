@@ -166,14 +166,22 @@ const createFakeClient = (state) => ({
             return { rows: [{ id: params[1], stock: 6 }] };
         }
 
-        if (/UPDATE coupons SET used_count = used_count \+/i.test(sql)) {
+        if (/SELECT id, status\s+FROM coupon_reservations/i.test(sql)) {
+            return { rows: [{ id: 9201, status: 'RESERVED' }] };
+        }
+
+        if (/UPDATE coupons\s+SET used_count = used_count \+/i.test(sql)) {
             state.couponIncrements += 1;
+            return { rows: [{ id: 901, code: 'TEST10', usage_limit: 100, used_count: 1 }], rowCount: 1 };
+        }
+
+        if (/UPDATE coupons\s+SET used_count = used_count -/i.test(sql)) {
+            state.couponDecrements += 1;
             return { rows: [] };
         }
 
-        if (/UPDATE coupons SET used_count = used_count -/i.test(sql)) {
-            state.couponDecrements += 1;
-            return { rows: [] };
+        if (/UPDATE coupon_reservations/i.test(sql)) {
+            return { rows: [{ id: 9201 }], rowCount: 1 };
         }
 
         if (/UPDATE payments/i.test(sql)) {
@@ -225,6 +233,34 @@ const createFakeClient = (state) => ({
             if (params[1] === 'PAYMENT_REFUNDED_CAPTURE_CONFLICT') state.refundedConflictEvents += 1;
             if (params[1] === 'PAYMENT_RECONCILIATION_REQUIRED') state.paymentReconciliationRequiredEvents += 1;
             return { rows: [] };
+        }
+
+        if (/INSERT INTO notification_outbox_events/i.test(sql)) {
+            const eventType = params[2];
+            state.notificationInserts += 1;
+            if (eventType === 'ORDER_CONFIRMED' || eventType === 'PAYMENT_SUCCESS') {
+                state.successNotificationInserts += 1;
+            }
+            if (eventType === 'PAYMENT_FAILED') {
+                state.failedNotificationInserts += 1;
+            }
+            if (eventType === 'REFUND_ACTION_REQUIRED') {
+                state.reconciliationNotificationInserts += 1;
+                state.durableReconciliationNotificationInserts += 1;
+            }
+            return {
+                rows: [{
+                    id: params[0],
+                    source_event_key: params[1],
+                    event_type: eventType,
+                    aggregate_type: params[3],
+                    aggregate_id: params[4],
+                    aggregate_revision: params[5],
+                    payload: JSON.parse(params[6]),
+                    status: 'PENDING',
+                    inserted: true
+                }]
+            };
         }
 
         if (/INSERT INTO notifications/i.test(sql)) {
@@ -385,7 +421,7 @@ const assertNoSecrets = (response, state) => {
         const failedState = createPaymentState();
         await withServer(failedState, async (server) => {
             const response = await postForm(server, '/api/payments/webhook/paytr', buildPayload());
-            assert.strictEqual(response.statusCode, 200);
+            assert.strictEqual(response.statusCode, 200, response.text);
             assert.strictEqual(response.text, 'OK');
             assert.strictEqual(failedState.paymentStatus, PAYMENT_STATUS.FAILED);
             assert.strictEqual(failedState.orderPaymentStatus, PAYMENT_STATUS.FAILED);
@@ -414,7 +450,7 @@ const assertNoSecrets = (response, state) => {
                 failed_reason_code: '',
                 failed_reason_msg: ''
             }));
-            assert.strictEqual(response.statusCode, 200);
+            assert.strictEqual(response.statusCode, 200, response.text);
             assert.strictEqual(response.text, 'OK');
             assert.strictEqual(successState.paymentStatus, PAYMENT_STATUS.PAID);
             assert.strictEqual(successState.orderPaymentStatus, PAYMENT_STATUS.PAID);
@@ -642,7 +678,11 @@ const assertNoSecrets = (response, state) => {
             assert.strictEqual(notificationFailureReconciliationState.paymentReconciliationRequiredEvents, 1);
             assert.strictEqual(notificationFailureReconciliationState.durableReconciliationNotificationInserts, 1);
             assert.strictEqual(notificationFailureReconciliationState.webhookProcessedUpdates, 1);
-            assert.ok(capturedNotificationErrors.length >= 1);
+            assert.strictEqual(
+                capturedNotificationErrors.length,
+                0,
+                'transactional outbox must not depend on the post-commit socket notification module'
+            );
         });
 
         const providerMismatchState = createPaymentState({ provider: 'iyzico' });

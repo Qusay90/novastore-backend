@@ -215,5 +215,12 @@
     "sha256": "28cc7c35ef6f167fa89abfd0f557688eec2039576c36dcfe7063c51847655959",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260828_02_unified_notification_core",
+    "path": "migrations/20260828_02_unified_notification_core.sql",
+    "sha256": "fb665ef3482395ce63b8854afbc80bf8993457ad0390721d0703fc616df38850",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

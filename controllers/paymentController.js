@@ -1,7 +1,8 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
 const { sendAuthError } = require('../middlewares/authMiddleware');
-const { createNotification } = require('./notificationController');
+const { EVENT } = require('../services/notificationEventCatalog');
+const { enqueueNotificationEvent } = require('../services/notificationOutboxService');
 const { initializeIyzicoPayment, verifyWebhookSignature } = require('../services/paymentProviderService');
 const {
     PaymentProviderConfigError,
@@ -341,15 +342,6 @@ const redactPaymentSecretText = (value = '') => {
     return text;
 };
 
-const createPaymentNotificationSafely = async (provider, userId, type, message, target) => {
-    try {
-        const { io } = require('../server');
-        await createNotification(userId, type, message, io, target);
-    } catch (err) {
-        console.error(`${provider} notification dispatch failed:`, redactPaymentSecretText(err.message));
-    }
-};
-
 const persistOpenPaymentReconciliation = async ({
     client,
     payment,
@@ -406,20 +398,49 @@ const persistOpenPaymentReconciliation = async ({
         reconciliationTask
     );
 
-    const notificationResult = await client.query(
-        `INSERT INTO notifications (user_id, type, message)
-         VALUES (NULL, $1, $2)
-         RETURNING id`,
-        [
-            'order_update',
-            `Aksiyon gerekli: Sipariş #${payment.order_id} için ödeme mutabakatı açık (${reconciliationTask.reasonCode}, ${taskId}).`
-        ]
-    );
+    const notificationEvent = await enqueueNotificationEvent(client, {
+        eventType: EVENT.REFUND_ACTION_REQUIRED,
+        aggregateType: 'order',
+        aggregateId: payment.order_id,
+        sourceEventKey: `REFUND_ACTION_REQUIRED:order:${payment.order_id}:${providerEventId}`,
+        payload: { provider, reasonCode: reconciliationTask.reasonCode }
+    });
 
     return {
         ...reconciliationTask,
-        notificationId: notificationResult.rows[0]?.id || null
+        notificationOutboxEventId: notificationEvent.id
     };
+};
+
+const enqueuePaymentOutcomeNotifications = async ({ client, payment, plan, provider, providerEventId }) => {
+    if (plan.decision === PAYMENT_CALLBACK_DECISION.CAPTURE_ACTIVE) {
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.ORDER_CONFIRMED,
+            aggregateType: 'order',
+            aggregateId: payment.order_id,
+            sourceEventKey: `ORDER_CONFIRMED:order:${payment.order_id}:${providerEventId}`,
+            payload: { provider, outcome: 'captured' }
+        });
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.PAYMENT_SUCCESS,
+            aggregateType: 'order',
+            aggregateId: payment.order_id,
+            sourceEventKey: `PAYMENT_SUCCESS:order:${payment.order_id}:${providerEventId}`,
+            payload: { provider, outcome: 'captured' }
+        });
+    }
+    if ([
+        PAYMENT_CALLBACK_DECISION.FAIL_ACTIVE,
+        PAYMENT_CALLBACK_DECISION.FAIL_PRESERVE_ORDER
+    ].includes(plan.decision)) {
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.PAYMENT_FAILED,
+            aggregateType: 'order',
+            aggregateId: payment.order_id,
+            sourceEventKey: `PAYMENT_FAILED:order:${payment.order_id}:${providerEventId}`,
+            payload: { provider, outcome: 'failed' }
+        });
+    }
 };
 
 const buildPaymentStatusResponse = (row) => {
@@ -758,6 +779,14 @@ const finalizePaytrCallback = async (payload, callbackOutcome) => {
             });
         }
 
+        await enqueuePaymentOutcomeNotifications({
+            client,
+            payment,
+            plan,
+            provider: 'paytr',
+            providerEventId: eventId
+        });
+
         await persistOpenPaymentReconciliation({
             client,
             payment,
@@ -809,49 +838,12 @@ const webhookPaytr = async (req, res) => {
         }
 
         if (payload.status === 'success') {
-            const { payment, decision } = await finalizePaytrSuccess(payload);
-
-            if (decision === PAYMENT_CALLBACK_DECISION.CAPTURE_ACTIVE && payment) {
-                if (payment.user_id) {
-                    await createPaymentNotificationSafely(
-                        'PayTR',
-                        payment.user_id,
-                        'order_update',
-                        `Sipariş #${payment.order_id} ödemesi başarıyla alındı.`,
-                        { entityType: 'order', entityId: Number(payment.order_id) }
-                    );
-                }
-
-                await createPaymentNotificationSafely(
-                    'PayTR',
-                    null,
-                    'new_order',
-                    `Yeni sipariş kesinleşti (#${payment.order_id}). Müşteri: ${payment.customer_name || 'Bilinmiyor'}`,
-                    { entityType: 'order', entityId: Number(payment.order_id) }
-                );
-            }
+            await finalizePaytrSuccess(payload);
             return res.type('text/plain').status(200).send('OK');
         }
 
         if (isPaytrFailedStatus(payload.status)) {
-            const { payment, decision } = await finalizePaytrFailure(payload);
-
-            if (
-                payment &&
-                payment.user_id &&
-                [
-                    PAYMENT_CALLBACK_DECISION.FAIL_ACTIVE,
-                    PAYMENT_CALLBACK_DECISION.FAIL_PRESERVE_ORDER
-                ].includes(decision)
-            ) {
-                await createPaymentNotificationSafely(
-                    'PayTR',
-                    payment.user_id,
-                    'order_update',
-                    `Sipariş #${payment.order_id} ödemesi başarısız oldu.`,
-                    { entityType: 'order', entityId: Number(payment.order_id) }
-                );
-            }
+            await finalizePaytrFailure(payload);
             return res.type('text/plain').status(200).send('OK');
         }
 
@@ -1117,6 +1109,14 @@ const initializePayment = async (req, res) => {
             paymentRef,
             idempotencyKey,
             paymentStatus
+        });
+
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.ORDER_CREATED,
+            aggregateType: 'order',
+            aggregateId: order.id,
+            sourceEventKey: `ORDER_CREATED:order:${order.id}:payment-init`,
+            payload: { source: 'payment_initialize', paymentMethod }
         });
 
         await client.query('COMMIT');
@@ -1508,6 +1508,14 @@ const webhookIyzico = async (req, res) => {
             });
         }
 
+        await enqueuePaymentOutcomeNotifications({
+            client,
+            payment,
+            plan,
+            provider: 'iyzico',
+            providerEventId: eventId
+        });
+
         await persistOpenPaymentReconciliation({
             client,
             payment,
@@ -1523,33 +1531,6 @@ const webhookIyzico = async (req, res) => {
         );
 
         await client.query('COMMIT');
-
-        const shouldNotifyCapture = plan.decision === PAYMENT_CALLBACK_DECISION.CAPTURE_ACTIVE;
-        const shouldNotifyFailure = [
-            PAYMENT_CALLBACK_DECISION.FAIL_ACTIVE,
-            PAYMENT_CALLBACK_DECISION.FAIL_PRESERVE_ORDER
-        ].includes(plan.decision);
-        if (payment.user_id && (shouldNotifyCapture || shouldNotifyFailure)) {
-            await createPaymentNotificationSafely(
-                'Iyzico',
-                payment.user_id,
-                'order_update',
-                shouldNotifyCapture
-                    ? `Sipari\u015F #${payment.order_id} \u00F6demesi ba\u015Far\u0131yla al\u0131nd\u0131.`
-                    : `Sipari\u015F #${payment.order_id} \u00F6demesi ba\u015Far\u0131s\u0131z oldu.`,
-                { entityType: 'order', entityId: Number(payment.order_id) }
-            );
-        }
-
-        if (shouldNotifyCapture) {
-            await createPaymentNotificationSafely(
-                'Iyzico',
-                null,
-                'new_order',
-                `Yeni sipari\u015F kesinle\u015Fti (#${payment.order_id}). M\u00FC\u015Fteri: ${payment.customer_name || 'Bilinmiyor'}`,
-                { entityType: 'order', entityId: Number(payment.order_id) }
-            );
-        }
 
         const duplicate = isDuplicatePaymentDecision(plan.decision);
         res.status(200).json({

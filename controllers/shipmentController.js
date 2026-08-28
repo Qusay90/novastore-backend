@@ -1,5 +1,4 @@
 const pool = require('../config/db');
-const { createNotification } = require('./notificationController');
 const { isAdminCommerceCapabilityEnabled } = require('../services/adminCommerceCapabilityService');
 const { ManualShipmentError } = require('../services/manualShipmentPolicy');
 const { recordManualShipment } = require('../services/manualShipmentService');
@@ -23,40 +22,11 @@ const getIdempotencyKey = (req) => {
     return req.headers?.['idempotency-key'] ?? req.headers?.['Idempotency-Key'];
 };
 
-const notifyManualShipmentSafely = async (
-    { orderId, userId },
-    {
-        createNotificationFn = createNotification,
-        getIoFn = () => require('../server').io,
-        logErrorFn = console.error
-    } = {}
-) => {
-    if (userId === null || userId === undefined || !Number.isInteger(Number(userId))) return false;
-    try {
-        const notification = await createNotificationFn(
-            Number(userId),
-            'order_update',
-            `Sipariş #${orderId} kargoya verildi.`,
-            getIoFn(),
-            { entityType: 'order', entityId: Number(orderId) }
-        );
-        if (!notification) {
-            logErrorFn('Manuel kargo kaydı sonrası bildirim hazırlanamadı.');
-            return false;
-        }
-        return true;
-    } catch (notificationError) {
-        logErrorFn('Manuel kargo kaydı sonrası bildirim hazırlanamadı.');
-        return false;
-    }
-};
-
 const createManualShipment = async (
     req,
     res,
     {
-        recordManualShipmentFn = recordManualShipment,
-        notificationDependencies = undefined
+        recordManualShipmentFn = recordManualShipment
     } = {}
 ) => {
     const orderId = Number(req.params.orderId);
@@ -80,12 +50,6 @@ const createManualShipment = async (
             body: req.body,
             actor: req.currentAdmin || req.user
         });
-        if (!result.reused) {
-            await notifyManualShipmentSafely(
-                { orderId, userId: result.userId },
-                notificationDependencies
-            );
-        }
         return res.status(result.reused ? 200 : 201).json({
             mesaj: result.reused
                 ? 'Manuel kargo kaydı daha önce oluşturulmuş.'
@@ -158,6 +122,5 @@ module.exports = {
     createShipment,
     createManualShipment,
     getIdempotencyKey,
-    getShipment,
-    notifyManualShipmentSafely
+    getShipment
 };

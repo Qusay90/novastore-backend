@@ -199,6 +199,24 @@ const createCouponLimitClient = (state) => ({
             return { rows: [{ id: state.orderItemWrites }], rowCount: 1 };
         }
 
+        if (/INSERT INTO notification_outbox_events/i.test(sql)) {
+            state.notificationOutboxInserts += 1;
+            assert.ok(['ORDER_CONFIRMED', 'PAYMENT_SUCCESS'].includes(params[2]));
+            return {
+                rows: [{
+                    id: params[0],
+                    source_event_key: params[1],
+                    event_type: params[2],
+                    aggregate_type: params[3],
+                    aggregate_id: params[4],
+                    aggregate_revision: params[5],
+                    payload: JSON.parse(params[6]),
+                    status: 'PENDING',
+                    inserted: true
+                }]
+            };
+        }
+
         throw new Error(`Unexpected coupon limit query: ${sql}`);
     },
     release() {}
@@ -250,6 +268,7 @@ const createCouponLimitClient = (state) => ({
             webhookProcessedUpdates: 0,
             lateSideEffects: 0,
             orderItemWrites: 0,
+            notificationOutboxInserts: 0,
             calls: []
         };
         pool.connect = async () => createCouponLimitClient(state);
@@ -272,6 +291,7 @@ const createCouponLimitClient = (state) => ({
         assert.strictEqual(state.webhookProcessedUpdates, 1);
         assert.strictEqual(state.lateSideEffects, 2);
         assert.strictEqual(state.orderItemWrites, 1);
+        assert.strictEqual(state.notificationOutboxInserts, 2);
 
         console.log('payment coupon usage limit smoke passed');
     } finally {

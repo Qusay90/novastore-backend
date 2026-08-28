@@ -168,7 +168,9 @@ const migrationSource = fs.readFileSync(
 const returnSource = fs.readFileSync(path.join(root, 'services', 'returnWorkflowService.js'), 'utf8');
 assert.match(paymentControllerSource, /pg_advisory_xact_lock\(hashtextextended\(\$1, 0\)\)/);
 assert.match(paymentControllerSource, /createPendingPaymentOrder/);
-assert.match(paymentControllerSource, /entityType:\s*['"]order['"]/);
+assert.match(paymentControllerSource, /enqueueNotificationEvent\(client/);
+assert.match(paymentControllerSource, /eventType:\s*EVENT\.(?:ORDER_CREATED|ORDER_CONFIRMED|PAYMENT_SUCCESS|PAYMENT_FAILED)/);
+assert.doesNotMatch(paymentControllerSource, /createPaymentNotificationSafely/);
 assert.match(migrationSource, /CREATE UNIQUE INDEX IF NOT EXISTS uq_returns_one_active_per_order/);
 assert.match(migrationSource, /CREATE TRIGGER trg_return_events_append_only/);
 assert.match(migrationSource, /CREATE UNIQUE INDEX IF NOT EXISTS uq_seller_order_items_source_index/);

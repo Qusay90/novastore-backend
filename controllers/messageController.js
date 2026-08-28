@@ -1,6 +1,7 @@
 const pool = require('../config/db');
-const { createNotification } = require('./notificationController');
 const { assertExternalSideEffectAllowed } = require('../config/stagingRuntimePolicy');
+const { EVENT } = require('../services/notificationEventCatalog');
+const { enqueueNotificationEvent } = require('../services/notificationOutboxService');
 const {
     SupportThreadError,
     appendSupportEvent,
@@ -110,6 +111,10 @@ exports.sendMessage = async (req, res) => {
             } else {
                 thread = await reopenSupportThreadForCustomer(client, { thread, customerId });
             }
+            const previousMessage = await client.query(
+                'SELECT id FROM messages WHERE support_thread_id = $1 ORDER BY id ASC LIMIT 1',
+                [thread.id]
+            );
             const receiverId = isAdmin
                 ? customerId
                 : Number(thread.assigned_admin_id) || await getPrimaryAdminId(client);
@@ -125,26 +130,22 @@ exports.sendMessage = async (req, res) => {
                 receiverId,
                 message
             });
+            const notificationEvent = isAdmin
+                ? EVENT.SUPPORT_REPLY
+                : (previousMessage.rows.length === 0 ? EVENT.SUPPORT_CREATED : EVENT.SUPPORT_MESSAGE);
+            await enqueueNotificationEvent(client, {
+                eventType: notificationEvent,
+                aggregateType: 'support_thread',
+                aggregateId: thread.id,
+                aggregateRevision: Number(savedMessage.id),
+                sourceEventKey: `${notificationEvent}:support_thread:${thread.id}:message:${savedMessage.id}`,
+                payload: { source: isAdmin ? 'admin_reply' : 'customer_message' }
+            });
             return { thread, savedMessage };
         });
 
         const normalizedSavedMessage = normalizeMessageRow(result.savedMessage);
         emitRealtimeMessage(result.savedMessage, isAdmin ? 'customer' : 'admin');
-
-        if (!isAdmin) {
-            try {
-                const { io } = require('../server');
-                await createNotification(
-                    null,
-                    'support_message',
-                    `Müşteri #${customerId} destek ekibine yazdı.`,
-                    io,
-                    { entityType: 'support_thread', entityId: result.thread.id }
-                );
-            } catch (error) {
-                console.error('Destek mesajı bildirimi oluşturulamadı:', error.message);
-            }
-        }
 
         return res.status(201).json(normalizedSavedMessage);
     } catch (error) {

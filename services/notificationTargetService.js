@@ -1,14 +1,26 @@
 const NOTIFICATION_ENTITY_TYPES = Object.freeze([
     'order',
+    'payment',
     'product',
     'product_question',
     'return_request',
     'review',
+    'seller_application',
+    'shipment',
+    'store',
     'support_thread'
 ]);
 
 const notificationEntityTypes = new Set(NOTIFICATION_ENTITY_TYPES);
-const ALLOWED_TARGET_FIELDS = new Set(['entityType', 'entityId', 'entity_type', 'entity_id']);
+const ALLOWED_TARGET_FIELDS = new Set([
+    'entityType',
+    'entityId',
+    'entityKey',
+    'entity_type',
+    'entity_id',
+    'entity_key'
+]);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 class NotificationTargetError extends TypeError {
     constructor(message, code = 'NOTIFICATION_TARGET_INVALID') {
@@ -45,7 +57,11 @@ const normalizeNotificationTarget = (target) => {
     const entityType = String(readAliasedTargetField(target, 'entityType', 'entity_type') || '')
         .trim()
         .toLowerCase();
-    const entityId = Number(readAliasedTargetField(target, 'entityId', 'entity_id'));
+    const rawEntityId = readAliasedTargetField(target, 'entityId', 'entity_id');
+    const entityId = rawEntityId === undefined || rawEntityId === null || rawEntityId === ''
+        ? null
+        : Number(rawEntityId);
+    const entityKey = String(readAliasedTargetField(target, 'entityKey', 'entity_key') || '').trim().toLowerCase() || null;
 
     if (!notificationEntityTypes.has(entityType)) {
         throw new NotificationTargetError(
@@ -53,7 +69,16 @@ const normalizeNotificationTarget = (target) => {
             'NOTIFICATION_TARGET_TYPE_REJECTED'
         );
     }
-    if (!Number.isSafeInteger(entityId) || entityId <= 0) {
+    if (entityType === 'seller_application') {
+        if (entityId !== null || !entityKey || !UUID_PATTERN.test(entityKey)) {
+            throw new NotificationTargetError(
+                'Satıcı başvurusu hedefi geçerli bir entityKey içermelidir.',
+                'NOTIFICATION_TARGET_KEY_INVALID'
+            );
+        }
+        return Object.freeze({ entityType, entityKey });
+    }
+    if (entityKey !== null || !Number.isSafeInteger(entityId) || entityId <= 0) {
         throw new NotificationTargetError(
             'Bildirim hedef kimliği pozitif bir tam sayı olmalıdır.',
             'NOTIFICATION_TARGET_ID_INVALID'

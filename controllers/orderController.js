@@ -1,5 +1,6 @@
 const pool = require('../config/db');
-const { createNotification } = require('./notificationController');
+const { EVENT } = require('../services/notificationEventCatalog');
+const { enqueueNotificationEvent } = require('../services/notificationOutboxService');
 const { getUserFromRequestIfAny, sendAuthError } = require('../middlewares/authMiddleware');
 const {
     ORDER_STATUS,
@@ -75,28 +76,6 @@ const runOrderQueryWithFallback = async (client, primaryQuery, params, fallbackQ
         if (!isShipmentSchemaMismatch) throw err;
         return client.query(fallbackQuery, params);
     }
-};
-
-const notifyOrderCreated = async (orderId, userId, customerName) => {
-    const { io } = require('../server');
-
-    if (userId) {
-        await createNotification(
-            userId,
-            'order_update',
-            `#${orderId} numaralı siparişiniz alındı ve ödeme süreci başlatıldı.`,
-            io,
-            { entityType: 'order', entityId: orderId }
-        );
-    }
-
-    await createNotification(
-        null,
-        'new_order',
-        `Yeni sipariş alındı! Sipariş No: #${orderId} - Müşteri: ${customerName}`,
-        io,
-        { entityType: 'order', entityId: orderId }
-    );
 };
 
 const fetchOrderById = async (client, orderId, { forUpdate = false } = {}) => {
@@ -247,9 +226,15 @@ const createReservedLegacyOrder = async (req, res) => {
             ]
         );
 
-        await client.query('COMMIT');
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.ORDER_CREATED,
+            aggregateType: 'order',
+            aggregateId: order.id,
+            sourceEventKey: `ORDER_CREATED:order:${order.id}:legacy-reserved`,
+            payload: { source: 'legacy_reserved_order' }
+        });
 
-        await notifyOrderCreated(order.id, userId, fullName);
+        await client.query('COMMIT');
 
         res.status(201).json({
             mesaj: 'Siparişiniz başarıyla alındı!',
@@ -472,25 +457,17 @@ const cancelOrder = async (req, res) => {
             idempotencyKey: adminCommand?.idempotencyKey || null,
             requestFingerprint: adminCommand?.requestFingerprint || null
         });
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.CANCELLATION_RESULT,
+            aggregateType: 'order',
+            aggregateId: orderId,
+            sourceEventKey: `CANCELLATION_RESULT:order:${orderId}:cancelled`,
+            payload: { source: isAdmin ? 'admin_cancellation' : 'customer_cancellation' }
+        });
 
         const updatedOrder = await fetchOrderById(client, orderId);
         await client.query('COMMIT');
         transactionOpen = false;
-
-        if (order.user_id) {
-            try {
-                const { io } = require('../server');
-                await createNotification(
-                    order.user_id,
-                    'order_update',
-                    `Sipariş #${orderId} iptal edildi.`,
-                    io,
-                    { entityType: 'order', entityId: orderId }
-                );
-            } catch (notificationError) {
-                console.error('İptal sonrası bildirim hazırlanamadı:', notificationError.message);
-            }
-        }
 
         return res.status(200).json({
             mesaj: 'Sipariş iptal edildi.',

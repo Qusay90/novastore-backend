@@ -26,8 +26,7 @@ const {
 const {
     createManualShipment,
     createShipment,
-    getShipment,
-    notifyManualShipmentSafely
+    getShipment
 } = require('../controllers/shipmentController');
 const { requireAdminCommerceCapability } = require('../middlewares/adminCommerceCapability');
 
@@ -50,7 +49,7 @@ const createResponse = () => ({
 
 const clone = (value) => (value ? { ...value } : value);
 
-const createState = ({ order = {}, payment = {} } = {}) => ({
+const createState = ({ order = {}, payment = {}, outboxFailure = false } = {}) => ({
     order: {
         id: 7001,
         user_id: null,
@@ -79,6 +78,9 @@ const createState = ({ order = {}, payment = {} } = {}) => ({
     shipmentInserts: 0,
     orderUpdates: 0,
     orderEvents: 0,
+    notificationOutboxInserts: 0,
+    notificationOutboxEvent: null,
+    outboxFailure,
     eventPayload: null,
     released: false
 });
@@ -130,6 +132,22 @@ const createClient = (state) => ({
             state.orderEvents += 1;
             state.eventPayload = JSON.parse(params[3]);
             return { rows: [{ id: state.orderEvents }], rowCount: 1 };
+        }
+        if (/INSERT INTO notification_outbox_events/i.test(text)) {
+            state.notificationOutboxInserts += 1;
+            if (state.outboxFailure) throw new Error('simulated transactional notification outbox failure');
+            state.notificationOutboxEvent = {
+                id: params[0],
+                source_event_key: params[1],
+                event_type: params[2],
+                aggregate_type: params[3],
+                aggregate_id: params[4],
+                aggregate_revision: params[5],
+                payload: JSON.parse(params[6]),
+                status: 'PENDING',
+                inserted: true
+            };
+            return { rows: [clone(state.notificationOutboxEvent)], rowCount: 1 };
         }
         throw new Error(`Unexpected manual shipment fake query: ${text}`);
     },
@@ -233,6 +251,10 @@ const runMutation = async (state, requestOptions = {}, dependencies = undefined)
         assert.equal(state.shipmentInserts, 1);
         assert.equal(state.orderUpdates, 1);
         assert.equal(state.orderEvents, 1);
+        assert.equal(state.notificationOutboxInserts, 1);
+        assert.equal(state.notificationOutboxEvent.event_type, 'SHIPMENT_CREATED');
+        assert.equal(state.notificationOutboxEvent.aggregate_type, 'order');
+        assert.equal(Number(state.notificationOutboxEvent.aggregate_id), 7001);
         assert.equal(state.released, true);
 
         const firstOrderLock = state.calls.findIndex(({ sql }) => /FROM orders\s+WHERE id = \$1\s+FOR UPDATE/i.test(sql));
@@ -241,6 +263,7 @@ const runMutation = async (state, requestOptions = {}, dependencies = undefined)
         const firstShipmentWrite = state.calls.findIndex(({ sql }) => /INSERT INTO shipments/i.test(sql));
         const firstOrderWrite = state.calls.findIndex(({ sql }) => /UPDATE orders/i.test(sql));
         const firstEventWrite = state.calls.findIndex(({ sql }) => /INSERT INTO order_events/i.test(sql));
+        const firstNotificationOutboxWrite = state.calls.findIndex(({ sql }) => /INSERT INTO notification_outbox_events/i.test(sql));
         const firstCommit = state.calls.findIndex(({ sql }) => sql === 'COMMIT');
         assert(firstOrderLock > 0, 'order must be locked after BEGIN');
         assert(firstShipmentLock > firstOrderLock, 'shipment lock follows order lock');
@@ -248,7 +271,8 @@ const runMutation = async (state, requestOptions = {}, dependencies = undefined)
         assert(firstShipmentWrite > firstPaymentsLock, 'shipment write follows every proof lock');
         assert(firstOrderWrite > firstShipmentWrite, 'order update follows shipment insert');
         assert(firstEventWrite > firstOrderWrite, 'audit event follows order update');
-        assert(firstCommit > firstEventWrite, 'commit follows every atomic write');
+        assert(firstNotificationOutboxWrite > firstEventWrite, 'notification outbox follows the authoritative order event');
+        assert(firstCommit > firstNotificationOutboxWrite, 'commit follows every atomic write including notification outbox');
 
         const rawMetadata = JSON.parse(state.shipment.raw_payload);
         assert.equal(rawMetadata.source, 'admin_manual_fulfillment');
@@ -320,60 +344,13 @@ const runMutation = async (state, requestOptions = {}, dependencies = undefined)
         assert.equal(reconciliationState.orderEvents, 0);
         assert.equal(reconciliationState.calls.at(-1).sql, 'ROLLBACK');
 
-        const notificationState = createState({ order: { user_id: 44 } });
-        let notificationAttempts = 0;
-        let notificationLogCalls = 0;
-        const notificationFailureResponse = await runMutation(
-            notificationState,
-            {},
-            {
-                notificationDependencies: {
-                    createNotificationFn: async () => {
-                        notificationAttempts += 1;
-                        assert.equal(notificationState.calls.at(-1).sql, 'COMMIT');
-                        throw new Error('simulated post-commit notification failure');
-                    },
-                    getIoFn: () => ({ simulated: true }),
-                    logErrorFn: (message) => {
-                        notificationLogCalls += 1;
-                        assert.equal(message, 'Manuel kargo kaydı sonrası bildirim hazırlanamadı.');
-                    }
-                }
-            }
-        );
-        assert.equal(notificationFailureResponse.statusCode, 201);
-        assert.equal(notificationFailureResponse.payload.reused, false);
-        assert.equal(notificationFailureResponse.payload.order.status, ORDER_STATUS.KARGOYA_VERILDI);
-        assert.equal(notificationAttempts, 1);
-        assert.equal(notificationLogCalls, 1);
-        assert.equal(notificationState.shipmentInserts, 1);
-        assert.equal(notificationState.orderUpdates, 1);
-        assert.equal(notificationState.orderEvents, 1);
-        assert.equal(notificationState.calls.some(({ sql }) => sql === 'ROLLBACK'), false);
-
-        let directNotificationLogs = 0;
-        const directNotificationResult = await notifyManualShipmentSafely(
-            { orderId: 7001, userId: 44 },
-            {
-                createNotificationFn: async () => { throw new Error('simulated rejection'); },
-                getIoFn: () => ({}),
-                logErrorFn: () => { directNotificationLogs += 1; }
-            }
-        );
-        assert.equal(directNotificationResult, false);
-        assert.equal(directNotificationLogs, 1);
-
-        let nullNotificationLogs = 0;
-        const nullNotificationResult = await notifyManualShipmentSafely(
-            { orderId: 7001, userId: 44 },
-            {
-                createNotificationFn: async () => null,
-                getIoFn: () => ({}),
-                logErrorFn: () => { nullNotificationLogs += 1; }
-            }
-        );
-        assert.equal(nullNotificationResult, false);
-        assert.equal(nullNotificationLogs, 1);
+        const notificationState = createState({ order: { user_id: 44 }, outboxFailure: true });
+        const notificationFailureResponse = await runMutation(notificationState);
+        assert.equal(notificationFailureResponse.statusCode, 500);
+        assert.equal(notificationFailureResponse.payload.code, 'MANUAL_SHIPMENT_FAILED');
+        assert.equal(notificationState.notificationOutboxInserts, 1);
+        assert.equal(notificationState.calls.at(-1).sql, 'ROLLBACK');
+        assert.equal(notificationState.calls.some(({ sql }) => sql === 'COMMIT'), false);
 
         pool.query = async () => ({
             rows: [{

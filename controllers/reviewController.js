@@ -1,11 +1,12 @@
 const pool = require('../config/db');
-const { createNotification } = require('./notificationController');
 const { getUserFromRequestIfAny, sendAuthError } = require('../middlewares/authMiddleware');
 const { ORDER_STATUS } = require('../constants/orderStatus');
 const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 const { maskFullName } = require('../services/privacyService');
 const { reviewUpload, uploadReviewMediaFiles, cleanupCloudinaryAssets } = require('../config/cloudinary');
 const { PLATFORM_STORE } = require('../services/categoryV2BackfillService');
+const { EVENT } = require('../services/notificationEventCatalog');
+const { enqueueNotificationEvent } = require('../services/notificationOutboxService');
 
 const MAX_REVIEW_MEDIA_COUNT = 4;
 const MAX_REVIEW_COMMENT_LENGTH = 2000;
@@ -427,6 +428,15 @@ const addReview = async (req, res) => {
             );
         }
 
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.REVIEW_CREATED,
+            aggregateType: 'review',
+            aggregateId: reviewId,
+            aggregateRevision: 1,
+            sourceEventKey: `REVIEW_CREATED:review:${reviewId}:r1`,
+            payload: { source: 'customer_review' }
+        });
+
         await client.query('COMMIT');
 
         res.status(201).json({
@@ -435,17 +445,6 @@ const addReview = async (req, res) => {
             status: REVIEW_STATUS.PENDING
         });
 
-        // Admin'e yeni yorum bildirimi (asenkron)
-        try {
-            const { io } = require('../server');
-            await createNotification(
-                null,
-                'new_review',
-                `Yeni bir ürün yorumu eklendi! Ürün ID: #${numericProductId} - Puan: ${numericRating}/5`,
-                io,
-                { entityType: 'review', entityId: Number(reviewId) }
-            );
-        } catch (_) { }
     } catch (err) {
         if (client) {
             try {
@@ -718,6 +717,14 @@ const moderateReview = async (req, res) => {
                 JSON.stringify(requestAuditMetadata(req, { product_id: Number(current.product_id) }))
             ]
         );
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.REVIEW_MODERATION_RESULT,
+            aggregateType: 'review',
+            aggregateId: reviewId,
+            aggregateRevision: Number(updated.revision),
+            sourceEventKey: `REVIEW_MODERATION_RESULT:review:${reviewId}:r${Number(updated.revision)}`,
+            payload: { status: updated.status }
+        });
         await client.query('COMMIT');
 
         return res.status(200).json({

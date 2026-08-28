@@ -157,6 +157,24 @@ const createInitializeClient = ({ existingPaymentRows = [] } = {}) => {
                 throw new Error('initialize must not increment coupon usage');
             }
 
+            if (/INSERT INTO notification_outbox_events/i.test(sql)) {
+                state.notificationInserts += 1;
+                assert.strictEqual(params[2], 'ORDER_CREATED');
+                return {
+                    rows: [{
+                        id: params[0],
+                        source_event_key: params[1],
+                        event_type: params[2],
+                        aggregate_type: params[3],
+                        aggregate_id: params[4],
+                        aggregate_revision: params[5],
+                        payload: JSON.parse(params[6]),
+                        status: 'PENDING',
+                        inserted: true
+                    }]
+                };
+            }
+
             if (/INSERT INTO notifications/i.test(sql)) {
                 state.notificationInserts += 1;
                 throw new Error('initialize must not create notifications');
@@ -348,6 +366,32 @@ const createCallbackClient = (state) => ({
             return { rows: [] };
         }
 
+        if (/INSERT INTO notification_outbox_events/i.test(sql)) {
+            const eventType = params[2];
+            if (eventType === 'ORDER_CONFIRMED' || eventType === 'PAYMENT_SUCCESS') {
+                state.successNotifications += 1;
+            }
+            if (eventType === 'PAYMENT_FAILED') {
+                state.failedNotifications += 1;
+            }
+            if (eventType === 'REFUND_ACTION_REQUIRED') {
+                state.durableReconciliationNotifications += 1;
+            }
+            return {
+                rows: [{
+                    id: params[0],
+                    source_event_key: params[1],
+                    event_type: eventType,
+                    aggregate_type: params[3],
+                    aggregate_id: params[4],
+                    aggregate_revision: params[5],
+                    payload: JSON.parse(params[6]),
+                    status: 'PENDING',
+                    inserted: true
+                }]
+            };
+        }
+
         if (/INSERT INTO notifications/i.test(sql)) {
             state.durableReconciliationNotifications += 1;
             return { rows: [{ id: state.durableReconciliationNotifications }] };
@@ -491,7 +535,7 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
         assert.strictEqual(initRun.res.body.paymentStatus, PAYMENT_STATUS.REQUIRES_ACTION);
         assert.strictEqual(initRun.client.state.stockDecrements, 1);
         assert.strictEqual(initRun.client.state.couponIncrements, 0);
-        assert.strictEqual(initRun.client.state.notificationInserts, 0);
+        assert.strictEqual(initRun.client.state.notificationInserts, 1);
         const paymentInsert = initRun.client.state.calls.find((call) => /INSERT INTO payments/i.test(call.sql));
         assert.ok(paymentInsert);
         const initRawRequest = JSON.parse(paymentInsert.params[7]);

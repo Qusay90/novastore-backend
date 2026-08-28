@@ -78,6 +78,7 @@ const reviewController = require('../controllers/reviewController');
 const questionController = require('../controllers/questionController');
 const messageController = require('../controllers/messageController');
 const { createNotification } = require('../controllers/notificationController');
+const { dispatchNotificationOutboxBatch } = require('../services/notificationOutboxService');
 const {
     deleteProductMediaRecord,
     registerProductMedia,
@@ -162,7 +163,7 @@ const customerActor = (id) => ({ id: Number(id), role: 'customer', principal: 'c
         const migrationCount = await pool.query(
             'SELECT COUNT(*)::INTEGER AS count FROM novastore_schema_migrations'
         );
-        assert.equal(migrationCount.rows[0].count, 31, 'Combined DB must have exactly 31 migrations.');
+        assert.equal(migrationCount.rows[0].count, 32, 'Combined DB must have exactly 32 migrations.');
 
         const storeResult = await pool.query(
             `SELECT id, slug
@@ -465,12 +466,13 @@ const customerActor = (id) => ({ id: Number(id), role: 'customer', principal: 'c
         );
         const handoffMessageId = Number(handoffMessage.rows[0].id);
         const dismissalNotificationRows = await pool.query(
-            `INSERT INTO notifications (user_id, type, message, is_read, entity_type, entity_id)
+            `INSERT INTO notifications
+                (user_id, recipient_role, type, category, priority, title, message, is_read, entity_type, entity_id)
              VALUES
-                (NULL, 'ai_handoff', $1, FALSE, 'support_thread', $2),
-                (NULL, 'ai_handoff', $1, FALSE, 'support_thread', $3),
-                (NULL, 'ai_handoff', $4, FALSE, NULL, NULL),
-                (NULL, 'ai_handoff', $5, FALSE, NULL, NULL)
+                (NULL, 'admin', 'ai_handoff', 'SUPPORT', 'HIGH', 'Destek devri gerekli', $1, FALSE, 'support_thread', $2),
+                (NULL, 'admin', 'ai_handoff', 'SUPPORT', 'HIGH', 'Destek devri gerekli', $1, FALSE, 'support_thread', $3),
+                (NULL, 'admin', 'ai_handoff', 'SUPPORT', 'HIGH', 'Destek devri gerekli', $4, FALSE, NULL, NULL),
+                (NULL, 'admin', 'ai_handoff', 'SUPPORT', 'HIGH', 'Destek devri gerekli', $5, FALSE, NULL, NULL)
              RETURNING id`,
             [
                 `Müşteri #${customerId} destek devri`,
@@ -566,6 +568,7 @@ const customerActor = (id) => ({ id: Number(id), role: 'customer', principal: 'c
             }
         );
 
+        await dispatchNotificationOutboxBatch({ database: pool, limit: 100 });
         const generatedTargets = await pool.query(
             `SELECT type, user_id, entity_type, entity_id
              FROM notifications
@@ -575,20 +578,20 @@ const customerActor = (id) => ({ id: Number(id), role: 'customer', principal: 'c
             [questionId, reviewId, supportThreadId]
         );
         assert(generatedTargets.rows.some((row) => (
-            row.type === 'question_answered'
+            row.type === 'QUESTION_ANSWERED'
             && Number(row.user_id) === customerId
             && row.entity_type === 'product_question'
             && Number(row.entity_id) === questionId
         )));
         assert(generatedTargets.rows.some((row) => (
-            row.type === 'new_review'
-            && row.user_id === null
+            row.type === 'REVIEW_CREATED'
+            && Number(row.user_id) === adminId
             && row.entity_type === 'review'
             && Number(row.entity_id) === reviewId
         )));
         assert(generatedTargets.rows.some((row) => (
-            row.type === 'support_message'
-            && row.user_id === null
+            row.type === 'SUPPORT_CREATED'
+            && Number(row.user_id) === adminId
             && row.entity_type === 'support_thread'
             && Number(row.entity_id) === supportThreadId
         )));

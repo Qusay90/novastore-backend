@@ -14,6 +14,8 @@
     "test:main6s-operations:integration": "node tests/main6sOperationsPostgresSmoke.js",
     "test:launch-critical:integration": "node tests/launchCriticalCommercePostgresSmoke.js",
     "test:main6t-combined": "node tests/main6tCombinedIntegrationSmoke.js",
+    "test:notification-core:unit": "node tests/notificationCoreUnitSmoke.js",
+    "test:notification-core:integration": "node tests/notificationCorePostgresSmoke.js",
     "test:staging-runtime-safety": "node tests/stagingRuntimeSafetySmoke.js",
     "test:staging-access-gate": "node tests/stagingAccessGateHttpSmoke.js",
     "test:staging-release-readiness": "node tests/stagingReleaseContractSmoke.js && node tests/stagingVerificationHarnessSmoke.js",
@@ -38,7 +40,8 @@
     "nodemailer": "^9.0.3",
     "pg": "^8.16.3",
     "resend": "^6.9.3",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

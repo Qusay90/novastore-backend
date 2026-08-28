@@ -1,5 +1,7 @@
 const pool = require('../config/db');
 const { appendOrderEvent } = require('./orderService');
+const { EVENT } = require('./notificationEventCatalog');
+const { enqueueNotificationEvent } = require('./notificationOutboxService');
 const {
     ManualShipmentError,
     buildManualShipmentMetadata,
@@ -215,6 +217,13 @@ const recordManualShipment = async ({ orderId, idempotencyKey, body, actor }) =>
                 labelGenerated: false
             }
         );
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.SHIPMENT_CREATED,
+            aggregateType: 'order',
+            aggregateId: command.orderId,
+            sourceEventKey: `SHIPMENT_CREATED:order:${command.orderId}:shipment:${shipment.id}`,
+            payload: { source: 'manual_handoff_confirmed' }
+        });
 
         await client.query('COMMIT');
         transactionCommitted = true;

@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const { writeAuditAndOutbox } = require('./sellerAuditOutboxService');
 const { appendOrderEvent } = require('./orderService');
+const { enqueueNotificationEvent } = require('./notificationOutboxService');
 const { ORDER_STATUS, PAYMENT_STATUS, SHIPMENT_STATUS } = require('../constants/orderStatus');
 
 class SellerOrderFulfillmentError extends Error {
@@ -147,17 +148,17 @@ const propagateSingleSellerShipment = async (client, sellerOrder, carrierName, t
             trackingLast4: trackingNumber.slice(-4)
         }
     );
-    if (canonicalOrder.user_id) {
-        await client.query(
-            `INSERT INTO notifications (user_id, type, message, entity_type, entity_id)
-             VALUES ($1, 'order_update', $2, 'order', $3)`,
-            [
-                Number(canonicalOrder.user_id),
-                `Sipariş #${sellerOrder.canonical_order_id} kargoya verildi.`,
-                sellerOrder.canonical_order_id
-            ]
-        );
-    }
+    await enqueueNotificationEvent(client, {
+        eventType: 'SHIPMENT_CREATED',
+        aggregateType: 'order',
+        aggregateId: sellerOrder.canonical_order_id,
+        aggregateRevision: Number(sellerOrder.revision) + 1,
+        sourceEventKey: `seller-shipment-recorded:order:${sellerOrder.canonical_order_id}:r${Number(sellerOrder.revision) + 1}`,
+        payload: {
+            reasonCode: 'SELLER_SHIPMENT_RECORDED',
+            carrierApiExecuted: false
+        }
+    });
     return Object.freeze({ propagated: true, canonicalOrderId: sellerOrder.canonical_order_id });
 };
 

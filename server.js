@@ -408,6 +408,7 @@ if (localSellerApiEnabled) {
     const { createSellerPasswordRecoveryRouter } = require('./routes/sellerPasswordRecoveryRoutes');
     const { createSellerApplicationRouter } = require('./routes/sellerApplicationRoutes');
     const { createSellerBusinessRouter } = require('./routes/sellerBusinessRoutes');
+    const { createSellerNotificationRouter } = require('./routes/sellerNotificationRoutes');
     const { createSellerAuthMiddleware } = require('./middlewares/sellerAuthMiddleware');
     const { createSellerApplicantAuth } = require('./middlewares/sellerApplicantAuth');
     const { createSellerTenantContextMiddleware } = require('./middlewares/sellerTenantContext');
@@ -501,6 +502,7 @@ if (localSellerApiEnabled) {
     app.use('/api/seller/v1', createSellerPasswordRecoveryRouter({ controller: passwordRecoveryController }));
     app.use('/api/seller/v1', createSellerApplicationRouter({ controller: applicationController, applicantAuth }));
     app.use('/api/seller/v1', createSellerContextRouter({ enabled: true, auth, tenant, controller: contextController }));
+    app.use('/api/seller/v1', createSellerNotificationRouter({ enabled: true, auth, tenant }));
     app.use('/api/seller/v1', createSellerBusinessRouter({
         enabled: true,
         auth,
@@ -579,6 +581,10 @@ const start = async () => {
         console.log(`Veritabani hedefi: ${startupSafety.target.label}`);
         await prepareDatabase(startupSafety);
         if (!startupSafety.localPreviewMode) await socketRevocationService.start();
+        if (startupSafety.shouldVerifyDbConnection) {
+            const { startNotificationWorker } = require('./services/notificationWorkerService');
+            startNotificationWorker({ database: pool, getIo: () => io });
+        }
     } catch (err) {
         console.error('Veritabani hazirlama hatasi:', pool.formatError(err));
         process.exitCode = 1;

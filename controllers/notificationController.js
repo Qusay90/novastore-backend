@@ -1,3 +1,5 @@
+'use strict';
+
 const pool = require('../config/db');
 const { emitWithRetry } = require('../services/notificationService');
 const {
@@ -5,184 +7,262 @@ const {
     normalizeNotificationTarget
 } = require('../services/notificationTargetService');
 const {
-    ExternalSideEffectBlockedError,
-    assertExternalSideEffectAllowed
-} = require('../config/stagingRuntimePolicy');
+    NotificationReadError,
+    getUnreadCount,
+    listNotifications,
+    markAllNotificationsRead,
+    markNotificationRead
+} = require('../services/notificationReadService');
+const {
+    WebPushSubscriptionError,
+    getWebPushSubscriptionState,
+    regularBinding,
+    registerWebPushSubscription,
+    revokeWebPushSubscription,
+    revokeWebPushSubscriptionsForSession,
+    sellerBinding
+} = require('../services/webPushSubscriptionService');
+const { publicWebPushConfiguration } = require('../services/webPushProviderService');
 
 const redactKnownSecretText = (value = '') => {
     let text = String(value || '');
-    for (const secret of [process.env.PAYTR_MERCHANT_KEY, process.env.PAYTR_MERCHANT_SALT]) {
+    for (const secret of [process.env.PAYTR_MERCHANT_KEY, process.env.PAYTR_MERCHANT_SALT, process.env.VAPID_PRIVATE_KEY]) {
         const secretText = String(secret || '').trim();
-        if (secretText) {
-            text = text.split(secretText).join('[REDACTED]');
-        }
+        if (secretText) text = text.split(secretText).join('[REDACTED]');
     }
     return text;
 };
 
+const legacyTitle = (type) => ({
+    ai_handoff: 'Destek devri gerekli',
+    new_order: 'Yeni sipariş',
+    new_question: 'Yeni ürün sorusu',
+    new_review: 'Yeni değerlendirme',
+    order_update: 'Sipariş güncellendi',
+    question_answered: 'Sorunuz yanıtlandı',
+    support_message: 'Yeni destek mesajı'
+}[String(type || '').trim()] || 'NovaStore bildirimi');
+
 /**
- * Yeni bildirim olusturur ve Socket.io ile gercek zamanli gonderir.
- * @param {number|null} userId
- * @param {string} type
- * @param {string} message
- * @param {object} io
- * @param {{entityType:string,entityId:number}|null} target
+ * Geriye dönük çağrılar için tek `notifications` gerçeğine yazan uyumluluk sınırı.
+ * Yeni launch-critical akışlar `notificationOutboxService` kullanmalıdır.
  */
 const createNotification = async (userId, type, message, io = null, target = null) => {
-    assertExternalSideEffectAllowed('outbound_notification');
     const normalizedTarget = normalizeNotificationTarget(target);
+    const recipientRole = userId ? 'customer' : 'admin';
     try {
         const result = await pool.query(
-            `INSERT INTO notifications (user_id, type, message, entity_type, entity_id)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO notifications
+                (user_id, recipient_role, type, category, priority, title, message,
+                 entity_type, entity_id, entity_key)
+             VALUES ($1, $2, $3, 'ACCOUNT', 'NORMAL', $4, $5, $6, $7, $8)
              RETURNING *`,
             [
                 userId || null,
+                recipientRole,
                 type,
+                legacyTitle(type),
                 message,
                 normalizedTarget?.entityType || null,
-                normalizedTarget?.entityId || null
+                normalizedTarget?.entityId || null,
+                normalizedTarget?.entityKey || null
             ]
         );
-        const notif = result.rows[0];
-
-        const room = userId ? `user_${userId}` : 'admin_room';
+        const notification = result.rows[0];
+        await pool.query(
+            `INSERT INTO notification_deliveries
+                (notification_id, channel, endpoint_key, status, attempt_count, sent_at)
+             VALUES ($1, 'IN_APP', 'logical', 'SENT', 1, CURRENT_TIMESTAMP)
+             ON CONFLICT (notification_id, channel, endpoint_key) DO NOTHING`,
+            [notification.id]
+        );
+        const room = userId ? `user_${Number(userId)}` : 'admin_room';
         await emitWithRetry({
             io,
             room,
-            eventName: 'new_notification',
-            payload: notif,
-            notificationId: notif.id,
-            retries: 3
-        });
-
-        return notif;
-    } catch (err) {
-        console.error('Bildirim oluşturma hatası:', redactKnownSecretText(err.message));
+            eventName: 'notification_refresh',
+            payload: { notificationId: Number(notification.id), unreadChanged: true },
+            notificationId: notification.id,
+            retries: 1
+        }).catch(() => false);
+        return notification;
+    } catch (error) {
+        if (error instanceof NotificationTargetError) throw error;
+        console.error('Bildirim oluşturma hatası:', redactKnownSecretText(error?.code || error?.name || 'NOTIFICATION_CREATE_FAILED'));
         return null;
     }
 };
 
-// GET /api/notifications/user/:userId
+const currentScope = (req) => Object.freeze({
+    userId: Number(req.user.id),
+    role: String(req.user.principal || req.user.role).toLowerCase(),
+    organizationId: null,
+    storeIds: Object.freeze([])
+});
+
+const currentSellerScope = (req) => Object.freeze({
+    userId: Number(req.sellerContext.userId),
+    role: 'seller',
+    organizationId: Number(req.sellerContext.organizationId),
+    storeIds: req.sellerContext.storeIds || Object.freeze([])
+});
+
+const sendKnownError = (res, error) => {
+    if (error instanceof NotificationReadError || error instanceof WebPushSubscriptionError || error instanceof NotificationTargetError) {
+        return res.status(error.statusCode || 400).json({ code: error.code, error: error.message });
+    }
+    console.error('Bildirim isteği hatası:', redactKnownSecretText(error?.code || error?.name || 'NOTIFICATION_REQUEST_FAILED'));
+    return res.status(500).json({ code: 'NOTIFICATION_REQUEST_FAILED', error: 'Bildirim işlemi tamamlanamadı.' });
+};
+
+const makeListHandler = (scopeFactory, { legacyArray = false } = {}) => async (req, res) => {
+    try {
+        const page = await listNotifications(pool, scopeFactory(req), {
+            limit: req.query?.limit,
+            cursor: req.query?.cursor
+        });
+        return res.status(200).json(legacyArray ? page.items : page);
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
+const makeUnreadHandler = (scopeFactory) => async (req, res) => {
+    try {
+        const unreadCount = await getUnreadCount(pool, scopeFactory(req));
+        return res.status(200).json({ unreadCount });
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
+const makeMarkOneHandler = (scopeFactory) => async (req, res) => {
+    try {
+        const notification = await markNotificationRead(pool, scopeFactory(req), req.params.id);
+        return res.status(200).json({ notification });
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
+const makeMarkAllHandler = (scopeFactory) => async (req, res) => {
+    try {
+        const updatedCount = await markAllNotificationsRead(pool, scopeFactory(req));
+        return res.status(200).json({ updatedCount });
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
+const makePushConfigHandler = () => (_req, res) => res.status(200).json(publicWebPushConfiguration());
+
+const makePushStateHandler = (bindingFactory) => async (req, res) => {
+    try {
+        const state = await getWebPushSubscriptionState({ binding: bindingFactory(req) });
+        return res.status(200).json(state);
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
+const makePushRegisterHandler = (bindingFactory) => async (req, res) => {
+    try {
+        const subscription = await registerWebPushSubscription({
+            binding: bindingFactory(req),
+            subscription: req.body?.subscription || req.body
+        });
+        return res.status(201).json({ subscription });
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
+const makePushRevokeHandler = (bindingFactory) => async (req, res) => {
+    try {
+        const result = await revokeWebPushSubscription({
+            binding: bindingFactory(req),
+            endpoint: req.body?.endpoint
+        });
+        return res.status(200).json(result);
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
+const makePushRevokeSessionHandler = (bindingFactory) => async (req, res) => {
+    try {
+        const revokedCount = await revokeWebPushSubscriptionsForSession({ binding: bindingFactory(req) });
+        return res.status(200).json({ revokedCount });
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
+const getCurrentNotifications = makeListHandler(currentScope);
+const getCurrentUnreadCount = makeUnreadHandler(currentScope);
+const markAsRead = makeMarkOneHandler(currentScope);
+const markAllAsRead = makeMarkAllHandler(currentScope);
+const getWebPushConfig = makePushConfigHandler();
+const getWebPushState = makePushStateHandler(regularBinding);
+const registerPushSubscription = makePushRegisterHandler(regularBinding);
+const revokePushSubscription = makePushRevokeHandler(regularBinding);
+const revokePushSession = makePushRevokeSessionHandler(regularBinding);
+
+const getSellerNotifications = makeListHandler(currentSellerScope);
+const getSellerUnreadCount = makeUnreadHandler(currentSellerScope);
+const markSellerNotificationRead = makeMarkOneHandler(currentSellerScope);
+const markAllSellerNotificationsRead = makeMarkAllHandler(currentSellerScope);
+const getSellerWebPushConfig = makePushConfigHandler();
+const getSellerWebPushState = makePushStateHandler(sellerBinding);
+const registerSellerPushSubscription = makePushRegisterHandler(sellerBinding);
+const revokeSellerPushSubscription = makePushRevokeHandler(sellerBinding);
+const revokeSellerPushSession = makePushRevokeSessionHandler(sellerBinding);
+
 const getUserNotifications = async (req, res) => {
-    try {
-        const userId = Number(req.params.userId);
-        if (!Number.isInteger(userId)) {
-            return res.status(400).json({ error: 'Geçersiz kullanıcı kimliği.' });
-        }
-
-        const result = await pool.query(
-            'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
-            [userId]
-        );
-        res.status(200).json(result.rows);
-    } catch (err) {
-        console.error('Bildirim getirme hatası:', err.message);
-        res.status(500).json({ error: 'Bildirimler getirilemedi.' });
+    if (Number(req.params.userId) !== Number(req.user.id) || req.user.principal !== 'customer') {
+        return res.status(403).json({ code: 'NOTIFICATION_SCOPE_FORBIDDEN', error: 'Bu bildirim kapsamına erişim yetkiniz yok.' });
     }
+    return makeListHandler(currentScope, { legacyArray: true })(req, res);
 };
 
-// GET /api/notifications/admin
-const getAdminNotifications = async (req, res) => {
-    try {
-        const result = await pool.query(
-            'SELECT * FROM notifications WHERE user_id IS NULL ORDER BY created_at DESC LIMIT 50'
-        );
-        res.status(200).json(result.rows);
-    } catch (err) {
-        console.error('Admin bildirim hatası:', err.message);
-        res.status(500).json({ error: 'Admin bildirimleri getirilemedi.' });
+const getAdminNotifications = makeListHandler(currentScope, { legacyArray: true });
+
+const markAllAsReadLegacy = async (req, res) => {
+    const requested = String(req.params.userId || '');
+    const expected = req.user.principal === 'admin' ? 'admin' : String(req.user.id);
+    if (requested !== expected) {
+        return res.status(403).json({ code: 'NOTIFICATION_SCOPE_FORBIDDEN', error: 'Bu bildirim kapsamına erişim yetkiniz yok.' });
     }
+    return markAllAsRead(req, res);
 };
 
-// PATCH /api/notifications/:id/read
-const markAsRead = async (req, res) => {
-    try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id)) {
-            return res.status(400).json({ error: 'Geçersiz bildirim kimliği.' });
-        }
-
-        const notifResult = await pool.query('SELECT id, user_id FROM notifications WHERE id = $1', [id]);
-        if (notifResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Bildirim bulunamadı.' });
-        }
-
-        const notif = notifResult.rows[0];
-
-        if (req.user.role !== 'admin') {
-            if (notif.user_id === null || Number(notif.user_id) !== req.user.id) {
-                return res.status(403).json({ error: 'Bu bildirime erişim yetkiniz yok.' });
-            }
-        }
-
-        await pool.query('UPDATE notifications SET is_read = TRUE WHERE id = $1', [id]);
-        res.status(200).json({ mesaj: 'Bildirim okundu olarak işaretlendi.' });
-    } catch (err) {
-        res.status(500).json({ error: 'Bildirim guncellenemedi.' });
-    }
-};
-
-// PATCH /api/notifications/read-all/:userId
-const markAllAsRead = async (req, res) => {
-    try {
-        const { userId } = req.params;
-
-        if (req.user.role === 'admin') {
-            if (userId === 'admin') {
-                await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id IS NULL');
-            } else {
-                const numericUserId = Number(userId);
-                if (!Number.isInteger(numericUserId)) {
-                    return res.status(400).json({ error: 'Geçersiz kullanıcı kimliği.' });
-                }
-                await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [numericUserId]);
-            }
-            return res.status(200).json({ mesaj: 'Tüm bildirimler okundu olarak işaretlendi.' });
-        }
-
-        const requestedUserId = Number(userId);
-        if (!Number.isInteger(requestedUserId) || requestedUserId !== req.user.id) {
-            return res.status(403).json({ error: 'Bu işlem için yetkiniz yok.' });
-        }
-
-        await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1', [req.user.id]);
-        res.status(200).json({ mesaj: 'Tüm bildirimler okundu olarak işaretlendi.' });
-    } catch (err) {
-        res.status(500).json({ error: 'Bildirimler guncellenemedi.' });
-    }
-};
-
-// POST /api/notifications/test
-const sendTestNotification = async (req, res) => {
-    try {
-        const { userId, type, message, entityType, entityId } = req.body;
-        const { io } = require('../server');
-        const hasTarget = entityType !== undefined || entityId !== undefined;
-        const notif = await createNotification(
-            userId || null,
-            type || 'order_update',
-            message || 'Bu bir test bildirimidir.',
-            io,
-            hasTarget ? { entityType, entityId } : null
-        );
-        res.status(201).json({ mesaj: 'Test bildirimi gonderildi!', bildirim: notif });
-    } catch (err) {
-        if (err instanceof NotificationTargetError) {
-            return res.status(err.statusCode).json({ code: err.code, error: err.message });
-        }
-        if (err instanceof ExternalSideEffectBlockedError) {
-            return res.status(err.statusCode).json({ code: err.code, error: err.publicMessage });
-        }
-        res.status(500).json({ error: err.message });
-    }
-};
+const sendTestNotification = (_req, res) => res.status(410).json({
+    code: 'CLIENT_DIRECTED_NOTIFICATION_DISABLED',
+    error: 'İstemci tarafından alıcı seçilen test bildirimi devre dışıdır.'
+});
 
 module.exports = {
     createNotification,
-    getUserNotifications,
     getAdminNotifications,
-    markAsRead,
+    getCurrentNotifications,
+    getCurrentUnreadCount,
+    getSellerNotifications,
+    getSellerUnreadCount,
+    getSellerWebPushConfig,
+    getSellerWebPushState,
+    getUserNotifications,
+    getWebPushConfig,
+    getWebPushState,
     markAllAsRead,
+    markAllAsReadLegacy,
+    markAllSellerNotificationsRead,
+    markAsRead,
+    markSellerNotificationRead,
+    registerPushSubscription,
+    registerSellerPushSubscription,
+    revokePushSession,
+    revokePushSubscription,
+    revokeSellerPushSession,
+    revokeSellerPushSubscription,
     sendTestNotification
 };

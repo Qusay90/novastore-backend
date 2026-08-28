@@ -2,6 +2,8 @@ const pool = require('../config/db');
 const { maskFullName } = require('../services/privacyService');
 const { buildPublicProductSqlPredicate } = require('../constants/productVisibility');
 const { PLATFORM_STORE } = require('../services/categoryV2BackfillService');
+const { EVENT } = require('../services/notificationEventCatalog');
+const { enqueueNotificationEvent } = require('../services/notificationOutboxService');
 
 const MIN_QUESTION_LENGTH = 5;
 const MAX_QUESTION_LENGTH = 1000;
@@ -60,6 +62,7 @@ const requestAuditMetadata = (req, values = {}) => {
 
 // Yeni Soru Sor
 exports.askQuestion = async (req, res) => {
+    let client;
     try {
         const productId = positiveInteger(
             req.body?.product_id,
@@ -74,7 +77,9 @@ exports.askQuestion = async (req, res) => {
         });
         const user_id = req.user.id;
 
-        const newQuestion = await pool.query(
+        client = await pool.connect();
+        await client.query('BEGIN');
+        const newQuestion = await client.query(
             `INSERT INTO product_questions (product_id, user_id, question)
              SELECT products.id, $2, $3
              FROM products
@@ -90,23 +95,19 @@ exports.askQuestion = async (req, res) => {
         );
 
         if (newQuestion.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ error: 'Ürün bulunamadı.', code: 'PRODUCT_NOT_FOUND' });
         }
 
-        // Bildirim gonder (Admine)
-        try {
-            const { io } = require('../server');
-            const { createNotification } = require('./notificationController');
-            await createNotification(
-                null,
-                'new_question',
-                'Yeni bir ürün sorusu geldi!',
-                io,
-                { entityType: 'product_question', entityId: Number(newQuestion.rows[0].id) }
-            );
-        } catch (notifErr) {
-            console.error('Bildirim gonderilirken hata:', notifErr);
-        }
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.QUESTION_CREATED,
+            aggregateType: 'product_question',
+            aggregateId: newQuestion.rows[0].id,
+            aggregateRevision: Number(newQuestion.rows[0].revision || 1),
+            sourceEventKey: `QUESTION_CREATED:product_question:${newQuestion.rows[0].id}:r${Number(newQuestion.rows[0].revision || 1)}`,
+            payload: { source: 'customer_question' }
+        });
+        await client.query('COMMIT');
 
         res.status(201).json({
             mesaj: 'Sorunuz başarıyla iletildi. Mağaza yanıtladığında burada görünecektir.',
@@ -117,11 +118,14 @@ exports.askQuestion = async (req, res) => {
             }
         });
     } catch (error) {
+        if (client) await client.query('ROLLBACK').catch(() => {});
         if (error instanceof QuestionOperationError) {
             return res.status(error.statusCode).json({ error: error.message, code: error.code });
         }
         console.error('Soru sorma hatası:', error);
         res.status(500).json({ error: 'Sunucu hatası' });
+    } finally {
+        if (client) client.release();
     }
 };
 
@@ -364,22 +368,15 @@ exports.answerQuestion = async (req, res) => {
                 JSON.stringify(requestAuditMetadata(req, { product_id: Number(current.product_id) }))
             ]
         );
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.QUESTION_ANSWERED,
+            aggregateType: 'product_question',
+            aggregateId: answeredQuestion.id,
+            aggregateRevision: Number(answeredQuestion.revision),
+            sourceEventKey: `QUESTION_ANSWERED:product_question:${answeredQuestion.id}:r${Number(answeredQuestion.revision)}`,
+            payload: { source: 'admin_answer' }
+        });
         await client.query('COMMIT');
-
-        // Bildirim gonder (Kullaniciya)
-        try {
-            const { io } = require('../server');
-            const { createNotification } = require('./notificationController');
-            await createNotification(
-                answeredQuestion.user_id,
-                'question_answered',
-                'Sorduğunuz soru mağaza tarafından yanıtlandı!',
-                io,
-                { entityType: 'product_question', entityId: Number(answeredQuestion.id) }
-            );
-        } catch (notifErr) {
-            console.error('Bildirim gonderilirken hata:', notifErr);
-        }
 
         res.status(200).json({ mesaj: 'Soru cevaplandı ve yayınlandı.', question: answeredQuestion });
     } catch (error) {

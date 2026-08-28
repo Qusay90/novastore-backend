@@ -1,28 +1,26 @@
-﻿const express = require('express');
+'use strict';
+
+const express = require('express');
 const router = express.Router();
-const {
-    getUserNotifications,
-    getAdminNotifications,
-    markAsRead,
-    markAllAsRead,
-    sendTestNotification
-} = require('../controllers/notificationController');
-const { authenticate, requireAdmin, requireSelfOrAdmin } = require('../middlewares/authMiddleware');
+const controller = require('../controllers/notificationController');
+const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 const { requireCurrentAdmin, requireCurrentAdminIfClaimed } = require('../middlewares/currentAdmin');
 
-// Kullanici bildirimleri
-router.get('/user/:userId', authenticate, requireSelfOrAdmin('userId'), requireCurrentAdminIfClaimed, getUserNotifications);
+router.get('/', authenticate, requireCurrentAdminIfClaimed, controller.getCurrentNotifications);
+router.get('/unread-count', authenticate, requireCurrentAdminIfClaimed, controller.getCurrentUnreadCount);
 
-// Admin bildirimleri
-router.get('/admin', authenticate, requireAdmin, requireCurrentAdmin, getAdminNotifications);
+router.get('/web-push/config', authenticate, requireCurrentAdminIfClaimed, controller.getWebPushConfig);
+router.get('/web-push/subscriptions', authenticate, requireCurrentAdminIfClaimed, controller.getWebPushState);
+router.post('/web-push/subscriptions', authenticate, requireCurrentAdminIfClaimed, controller.registerPushSubscription);
+router.delete('/web-push/subscriptions', authenticate, requireCurrentAdminIfClaimed, controller.revokePushSubscription);
+router.delete('/web-push/subscriptions/session', authenticate, requireCurrentAdminIfClaimed, controller.revokePushSession);
 
-// Tekil bildirimi okundu yap
-router.patch('/:id/read', authenticate, requireCurrentAdminIfClaimed, markAsRead);
+router.get('/user/:userId', authenticate, controller.getUserNotifications);
+router.get('/admin', authenticate, requireAdmin, requireCurrentAdmin, controller.getAdminNotifications);
+router.patch('/read-all/:userId', authenticate, requireCurrentAdminIfClaimed, controller.markAllAsReadLegacy);
+router.patch('/read-all', authenticate, requireCurrentAdminIfClaimed, controller.markAllAsRead);
+router.patch('/:id/read', authenticate, requireCurrentAdminIfClaimed, controller.markAsRead);
 
-// Tum bildirimleri okundu yap (userId veya 'admin')
-router.patch('/read-all/:userId', authenticate, requireCurrentAdminIfClaimed, markAllAsRead);
-
-// Test bildirimi gonder
-router.post('/test', authenticate, requireAdmin, requireCurrentAdmin, sendTestNotification);
+router.post('/test', authenticate, requireAdmin, requireCurrentAdmin, controller.sendTestNotification);
 
 module.exports = router;

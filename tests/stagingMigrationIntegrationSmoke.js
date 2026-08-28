@@ -190,7 +190,9 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'attribute_templates', 'auth_sessions', 'campaign_configs', 'categories',
         'category_aliases', 'category_stats', 'collection_products', 'collection_rules',
         'collections', 'coupon_reservations', 'coupons', 'customer_addresses', 'customer_operation_audit_events', 'favorites', 'invoices',
-        'menu_items', 'menus', 'messages', 'notification_audit_logs', 'notifications',
+        'menu_items', 'menus', 'messages', 'notification_audit_logs',
+        'notification_deliveries', 'notification_delivery_attempts',
+        'notification_outbox_events', 'notifications',
         'order_events', 'order_item_backfill_issues', 'order_items', 'orders',
         'page_visits', 'payments', 'product_actions', 'product_attribute_values',
         'product_categories', 'product_media', 'product_questions', 'products',
@@ -212,7 +214,7 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'seller_returns', 'seller_role_permissions', 'seller_roles', 'seller_sessions',
         'seller_settlements', 'seller_step_up_challenges', 'seller_store_profiles',
         'seller_stores', 'seller_support_conversations', 'seller_support_messages',
-        'seller_support_ratings',
+        'seller_support_ratings', 'web_push_subscriptions',
         'webhook_events', LEDGER_TABLE
     ].sort();
     const tables = await admin.query(

@@ -185,6 +185,28 @@ const createFakeClient = (state) => ({
             return { rows: [] };
         }
 
+        if (/INSERT INTO notification_outbox_events/i.test(sql)) {
+            const eventType = params[2];
+            state.notificationInserts += 1;
+            if (eventType === 'REFUND_ACTION_REQUIRED') {
+                state.reconciliationNotificationInserts += 1;
+                state.durableReconciliationNotificationInserts += 1;
+            }
+            return {
+                rows: [{
+                    id: params[0],
+                    source_event_key: params[1],
+                    event_type: eventType,
+                    aggregate_type: params[3],
+                    aggregate_id: params[4],
+                    aggregate_revision: params[5],
+                    payload: JSON.parse(params[6]),
+                    status: 'PENDING',
+                    inserted: true
+                }]
+            };
+        }
+
         if (/INSERT INTO notifications/i.test(sql)) {
             state.notificationInserts += 1;
             state.reconciliationNotificationInserts += 1;
@@ -548,7 +570,11 @@ const signHeaders = (payload, secret) => ({
         assert.strictEqual(postCommitNotificationFailureState.reconciliationMetadataWrites, 1);
         assert.strictEqual(postCommitNotificationFailureState.reconciliationRequiredEvents, 1);
         assert.strictEqual(postCommitNotificationFailureState.durableReconciliationNotificationInserts, 1);
-        assert.ok(capturedNotificationErrors.length >= 1);
+        assert.strictEqual(
+            capturedNotificationErrors.length,
+            0,
+            'transactional outbox must not depend on the post-commit socket notification module'
+        );
         assert.strictEqual(capturedNotificationErrors.join(' ').includes(process.env.IYZICO_WEBHOOK_SECRET), false);
 
         const unknownStatusState = createPaymentState();

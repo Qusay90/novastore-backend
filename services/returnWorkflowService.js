@@ -2,6 +2,8 @@
 
 const pool = require('../config/db');
 const { ORDER_STATUS, PAYMENT_STATUS, REFUND_STATUS } = require('../constants/orderStatus');
+const { EVENT } = require('./notificationEventCatalog');
+const { enqueueNotificationEvent } = require('./notificationOutboxService');
 
 const RETURN_STATUS = Object.freeze({
     REQUESTED: 'REQUESTED',
@@ -88,12 +90,6 @@ const appendReturnEvent = async (client, {
         (return_id, order_id, actor_user_id, actor_role, event_type, from_status, to_status, payload)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
     [returnId, orderId, actorUserId, actorRole, eventType, fromStatus, toStatus, JSON.stringify(payload)]
-);
-
-const insertReturnNotification = async (client, { userId, returnId, message }) => client.query(
-    `INSERT INTO notifications (user_id, type, message, entity_type, entity_id)
-     VALUES ($1, 'order_update', $2, 'return_request', $3)`,
-    [userId, message, returnId]
 );
 
 const serializeReturn = (row, extra = {}) => Object.freeze({
@@ -195,10 +191,13 @@ const createCustomerReturn = async ({ user, body, database = pool, env = process
             toStatus: RETURN_STATUS.REQUESTED,
             payload: { reasonCode, refundProviderExecuted: false }
         });
-        await insertReturnNotification(client, {
-            userId: null,
-            returnId: returnRow.id,
-            message: `Sipariş #${orderId} için yeni iade talebi oluşturuldu.`
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.RETURN_REQUESTED,
+            aggregateType: 'return_request',
+            aggregateId: returnRow.id,
+            aggregateRevision: 1,
+            sourceEventKey: `RETURN_REQUESTED:return_request:${returnRow.id}:r1`,
+            payload: { source: 'customer_return' }
         });
         await client.query('COMMIT');
         open = false;
@@ -298,13 +297,14 @@ const updateReturnByAdmin = async ({ returnId, admin, body, database = pool }) =
                 refundProviderGate: targetStatus === RETURN_STATUS.APPROVED
             }
         });
-        if (current.order_user_id) {
-            await insertReturnNotification(client, {
-                userId: Number(current.order_user_id),
-                returnId: safeReturnId,
-                message: `Sipariş #${current.order_id} iade talebinizin durumu güncellendi: ${targetStatus}.`
-            });
-        }
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.RETURN_STATUS_CHANGED,
+            aggregateType: 'return_request',
+            aggregateId: safeReturnId,
+            aggregateRevision: Number(current.revision) + 1,
+            sourceEventKey: `RETURN_STATUS_CHANGED:return_request:${safeReturnId}:r${Number(current.revision) + 1}`,
+            payload: { status: targetStatus }
+        });
         await client.query('COMMIT');
         open = false;
         return Object.freeze({

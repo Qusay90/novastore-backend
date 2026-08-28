@@ -246,12 +246,6 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
             createEscalationMessage({ userId: 42, summary: 'synthetic staging handoff' }),
             ExternalSideEffectBlockedError
         );
-        const { createNotification } = require('../controllers/notificationController');
-        await assert.rejects(
-            createNotification(null, 'synthetic', 'synthetic staging notification'),
-            ExternalSideEffectBlockedError
-        );
-
         Module._load = function patchedNotificationServerLoad(request, parent, isMain) {
             if (
                 request === '../server' &&
@@ -272,8 +266,8 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         } finally {
             Module._load = originalLoad;
         }
-        assert.equal(notificationResult.state.statusCode, 503);
-        assert.equal(notificationResult.state.payload.code, 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED');
+        assert.equal(notificationResult.state.statusCode, 410);
+        assert.equal(notificationResult.state.payload.code, 'CLIENT_DIRECTED_NOTIFICATION_DISABLED');
         assert.equal(messageDatabaseCalls, 0);
 
         Module._load = function patchedAssistantAuthLoad(request, parent, isMain) {
@@ -534,10 +528,10 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         assert.equal(packageJson.scripts['staging:bootstrap'], 'node scripts/stagingBootstrapCli.js');
     });
 
-    await check('runtime', '42 migration manifest remains the exact 31-file combined registry', () => {
+    await check('runtime', '42 migration manifest remains the exact 32-file combined registry', () => {
         const manifest = JSON.parse(read('scripts/staging-migrations/manifest.json'));
-        assert.equal(manifest.length, 31);
-        assert.equal(new Set(manifest.map((item) => item.path)).size, 31);
+        assert.equal(manifest.length, 32);
+        assert.equal(new Set(manifest.map((item) => item.path)).size, 32);
     });
 
     await check('runtime', '43 local and production behavior stays outside staging policy', () => {

@@ -146,9 +146,17 @@ const createFakeClient = (state) => ({
             return { rows: [] };
         }
 
-        if (/UPDATE coupons SET used_count/i.test(sql)) {
+        if (/SELECT id, status\s+FROM coupon_reservations/i.test(sql)) {
+            return { rows: [{ id: 9201, status: 'RESERVED' }] };
+        }
+
+        if (/UPDATE coupons\s+SET used_count/i.test(sql)) {
             state.couponUpdates += 1;
-            return { rows: [] };
+            return { rows: [{ id: 901, code: 'TEST10', usage_limit: 100, used_count: 1 }], rowCount: 1 };
+        }
+
+        if (/UPDATE coupon_reservations/i.test(sql)) {
+            return { rows: [{ id: 9201 }], rowCount: 1 };
         }
 
         if (/UPDATE orders/i.test(sql)) {
@@ -163,6 +171,24 @@ const createFakeClient = (state) => ({
         if (/INSERT INTO order_events/i.test(sql)) {
             state.orderEvents += 1;
             return { rows: [] };
+        }
+
+        if (/INSERT INTO notification_outbox_events/i.test(sql)) {
+            state.notificationInserts += 1;
+            assert.ok(['ORDER_CONFIRMED', 'PAYMENT_SUCCESS'].includes(params[2]));
+            return {
+                rows: [{
+                    id: params[0],
+                    source_event_key: params[1],
+                    event_type: params[2],
+                    aggregate_type: params[3],
+                    aggregate_id: params[4],
+                    aggregate_revision: params[5],
+                    payload: JSON.parse(params[6]),
+                    status: 'PENDING',
+                    inserted: true
+                }]
+            };
         }
 
         if (/INSERT INTO order_items/i.test(sql)) {
@@ -276,7 +302,7 @@ const assertNoSideEffects = (state) => {
         const successState = createPaymentState();
         await withServer(successState, async (server) => {
             const response = await postForm(server, '/api/payments/webhook/paytr', buildPayload());
-            assert.strictEqual(response.statusCode, 200);
+            assert.strictEqual(response.statusCode, 200, response.text);
             assert.strictEqual(response.text, 'OK');
             assert.strictEqual(successState.paymentStatus, PAYMENT_STATUS.PAID);
             assert.strictEqual(successState.orderPaymentStatus, PAYMENT_STATUS.PAID);

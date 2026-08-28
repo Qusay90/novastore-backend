@@ -92,9 +92,10 @@ const assertRouteContract = () => {
 const assertNotificationTargetContract = () => {
     const reviewControllerSource = fs.readFileSync(path.join(root, 'controllers', 'reviewController.js'), 'utf8');
     const questionControllerSource = fs.readFileSync(path.join(root, 'controllers', 'questionController.js'), 'utf8');
-    assert.match(reviewControllerSource, /entityType:\s*'review',\s*entityId:\s*Number\(reviewId\)/);
-    assert.match(questionControllerSource, /entityType:\s*'product_question',\s*entityId:\s*Number\(newQuestion\.rows\[0\]\.id\)/);
-    assert.match(questionControllerSource, /entityType:\s*'product_question',\s*entityId:\s*Number\(answeredQuestion\.id\)/);
+    assert.match(reviewControllerSource, /eventType:\s*EVENT\.REVIEW_CREATED[\s\S]*aggregateType:\s*'review'[\s\S]*aggregateId:\s*reviewId/);
+    assert.match(reviewControllerSource, /eventType:\s*EVENT\.REVIEW_MODERATION_RESULT[\s\S]*aggregateType:\s*'review'[\s\S]*aggregateId:\s*reviewId/);
+    assert.match(questionControllerSource, /eventType:\s*EVENT\.QUESTION_CREATED[\s\S]*aggregateType:\s*'product_question'[\s\S]*aggregateId:\s*newQuestion\.rows\[0\]\.id/);
+    assert.match(questionControllerSource, /eventType:\s*EVENT\.QUESTION_ANSWERED[\s\S]*aggregateType:\s*'product_question'[\s\S]*aggregateId:\s*answeredQuestion\.id/);
 };
 
 const testPublicProjection = async () => {
@@ -249,6 +250,19 @@ const testSellerWritesFailClosed = async () => {
     assert.equal(review.statusCode, 403);
     assert.equal(review.body.code, 'SELLER_REVIEW_HANDOFF_REQUIRED');
 
+    const questionTransaction = [];
+    pool.connect = async () => transactionClient(async (sql) => {
+        const text = String(sql).trim();
+        questionTransaction.push(text);
+        if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(text)) return { rows: [] };
+        if (/INSERT INTO product_questions/i.test(text)) {
+            queryCount += 1;
+            assert.match(text, /first_party_store\.slug/i);
+            return { rows: [] };
+        }
+        throw new Error(`Unexpected seller question transaction query: ${text}`);
+    });
+
     const question = await invoke(questionController.askQuestion, {
         user: { id: 41, role: 'customer', principal: 'customer' },
         body: { product_id: 999, question: 'Satıcı ürünü hakkında soru?' }
@@ -256,6 +270,8 @@ const testSellerWritesFailClosed = async () => {
     assert.equal(question.statusCode, 404);
     assert.equal(question.body.code, 'PRODUCT_NOT_FOUND');
     assert.equal(queryCount, 2);
+    assert.deepEqual(questionTransaction, ['BEGIN', questionTransaction[1], 'ROLLBACK']);
+    assert.match(questionTransaction[1], /INSERT INTO product_questions/i);
 };
 
 const testReviewModerationAudit = async () => {
@@ -286,6 +302,13 @@ const testReviewModerationAudit = async () => {
             assert.equal(JSON.parse(params[4]).revision, 2);
             assert.equal(JSON.parse(params[5]).product_id, 101);
             return { rows: [] };
+        }
+        if (/INSERT INTO notification_outbox_events/i.test(text)) {
+            assert.equal(params[2], 'REVIEW_MODERATION_RESULT');
+            assert.equal(params[3], 'review');
+            assert.equal(Number(params[4]), 601);
+            assert.equal(Number(params[5]), 2);
+            return { rows: [{ id: params[0], inserted: true, status: 'PENDING' }] };
         }
         throw new Error(`Unexpected review moderation query: ${text}`);
     });
@@ -324,7 +347,6 @@ const testReviewTenantDenied = async () => {
 
 const testQuestionAnswerAudit = async () => {
     const calls = [];
-    notificationCalls.length = 0;
     pool.connect = async () => transactionClient(async (sql, params = []) => {
         const text = String(sql).trim();
         calls.push({ text, params });
@@ -365,6 +387,13 @@ const testQuestionAnswerAudit = async () => {
             assert.equal(JSON.parse(params[4]).revision, 2);
             return { rows: [] };
         }
+        if (/INSERT INTO notification_outbox_events/i.test(text)) {
+            assert.equal(params[2], 'QUESTION_ANSWERED');
+            assert.equal(params[3], 'product_question');
+            assert.equal(Number(params[4]), 501);
+            assert.equal(Number(params[5]), 2);
+            return { rows: [{ id: params[0], inserted: true, status: 'PENDING' }] };
+        }
         throw new Error(`Unexpected question answer query: ${text}`);
     });
 
@@ -378,7 +407,7 @@ const testQuestionAnswerAudit = async () => {
     assert.equal(result.body.question.answer, 'Evet, stokta.');
     assert.equal(result.body.question.answered_by, 9);
     assert.equal(calls.filter((call) => call.text === 'COMMIT').length, 1);
-    assert.deepEqual(notificationCalls.at(-1)?.[4], { entityType: 'product_question', entityId: 501 });
+    assert.equal(calls.some((call) => /INSERT INTO notification_outbox_events/i.test(call.text)), true);
 };
 
 const testQuestionValidationAndConflict = async () => {

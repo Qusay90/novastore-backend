@@ -244,7 +244,8 @@ const run = async () => {
     const controller = read('controllers/messageController.js');
     assert.match(controller, /await requireCustomer\(pool, requestedUserId\)/);
     assert.match(controller, /claimSupportThread/);
-    assert.match(controller, /entityType: 'support_thread'/);
+    assert.match(controller, /enqueueNotificationEvent\(client[\s\S]*aggregateType: 'support_thread'/);
+    assert.match(controller, /EVENT\.SUPPORT_(?:CREATED|MESSAGE|REPLY)/);
     assert.match(controller, /UPDATE messages[\s\S]*handoff_dismissed_at/i);
     assert.match(controller, /entity_type IS NULL[\s\S]*entity_id IS NULL[\s\S]*message ~ \$2/i);
     assert.match(controller, /\(\[\^0-9\]\|\$\)/);

@@ -1,5 +1,7 @@
 const pool = require('../config/db');
 const { assertExternalSideEffectAllowed } = require('../config/stagingRuntimePolicy');
+const { EVENT } = require('./notificationEventCatalog');
+const { enqueueNotificationEvent } = require('./notificationOutboxService');
 const {
     SUPPORT_SUMMARY_MAX_LENGTH,
     SupportThreadError,
@@ -50,6 +52,14 @@ const createEscalationMessage = async ({ userId, summary }) => {
             receiverId: adminId,
             message: `${AI_HANDOFF_PREFIX}\n${normalizedSummary}`,
             eventType: 'NOVABOT_ESCALATED'
+        });
+        await enqueueNotificationEvent(client, {
+            eventType: EVENT.SUPPORT_ESCALATED,
+            aggregateType: 'support_thread',
+            aggregateId: thread.id,
+            aggregateRevision: Number(message.id),
+            sourceEventKey: `SUPPORT_ESCALATED:support_thread:${thread.id}:message:${message.id}`,
+            payload: { source: 'novabot' }
         });
         return {
             adminId,

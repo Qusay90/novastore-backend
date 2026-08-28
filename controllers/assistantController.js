@@ -2,7 +2,6 @@ const { getUserFromRequestIfAny, sendAuthError } = require('../middlewares/authM
 const { handleAssistantChat } = require('../services/assistantOrchestrator');
 const { createEscalationMessage } = require('../services/escalationService');
 const { SUPPORT_SUMMARY_MAX_LENGTH } = require('../services/supportThreadService');
-const { createNotification } = require('./notificationController');
 const {
     ExternalSideEffectBlockedError,
     assertExternalSideEffectAllowed
@@ -83,13 +82,6 @@ const escalate = async (req, res) => {
                     receiver_role: 'admin'
                 });
             }
-            await createNotification(
-                null,
-                'ai_handoff',
-                `AI devri oluştu. Müşteri #${user.id} temsilciye aktarıldı.`,
-                io,
-                { entityType: 'support_thread', entityId: escalation.thread.id }
-            );
         } catch (_) {}
 
         res.status(201).json({

@@ -5,6 +5,8 @@ const {
     normalizeSellerApplicationTermsGeneration,
     normalizeSellerApplicationTermsRevision
 } = require('../config/sellerApplicationTerms');
+const { EVENT } = require('./notificationEventCatalog');
+const { enqueueNotificationEvent } = require('./notificationOutboxService');
 
 const APPLICATION_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const EDITABLE_STATUSES = new Set(['DRAFT', 'IN_PROGRESS', 'NEEDS_CORRECTION']);
@@ -357,6 +359,12 @@ const createSellerApplicationService = ({ database, secret, termsAuthority = nul
                 [sessionId, applicationId, tokenHash, expiresAt, createdAt]
             );
             await recordEvent(client, inserted.rows[0], 'seller.application.created', null, 'success', { applicant_authority: 'APPLICATION_BOUND', auto_approved: false });
+            await enqueueNotificationEvent(client, {
+                eventType: EVENT.SELLER_APPLICATION_CREATED,
+                aggregateId: applicationId,
+                aggregateRevision: 1,
+                sourceEventKey: `seller.application.created:${applicationId}:r1`
+            });
             return Object.freeze({ application: mapApplication(inserted.rows[0], activeTermsRevision), applicant_token: applicantToken, token_type: 'Applicant', expires_in: Math.ceil(APPLICATION_SESSION_TTL_MS / 1000) });
         });
     };
@@ -566,6 +574,12 @@ const createSellerApplicationService = ({ database, secret, termsAuthority = nul
             );
             if (updated.rows?.length !== 1) throw new SellerApplicationError('REVISION_CONFLICT', 409);
             await recordEvent(client, updated.rows[0], `seller.application.review.${command}`, row.status, 'success', { reviewer_user_id: Number(reviewer.userId), provider_verified: nextStatus === 'APPROVED' });
+            await enqueueNotificationEvent(client, {
+                eventType: EVENT.SELLER_APPLICATION_STATUS_CHANGED,
+                aggregateId: applicationId,
+                aggregateRevision: Number(updated.rows[0].revision),
+                sourceEventKey: `seller.application.status:${applicationId}:r${Number(updated.rows[0].revision)}`
+            });
             return Object.freeze({ application: mapApplication(updated.rows[0], activeTermsRevision) });
         });
     };
