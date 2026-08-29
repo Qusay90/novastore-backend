@@ -13,7 +13,7 @@ import {
   currentFcmToken,
   getCustomerUnreadCount,
   getNativeNotificationCapability,
-  hasCustomerSession,
+  hasVerifiedCustomerSession,
   listCustomerNotifications,
   loginCustomer,
   logoutCustomer,
@@ -124,8 +124,8 @@ export function useCustomerNotificationRuntime() {
 
 export default function CustomerNotificationRuntime({ children }: PropsWithChildren) {
   const native = Capacitor.isNativePlatform();
-  const [sessionAvailable, setSessionAvailable] = useState(hasCustomerSession);
-  const [phase, setPhase] = useState<NotificationFeedPhase>(() => hasCustomerSession() ? "idle" : "guest");
+  const [sessionAvailable, setSessionAvailable] = useState(hasVerifiedCustomerSession);
+  const [phase, setPhase] = useState<NotificationFeedPhase>(() => hasVerifiedCustomerSession() ? "idle" : "guest");
   const [items, setItems] = useState<readonly CustomerNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
@@ -136,7 +136,7 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
   const inAppTimer = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!hasCustomerSession()) {
+    if (!hasVerifiedCustomerSession()) {
       setSessionAvailable(false);
       setPhase("guest");
       setItems([]);
@@ -215,7 +215,7 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
   }, [native]);
 
   const enablePush = useCallback(async () => {
-    if (!native || !hasCustomerSession()) {
+    if (!native || !hasVerifiedCustomerSession()) {
       setPushState(native ? "error" : "not-supported");
       return;
     }
@@ -266,23 +266,11 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
 
   const login = useCallback(async (email: string, password: string) => {
     await loginCustomer(email, password);
-    if (native && currentFcmToken()) {
-      try {
-        await registerFcmToken(currentFcmToken());
-      } catch (error) {
-        let providerRevoked = false;
-        try { await PushNotifications.unregister(); providerRevoked = true; } catch { /* handled below */ }
-        if (providerRevoked) globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
-        else {
-          try { await logoutCustomer(); } catch { /* local session is still cleared */ }
-          throw error;
-        }
-      }
-    }
-    setSessionAvailable(true);
-    await refresh();
-    await inspectPushState();
-  }, [inspectPushState, native, refresh]);
+    setSessionAvailable(false);
+    setItems([]);
+    setUnreadCount(0);
+    setPhase("guest");
+  }, []);
 
   const logout = useCallback(async () => {
     if (native) {
@@ -310,21 +298,62 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
   }, [inspectPushState, refresh]);
 
   useEffect(() => {
-    const onOnline = () => { if (hasCustomerSession()) void refresh(); };
+    const onOnline = () => { if (hasVerifiedCustomerSession()) void refresh(); };
     const onOffline = () => {
       setPhase("offline");
       setErrorMessage("Çevrimdışısın. Son bildirimler güncellenemedi.");
     };
-    const onRefresh = () => { if (hasCustomerSession()) void refresh(); };
+    const onRefresh = () => { if (hasVerifiedCustomerSession()) void refresh(); };
+    const onAuthRequired = () => {
+      setSessionAvailable(false);
+      setItems([]);
+      setUnreadCount(0);
+      setPhase("guest");
+      if (native && currentFcmToken()) {
+        void retireOrphanedPushDelivery().then((retired) => setPushState(retired ? "not-requested" : "error"));
+      }
+    };
+    const onVerified = () => {
+      if (!hasVerifiedCustomerSession()) return;
+      const activate = async () => {
+        if (native && currentFcmToken()) {
+          try {
+            await registerFcmToken(currentFcmToken());
+          } catch (error) {
+            let providerRevoked = false;
+            try { await PushNotifications.unregister(); providerRevoked = true; } catch { /* handled below */ }
+            if (providerRevoked) globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
+            else {
+              try { await logoutCustomer(); } catch { /* local session is still cleared */ }
+              throw error;
+            }
+          }
+        }
+        setSessionAvailable(true);
+        await refresh();
+        await inspectPushState();
+      };
+      void activate().catch(() => {
+        setSessionAvailable(false);
+        setItems([]);
+        setUnreadCount(0);
+        setPhase("error");
+        setErrorMessage("Müşteri bildirim oturumu güvenle başlatılamadı.");
+      });
+    };
     globalThis.addEventListener("online", onOnline);
     globalThis.addEventListener("offline", onOffline);
     globalThis.addEventListener("novastore:notification-refresh", onRefresh);
+    globalThis.addEventListener("novastore:auth-required", onAuthRequired);
+    globalThis.addEventListener("novastore:auth-verified", onVerified);
     return () => {
       globalThis.removeEventListener("online", onOnline);
       globalThis.removeEventListener("offline", onOffline);
       globalThis.removeEventListener("novastore:notification-refresh", onRefresh);
+      globalThis.removeEventListener("novastore:auth-required", onAuthRequired);
+      globalThis.removeEventListener("novastore:auth-verified", onVerified);
     };
-  }, [refresh]);
+  }, [inspectPushState, native, refresh]);
 
   useEffect(() => {
     if (!native) return;
@@ -334,7 +363,7 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
       void promise.then((handle) => { if (active) handles.push(handle); else void handle.remove(); });
     };
     keep(PushNotifications.addListener("registration", (registration) => {
-      if (!hasCustomerSession()) {
+      if (!hasVerifiedCustomerSession()) {
         void retireOrphanedPushDelivery();
         setPushState("error");
         return;
@@ -346,7 +375,7 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
     }));
     keep(PushNotifications.addListener("registrationError", () => setPushState("provider-unavailable")));
     keep(PushNotifications.addListener("pushNotificationReceived", (notification) => {
-      if (!hasCustomerSession()) {
+      if (!hasVerifiedCustomerSession()) {
         void retireOrphanedPushDelivery();
         return;
       }
@@ -360,8 +389,8 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
     }));
     keep(PushNotifications.addListener("pushNotificationActionPerformed", (action: ActionPerformed) => {
       const payload = normalizeCustomerPushPayload(pushData(action.notification));
-      if (!payload || !hasCustomerSession()) {
-        if (!hasCustomerSession()) void retireOrphanedPushDelivery();
+      if (!payload || !hasVerifiedCustomerSession()) {
+        if (!hasVerifiedCustomerSession()) void retireOrphanedPushDelivery();
         globalThis.dispatchEvent(notificationOpenEvent(null, null));
         return;
       }

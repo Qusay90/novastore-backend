@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import NativeRuntime from "./native/NativeRuntime";
+import { CustomerAccountRuntime } from "./account";
 import { CustomerNotificationRuntime } from "./notifications";
 import Prototype from "./Prototype";
 import "./native/native-base.css";
@@ -13,7 +14,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <NativeRuntime>
       <CustomerNotificationRuntime>
-        <Prototype />
+        <CustomerAccountRuntime>
+          <Prototype />
+        </CustomerAccountRuntime>
       </CustomerNotificationRuntime>
     </NativeRuntime>
   </React.StrictMode>,

@@ -23,7 +23,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.json.JSONException;
-import org.json.JSONObject;
+import org.json.JSONTokener;
 
 @CapacitorPlugin(name = "NovaNotificationApi")
 public final class NovaNotificationApiPlugin extends Plugin {
@@ -32,24 +32,41 @@ public final class NovaNotificationApiPlugin extends Plugin {
     private static final Pattern CUSTOMER_RETURN = Pattern.compile("^/api/returns/[1-9][0-9]*$");
     private static final Pattern CUSTOMER_REVIEW_LIST = Pattern.compile("^/api/reviews/user/[1-9][0-9]*$");
     private static final Pattern CUSTOMER_SUPPORT_HISTORY = Pattern.compile("^/api/messages/history/[1-9][0-9]*$");
+    private static final Pattern CUSTOMER_ADDRESS = Pattern.compile("^/api/addresses/[1-9][0-9]*$");
+    private static final Pattern CUSTOMER_ADDRESS_DEFAULT = Pattern.compile("^/api/addresses/[1-9][0-9]*/default$");
     private static final Pattern PUBLIC_PRODUCT = Pattern.compile("^/api/products/[1-9][0-9]*$");
     private static final Pattern SAFE_CURSOR = Pattern.compile("^[A-Za-z0-9_-]{1,1024}$");
     private static final Set<String> EXACT_GET = Set.of(
         "/api/users/me",
+        "/api/users/security-status",
+        "/api/addresses",
         "/api/questions/user",
         "/api/notifications/unread-count"
     );
     private static final Set<String> EXACT_POST = Set.of(
         "/api/users/login",
+        "/api/users/register",
         "/api/users/logout",
+        "/api/users/change-password",
+        "/api/auth/forgot-password",
+        "/api/auth/reset-password",
+        "/api/addresses",
+        "/api/messages/send",
         "/api/notifications/android-push/tokens"
     );
     private static final Set<String> EXACT_PATCH = Set.of(
-        "/api/notifications/read-all"
+        "/api/notifications/read-all",
+        "/api/users/me"
     );
     private static final Set<String> EXACT_DELETE = Set.of(
         "/api/notifications/android-push/tokens",
         "/api/notifications/android-push/tokens/session"
+    );
+    private static final Set<String> UNAUTHENTICATED_POST = Set.of(
+        "/api/users/login",
+        "/api/users/register",
+        "/api/auth/forgot-password",
+        "/api/auth/reset-password"
     );
     private static final int MAX_RESPONSE_BYTES = 1024 * 1024;
     private static final int MAX_REQUEST_BYTES = 32 * 1024;
@@ -63,7 +80,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
             return;
         }
         String token = canonicalToken(call.getString("token"));
-        boolean authenticated = !("POST".equals(method) && "/api/users/login".equals(path));
+        boolean authenticated = !("POST".equals(method) && UNAUTHENTICATED_POST.contains(path));
         if (authenticated && token == null) {
             call.reject("CUSTOMER_SESSION_MISSING");
             return;
@@ -137,7 +154,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
             }
             JSObject result = new JSObject();
             result.put("status", status);
-            result.put("payload", responseBody.isEmpty() ? new JSObject() : JSObject.fromJSONObject(new JSONObject(responseBody)));
+            result.put("payload", responseBody.isEmpty() ? new JSObject() : new JSONTokener(responseBody).nextValue());
             call.resolve(result);
         } catch (IOException | JSONException | IllegalArgumentException failure) {
             call.reject("CUSTOMER_NOTIFICATION_REQUEST_FAILED");
@@ -157,7 +174,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
     static String canonicalMethod(String value) {
         if (value == null) return null;
         String method = value.trim().toUpperCase(Locale.ROOT);
-        return Set.of("GET", "POST", "PATCH", "DELETE").contains(method) ? method : null;
+        return Set.of("GET", "POST", "PUT", "PATCH", "DELETE").contains(method) ? method : null;
     }
 
     static String canonicalPath(String value) {
@@ -203,8 +220,9 @@ public final class NovaNotificationApiPlugin extends Plugin {
                 || PUBLIC_PRODUCT.matcher(path).matches()
         )) return true;
         if ("POST".equals(method) && EXACT_POST.contains(path)) return true;
-        if ("PATCH".equals(method) && (EXACT_PATCH.contains(path) || READ_ONE.matcher(path).matches())) return true;
-        return "DELETE".equals(method) && EXACT_DELETE.contains(path);
+        if ("PUT".equals(method) && CUSTOMER_ADDRESS.matcher(path).matches()) return true;
+        if ("PATCH".equals(method) && (EXACT_PATCH.contains(path) || READ_ONE.matcher(path).matches() || CUSTOMER_ADDRESS_DEFAULT.matcher(path).matches())) return true;
+        return "DELETE".equals(method) && (EXACT_DELETE.contains(path) || CUSTOMER_ADDRESS.matcher(path).matches());
     }
 
     static String canonicalToken(String value) {

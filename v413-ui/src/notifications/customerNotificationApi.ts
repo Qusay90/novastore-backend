@@ -9,6 +9,7 @@ import {
 
 export const CUSTOMER_TOKEN_KEY = "nova_user_token";
 export const CUSTOMER_USER_KEY = "nova_user_info";
+export const CUSTOMER_VERIFIED_USER_KEY = "novastore.customer.verifiedUserId";
 export const ANDROID_FCM_TOKEN_KEY = "novastore.android.fcmToken";
 export const ANDROID_INSTALLATION_ID_KEY = "novastore.android.installationId";
 export const ANDROID_PERMISSION_REQUESTED_KEY = "novastore.android.notificationPermissionRequested";
@@ -29,8 +30,15 @@ type NovaNotificationApiPlugin = Readonly<{
 const NovaNotificationApi = registerPlugin<NovaNotificationApiPlugin>("NovaNotificationApi");
 const EXACT_RULES = new Map<string, ReadonlySet<string>>([
   ["/api/users/login", new Set(["POST"])],
-  ["/api/users/me", new Set(["GET"])],
+  ["/api/users/register", new Set(["POST"])],
+  ["/api/users/me", new Set(["GET", "PATCH"])],
   ["/api/users/logout", new Set(["POST"])],
+  ["/api/users/security-status", new Set(["GET"])],
+  ["/api/users/change-password", new Set(["POST"])],
+  ["/api/auth/forgot-password", new Set(["POST"])],
+  ["/api/auth/reset-password", new Set(["POST"])],
+  ["/api/addresses", new Set(["GET", "POST"])],
+  ["/api/messages/send", new Set(["POST"])],
   ["/api/questions/user", new Set(["GET"])],
   ["/api/notifications", new Set(["GET"])],
   ["/api/notifications/unread-count", new Set(["GET"])],
@@ -43,6 +51,8 @@ const CUSTOMER_ORDER_LIST_PATTERN = /^\/api\/orders\/user\/[1-9]\d*$/u;
 const CUSTOMER_RETURN_PATTERN = /^\/api\/returns\/[1-9]\d*$/u;
 const CUSTOMER_REVIEW_LIST_PATTERN = /^\/api\/reviews\/user\/[1-9]\d*$/u;
 const CUSTOMER_SUPPORT_HISTORY_PATTERN = /^\/api\/messages\/history\/[1-9]\d*$/u;
+const CUSTOMER_ADDRESS_PATTERN = /^\/api\/addresses\/[1-9]\d*$/u;
+const CUSTOMER_ADDRESS_DEFAULT_PATTERN = /^\/api\/addresses\/[1-9]\d*\/default$/u;
 const PUBLIC_PRODUCT_PATTERN = /^\/api\/products\/[1-9]\d*$/u;
 const ALLOWED_QUERY_KEYS = new Set(["limit", "cursor"]);
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -74,6 +84,8 @@ function requestRule(path: string, method: string) {
   const exact = EXACT_RULES.get(parsed.pathname);
   const allowed = exact?.has(normalizedMethod)
     || (READ_ONE_PATTERN.test(parsed.pathname) && normalizedMethod === "PATCH")
+    || (CUSTOMER_ADDRESS_PATTERN.test(parsed.pathname) && (normalizedMethod === "PUT" || normalizedMethod === "DELETE"))
+    || (CUSTOMER_ADDRESS_DEFAULT_PATTERN.test(parsed.pathname) && normalizedMethod === "PATCH")
     || (normalizedMethod === "GET" && (
       CUSTOMER_ORDER_LIST_PATTERN.test(parsed.pathname)
       || CUSTOMER_RETURN_PATTERN.test(parsed.pathname)
@@ -138,7 +150,7 @@ async function readResponse(response: Response) {
   }
 }
 
-async function request(path: string, method = "GET", body?: Record<string, unknown>, authenticated = true) {
+export async function requestCustomerApi(path: string, method = "GET", body?: Record<string, unknown>, authenticated = true) {
   const normalized = requestRule(path, method);
   const token = customerToken(authenticated);
   let status: number;
@@ -191,6 +203,8 @@ async function request(path: string, method = "GET", body?: Record<string, unkno
   return payload;
 }
 
+const request = requestCustomerApi;
+
 function validUser(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const source = value as Record<string, unknown>;
@@ -216,7 +230,7 @@ function containsEntityId(payload: unknown, id: number, field = "id") {
 }
 
 export async function authorizeCustomerNotificationTarget(target: CustomerNotificationTarget | null): Promise<CustomerNotificationTarget | null> {
-  if (!target || !hasCustomerSession()) return null;
+  if (!target || !hasVerifiedCustomerSession()) return null;
   const userId = currentCustomerUserId();
   try {
     if (target.entityType === "order") {
@@ -249,6 +263,10 @@ export async function authorizeCustomerNotificationTarget(target: CustomerNotifi
 export function clearCustomerSession() {
   globalThis.localStorage?.removeItem?.(CUSTOMER_TOKEN_KEY);
   globalThis.localStorage?.removeItem?.(CUSTOMER_USER_KEY);
+  globalThis.localStorage?.removeItem?.(CUSTOMER_VERIFIED_USER_KEY);
+  if (typeof globalThis.dispatchEvent === "function" && typeof globalThis.Event === "function") {
+    globalThis.dispatchEvent(new Event("novastore:auth-required"));
+  }
 }
 
 export async function loginCustomer(email: string, password: string) {
@@ -263,6 +281,7 @@ export async function loginCustomer(email: string, password: string) {
   }
   globalThis.localStorage?.setItem?.(CUSTOMER_TOKEN_KEY, token);
   globalThis.localStorage?.setItem?.(CUSTOMER_USER_KEY, JSON.stringify(user));
+  globalThis.localStorage?.removeItem?.(CUSTOMER_VERIFIED_USER_KEY);
   return user;
 }
 
@@ -270,13 +289,21 @@ export async function logoutCustomer() {
   try { await request("/api/users/logout", "POST"); } finally { clearCustomerSession(); }
 }
 
+function requireVerifiedCustomerSession() {
+  if (!hasVerifiedCustomerSession()) {
+    throw new CustomerNotificationApiError("Doğrulanmış müşteri oturumu gerekli.", 401, "CUSTOMER_SESSION_NOT_VERIFIED");
+  }
+}
+
 export async function listCustomerNotifications(cursor?: string): Promise<CustomerNotificationPage> {
+  requireVerifiedCustomerSession();
   const params = new URLSearchParams({ limit: "50" });
   if (cursor) params.set("cursor", cursor);
   return normalizeCustomerNotificationPage(await request(`/api/notifications?${params.toString()}`));
 }
 
 export async function getCustomerUnreadCount() {
+  requireVerifiedCustomerSession();
   const payload = await request("/api/notifications/unread-count");
   const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
   const unreadCount = Number(source.unreadCount);
@@ -287,6 +314,7 @@ export async function getCustomerUnreadCount() {
 }
 
 export async function markCustomerNotificationRead(id: number): Promise<CustomerNotification> {
+  requireVerifiedCustomerSession();
   if (!Number.isSafeInteger(id) || id < 1) throw new CustomerNotificationApiError("Bildirim kimliği geçersiz.", 0, "CUSTOMER_NOTIFICATION_ID_INVALID");
   const payload = await request(`/api/notifications/${id}/read`, "PATCH");
   const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
@@ -296,6 +324,7 @@ export async function markCustomerNotificationRead(id: number): Promise<Customer
 }
 
 export async function markAllCustomerNotificationsRead() {
+  requireVerifiedCustomerSession();
   const payload = await request("/api/notifications/read-all", "PATCH");
   const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
   const updatedCount = Number(source.updatedCount);
@@ -346,18 +375,21 @@ export function installationId() {
 }
 
 export async function registerFcmToken(token: string, predecessor = "") {
+  requireVerifiedCustomerSession();
   const payload = fcmRegistrationPayload(token, predecessor);
   await request("/api/notifications/android-push/tokens", "POST", payload);
   globalThis.localStorage?.setItem?.(ANDROID_FCM_TOKEN_KEY, payload.token);
 }
 
 export async function revokeFcmToken(token = currentFcmToken()) {
+  requireVerifiedCustomerSession();
   if (!token) return;
   await request("/api/notifications/android-push/tokens", "DELETE", fcmRevocationPayload(token));
   globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
 }
 
 export async function revokeFcmSession() {
+  requireVerifiedCustomerSession();
   await request("/api/notifications/android-push/tokens/session", "DELETE", fcmRevocationPayload());
 }
 
@@ -371,4 +403,25 @@ export async function openNativeNotificationSettings() {
 }
 
 export function hasCustomerSession() { return Boolean(storageValue(CUSTOMER_TOKEN_KEY)); }
+
+export function markCustomerSessionVerified(userId: number) {
+  const expectedId = Number(userId);
+  let storedUser: ReturnType<typeof validUser> = null;
+  try { storedUser = validUser(JSON.parse(storageValue(CUSTOMER_USER_KEY))); } catch { /* rejected below */ }
+  if (!Number.isSafeInteger(expectedId) || expectedId < 1 || storedUser?.id !== expectedId || !hasCustomerSession()) {
+    throw new CustomerNotificationApiError("Doğrulanmış müşteri oturumu mühürlenemedi.", 401, "CUSTOMER_SESSION_VERIFICATION_INVALID");
+  }
+  globalThis.localStorage?.setItem?.(CUSTOMER_VERIFIED_USER_KEY, String(expectedId));
+  if (typeof globalThis.dispatchEvent === "function" && typeof globalThis.Event === "function") {
+    globalThis.dispatchEvent(new Event("novastore:auth-verified"));
+  }
+}
+
+export function hasVerifiedCustomerSession() {
+  if (!hasCustomerSession()) return false;
+  const verifiedId = Number(storageValue(CUSTOMER_VERIFIED_USER_KEY));
+  if (!Number.isSafeInteger(verifiedId) || verifiedId < 1) return false;
+  try { return validUser(JSON.parse(storageValue(CUSTOMER_USER_KEY)))?.id === verifiedId; } catch { return false; }
+}
+
 export const customerNotificationApiTestUtils = Object.freeze({ requestRule, validUser });
