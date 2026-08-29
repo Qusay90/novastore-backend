@@ -21,6 +21,7 @@ async function installSession(page: Page) {
   await page.addInitScript(() => {
     localStorage.setItem("nova_user_token", "customer-session-token");
     localStorage.setItem("nova_user_info", JSON.stringify({ id: 17, fullName: "Test Müşteri", email: "test@example.invalid", role: "customer" }));
+    localStorage.setItem("novastore.customer.verifiedUserId", "17");
   });
 }
 
@@ -71,6 +72,7 @@ test("logged-out and offline states are explicit and never expose a private feed
   await page.evaluate(() => {
     localStorage.setItem("nova_user_token", "customer-session-token");
     localStorage.setItem("nova_user_info", JSON.stringify({ id: 17, fullName: "Test Müşteri", email: "test@example.invalid", role: "customer" }));
+    localStorage.setItem("novastore.customer.verifiedUserId", "17");
     Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
     dispatchEvent(new Event("offline"));
   });

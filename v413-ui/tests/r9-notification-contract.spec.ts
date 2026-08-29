@@ -15,6 +15,7 @@ import {
   getCustomerUnreadCount,
   listCustomerNotifications,
   loginCustomer,
+  markCustomerSessionVerified,
   markAllCustomerNotificationsRead,
   markCustomerNotificationRead,
   pushRevocationSatisfied,
@@ -152,6 +153,7 @@ test("real adapter flow keeps feed, read state and entity authorization server-o
     return new Response(JSON.stringify({ code: "NOT_FOUND", error: "not found" }), { status: 404 });
   }});
   await loginCustomer("TEST@example.invalid", "secret-password");
+  markCustomerSessionVerified(17);
   expect((await listCustomerNotifications()).items[0].isRead).toBe(false);
   expect(await getCustomerUnreadCount()).toBe(1);
   expect((await markCustomerNotificationRead(7)).isRead).toBe(true);
