@@ -229,5 +229,12 @@
     "sha256": "e06dc4b5182b2e45b9a02ac5cba241848066f4b5778eef96fb5142db8b78f773",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260829_01_customer_refresh_rotation",
+    "path": "migrations/20260829_01_customer_refresh_rotation.sql",
+    "sha256": "67977980f37ea2fa37de3ae84334c6f4a18ebc28892cf233f0715e9768aa94c3",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

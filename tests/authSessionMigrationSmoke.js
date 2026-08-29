@@ -44,7 +44,7 @@ const { cleanupExpiredSessions } = require('../services/authSessionService');
             SELECT table_name, column_name
             FROM information_schema.columns
             WHERE table_schema = 'public'
-              AND table_name IN ('users', 'auth_sessions')
+              AND table_name IN ('users', 'auth_sessions', 'auth_refresh_tokens')
             ORDER BY table_name, ordinal_position
         `);
         const columnKeys = new Set(columns.rows.map((row) => `${row.table_name}.${row.column_name}`));
@@ -57,7 +57,13 @@ const { cleanupExpiredSessions } = require('../services/authSessionService');
             'auth_sessions.issued_at',
             'auth_sessions.expires_at',
             'auth_sessions.revoked_at',
-            'auth_sessions.revoke_reason'
+            'auth_sessions.revoke_reason',
+            'auth_refresh_tokens.auth_session_id',
+            'auth_refresh_tokens.generation',
+            'auth_refresh_tokens.token_hash',
+            'auth_refresh_tokens.status',
+            'auth_refresh_tokens.expires_at',
+            'auth_refresh_tokens.replaced_by_token_id'
         ]) assert(columnKeys.has(key), `missing schema column ${key}`);
         assert.equal(
             [...columnKeys].some((key) => /raw_jti|raw_token|jwt|access_token/i.test(key)),
@@ -67,30 +73,36 @@ const { cleanupExpiredSessions } = require('../services/authSessionService');
 
         const indexes = await client.query(`
             SELECT indexname FROM pg_indexes
-            WHERE schemaname = 'public' AND tablename = 'auth_sessions'
+            WHERE schemaname = 'public'
+              AND tablename IN ('auth_sessions', 'auth_refresh_tokens')
         `);
         const indexNames = new Set(indexes.rows.map((row) => row.indexname));
         assert(indexNames.has('idx_auth_sessions_active_user_principal'));
         assert(indexNames.has('idx_auth_sessions_expires_at'));
+        assert(indexNames.has('uq_auth_refresh_tokens_active_session'));
+        assert(indexNames.has('idx_auth_refresh_tokens_session_status_expiry'));
 
         const constraints = await client.query(`
             SELECT contype, pg_get_constraintdef(oid) AS definition
             FROM pg_constraint
-            WHERE conrelid = 'auth_sessions'::regclass
+            WHERE conrelid IN ('auth_sessions'::regclass, 'auth_refresh_tokens'::regclass)
         `);
         assert(constraints.rows.some((row) => row.contype === 'f' && /users/i.test(row.definition)));
         assert(constraints.rows.some((row) => row.contype === 'u' && /jti_hash/i.test(row.definition)));
         assert(constraints.rows.some((row) => row.contype === 'c' && /expires_at > issued_at/i.test(row.definition)));
         assert(constraints.rows.some((row) => row.contype === 'c' && /customer.*admin|admin.*customer/i.test(row.definition)));
+        assert(constraints.rows.some((row) => row.contype === 'c' && /active.*rotated.*replayed.*revoked.*expired/i.test(row.definition)));
 
         const triggers = await client.query(`
             SELECT tgname FROM pg_trigger
             WHERE NOT tgisinternal
-              AND tgrelid IN ('users'::regclass, 'auth_sessions'::regclass)
+              AND tgrelid IN ('users'::regclass, 'auth_sessions'::regclass, 'auth_refresh_tokens'::regclass)
         `);
         const triggerNames = new Set(triggers.rows.map((row) => row.tgname));
         assert(triggerNames.has('trg_users_revoke_auth_sessions'));
         assert(triggerNames.has('trg_auth_sessions_notify_revoked'));
+        assert(triggerNames.has('trg_auth_refresh_customer_binding'));
+        assert(triggerNames.has('trg_auth_session_revoke_customer_refresh'));
 
         const user = await client.query(
             `INSERT INTO users (email, password, role)
@@ -100,10 +112,17 @@ const { cleanupExpiredSessions } = require('../services/authSessionService');
         assert.equal(user.rows[0].auth_enabled, true);
         const userId = Number(user.rows[0].id);
         const hashA = 'a'.repeat(64);
-        await client.query(
+        const customerSession = await client.query(
             `INSERT INTO auth_sessions (jti_hash, user_id, principal_type, issued_at, expires_at)
-             VALUES ($1, $2, 'customer', NOW(), NOW() + INTERVAL '1 hour')`,
+             VALUES ($1, $2, 'customer', NOW(), NOW() + INTERVAL '1 hour')
+             RETURNING id`,
             [hashA, userId]
+        );
+        await client.query(
+            `INSERT INTO auth_refresh_tokens (
+                id, auth_session_id, generation, token_hash, expires_at
+             ) VALUES ('11111111-1111-4111-8111-111111111111', $1, 1, $2, NOW() + INTERVAL '2 hours')`,
+            [customerSession.rows[0].id, 'd'.repeat(64)]
         );
         await assert.rejects(
             () => client.query(
@@ -122,12 +141,27 @@ const { cleanupExpiredSessions } = require('../services/authSessionService');
         state = await client.query('SELECT revoked_at, revoke_reason FROM auth_sessions WHERE jti_hash = $1', [hashA]);
         assert(state.rows[0].revoked_at);
         assert.equal(state.rows[0].revoke_reason, 'user_security_state_changed');
+        assert.equal((await client.query(
+            `SELECT status FROM auth_refresh_tokens
+             WHERE id = '11111111-1111-4111-8111-111111111111'`
+        )).rows[0].status, 'revoked');
 
         const hashB = 'b'.repeat(64);
         await client.query(
             `INSERT INTO auth_sessions (jti_hash, user_id, principal_type, issued_at, expires_at)
-             VALUES ($1, $2, 'admin', NOW(), NOW() + INTERVAL '1 hour')`,
+             VALUES ($1, $2, 'admin', NOW(), NOW() + INTERVAL '1 hour')
+             RETURNING id`,
             [hashB, userId]
+        );
+        const adminSession = await client.query('SELECT id FROM auth_sessions WHERE jti_hash = $1', [hashB]);
+        await assert.rejects(
+            () => client.query(
+                `INSERT INTO auth_refresh_tokens (
+                    id, auth_session_id, generation, token_hash, expires_at
+                 ) VALUES ('22222222-2222-4222-8222-222222222222', $1, 1, $2, NOW() + INTERVAL '2 hours')`,
+                [adminSession.rows[0].id, 'e'.repeat(64)]
+            ),
+            (error) => error.code === '23514'
         );
         await client.query('UPDATE users SET auth_enabled = FALSE WHERE id = $1', [userId]);
         state = await client.query('SELECT revoked_at FROM auth_sessions WHERE jti_hash = $1', [hashB]);
@@ -144,7 +178,7 @@ const { cleanupExpiredSessions } = require('../services/authSessionService');
         const expiredCount = await client.query('SELECT COUNT(*)::int AS count FROM auth_sessions WHERE expires_at <= NOW()');
         assert.equal(expiredCount.rows[0].count, 0);
 
-        console.log('authSessionMigrationSmoke: PASS fresh=1 upgrade=1 constraints=4 indexes=2 triggers=2');
+        console.log('authSessionMigrationSmoke: PASS fresh=1 upgrade=1 constraints=5 indexes=4 triggers=4 refresh-binding=1');
     } finally {
         await client.end();
     }

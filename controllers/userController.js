@@ -1,6 +1,6 @@
 ﻿const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
-const { AuthSessionError, issueAccessSession } = require('../services/authSessionService');
+const { AuthSessionError, issueCustomerSession } = require('../services/authSessionService');
 
 const insertUserWithSchemaFallback = async (fullName, email, hashedPassword) => {
     try {
@@ -159,10 +159,9 @@ const loginUser = async (req, res) => {
             return res.status(400).json({ error: 'E-posta veya şifre hatalı.' });
         }
 
-        const session = await issueAccessSession({
+        const session = await issueCustomerSession({
             userId: currentUser.id,
             role: currentUser.role,
-            principal: 'customer',
             queryable: client
         });
         await client.query('COMMIT');
@@ -171,6 +170,10 @@ const loginUser = async (req, res) => {
         return res.status(200).json({
             mesaj: 'Giriş başarılı! Yönlendiriliyorsunuz...',
             token: session.token,
+            refreshToken: session.refreshToken,
+            accessExpiresAt: session.expiresAt.toISOString(),
+            refreshExpiresAt: session.refreshExpiresAt.toISOString(),
+            sessionId: session.sessionId,
             user: {
                 id: currentUser.id,
                 fullName: currentUser.full_name || currentUser.name,
