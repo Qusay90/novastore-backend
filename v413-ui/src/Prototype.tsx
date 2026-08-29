@@ -62,6 +62,7 @@ import {
 } from "./adapters";
 import { hasAppOwnedBackEntry, nativeHistoryDepth } from "./native/nativeNavigation";
 import { canonicalNativeRoute, canonicalNativeRouteOrSafeDefault } from "./native/routeContract";
+import { useCustomerAccountRuntime, type CustomerAddressInput, type CustomerOrder } from "./account";
 import {
   normalizeCustomerNotificationTarget,
   resolveCustomerNotificationDestination,
@@ -145,6 +146,8 @@ type SavedAddress = {
   line: string;
   city: string;
   postalCode: string;
+  phone?: string;
+  district?: string;
   isDefault: boolean;
 };
 
@@ -206,6 +209,7 @@ type CommerceState = {
   selectedProductId: string;
   selectedOrderId: number | null;
   publicProducts: Record<string, Product>;
+  publicCatalogPhase: "idle" | "loading" | "ready" | "error";
   addresses: SavedAddress[];
   paymentMethods: SavedPaymentMethod[];
   productReviews: ProductReview[];
@@ -224,6 +228,7 @@ type CommerceState = {
   selectProduct: (id: string) => void;
   selectOrder: (id: number | null) => void;
   registerPublicProducts: (products: readonly Product[]) => void;
+  reloadPublicCatalog: () => void;
   addAddress: (address: Omit<SavedAddress, "id" | "isDefault">) => void;
   updateAddress: (id: string, address: Omit<SavedAddress, "id" | "isDefault">) => void;
   removeAddress: (id: string) => void;
@@ -344,26 +349,28 @@ export default function Prototype() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const [route, setRoute] = useState<Route>(readRoute);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => new Set());
-  const [cartLines, setCartLines] = useState<CartLine[]>([
+  const [cartLines, setCartLines] = useState<CartLine[]>(() => NATIVE_SHELL ? [] : [
     { id: "headphones", productId: "pulse-anc", quantity: 1 },
     { id: "coffee", productId: "barista-pro", quantity: 2 },
   ]);
-  const [appliedCoupon, setAppliedCoupon] = useState("NOVAYAZ");
+  const [appliedCoupon, setAppliedCoupon] = useState(() => NATIVE_SHELL ? "" : "NOVAYAZ");
   const [selectedProductId, setSelectedProductId] = useState("pulse-anc");
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [publicProducts, setPublicProducts] = useState<Record<string, Product>>({});
-  const [addresses, setAddresses] = useState<SavedAddress[]>([
+  const [publicCatalogPhase, setPublicCatalogPhase] = useState<"idle" | "loading" | "ready" | "error">(() => NATIVE_SHELL ? "loading" : "idle");
+  const [publicCatalogRevision, setPublicCatalogRevision] = useState(0);
+  const [addresses, setAddresses] = useState<SavedAddress[]>(() => NATIVE_SHELL ? [] : [
     { id: "home", label: "Ev", recipient: "Kullanıcı Adı", line: "Atakum Mah. Cumhuriyet Cad. No: 58 D: 12", city: "Samsun / Atakum", postalCode: "55200", isDefault: true },
   ]);
-  const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>([
+  const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>(() => NATIVE_SHELL ? [] : [
     { id: "nova-card", nickname: "Nova Kart", brand: "visa", last4: "4242", expiry: "09/29", isDefault: true },
   ]);
-  const [productReviews, setProductReviews] = useState<ProductReview[]>([
+  const [productReviews, setProductReviews] = useState<ProductReview[]>(() => NATIVE_SHELL ? [] : [
     { id: "review-aylin", productId: "pulse-anc", ownerId: "customer-aylin", authorMasked: "Ay***", rating: 5, copy: "Ses kalitesi çok dengeli, kulak yastıkları uzun kullanımda rahat.", verified: true },
     { id: "review-mert", productId: "pulse-anc", ownerId: "customer-mert", authorMasked: "Me***", rating: 4, copy: "Gürültü engelleme toplu taşımada belirgin fark yaratıyor.", verified: true },
     { id: "review-selin", productId: "pulse-anc", ownerId: "customer-selin", authorMasked: "Se***", rating: 5, copy: "İki cihaza aynı anda bağlanması iş akışımı kolaylaştırdı.", verified: true },
   ]);
-  const [productQuestions, setProductQuestions] = useState<ProductQuestion[]>([
+  const [productQuestions, setProductQuestions] = useState<ProductQuestion[]>(() => NATIVE_SHELL ? [] : [
     { id: "question-public", productId: "pulse-anc", ownerId: "customer-melisa", authorMasked: "Me***", question: "ANC açıkken pil ömrü yaklaşık kaç saat?", status: "answered", answer: "ANC açık kullanımda yaklaşık 36 saate kadar kullanım sunar." },
     { id: "question-hidden", productId: "pulse-anc", ownerId: "customer-other", authorMasked: "Al***", question: "Bu bekleyen soru başka müşteriye ait.", status: "pending" },
   ]);
@@ -378,6 +385,7 @@ export default function Prototype() {
   const [contentRevision, setContentRevision] = useState(0);
   const [refreshRequest, setRefreshRequest] = useState<RefreshRequest>({ id: 0, source: "reselect" });
   const notificationRuntime = useCustomerNotificationRuntime();
+  const accountRuntime = useCustomerAccountRuntime();
   const capture = !NATIVE_SHELL && params.get("capture") === "1";
   const nativeShell = NATIVE_SHELL;
   const layout = NATIVE_SHELL ? "phone" : params.get("layout") === "tablet" ? "tablet" : "phone";
@@ -413,6 +421,26 @@ export default function Prototype() {
     setRefreshRequest((current) => ({ id: current.id + 1, source }));
   }, [keyboard]);
 
+  useEffect(() => {
+    if (!NATIVE_SHELL) return;
+    if (accountRuntime?.phase !== "authenticated") {
+      setAddresses([]);
+      setPaymentMethods([]);
+      return;
+    }
+    setAddresses(accountRuntime.addresses.map((address) => ({
+      id: String(address.id),
+      label: address.title,
+      recipient: address.fullName,
+      line: address.addressLine,
+      city: address.city,
+      district: address.district,
+      phone: address.phone,
+      postalCode: "",
+      isDefault: address.isDefault,
+    })));
+  }, [accountRuntime?.addresses, accountRuntime?.phase]);
+
   const registerPublicProducts = useCallback((incoming: readonly Product[]) => {
     setPublicProducts((current) => {
       let changed = false;
@@ -424,6 +452,25 @@ export default function Prototype() {
       return changed ? next : current;
     });
   }, []);
+
+  useEffect(() => {
+    if (!NATIVE_SHELL) return;
+    let active = true;
+    setPublicCatalogPhase("loading");
+    loadCanonicalPublicStore(DEFAULT_PUBLIC_STORE_SLUG)
+      .then((projection) => {
+        if (!active) return;
+        const incoming = productsFromPublicProjection(projection);
+        setPublicProducts(Object.fromEntries(incoming.map((product) => [product.id, product])));
+        setPublicCatalogPhase("ready");
+      })
+      .catch(() => {
+        if (!active) return;
+        setPublicProducts({});
+        setPublicCatalogPhase("error");
+      });
+    return () => { active = false; };
+  }, [publicCatalogRevision]);
 
   const go = (next: CalId, tab = initialTab[next], view: ViewId = "", context: RouteContext = {}) => {
     keyboard.hide();
@@ -482,6 +529,7 @@ export default function Prototype() {
     selectedProductId,
     selectedOrderId,
     publicProducts,
+    publicCatalogPhase,
     addresses,
     paymentMethods,
     productReviews,
@@ -508,6 +556,7 @@ export default function Prototype() {
     selectProduct: setSelectedProductId,
     selectOrder: setSelectedOrderId,
     registerPublicProducts,
+    reloadPublicCatalog: () => setPublicCatalogRevision((current) => current + 1),
     addAddress: (address) => setAddresses((current) => [...current, { ...address, id: `address-${Date.now()}`, isDefault: current.length === 0 }]),
     updateAddress: (id, address) => setAddresses((current) => current.map((item) => item.id === id ? { ...item, ...address } : item)),
     removeAddress: (id) => setAddresses((current) => {
@@ -534,7 +583,7 @@ export default function Prototype() {
     selectCatalog: (category, subcategory = category) => setCatalogSelection({ category, subcategory }),
     applyCatalogFilters: (filters) => setCatalogFilters({ ...filters, applied: true }),
     setCatalogSort,
-  }), [favoriteIds, cartCount, cartLines, appliedCoupon, selectedProductId, selectedOrderId, publicProducts, addresses, paymentMethods, productReviews, productQuestions, readNotificationIds, notificationPreferences, catalogSelection, catalogFilters, catalogSort, registerPublicProducts]);
+  }), [favoriteIds, cartCount, cartLines, appliedCoupon, selectedProductId, selectedOrderId, publicProducts, publicCatalogPhase, addresses, paymentMethods, productReviews, productQuestions, readNotificationIds, notificationPreferences, catalogSelection, catalogFilters, catalogSort, registerPublicProducts]);
 
   return (
     <CommerceContext.Provider value={commerce}>
@@ -1066,6 +1115,7 @@ function BrandLockup() {
 
 function LoginScreen({ go, view }: { go: Go; view: ViewId }) {
   const notificationRuntime = useCustomerNotificationRuntime();
+  const accountRuntime = useCustomerAccountRuntime();
   const [remember, setRemember] = useState(true);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -1076,20 +1126,40 @@ function LoginScreen({ go, view }: { go: Go; view: ViewId }) {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (authView === "register" && !termsAccepted) return;
-    setSubmitted(true);
+    setSubmitted(false);
     setAuthError("");
-    if (authView !== "login") return;
-    if (!notificationRuntime) {
+    if (NATIVE_SHELL && !accountRuntime) {
+      setAuthError("Müşteri oturumu başlatılamadı. Uygulamayı yeniden açıp tekrar dene.");
+      return;
+    }
+    if (!NATIVE_SHELL && !notificationRuntime) {
+      setSubmitted(true);
       window.setTimeout(() => go("CAL-10", "account"), 180);
       return;
     }
     const fields = new FormData(event.currentTarget);
+    const identifier = String(fields.get("identifier") || "");
+    const password = String(fields.get("password") || "");
     setAuthBusy(true);
     try {
-      await notificationRuntime.login(String(fields.get("identifier") || ""), String(fields.get("password") || ""));
-      go("CAL-10", "account");
-    } catch {
-      setAuthError("Giriş yapılamadı. Bilgilerini ve bağlantını kontrol edip tekrar dene.");
+      if (authView === "forgot") {
+        await accountRuntime?.requestPasswordRecovery(identifier);
+        setSubmitted(true);
+      } else if (authView === "register") {
+        await accountRuntime?.register(String(fields.get("name") || ""), identifier, password);
+        go("CAL-10", "account");
+      } else {
+        if (accountRuntime) await accountRuntime.login(identifier, password);
+        else await notificationRuntime!.login(identifier, password);
+        go("CAL-10", "account");
+      }
+    } catch (error) {
+      const fallback = authView === "register"
+        ? "Kayıt tamamlanamadı. Bilgilerini kontrol edip tekrar dene."
+        : authView === "forgot"
+          ? "Şifre sıfırlama isteği gönderilemedi. Bağlantını kontrol edip tekrar dene."
+          : "Giriş yapılamadı. Bilgilerini ve bağlantını kontrol edip tekrar dene.";
+      setAuthError(error instanceof Error && error.message && !error.message.includes("CUSTOMER_") ? error.message : fallback);
     } finally {
       setAuthBusy(false);
     }
@@ -1107,9 +1177,9 @@ function LoginScreen({ go, view }: { go: Go; view: ViewId }) {
         </div>}
         {authView === "register" && <button type="button" className={`check-control${termsAccepted ? " checked" : ""}`} aria-pressed={termsAccepted} onClick={() => setTermsAccepted(!termsAccepted)}><span>{termsAccepted && <CheckIcon />}</span>Kullanım koşullarını kabul ediyorum</button>}
       </section>
-      <button className="primary orange" type="submit" disabled={authBusy || (authView === "register" && !termsAccepted)}>{authBusy ? "Giriş yapılıyor…" : authView === "forgot" ? "Sıfırlama Bağlantısı Gönder" : authView === "register" ? "Hesap Oluştur" : "Giriş Yap"}</button>
+      <button className="primary orange" type="submit" disabled={authBusy || (authView === "register" && !termsAccepted)}>{authBusy ? "İşlem yapılıyor…" : authView === "forgot" ? "Sıfırlama Bağlantısı Gönder" : authView === "register" ? "Hesap Oluştur" : "Giriş Yap"}</button>
       {authError && <p role="alert" className="auth-status auth-error">{authError}</p>}
-      {submitted && authView !== "login" && <p role="status" className="auth-status">İşlemin alındı. Sonraki adımlar güvenli kanaldan iletilecek.</p>}
+      {submitted && authView === "forgot" && <p role="status" className="auth-status">Hesap bulunuyorsa sıfırlama bağlantısı güvenli kanaldan iletilecek.</p>}
       <p className="center-copy">{authView === "register" ? <>Zaten hesabın var mı? <button type="button" onClick={() => go("CAL-01", "account", "login")}>Giriş Yap</button></> : <>Hesabın yok mu? <button type="button" onClick={() => go("CAL-01", "account", "register")}>Kayıt Ol</button></>}</p>
       <footer className="legal-links">Gizlilik Politikası <b>•</b> Kullanım Koşulları</footer>
     </form>
@@ -1187,7 +1257,8 @@ function CategoryIcon({ id }: { id: CategoryId }) {
 }
 
 function HomeScreen({ go }: { go: Go }) {
-  const { selectCatalog } = useCommerce();
+  const { selectCatalog, publicProducts, publicCatalogPhase, reloadPublicCatalog } = useCommerce();
+  const runtimeProducts = NATIVE_SHELL ? Object.values(publicProducts) : products;
   return (
     <div className="root-layout home-layout">
       <section className="home-hero"><img src={`${A}/extracts/home-hero.png`} alt="Ev yaşam koleksiyonu" /><div className="carousel-dots"><i /><i /><i /></div></section>
@@ -1199,18 +1270,22 @@ function HomeScreen({ go }: { go: Go }) {
         ))}
       </section>
       <SectionTitle title="Bugünün Seçimleri" action="Tümünü Gör" onClick={() => go("CAL-04")} />
-      <div className="product-grid home-products">
-        {products.map((product, index) => <ProductCard key={`home-${product.id}`} {...product} testId={`home-product-card-${index}`} onClick={() => go("CAL-06")} />)}
-      </div>
+      {NATIVE_SHELL && publicCatalogPhase === "loading" ? <CatalogAuthorityState phase="loading" />
+        : NATIVE_SHELL && publicCatalogPhase === "error" ? <CatalogAuthorityState phase="error" onRetry={reloadPublicCatalog} />
+          : runtimeProducts.length ? <div className="product-grid home-products">
+            {runtimeProducts.map((product, index) => <ProductCard key={`home-${product.id}`} {...product} testId={`home-product-card-${index}`} onClick={() => openProductDetail(go, product)} />)}
+          </div> : <CatalogAuthorityState phase="empty" />}
     </div>
   );
 }
 
 function SearchScreen({ go, query, setQuery, panelOpen, setPanelOpen }: { go: Go; query: string; setQuery: (value: string) => void; panelOpen: boolean; setPanelOpen: (open: boolean) => void }) {
+  const { publicProducts, publicCatalogPhase, reloadPublicCatalog } = useCommerce();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [history, setHistory] = useState(["kablosuz kulaklık", "kahve makinesi", "kabin boy valiz"]);
   const normalized = query.trim().toLocaleLowerCase("tr-TR");
-  const results = normalized ? products.filter((product) => `${product.name} ${product.store}`.toLocaleLowerCase("tr-TR").includes(normalized)) : [];
+  const sourceProducts = NATIVE_SHELL ? Object.values(publicProducts) : products;
+  const results = normalized ? sourceProducts.filter((product) => `${product.name} ${product.store}`.toLocaleLowerCase("tr-TR").includes(normalized)) : [];
   const choose = (value: string) => {
     setQuery(value);
     setHistory((current) => [value, ...current.filter((item) => item !== value)].slice(0, 6));
@@ -1234,12 +1309,14 @@ function SearchScreen({ go, query, setQuery, panelOpen, setPanelOpen }: { go: Go
           <div className="search-suggestions"><h2>Önerilen aramalar</h2><div>{["Bluetooth kulaklık", "Akıllı saat", "Kahve makinesi", "Valiz"].map((item) => <button type="button" key={item} onClick={() => choose(item)}>{item}</button>)}</div></div>
         </section>}
       </div>
-      {normalized ? (
+      {NATIVE_SHELL && publicCatalogPhase === "loading" ? <CatalogAuthorityState phase="loading" />
+        : NATIVE_SHELL && publicCatalogPhase === "error" ? <CatalogAuthorityState phase="error" onRetry={reloadPublicCatalog} />
+          : normalized ? (
         <section className="search-results">
           <div className="search-summary"><div><h1>Arama sonuçları</h1><p>“{query}” için {results.length} ürün</p></div><button type="button" onClick={() => go("CAL-05", "home")}>Filtrele <MixerHorizontalIcon /></button></div>
-          {results.length ? <div className="product-grid">{results.map((product) => <ProductCard key={`search-${product.id}`} {...product} onClick={() => go("CAL-06")} />)}</div> : <div className="empty-state"><MagnifyingGlassIcon /><h2>Sonuç bulunamadı</h2><p>Başka bir ürün, kategori veya marka deneyebilirsin.</p></div>}
+          {results.length ? <div className="product-grid">{results.map((product) => <ProductCard key={`search-${product.id}`} {...product} onClick={() => openProductDetail(go, product)} />)}</div> : <div className="empty-state"><MagnifyingGlassIcon /><h2>Sonuç bulunamadı</h2><p>Başka bir ürün, kategori veya marka deneyebilirsin.</p></div>}
         </section>
-      ) : <section className="search-discovery"><h2>Senin için seçtiklerimiz</h2><div className="product-grid">{products.slice(0, 6).map((product) => <ProductCard key={`discover-${product.id}`} {...product} onClick={() => go("CAL-06")} />)}</div></section>}
+      ) : sourceProducts.length ? <section className="search-discovery"><h2>Senin için seçtiklerimiz</h2><div className="product-grid">{sourceProducts.slice(0, 6).map((product) => <ProductCard key={`discover-${product.id}`} {...product} onClick={() => openProductDetail(go, product)} />)}</div></section> : <CatalogAuthorityState phase="empty" />}
     </div>
   );
 }
@@ -1288,6 +1365,21 @@ const products: Product[] = [
   { id: "travel-pro", name: "Nova Travel Pro", store: "Nova Travel", price: "₺4.149", old: "₺4.699", image: `${A}/extracts/product-luggage-clean.png`, badge: "%12" },
   { id: "barista-touch", name: "Nova Barista Touch", store: "Brewista Store", price: "₺8.299", old: "₺8.999", image: `${A}/extracts/product-coffee-clean.png`, badge: "%8" },
 ];
+
+function openProductDetail(go: Go, product: Product) {
+  go("CAL-06", "home", "", product.isPublicProjection
+    ? { storeSlug: product.storeSlug, productId: product.id, mode: "customer" }
+    : {});
+}
+
+function CatalogAuthorityState({ phase, onRetry }: { phase: "loading" | "error" | "empty"; onRetry?: () => void }) {
+  const copy = phase === "loading"
+    ? { title: "Ürünler yükleniyor", detail: "Güncel mağaza kataloğu alınıyor." }
+    : phase === "error"
+      ? { title: "Ürünler yüklenemedi", detail: "Bağlantını kontrol edip tekrar deneyebilirsin." }
+      : { title: "Gösterilecek ürün yok", detail: "Public mağaza kataloğunda aktif ürün bulunmuyor." };
+  return <section className="catalog-authority-state" role={phase === "error" ? "alert" : "status"}><CubeIcon /><h2>{copy.title}</h2><p>{copy.detail}</p>{phase === "error" && onRetry && <button className="secondary" type="button" onClick={onRetry}>Tekrar Dene</button>}</section>;
+}
 
 function formatCatalogPrice(value: number) {
   return `₺${value.toLocaleString("tr-TR", {
@@ -1353,6 +1445,7 @@ function productAmount(product: Product) {
 }
 
 function productBrand(product: Product) {
+  if (product.isPublicProjection) return product.store;
   if (product.id.startsWith("pulse")) return "Nova Audio";
   if (product.id.startsWith("sound")) return "SoundLab";
   return "TeknoBeat";
@@ -1360,22 +1453,24 @@ function productBrand(product: Product) {
 
 function productFeatures(product: Product) {
   const features = new Set<string>();
+  if (product.isPublicProjection) return features;
   if (product.id.startsWith("pulse")) features.add("Aktif Gürültü Engelleme");
   if (/^(pulse|sound)/.test(product.id)) features.add("Bluetooth 5.3");
   if (/pulse|travel-pro|barista-touch/.test(product.id)) features.add("40+ saat pil");
   return features;
 }
 
-function catalogProducts(category: string) {
+function catalogProducts(category: string, source: readonly Product[] = products) {
+  if (source.some((product) => product.isPublicProjection)) return [...source];
   const ids = CATEGORY_PRODUCT_IDS[category] ?? CATEGORY_PRODUCT_IDS.Elektronik;
-  return products.filter((product) => ids.includes(product.id));
+  return source.filter((product) => ids.includes(product.id));
 }
 
 function filteredProducts(source: Product[], filters: Omit<CatalogFilters, "applied"> | CatalogFilters) {
   return source.filter((product) => {
     if (filters.brands.length && !filters.brands.includes(productBrand(product))) return false;
     if (filters.features.length && !filters.features.every((feature) => productFeatures(product).has(feature))) return false;
-    if (filters.inStock && product.id === "sound-move") return false;
+    if (filters.inStock && (product.stock !== undefined ? product.stock <= 0 : product.id === "sound-move")) return false;
     const amount = productAmount(product);
     if (filters.minPrice !== null && amount < filters.minPrice) return false;
     if (filters.maxPrice !== null && amount > filters.maxPrice) return false;
@@ -1431,23 +1526,26 @@ function formatMoney(value: number) {
 
 function PlpScreen({ go, favoritesOnly = false }: { go: Go; favoritesOnly?: boolean }) {
   const keyboard = useKeyboard();
-  const { favoriteIds, catalogSelection, catalogFilters, catalogSort, setCatalogSort } = useCommerce();
+  const { favoriteIds, catalogSelection, catalogFilters, catalogSort, setCatalogSort, publicProducts, publicCatalogPhase, reloadPublicCatalog } = useCommerce();
   const [sortOpen, setSortOpen] = useState(false);
   const [selectedChip, setSelectedChip] = useState("Tümü");
-  const scoped = catalogProducts(catalogSelection.category);
+  const sourceProducts = NATIVE_SHELL ? Object.values(publicProducts) : products;
+  const scoped = catalogProducts(catalogSelection.category, sourceProducts);
   const applied = catalogFilters.applied ? filteredProducts(scoped, catalogFilters) : scoped;
-  const chipFiltered = selectedChip === "Tümü" ? applied : selectedChip === "ANC" ? applied.filter((product) => productFeatures(product).has("Aktif Gürültü Engelleme")) : applied.filter((product) => productFeatures(product).has("Bluetooth 5.3"));
+  const chipFiltered = NATIVE_SHELL || selectedChip === "Tümü" ? applied : selectedChip === "ANC" ? applied.filter((product) => productFeatures(product).has("Aktif Gürültü Engelleme")) : applied.filter((product) => productFeatures(product).has("Bluetooth 5.3"));
   const sorted = sortProducts(chipFiltered, catalogSort);
-  const visibleProducts = favoritesOnly ? products.filter((product) => favoriteIds.has(product.id)) : sorted;
+  const visibleProducts = favoritesOnly ? sourceProducts.filter((product) => favoriteIds.has(product.id)) : sorted;
   const listingTitle = catalogSelection.subcategory || catalogSelection.category;
   const activeFilterCount = catalogFilters.applied ? catalogFilters.brands.length + catalogFilters.features.length + Number(catalogFilters.inStock) + Number(catalogFilters.minPrice !== null || catalogFilters.maxPrice !== null) : 0;
   const sortLabel = SORT_OPTIONS.find((option) => option.key === catalogSort)?.label ?? SORT_OPTIONS[0].label;
   return (
     <>
       <div className="root-layout plp-layout">
-        {!favoritesOnly && <><div className="breadcrumb">{catalogSelection.category}{catalogSelection.subcategory && catalogSelection.subcategory !== catalogSelection.category && <><CaretRightIcon /> {catalogSelection.subcategory}</>}</div><div className="plp-heading"><div><h1>{listingTitle}</h1><p>{visibleProducts.length} örnek ürün</p></div><div className="plp-actions"><button type="button" aria-haspopup="dialog" onClick={() => { keyboard.hide(); setSortOpen(true); }}><PinLeftIcon /> Sırala: {sortLabel}</button><button onClick={() => go("CAL-05")}><MixerHorizontalIcon /> Filtrele {activeFilterCount > 0 && <b>{activeFilterCount}</b>}</button></div></div><div className="chip-row">{["Tümü", "ANC", "Bluetooth 5.3"].map((chip) => <button className={selectedChip === chip ? "active" : ""} aria-pressed={selectedChip === chip} onClick={() => setSelectedChip(chip)} key={chip}>{chip}</button>)}</div></>}
+        {!favoritesOnly && <><div className="breadcrumb">{catalogSelection.category}{catalogSelection.subcategory && catalogSelection.subcategory !== catalogSelection.category && <><CaretRightIcon /> {catalogSelection.subcategory}</>}</div><div className="plp-heading"><div><h1>{listingTitle}</h1><p>{visibleProducts.length} ürün</p></div><div className="plp-actions"><button type="button" aria-haspopup="dialog" onClick={() => { keyboard.hide(); setSortOpen(true); }}><PinLeftIcon /> Sırala: {sortLabel}</button><button onClick={() => go("CAL-05")}><MixerHorizontalIcon /> Filtrele {activeFilterCount > 0 && <b>{activeFilterCount}</b>}</button></div></div>{!NATIVE_SHELL && <div className="chip-row">{["Tümü", "ANC", "Bluetooth 5.3"].map((chip) => <button className={selectedChip === chip ? "active" : ""} aria-pressed={selectedChip === chip} onClick={() => setSelectedChip(chip)} key={chip}>{chip}</button>)}</div>}</>}
         {favoritesOnly && <div className="favorites-heading"><h1>Favorilerim</h1><p>{visibleProducts.length} ürün kaydedildi</p></div>}
-        {visibleProducts.length ? <div className="product-grid plp-products">{visibleProducts.map((product, index) => <ProductCard key={product.id} {...product} testId={`product-card-${index}`} onClick={() => go("CAL-06")} />)}</div> : <div className="empty-state favorites-empty"><PhosphorHeartIcon weight="regular" /><h2>{favoritesOnly ? "Favorilerin henüz boş" : "Bu seçimde ürün bulunamadı"}</h2><p>{favoritesOnly ? "Beğendiğin ürünlerdeki kalbe dokunarak buraya ekleyebilirsin." : "Filtreleri temizleyerek daha fazla ürün görebilirsin."}</p><button className="primary navy" type="button" onClick={() => favoritesOnly ? go("CAL-02", "home") : go("CAL-05", "home")}>{favoritesOnly ? "Ürünleri Keşfet" : "Filtreleri Düzenle"}</button></div>}
+        {NATIVE_SHELL && publicCatalogPhase === "loading" ? <CatalogAuthorityState phase="loading" />
+          : NATIVE_SHELL && publicCatalogPhase === "error" ? <CatalogAuthorityState phase="error" onRetry={reloadPublicCatalog} />
+            : visibleProducts.length ? <div className="product-grid plp-products">{visibleProducts.map((product, index) => <ProductCard key={product.id} {...product} testId={`product-card-${index}`} onClick={() => openProductDetail(go, product)} />)}</div> : <div className="empty-state favorites-empty"><PhosphorHeartIcon weight="regular" /><h2>{favoritesOnly ? "Favorilerin henüz boş" : "Bu seçimde ürün bulunamadı"}</h2><p>{favoritesOnly ? "Beğendiğin ürünlerdeki kalbe dokunarak buraya ekleyebilirsin." : "Filtreleri temizleyerek daha fazla ürün görebilirsin."}</p><button className="primary navy" type="button" onClick={() => favoritesOnly ? go("CAL-02", "home") : go("CAL-05", "home")}>{favoritesOnly ? "Ürünleri Keşfet" : "Filtreleri Düzenle"}</button></div>}
       </div>
       {!favoritesOnly && <BottomSheet open={sortOpen} onOpenChange={setSortOpen} title="Sırala" description="Ürünlerin gösterim sırasını seç">
         <div className="sort-options" role="radiogroup" aria-label="Ürün sıralaması">
@@ -1712,7 +1810,7 @@ function ProductCard({ id, name, store, price, old, image, images, badge, rating
 }
 
 function FilterScreen({ go }: { go: Go }) {
-  const { catalogSelection, catalogFilters, applyCatalogFilters } = useCommerce();
+  const { catalogSelection, catalogFilters, applyCatalogFilters, publicProducts } = useCommerce();
   const initialDraft = catalogFilters;
   const [brands, setBrands] = useState(initialDraft.brands);
   const [stock, setStock] = useState(initialDraft.inStock);
@@ -1727,7 +1825,10 @@ function FilterScreen({ go }: { go: Go }) {
   const priceError = minPrice !== null && maxPrice !== null && minPrice > maxPrice;
   const clearAll = () => { setBrands([]); setStock(false); setMinPriceDraft(""); setMaxPriceDraft(""); setFeatures([]); };
   const draftFilters = { brands, features, inStock: stock, minPrice, maxPrice };
-  const previewCount = priceError ? 0 : filteredProducts(catalogProducts(catalogSelection.category), draftFilters).length;
+  const sourceProducts = NATIVE_SHELL ? Object.values(publicProducts) : products;
+  const categorySource = catalogProducts(catalogSelection.category, sourceProducts);
+  const availableBrands = [...new Set(categorySource.map(productBrand))];
+  const previewCount = priceError ? 0 : filteredProducts(categorySource, draftFilters).length;
   const apply = () => {
     if (priceError) return;
     applyCatalogFilters(draftFilters);
@@ -1735,15 +1836,15 @@ function FilterScreen({ go }: { go: Go }) {
   };
   return (
     <div className="filter-stage">
-      <div className="filter-backdrop" aria-hidden="true" inert><div className="ghost-products"><ProductCard {...products[0]} onClick={() => {}} /><ProductCard {...products[1]} onClick={() => {}} /><ProductCard {...products[2]} onClick={() => {}} /><ProductCard {...products[3]} onClick={() => {}} /></div></div>
+      <div className="filter-backdrop" aria-hidden="true" inert><div className="ghost-products">{sourceProducts.slice(0, 4).map((product) => <ProductCard {...product} key={`filter-${product.id}`} onClick={() => {}} />)}</div></div>
       <section className="filter-sheet" role="dialog" aria-modal="true" aria-label="Ürün filtreleri">
         <div className="sheet-handle" />
-        <header><div><h1>Filtrele</h1><p>{catalogProducts(catalogSelection.category).length} ürün arasından seçim yap</p></div><IconButton label="Kapat" onClick={() => go("CAL-04")}><Cross1Icon /></IconButton></header>
+        <header><div><h1>Filtrele</h1><p>{categorySource.length} ürün arasından seçim yap</p></div><IconButton label="Kapat" onClick={() => go("CAL-04")}><Cross1Icon /></IconButton></header>
         <div className="filter-columns">
           <div className="filter-group"><h2>Kategori</h2><button className="select-row" type="button" onClick={() => go("CAL-03", "categories")}>{catalogSelection.category} / {catalogSelection.subcategory} <CaretRightIcon /></button></div>
           <div className="filter-group"><h2>Fiyat aralığı</h2><div className="price-inputs"><label>En az <span><b>₺</b><KeyboardInput aria-label="En düşük fiyat" inputMode="numeric" value={minPriceDraft} aria-invalid={priceError} onChange={(event) => setMinPriceDraft(cleanPrice(event.target.value))} placeholder="0" /></span></label><label>En çok <span><b>₺</b><KeyboardInput aria-label="En yüksek fiyat" inputMode="numeric" value={maxPriceDraft} aria-invalid={priceError} onChange={(event) => setMaxPriceDraft(cleanPrice(event.target.value))} placeholder="Sınır yok" /></span></label></div>{priceError && <p className="filter-error" role="alert">En düşük fiyat, en yüksek fiyattan büyük olamaz.</p>}</div>
-          <div className="filter-group"><h2>Marka</h2>{["Nova Audio", "SoundLab", "TeknoBeat"].map((name) => <button className={`check-control${brands.includes(name) ? " checked" : ""}`} aria-pressed={brands.includes(name)} key={name} onClick={() => toggle(name)}><span>{brands.includes(name) && <CheckIcon />}</span>{name}<small>{name === "Nova Audio" ? 68 : name === "SoundLab" ? 42 : 31}</small></button>)}</div>
-          <div className="filter-group"><h2>Ürün özellikleri</h2><div className="chip-row wrap">{["Aktif Gürültü Engelleme", "Bluetooth 5.3", "40+ saat pil"].map((name) => <button type="button" className={features.includes(name) ? "active" : ""} aria-pressed={features.includes(name)} onClick={() => toggleFeature(name)} key={name}>{name}</button>)}</div></div>
+          <div className="filter-group"><h2>Marka / mağaza</h2>{availableBrands.map((name) => <button className={`check-control${brands.includes(name) ? " checked" : ""}`} aria-pressed={brands.includes(name)} key={name} onClick={() => toggle(name)}><span>{brands.includes(name) && <CheckIcon />}</span>{name}<small>{categorySource.filter((product) => productBrand(product) === name).length}</small></button>)}</div>
+          {!NATIVE_SHELL && <div className="filter-group"><h2>Ürün özellikleri</h2><div className="chip-row wrap">{["Aktif Gürültü Engelleme", "Bluetooth 5.3", "40+ saat pil"].map((name) => <button type="button" className={features.includes(name) ? "active" : ""} aria-pressed={features.includes(name)} onClick={() => toggleFeature(name)} key={name}>{name}</button>)}</div></div>}
           <div className="filter-group"><button type="button" className={`switch-row${stock ? " on" : ""}`} aria-label="Stoktakiler" aria-pressed={stock} onClick={() => setStock(!stock)}><span><strong>Yalnız stoktakiler</strong><small>Tükenen ürünleri gizle</small></span><i /></button></div>
         </div>
         <footer><button type="button" className="secondary" onClick={clearAll}>Temizle</button><button type="button" className="primary navy" disabled={priceError} onClick={apply}>{previewCount} Ürünü Göster</button></footer>
@@ -1777,7 +1878,7 @@ const productDetailData = {
 
 function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   const keyboard = useKeyboard();
-  const { favoriteIds, toggleFavorite, addToCart, selectedProductId, selectProduct, publicProducts, registerPublicProducts, productReviews, productQuestions, publishReview, submitProductQuestion } = useCommerce();
+  const { favoriteIds, toggleFavorite, addToCart, selectedProductId, selectProduct, publicProducts, publicCatalogPhase, reloadPublicCatalog, registerPublicProducts, productReviews, productQuestions, publishReview, submitProductQuestion } = useCommerce();
   const readOnlyPreview = route.mode === "preview";
   const routedProduct = route.productId ? publicProducts[route.productId] : undefined;
   const catalogProduct = routedProduct || publicProducts[selectedProductId] || products.find((product) => product.id === selectedProductId) || products[0];
@@ -1860,7 +1961,7 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   const favorite = favoriteIds.has(detail.id);
   const reviewsForProduct = productReviews.filter((review) => review.productId === detail.id);
   const ownReview = reviewsForProduct.find((review) => review.ownerId === CURRENT_MOCK_USER_ID);
-  const canReview = !readOnlyPreview && detail.id === "pulse-anc" && !ownReview;
+  const canReview = !NATIVE_SHELL && !readOnlyPreview && detail.id === "pulse-anc" && !ownReview;
   const visibleQuestions = catalogProduct.isPublicProjection
     ? []
     : productQuestions.filter((question) => question.productId === detail.id && (question.status === "answered" || question.ownerId === CURRENT_MOCK_USER_ID));
@@ -1924,7 +2025,7 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   };
   const submitReview = (event: FormEvent) => {
     event.preventDefault();
-    if (readOnlyPreview || !reviewDraft.trim()) return;
+    if (NATIVE_SHELL || readOnlyPreview || !reviewDraft.trim()) return;
     keyboard.hide();
     publishReview(detail.id, reviewRating, reviewDraft);
     setReviewDraft("");
@@ -1933,7 +2034,7 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   };
   const submitQuestion = (event: FormEvent) => {
     event.preventDefault();
-    if (readOnlyPreview) return;
+    if (NATIVE_SHELL || readOnlyPreview) return;
     const clean = questionDraft.trim();
     if (!clean) return;
     keyboard.hide();
@@ -1942,7 +2043,7 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
     setQuestionOpen(false);
   };
   const openSellerQuestion = () => {
-    if (readOnlyPreview) return;
+    if (NATIVE_SHELL || readOnlyPreview) return;
     setQuestionOpen(true);
     window.requestAnimationFrame(() => questionSection.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
@@ -1951,6 +2052,11 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   }
   if (route.storeSlug && route.productId && !publicProducts[route.productId] && remoteLoadState === "error") {
     return <div className="pdp-contract-load-state error" data-testid="public-product-error" role="alert"><StorefrontIcon /><h1>Ürün şu anda yüklenemedi</h1><p>Güvenli bağlantıyı yeniden deneyebilirsin.</p><button type="button" className="primary navy" onClick={() => setRemoteLoadRevision((value) => value + 1)}>Yeniden Dene</button></div>;
+  }
+  if (NATIVE_SHELL && !catalogProduct.isPublicProjection) {
+    return publicCatalogPhase === "error"
+      ? <div className="pdp-contract-load-state error" role="alert"><StorefrontIcon /><h1>Ürün yüklenemedi</h1><p>Public mağaza kataloğu doğrulanamadı.</p><button type="button" className="primary navy" onClick={reloadPublicCatalog}>Yeniden Dene</button></div>
+      : <div className="pdp-contract-load-state" role="status"><ReloadIcon /><h1>Ürün yükleniyor</h1><p>Güncel public ürün bilgileri hazırlanıyor.</p></div>;
   }
 
   return (
@@ -1988,7 +2094,7 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
                 <div className="rating large"><StarFilledIcon /><b>{detail.rating}</b><i /><button type="button" onClick={() => reviewSection.current?.scrollIntoView({ behavior: "smooth", block: "center" })}>{displayedReviewCount} değerlendirme</button></div>
                 <div className="price large"><strong>{detail.price}</strong>{detail.oldPrice && <del>{detail.oldPrice}</del>}{detail.discount && <span>{detail.discount}</span>}</div>
                 <div className="variant"><h2>Renk</h2><div>{[{ label: "Kırık Beyaz", className: "cream" }, { label: "Gece Mavisi", className: "navy" }].map((item) => <button type="button" aria-label={item.label} aria-pressed={color === item.label} className={`${item.className}${color === item.label ? " active" : ""}`} onClick={() => setColor(item.label)} key={item.label}><i /><span>{item.label}</span></button>)}</div><small className="variant-selection">Seçim: {color} · {color === "Kırık Beyaz" ? "NS-PA-IV" : "NS-PA-NV"}</small></div>
-                <section className="pdp-seller-panel" aria-labelledby="pdp-seller-title"><h2 id="pdp-seller-title"><StorefrontIcon weight="duotone" /> Satıcı Bilgisi</h2><div className="pdp-seller-identity"><img src={catalogProduct.storeLogoUrl ?? LOGO} alt="" /><div><strong>{detail.seller.name} {!catalogProduct.isPublicProjection && <SealCheckIcon weight="fill" aria-label="Doğrulanmış satıcı" />}</strong><span>{catalogProduct.isPublicProjection ? "Public mağaza kaydı" : "Güvenilir satıcı · Hızlı gönderici"}</span></div><b>{detail.seller.score}</b></div><div className="pdp-seller-actions"><button type="button" onClick={() => go("CAL-04", "home", "store", { storeSlug: catalogProduct.storeSlug ?? route.storeSlug, mode: route.mode })}>Mağazaya Git</button><button type="button" disabled={readOnlyPreview} onClick={openSellerQuestion}>Satıcıya Sor</button></div></section>
+                <section className="pdp-seller-panel" aria-labelledby="pdp-seller-title"><h2 id="pdp-seller-title"><StorefrontIcon weight="duotone" /> Satıcı Bilgisi</h2><div className="pdp-seller-identity"><img src={catalogProduct.storeLogoUrl ?? LOGO} alt="" /><div><strong>{detail.seller.name} {!catalogProduct.isPublicProjection && <SealCheckIcon weight="fill" aria-label="Doğrulanmış satıcı" />}</strong><span>{catalogProduct.isPublicProjection ? "Public mağaza kaydı" : "Güvenilir satıcı · Hızlı gönderici"}</span></div><b>{detail.seller.score}</b></div><div className="pdp-seller-actions"><button type="button" onClick={() => go("CAL-04", "home", "store", { storeSlug: catalogProduct.storeSlug ?? route.storeSlug, mode: route.mode })}>Mağazaya Git</button><button type="button" disabled={NATIVE_SHELL || readOnlyPreview} onClick={openSellerQuestion}>{NATIVE_SHELL ? "Soru kanalı yakında" : "Satıcıya Sor"}</button></div></section>
                 <div className="pdp-stock"><CheckCircleIcon weight="fill" /><div><strong>{detail.stock}</strong><span>{detail.seller.invoice}</span></div></div>
                 {detail.campaign && <p className="campaign-note"><b>Kampanya</b>{detail.campaign}</p>}
                 <section className={`pdp-description-section${readableText ? " is-readable" : ""}`} aria-labelledby="pdp-description-title">
@@ -2009,7 +2115,7 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
                 <div className="review-list">{reviewsForProduct.slice(0, reviewsExpanded ? reviewsForProduct.length : 2).map((review) => <article className="review-preview" key={review.id}><span className="review-avatar" aria-hidden="true"><PersonIcon /></span><div><header><b>{review.authorMasked}</b>{review.verified && <em><CheckIcon /> Doğrulanmış alışveriş</em>}</header><span>{review.copy}</span></div></article>)}</div>
                 {reviewOpen && <form className="pdp-inline-form review-form" onSubmit={submitReview}><h3>Ürünü değerlendir</h3><div className="review-stars" aria-label="Puan seç">{[1, 2, 3, 4, 5].map((value) => <button type="button" key={value} aria-label={`${value} yıldız`} aria-pressed={reviewRating === value} onClick={() => setReviewRating(value)}><StarFilledIcon /></button>)}</div><KeyboardTextarea aria-label="Değerlendirmen" value={reviewDraft} onChange={(event) => setReviewDraft(event.target.value)} placeholder="Deneyimini paylaş" /><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setReviewOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={!reviewDraft.trim()}>Gönder</button></div></form>}
               </article>
-              <article className="pdp-question-card" ref={questionSection}><div className="pdp-question-summary"><div><h2>Ürün soruları</h2><p>{readOnlyPreview ? "Satıcı önizlemesinde soru gönderimi kapalıdır." : "Ürünle ilgili merak ettiğini satıcıya sor."}</p></div><button type="button" className="secondary" disabled={readOnlyPreview} onClick={() => setQuestionOpen(!questionOpen)}>Soru Sor</button></div>{questionOpen && !readOnlyPreview && <form className="pdp-inline-form" onSubmit={submitQuestion}><KeyboardTextarea aria-label="Ürün hakkında sorun" maxLength={300} value={questionDraft} onChange={(event) => setQuestionDraft(event.target.value)} placeholder="Sorunu yaz" /><small>{questionDraft.length}/300</small><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setQuestionOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={!questionDraft.trim()}>Satıcıya Gönder</button></div></form>}<div className="question-thread-list">{visibleQuestions.map((question) => <article className="question-thread" data-status={question.status} key={question.id}><div className="question-block"><b>Soru · {question.authorMasked}</b><p>{question.question}</p></div>{question.status === "answered" ? <div className="answer-block"><b>Satıcı yanıtı</b><p>{question.answer}</p></div> : <small role="status"><ClockIcon /> Satıcı yanıtı bekleniyor · yalnızca sen görebilirsin</small>}</article>)}</div></article>
+              <article className="pdp-question-card" ref={questionSection}><div className="pdp-question-summary"><div><h2>Ürün soruları</h2><p>{NATIVE_SHELL ? "Yetkili ürün soru sözleşmesi bu sürümde etkin değil." : readOnlyPreview ? "Satıcı önizlemesinde soru gönderimi kapalıdır." : "Ürünle ilgili merak ettiğini satıcıya sor."}</p></div><button type="button" className="secondary" disabled={NATIVE_SHELL || readOnlyPreview} onClick={() => setQuestionOpen(!questionOpen)}>Soru Sor</button></div>{questionOpen && !NATIVE_SHELL && !readOnlyPreview && <form className="pdp-inline-form" onSubmit={submitQuestion}><KeyboardTextarea aria-label="Ürün hakkında sorun" maxLength={300} value={questionDraft} onChange={(event) => setQuestionDraft(event.target.value)} placeholder="Sorunu yaz" /><small>{questionDraft.length}/300</small><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setQuestionOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={!questionDraft.trim()}>Satıcıya Gönder</button></div></form>}<div className="question-thread-list">{visibleQuestions.map((question) => <article className="question-thread" data-status={question.status} key={question.id}><div className="question-block"><b>Soru · {question.authorMasked}</b><p>{question.question}</p></div>{question.status === "answered" ? <div className="answer-block"><b>Satıcı yanıtı</b><p>{question.answer}</p></div> : <small role="status"><ClockIcon /> Satıcı yanıtı bekleniyor · yalnızca sen görebilirsin</small>}</article>)}</div></article>
               <section className="recommendations"><div className="section-title"><h2>Benzer ürünler</h2><button type="button" onClick={() => go("CAL-04", "home", catalogProduct.isPublicProjection ? "store" : "", { storeSlug: catalogProduct.storeSlug, mode: route.mode })}>Tümünü Gör <ArrowRightIcon /></button></div><Carousel ariaLabel="Benzer ürünler" className="recommendation-carousel" contentClassName="recommendation-track">{recommendationProducts.slice(0, 5).map((product) => <ProductCard key={`recommend-${product.id}`} {...product} readOnlyPreview={readOnlyPreview} onClick={() => openRecommendation(product)} />)}</Carousel></section>
             </section>
           </div>
@@ -2064,7 +2170,7 @@ function CartScreen({ go }: { go: Go }) {
   const { cartLines, cartCount, appliedCoupon, applyCartCoupon, changeCartQuantity, removeCartLine, publicProducts } = useCommerce();
   const [coupon, setCoupon] = useState(appliedCoupon);
   const items = cartLines.flatMap((line) => {
-    const product = publicProducts[line.productId] ?? products.find((candidate) => candidate.id === line.productId);
+    const product = publicProducts[line.productId] ?? (!NATIVE_SHELL ? products.find((candidate) => candidate.id === line.productId) : undefined);
     return product ? [{ ...line, product }] : [];
   });
   const subtotal = items.reduce((total, item) => total + productAmount(item.product) * item.quantity, 0);
@@ -2086,25 +2192,40 @@ function SummaryRows({ subtotal, discount, total }: { subtotal: number; discount
 }
 
 function CheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
+  const accountRuntime = useCustomerAccountRuntime();
   const { addresses, cartLines, cartCount, appliedCoupon, clearCart, publicProducts } = useCommerce();
-  const [paid, setPaid] = useState(view === "success");
-  const [cardholder, setCardholder] = useState("EBU ABDULLAH");
-  const [cardNumber, setCardNumber] = useState("••••  ••••  ••••  4242");
-  const [expiry, setExpiry] = useState("09/29");
-  const [cvv, setCvv] = useState("123");
+  const [paid, setPaid] = useState(!NATIVE_SHELL && view === "success");
+  const [cardholder, setCardholder] = useState(() => NATIVE_SHELL ? "" : "EBU ABDULLAH");
+  const [cardNumber, setCardNumber] = useState(() => NATIVE_SHELL ? "" : "••••  ••••  ••••  4242");
+  const [expiry, setExpiry] = useState(() => NATIVE_SHELL ? "" : "09/29");
+  const [cvv, setCvv] = useState(() => NATIVE_SHELL ? "" : "123");
   const [cvvVisible, setCvvVisible] = useState(false);
+  const [paymentGate, setPaymentGate] = useState("");
   const defaultAddress = addresses.find((address) => address.isDefault) ?? addresses[0];
   const [selectedAddressId, setSelectedAddressId] = useState(defaultAddress?.id ?? "custom");
-  const [customAddress, setCustomAddress] = useState(defaultAddress?.line ?? "Atakum Mah. Cumhuriyet Cad. No: 58 D: 12");
+  const [customAddress, setCustomAddress] = useState(defaultAddress?.line ?? (NATIVE_SHELL ? "" : "Atakum Mah. Cumhuriyet Cad. No: 58 D: 12"));
   const [draftAddress, setDraftAddress] = useState(customAddress);
   const selectedAddress = addresses.find((address) => address.id === selectedAddressId);
+  useEffect(() => {
+    if (NATIVE_SHELL && defaultAddress && !addresses.some((address) => address.id === selectedAddressId)) {
+      setSelectedAddressId(defaultAddress.id);
+      setCustomAddress(defaultAddress.line);
+      setDraftAddress(defaultAddress.line);
+    }
+  }, [addresses, defaultAddress, selectedAddressId]);
   const checkoutItems = cartLines.flatMap((line) => {
-    const product = publicProducts[line.productId] ?? products.find((candidate) => candidate.id === line.productId);
+    const product = publicProducts[line.productId] ?? (!NATIVE_SHELL ? products.find((candidate) => candidate.id === line.productId) : undefined);
     return product ? [{ ...line, product }] : [];
   });
   const subtotal = checkoutItems.reduce((sum, item) => sum + productAmount(item.product) * item.quantity, 0);
   const discount = appliedCoupon ? Math.min(1500, Math.round(subtotal * .15)) : 0;
   const total = subtotal - discount;
+  if (NATIVE_SHELL && accountRuntime?.phase !== "authenticated") {
+    return <div className="detail-layout checkout-layout"><section className="checkout-success checkout-blocked"><LockClosedIcon /><h1>Ödeme için giriş yap</h1><p>Adres ve sipariş sahipliği gerçek PC1 müşteri oturumuyla doğrulanmalıdır.</p><button className="primary navy" onClick={() => go("CAL-01", "account", "login")}>Giriş Yap</button></section></div>;
+  }
+  if (NATIVE_SHELL && addresses.length === 0) {
+    return <div className="detail-layout checkout-layout"><section className="checkout-success checkout-blocked"><MapPinIcon /><h1>Teslimat adresi ekle</h1><p>Ödeme adımında örnek adres kullanılmaz. Gerçek hesabına bir adres eklemelisin.</p><button className="primary navy" onClick={() => go("CAL-10", "account", "addresses")}>Adres Ekle</button></section></div>;
+  }
   if (paid) {
     return <div className="detail-layout checkout-layout"><section className="checkout-success" role="status"><CheckIcon /><h1>Siparişin alındı</h1><p>#NS1234567 numaralı siparişini Hesabım bölümünden takip edebilirsin.</p><button className="primary navy" onClick={() => go("CAL-09", "account")}>Siparişi Gör</button></section></div>;
   }
@@ -2113,15 +2234,35 @@ function CheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
       <div className="checkout-heading"><h1>Ödeme</h1></div>
       <div className="checkout-steps"><span className="done"><CheckIcon /> Sepet</span><i /><span className="done"><CheckIcon /> Teslimat</span><i /><span className="active">3</span><b>Ödeme</b></div>
       <div className="checkout-grid">
-        <section className="checkout-main"><article className="address-card"><span><MapPinIcon data-icon="location-pin" weight="regular" /></span><div><h2>Teslimat Adresi</h2><strong>{selectedAddress?.label ?? "Özel adres"}</strong><p>{selectedAddress?.line ?? customAddress}<br />{selectedAddress ? `${selectedAddress.postalCode} ${selectedAddress.city}` : "55000 Samsun / Türkiye"}</p></div><button onClick={() => go("CAL-08", "cart", "address")}>Adresi değiştir</button></article>{view === "address" && <section className="address-editor" data-testid="checkout-address-editor" role="dialog" aria-label="Teslimat adresini düzenle"><h2>Teslimat adresi</h2><div className="checkout-address-options" role="radiogroup" aria-label="Kayıtlı adresler">{addresses.map((address) => <button type="button" role="radio" aria-checked={selectedAddressId === address.id} className={selectedAddressId === address.id ? "active" : ""} onClick={() => setSelectedAddressId(address.id)} key={address.id}><b>{address.label}</b><span>{address.line}</span></button>)}</div><KeyboardInput aria-label="Adres" value={draftAddress} onChange={(event) => { setDraftAddress(event.target.value); setSelectedAddressId("custom"); }} /><div><button className="secondary" onClick={() => go("CAL-08", "cart")}>Vazgeç</button><button className="primary navy" onClick={() => { if (selectedAddressId === "custom" && draftAddress.trim()) setCustomAddress(draftAddress.trim()); go("CAL-08", "cart"); }}>Adresi Kaydet</button></div></section>}<article className="delivery-card"><CheckIcon /><div><h2>Standart Teslimat</h2><p>Adres ve hazırlık süresine göre hesaplanır</p></div><strong>Hesaplanacak</strong></article><section className="payment-methods"><h2>Ödeme Yöntemi</h2><div><button type="button" className="active" aria-pressed="true"><CreditCardIcon data-icon="payment-card" weight="regular" />Kartla ödeme <CheckIcon className="payment-selected-check" /></button></div></section><article className="card-form"><label>Kart Üzerindeki İsim<KeyboardInput value={cardholder} onChange={(event) => setCardholder(event.target.value)} /></label><label>Kart Numarası<span className="input-icon"><KeyboardInput inputMode="numeric" value={cardNumber} onChange={(event) => setCardNumber(event.target.value)} /><CreditCardIcon data-icon="payment-card" weight="regular" aria-hidden="true" /></span></label><div><label>Son Kullanma<span className="input-icon"><KeyboardInput inputMode="numeric" value={expiry} onChange={(event) => setExpiry(event.target.value)} /><CalendarIcon data-icon="expiry-calendar" aria-hidden="true" /></span></label><label>CVV<span className="input-icon"><KeyboardInput inputMode="numeric" type={cvvVisible ? "text" : "password"} value={cvv} onChange={(event) => setCvv(event.target.value.replace(/\D/g, "").slice(0, 4))} /><button type="button" className="card-field-action" aria-label={cvvVisible ? "CVV'yi gizle" : "CVV'yi göster"} aria-pressed={cvvVisible} onClick={() => setCvvVisible(!cvvVisible)}>{cvvVisible ? <EyeClosedIcon /> : <EyeOpenIcon />}</button></span></label></div><p><CheckIcon /> 3D Secure ile güvenli ödeme</p><small><LockClosedIcon /> Kart bilgileriniz güvenle korunur</small></article></section>
-        <aside className="checkout-summary"><section className="checkout-summary-card"><h2>Sipariş Özeti</h2><p className="muted">{cartCount} ürün</p><div className="summary-products">{checkoutItems.map((item) => <div className="summary-product" data-product-id={item.product.id} key={item.id}><img src={item.product.image} alt="" /><span>{item.product.name}<br /><b>{item.quantity} × {item.product.price}</b></span></div>)}</div><SummaryRows subtotal={subtotal} discount={discount} total={total} /></section><button className="primary navy" disabled={!checkoutItems.length} onClick={() => { setPaid(true); clearCart(); go("CAL-08", "cart", "success"); }}>{formatMoney(total)} · Güvenle Öde <ArrowRightIcon /></button><small className="secure-copy"><LockClosedIcon /> 256-bit SSL ile güvenli ödeme</small></aside>
+        <section className="checkout-main"><article className="address-card"><span><MapPinIcon data-icon="location-pin" weight="regular" /></span><div><h2>Teslimat Adresi</h2><strong>{selectedAddress?.label ?? "Özel adres"}</strong><p>{selectedAddress?.line ?? customAddress}<br />{selectedAddress ? [selectedAddress.district, selectedAddress.city, selectedAddress.postalCode].filter(Boolean).join(" / ") : NATIVE_SHELL ? "" : "55000 Samsun / Türkiye"}</p></div><button className="checkout-address-change" onClick={() => go("CAL-08", "cart", "address")}>Adresi değiştir</button></article>{view === "address" && <section className="address-editor" data-testid="checkout-address-editor" role="dialog" aria-label="Teslimat adresini düzenle"><h2>Teslimat adresi</h2><div className="checkout-address-options" role="radiogroup" aria-label="Kayıtlı adresler">{addresses.map((address) => <button type="button" role="radio" aria-checked={selectedAddressId === address.id} className={selectedAddressId === address.id ? "active" : ""} onClick={() => setSelectedAddressId(address.id)} key={address.id}><b>{address.label}</b><span>{address.line}</span></button>)}</div>{!NATIVE_SHELL && <KeyboardInput aria-label="Adres" value={draftAddress} onChange={(event) => { setDraftAddress(event.target.value); setSelectedAddressId("custom"); }} />}<div><button className="secondary" onClick={() => go("CAL-08", "cart")}>Vazgeç</button><button className="primary navy" onClick={() => { if (!NATIVE_SHELL && selectedAddressId === "custom" && draftAddress.trim()) setCustomAddress(draftAddress.trim()); go("CAL-08", "cart"); }}>{NATIVE_SHELL ? "Adresi Seç" : "Adresi kaydet"}</button></div></section>}<article className="delivery-card"><CheckIcon /><div><h2>Standart Teslimat</h2><p>Adres ve hazırlık süresine göre hesaplanır</p></div><strong>Hesaplanacak</strong></article><section className="payment-methods"><h2>Ödeme Yöntemi</h2><div><button type="button" className="active" aria-pressed="true"><CreditCardIcon data-icon="payment-card" weight="regular" />Kartla ödeme <CheckIcon className="payment-selected-check" /></button></div></section><article className="card-form"><label>Kart Üzerindeki İsim<KeyboardInput value={cardholder} onChange={(event) => setCardholder(event.target.value)} /></label><label>Kart Numarası<span className="input-icon"><KeyboardInput inputMode="numeric" value={cardNumber} onChange={(event) => setCardNumber(event.target.value)} /><CreditCardIcon data-icon="payment-card" weight="regular" aria-hidden="true" /></span></label><div><label>Son Kullanma<span className="input-icon"><KeyboardInput inputMode="numeric" value={expiry} onChange={(event) => setExpiry(event.target.value)} /><CalendarIcon data-icon="expiry-calendar" aria-hidden="true" /></span></label><label>CVV<span className="input-icon"><KeyboardInput inputMode="numeric" type={cvvVisible ? "text" : "password"} value={cvv} onChange={(event) => setCvv(event.target.value.replace(/\D/g, "").slice(0, 4))} /><button type="button" className="card-field-action" aria-label={cvvVisible ? "CVV'yi gizle" : "CVV'yi göster"} aria-pressed={cvvVisible} onClick={() => setCvvVisible(!cvvVisible)}>{cvvVisible ? <EyeClosedIcon /> : <EyeOpenIcon />}</button></span></label></div><p><CheckIcon /> 3D Secure ile güvenli ödeme</p><small><LockClosedIcon /> Kart bilgileriniz güvenle korunur</small></article></section>
+        <aside className="checkout-summary"><section className="checkout-summary-card"><h2>Sipariş Özeti</h2><p className="muted">{cartCount} ürün</p><div className="summary-products">{checkoutItems.map((item) => <div className="summary-product" data-product-id={item.product.id} key={item.id}><img src={item.product.image} alt="" /><span>{item.product.name}<br /><b>{item.quantity} × {item.product.price}</b></span></div>)}</div><SummaryRows subtotal={subtotal} discount={discount} total={total} /></section><button className="primary navy" disabled={!checkoutItems.length} onClick={() => {
+          if (NATIVE_SHELL) { setPaymentGate("PayTR üretim ödeme geçidi bu turda yetkilendirilmedi. Sahte sipariş oluşturulmadı."); return; }
+          setPaid(true); clearCart(); go("CAL-08", "cart", "success");
+        }}>{formatMoney(total)} · Güvenle Öde <ArrowRightIcon /></button>{paymentGate && <p className="checkout-payment-gate" role="alert">{paymentGate}</p>}<small className="secure-copy"><LockClosedIcon /> 256-bit SSL ile güvenli ödeme</small></aside>
       </div>
     </div>
   );
 }
 
 function OrderDetailScreen({ go, view }: { go: Go; view: ViewId }) {
-  const { selectProduct, selectedOrderId } = useCommerce();
+  const { selectProduct, selectOrder, selectedOrderId } = useCommerce();
+  const accountRuntime = useCustomerAccountRuntime();
+  if (NATIVE_SHELL) {
+    if (accountRuntime?.phase !== "authenticated") {
+      return <div className="root-layout order-layout"><section className="account-empty-authoritative"><LockClosedIcon /><h1>Siparişler için giriş yap</h1><p>Sipariş geçmişi yalnız doğrulanmış PC1 müşteri oturumunda gösterilir.</p><button className="primary navy" onClick={() => go("CAL-01", "account", "login")}>Giriş Yap</button></section></div>;
+    }
+    const selected = selectedOrderId ? accountRuntime.orders.find((order) => order.id === selectedOrderId) : null;
+    const orderDate = (order: CustomerOrder) => order.createdAt
+      ? new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(order.createdAt))
+      : "Tarih bilgisi yok";
+    if (selectedOrderId && !selected) {
+      return <div className="root-layout order-layout"><section className="account-empty-authoritative" role="alert"><CubeIcon /><h1>Sipariş bulunamadı</h1><p>Bu sipariş gerçek müşteri hesabında yok veya artık erişilebilir değil.</p><button className="secondary" onClick={() => go("CAL-10", "account")}>Hesabıma Dön</button></section></div>;
+    }
+    if (selected) {
+      return <div className="root-layout order-layout" data-testid="real-order-detail" data-order-id={selected.id}><article className="order-card"><header><div><h1>Sipariş #{selected.id}</h1><p>{orderDate(selected)}</p></div><span><CubeIcon /> {selected.status}</span></header>{selected.items.length ? <div className="real-order-items">{selected.items.map((item, index) => <div className="order-product" key={`${item.id ?? "item"}-${index}`}>{item.image ? <img src={item.image} alt={item.name} /> : <CubeIcon />}<div><h2>{item.name}</h2><p>Adet: {item.quantity}</p><strong>{formatMoney(item.price * item.quantity)}</strong></div></div>)}</div> : <p className="account-feature-intro">Sipariş kalemleri sunucu yanıtında bulunmuyor.</p>}<div className="order-total"><p><span>Ödeme durumu</span><b>{selected.paymentStatus || "Bilgi yok"}</b></p><p><span>Ödeme yöntemi</span><b>{selected.paymentMethod || "Bilgi yok"}</b></p><hr /><p><strong>Toplam</strong><strong>{formatMoney(selected.total)}</strong></p></div></article><button className="secondary" onClick={() => { accountRuntime.refresh().catch(() => undefined); }}>Sunucudan Yenile</button></div>;
+    }
+    return <div className="root-layout order-layout real-order-list" data-testid="real-order-list"><header className="utility-heading"><div><h1>Siparişlerim</h1><p>PC1 müşteri hesabındaki güncel siparişler.</p></div></header>{accountRuntime.orders.length ? <section>{accountRuntime.orders.map((order) => <button type="button" className="orders-link" key={order.id} onClick={() => selectOrder(order.id)}><CubeIcon /><span><b>Sipariş #{order.id}</b><small>{orderDate(order)} · {order.status}</small></span><strong>{formatMoney(order.total)}</strong><CaretRightIcon /></button>)}</section> : <section className="account-empty-authoritative"><CubeIcon /><h1>Henüz siparişin yok</h1><p>Gerçek hesabında sipariş oluştuğunda burada görünecek.</p></section>}</div>;
+  }
   if (view === "invoice") return <div className="root-layout order-utility-layout"><section className="invoice-preview"><header><BrandLockup /><span>E-Arşiv Fatura</span></header><h1>NovaStore Satış Faturası</h1><p><b>Fatura No</b> NS-2026-001234</p><p><b>Düzenleme</b> 18 Temmuz 2026</p><article><span>NovaSound N1 Kulaklık · 1 adet</span><b>₺1.299,00</b></article><article><span>İndirim</span><b>−₺150,00</b></article><footer><strong>Genel Toplam</strong><strong>₺1.149,00</strong></footer><button className="primary navy" type="button" onClick={() => {
     if (NATIVE_SHELL) window.dispatchEvent(new Event("novastore:print-invoice"));
     else window.print();
@@ -2142,15 +2283,37 @@ function InfoRow({ icon, title, copy, action, onAction }: { icon: ReactNode; tit
 
 function AccountScreen({ go, view }: { go: Go; view: ViewId }) {
   const notificationRuntime = useCustomerNotificationRuntime();
+  const accountRuntime = useCustomerAccountRuntime();
   const { selectOrder } = useCommerce();
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  if (NATIVE_SHELL && (!accountRuntime || accountRuntime.phase !== "authenticated")) {
+    const phase = accountRuntime?.phase ?? "error";
+    const loading = phase === "loading";
+    const guest = phase === "guest";
+    return <div className="root-layout account-layout account-auth-state" data-testid={`account-${phase}`}>
+      <section role={loading ? "status" : "alert"} aria-busy={loading || undefined}>
+        {loading ? <ReloadIcon /> : <PersonIcon />}
+        <h1>{loading ? "Hesabın doğrulanıyor" : guest ? "NovaStore hesabına giriş yap" : "Hesap doğrulanamadı"}</h1>
+        <p>{loading
+          ? "Özel hesap verilerin yalnız PC1 sunucu oturumu doğrulandıktan sonra gösterilecek."
+          : guest
+            ? "Profilin, adreslerin, siparişlerin ve bildirimlerin gerçek hesabına bağlıdır."
+            : accountRuntime?.errorMessage || "Bağlantını kontrol edip tekrar deneyebilirsin."}</p>
+        {!loading && <div>{guest
+          ? <><button className="primary navy" type="button" onClick={() => go("CAL-01", "account", "login")}>Giriş Yap</button><button className="secondary" type="button" onClick={() => go("CAL-01", "account", "register")}>Kayıt Ol</button></>
+          : <button className="secondary" type="button" onClick={() => void accountRuntime?.refresh()}>Tekrar Dene</button>}</div>}
+      </section>
+    </div>;
+  }
   if (view === "returns") return <ReturnsScreen go={go} />;
   if (view === "faq" || view === "history") return <AccountUtilityScreen go={go} view={view} />;
   if (view === "addresses") return <AddressBookScreen go={go} />;
   if (view === "notifications") return <NotificationCenterScreen go={go} />;
   if (["profile", "payments", "coupons", "reviews", "questions", "security", "settings"].includes(view)) return <AccountFeatureScreen go={go} view={view as "profile" | "payments" | "coupons" | "reviews" | "questions" | "security" | "settings"} />;
-  const tiles: Array<[string, ReactNode, ViewId]> = [
+  const tiles: Array<[string, ReactNode, ViewId]> = NATIVE_SHELL ? [
+    ["Adreslerim", <MapPinIcon data-icon="location-pin" weight="regular" />, "addresses"],
+  ] : [
     ["Adreslerim", <MapPinIcon data-icon="location-pin" weight="regular" />, "addresses"],
     ["Ödeme Yöntemlerim", <CreditCardIcon data-icon="payment-card" weight="regular" />, "payments"],
     ["Kuponlarım", <CubeIcon />, "coupons"],
@@ -2159,12 +2322,20 @@ function AccountScreen({ go, view }: { go: Go; view: ViewId }) {
   ];
   return (
     <div className="root-layout account-layout">
-      <article className="profile-card"><div className="avatar"><PersonIcon /></div><div><h1>Kullanıcı Adı</h1><p>Profil bilgilerini görüntüle</p></div><CaretRightIcon /><button onClick={() => go("CAL-10", "account", "profile")}>Profili Düzenle</button></article>
-      <button className="orders-link" onClick={() => { selectOrder(null); go("CAL-09"); }}><CubeIcon /><span><b>Siparişlerim</b><small>Tüm siparişlerini görüntüle</small></span><CaretRightIcon /></button>
+      <article className="profile-card"><div className="avatar"><PersonIcon /></div><div><h1>{accountRuntime?.user?.fullName || (NATIVE_SHELL ? "Ad soyad eklenmemiş" : "Kullanıcı Adı")}</h1><p>{accountRuntime?.user?.email || "Profil bilgilerini görüntüle"}</p></div><CaretRightIcon /><button onClick={() => go("CAL-10", "account", "profile")}>Profili Düzenle</button></article>
+      <button className="orders-link" onClick={() => { selectOrder(null); go("CAL-09"); }}><CubeIcon /><span><b>Siparişlerim</b><small>{NATIVE_SHELL ? `${accountRuntime?.orders.length ?? 0} gerçek sipariş` : "Tüm siparişlerini görüntüle"}</small></span><CaretRightIcon /></button>
       <SectionTitle title="Hesap ve Alışveriş" />
       <div className="account-tiles">{tiles.map(([name, icon, target]) => <button key={name} onClick={() => go("CAL-10", "account", target)}>{icon}<span>{name}</span></button>)}</div>
       <div className="account-list"><button onClick={() => go("CAL-10", "account", "notifications")}><BellIcon /> Bildirimler ve Tercihler <CaretRightIcon /></button><button onClick={() => go("CAL-10", "account", "security")}><LockClosedIcon /> Gizlilik ve Güvenlik <CaretRightIcon /></button><button onClick={() => go("CAL-11", "support")}><QuestionMarkCircledIcon /> Yardım ve Destek <CaretRightIcon /></button><button onClick={() => go("CAL-10", "account", "faq")}><ChatBubbleIcon /> Sıkça Sorulan Sorular <CaretRightIcon /></button></div>
       <button className="logout" disabled={logoutBusy} onClick={() => {
+        if (NATIVE_SHELL && accountRuntime) {
+          setLogoutError("");
+          setLogoutBusy(true);
+          void accountRuntime.logout()
+            .then(() => go("CAL-01", "account", "login"))
+            .catch(() => { setLogoutBusy(false); setLogoutError("Çıkış güvenle tamamlanamadı. Bağlantını kontrol edip tekrar dene."); });
+          return;
+        }
         if (!notificationRuntime) { go("CAL-01", "account", "login"); return; }
         setLogoutError("");
         setLogoutBusy(true);
@@ -2179,22 +2350,48 @@ function AccountScreen({ go, view }: { go: Go; view: ViewId }) {
 
 function AccountFeatureScreen({ go, view }: { go: Go; view: "profile" | "payments" | "coupons" | "reviews" | "questions" | "security" | "settings" }) {
   const keyboard = useKeyboard();
+  const accountRuntime = useCustomerAccountRuntime();
   const { selectProduct } = useCommerce();
-  const [profile, setProfile] = useState({ name: "Kullanıcı Adı", email: "kullanici@novastore.test", phone: "+90 555 000 00 00" });
+  const [profile, setProfile] = useState(() => NATIVE_SHELL
+    ? { name: accountRuntime?.user?.fullName || "", email: accountRuntime?.user?.email || "", phone: accountRuntime?.user?.phone || "" }
+    : { name: "Kullanıcı Adı", email: "kullanici@novastore.test", phone: "+90 555 000 00 00" });
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [couponCopied, setCouponCopied] = useState("");
   const [preferences, setPreferences] = useState({ twoFactor: true, loginAlerts: true, personalized: false, compact: false });
   const openProduct = () => { selectProduct("pulse-anc"); go("CAL-06", "home"); };
 
-  if (view === "payments") return <PaymentsScreen />;
+  useEffect(() => {
+    if (!NATIVE_SHELL || !accountRuntime?.user) return;
+    setProfile({ name: accountRuntime.user.fullName, email: accountRuntime.user.email, phone: accountRuntime.user.phone || "" });
+  }, [accountRuntime?.user]);
 
-  if (view === "profile") return <form className="root-layout account-feature-layout account-profile-form" onSubmit={(event) => { event.preventDefault(); keyboard.hide(); setSaved(true); }}><section className="account-feature-card"><PersonIcon /><h1>Profil bilgileri</h1><label>Ad Soyad<KeyboardInput aria-label="Profil adı" value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} /></label><label>E-posta<KeyboardInput aria-label="Profil e-posta" value={profile.email} onChange={(event) => setProfile({ ...profile, email: event.target.value })} /></label><label>Telefon<KeyboardInput aria-label="Profil telefonu" value={profile.phone} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} /></label><button className="primary navy" type="submit">Değişiklikleri Kaydet</button>{saved && <p className="inline-success" role="status"><CheckIcon /> Profil bilgilerin güncellendi.</p>}</section></form>;
+  if (view === "payments") return NATIVE_SHELL
+    ? <div className="root-layout account-feature-layout"><section className="account-feature-card account-empty-authoritative"><CreditCardIcon weight="regular" /><h1>Kayıtlı ödeme yöntemi yok</h1><p>PC1’de güvenli kayıtlı kart sözleşmesi bulunmadığı için uygulama örnek kart göstermiyor.</p></section></div>
+    : <PaymentsScreen />;
+
+  if (view === "profile") return <form className="root-layout account-feature-layout account-profile-form" onSubmit={(event) => {
+    event.preventDefault(); keyboard.hide(); setSaved(false); setSaveError("");
+    if (NATIVE_SHELL && accountRuntime) {
+      void accountRuntime.updateProfile(profile.name, profile.phone)
+        .then(() => setSaved(true))
+        .catch((error) => setSaveError(error instanceof Error ? error.message : "Profil güncellenemedi."));
+    } else setSaved(true);
+  }}><section className="account-feature-card"><PersonIcon /><h1>Profil bilgileri</h1><label>Ad Soyad<KeyboardInput aria-label="Profil adı" value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} /></label><label>E-posta<KeyboardInput aria-label="Profil e-posta" value={profile.email} readOnly={NATIVE_SHELL} onChange={(event) => setProfile({ ...profile, email: event.target.value })} /></label><label>Telefon<KeyboardInput aria-label="Profil telefonu" value={profile.phone} placeholder="Telefon eklenmemiş" onChange={(event) => setProfile({ ...profile, phone: event.target.value })} /></label><button className="primary navy" type="submit" disabled={accountRuntime?.busy}> {accountRuntime?.busy ? "Kaydediliyor…" : "Değişiklikleri Kaydet"}</button>{saved && <p className="inline-success" role="status"><CheckIcon /> Profil bilgilerin sunucudan yeniden doğrulandı.</p>}{saveError && <p className="account-logout-error" role="alert">{saveError}</p>}</section></form>;
+
+  if (NATIVE_SHELL && (view === "coupons" || view === "reviews" || view === "questions")) {
+    return <div className="root-layout account-feature-layout"><section className="account-feature-card account-empty-authoritative">{view === "reviews" ? <StarFilledIcon /> : view === "questions" ? <QuestionMarkCircledIcon /> : <CubeIcon />}<h1>{view === "reviews" ? "Değerlendirmelerim" : view === "questions" ? "Ürün sorularım" : "Kuponlarım"}</h1><p>Bu hesap için doğrulanmış sunucu kaydı bulunmadığı sürece örnek içerik gösterilmez.</p></section></div>;
+  }
 
   if (view === "coupons") return <div className="root-layout account-feature-layout"><section className="account-feature-card"><CubeIcon /><h1>Kullanılabilir kuponlar</h1>{[["NOVA250", "₺250 indirim", "₺2.000 üzeri"], ["HOSGELDIN", "%10 indirim", "İlk sipariş"]].map(([code, value, condition]) => <article className="coupon-card" key={code}><div><b>{value}</b><span>{condition}</span></div><button type="button" onClick={() => setCouponCopied(code)}>{couponCopied === code ? "Kopyalandı" : code}</button></article>)}{couponCopied && <p className="inline-success" role="status"><CheckIcon /> {couponCopied} kuponu kopyalandı.</p>}</section></div>;
 
   if (view === "reviews" || view === "questions") return <div className="root-layout account-feature-layout"><section className="account-feature-card">{view === "reviews" ? <StarFilledIcon /> : <QuestionMarkCircledIcon />}<h1>{view === "reviews" ? "Değerlendirmelerim" : "Ürün sorularım"}</h1><article className="account-activity-card"><img src={PRODUCT_HERO} alt="Nova Pulse ANC Kulaklık" /><div><b>Nova Pulse ANC Kulaklık</b><p>{view === "reviews" ? "5 yıldız · Ses kalitesi ve konfor çok iyi." : "Pil ömrü ANC açıkken kaç saat?"}</p><small>{view === "reviews" ? "Yayınlandı" : "Satıcı yanıtladı: 36 saate kadar."}</small></div><button type="button" onClick={openProduct}>Ürüne Git</button></article></section></div>;
 
   const settingsMode = view === "settings";
+  if (NATIVE_SHELL && view === "security") {
+    const security = accountRuntime?.securityStatus;
+    return <div className="root-layout account-feature-layout"><section className="account-feature-card"><LockClosedIcon /><h1>Gizlilik ve güvenlik</h1>{security ? <div className="authoritative-security-list"><p><span>E-posta</span><b>{security.email}</b></p><p><span>Telefon</span><b>{security.phone || "Eklenmemiş"}</b></p><p><span>Şifre</span><b>{security.hasPassword ? "Tanımlı" : "Tanımlı değil"}</b></p><p><span>İki adımlı doğrulama</span><b>{security.twoFactorEnabled ? "Açık" : "Kapalı"}</b></p></div> : <p>Güvenlik durumu sunucudan alınamadı. Örnek değer gösterilmiyor.</p>}</section></div>;
+  }
   const rows: Array<[keyof typeof preferences, string, string]> = settingsMode
     ? [["personalized", "Kişiselleştirilmiş öneriler", "Yerel oturum tercihlerini kullan"], ["compact", "Kompakt görünüm", "Liste yoğunluğunu artır"]]
     : [["twoFactor", "İki adımlı doğrulama", "Hesap girişlerini güçlendir"], ["loginAlerts", "Giriş uyarıları", "Yeni cihazlarda bildirim al"]];
@@ -2293,31 +2490,59 @@ function PaymentsScreen() {
 
 function AddressBookScreen({ go }: { go: Go }) {
   const keyboard = useKeyboard();
+  const accountRuntime = useCustomerAccountRuntime();
   const { addresses, addAddress, updateAddress, removeAddress, setDefaultAddress } = useCommerce();
   const [editor, setEditor] = useState<"create" | string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ label: "", recipient: "", line: "", city: "", postalCode: "" });
-  const openCreate = () => { setDraft({ label: "", recipient: "", line: "", city: "", postalCode: "" }); setEditor("create"); };
-  const openEdit = (address: SavedAddress) => { setDraft({ label: address.label, recipient: address.recipient, line: address.line, city: address.city, postalCode: address.postalCode }); setEditor(address.id); };
+  const emptyDraft = { label: "", recipient: "", phone: "", line: "", city: "", district: "", postalCode: "" };
+  const [draft, setDraft] = useState(emptyDraft);
+  const [actionError, setActionError] = useState("");
+  const openCreate = () => { setDraft(emptyDraft); setEditor("create"); setActionError(""); };
+  const openEdit = (address: SavedAddress) => { setDraft({ label: address.label, recipient: address.recipient, phone: address.phone || "", line: address.line, city: address.city, district: address.district || "", postalCode: address.postalCode }); setEditor(address.id); setActionError(""); };
   const closeEditor = () => { keyboard.hide(); setEditor(null); };
   const save = (event: FormEvent) => {
     event.preventDefault();
-    if (Object.values(draft).some((value) => !value.trim())) return;
-    if (editor && editor !== "create") updateAddress(editor, draft); else addAddress(draft);
-    keyboard.hide();
-    setDraft({ label: "", recipient: "", line: "", city: "", postalCode: "" });
-    setEditor(null);
+    const required = NATIVE_SHELL
+      ? [draft.label, draft.recipient, draft.phone, draft.line, draft.city, draft.district]
+      : [draft.label, draft.recipient, draft.line, draft.city, draft.postalCode];
+    if (required.some((value) => !value.trim())) return;
+    const finish = () => { keyboard.hide(); setDraft(emptyDraft); setEditor(null); };
+    if (NATIVE_SHELL && accountRuntime) {
+      const current = editor && editor !== "create" ? addresses.find((address) => address.id === editor) : null;
+      const payload: CustomerAddressInput = {
+        title: draft.label,
+        fullName: draft.recipient,
+        phone: draft.phone,
+        city: draft.city,
+        district: draft.district,
+        addressLine: draft.line,
+        isDefault: current?.isDefault ?? addresses.length === 0,
+      };
+      setActionError("");
+      const operation = editor && editor !== "create"
+        ? accountRuntime.updateAddress(Number(editor), payload)
+        : accountRuntime.createAddress(payload);
+      void operation.then(finish).catch((error) => setActionError(error instanceof Error ? error.message : "Adres kaydedilemedi."));
+      return;
+    }
+    const localDraft = { label: draft.label, recipient: draft.recipient, line: draft.line, city: draft.city, postalCode: draft.postalCode };
+    if (editor && editor !== "create") updateAddress(editor, localDraft); else addAddress(localDraft);
+    finish();
   };
   const pendingDelete = deleteId ? addresses.find((address) => address.id === deleteId) : undefined;
   return (
     <>
       <div className="root-layout address-book-layout" data-testid="address-book-screen">
         <header className="utility-heading"><div><h1>Teslimat adresleri</h1><p>Ödeme sırasında kullanacağın adresleri yönet.</p></div><button type="button" className="primary navy" onClick={openCreate}><PlusIcon /> Yeni adres ekle</button></header>
-        {addresses.length ? <section className="saved-addresses" role="radiogroup" aria-label="Varsayılan teslimat adresi">{addresses.map((address) => <article className="saved-address" data-testid={`saved-address-${address.id}`} key={address.id}><button type="button" className="address-default-selector" role="radio" aria-checked={address.isDefault} aria-label={`${address.label} adresini varsayılan yap`} onClick={() => setDefaultAddress(address.id)}><MapPinIcon data-icon="location-pin" weight={address.isDefault ? "fill" : "regular"} /></button><div><h2>{address.label}{address.isDefault && <b>Varsayılan</b>}</h2><strong>{address.recipient}</strong><p>{address.line}<br />{address.postalCode} {address.city}</p></div><div><button type="button" onClick={() => openEdit(address)}>Düzenle</button><button type="button" className="danger-text" onClick={() => setDeleteId(address.id)}>Sil</button></div></article>)}</section> : <div className="empty-state address-empty"><MapPinIcon weight="regular" /><h2>Kayıtlı adresin yok</h2><p>Ödeme adımında kullanmak için ilk adresini ekleyebilirsin.</p><button type="button" className="primary navy" onClick={openCreate}>Adres Ekle</button></div>}
-        {editor && <form className="address-create-form" data-testid="address-create-form" onSubmit={save}><h2>{editor === "create" ? "Yeni adres" : "Adresi düzenle"}</h2><label>Adres adı<KeyboardInput aria-label="Adres adı" value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} placeholder="Ev, İş..." /></label><label>Ad soyad<KeyboardInput aria-label="Adres alıcısı" value={draft.recipient} onChange={(event) => setDraft({ ...draft, recipient: event.target.value })} /></label><label>Açık adres<KeyboardInput aria-label="Açık adres" value={draft.line} onChange={(event) => setDraft({ ...draft, line: event.target.value })} /></label><div><label>İl / İlçe<KeyboardInput aria-label="İl ve ilçe" value={draft.city} onChange={(event) => setDraft({ ...draft, city: event.target.value })} /></label><label>Posta kodu<KeyboardInput aria-label="Posta kodu" inputMode="numeric" value={draft.postalCode} onChange={(event) => setDraft({ ...draft, postalCode: event.target.value.replace(/\D/g, "").slice(0, 5) })} /></label></div><footer><button type="button" className="secondary" onClick={closeEditor}>Vazgeç</button><button type="submit" className="primary navy" disabled={Object.values(draft).some((value) => !value.trim())}>{editor === "create" ? "Adresi Kaydet" : "Değişiklikleri Kaydet"}</button></footer></form>}
+        {addresses.length ? <section className="saved-addresses" role="radiogroup" aria-label="Varsayılan teslimat adresi">{addresses.map((address) => <article className="saved-address" data-testid={`saved-address-${address.id}`} key={address.id}><button type="button" className="address-default-selector" role="radio" aria-checked={address.isDefault} aria-label={`${address.label} adresini varsayılan yap`} onClick={() => NATIVE_SHELL && accountRuntime ? void accountRuntime.setDefaultAddress(Number(address.id)).catch((error) => setActionError(error instanceof Error ? error.message : "Adres seçilemedi.")) : setDefaultAddress(address.id)}><MapPinIcon data-icon="location-pin" weight={address.isDefault ? "fill" : "regular"} /></button><div><h2>{address.label}{address.isDefault && <b>Varsayılan</b>}</h2><strong>{address.recipient}</strong><p>{address.line}<br />{[address.district, address.city, address.postalCode].filter(Boolean).join(" / ")}</p></div><div><button type="button" onClick={() => openEdit(address)}>Düzenle</button><button type="button" className="danger-text" onClick={() => setDeleteId(address.id)}>Sil</button></div></article>)}</section> : <div className="empty-state address-empty"><MapPinIcon weight="regular" /><h2>Kayıtlı adresin yok</h2><p>Ödeme adımında kullanmak için ilk gerçek adresini ekleyebilirsin.</p><button type="button" className="primary navy" onClick={openCreate}>Adres Ekle</button></div>}
+        {editor && <form className="address-create-form" data-testid="address-create-form" onSubmit={save}><h2>{editor === "create" ? "Yeni adres" : "Adresi düzenle"}</h2><label>Adres adı<KeyboardInput aria-label="Adres adı" value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} placeholder="Ev, İş..." /></label><label>Ad soyad<KeyboardInput aria-label="Adres alıcısı" value={draft.recipient} onChange={(event) => setDraft({ ...draft, recipient: event.target.value })} /></label>{NATIVE_SHELL && <label>Telefon<KeyboardInput aria-label="Adres telefonu" inputMode="tel" value={draft.phone} onChange={(event) => setDraft({ ...draft, phone: event.target.value })} /></label>}<label>Açık adres<KeyboardInput aria-label="Açık adres" value={draft.line} onChange={(event) => setDraft({ ...draft, line: event.target.value })} /></label>{NATIVE_SHELL ? <div><label>İl<KeyboardInput aria-label="İl" value={draft.city} onChange={(event) => setDraft({ ...draft, city: event.target.value })} /></label><label>İlçe<KeyboardInput aria-label="İlçe" value={draft.district} onChange={(event) => setDraft({ ...draft, district: event.target.value })} /></label></div> : <div><label>İl ve ilçe<KeyboardInput aria-label="İl ve ilçe" value={draft.city} onChange={(event) => setDraft({ ...draft, city: event.target.value })} /></label><label>Posta kodu<KeyboardInput aria-label="Posta kodu" inputMode="numeric" value={draft.postalCode} onChange={(event) => setDraft({ ...draft, postalCode: event.target.value.replace(/\D/g, "").slice(0, 5) })} /></label></div>}<footer><button type="button" className="secondary" onClick={closeEditor}>Vazgeç</button><button type="submit" className="primary navy" disabled={accountRuntime?.busy}>{accountRuntime?.busy ? "Kaydediliyor…" : editor === "create" ? "Adresi Kaydet" : "Değişiklikleri Kaydet"}</button></footer>{actionError && <p className="account-logout-error" role="alert">{actionError}</p>}</form>}
       </div>
-      <BottomSheet open={Boolean(deleteId)} onOpenChange={(open) => { if (!open) setDeleteId(null); }} title="Adresi sil?" description={`${pendingDelete?.label || "Bu adres"} kalıcı prototip listesinden kaldırılacak.`} snap={0.34}>
-        <div className="delete-confirmation"><p>Bu işlem yalnızca mevcut prototip oturumunu etkiler.</p><div><button type="button" className="secondary" onClick={() => setDeleteId(null)}>Vazgeç</button><button type="button" className="danger-button" onClick={() => { if (deleteId) removeAddress(deleteId); setDeleteId(null); }}>Adresi Sil</button></div></div>
+      <BottomSheet open={Boolean(deleteId)} onOpenChange={(open) => { if (!open) setDeleteId(null); }} title="Adresi sil?" description={`${pendingDelete?.label || "Bu adres"} hesabından kaldırılacak.`} snap={0.34}>
+        <div className="delete-confirmation"><p>{NATIVE_SHELL ? "Adres PC1 müşteri hesabından kalıcı olarak silinir." : "Bu işlem yalnızca mevcut prototip oturumunu etkiler."}</p><div><button type="button" className="secondary" onClick={() => setDeleteId(null)}>Vazgeç</button><button type="button" className="danger-button" onClick={() => {
+          if (!deleteId) return;
+          if (NATIVE_SHELL && accountRuntime) void accountRuntime.deleteAddress(Number(deleteId)).then(() => setDeleteId(null)).catch((error) => setActionError(error instanceof Error ? error.message : "Adres silinemedi."));
+          else { removeAddress(deleteId); setDeleteId(null); }
+        }}>Adresi Sil</button></div></div>
       </BottomSheet>
     </>
   );
@@ -2390,6 +2615,7 @@ function NotificationCenterScreen({ go }: { go: Go }) {
 function ReturnsScreen({ go }: { go: Go }) {
   const [reason, setReason] = useState("Beden / renk değişimi");
   const [created, setCreated] = useState(false);
+  if (NATIVE_SHELL) return <div className="root-layout returns-layout" data-testid="returns-view"><section className="returns-hero"><ReloadIcon /><div><h1>İade ve değişim</h1><p>Örnek sipariş veya sahte gönderi kodu gösterilmez.</p></div></section><section className="account-empty-authoritative"><CubeIcon /><h1>Gerçek siparişini seç</h1><p>İade uygunluğu PC1 sipariş sözleşmesinden doğrulanmalıdır. Bu istemci akışı henüz etkin değil.</p><button className="primary navy" onClick={() => go("CAL-09", "account")}>Siparişlerime Git</button><button className="secondary" onClick={() => go("CAL-11", "support", "live")}>Destek Al</button></section></div>;
   return <div className="root-layout returns-layout" data-testid="returns-view"><section className="returns-hero"><ReloadIcon /><div><h1>Kolay iade ve değişim</h1><p>Uygun siparişini seç, ücretsiz gönderi kodunu hemen oluştur.</p></div></section><article className="return-order"><img src={`${A}/extracts/order-headphones.png`} alt="NovaSound N1 Kulaklık" /><div><small>#NS1234567 · Teslim edildi</small><h2>NovaSound N1 Kulaklık</h2><p>İade süresi: 9 gün kaldı</p></div><CheckIcon /></article><section className="return-reasons"><h2>İşlem nedeni</h2>{["Beden / renk değişimi", "Ürün beklentimi karşılamadı", "Hasarlı veya eksik ürün"].map((item) => <button className={reason === item ? "active" : ""} aria-pressed={reason === item} onClick={() => setReason(item)} key={item}><span>{reason === item && <CheckIcon />}</span>{item}</button>)}</section><button className="primary navy return-cta" onClick={() => setCreated(true)}>İade Talebi Oluştur</button>{created && <p role="status" className="return-status"><CheckIcon /> Talebin hazırlandı. Ücretsiz gönderi kodun: NS-4821</p>}<button className="text-action return-support" onClick={() => go("CAL-11", "support")}>Yardım Merkezine Git</button></div>;
 }
 
@@ -2402,11 +2628,11 @@ type LocalDetailItem = {
 };
 
 const supportArticles: LocalDetailItem[] = [
-  { id: "track-order", title: "Siparişimi nasıl takip ederim?", detail: "Hesabım bölümündeki Siparişlerim satırını aç. Sipariş detayında hazırlık, kargo ve teslimat adımlarının güncel yerel önizlemesini görebilirsin.", meta: "Sipariş ve teslimat", searchTerms: ["kargo", "takip", "teslimat", "sipariş nerede"] },
-  { id: "return-window", title: "İade ve değişim nasıl yapılır?", detail: "Hesabım > İade ve Değişim yolundan uygun siparişi seç, işlem nedenini belirle ve yerel demo talebini oluştur. Bu prototip gerçek bir kargo kodu üretmez.", meta: "İade ve değişim", searchTerms: ["iade", "değişim", "vazgeçme", "ürünü gönder"] },
-  { id: "payment-options", title: "Ödeme seçenekleri nelerdir?", detail: "Ödeme önizlemesinde yalnız kartla ödeme kullanılabilir. Kart numarası ve CVV gibi hassas bilgiler bu yerel prototipte gerçek bir tahsilat için gönderilmez.", meta: "Ödeme", searchTerms: ["kart", "kredi kartı", "banka kartı", "ödeme"] },
-  { id: "invoice", title: "Faturamı nasıl görüntülerim?", detail: "Sipariş detayındaki Fatura satırı, e-arşiv fatura önizlemesine açılır. Bu kalibrasyon paketinde belge yalnızca yerel örnek içeriktir.", meta: "Fatura", searchTerms: ["e-arşiv", "belge", "fiş"] },
-  { id: "address", title: "Teslimat adresimi nasıl değiştiririm?", detail: "Hesabım > Adreslerim ekranından yeni adres ekleyebilir ve varsayılan adresi değiştirebilirsin. Değişiklikler yalnızca mevcut prototip oturumunda saklanır.", meta: "Hesap", searchTerms: ["adres", "konum", "varsayılan adres"] },
+  { id: "track-order", title: "Siparişimi nasıl takip ederim?", detail: "Hesabım bölümündeki Siparişlerim satırını aç. Sipariş detayında PC1 hesabındaki güncel hazırlık, kargo ve teslimat durumunu görebilirsin.", meta: "Sipariş ve teslimat", searchTerms: ["kargo", "takip", "teslimat", "sipariş nerede"] },
+  { id: "return-window", title: "İade ve değişim nasıl yapılır?", detail: NATIVE_SHELL ? "İade uygunluğu gerçek sipariş durumuna göre doğrulanır. İstemci akışı etkin değilse canlı destekten yardım alabilirsin." : "Hesabım > İade ve Değişim yolundan uygun siparişi seç, işlem nedenini belirle ve yerel demo talebini oluştur. Bu prototip gerçek bir kargo kodu üretmez.", meta: "İade ve değişim", searchTerms: ["iade", "değişim", "vazgeçme", "ürünü gönder"] },
+  { id: "payment-options", title: "Ödeme seçenekleri nelerdir?", detail: "Ödeme sağlayıcısı üretim için yetkilendirilmeden uygulama tahsilat veya sahte sipariş sonucu üretmez.", meta: "Ödeme", searchTerms: ["kart", "kredi kartı", "banka kartı", "ödeme"] },
+  { id: "invoice", title: "Faturamı nasıl görüntülerim?", detail: NATIVE_SHELL ? "Fatura yalnız gerçek siparişe bağlı yetkili belge sözleşmesi mevcut olduğunda gösterilir." : "Sipariş detayındaki Fatura satırı, e-arşiv fatura önizlemesine açılır. Bu kalibrasyon paketinde belge yalnızca yerel örnek içeriktir.", meta: "Fatura", searchTerms: ["e-arşiv", "belge", "fiş"] },
+  { id: "address", title: "Teslimat adresimi nasıl değiştiririm?", detail: "Hesabım > Adreslerim ekranından PC1 hesabındaki adresleri ekleyebilir, düzenleyebilir ve varsayılan adresi değiştirebilirsin.", meta: "Hesap", searchTerms: ["adres", "konum", "varsayılan adres"] },
   { id: "account-security", title: "Hesabımı nasıl güvende tutarım?", detail: "Benzersiz bir parola kullan, doğrulama kodunu kimseyle paylaşma ve tanımadığın oturumları kapat. NovaStore destek ekibi senden parolanı istemez.", meta: "Hesap ve güvenlik", searchTerms: ["şifre", "parola", "gizlilik", "güvenlik"] },
 ];
 
@@ -2444,6 +2670,7 @@ function ExpandableLocalList({ items, idPrefix, className = "" }: { items: Local
 function AccountUtilityScreen({ go, view }: { go: Go; view: "faq" | "history" }) {
   const title = view === "faq" ? "Sıkça Sorulan Sorular" : "Geçmiş İşlemler";
   const items = view === "faq" ? supportArticles.slice(0, 3) : accountHistoryItems;
+  if (NATIVE_SHELL && view === "history") return <div className="root-layout utility-layout"><section className="utility-card account-empty-authoritative"><ClockIcon /><h1>Geçmiş işlemler</h1><p>PC1’de yetkili birleşik hesap etkinliği sözleşmesi bulunmadığı için örnek işlem geçmişi gösterilmez.</p></section><button className="primary navy" onClick={() => go("CAL-11", "support", "history")}>Destek Geçmişine Git</button></div>;
   return <div className="root-layout utility-layout"><section className="utility-card">{view === "faq" ? <QuestionMarkCircledIcon /> : <ClockIcon />}<h1>{title}</h1><p>{view === "faq" ? "Sipariş, ödeme, teslimat ve hesap konularındaki sık sorulan yanıtları incele." : "Destek ve hesap işlemlerinin son durumunu güvenle görüntüle."}</p><ExpandableLocalList items={items} idPrefix={`account-${view}`} /></section><button className="primary navy" onClick={() => go("CAL-11", "support")}>Yardım Merkezine Git</button></div>;
 }
 
@@ -2457,8 +2684,8 @@ function SupportHubScreen({ go, view }: { go: Go; view: ViewId }) {
       <div className="support-heading"><div><h1>Yardım ve Destek</h1></div><button onClick={() => go("CAL-11", "support", "history")}><ClockIcon /><span>Geçmiş</span></button></div>
       <label className="support-search"><MagnifyingGlassIcon /><KeyboardInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nasıl yardımcı olabiliriz?" aria-label="Destekte ara" /></label>
       <section className="quick-help"><h2>Hızlı Yardım</h2><div><button onClick={() => go("CAL-09", "account")}><CubeIcon />Sipariş ve Teslimat<CaretRightIcon /></button><button onClick={() => go("CAL-10", "account", "returns")}><ReloadIcon />İade ve değişim<CaretRightIcon /></button><button onClick={() => go("CAL-11", "support", "faq")}><CreditCardIcon data-icon="payment-card" weight="regular" />Ödeme Sorunları<CaretRightIcon /></button><button onClick={() => go("CAL-10", "account", "security")}><LockClosedIcon />Hesap ve Güvenlik<CaretRightIcon /></button></div></section>
-      <section className="novabot-card"><span className="novabot-art"><img src={NOVABOT} alt="NovaBot resmi simgesi" /></span><div><h2>NovaBot</h2><p><i /> Çevrimiçi</p><span>Sorunu anlat, NovaBot anında yardımcı olsun.</span></div><button className="primary navy" onClick={() => go("CAL-12", "support")}><PersonIcon /> NovaBot’u Başlat <ArrowRightIcon /></button></section>
-      <button className="live-support" onClick={() => go("CAL-11", "support", "live")}><PersonIcon /><span><b>Canlı Desteğe Bağlan</b><small><i /> Genellikle hemen yanıtlar</small></span><ArrowRightIcon /></button>
+      <section className="novabot-card"><span className="novabot-art"><img src={NOVABOT} alt="NovaBot resmi simgesi" /></span><div><h2>NovaBot</h2><p><i /> {NATIVE_SHELL ? "Yakında" : "Çevrimiçi"}</p><span>{NATIVE_SHELL ? "Gerçek servis sözleşmesi etkinleştirildiğinde kullanıma açılacak." : "Sorunu anlat, NovaBot anında yardımcı olsun."}</span></div><button className="primary navy" onClick={() => go("CAL-12", "support")}><PersonIcon /> {NATIVE_SHELL ? "Bilgi Al" : "NovaBot’u Başlat"} <ArrowRightIcon /></button></section>
+      <button className="live-support" onClick={() => go("CAL-11", "support", "live")}><PersonIcon /><span><b>{NATIVE_SHELL ? "Destek Mesajları" : "Canlı Desteğe Bağlan"}</b><small><i /> {NATIVE_SHELL ? "PC1 müşteri hesabına bağlı" : "Genellikle hemen yanıtlar"}</small></span><ArrowRightIcon /></button>
       <div className="support-links"><button onClick={() => go("CAL-11", "support", "faq")}><QuestionMarkCircledIcon />Sıkça Sorulan Sorular<CaretRightIcon /></button><button onClick={() => go("CAL-11", "support", "history")}><ChatBubbleIcon />Geçmiş Sohbetler<CaretRightIcon /></button></div>
       {normalizedQuery && <section className="support-search-results" data-testid="support-search-results" aria-label="Destek arama sonuçları"><header><h2>Arama sonuçları</h2><span>{matchingArticles.length} sonuç</span></header>{matchingArticles.length ? <ExpandableLocalList items={matchingArticles} idPrefix="support-search" /> : <div className="support-search-empty" data-testid="support-search-empty" role="status"><MagnifyingGlassIcon /><h3>Sonuç bulunamadı</h3><p>Başka bir sipariş, ödeme veya hesap ifadesi deneyebilirsin.</p></div>}</section>}
     </div>
@@ -2466,10 +2693,23 @@ function SupportHubScreen({ go, view }: { go: Go; view: ViewId }) {
 }
 
 function SupportSubpage({ go, view }: { go: Go; view: "faq" | "history" | "live" }) {
+  const accountRuntime = useCustomerAccountRuntime();
   const [liveState, setLiveState] = useState<"queued" | "ready" | "connected">("queued");
+  const [supportDraft, setSupportDraft] = useState("");
+  const [supportError, setSupportError] = useState("");
   const copy = view === "faq" ? "Sıkça Sorulan Sorular" : view === "history" ? "Geçmiş Destek Kayıtları" : "Canlı Destek";
   const items = view === "history" ? supportHistoryItems : supportArticles.slice(0, 3);
   const liveCopy = liveState === "queued" ? { title: "Yerel destek sırası hazır", detail: "Durumu yenileyerek uzman eşleşmesini bu prototip içinde simüle edebilirsin." } : liveState === "ready" ? { title: "Destek uzmanı eşleşti", detail: "Demo görüşmesini başlatmaya hazırsın; henüz gerçek bir temsilciye bağlanılmadı." } : { title: "Demo görüşme başladı", detail: "Bu yalnızca yerel bağlantı önizlemesidir; gerçek bir temsilciye bağlanılmaz ve dışarıya mesaj veya destek talebi gönderilmez." };
+  if (NATIVE_SHELL && (view === "history" || view === "live")) {
+    if (accountRuntime?.phase !== "authenticated") return <div className="root-layout support-subpage"><section className="support-detail-card account-empty-authoritative"><LockClosedIcon /><h1>Destek hesabına giriş yap</h1><p>Destek geçmişi ve mesajlar yalnız doğrulanmış müşteri oturumunda gösterilir.</p><button className="primary navy" onClick={() => go("CAL-01", "account", "login")}>Giriş Yap</button></section></div>;
+    const submit = (event: FormEvent) => {
+      event.preventDefault(); setSupportError("");
+      void accountRuntime.sendSupportMessage(supportDraft)
+        .then(() => setSupportDraft(""))
+        .catch((error) => setSupportError(error instanceof Error ? error.message : "Destek mesajı gönderilemedi."));
+    };
+    return <div className="root-layout support-subpage"><section className="support-detail-card real-support-card"><ChatBubbleIcon /><h1>{view === "history" ? "Geçmiş destek mesajları" : "Canlı destek"}</h1><p>İçerik gerçek PC1 müşteri hesabından alınır.</p>{accountRuntime.supportMessages.length ? <div className="real-support-messages" aria-live="polite">{accountRuntime.supportMessages.map((message) => <article className={message.sentByCustomer ? "customer" : "support"} key={message.id}><p>{message.message}</p><small>{message.createdAt ? new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(message.createdAt)) : "Zaman bilgisi yok"}</small></article>)}</div> : <div className="empty-state"><ChatBubbleIcon /><h2>Destek geçmişi yok</h2><p>Gerçek bir mesaj gönderdiğinde burada görünecek.</p></div>}{view === "live" && <form className="real-support-composer" onSubmit={submit}><KeyboardTextarea aria-label="Destek mesajı" value={supportDraft} onChange={(event) => setSupportDraft(event.target.value)} placeholder="Mesajını yaz..." /><button className="primary navy" type="submit" disabled={!supportDraft.trim() || accountRuntime.busy}>{accountRuntime.busy ? "Gönderiliyor…" : "Mesaj Gönder"}</button></form>}{supportError && <p className="account-logout-error" role="alert">{supportError}</p>}</section></div>;
+  }
   return <div className="root-layout support-subpage"><section className="support-detail-card">{view === "live" ? <PersonIcon /> : view === "history" ? <ClockIcon /> : <QuestionMarkCircledIcon />}<h1>{copy}</h1><p>{view === "live" ? "Canlı destek bağlantısının yerel demo adımlarını güvenle incele." : view === "history" ? "Son destek görüşmelerin ve çözüm durumları." : "En çok sorulan konulardaki kısa ve güvenilir yanıtlar."}</p>{view === "live" ? <><div className="live-support-state" data-testid="live-support-state" data-state={liveState} role="status"><i /><span><b>{liveCopy.title}</b><small>{liveCopy.detail}</small></span></div><div className="live-support-controls"><button type="button" disabled={liveState !== "queued"} onClick={() => setLiveState("ready")}>Bağlantı durumunu yenile <ReloadIcon /></button><button type="button" disabled={liveState !== "ready"} onClick={() => setLiveState("connected")}>Görüşmeyi başlat <ArrowRightIcon /></button></div></> : <ExpandableLocalList items={items} idPrefix={`support-${view}`} />}</section><button className="primary navy" onClick={() => go("CAL-12", "support")}>NovaBot ile Devam Et</button></div>;
 }
 
@@ -2482,6 +2722,9 @@ function NovaBotScreen({ go }: { go: Go }) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 1, from: "bot", text: "Merhaba! Sana nasıl yardımcı olabilirim?", time: "12:04 · İletildi" },
   ]);
+  if (NATIVE_SHELL) {
+    return <div className="root-layout novabot-layout"><section className="support-detail-card account-empty-authoritative"><img className="novabot-runtime-logo" src={NOVABOT} alt="NovaBot" /><h1>NovaBot yakında</h1><p>NovaBot gerçek PC1 sözleşmesine bağlanmadan örnek sohbet üretmez. Gerçek destek için canlı destek kanalını kullanabilirsin.</p><button className="primary navy" onClick={() => go("CAL-11", "support", "live")}>Canlı Desteğe Git</button></section></div>;
+  }
   const sendMessage = (text: string) => {
     const clean = text.trim();
     if (!clean) return;

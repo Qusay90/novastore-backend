@@ -544,6 +544,7 @@ button { color: inherit; }
 .address-card strong { font-size: 14px; }
 .address-card p, .delivery-card p { margin: 2px 0; color: var(--nova-muted); font-size: 9px; line-height: 1.35; }
 .address-card button { min-height: 34px; border: 1px solid var(--nova-deep); border-radius: 9px; background: #fff; font-size: 10px; }
+.address-card > .checkout-address-change { min-height: 34px; padding: 0 9px; font-size: 8.5px; line-height: 1.2; white-space: nowrap; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .delivery-card { min-height: 74px; display: grid; grid-template-columns: 28px 1fr auto; align-items: center; }
 .delivery-card > svg { width: 23px; height: 23px; padding: 4px; border-radius: 50%; color: #fff; background: var(--nova-deep); }
 .delivery-card > strong { color: var(--nova-orange-text); font-size: 11px; }
@@ -1125,6 +1126,26 @@ body:has(.capture-mode) .device-screen:has(.capture-mode) > :is(.sheet-overlay, 
 .checkout-address-options > button.active { border-color: var(--nova-orange); background: #fff6ef; }
 .checkout-address-options b { font-size: 10px; }
 .checkout-address-options span { color: var(--nova-muted); font-size: 8px; line-height: 1.35; }
+.checkout-payment-gate { margin: 8px 0 0; padding: 9px 10px; border-radius: 10px; color: #8a3900; background: #fff3ea; font-size: 9px; line-height: 1.4; }
+.checkout-blocked { min-height: 360px; align-content: center; }
+
+.account-auth-state { min-height: 600px; display: grid; align-content: start; }
+.account-auth-state > section { padding: 22px 18px; border: 1px solid rgba(15,44,78,.07); border-radius: 19px; background: #fff; box-shadow: 0 8px 22px rgba(15,44,78,.065); text-align: center; }
+.account-auth-state > section > svg { width: 44px; height: 44px; padding: 10px; border-radius: 14px; color: #fff; background: var(--nova-deep); }
+.account-auth-state h1 { margin: 13px 0 6px; font-size: 20px; }
+.account-auth-state p { margin: 0; color: var(--nova-muted); font-size: 10px; line-height: 1.5; }
+.account-auth-state section > div { margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.account-auth-state section > div > button:only-child { grid-column: 1 / -1; }
+.catalog-authority-state { min-height: 210px; margin: 12px 0; padding: 24px 16px; border: 1px solid rgba(15,44,78,.07); border-radius: 18px; background: #fff; display: grid; place-items: center; align-content: center; gap: 7px; text-align: center; }
+.catalog-authority-state > svg { width: 34px; height: 34px; color: var(--nova-deep); }
+.catalog-authority-state h2, .catalog-authority-state p { margin: 0; }
+.catalog-authority-state h2 { color: var(--nova-deep); font-size: 15px; }
+.catalog-authority-state p { color: var(--nova-muted); font-size: 9px; line-height: 1.5; }
+.catalog-authority-state button { min-height: 44px; margin-top: 5px; }
+.account-empty-authoritative > p { color: var(--nova-muted); font-size: 10px; line-height: 1.5; }
+.authoritative-security-list { margin-top: 8px; display: grid; gap: 0; }
+.authoritative-security-list p { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--nova-line); display: flex; justify-content: space-between; gap: 12px; font-size: 10px; }
+.authoritative-security-list span { color: var(--nova-muted); }
 
 .account-feature-layout, .order-utility-layout { min-height: 600px; display: grid; align-content: start; }
 .account-feature-card, .invoice-preview, .tracking-preview { padding: 18px; border: 1px solid rgba(15,44,78,.07); border-radius: 19px; background: #fff; box-shadow: 0 8px 22px rgba(15,44,78,.065); }
