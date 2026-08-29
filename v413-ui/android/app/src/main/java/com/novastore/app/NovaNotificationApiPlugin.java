@@ -18,8 +18,11 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.json.JSONException;
@@ -36,15 +39,16 @@ public final class NovaNotificationApiPlugin extends Plugin {
     private static final Pattern CUSTOMER_ADDRESS_DEFAULT = Pattern.compile("^/api/addresses/[1-9][0-9]*/default$");
     private static final Pattern PUBLIC_PRODUCT = Pattern.compile("^/api/products/[1-9][0-9]*$");
     private static final Pattern SAFE_CURSOR = Pattern.compile("^[A-Za-z0-9_-]{1,1024}$");
-    private static final Set<String> EXACT_GET = Set.of(
+    private static final Set<String> EXACT_GET = immutableSet(
         "/api/users/me",
         "/api/users/security-status",
         "/api/addresses",
         "/api/questions/user",
         "/api/notifications/unread-count"
     );
-    private static final Set<String> EXACT_POST = Set.of(
+    private static final Set<String> EXACT_POST = immutableSet(
         "/api/users/login",
+        "/api/users/refresh",
         "/api/users/register",
         "/api/users/logout",
         "/api/users/change-password",
@@ -54,20 +58,23 @@ public final class NovaNotificationApiPlugin extends Plugin {
         "/api/messages/send",
         "/api/notifications/android-push/tokens"
     );
-    private static final Set<String> EXACT_PATCH = Set.of(
+    private static final Set<String> EXACT_PATCH = immutableSet(
         "/api/notifications/read-all",
         "/api/users/me"
     );
-    private static final Set<String> EXACT_DELETE = Set.of(
+    private static final Set<String> EXACT_DELETE = immutableSet(
         "/api/notifications/android-push/tokens",
         "/api/notifications/android-push/tokens/session"
     );
-    private static final Set<String> UNAUTHENTICATED_POST = Set.of(
+    private static final Set<String> UNAUTHENTICATED_POST = immutableSet(
         "/api/users/login",
+        "/api/users/refresh",
         "/api/users/register",
         "/api/auth/forgot-password",
         "/api/auth/reset-password"
     );
+    private static final Set<String> SUPPORTED_METHODS = immutableSet("GET", "POST", "PUT", "PATCH", "DELETE");
+    private static final Set<String> REFRESH_BODY_KEYS = immutableSet("refreshToken", "sessionId");
     private static final int MAX_RESPONSE_BYTES = 1024 * 1024;
     private static final int MAX_REQUEST_BYTES = 32 * 1024;
 
@@ -86,6 +93,10 @@ public final class NovaNotificationApiPlugin extends Plugin {
             return;
         }
         JSObject body = call.getObject("body");
+        if ("/api/users/refresh".equals(path) && (token != null || !validRefreshBody(body))) {
+            call.reject("AUTH_REFRESH_REQUEST_INVALID");
+            return;
+        }
         if ("GET".equals(method) && body != null) {
             call.reject("CUSTOMER_NOTIFICATION_BODY_FORBIDDEN");
             return;
@@ -174,7 +185,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
     static String canonicalMethod(String value) {
         if (value == null) return null;
         String method = value.trim().toUpperCase(Locale.ROOT);
-        return Set.of("GET", "POST", "PUT", "PATCH", "DELETE").contains(method) ? method : null;
+        return SUPPORTED_METHODS.contains(method) ? method : null;
     }
 
     static String canonicalPath(String value) {
@@ -223,6 +234,25 @@ public final class NovaNotificationApiPlugin extends Plugin {
         if ("PUT".equals(method) && CUSTOMER_ADDRESS.matcher(path).matches()) return true;
         if ("PATCH".equals(method) && (EXACT_PATCH.contains(path) || READ_ONE.matcher(path).matches() || CUSTOMER_ADDRESS_DEFAULT.matcher(path).matches())) return true;
         return "DELETE".equals(method) && (EXACT_DELETE.contains(path) || CUSTOMER_ADDRESS.matcher(path).matches());
+    }
+
+    static boolean validRefreshBody(JSObject body) {
+        if (body == null) return false;
+        Set<String> keys = new HashSet<>();
+        Iterator<String> iterator = body.keys();
+        while (iterator.hasNext()) keys.add(iterator.next());
+        return validRefreshEnvelope(keys, body.optString("refreshToken", null), body.opt("sessionId"));
+    }
+
+    static boolean validRefreshEnvelope(Set<String> keys, String refreshToken, Object rawSessionId) {
+        if (!keys.equals(REFRESH_BODY_KEYS) || canonicalToken(refreshToken) == null) return false;
+        if (!(rawSessionId instanceof Number)) return false;
+        long sessionId = ((Number) rawSessionId).longValue();
+        return sessionId > 0 && ((Number) rawSessionId).doubleValue() == (double) sessionId;
+    }
+
+    private static Set<String> immutableSet(String... values) {
+        return Collections.unmodifiableSet(new HashSet<>(Arrays.asList(values)));
     }
 
     static String canonicalToken(String value) {

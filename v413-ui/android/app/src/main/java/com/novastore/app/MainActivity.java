@@ -17,6 +17,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         SplashScreen.installSplashScreen(this);
+        registerPlugin(NovaCustomerSessionPlugin.class);
         registerPlugin(NovaInsetsPlugin.class);
         registerPlugin(NovaNotificationApiPlugin.class);
         registerPlugin(NovaPrintPlugin.class);

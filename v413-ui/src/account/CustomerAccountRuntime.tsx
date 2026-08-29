@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import {
-  clearCustomerSession,
-  CUSTOMER_USER_KEY,
+  clearGuardedCustomerSession,
+  currentCustomerSessionGuard,
+  customerSessionMatchesGuard,
   CustomerNotificationApiError,
   hasCustomerSession,
   markCustomerSessionVerified,
@@ -113,8 +114,7 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     const currentSequence = ++sequence.current;
     const profile = await getCurrentCustomer();
     if (sequence.current !== currentSequence) return;
-    globalThis.localStorage?.setItem?.(CUSTOMER_USER_KEY, JSON.stringify(profile));
-    markCustomerSessionVerified(profile.id);
+    markCustomerSessionVerified(profile);
     setUser(profile);
     setPhase("authenticated");
     setErrorMessage("");
@@ -129,15 +129,17 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
       setErrorMessage("");
       return;
     }
+    const guard = currentCustomerSessionGuard();
     setPhase("loading");
     setErrorMessage("");
     try {
       await establishVerifiedSession();
     } catch (error) {
+      if (!customerSessionMatchesGuard(guard)) return;
       ++sequence.current;
       clearPrivateState();
-      if (error instanceof CustomerNotificationApiError && error.status === 401) {
-        clearCustomerSession();
+      if (error instanceof CustomerNotificationApiError && [400, 401, 403].includes(error.status)) {
+        await clearGuardedCustomerSession(guard);
         setPhase("guest");
         return;
       }
@@ -151,11 +153,18 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   const login = useCallback(async (email: string, password: string) => {
     if (!notifications) throw new Error("Bildirim ve müşteri oturumu çalışma zamanı bulunamadı.");
     setBusy(true);
+    let guard: ReturnType<typeof currentCustomerSessionGuard> | null = null;
     try {
       await notifications.login(email, password);
+      guard = currentCustomerSessionGuard();
       await establishVerifiedSession();
     } catch (error) {
-      clearCustomerSession();
+      if (guard) {
+        if (!customerSessionMatchesGuard(guard)) throw error;
+        await clearGuardedCustomerSession(guard);
+      } else if (hasCustomerSession()) {
+        throw error;
+      }
       ++sequence.current;
       clearPrivateState();
       setPhase("guest");
@@ -167,13 +176,20 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
 
   const register = useCallback(async (fullName: string, email: string, password: string) => {
     setBusy(true);
+    let guard: ReturnType<typeof currentCustomerSessionGuard> | null = null;
     try {
       await registerCustomer(fullName, email, password);
       if (!notifications) throw new Error("Müşteri oturumu çalışma zamanı bulunamadı.");
       await notifications.login(email, password);
+      guard = currentCustomerSessionGuard();
       await establishVerifiedSession();
     } catch (error) {
-      clearCustomerSession();
+      if (guard) {
+        if (!customerSessionMatchesGuard(guard)) throw error;
+        await clearGuardedCustomerSession(guard);
+      } else if (hasCustomerSession()) {
+        throw error;
+      }
       ++sequence.current;
       clearPrivateState();
       setPhase("guest");
@@ -237,12 +253,24 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
     const onOnline = () => { if (hasCustomerSession()) void refresh(); };
+    const onSessionReady = () => { void refresh(); };
     const onAuthRequired = () => { ++sequence.current; clearPrivateState(); setPhase("guest"); };
+    const onAuthUnverified = () => {
+      ++sequence.current;
+      clearPrivateState();
+      setPhase(globalThis.navigator?.onLine ? "error" : "offline");
+      setErrorMessage("Müşteri oturumu yeniden doğrulanana kadar özel hesap bilgileri gizlendi.");
+    };
     globalThis.addEventListener("online", onOnline);
+    globalThis.addEventListener("novastore:session-ready", onSessionReady);
     globalThis.addEventListener("novastore:auth-required", onAuthRequired);
+    globalThis.addEventListener("novastore:auth-unverified", onAuthUnverified);
+    if (document.documentElement.dataset.novastoreSessionStorage === "ready-after-timeout") onSessionReady();
     return () => {
       globalThis.removeEventListener("online", onOnline);
+      globalThis.removeEventListener("novastore:session-ready", onSessionReady);
       globalThis.removeEventListener("novastore:auth-required", onAuthRequired);
+      globalThis.removeEventListener("novastore:auth-unverified", onAuthUnverified);
     };
   }, [clearPrivateState, refresh]);
 

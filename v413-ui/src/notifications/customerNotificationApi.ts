@@ -1,5 +1,20 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import {
+  clearStoredCustomerSession,
+  currentCustomerSession,
+  currentCustomerSessionState,
+  customerRefreshExpired,
+  customerSessionCanRefresh,
+  customerSessionNeedsRefresh,
+  CUSTOMER_SESSION_KEY,
+  CUSTOMER_TOKEN_KEY,
+  initializeCustomerSession,
+  normalizeCustomerCredentialSession,
+  replaceCustomerSession,
+  type CustomerCredentialSession,
+  type CustomerSessionState,
+} from "../auth/customerSession";
+import {
   normalizeCustomerNotification,
   normalizeCustomerNotificationPage,
   type CustomerNotification,
@@ -7,12 +22,34 @@ import {
   type CustomerNotificationTarget,
 } from "./notificationContract";
 
-export const CUSTOMER_TOKEN_KEY = "nova_user_token";
-export const CUSTOMER_USER_KEY = "nova_user_info";
+export { CUSTOMER_SESSION_KEY, CUSTOMER_TOKEN_KEY };
 export const CUSTOMER_VERIFIED_USER_KEY = "novastore.customer.verifiedUserId";
 export const ANDROID_FCM_TOKEN_KEY = "novastore.android.fcmToken";
 export const ANDROID_INSTALLATION_ID_KEY = "novastore.android.installationId";
 export const ANDROID_PERMISSION_REQUESTED_KEY = "novastore.android.notificationPermissionRequested";
+
+type VerifiedCustomer = Readonly<{ id: number; email: string; fullName: string; role: "customer" }>;
+type RefreshResult = Readonly<{ session: CustomerCredentialSession; user: VerifiedCustomer }>;
+export type CustomerSessionGuard = Readonly<{ generation: number; sessionId: number | null }>;
+
+// Identity is intentionally process-local. Secure credentials may be restored
+// only after the current WebView validates them through /api/users/me.
+let verifiedCustomer: VerifiedCustomer | null = null;
+let verifiedCustomerGeneration = -1;
+let refreshFlight: Readonly<{ generation: number; promise: Promise<RefreshResult> }> | null = null;
+
+function clearCustomerVerification() {
+  verifiedCustomer = null;
+  verifiedCustomerGeneration = -1;
+  try { globalThis.localStorage?.removeItem?.(CUSTOMER_VERIFIED_USER_KEY); } catch { /* process-local identity is already cleared */ }
+}
+
+function suspendCustomerVerification() {
+  clearCustomerVerification();
+  if (typeof globalThis.dispatchEvent === "function" && typeof globalThis.Event === "function") {
+    globalThis.dispatchEvent(new Event("novastore:auth-unverified"));
+  }
+}
 
 type NativeApiResponse = Readonly<{ status: number; payload: unknown }>;
 type NativeNotificationCapability = Readonly<{
@@ -30,6 +67,7 @@ type NovaNotificationApiPlugin = Readonly<{
 const NovaNotificationApi = registerPlugin<NovaNotificationApiPlugin>("NovaNotificationApi");
 const EXACT_RULES = new Map<string, ReadonlySet<string>>([
   ["/api/users/login", new Set(["POST"])],
+  ["/api/users/refresh", new Set(["POST"])],
   ["/api/users/register", new Set(["POST"])],
   ["/api/users/me", new Set(["GET", "PATCH"])],
   ["/api/users/logout", new Set(["POST"])],
@@ -123,7 +161,7 @@ function storageValue(key: string) {
 }
 
 function customerToken(required = true) {
-  const token = storageValue(CUSTOMER_TOKEN_KEY);
+  const token = currentCustomerSession()?.accessToken || "";
   if (required && !token) {
     throw new CustomerNotificationApiError("Müşteri oturumu gerekli.", 401, "CUSTOMER_SESSION_MISSING");
   }
@@ -150,9 +188,10 @@ async function readResponse(response: Response) {
   }
 }
 
-export async function requestCustomerApi(path: string, method = "GET", body?: Record<string, unknown>, authenticated = true) {
-  const normalized = requestRule(path, method);
-  const token = customerToken(authenticated);
+type NormalizedRequest = Readonly<{ path: string; method: string }>;
+type TransportResult = Readonly<{ status: number; payload: unknown }>;
+
+async function transportCustomerApi(normalized: NormalizedRequest, body: Record<string, unknown> | undefined, token: string): Promise<TransportResult> {
   let status: number;
   let payload: unknown;
   if (Capacitor.isNativePlatform()) {
@@ -196,11 +235,194 @@ export async function requestCustomerApi(path: string, method = "GET", body?: Re
   if (!Number.isSafeInteger(status) || status < 100 || status > 599) {
     throw new CustomerNotificationApiError("Bildirim API durum kodu geçersiz.", 0, "CUSTOMER_NOTIFICATION_RESPONSE_INVALID");
   }
-  if (status < 200 || status >= 300) {
-    if (status === 401) clearCustomerSession();
-    throw responseError(status, payload);
+  return Object.freeze({ status, payload });
+}
+
+function successful(result: TransportResult) {
+  return result.status >= 200 && result.status < 300;
+}
+
+function refreshResponse(value: unknown): CustomerCredentialSession | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const source = value as Record<string, unknown>;
+  const expected = ["accessExpiresAt", "accessToken", "refreshExpiresAt", "refreshToken", "sessionId", "tokenType"];
+  if (Object.keys(source).sort().join("\u0000") !== expected.sort().join("\u0000") || source.tokenType !== "Bearer") return null;
+  return normalizeCustomerCredentialSession({
+    accessToken: source.accessToken,
+    refreshToken: source.refreshToken,
+    accessExpiresAt: source.accessExpiresAt,
+    refreshExpiresAt: source.refreshExpiresAt,
+    sessionId: source.sessionId,
+  });
+}
+
+function loginSession(value: Record<string, unknown>) {
+  return normalizeCustomerCredentialSession({
+    accessToken: value.token,
+    refreshToken: value.refreshToken,
+    accessExpiresAt: value.accessExpiresAt,
+    refreshExpiresAt: value.refreshExpiresAt,
+    sessionId: value.sessionId,
+  });
+}
+
+async function rejectRefresh(result: TransportResult, expectedGeneration: number): Promise<never> {
+  const error = responseError(result.status, result.payload);
+  if ([400, 401, 403].includes(result.status)) {
+    await clearCustomerSession(expectedGeneration);
+  } else if (
+    (result.status === 429 || result.status === 503 || result.status >= 500)
+    && currentCustomerSessionState().generation === expectedGeneration
+  ) {
+    suspendCustomerVerification();
   }
-  return payload;
+  throw error;
+}
+
+async function verifyRefreshedCustomer(session: CustomerCredentialSession, generation: number) {
+  const result = await transportCustomerApi(requestRule("/api/users/me", "GET"), undefined, session.accessToken);
+  const current = currentCustomerSessionState();
+  if (current.generation !== generation || current.session?.accessToken !== session.accessToken) {
+    throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
+  }
+  if (!successful(result)) await rejectRefresh(result, generation);
+  const source = result.payload && typeof result.payload === "object" && !Array.isArray(result.payload)
+    ? result.payload as Record<string, unknown>
+    : {};
+  const user = validUser(source.user ?? source);
+  if (!user) {
+    if (currentCustomerSessionState().generation === generation) suspendCustomerVerification();
+    throw new CustomerNotificationApiError("Yenilenen müşteri kimliği doğrulanamadı.", 0, "CUSTOMER_REFRESH_ME_INVALID");
+  }
+  markCustomerSessionVerified(user, generation);
+  return user;
+}
+
+async function performCanonicalRefresh(expectedGeneration: number): Promise<RefreshResult> {
+  const state = currentCustomerSessionState();
+  if (state.generation !== expectedGeneration) {
+    throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
+  }
+  const session = state.session;
+  if (!session || !customerSessionCanRefresh(session) || customerRefreshExpired(session)) {
+    await clearCustomerSession(expectedGeneration);
+    throw new CustomerNotificationApiError("Müşteri yenileme oturumu sona erdi.", 401, "AUTH_REFRESH_REJECTED");
+  }
+  const result = await transportCustomerApi(requestRule("/api/users/refresh", "POST"), {
+    refreshToken: session.refreshToken!,
+    sessionId: session.sessionId!,
+  }, "");
+  if (!successful(result)) await rejectRefresh(result, expectedGeneration);
+  const replacement = refreshResponse(result.payload);
+  if (!replacement || replacement.sessionId !== session.sessionId) {
+    await clearCustomerSession(expectedGeneration);
+    throw new CustomerNotificationApiError("Müşteri yenileme yanıtı doğrulanamadı.", 0, "CUSTOMER_REFRESH_RESPONSE_INVALID");
+  }
+  if (currentCustomerSessionState().generation !== expectedGeneration) {
+    throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
+  }
+  // Rotation has invalidated the old server generation. Quarantine its
+  // private UI before attempting the durable secure-store replacement so a
+  // Keystore persistence failure cannot leave stale private data accepted.
+  suspendCustomerVerification();
+  const replaced = await replaceCustomerSession(expectedGeneration, replacement);
+  const user = await verifyRefreshedCustomer(replacement, replaced.generation);
+  return Object.freeze({ session: replacement, user });
+}
+
+export async function refreshCustomerSession(expectedGeneration?: number) {
+  await initializeCustomerSession();
+  const generation = expectedGeneration ?? currentCustomerSessionState().generation;
+  if (refreshFlight?.generation === generation) return refreshFlight.promise;
+  const promise = performCanonicalRefresh(generation);
+  const flight = Object.freeze({ generation, promise });
+  refreshFlight = flight;
+  try { return await promise; } finally {
+    if (refreshFlight === flight) refreshFlight = null;
+  }
+}
+
+function sessionStateMatchesGuard(state: CustomerSessionState, guard: CustomerSessionGuard) {
+  return state.generation === guard.generation
+    || Boolean(guard.sessionId && state.session?.sessionId === guard.sessionId);
+}
+
+async function authenticatedRequest(
+  normalized: NormalizedRequest,
+  body: Record<string, unknown> | undefined,
+  allowRefresh: boolean,
+  retryCount = 0,
+  guard?: CustomerSessionGuard,
+): Promise<unknown> {
+  const initial = currentCustomerSessionState();
+  if (guard && !sessionStateMatchesGuard(initial, guard)) {
+    throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
+  }
+  if (!initial.session) throw new CustomerNotificationApiError("Müşteri oturumu gerekli.", 401, "CUSTOMER_SESSION_MISSING");
+  if (customerRefreshExpired(initial.session)) {
+    await clearCustomerSession(initial.generation);
+    throw new CustomerNotificationApiError("Müşteri yenileme oturumu sona erdi.", 401, "AUTH_REFRESH_REJECTED");
+  }
+  if (allowRefresh && retryCount === 0 && customerSessionNeedsRefresh(initial.session)) {
+    await refreshCustomerSession(initial.generation);
+  }
+  const used = currentCustomerSessionState();
+  if (guard && !sessionStateMatchesGuard(used, guard)) {
+    throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
+  }
+  if (!used.session) throw new CustomerNotificationApiError("Müşteri oturumu gerekli.", 401, "CUSTOMER_SESSION_MISSING");
+  const result = await transportCustomerApi(normalized, body, used.session.accessToken);
+  if (successful(result)) {
+    if (currentCustomerSessionState().generation !== used.generation) {
+      throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
+    }
+    return result.payload;
+  }
+  if (result.status !== 401) throw responseError(result.status, result.payload);
+
+  const current = currentCustomerSessionState();
+  if (current.generation !== used.generation) {
+    if (guard && !sessionStateMatchesGuard(current, guard)) {
+      throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
+    }
+    if (retryCount < 1 && current.session) return authenticatedRequest(normalized, body, false, retryCount + 1, guard);
+    throw responseError(result.status, result.payload);
+  }
+  if (allowRefresh && retryCount === 0 && customerSessionCanRefresh(used.session)) {
+    await refreshCustomerSession(used.generation);
+    return authenticatedRequest(normalized, body, false, retryCount + 1, guard);
+  }
+  await clearCustomerSession(used.generation);
+  throw responseError(result.status, result.payload);
+}
+
+async function requestCustomerApiInternal(
+  path: string,
+  method = "GET",
+  body?: Record<string, unknown>,
+  authenticated = true,
+  allowRefresh = true,
+  guard?: CustomerSessionGuard,
+) {
+  await initializeCustomerSession();
+  const normalized = requestRule(path, method);
+  if (normalized.path === "/api/users/refresh") {
+    throw new CustomerNotificationApiError("Yenileme işlemi yalnız oturum yöneticisi tarafından çağrılabilir.", 0, "CUSTOMER_REFRESH_DIRECT_CALL_FORBIDDEN");
+  }
+  if (authenticated) {
+    // Every operation is bound to the session family that initiated it. A
+    // stale A-side 401 may retry after A's token rotation, but never under a
+    // newly logged-in Customer B.
+    const operationGuard = guard ?? currentCustomerSessionGuard();
+    return authenticatedRequest(normalized, body, allowRefresh, 0, operationGuard);
+  }
+  const result = await transportCustomerApi(normalized, body, "");
+  if (!successful(result)) throw responseError(result.status, result.payload);
+  return result.payload;
+}
+
+export async function requestCustomerApi(path: string, method = "GET", body?: Record<string, unknown>, authenticated = true) {
+  return requestCustomerApiInternal(path, method, body, authenticated, true);
 }
 
 const request = requestCustomerApi;
@@ -217,11 +439,11 @@ function validUser(value: unknown) {
 }
 
 function currentCustomerUserId() {
-  try {
-    const source = JSON.parse(storageValue(CUSTOMER_USER_KEY)) as Record<string, unknown> | null;
-    const id = Number(source?.id);
-    if (Number.isSafeInteger(id) && id > 0) return id;
-  } catch { /* malformed local session is rejected below */ }
+  if (!hasVerifiedCustomerSession()) {
+    throw new CustomerNotificationApiError("Müşteri oturumu doğrulanamadı.", 401, "CUSTOMER_SESSION_INVALID");
+  }
+  const id = verifiedCustomer?.id;
+  if (Number.isSafeInteger(id) && Number(id) > 0) return Number(id);
   throw new CustomerNotificationApiError("Müşteri oturumu doğrulanamadı.", 401, "CUSTOMER_SESSION_INVALID");
 }
 
@@ -260,33 +482,62 @@ export async function authorizeCustomerNotificationTarget(target: CustomerNotifi
   }
 }
 
-export function clearCustomerSession() {
-  globalThis.localStorage?.removeItem?.(CUSTOMER_TOKEN_KEY);
-  globalThis.localStorage?.removeItem?.(CUSTOMER_USER_KEY);
-  globalThis.localStorage?.removeItem?.(CUSTOMER_VERIFIED_USER_KEY);
+export async function clearCustomerSession(expectedGeneration?: number) {
+  const current = currentCustomerSessionState();
+  if (expectedGeneration !== undefined && current.generation !== expectedGeneration) return false;
+  // Quarantine private state before durable clearing. If Keystore or
+  // SharedPreferences fails, the caller receives that failure but no cached
+  // Customer identity remains accepted in this process.
+  clearCustomerVerification();
   if (typeof globalThis.dispatchEvent === "function" && typeof globalThis.Event === "function") {
     globalThis.dispatchEvent(new Event("novastore:auth-required"));
   }
+  const cleared = await clearStoredCustomerSession(expectedGeneration);
+  if (!cleared) return false;
+  return true;
+}
+
+export function currentCustomerSessionGuard(): CustomerSessionGuard {
+  const current = currentCustomerSessionState();
+  return Object.freeze({ generation: current.generation, sessionId: current.session?.sessionId ?? null });
+}
+
+export function customerSessionMatchesGuard(guard: CustomerSessionGuard) {
+  return sessionStateMatchesGuard(currentCustomerSessionState(), guard);
+}
+
+export async function clearGuardedCustomerSession(guard: CustomerSessionGuard) {
+  const current = currentCustomerSessionState();
+  if (
+    current.generation !== guard.generation
+    && (!guard.sessionId || current.session?.sessionId !== guard.sessionId)
+  ) return false;
+  return clearCustomerSession(current.generation);
 }
 
 export async function loginCustomer(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
   if (!normalizedEmail || !password) throw new CustomerNotificationApiError("E-posta ve şifre gerekli.", 0, "CUSTOMER_LOGIN_INPUT_INVALID");
+  await clearCustomerSession();
+  const expectedGeneration = currentCustomerSessionState().generation;
   const payload = await request("/api/users/login", "POST", { email: normalizedEmail, password }, false);
   const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
-  const token = typeof source.token === "string" ? source.token.trim() : "";
+  const session = loginSession(source);
   const user = validUser(source.user);
-  if (!token || token.length > 8_192 || !user) {
+  if (!session || !user) {
     throw new CustomerNotificationApiError("Müşteri giriş yanıtı doğrulanamadı.", 0, "CUSTOMER_LOGIN_RESPONSE_INVALID");
   }
-  globalThis.localStorage?.setItem?.(CUSTOMER_TOKEN_KEY, token);
-  globalThis.localStorage?.setItem?.(CUSTOMER_USER_KEY, JSON.stringify(user));
-  globalThis.localStorage?.removeItem?.(CUSTOMER_VERIFIED_USER_KEY);
+  clearCustomerVerification();
+  await replaceCustomerSession(expectedGeneration, session);
   return user;
 }
 
-export async function logoutCustomer() {
-  try { await request("/api/users/logout", "POST"); } finally { clearCustomerSession(); }
+export async function logoutCustomer(guard = currentCustomerSessionGuard()) {
+  try {
+    await requestCustomerApiInternal("/api/users/logout", "POST", undefined, true, true, guard);
+  } finally {
+    await clearGuardedCustomerSession(guard);
+  }
 }
 
 function requireVerifiedCustomerSession() {
@@ -381,16 +632,25 @@ export async function registerFcmToken(token: string, predecessor = "") {
   globalThis.localStorage?.setItem?.(ANDROID_FCM_TOKEN_KEY, payload.token);
 }
 
-export async function revokeFcmToken(token = currentFcmToken()) {
+export async function revokeFcmToken(token = currentFcmToken(), canFinalize: () => boolean = () => true) {
   requireVerifiedCustomerSession();
   if (!token) return;
   await request("/api/notifications/android-push/tokens", "DELETE", fcmRevocationPayload(token));
-  globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
+  if (canFinalize() && currentFcmToken() === token) {
+    globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
+  }
 }
 
-export async function revokeFcmSession() {
+export async function revokeFcmSession(guard = currentCustomerSessionGuard()) {
   requireVerifiedCustomerSession();
-  await request("/api/notifications/android-push/tokens/session", "DELETE", fcmRevocationPayload());
+  await requestCustomerApiInternal(
+    "/api/notifications/android-push/tokens/session",
+    "DELETE",
+    fcmRevocationPayload(),
+    true,
+    true,
+    guard,
+  );
 }
 
 export async function getNativeNotificationCapability() {
@@ -402,26 +662,32 @@ export async function openNativeNotificationSettings() {
   if (Capacitor.isNativePlatform()) await NovaNotificationApi.openNotificationSettings();
 }
 
-export function hasCustomerSession() { return Boolean(storageValue(CUSTOMER_TOKEN_KEY)); }
+export function hasCustomerSession() { return Boolean(currentCustomerSession()); }
 
-export function markCustomerSessionVerified(userId: number) {
-  const expectedId = Number(userId);
-  let storedUser: ReturnType<typeof validUser> = null;
-  try { storedUser = validUser(JSON.parse(storageValue(CUSTOMER_USER_KEY))); } catch { /* rejected below */ }
-  if (!Number.isSafeInteger(expectedId) || expectedId < 1 || storedUser?.id !== expectedId || !hasCustomerSession()) {
+export function markCustomerSessionVerified(value: unknown, expectedGeneration = currentCustomerSessionState().generation) {
+  const user = validUser(value);
+  const current = currentCustomerSessionState();
+  if (!user || !current.session || current.generation !== expectedGeneration) {
     throw new CustomerNotificationApiError("Doğrulanmış müşteri oturumu mühürlenemedi.", 401, "CUSTOMER_SESSION_VERIFICATION_INVALID");
   }
-  globalThis.localStorage?.setItem?.(CUSTOMER_VERIFIED_USER_KEY, String(expectedId));
+  verifiedCustomer = user;
+  verifiedCustomerGeneration = expectedGeneration;
+  try { globalThis.localStorage?.removeItem?.(CUSTOMER_VERIFIED_USER_KEY); } catch { /* process-local verification remains authoritative */ }
   if (typeof globalThis.dispatchEvent === "function" && typeof globalThis.Event === "function") {
     globalThis.dispatchEvent(new Event("novastore:auth-verified"));
   }
 }
 
 export function hasVerifiedCustomerSession() {
-  if (!hasCustomerSession()) return false;
-  const verifiedId = Number(storageValue(CUSTOMER_VERIFIED_USER_KEY));
-  if (!Number.isSafeInteger(verifiedId) || verifiedId < 1) return false;
-  try { return validUser(JSON.parse(storageValue(CUSTOMER_USER_KEY)))?.id === verifiedId; } catch { return false; }
+  const current = currentCustomerSessionState();
+  if (!current.session || current.generation !== verifiedCustomerGeneration) return false;
+  return Boolean(verifiedCustomer && Number.isSafeInteger(verifiedCustomer.id) && verifiedCustomer.id > 0);
 }
 
-export const customerNotificationApiTestUtils = Object.freeze({ requestRule, validUser });
+export const customerNotificationApiTestUtils = Object.freeze({
+  currentCustomerSessionState,
+  loginSession,
+  refreshResponse,
+  requestRule,
+  validUser,
+});

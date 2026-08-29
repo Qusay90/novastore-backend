@@ -9,10 +9,13 @@ import {
   ANDROID_FCM_TOKEN_KEY,
   ANDROID_PERMISSION_REQUESTED_KEY,
   authorizeCustomerNotificationTarget,
+  currentCustomerSessionGuard,
+  customerSessionMatchesGuard,
   CustomerNotificationApiError,
   currentFcmToken,
   getCustomerUnreadCount,
   getNativeNotificationCapability,
+  hasCustomerSession,
   hasVerifiedCustomerSession,
   listCustomerNotifications,
   loginCustomer,
@@ -108,10 +111,134 @@ function providerGate(error: unknown) {
     && ([404, 410, 501].includes(error.status) || error.code.includes("NOT_FOUND"));
 }
 
-async function retireOrphanedPushDelivery() {
+let pushProviderRestoreRequired = false;
+let pushProviderIntentEpoch = 0;
+let disabledPushProviderGuard: Readonly<{
+  epoch: number;
+  guard: ReturnType<typeof currentCustomerSessionGuard>;
+}> | null = null;
+let pendingPushRegistration: Readonly<{
+  guard: ReturnType<typeof currentCustomerSessionGuard>;
+  token: string;
+  predecessor: string | undefined;
+}> | null = null;
+type PushProviderRestoreFlight = Readonly<{
+  guard: ReturnType<typeof currentCustomerSessionGuard>;
+  intentEpoch: number;
+  promise: Promise<boolean>;
+  settle: (registered: boolean) => void;
+}>;
+let pushProviderRestoreFlight: PushProviderRestoreFlight | null = null;
+
+function pushProviderDisabledForCurrentSession() {
+  return Boolean(
+    disabledPushProviderGuard
+    && disabledPushProviderGuard.epoch === pushProviderIntentEpoch
+    && customerSessionMatchesGuard(disabledPushProviderGuard.guard),
+  );
+}
+
+function settlePushProviderRestore(registered: boolean) {
+  const flight = pushProviderRestoreFlight;
+  if (!flight) {
+    if (!registered) pushProviderRestoreRequired = true;
+    return false;
+  }
+  flight.settle(
+    registered
+    && flight.intentEpoch === pushProviderIntentEpoch
+    && !pushProviderDisabledForCurrentSession()
+    && customerSessionMatchesGuard(flight.guard),
+  );
+  return true;
+}
+
+async function restoreCurrentPushProvider() {
+  if (
+    pushProviderDisabledForCurrentSession()
+    || !hasCustomerSession()
+    || (!currentFcmToken() && !pendingPushRegistration)
+  ) return false;
+  if (pushProviderRestoreFlight && customerSessionMatchesGuard(pushProviderRestoreFlight.guard)) {
+    return pushProviderRestoreFlight.promise;
+  }
+  pushProviderRestoreFlight?.settle(false);
+  const guard = currentCustomerSessionGuard();
+  let resolveFlight!: (registered: boolean) => void;
+  const promise = new Promise<boolean>((resolve) => { resolveFlight = resolve; });
+  let timeoutId: number | undefined;
+  const flight: PushProviderRestoreFlight = Object.freeze({
+    guard,
+    intentEpoch: pushProviderIntentEpoch,
+    promise,
+    settle(registered: boolean) {
+      if (pushProviderRestoreFlight !== flight) return;
+      pushProviderRestoreFlight = null;
+      if (timeoutId !== undefined) globalThis.clearTimeout(timeoutId);
+      pushProviderRestoreRequired = !registered;
+      resolveFlight(registered);
+    },
+  });
+  pushProviderRestoreFlight = flight;
+  timeoutId = globalThis.setTimeout(() => flight.settle(false), 10_000);
+  pushProviderRestoreRequired = true;
   try {
+    await PushNotifications.register();
+  } catch {
+    flight.settle(false);
+  }
+  return promise;
+}
+
+async function retireDisabledPushRegistration(token: string) {
+  const cleanupEpoch = pushProviderIntentEpoch;
+  const cleanupIntent = disabledPushProviderGuard;
+  const cleanupStillCurrent = () => pushProviderIntentEpoch === cleanupEpoch
+    && disabledPushProviderGuard === cleanupIntent
+    && pushProviderDisabledForCurrentSession();
+  const restoreAfterStaleCleanup = async () => {
+    if (!cleanupStillCurrent() && hasCustomerSession() && currentFcmToken() && !pushProviderDisabledForCurrentSession()) {
+      pushProviderRestoreRequired = true;
+      return restoreCurrentPushProvider();
+    }
+    return false;
+  };
+  let serverRevoked = false;
+  let providerRevoked = false;
+  try { await revokeFcmToken(token, () => false); serverRevoked = true; } catch { /* provider revoke remains a safe fallback */ }
+  if (!cleanupStillCurrent()) return restoreAfterStaleCleanup();
+  try { await PushNotifications.unregister(); providerRevoked = true; } catch { /* server revoke remains a safe fallback */ }
+  if (!cleanupStillCurrent()) return restoreAfterStaleCleanup();
+  if (!pushRevocationSatisfied(true, serverRevoked, providerRevoked)) {
+    throw new CustomerNotificationApiError("Geç bildirim kaydı güvenle kaldırılamadı.", 0, "ANDROID_FCM_LATE_BIND_CLEANUP_REQUIRED");
+  }
+  if (currentFcmToken() === token) globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
+  return false;
+}
+
+async function bindPushRegistration(pending: NonNullable<typeof pendingPushRegistration>) {
+  if (pushProviderDisabledForCurrentSession() || !customerSessionMatchesGuard(pending.guard)) return false;
+  await registerFcmToken(pending.token, pending.predecessor);
+  if (pushProviderDisabledForCurrentSession()) {
+    return retireDisabledPushRegistration(pending.token);
+  }
+  return customerSessionMatchesGuard(pending.guard);
+}
+
+async function retireOrphanedPushDelivery(guard = currentCustomerSessionGuard()) {
+  try {
+    pushProviderRestoreRequired = true;
     await PushNotifications.unregister();
+    if (!customerSessionMatchesGuard(guard) && hasCustomerSession()) {
+      // A newer login appeared while the old provider endpoint was being
+      // retired. Re-register even during its pre-/me window so the stale
+      // continuation cannot disable the new generation's shared provider.
+      await restoreCurrentPushProvider();
+      return false;
+    }
     globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
+    pendingPushRegistration = null;
+    pushProviderRestoreRequired = false;
     return true;
   } catch {
     return false;
@@ -135,12 +262,24 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
   const receivedIds = useRef(new Set<number>());
   const inAppTimer = useRef<number | null>(null);
 
+  const clearPrivateNotificationState = useCallback((nextPhase: NotificationFeedPhase = "guest") => {
+    ++refreshSequence.current;
+    setSessionAvailable(false);
+    setItems([]);
+    setUnreadCount(0);
+    setErrorMessage("");
+    setInAppPayload(null);
+    receivedIds.current.clear();
+    if (inAppTimer.current !== null) {
+      globalThis.clearTimeout(inAppTimer.current);
+      inAppTimer.current = null;
+    }
+    setPhase(nextPhase);
+  }, []);
+
   const refresh = useCallback(async () => {
     if (!hasVerifiedCustomerSession()) {
-      setSessionAvailable(false);
-      setPhase("guest");
-      setItems([]);
-      setUnreadCount(0);
+      clearPrivateNotificationState();
       return;
     }
     if (!globalThis.navigator?.onLine) {
@@ -154,18 +293,17 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
     setErrorMessage("");
     try {
       const [page, count] = await Promise.all([listCustomerNotifications(), getCustomerUnreadCount()]);
-      if (sequence !== refreshSequence.current) return;
+      if (sequence !== refreshSequence.current || !hasVerifiedCustomerSession()) return;
       setItems(page.items);
       setUnreadCount(count);
       setPhase(page.items.length ? "ready" : "empty");
     } catch (error) {
       if (sequence !== refreshSequence.current) return;
       if (error instanceof CustomerNotificationApiError && error.status === 401) {
-        const pushRetired = !native || !currentFcmToken() || await retireOrphanedPushDelivery();
-        setSessionAvailable(false);
-        setItems([]);
-        setUnreadCount(0);
-        setPhase("guest");
+        const guard = currentCustomerSessionGuard();
+        const pushRetired = !native || !currentFcmToken() || await retireOrphanedPushDelivery(guard);
+        if (sequence !== refreshSequence.current) return;
+        clearPrivateNotificationState();
         if (native) setPushState(pushRetired ? "not-requested" : "error");
         return;
       }
@@ -174,16 +312,22 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
         ? "Çevrimdışısın. Bağlantı geldiğinde yeniden deneyebilirsin."
         : "Bildirimler şu anda yüklenemedi. Tekrar deneyebilirsin.");
     }
-  }, [native]);
+  }, [clearPrivateNotificationState, native]);
 
   const markRead = useCallback(async (id: number) => {
+    const sequence = refreshSequence.current;
     const updated = await markCustomerNotificationRead(id);
+    if (sequence !== refreshSequence.current || !hasVerifiedCustomerSession()) return;
     setItems((current) => current.map((item) => item.id === id ? updated : item));
-    setUnreadCount(await getCustomerUnreadCount());
+    const count = await getCustomerUnreadCount();
+    if (sequence !== refreshSequence.current || !hasVerifiedCustomerSession()) return;
+    setUnreadCount(count);
   }, []);
 
   const markAllRead = useCallback(async () => {
+    const sequence = refreshSequence.current;
     await markAllCustomerNotificationsRead();
+    if (sequence !== refreshSequence.current || !hasVerifiedCustomerSession()) return;
     setItems((current) => current.map((item) => item.isRead ? item : Object.freeze({ ...item, isRead: true, readAt: new Date().toISOString() })));
     setUnreadCount(0);
   }, []);
@@ -219,17 +363,28 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
       setPushState(native ? "error" : "not-supported");
       return;
     }
+    const enableGuard = currentCustomerSessionGuard();
+    const enableEpoch = ++pushProviderIntentEpoch;
+    disabledPushProviderGuard = null;
+    pushProviderRestoreFlight?.settle(false);
+    pushProviderRestoreRequired = false;
+    const stillCurrent = () => pushProviderIntentEpoch === enableEpoch
+      && !pushProviderDisabledForCurrentSession()
+      && customerSessionMatchesGuard(enableGuard);
     setPushState("enabling");
     try {
       const capability = await getNativeNotificationCapability();
+      if (!stillCurrent()) return;
       if (!capability.providerConfigured) {
         setPushState("provider-unavailable");
         return;
       }
       let permission = await PushNotifications.checkPermissions();
+      if (!stillCurrent()) return;
       if (permission.receive === "prompt" || permission.receive === "prompt-with-rationale") {
         globalThis.localStorage?.setItem?.(ANDROID_PERMISSION_REQUESTED_KEY, "true");
         permission = await PushNotifications.requestPermissions();
+        if (!stillCurrent()) return;
       }
       if (permission.receive !== "granted") {
         setPushState(permission.receive === "denied" ? "settings-required" : "denied");
@@ -243,54 +398,93 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
         visibility: 0,
         vibration: true,
       });
+      if (!stillCurrent()) return;
       await PushNotifications.register();
     } catch {
-      setPushState("error");
+      if (stillCurrent()) setPushState("error");
     }
   }, [native]);
 
   const disablePush = useCallback(async () => {
     if (!native) return;
-    const tokenPresent = Boolean(currentFcmToken());
+    const disabledGuard = currentCustomerSessionGuard();
+    const disableEpoch = ++pushProviderIntentEpoch;
+    const disabledIntent = Object.freeze({ epoch: disableEpoch, guard: disabledGuard });
+    disabledPushProviderGuard = disabledIntent;
+    pushProviderRestoreFlight?.settle(false);
+    pushProviderRestoreRequired = false;
+    pendingPushRegistration = null;
+    const stillCurrent = () => pushProviderIntentEpoch === disableEpoch
+      && disabledPushProviderGuard === disabledIntent
+      && customerSessionMatchesGuard(disabledGuard);
+    const restoreAfterStaleContinuation = async () => {
+      if (!stillCurrent() && hasCustomerSession() && currentFcmToken() && !pushProviderDisabledForCurrentSession()) {
+        pushProviderRestoreRequired = true;
+        await restoreCurrentPushProvider();
+      }
+    };
+    const token = currentFcmToken();
+    const tokenPresent = Boolean(token);
     let serverRevoked = !tokenPresent;
     let providerRevoked = false;
-    try { await revokeFcmToken(); serverRevoked = true; } catch { /* provider revocation can still make delivery impossible */ }
+    try { await revokeFcmToken(token ?? undefined, stillCurrent); serverRevoked = true; } catch { /* provider revocation can still make delivery impossible */ }
+    if (!stillCurrent()) {
+      await restoreAfterStaleContinuation();
+      return;
+    }
     try { await PushNotifications.unregister(); providerRevoked = true; } catch { /* server revocation can still make delivery impossible */ }
+    if (!stillCurrent()) {
+      await restoreAfterStaleContinuation();
+      return;
+    }
     if (!pushRevocationSatisfied(tokenPresent, serverRevoked, providerRevoked)) {
       setPushState("error");
       throw new CustomerNotificationApiError("Bildirim teslim noktası güvenle kaldırılamadı.", 0, "ANDROID_FCM_REVOKE_REQUIRED");
     }
-    globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
+    if (!token || currentFcmToken() === token) globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
     setPushState("not-requested");
   }, [native]);
 
   const login = useCallback(async (email: string, password: string) => {
+    clearPrivateNotificationState();
     await loginCustomer(email, password);
-    setSessionAvailable(false);
-    setItems([]);
-    setUnreadCount(0);
-    setPhase("guest");
-  }, []);
+  }, [clearPrivateNotificationState]);
 
   const logout = useCallback(async () => {
+    const guard = currentCustomerSessionGuard();
+    pendingPushRegistration = null;
+    clearPrivateNotificationState();
     if (native) {
       const tokenPresent = Boolean(currentFcmToken());
       let serverRevoked = !tokenPresent;
       let providerRevoked = false;
-      try { await revokeFcmSession(); serverRevoked = true; } catch { /* provider revocation can still make delivery impossible */ }
+      try { await revokeFcmSession(guard); serverRevoked = true; } catch { /* provider revocation can still make delivery impossible */ }
+      if (!customerSessionMatchesGuard(guard)) {
+        throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
+      }
       try { await PushNotifications.unregister(); providerRevoked = true; } catch { /* server revocation can still make delivery impossible */ }
+      if (!customerSessionMatchesGuard(guard)) {
+        // The provider operation raced with a new Customer login. Restore the
+        // current generation even while /me verification is still pending.
+        if (!await restoreCurrentPushProvider()) setPushState("error");
+        throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
+      }
       if (!pushRevocationSatisfied(tokenPresent, serverRevoked, providerRevoked)) {
         throw new CustomerNotificationApiError("Güvenli çıkış için bildirim bağlantısı kaldırılamadı.", 0, "ANDROID_LOGOUT_PUSH_REVOKE_REQUIRED");
       }
       globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
     }
-    try { await logoutCustomer(); } catch { /* local session is cleared by logoutCustomer */ }
-    setSessionAvailable(false);
-    setItems([]);
-    setUnreadCount(0);
-    setPhase("guest");
+    try {
+      await logoutCustomer(guard);
+    } catch (error) {
+      // A server-side logout failure is safe to tolerate only after the local
+      // secure generation was actually cleared. Never report guest while a
+      // restorable Keystore session still exists.
+      if (hasCustomerSession()) throw error;
+    }
+    clearPrivateNotificationState();
     setPushState(native ? "not-requested" : "not-supported");
-  }, [native]);
+  }, [clearPrivateNotificationState, native]);
 
   useEffect(() => {
     void refresh();
@@ -300,44 +494,93 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
   useEffect(() => {
     const onOnline = () => { if (hasVerifiedCustomerSession()) void refresh(); };
     const onOffline = () => {
-      setPhase("offline");
-      setErrorMessage("Çevrimdışısın. Son bildirimler güncellenemedi.");
+      if (hasVerifiedCustomerSession()) {
+        setPhase("offline");
+        setErrorMessage("Çevrimdışısın. Son bildirimler güncellenemedi.");
+      } else {
+        clearPrivateNotificationState();
+      }
     };
     const onRefresh = () => { if (hasVerifiedCustomerSession()) void refresh(); };
     const onAuthRequired = () => {
-      setSessionAvailable(false);
-      setItems([]);
-      setUnreadCount(0);
-      setPhase("guest");
+      pendingPushRegistration = null;
+      clearPrivateNotificationState();
       if (native && currentFcmToken()) {
-        void retireOrphanedPushDelivery().then((retired) => setPushState(retired ? "not-requested" : "error"));
+        const guard = currentCustomerSessionGuard();
+        void retireOrphanedPushDelivery(guard).then((retired) => {
+          if (!customerSessionMatchesGuard(guard) && hasCustomerSession()) return;
+          setPushState(retired ? "not-requested" : "error");
+        });
       }
+    };
+    const onAuthUnverified = () => {
+      clearPrivateNotificationState(globalThis.navigator?.onLine ? "error" : "offline");
+      setErrorMessage("Müşteri oturumu yeniden doğrulanana kadar özel bildirimler gizlendi.");
     };
     const onVerified = () => {
       if (!hasVerifiedCustomerSession()) return;
+      const guard = currentCustomerSessionGuard();
       const activate = async () => {
-        if (native && currentFcmToken()) {
+        if (native && !pushProviderDisabledForCurrentSession() && (currentFcmToken() || pendingPushRegistration)) {
+          const restorationWasRequired = pushProviderRestoreRequired;
+          if (restorationWasRequired) {
+            const restored = await restoreCurrentPushProvider();
+            if (!customerSessionMatchesGuard(guard)) return;
+            if (!restored) {
+              pendingPushRegistration = null;
+              pushProviderRestoreRequired = true;
+              throw new CustomerNotificationApiError("Bildirim sağlayıcısı yeniden kaydedilemedi.", 0, "ANDROID_FCM_PROVIDER_RESTORE_REQUIRED");
+            }
+          }
           try {
-            await registerFcmToken(currentFcmToken());
+            const pending = pendingPushRegistration;
+            if (pending && customerSessionMatchesGuard(pending.guard)) {
+              await bindPushRegistration(pending);
+              if (customerSessionMatchesGuard(guard) && pendingPushRegistration === pending) pendingPushRegistration = null;
+            } else if (!restorationWasRequired) {
+              const durableToken = currentFcmToken();
+              if (!durableToken) throw new CustomerNotificationApiError("Bildirim teslim anahtarı bulunamadı.", 0, "ANDROID_FCM_TOKEN_MISSING");
+              await bindPushRegistration(Object.freeze({ guard, token: durableToken, predecessor: undefined }));
+            }
           } catch (error) {
-            let providerRevoked = false;
-            try { await PushNotifications.unregister(); providerRevoked = true; } catch { /* handled below */ }
-            if (providerRevoked) globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
-            else {
-              try { await logoutCustomer(); } catch { /* local session is still cleared */ }
-              throw error;
+            if (!customerSessionMatchesGuard(guard)) return;
+            if (
+              error instanceof CustomerNotificationApiError
+              && error.code === "ANDROID_FCM_LATE_BIND_CLEANUP_REQUIRED"
+              && pushProviderDisabledForCurrentSession()
+            ) {
+              pushProviderRestoreRequired = false;
+              setPushState("error");
+            } else {
+              let providerRevoked = false;
+              try { await PushNotifications.unregister(); providerRevoked = true; } catch { /* handled below */ }
+              if (!customerSessionMatchesGuard(guard)) {
+                if (!await restoreCurrentPushProvider()) setPushState("error");
+                return;
+              }
+              if (providerRevoked) {
+                pendingPushRegistration = null;
+                pushProviderRestoreRequired = true;
+                globalThis.localStorage?.removeItem?.(ANDROID_FCM_TOKEN_KEY);
+              } else {
+                try {
+                  await logoutCustomer(guard);
+                } catch (logoutError) {
+                  if (hasCustomerSession()) throw logoutError;
+                }
+                throw error;
+              }
             }
           }
         }
+        if (!customerSessionMatchesGuard(guard)) return;
         setSessionAvailable(true);
         await refresh();
         await inspectPushState();
       };
       void activate().catch(() => {
-        setSessionAvailable(false);
-        setItems([]);
-        setUnreadCount(0);
-        setPhase("error");
+        if (!customerSessionMatchesGuard(guard)) return;
+        clearPrivateNotificationState("error");
         setErrorMessage("Müşteri bildirim oturumu güvenle başlatılamadı.");
       });
     };
@@ -345,15 +588,17 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
     globalThis.addEventListener("offline", onOffline);
     globalThis.addEventListener("novastore:notification-refresh", onRefresh);
     globalThis.addEventListener("novastore:auth-required", onAuthRequired);
+    globalThis.addEventListener("novastore:auth-unverified", onAuthUnverified);
     globalThis.addEventListener("novastore:auth-verified", onVerified);
     return () => {
       globalThis.removeEventListener("online", onOnline);
       globalThis.removeEventListener("offline", onOffline);
       globalThis.removeEventListener("novastore:notification-refresh", onRefresh);
       globalThis.removeEventListener("novastore:auth-required", onAuthRequired);
+      globalThis.removeEventListener("novastore:auth-unverified", onAuthUnverified);
       globalThis.removeEventListener("novastore:auth-verified", onVerified);
     };
-  }, [inspectPushState, native, refresh]);
+  }, [clearPrivateNotificationState, inspectPushState, native, refresh]);
 
   useEffect(() => {
     if (!native) return;
@@ -363,20 +608,70 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
       void promise.then((handle) => { if (active) handles.push(handle); else void handle.remove(); });
     };
     keep(PushNotifications.addListener("registration", (registration) => {
-      if (!hasVerifiedCustomerSession()) {
-        void retireOrphanedPushDelivery();
-        setPushState("error");
+      if (pushProviderDisabledForCurrentSession()) {
+        pendingPushRegistration = null;
+        settlePushProviderRestore(false);
+        pushProviderRestoreRequired = false;
+        // Keep the late token as a cleanup handle until either the PC1
+        // endpoint or the device-global provider registration is proven
+        // retired. Never report disabled while both gates remain open.
+        globalThis.localStorage?.setItem?.(ANDROID_FCM_TOKEN_KEY, registration.value);
+        void retireDisabledPushRegistration(registration.value)
+          .then((restored) => setPushState(restored ? "enabling" : "not-requested"))
+          .catch(() => setPushState("error"));
         return;
       }
-      const previous = currentFcmToken();
-      void registerFcmToken(registration.value, previous)
-        .then(() => setPushState("enabled"))
-        .catch((error) => setPushState(providerGate(error) ? "server-gate" : "error"));
+      const pending = Object.freeze({
+        guard: currentCustomerSessionGuard(),
+        token: registration.value,
+        predecessor: currentFcmToken() ?? undefined,
+      });
+      pendingPushRegistration = pending;
+      if (!hasVerifiedCustomerSession()) {
+        clearPrivateNotificationState();
+        // Refresh/login keeps a credential generation while /me is pending.
+        // Ignore this transitional callback; terminal auth-required owns
+        // provider retirement and prevents a normal rotation from disabling
+        // push delivery.
+        if (hasCustomerSession()) {
+          settlePushProviderRestore(true);
+          setPushState("enabling");
+        } else {
+          pendingPushRegistration = null;
+          settlePushProviderRestore(false);
+          void retireOrphanedPushDelivery();
+          setPushState("error");
+        }
+        return;
+      }
+      const restoreFlightPresent = Boolean(pushProviderRestoreFlight);
+      void bindPushRegistration(pending)
+        .then((bound) => {
+          if (pendingPushRegistration === pending) pendingPushRegistration = null;
+          if (restoreFlightPresent) settlePushProviderRestore(bound);
+          if (pushProviderDisabledForCurrentSession()) pushProviderRestoreRequired = false;
+          else if (!restoreFlightPresent) pushProviderRestoreRequired = !bound;
+          setPushState(bound ? "enabled" : pushProviderDisabledForCurrentSession() ? "not-requested" : "error");
+        })
+        .catch((error) => {
+          if (restoreFlightPresent) settlePushProviderRestore(false);
+          const cleanupRequired = error instanceof CustomerNotificationApiError
+            && error.code === "ANDROID_FCM_LATE_BIND_CLEANUP_REQUIRED";
+          if (pushProviderDisabledForCurrentSession()) pushProviderRestoreRequired = false;
+          setPushState(cleanupRequired ? "error" : pushProviderDisabledForCurrentSession() ? "not-requested" : providerGate(error) ? "server-gate" : "error");
+        });
     }));
-    keep(PushNotifications.addListener("registrationError", () => setPushState("provider-unavailable")));
+    keep(PushNotifications.addListener("registrationError", () => {
+      const disabled = pushProviderDisabledForCurrentSession();
+      pendingPushRegistration = null;
+      settlePushProviderRestore(false);
+      pushProviderRestoreRequired = !disabled;
+      setPushState(disabled ? "not-requested" : "provider-unavailable");
+    }));
     keep(PushNotifications.addListener("pushNotificationReceived", (notification) => {
       if (!hasVerifiedCustomerSession()) {
-        void retireOrphanedPushDelivery();
+        clearPrivateNotificationState();
+        if (!hasCustomerSession()) void retireOrphanedPushDelivery();
         return;
       }
       const payload = normalizeCustomerPushPayload(pushData(notification));
@@ -390,7 +685,10 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
     keep(PushNotifications.addListener("pushNotificationActionPerformed", (action: ActionPerformed) => {
       const payload = normalizeCustomerPushPayload(pushData(action.notification));
       if (!payload || !hasVerifiedCustomerSession()) {
-        if (!hasVerifiedCustomerSession()) void retireOrphanedPushDelivery();
+        if (!hasVerifiedCustomerSession()) {
+          clearPrivateNotificationState();
+          if (!hasCustomerSession()) void retireOrphanedPushDelivery();
+        }
         globalThis.dispatchEvent(notificationOpenEvent(null, null));
         return;
       }
@@ -407,7 +705,7 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
       for (const handle of handles) void handle.remove();
       if (inAppTimer.current !== null) globalThis.clearTimeout(inAppTimer.current);
     };
-  }, [native, refresh]);
+  }, [clearPrivateNotificationState, native, refresh]);
 
   const value = useMemo<NotificationRuntimeValue>(() => Object.freeze({
     sessionAvailable,
