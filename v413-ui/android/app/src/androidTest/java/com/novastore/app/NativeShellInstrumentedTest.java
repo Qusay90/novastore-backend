@@ -131,6 +131,7 @@ public class NativeShellInstrumentedTest {
                     "print: Capacitor.isPluginAvailable('NovaPrint')," +
                     "share: Capacitor.isPluginAvailable('NovaShare')," +
                     "publicStore: Capacitor.isPluginAvailable('NovaPublicStore')," +
+                    "customerSession: Capacitor.isPluginAvailable('NovaCustomerSession')," +
                     "notificationApi: Capacitor.isPluginAvailable('NovaNotificationApi')," +
                     "pushNotifications: Capacitor.isPluginAvailable('PushNotifications')," +
                     "http: Capacitor.isPluginAvailable('CapacitorHttp')," +
@@ -145,6 +146,7 @@ public class NativeShellInstrumentedTest {
             assertTrue(bridge.getBoolean("print"));
             assertTrue(bridge.getBoolean("share"));
             assertTrue(bridge.getBoolean("publicStore"));
+            assertTrue(bridge.getBoolean("customerSession"));
             assertTrue(bridge.getBoolean("notificationApi"));
             assertTrue(bridge.getBoolean("pushNotifications"));
             assertFalse(bridge.getBoolean("http"));

@@ -20,8 +20,6 @@ const notification = {
 async function installSession(page: Page) {
   await page.addInitScript(() => {
     localStorage.setItem("nova_user_token", "customer-session-token");
-    localStorage.setItem("nova_user_info", JSON.stringify({ id: 17, fullName: "Test Müşteri", email: "test@example.invalid", role: "customer" }));
-    localStorage.setItem("novastore.customer.verifiedUserId", "17");
   });
 }
 
@@ -43,7 +41,7 @@ async function mockNotificationAuthority(page: Page, options: { deletedOrder?: b
 test("authenticated notification center renders unread semantics and opens only an owned order", async ({ page }) => {
   await installSession(page);
   await mockNotificationAuthority(page);
-  await page.goto("/tests/notification-runtime-fixture.html?cal=CAL-10&tab=account&view=notifications");
+  await page.goto("/tests/notification-runtime-fixture.html?cal=CAL-10&tab=account&view=notifications&verifiedFixture=1");
   await expect(page.getByTestId("notification-center-screen")).toHaveAttribute("data-feed-state", "ready");
   await expect(page.getByText("1 okunmamış bildirim")).toBeVisible();
   const item = page.getByRole("button", { name: "Sipariş durumu güncellendi okunmadı" });
@@ -57,7 +55,7 @@ test("authenticated notification center renders unread semantics and opens only 
 test("deleted or unauthorized target stays in the safe notification center", async ({ page }) => {
   await installSession(page);
   await mockNotificationAuthority(page, { deletedOrder: true });
-  await page.goto("/tests/notification-runtime-fixture.html?cal=CAL-10&tab=account&view=notifications");
+  await page.goto("/tests/notification-runtime-fixture.html?cal=CAL-10&tab=account&view=notifications&verifiedFixture=1");
   await page.getByRole("button", { name: "Sipariş durumu güncellendi okunmadı" }).click();
   await expect(page.getByRole("alert")).toContainText("artık kullanılamıyor veya hesabına ait değil");
   await expect(page.getByTestId("notification-center-screen")).toBeVisible();
@@ -71,11 +69,11 @@ test("logged-out and offline states are explicit and never expose a private feed
 
   await page.evaluate(() => {
     localStorage.setItem("nova_user_token", "customer-session-token");
-    localStorage.setItem("nova_user_info", JSON.stringify({ id: 17, fullName: "Test Müşteri", email: "test@example.invalid", role: "customer" }));
     localStorage.setItem("novastore.customer.verifiedUserId", "17");
     Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
     dispatchEvent(new Event("offline"));
   });
-  await expect(page.getByTestId("notification-offline")).toBeVisible();
-  await expect(page.getByText("Çevrimdışısın", { exact: false })).toBeVisible();
+  await expect(page.getByTestId("notification-login-required")).toBeVisible();
+  await expect(page.getByText("0 okunmamış bildirim")).toBeVisible();
+  await expect(page.getByTestId("notification-offline")).toHaveCount(0);
 });

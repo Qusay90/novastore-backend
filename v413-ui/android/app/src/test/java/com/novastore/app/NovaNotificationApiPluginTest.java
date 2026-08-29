@@ -5,6 +5,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Set;
+
 import org.junit.Test;
 
 public final class NovaNotificationApiPluginTest {
@@ -15,6 +17,7 @@ public final class NovaNotificationApiPluginTest {
         assertTrue(NovaNotificationApiPlugin.allowed("/api/notifications/42/read", "PATCH"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/notifications/android-push/tokens", "POST"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/notifications/android-push/tokens/session", "DELETE"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/users/refresh", "POST"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/orders/user/7", "GET"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/returns/7", "GET"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/questions/user", "GET"));
@@ -37,6 +40,7 @@ public final class NovaNotificationApiPluginTest {
         assertFalse(NovaNotificationApiPlugin.allowed("/api/notifications/0/read", "PATCH"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/orders/user/0", "GET"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/messages/history/7", "POST"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/users/refresh", "GET"));
     }
 
     @Test
@@ -60,5 +64,18 @@ public final class NovaNotificationApiPluginTest {
         assertNull(NovaNotificationApiPlugin.canonicalToken("short"));
         assertNull(NovaNotificationApiPlugin.canonicalToken("0123456789abcdef embedded"));
         assertNull(NovaNotificationApiPlugin.canonicalToken(null));
+    }
+
+    @Test
+    public void refreshEnvelopeIsExactAndIdentityFree() {
+        assertTrue(NovaNotificationApiPlugin.validRefreshEnvelope(
+            Set.of("refreshToken", "sessionId"), "refresh-token-0123456789", 17
+        ));
+        assertFalse(NovaNotificationApiPlugin.validRefreshEnvelope(
+            Set.of("refreshToken", "sessionId", "userId"), "refresh-token-0123456789", 17
+        ));
+        assertFalse(NovaNotificationApiPlugin.validRefreshEnvelope(
+            Set.of("refreshToken", "sessionId"), "refresh-token-0123456789", 17.5
+        ));
     }
 }

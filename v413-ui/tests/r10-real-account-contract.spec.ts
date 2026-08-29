@@ -47,6 +47,7 @@ test("R10 native account transport is allowlisted narrowly", () => {
   const { requestRule } = customerNotificationApiTestUtils;
   for (const [path, method] of [
     ["/api/users/me", "GET"], ["/api/users/me", "PATCH"], ["/api/users/register", "POST"],
+    ["/api/users/refresh", "POST"],
     ["/api/users/security-status", "GET"], ["/api/addresses", "GET"], ["/api/addresses", "POST"],
     ["/api/addresses/7", "PUT"], ["/api/addresses/7/default", "PATCH"], ["/api/addresses/7", "DELETE"],
     ["/api/orders/user/7", "GET"], ["/api/messages/history/7", "GET"], ["/api/messages/send", "POST"],
@@ -70,7 +71,14 @@ test("R10 customer A and B receive only their own profile, addresses, orders and
       const body = JSON.parse(String(init.body || "{}"));
       activeCustomer = body.email.startsWith("b@") ? "b" : "a";
       const id = activeCustomer === "a" ? 17 : 18;
-      return new Response(JSON.stringify({ token: `customer-${activeCustomer}-session-token`, user: { id, fullName: `Müşteri ${activeCustomer.toUpperCase()}`, email: `${activeCustomer}@example.test`, role: "customer" } }), { status: 200 });
+      return new Response(JSON.stringify({
+        token: `customer-${activeCustomer}-session-token`,
+        refreshToken: `customer-${activeCustomer}-refresh-token`,
+        accessExpiresAt: "2099-01-01T00:00:00.000Z",
+        refreshExpiresAt: "2099-02-01T00:00:00.000Z",
+        sessionId: id,
+        user: { id, fullName: `Müşteri ${activeCustomer.toUpperCase()}`, email: `${activeCustomer}@example.test`, role: "customer" },
+      }), { status: 200 });
     }
     const id = activeCustomer === "a" ? 17 : 18;
     if (authorization !== `Bearer customer-${activeCustomer}-session-token`) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
@@ -85,7 +93,7 @@ test("R10 customer A and B receive only their own profile, addresses, orders and
 
   await loginCustomer("a@example.test", "customer-password");
   expect(hasVerifiedCustomerSession()).toBe(false);
-  markCustomerSessionVerified(17);
+  markCustomerSessionVerified({ id: 17, fullName: "Müşteri A", email: "a@example.test", role: "customer" });
   expect(hasVerifiedCustomerSession()).toBe(true);
   expect((await getCurrentCustomer()).id).toBe(17);
   expect((await listCustomerAddresses())[0].addressLine).toBe("A Sokağı 1");
@@ -94,19 +102,19 @@ test("R10 customer A and B receive only their own profile, addresses, orders and
   expect((await createCustomerAddress({ title: "Ev", fullName: "Müşteri A", phone: "05550000001", city: "İstanbul", district: "Kadıköy", addressLine: "A Sokağı 1", isDefault: true })).id).toBe(101);
   expect((await updateCustomerProfile("Güncel A", "+905550000001")).fullName).toBe("Güncel A");
 
-  clearCustomerSession();
+  await clearCustomerSession();
   await loginCustomer("b@example.test", "customer-password");
   expect(hasVerifiedCustomerSession()).toBe(false);
-  markCustomerSessionVerified(18);
+  markCustomerSessionVerified({ id: 18, fullName: "Müşteri B", email: "b@example.test", role: "customer" });
   expect(hasVerifiedCustomerSession()).toBe(true);
   expect((await getCurrentCustomer()).id).toBe(18);
   expect((await listCustomerAddresses())[0].addressLine).toBe("B Sokağı 1");
   expect((await listCustomerOrders(18))[0].id).toBe(401);
   expect((await listCustomerSupportMessages(18))[0].message).toBe("B destek mesajı");
-  expect(values.get("nova_user_info")).toContain("b@example.test");
+  expect(values.get("novastore.customer.session.v1") ?? "").not.toContain("b@example.test");
   expect(calls.filter((call) => call.path !== "/api/users/login" && call.authorization.includes("customer-a")).length).toBeGreaterThan(0);
   expect(calls.filter((call) => call.path !== "/api/users/login" && call.authorization.includes("customer-b")).length).toBeGreaterThan(0);
-  clearCustomerSession();
+  await clearCustomerSession();
 });
 
 test("checkout address-change typography is compact without shrinking its control", async ({ page }) => {

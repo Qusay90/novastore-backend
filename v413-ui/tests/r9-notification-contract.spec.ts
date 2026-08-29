@@ -119,6 +119,7 @@ test("native API allowlist rejects cross-origin, traversal and invented operatio
   expect(requestRule("/api/notifications?limit=50&cursor=abc_123", "GET")).toEqual({ path: "/api/notifications?limit=50&cursor=abc_123", method: "GET" });
   expect(requestRule("/api/notifications/7/read", "PATCH")).toEqual({ path: "/api/notifications/7/read", method: "PATCH" });
   expect(requestRule("/api/orders/user/17", "GET")).toEqual({ path: "/api/orders/user/17", method: "GET" });
+  expect(requestRule("/api/users/refresh", "POST")).toEqual({ path: "/api/users/refresh", method: "POST" });
   expect(requestRule("/api/returns/9", "GET")).toEqual({ path: "/api/returns/9", method: "GET" });
   expect(requestRule("/api/questions/user", "GET")).toEqual({ path: "/api/questions/user", method: "GET" });
   expect(() => requestRule("/api/notifications?limit=50&limit=20", "GET")).toThrow();
@@ -144,7 +145,14 @@ test("real adapter flow keeps feed, read state and entity authorization server-o
   Object.defineProperty(globalThis, "fetch", { configurable: true, value: async (input: string, init: RequestInit = {}) => {
     const path = String(input);
     calls.push({ path, method: String(init.method || "GET"), authorization: String((init.headers as Record<string, string>)?.authorization || "") });
-    if (path === "/api/users/login") return new Response(JSON.stringify({ token: "customer-session-token", user: { id: 17, fullName: "Test Müşteri", email: "test@example.invalid", role: "customer" } }), { status: 200 });
+    if (path === "/api/users/login") return new Response(JSON.stringify({
+      token: "customer-session-token",
+      refreshToken: "customer-refresh-token-0001",
+      accessExpiresAt: "2099-01-01T00:00:00.000Z",
+      refreshExpiresAt: "2099-02-01T00:00:00.000Z",
+      sessionId: 17,
+      user: { id: 17, fullName: "Test Müşteri", email: "test@example.invalid", role: "customer" },
+    }), { status: 200 });
     if (path === "/api/notifications?limit=50") return new Response(JSON.stringify({ items: [unread], page: { limit: 50, hasMore: false, nextCursor: null } }), { status: 200 });
     if (path === "/api/notifications/unread-count") return new Response(JSON.stringify({ unreadCount: 1 }), { status: 200 });
     if (path === "/api/notifications/7/read") return new Response(JSON.stringify({ notification: { ...unread, is_read: true, read_at: timestamp } }), { status: 200 });
@@ -153,7 +161,7 @@ test("real adapter flow keeps feed, read state and entity authorization server-o
     return new Response(JSON.stringify({ code: "NOT_FOUND", error: "not found" }), { status: 404 });
   }});
   await loginCustomer("TEST@example.invalid", "secret-password");
-  markCustomerSessionVerified(17);
+  markCustomerSessionVerified({ id: 17, fullName: "Test Müşteri", email: "test@example.invalid", role: "customer" });
   expect((await listCustomerNotifications()).items[0].isRead).toBe(false);
   expect(await getCustomerUnreadCount()).toBe(1);
   expect((await markCustomerNotificationRead(7)).isRead).toBe(true);
@@ -161,7 +169,7 @@ test("real adapter flow keeps feed, read state and entity authorization server-o
   expect(await authorizeCustomerNotificationTarget({ entityType: "order", entityId: 42 })).toEqual({ entityType: "order", entityId: 42 });
   expect(await authorizeCustomerNotificationTarget({ entityType: "order", entityId: 404 })).toBeNull();
   expect(calls.filter((call) => call.path !== "/api/users/login").every((call) => call.authorization === "Bearer customer-session-token")).toBe(true);
-  clearCustomerSession();
+  await clearCustomerSession();
 });
 
 test("FCM lifecycle payloads bind to installation, support rotation and never carry identity or URL", () => {
