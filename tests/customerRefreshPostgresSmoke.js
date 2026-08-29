@@ -212,28 +212,60 @@ const captureConsoleOutput = () => {
         });
         assert.equal(registered.status, 201);
 
-        await pool.query(`
-            CREATE OR REPLACE FUNCTION pc1_hold_first_refresh_rotation()
-            RETURNS TRIGGER LANGUAGE plpgsql AS $$
-            BEGIN
-                PERFORM pg_sleep(0.25);
-                RETURN NEW;
-            END;
-            $$;
-            CREATE TRIGGER trg_pc1_hold_first_refresh_rotation
-            BEFORE UPDATE OF status ON auth_refresh_tokens
-            FOR EACH ROW
-            WHEN (OLD.status = 'active' AND NEW.status = 'rotated')
-            EXECUTE FUNCTION pc1_hold_first_refresh_rotation();
-        `);
-        const firstConcurrent = refresh(concurrentLogin);
-        await delay(50);
-        const secondConcurrent = refresh(concurrentLogin);
-        const concurrentResponses = await Promise.all([firstConcurrent, secondConcurrent]);
-        await pool.query(`
-            DROP TRIGGER trg_pc1_hold_first_refresh_rotation ON auth_refresh_tokens;
-            DROP FUNCTION pc1_hold_first_refresh_rotation();
-        `);
+        const concurrencyLockKeys = Object.freeze([73421, 60829]);
+        const concurrencyGate = await pool.connect();
+        let concurrencyGateHeld = false;
+        let firstConcurrent = null;
+        let concurrentResponses;
+        try {
+            await concurrencyGate.query('SELECT pg_advisory_lock($1, $2)', concurrencyLockKeys);
+            concurrencyGateHeld = true;
+            await pool.query(`
+                CREATE OR REPLACE FUNCTION pc1_hold_first_refresh_rotation()
+                RETURNS TRIGGER LANGUAGE plpgsql AS $$
+                BEGIN
+                    PERFORM pg_advisory_xact_lock(73421, 60829);
+                    RETURN NEW;
+                END;
+                $$;
+                CREATE TRIGGER trg_pc1_hold_first_refresh_rotation
+                BEFORE UPDATE OF status ON auth_refresh_tokens
+                FOR EACH ROW
+                WHEN (OLD.status = 'active' AND NEW.status = 'rotated')
+                EXECUTE FUNCTION pc1_hold_first_refresh_rotation();
+            `);
+            firstConcurrent = refresh(concurrentLogin);
+            let firstRotationBlocked = false;
+            for (let attempt = 0; attempt < 200; attempt += 1) {
+                const waiting = await pool.query(
+                    `SELECT COUNT(*)::INT AS count
+                     FROM pg_stat_activity
+                     WHERE datname = current_database()
+                       AND wait_event_type = 'Lock'
+                       AND wait_event = 'advisory'
+                       AND query LIKE '%UPDATE auth_refresh_tokens%'`
+                );
+                if (Number(waiting.rows[0].count) > 0) {
+                    firstRotationBlocked = true;
+                    break;
+                }
+                await delay(10);
+            }
+            assert.equal(firstRotationBlocked, true, 'First refresh must hold the token row before the duplicate request.');
+            const secondConcurrent = await refresh(concurrentLogin);
+            assert.equal(secondConcurrent.status, 401);
+            await concurrencyGate.query('SELECT pg_advisory_unlock($1, $2)', concurrencyLockKeys);
+            concurrencyGateHeld = false;
+            concurrentResponses = [await firstConcurrent, secondConcurrent];
+        } finally {
+            if (concurrencyGateHeld) {
+                await concurrencyGate.query('SELECT pg_advisory_unlock($1, $2)', concurrencyLockKeys).catch(() => {});
+            }
+            if (firstConcurrent) await firstConcurrent.catch(() => {});
+            concurrencyGate.release();
+            await pool.query('DROP TRIGGER IF EXISTS trg_pc1_hold_first_refresh_rotation ON auth_refresh_tokens');
+            await pool.query('DROP FUNCTION IF EXISTS pc1_hold_first_refresh_rotation()');
+        }
         const concurrentSuccesses = concurrentResponses.filter((response) => response.status === 200);
         const concurrentFailures = concurrentResponses.filter((response) => response.status === 401);
         assert.equal(concurrentSuccesses.length, 1);
@@ -315,6 +347,28 @@ const captureConsoleOutput = () => {
             refreshToken: lifecycleR3.body.refreshToken,
             sessionId: lifecycleR3.body.sessionId
         })).status, 401);
+
+        const accessExpiredLogin = await loginCustomer('customer-a@example.test');
+        await pool.query(
+            `UPDATE auth_sessions
+             SET issued_at = CURRENT_TIMESTAMP - INTERVAL '2 days',
+                 expires_at = CURRENT_TIMESTAMP - INTERVAL '1 day'
+             WHERE id = $1`,
+            [accessExpiredLogin.sessionId]
+        );
+        assert.equal((await jsonRequest(baseUrl, '/api/users/me', { token: accessExpiredLogin.token })).status, 401);
+        await authSessionService.cleanupExpiredSessions({ queryable: pool, limit: 500 });
+        assert.equal(Number((await pool.query(
+            'SELECT COUNT(*)::INT AS count FROM auth_sessions WHERE id = $1',
+            [accessExpiredLogin.sessionId]
+        )).rows[0].count), 1, 'Cleanup must preserve an access-expired session with a live refresh credential.');
+        const accessExpiryRenewal = await refresh(accessExpiredLogin);
+        assert.equal(accessExpiryRenewal.status, 200);
+        const accessExpiryRenewedMe = await jsonRequest(baseUrl, '/api/users/me', {
+            token: accessExpiryRenewal.body.accessToken
+        });
+        assert.equal(accessExpiryRenewedMe.status, 200);
+        assert.equal(accessExpiryRenewedMe.body.user.id, customerAId);
 
         const expiredLogin = await loginCustomer('customer-a@example.test');
         seenRawRefreshTokens.push(expiredLogin.refreshToken);
@@ -504,6 +558,7 @@ const captureConsoleOutput = () => {
             customerABIsolation: 'PASS',
             crossRoleConfusionCount: 0,
             tokenLogLeakCount,
+            accessExpiryRenewal: 'PASS',
             passwordChangeAfterAccessExpiryRevocation: 'PASS',
             androidFcmAuthIdentityRegression: 'PASS',
             staleCustomerNotificationDeviceLeak: staleCustomerDeviceLeak,
