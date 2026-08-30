@@ -11,6 +11,7 @@ android {
         versionName "4.13.0-owner-preview"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "String", "NOVASTORE_API_BASE_URL", '"https://novastore.tr/"'
+        buildConfigField "boolean", "NOVASTORE_LOCAL_UAT", "false"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -22,15 +23,25 @@ android {
             applicationIdSuffix ".v413preview"
             versionNameSuffix "-debug"
             buildConfigField "String", "NOVASTORE_API_BASE_URL", '"http://10.0.2.2:5000/"'
+            buildConfigField "boolean", "NOVASTORE_LOCAL_UAT", "false"
             resValue "string", "app_name", "NovaStore V4.13 Önizleme"
             resValue "string", "title_activity_main", "NovaStore V4.13 Önizleme"
+        }
+        uat {
+            initWith release
+            debuggable true
+            buildConfigField "String", "NOVASTORE_API_BASE_URL", '"http://127.0.0.1:5000/"'
+            buildConfigField "boolean", "NOVASTORE_LOCAL_UAT", "true"
+            matchingFallbacks = ["release"]
         }
         release {
             minifyEnabled false
             buildConfigField "String", "NOVASTORE_API_BASE_URL", '"https://novastore.tr/"'
+            buildConfigField "boolean", "NOVASTORE_LOCAL_UAT", "false"
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    testBuildType "uat"
     buildFeatures {
         buildConfig true
     }

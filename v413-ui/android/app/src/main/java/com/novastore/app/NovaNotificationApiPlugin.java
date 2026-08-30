@@ -176,7 +176,11 @@ public final class NovaNotificationApiPlugin extends Plugin {
 
     private URI validatedApiBase() {
         URI base = URI.create(BuildConfig.NOVASTORE_API_BASE_URL);
-        if (!NovaPublicStorePlugin.isApprovedApiBase(base, BuildConfig.DEBUG)) {
+        if (!NovaPublicStorePlugin.isApprovedApiBase(
+            base,
+            BuildConfig.DEBUG,
+            BuildConfig.NOVASTORE_LOCAL_UAT
+        )) {
             throw new IllegalArgumentException("CUSTOMER_NOTIFICATION_API_ORIGIN_INVALID");
         }
         return base;

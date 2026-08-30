@@ -154,21 +154,30 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     if (!notifications) throw new Error("Bildirim ve müşteri oturumu çalışma zamanı bulunamadı.");
     setBusy(true);
     let guard: ReturnType<typeof currentCustomerSessionGuard> | null = null;
+    let loginStage: "login-request" | "me-verification" = "login-request";
     try {
       await notifications.login(email, password);
       guard = currentCustomerSessionGuard();
+      loginStage = "me-verification";
       await establishVerifiedSession();
     } catch (error) {
+      const surfacedError = loginStage === "me-verification"
+        ? new CustomerNotificationApiError(
+          "Giriş tamamlandı ancak müşteri hesabı doğrulanamadı.",
+          error instanceof CustomerNotificationApiError ? error.status : 0,
+          "CUSTOMER_LOGIN_ME_FAILED",
+        )
+        : error;
       if (guard) {
-        if (!customerSessionMatchesGuard(guard)) throw error;
+        if (!customerSessionMatchesGuard(guard)) throw surfacedError;
         await clearGuardedCustomerSession(guard);
       } else if (hasCustomerSession()) {
-        throw error;
+        throw surfacedError;
       }
       ++sequence.current;
       clearPrivateState();
       setPhase("guest");
-      throw error;
+      throw surfacedError;
     } finally {
       setBusy(false);
     }

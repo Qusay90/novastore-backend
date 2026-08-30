@@ -228,8 +228,8 @@ public class NativeShellInstrumentedTest {
             "novastore://customer?cal=CAL-01&tab=account&view=login"
         ));
         cold.setClassName(
-            "com.novastore.app.v413preview",
-            "com.novastore.app.MainActivity"
+            InstrumentationRegistry.getInstrumentation().getTargetContext().getPackageName(),
+            MainActivity.class.getName()
         );
         cold.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 

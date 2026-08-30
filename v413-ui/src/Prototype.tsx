@@ -64,6 +64,7 @@ import { hasAppOwnedBackEntry, nativeHistoryDepth } from "./native/nativeNavigat
 import { canonicalNativeRoute, canonicalNativeRouteOrSafeDefault } from "./native/routeContract";
 import { useCustomerAccountRuntime, type CustomerAddressInput, type CustomerOrder } from "./account";
 import {
+  CustomerNotificationApiError,
   normalizeCustomerNotificationTarget,
   resolveCustomerNotificationDestination,
   useCustomerNotificationRuntime,
@@ -1113,6 +1114,41 @@ function BrandLockup() {
   return <div className="brand-lockup"><img src={LOGO} alt="NovaStore resmi logosu" /><strong>NovaStore</strong></div>;
 }
 
+function loginFailureCopy(error: unknown) {
+  if (!(error instanceof CustomerNotificationApiError)) {
+    return "Giriş yapılamadı. Bilgilerini kontrol edip tekrar dene.";
+  }
+  if (error.code === "CUSTOMER_LOGIN_SESSION_PERSIST_FAILED" || error.code === "CUSTOMER_LOGIN_ME_FAILED") {
+    return "Giriş doğrulandı ancak hesap oturumu güvenle başlatılamadı. Tekrar dene.";
+  }
+  if (error.code === "CUSTOMER_NOTIFICATION_NETWORK_ERROR") {
+    return "NovaStore sunucusuna bağlanılamadı. Bağlantını kontrol edip tekrar dene.";
+  }
+  if ([400, 401, 403].includes(error.status)) {
+    return "E-posta veya şifre hatalı.";
+  }
+  if (error.status === 429 || error.status >= 500) {
+    return "Sunucu geçici olarak yanıt veremiyor. Biraz sonra tekrar dene.";
+  }
+  return "Giriş yapılamadı. Bilgilerini kontrol edip tekrar dene.";
+}
+
+function LegalStatusScreen({ onClose, view }: { onClose: () => void; view: "privacy" | "terms" }) {
+  const privacy = view === "privacy";
+  const title = privacy ? "Gizlilik Politikası" : "Kullanım Koşulları";
+  return (
+    <div className="legal-status-overlay" role="dialog" aria-modal="true" aria-labelledby={`login-${view}-title`}>
+      <section className="legal-status-page" data-testid={`login-${view}-status`}>
+        <LockClosedIcon aria-hidden="true" />
+        <h1 id={`login-${view}-title`}>{title}</h1>
+        <p>Bu belgenin sahibi tarafından onaylanmış içeriği henüz uygulamada yayımlanmadı.</p>
+        <p className="legal-publication-status" role="status">Mevcut durum: içerik sahibi onayı bekleniyor.</p>
+        <button className="primary navy" type="button" onClick={onClose}>Giriş ekranına dön</button>
+      </section>
+    </div>
+  );
+}
+
 function LoginScreen({ go, view }: { go: Go; view: ViewId }) {
   const notificationRuntime = useCustomerNotificationRuntime();
   const accountRuntime = useCustomerAccountRuntime();
@@ -1122,6 +1158,7 @@ function LoginScreen({ go, view }: { go: Go; view: ViewId }) {
   const [termsAccepted, setTermsAccepted] = useState(true);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [legalStatus, setLegalStatus] = useState<"privacy" | "terms" | null>(null);
   const authView = view === "forgot" || view === "register" ? view : "login";
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1158,8 +1195,8 @@ function LoginScreen({ go, view }: { go: Go; view: ViewId }) {
         ? "Kayıt tamamlanamadı. Bilgilerini kontrol edip tekrar dene."
         : authView === "forgot"
           ? "Şifre sıfırlama isteği gönderilemedi. Bağlantını kontrol edip tekrar dene."
-          : "Giriş yapılamadı. Bilgilerini ve bağlantını kontrol edip tekrar dene.";
-      setAuthError(error instanceof Error && error.message && !error.message.includes("CUSTOMER_") ? error.message : fallback);
+          : loginFailureCopy(error);
+      setAuthError(fallback);
     } finally {
       setAuthBusy(false);
     }
@@ -1169,7 +1206,7 @@ function LoginScreen({ go, view }: { go: Go; view: ViewId }) {
       <section className="login-intro"><BrandLockup /><h2>{authView === "forgot" ? "Hesabına yeniden eriş." : authView === "register" ? "NovaStore’a katıl." : "NovaStore hesabına giriş yap."}</h2></section>
       <section className="auth-card">
         {authView === "register" && <label>Ad Soyad<KeyboardInput name="name" placeholder="Adını ve soyadını yaz" required /></label>}
-        <label>E-posta veya telefon numarası<KeyboardInput name="identifier" placeholder="ornek@eposta.com veya +90 5..." required /></label>
+        <label>E-posta<KeyboardInput name="identifier" inputMode="email" autoComplete="email" placeholder="ornek@eposta.com" required /></label>
         {authView !== "forgot" && <label>Şifre<span className="password-field"><KeyboardInput name="password" type={passwordVisible ? "text" : "password"} placeholder="Şifreni gir" required /><button type="button" className="password-toggle" aria-label={passwordVisible ? "Şifreyi gizle" : "Şifreyi göster"} aria-pressed={passwordVisible} onClick={() => setPasswordVisible(!passwordVisible)}><EyeOpenIcon /></button></span></label>}
         {authView === "login" && <div className="auth-options">
           <button type="button" className={`check-control${remember ? " checked" : ""}`} onClick={() => setRemember(!remember)} aria-pressed={remember}><span>{remember && <CheckIcon />}</span>Beni hatırla</button>
@@ -1181,7 +1218,12 @@ function LoginScreen({ go, view }: { go: Go; view: ViewId }) {
       {authError && <p role="alert" className="auth-status auth-error">{authError}</p>}
       {submitted && authView === "forgot" && <p role="status" className="auth-status">Hesap bulunuyorsa sıfırlama bağlantısı güvenli kanaldan iletilecek.</p>}
       <p className="center-copy">{authView === "register" ? <>Zaten hesabın var mı? <button type="button" onClick={() => go("CAL-01", "account", "login")}>Giriş Yap</button></> : <>Hesabın yok mu? <button type="button" onClick={() => go("CAL-01", "account", "register")}>Kayıt Ol</button></>}</p>
-      <footer className="legal-links">Gizlilik Politikası <b>•</b> Kullanım Koşulları</footer>
+      <footer className="legal-links" aria-label="Yasal bilgiler">
+        <button type="button" onClick={() => setLegalStatus("privacy")}>Gizlilik Politikası</button>
+        <b aria-hidden="true">•</b>
+        <button type="button" onClick={() => setLegalStatus("terms")}>Kullanım Koşulları</button>
+      </footer>
+      {legalStatus && <LegalStatusScreen view={legalStatus} onClose={() => setLegalStatus(null)} />}
     </form>
   );
 }

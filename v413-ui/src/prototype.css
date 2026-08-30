@@ -147,7 +147,7 @@ button { color: inherit; }
 .secondary { border: 1px solid var(--nova-orange); color: var(--nova-orange-text); background: #fff; }
 
 /* CAL-01 */
-.login-layout { min-height: 834px; display: flex; flex-direction: column; }
+.login-layout { min-height: 834px; padding-bottom: var(--shell-safe-bottom); display: flex; flex-direction: column; }
 .login-intro { text-align: center; }
 .brand-lockup { display: inline-flex; flex-direction: column; align-items: center; font-size: 22px; }
 .brand-lockup img { width: 94px; height: 94px; object-fit: contain; }
@@ -168,7 +168,16 @@ button { color: inherit; }
 .center-copy { text-align: center; margin-top: 17px; }
 .center-copy button { border: 0; padding: 0 3px; color: var(--nova-deep); background: transparent; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .auth-status { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; color: var(--nova-success); background: rgba(21,148,71,.08); text-align: center; font-size: 11px; }
-.legal-links { margin-top: auto; padding: 24px 0 8px; text-align: center; color: var(--nova-deep); font-size: 12px; word-spacing: 8px; }
+.legal-links { margin-top: auto; padding: 24px 0 8px; display: flex; align-items: center; justify-content: center; gap: 2px; text-align: center; color: var(--nova-deep); font-size: 12px; }
+.legal-links button { min-height: 48px; padding: 0 8px; border: 0; border-radius: 10px; color: inherit; background: transparent; text-decoration: underline; text-underline-offset: 3px; }
+.legal-links b { line-height: 48px; }
+.legal-status-overlay { position: absolute; z-index: 40; inset: 0; padding: 20px 18px calc(20px + var(--shell-safe-bottom)); display: grid; overflow: auto; background: rgba(248,248,249,.98); }
+.legal-status-page { min-height: 100%; padding: 48px 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.legal-status-page > svg { width: 52px; height: 52px; padding: 12px; border-radius: 50%; color: #fff; background: var(--nova-deep); }
+.legal-status-page h1 { margin: 22px 0 10px; font-size: 22px; }
+.legal-status-page p { max-width: 320px; margin: 0 0 12px; color: var(--nova-muted); line-height: 1.55; }
+.legal-status-page .legal-publication-status { color: var(--nova-deep); font-weight: 600; }
+.legal-status-page .primary { width: min(100%, 320px); margin-top: 16px; }
 
 /* CAL-02 */
 .home-hero { position: relative; height: 218px; overflow: hidden; border-radius: 12px; }

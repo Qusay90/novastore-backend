@@ -18,21 +18,34 @@ public final class NovaPublicStorePluginTest {
     }
 
     @Test
-    public void debugAndReleaseOriginsAreExactAndDoNotOverlap() {
+    public void debugUatAndReleaseOriginsAreExactAndDoNotOverlap() {
         URI debug = URI.create("http://10.0.2.2:5000/");
+        URI uat = URI.create("http://127.0.0.1:5000/");
         URI release = URI.create("https://novastore.tr/");
-        assertTrue(NovaPublicStorePlugin.isApprovedApiBase(debug, true));
-        assertFalse(NovaPublicStorePlugin.isApprovedApiBase(debug, false));
-        assertTrue(NovaPublicStorePlugin.isApprovedApiBase(release, false));
-        assertFalse(NovaPublicStorePlugin.isApprovedApiBase(release, true));
+        assertTrue(NovaPublicStorePlugin.isApprovedApiBase(debug, true, false));
+        assertFalse(NovaPublicStorePlugin.isApprovedApiBase(debug, false, false));
+        assertFalse(NovaPublicStorePlugin.isApprovedApiBase(debug, false, true));
+        assertTrue(NovaPublicStorePlugin.isApprovedApiBase(uat, false, true));
+        assertTrue(NovaPublicStorePlugin.isApprovedApiBase(uat, true, true));
+        assertFalse(NovaPublicStorePlugin.isApprovedApiBase(uat, true, false));
+        assertFalse(NovaPublicStorePlugin.isApprovedApiBase(uat, false, false));
+        assertTrue(NovaPublicStorePlugin.isApprovedApiBase(release, false, false));
+        assertFalse(NovaPublicStorePlugin.isApprovedApiBase(release, true, false));
+        assertFalse(NovaPublicStorePlugin.isApprovedApiBase(release, false, true));
+        assertFalse(NovaPublicStorePlugin.isApprovedApiBase(release, true, true));
         assertEquals("http://10.0.2.2:5000", NovaPublicStorePlugin.apiOrigin(debug));
+        assertEquals("http://127.0.0.1:5000", NovaPublicStorePlugin.apiOrigin(uat));
         assertEquals("https://novastore.tr", NovaPublicStorePlugin.apiOrigin(release));
     }
 
     @Test
     public void originConfusionAndPathInjectionAreRejected() {
         for (String invalid : new String[] {
-            "http://127.0.0.1:5000/",
+            "http://127.0.0.1:5001/",
+            "http://localhost:5000/",
+            "http://127.0.0.2:5000/",
+            "http://127.0.0.1:5000/api/private/",
+            "http://127.0.0.1:5000/?token=secret",
             "http://10.0.2.2:5001/",
             "http://10.0.2.2:5000/api/private/",
             "http://10.0.2.2:5000/?token=secret",
@@ -41,8 +54,9 @@ public final class NovaPublicStorePluginTest {
             "https://user@novastore.tr/"
         }) {
             URI candidate = URI.create(invalid);
-            assertFalse(invalid, NovaPublicStorePlugin.isApprovedApiBase(candidate, true));
-            assertFalse(invalid, NovaPublicStorePlugin.isApprovedApiBase(candidate, false));
+            assertFalse(invalid, NovaPublicStorePlugin.isApprovedApiBase(candidate, true, false));
+            assertFalse(invalid, NovaPublicStorePlugin.isApprovedApiBase(candidate, false, true));
+            assertFalse(invalid, NovaPublicStorePlugin.isApprovedApiBase(candidate, false, false));
         }
     }
 }

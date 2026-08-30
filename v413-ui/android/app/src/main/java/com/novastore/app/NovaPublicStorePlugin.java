@@ -72,16 +72,17 @@ public final class NovaPublicStorePlugin extends Plugin {
 
     private URI validatedApiBase() {
         URI base = URI.create(BuildConfig.NOVASTORE_API_BASE_URL);
-        if (!isApprovedApiBase(base, BuildConfig.DEBUG)) {
+        if (!isApprovedApiBase(base, BuildConfig.DEBUG, BuildConfig.NOVASTORE_LOCAL_UAT)) {
             throw new IllegalArgumentException("PUBLIC_STORE_API_ORIGIN_INVALID");
         }
         return base;
     }
 
-    static boolean isApprovedApiBase(URI base, boolean debug) {
+    static boolean isApprovedApiBase(URI base, boolean debug, boolean localUat) {
         String scheme = base.getScheme();
         String host = base.getHost();
         boolean approvedDebug = debug
+            && !localUat
             && "http".equals(scheme)
             && "10.0.2.2".equals(host)
             && base.getPort() == 5000
@@ -89,7 +90,16 @@ public final class NovaPublicStorePlugin extends Plugin {
             && base.getRawUserInfo() == null
             && base.getRawQuery() == null
             && base.getRawFragment() == null;
+        boolean approvedLocalUat = localUat
+            && "http".equals(scheme)
+            && "127.0.0.1".equals(host)
+            && base.getPort() == 5000
+            && "/".equals(base.getPath())
+            && base.getRawUserInfo() == null
+            && base.getRawQuery() == null
+            && base.getRawFragment() == null;
         boolean approvedRelease = !debug
+            && !localUat
             && "https".equals(scheme)
             && "novastore.tr".equals(host)
             && base.getPort() == -1
@@ -97,7 +107,7 @@ public final class NovaPublicStorePlugin extends Plugin {
             && base.getRawUserInfo() == null
             && base.getRawQuery() == null
             && base.getRawFragment() == null;
-        return approvedDebug || approvedRelease;
+        return approvedDebug || approvedLocalUat || approvedRelease;
     }
 
     static String canonicalSlug(String value) {

@@ -528,7 +528,16 @@ export async function loginCustomer(email: string, password: string) {
     throw new CustomerNotificationApiError("Müşteri giriş yanıtı doğrulanamadı.", 0, "CUSTOMER_LOGIN_RESPONSE_INVALID");
   }
   clearCustomerVerification();
-  await replaceCustomerSession(expectedGeneration, session);
+  try {
+    await replaceCustomerSession(expectedGeneration, session);
+  } catch {
+    clearCustomerVerification();
+    throw new CustomerNotificationApiError(
+      "Giriş doğrulandı ancak güvenli oturum bu cihazda saklanamadı.",
+      0,
+      "CUSTOMER_LOGIN_SESSION_PERSIST_FAILED",
+    );
+  }
   return user;
 }
 
