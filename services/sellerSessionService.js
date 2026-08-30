@@ -43,6 +43,9 @@ const requirePool = (database) => {
 
 const sessionFailure = (row) => {
     if (!row || row.session_status !== 'active') return new SellerSessionError('SELLER_SESSION_REVOKED');
+    if (Object.prototype.hasOwnProperty.call(row, 'auth_enabled') && row.auth_enabled !== true) {
+        return new SellerSessionError('SELLER_SESSION_REVOKED');
+    }
     if (new Date(row.session_expires_at).getTime() <= Date.now()) return new SellerSessionError('SESSION_EXPIRED');
     if (row.membership_status !== 'active') return new SellerSessionError('NO_ACTIVE_MEMBERSHIP', 403);
     if (row.organization_status !== 'active') return new SellerSessionError('ACCOUNT_SUSPENDED', 403);
@@ -68,7 +71,7 @@ const loadLiveSellerSession = async (queryable, principal) => {
     const sessionId = nonEmptyString(principal?.sessionId, 'SELLER_AUDIENCE_REQUIRED');
     const userId = positiveInteger(principal?.userId, 'SELLER_AUDIENCE_REQUIRED');
     const result = await target.query(
-        "SELECT session.id AS session_id, session.user_id, session.organization_id, session.membership_id, session.status AS session_status, session.expires_at AS session_expires_at, session.membership_revision AS session_membership_revision, session.security_stamp AS session_security_stamp, membership.role_id, membership.status AS membership_status, membership.membership_revision, membership.security_stamp, organization.status AS organization_status FROM seller_sessions session JOIN seller_memberships membership ON membership.organization_id = session.organization_id AND membership.id = session.membership_id AND membership.user_id = session.user_id JOIN seller_organizations organization ON organization.id = session.organization_id WHERE session.id = $1 AND session.user_id = $2 AND session.audience = 'seller'",
+        "SELECT session.id AS session_id, session.user_id, session.organization_id, session.membership_id, session.status AS session_status, session.expires_at AS session_expires_at, session.membership_revision AS session_membership_revision, session.security_stamp AS session_security_stamp, membership.role_id, membership.status AS membership_status, membership.membership_revision, membership.security_stamp, organization.status AS organization_status, user_row.auth_enabled FROM seller_sessions session JOIN seller_memberships membership ON membership.organization_id = session.organization_id AND membership.id = session.membership_id AND membership.user_id = session.user_id JOIN seller_organizations organization ON organization.id = session.organization_id JOIN users user_row ON user_row.id = session.user_id AND user_row.auth_enabled = TRUE WHERE session.id = $1 AND session.user_id = $2 AND session.audience = 'seller'",
         [sessionId, userId]
     );
     const row = result.rows?.[0];

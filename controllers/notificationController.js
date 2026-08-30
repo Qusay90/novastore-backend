@@ -31,6 +31,10 @@ const {
     revokeAndroidPushEndpointsForSession,
     sellerAndroidBinding
 } = require('../services/androidPushEndpointService');
+const {
+    SellerNotificationAuthorizationError,
+    resolveSellerNotificationTarget
+} = require('../services/sellerNotificationAuthorizationService');
 
 const redactKnownSecretText = (value = '') => {
     let text = String(value || '');
@@ -114,10 +118,11 @@ const currentScope = (req) => Object.freeze({
 });
 
 const currentSellerScope = (req) => Object.freeze({
+    sessionId: String(req.sellerContext.sessionId),
     userId: Number(req.sellerContext.userId),
     role: 'seller',
     organizationId: Number(req.sellerContext.organizationId),
-    storeIds: req.sellerContext.storeIds || Object.freeze([])
+    membershipId: Number(req.sellerContext.membershipId)
 });
 
 const sendKnownError = (res, error) => {
@@ -126,6 +131,7 @@ const sendKnownError = (res, error) => {
         || error instanceof WebPushSubscriptionError
         || error instanceof AndroidPushEndpointError
         || error instanceof NotificationTargetError
+        || error instanceof SellerNotificationAuthorizationError
     ) {
         return res.status(error.statusCode || 400).json({ code: error.code, error: error.message });
     }
@@ -167,6 +173,18 @@ const makeMarkAllHandler = (scopeFactory) => async (req, res) => {
     try {
         const updatedCount = await markAllNotificationsRead(pool, scopeFactory(req));
         return res.status(200).json({ updatedCount });
+    } catch (error) {
+        return sendKnownError(res, error);
+    }
+};
+
+const getSellerNotificationTarget = async (req, res) => {
+    try {
+        const target = await resolveSellerNotificationTarget(pool, {
+            notificationId: req.params.id,
+            context: req.sellerContext
+        });
+        return res.status(200).json(target);
     } catch (error) {
         return sendKnownError(res, error);
     }
@@ -307,6 +325,7 @@ module.exports = {
     getCurrentNotifications,
     getCurrentUnreadCount,
     getSellerNotifications,
+    getSellerNotificationTarget,
     getSellerUnreadCount,
     getSellerWebPushConfig,
     getSellerWebPushState,

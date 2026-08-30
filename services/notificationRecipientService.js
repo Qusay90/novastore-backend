@@ -1,6 +1,7 @@
 'use strict';
 
 const { getNotificationEventPolicy } = require('./notificationEventCatalog');
+const { getSellerNotificationEventAuthority } = require('./sellerNotificationAuthorizationService');
 
 class NotificationRecipientError extends Error {
     constructor(message, code = 'NOTIFICATION_RECIPIENT_RESOLUTION_FAILED') {
@@ -64,9 +65,30 @@ const sellerScopeSql = Object.freeze({
                         membership.organization_id,
                         seller_order.store_id
           FROM seller_orders seller_order
+          JOIN seller_stores seller_store
+            ON seller_store.organization_id = seller_order.organization_id
+           AND seller_store.id = seller_order.store_id
+           AND seller_store.status = 'active'
+           AND seller_store.closed_at IS NULL
           JOIN seller_memberships membership
             ON membership.organization_id = seller_order.organization_id
            AND membership.status = 'active'
+          JOIN seller_organizations organization
+            ON organization.id = membership.organization_id
+           AND organization.status = 'active'
+          JOIN seller_roles role_row
+            ON role_row.id = membership.role_id
+           AND role_row.is_active = TRUE
+           AND (role_row.organization_id IS NULL OR role_row.organization_id = membership.organization_id)
+          JOIN seller_role_permissions role_permission
+            ON role_permission.role_id = role_row.id
+           AND role_permission.permission_code = $2
+          JOIN seller_permissions permission
+            ON permission.code = role_permission.permission_code
+           AND permission.is_active = TRUE
+          JOIN users user_row
+            ON user_row.id = membership.user_id
+           AND user_row.auth_enabled = TRUE
           JOIN seller_membership_store_scopes scope
             ON scope.organization_id = membership.organization_id
            AND scope.membership_id = membership.id
@@ -81,9 +103,30 @@ const sellerScopeSql = Object.freeze({
                         seller_order.store_id
           FROM returns return_row
           JOIN seller_orders seller_order ON seller_order.canonical_order_id = return_row.order_id
+          JOIN seller_stores seller_store
+            ON seller_store.organization_id = seller_order.organization_id
+           AND seller_store.id = seller_order.store_id
+           AND seller_store.status = 'active'
+           AND seller_store.closed_at IS NULL
           JOIN seller_memberships membership
             ON membership.organization_id = seller_order.organization_id
            AND membership.status = 'active'
+          JOIN seller_organizations organization
+            ON organization.id = membership.organization_id
+           AND organization.status = 'active'
+          JOIN seller_roles role_row
+            ON role_row.id = membership.role_id
+           AND role_row.is_active = TRUE
+           AND (role_row.organization_id IS NULL OR role_row.organization_id = membership.organization_id)
+          JOIN seller_role_permissions role_permission
+            ON role_permission.role_id = role_row.id
+           AND role_permission.permission_code = $2
+          JOIN seller_permissions permission
+            ON permission.code = role_permission.permission_code
+           AND permission.is_active = TRUE
+          JOIN users user_row
+            ON user_row.id = membership.user_id
+           AND user_row.auth_enabled = TRUE
           JOIN seller_membership_store_scopes scope
             ON scope.organization_id = membership.organization_id
            AND scope.membership_id = membership.id
@@ -97,7 +140,7 @@ const sellerScopeSql = Object.freeze({
                         membership.organization_id,
                         seller_store.id AS store_id
           FROM product_questions question
-          JOIN products product ON product.id = question.product_id
+          JOIN products product ON product.id = question.product_id AND product.deleted_at IS NULL
           JOIN seller_stores seller_store
             ON seller_store.legacy_store_id = product.store_id
            AND seller_store.status = 'active'
@@ -105,6 +148,22 @@ const sellerScopeSql = Object.freeze({
           JOIN seller_memberships membership
             ON membership.organization_id = seller_store.organization_id
            AND membership.status = 'active'
+          JOIN seller_organizations organization
+            ON organization.id = membership.organization_id
+           AND organization.status = 'active'
+          JOIN seller_roles role_row
+            ON role_row.id = membership.role_id
+           AND role_row.is_active = TRUE
+           AND (role_row.organization_id IS NULL OR role_row.organization_id = membership.organization_id)
+          JOIN seller_role_permissions role_permission
+            ON role_permission.role_id = role_row.id
+           AND role_permission.permission_code = $2
+          JOIN seller_permissions permission
+            ON permission.code = role_permission.permission_code
+           AND permission.is_active = TRUE
+          JOIN users user_row
+            ON user_row.id = membership.user_id
+           AND user_row.auth_enabled = TRUE
           JOIN seller_membership_store_scopes scope
             ON scope.organization_id = membership.organization_id
            AND scope.membership_id = membership.id
@@ -118,7 +177,7 @@ const sellerScopeSql = Object.freeze({
                         membership.organization_id,
                         seller_store.id AS store_id
           FROM reviews review_row
-          JOIN products product ON product.id = review_row.product_id
+          JOIN products product ON product.id = review_row.product_id AND product.deleted_at IS NULL
           JOIN seller_stores seller_store
             ON seller_store.legacy_store_id = product.store_id
            AND seller_store.status = 'active'
@@ -126,6 +185,22 @@ const sellerScopeSql = Object.freeze({
           JOIN seller_memberships membership
             ON membership.organization_id = seller_store.organization_id
            AND membership.status = 'active'
+          JOIN seller_organizations organization
+            ON organization.id = membership.organization_id
+           AND organization.status = 'active'
+          JOIN seller_roles role_row
+            ON role_row.id = membership.role_id
+           AND role_row.is_active = TRUE
+           AND (role_row.organization_id IS NULL OR role_row.organization_id = membership.organization_id)
+          JOIN seller_role_permissions role_permission
+            ON role_permission.role_id = role_row.id
+           AND role_permission.permission_code = $2
+          JOIN seller_permissions permission
+            ON permission.code = role_permission.permission_code
+           AND permission.is_active = TRUE
+          JOIN users user_row
+            ON user_row.id = membership.user_id
+           AND user_row.auth_enabled = TRUE
           JOIN seller_membership_store_scopes scope
             ON scope.organization_id = membership.organization_id
            AND scope.membership_id = membership.id
@@ -136,31 +211,48 @@ const sellerScopeSql = Object.freeze({
          ORDER BY membership.organization_id, seller_store.id, membership.user_id`
 });
 
-const loadSellerApplicationRecipient = async (queryable, event) => {
+const loadSellerApplicationRecipient = async (queryable, event, permissionCode) => {
     const applicationKey = String(event.aggregateId || '').trim().toLowerCase();
     const result = await queryable.query(
         `SELECT DISTINCT membership.user_id,
                          membership.organization_id,
                          NULL::BIGINT AS store_id
            FROM seller_applications application
-           JOIN users user_row ON LOWER(user_row.email) = LOWER(application.applicant_email)
+           JOIN users user_row
+             ON user_row.id = application.applicant_user_id
+             AND user_row.auth_enabled = TRUE
            JOIN seller_memberships membership
              ON membership.user_id = user_row.id
             AND membership.status = 'active'
+           JOIN seller_organizations organization
+             ON organization.id = membership.organization_id
+            AND organization.status = 'active'
+           JOIN seller_roles role_row
+             ON role_row.id = membership.role_id
+            AND role_row.is_active = TRUE
+            AND (role_row.organization_id IS NULL OR role_row.organization_id = membership.organization_id)
+           JOIN seller_role_permissions role_permission
+             ON role_permission.role_id = role_row.id
+            AND role_permission.permission_code = $2
+           JOIN seller_permissions permission
+             ON permission.code = role_permission.permission_code
+            AND permission.is_active = TRUE
           WHERE application.id = $1::UUID
           ORDER BY membership.organization_id, membership.user_id`,
-        [applicationKey]
+        [applicationKey, permissionCode]
     );
     return result.rows.map((row) => rowToRecipient(row, 'seller'));
 };
 
 const loadSellerRecipients = async (queryable, event) => {
+    const eventAuthority = getSellerNotificationEventAuthority(event.eventType);
+    if (!eventAuthority || eventAuthority.targetType !== event.aggregateType) return [];
     if (event.aggregateType === 'seller_application') {
-        return loadSellerApplicationRecipient(queryable, event);
+        return loadSellerApplicationRecipient(queryable, event, eventAuthority.permission);
     }
     const sql = sellerScopeSql[event.aggregateType];
     if (!sql) return [];
-    const result = await queryable.query(sql, [positiveId(event.aggregateId)]);
+    const result = await queryable.query(sql, [positiveId(event.aggregateId), eventAuthority.permission]);
     return result.rows.map((row) => rowToRecipient(row, 'seller'));
 };
 

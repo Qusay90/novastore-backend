@@ -2,6 +2,7 @@
 
 const express = require('express');
 const controller = require('../controllers/notificationController');
+const { privateNoStore } = require('../middlewares/privateNoStore');
 
 const createSellerNotificationRouter = ({ enabled, auth, tenant } = {}) => {
     const router = express.Router();
@@ -10,6 +11,7 @@ const createSellerNotificationRouter = ({ enabled, auth, tenant } = {}) => {
         throw new TypeError('Seller bildirim rotaları için kimlik ve tenant koruması gerekir.');
     }
     const guarded = [
+        privateNoStore,
         auth.sellerAudienceAuthenticate,
         auth.requireLiveSellerSession,
         tenant.resolveServerTenantContext
@@ -17,6 +19,7 @@ const createSellerNotificationRouter = ({ enabled, auth, tenant } = {}) => {
 
     router.get('/notifications', ...guarded, controller.getSellerNotifications);
     router.get('/notifications/unread-count', ...guarded, controller.getSellerUnreadCount);
+    router.get('/notifications/:id/target', ...guarded, controller.getSellerNotificationTarget);
     router.patch('/notifications/read-all', ...guarded, controller.markAllSellerNotificationsRead);
     router.patch('/notifications/:id/read', ...guarded, controller.markSellerNotificationRead);
     router.get('/notifications/web-push/config', ...guarded, controller.getSellerWebPushConfig);

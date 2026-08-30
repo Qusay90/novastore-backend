@@ -736,6 +736,49 @@ const revokeAllSessions = async ({ userId, principal, queryable = pool }) => {
 const cleanupExpiredSessions = async ({ queryable = pool, limit = 500 } = {}) => {
     const boundedLimit = Math.max(1, Math.min(Number(limit) || 500, 5000));
     try {
+        const relationResult = await queryable.query(
+            `SELECT (
+                    to_regclass('public.notification_deliveries') IS NOT NULL
+                    AND to_regclass('public.web_push_subscriptions') IS NOT NULL
+                ) AS web_delivery_guard_available,
+                (
+                    to_regclass('public.notification_deliveries') IS NOT NULL
+                    AND to_regclass('public.android_push_endpoints') IS NOT NULL
+                ) AS android_delivery_guard_available`
+        );
+        const relations = relationResult.rows[0] || {};
+        const deliveryGuards = [
+            relations.web_delivery_guard_available === true
+                ? `AND NOT EXISTS (
+                       SELECT 1
+                       FROM web_push_subscriptions subscription
+                       JOIN notification_deliveries delivery
+                         ON delivery.web_push_subscription_id = subscription.id
+                       WHERE subscription.auth_session_id = candidate.id
+                         AND NOT EXISTS (
+                             SELECT 1
+                             FROM notification_deliveries lockable_delivery
+                             WHERE lockable_delivery.id = delivery.id
+                             FOR UPDATE OF lockable_delivery SKIP LOCKED
+                         )
+                   )`
+                : '',
+            relations.android_delivery_guard_available === true
+                ? `AND NOT EXISTS (
+                       SELECT 1
+                       FROM android_push_endpoints endpoint
+                       JOIN notification_deliveries delivery
+                         ON delivery.android_push_endpoint_id = endpoint.id
+                       WHERE endpoint.auth_session_id = candidate.id
+                         AND NOT EXISTS (
+                             SELECT 1
+                             FROM notification_deliveries lockable_delivery
+                             WHERE lockable_delivery.id = delivery.id
+                             FOR UPDATE OF lockable_delivery SKIP LOCKED
+                         )
+                   )`
+                : ''
+        ].filter(Boolean).join('\n                   ');
         const result = await queryable.query(
             `DELETE FROM auth_sessions session
              WHERE session.id IN (
@@ -749,8 +792,10 @@ const cleanupExpiredSessions = async ({ queryable = pool, limit = 500 } = {}) =>
                          AND refresh_token.status = 'active'
                          AND refresh_token.expires_at > CURRENT_TIMESTAMP
                    )
+                   ${deliveryGuards}
                  ORDER BY candidate.expires_at, candidate.id
                  LIMIT $1
+                 FOR UPDATE OF candidate SKIP LOCKED
              )
              RETURNING id`,
             [boundedLimit]

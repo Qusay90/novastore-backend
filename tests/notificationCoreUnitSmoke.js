@@ -50,6 +50,7 @@ const {
 const {
     buildWebPushPayload,
     classifyProviderError,
+    createWebPushProvider,
     publicWebPushConfiguration,
     resolveWebPushConfiguration
 } = require('../services/webPushProviderService');
@@ -280,9 +281,14 @@ const runWebClientContract = async () => {
     const completeConfig = resolveWebPushConfiguration({
         VAPID_PUBLIC_KEY: 'public-test-key',
         VAPID_PRIVATE_KEY: 'private-test-key',
-        WEB_PUSH_SUBJECT: 'mailto:notifications@example.test'
+        WEB_PUSH_SUBJECT: 'mailto:notifications@example.test',
+        WEB_PUSH_REQUEST_TIMEOUT_MS: '2500'
     });
     assert.equal(completeConfig.configured, true);
+    assert.equal(completeConfig.timeoutMs, 2500);
+    assert.equal(resolveWebPushConfiguration({ WEB_PUSH_REQUEST_TIMEOUT_MS: '500' }).timeoutMs, 1000);
+    assert.equal(resolveWebPushConfiguration({ WEB_PUSH_REQUEST_TIMEOUT_MS: '20000' }).timeoutMs, 15000);
+    assert.equal(resolveWebPushConfiguration({ WEB_PUSH_REQUEST_TIMEOUT_MS: 'invalid' }).timeoutMs, 5000);
     const publicConfig = publicWebPushConfiguration({
         VAPID_PUBLIC_KEY: 'public-test-key',
         VAPID_PRIVATE_KEY: 'private-test-key',
@@ -307,6 +313,45 @@ const runWebClientContract = async () => {
     assert.equal(payload.recipientRole, 'admin');
     assert.deepEqual(payload.target, { entityType: 'order', entityId: 77 });
     assert.equal(Object.hasOwn(payload, 'url'), false);
+
+    let providerOptions = null;
+    const provider = createWebPushProvider({
+        env: {
+            VAPID_PUBLIC_KEY: 'public-test-key',
+            VAPID_PRIVATE_KEY: 'private-test-key',
+            WEB_PUSH_SUBJECT: 'mailto:notifications@example.test',
+            WEB_PUSH_REQUEST_TIMEOUT_MS: '2500'
+        },
+        webPushModule: {
+            setVapidDetails: () => {},
+            sendNotification: async (_subscription, _payload, options) => {
+                providerOptions = options;
+                return { statusCode: 201 };
+            }
+        },
+        assertOutboundAllowed: () => {}
+    });
+    await provider.send({
+        subscription: {
+            endpoint: 'https://updates.push.services.mozilla.com/wpush/v2/unit-test',
+            p256dh: 'A'.repeat(43),
+            auth_secret: 'B'.repeat(22),
+            expiration_time: null
+        },
+        notification: {
+            id: 9,
+            recipient_role: 'seller',
+            type: 'ORDER_CONFIRMED',
+            category: 'ORDER',
+            priority: 'HIGH',
+            title: 'Sipariş onaylandı',
+            message: 'Sipariş işlemi tamamlandı.',
+            entity_type: 'order',
+            entity_id: 77,
+            entity_key: null
+        }
+    });
+    assert.equal(providerOptions.timeout, 2500, 'provider request must have a finite bounded socket timeout');
     assert.equal(classifyProviderError({ statusCode: 410 }).invalidSubscription, true);
     assert.equal(classifyProviderError({ statusCode: 503 }).retryable, true);
     assert.equal(classifyProviderError({ statusCode: 400 }).retryable, false);

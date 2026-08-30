@@ -5,6 +5,10 @@ const {
     AndroidPushProviderError,
     createFcmHttpV1Provider
 } = require('./androidPushProviderService');
+const {
+    SellerNotificationAuthorizationError,
+    authorizeSellerPrivateDelivery
+} = require('./sellerNotificationAuthorizationService');
 
 const MAX_ANDROID_PUSH_ATTEMPTS = 3;
 
@@ -20,7 +24,12 @@ const claimAndroidDelivery = async (client) => {
     const result = await client.query(
         `SELECT delivery.id AS delivery_id,
                 delivery.attempt_count,
+                notification.id AS notification_id,
                 notification.id,
+                notification.user_id AS notification_user_id,
+                notification.recipient_role AS notification_recipient_role,
+                notification.recipient_organization_id AS notification_organization_id,
+                notification.recipient_store_id AS notification_store_id,
                 notification.type,
                 notification.category,
                 notification.priority,
@@ -30,6 +39,12 @@ const claimAndroidDelivery = async (client) => {
                 notification.entity_id,
                 notification.entity_key,
                 endpoint.id AS endpoint_id,
+                endpoint.user_id AS endpoint_user_id,
+                endpoint.recipient_role AS endpoint_recipient_role,
+                endpoint.recipient_organization_id AS endpoint_organization_id,
+                endpoint.auth_session_id AS endpoint_auth_session_id,
+                endpoint.seller_session_id AS endpoint_seller_session_id,
+                endpoint.application AS endpoint_application,
                 endpoint.token,
                 endpoint.status AS endpoint_status,
                 CASE
@@ -54,10 +69,64 @@ const claimAndroidDelivery = async (client) => {
             AND COALESCE(delivery.next_attempt_at, CURRENT_TIMESTAMP) <= CURRENT_TIMESTAMP
           ORDER BY delivery.created_at ASC, delivery.id ASC
           LIMIT 1
-          FOR UPDATE OF delivery, endpoint SKIP LOCKED`
+          FOR UPDATE OF delivery SKIP LOCKED`
     );
     return result.rows[0] || null;
 };
+
+const loadLockedAndroidEndpoint = async (client, endpointId) => {
+    const result = await client.query(
+        `SELECT endpoint.id AS endpoint_id,
+                endpoint.user_id AS endpoint_user_id,
+                endpoint.recipient_role AS endpoint_recipient_role,
+                endpoint.recipient_organization_id AS endpoint_organization_id,
+                endpoint.auth_session_id AS endpoint_auth_session_id,
+                endpoint.seller_session_id AS endpoint_seller_session_id,
+                endpoint.application AS endpoint_application,
+                endpoint.token,
+                endpoint.status AS endpoint_status,
+                CASE
+                    WHEN endpoint.auth_session_id IS NOT NULL THEN
+                        auth_session.revoked_at IS NULL
+                        AND auth_session.expires_at > CURRENT_TIMESTAMP
+                    ELSE NULL
+                END AS auth_session_live,
+                CASE
+                    WHEN endpoint.seller_session_id IS NOT NULL THEN
+                        seller_session.status = 'active'
+                        AND seller_session.expires_at > CURRENT_TIMESTAMP
+                    ELSE NULL
+                END AS seller_session_live
+           FROM android_push_endpoints endpoint
+      LEFT JOIN auth_sessions auth_session ON auth_session.id = endpoint.auth_session_id
+      LEFT JOIN seller_sessions seller_session ON seller_session.id = endpoint.seller_session_id
+          WHERE endpoint.id = $1
+          FOR UPDATE OF endpoint`,
+        [endpointId]
+    );
+    return result.rows[0] || null;
+};
+
+const nullableIdentity = (value) => value == null ? null : String(value).trim().toLowerCase();
+
+const isSameAndroidBinding = (claimed, refreshed) => (
+    String(refreshed?.endpoint_id || '').toLowerCase() === String(claimed.endpoint_id || '').toLowerCase()
+    && Number(refreshed.endpoint_user_id) === Number(claimed.endpoint_user_id)
+    && String(refreshed.endpoint_recipient_role || '').trim().toLowerCase()
+        === String(claimed.endpoint_recipient_role || '').trim().toLowerCase()
+    && nullableIdentity(refreshed.endpoint_organization_id) === nullableIdentity(claimed.endpoint_organization_id)
+    && nullableIdentity(refreshed.endpoint_auth_session_id) === nullableIdentity(claimed.endpoint_auth_session_id)
+    && nullableIdentity(refreshed.endpoint_seller_session_id) === nullableIdentity(claimed.endpoint_seller_session_id)
+    && refreshed.endpoint_application === claimed.endpoint_application
+    && String(refreshed.endpoint_recipient_role || '').trim().toLowerCase()
+        === String(claimed.notification_recipient_role || '').trim().toLowerCase()
+    && (
+        claimed.notification_user_id == null
+            ? String(refreshed.endpoint_recipient_role || '').trim().toLowerCase() === 'admin'
+            : Number(refreshed.endpoint_user_id) === Number(claimed.notification_user_id)
+    )
+    && nullableIdentity(refreshed.endpoint_organization_id) === nullableIdentity(claimed.notification_organization_id)
+);
 
 const isLiveAndroidBinding = (row) => (
     row.endpoint_status === 'ACTIVE'
@@ -89,6 +158,64 @@ const markInactiveEndpoint = async (client, row) => {
     );
 };
 
+const markSellerUnauthorizedDelivery = async (client, row, error, { endpointBindingCurrent = false } = {}) => {
+    if (error.endpointInvalid && endpointBindingCurrent) {
+        await client.query(
+            `UPDATE android_push_endpoints
+                SET status = 'REVOKED',
+                    revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP),
+                    invalid_reason = COALESCE(invalid_reason, 'SELLER_AUTHORITY_NOT_ACTIVE'),
+                    updated_at = CURRENT_TIMESTAMP
+              WHERE id = $1
+                AND user_id = $2
+                AND recipient_role = $3
+                AND recipient_organization_id IS NOT DISTINCT FROM $4
+                AND auth_session_id IS NOT DISTINCT FROM $5
+                AND seller_session_id IS NOT DISTINCT FROM $6::UUID
+                AND application = $7
+                AND status = 'ACTIVE'`,
+            [
+                row.endpoint_id,
+                row.endpoint_user_id,
+                row.endpoint_recipient_role,
+                row.endpoint_organization_id,
+                row.endpoint_auth_session_id,
+                row.endpoint_seller_session_id,
+                row.endpoint_application
+            ]
+        );
+    }
+    const attempt = Number(row.attempt_count) + 1;
+    await insertAttempt(client, row.delivery_id, attempt, 'FAILED', null, 'SELLER_DELIVERY_NOT_AUTHORIZED');
+    await client.query(
+        `UPDATE notification_deliveries
+            SET status = 'FAILED',
+                attempt_count = $2,
+                next_attempt_at = NULL,
+                last_error_code = 'SELLER_DELIVERY_NOT_AUTHORIZED',
+                last_error_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1`,
+        [row.delivery_id, attempt]
+    );
+};
+
+const markChangedBindingDelivery = async (client, row) => {
+    const attempt = Number(row.attempt_count) + 1;
+    await insertAttempt(client, row.delivery_id, attempt, 'FAILED', null, 'DELIVERY_BINDING_CHANGED');
+    await client.query(
+        `UPDATE notification_deliveries
+            SET status = 'FAILED',
+                attempt_count = $2,
+                next_attempt_at = NULL,
+                last_error_code = 'DELIVERY_BINDING_CHANGED',
+                last_error_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1`,
+        [row.delivery_id, attempt]
+    );
+};
+
 const deliverOneAndroidPush = async ({ database = pool, provider = createFcmHttpV1Provider() } = {}) => {
     if (!provider.configured) {
         return Object.freeze({ processed: false, skipped: 'CONFIGURATION_REQUIRED' });
@@ -96,10 +223,56 @@ const deliverOneAndroidPush = async ({ database = pool, provider = createFcmHttp
     const client = await database.connect();
     try {
         await client.query('BEGIN');
-        const row = await claimAndroidDelivery(client);
-        if (!row) {
+        const claimedRow = await claimAndroidDelivery(client);
+        if (!claimedRow) {
             await client.query('COMMIT');
             return Object.freeze({ processed: false });
+        }
+        let row = claimedRow;
+        if (claimedRow.notification_recipient_role === 'seller') {
+            try {
+                // Lock Seller authority before the endpoint. Session-revocation triggers use
+                // the same session -> endpoint order, avoiding an endpoint -> session cycle.
+                await authorizeSellerPrivateDelivery(client, claimedRow, { channel: 'ANDROID_PUSH' });
+                const refreshedEndpoint = await loadLockedAndroidEndpoint(client, claimedRow.endpoint_id);
+                if (!isSameAndroidBinding(claimedRow, refreshedEndpoint)) {
+                    await markChangedBindingDelivery(client, claimedRow);
+                    await client.query('COMMIT');
+                    return Object.freeze({
+                        processed: true,
+                        status: 'FAILED',
+                        deliveryId: Number(claimedRow.delivery_id),
+                        errorCode: 'DELIVERY_BINDING_CHANGED'
+                    });
+                }
+                row = { ...claimedRow, ...refreshedEndpoint };
+            } catch (error) {
+                if (!(error instanceof SellerNotificationAuthorizationError)) throw error;
+                const refreshedEndpoint = await loadLockedAndroidEndpoint(client, claimedRow.endpoint_id);
+                const endpointBindingCurrent = isSameAndroidBinding(claimedRow, refreshedEndpoint);
+                const failureRow = refreshedEndpoint ? { ...claimedRow, ...refreshedEndpoint } : claimedRow;
+                await markSellerUnauthorizedDelivery(client, failureRow, error, { endpointBindingCurrent });
+                await client.query('COMMIT');
+                return Object.freeze({
+                    processed: true,
+                    status: 'FAILED',
+                    deliveryId: Number(claimedRow.delivery_id),
+                    errorCode: 'SELLER_DELIVERY_NOT_AUTHORIZED'
+                });
+            }
+        } else {
+            const refreshedEndpoint = await loadLockedAndroidEndpoint(client, claimedRow.endpoint_id);
+            if (!isSameAndroidBinding(claimedRow, refreshedEndpoint)) {
+                await markChangedBindingDelivery(client, claimedRow);
+                await client.query('COMMIT');
+                return Object.freeze({
+                    processed: true,
+                    status: 'FAILED',
+                    deliveryId: Number(claimedRow.delivery_id),
+                    errorCode: 'DELIVERY_BINDING_CHANGED'
+                });
+            }
+            row = { ...claimedRow, ...refreshedEndpoint };
         }
         if (!isLiveAndroidBinding(row)) {
             await markInactiveEndpoint(client, row);
@@ -109,6 +282,23 @@ const deliverOneAndroidPush = async ({ database = pool, provider = createFcmHttp
                 status: 'INVALID_SUBSCRIPTION',
                 deliveryId: Number(row.delivery_id)
             });
+        }
+        if (row.notification_recipient_role === 'seller') {
+            try {
+                // Revalidate the refreshed endpoint and target while holding both the
+                // original Seller authority locks and the endpoint row lock.
+                await authorizeSellerPrivateDelivery(client, row, { channel: 'ANDROID_PUSH' });
+            } catch (error) {
+                if (!(error instanceof SellerNotificationAuthorizationError)) throw error;
+                await markSellerUnauthorizedDelivery(client, row, error, { endpointBindingCurrent: true });
+                await client.query('COMMIT');
+                return Object.freeze({
+                    processed: true,
+                    status: 'FAILED',
+                    deliveryId: Number(row.delivery_id),
+                    errorCode: 'SELLER_DELIVERY_NOT_AUTHORIZED'
+                });
+            }
         }
 
         const attempt = Number(row.attempt_count) + 1;

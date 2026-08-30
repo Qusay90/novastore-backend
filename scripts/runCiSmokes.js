@@ -32,6 +32,7 @@ const smokeTests = [
     'tests/adminOperationsContractSmoke.mjs',
     'tests/notificationTargetRoutingSmoke.mjs',
     'tests/androidFcmProviderUnitSmoke.js',
+    'tests/sellerNotificationAuthorizationUnitSmoke.js',
     'tests/customerRefreshContractSmoke.js',
     'tests/reviewPublicationVisibilitySmoke.js',
     'tests/localMain6sSchemaInitSmoke.js',

@@ -18,6 +18,8 @@
     "test:notification-core:integration": "node tests/notificationCorePostgresSmoke.js",
     "test:android-fcm:unit": "node tests/androidFcmProviderUnitSmoke.js",
     "test:android-fcm:integration": "node tests/notificationCorePostgresSmoke.js",
+    "test:seller-notification-authorization:unit": "node tests/sellerNotificationAuthorizationUnitSmoke.js",
+    "test:seller-notification-authorization:integration": "node tests/notificationCorePostgresSmoke.js",
     "test:customer-refresh:unit": "node tests/customerRefreshContractSmoke.js",
     "test:customer-refresh:integration": "node tests/customerRefreshPostgresSmoke.js",
     "test:staging-runtime-safety": "node tests/stagingRuntimeSafetySmoke.js",

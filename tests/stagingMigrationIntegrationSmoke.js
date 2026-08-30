@@ -175,6 +175,47 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
     assert.equal(mediaLedgerAfterRejection.rows[0].count, 0);
 
     await resetPublic();
+    const applicantBindingMigrationIndex = registry.findIndex(
+        (migration) => migration.id === '20260830_01_seller_application_user_binding'
+    );
+    assert.equal(applicantBindingMigrationIndex, registry.length - 1);
+    const preApplicantBindingRegistry = registry.slice(0, applicantBindingMigrationIndex);
+    const preApplicantBindingApply = await runApply({
+        env,
+        registry: preApplicantBindingRegistry,
+        output: silent
+    });
+    assert.deepEqual(preApplicantBindingApply.applied, preApplicantBindingRegistry.map((entry) => entry.id));
+    await admin.query(
+        `INSERT INTO users (id, email, password)
+         VALUES
+            (92001, 'binding-unique@example.test', 'not-used'),
+            (92002, 'binding-ambiguous@example.test', 'not-used'),
+            (92003, 'BINDING-AMBIGUOUS@EXAMPLE.TEST', 'not-used')`
+    );
+    await admin.query(
+        `INSERT INTO seller_applications
+            (id, applicant_authority_hash, applicant_identity_hash, applicant_email,
+             applicant_display_name, creation_idempotency_key_hash, creation_request_fingerprint)
+         VALUES
+            ('92000000-0000-4000-8000-000000000001', repeat('a', 64), repeat('b', 64),
+             'BINDING-UNIQUE@EXAMPLE.TEST', 'Unique binding probe', repeat('c', 64), repeat('d', 64)),
+            ('92000000-0000-4000-8000-000000000002', repeat('e', 64), repeat('f', 64),
+             'binding-ambiguous@example.test', 'Ambiguous binding probe', repeat('1', 64), repeat('2', 64))`
+    );
+    const applicantBindingApply = await runApply({ env, registry, output: silent });
+    assert.deepEqual(applicantBindingApply.applied, ['20260830_01_seller_application_user_binding']);
+    const applicantBindings = await admin.query(
+        `SELECT id::TEXT, applicant_user_id
+           FROM seller_applications
+          ORDER BY id`
+    );
+    assert.deepEqual(applicantBindings.rows, [
+        { id: '92000000-0000-4000-8000-000000000001', applicant_user_id: null },
+        { id: '92000000-0000-4000-8000-000000000002', applicant_user_id: null }
+    ], 'migration must never infer a private account binding from applicant email');
+
+    await resetPublic();
 
     const firstApply = await runApply({ env, registry, output: silent });
     assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));
@@ -187,7 +228,7 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
 
     const expectedTables = [
         'admin_catalog_audit_events', 'attribute_definitions', 'attribute_options',
-        'attribute_templates', 'auth_sessions', 'campaign_configs', 'categories',
+        'attribute_templates', 'auth_refresh_tokens', 'auth_sessions', 'campaign_configs', 'categories',
         'category_aliases', 'category_stats', 'collection_products', 'collection_rules',
         'collections', 'coupon_reservations', 'coupons', 'customer_addresses', 'customer_operation_audit_events', 'favorites', 'invoices',
         'menu_items', 'menus', 'messages', 'notification_audit_logs',
@@ -198,7 +239,7 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'product_categories', 'product_media', 'product_questions', 'products',
         'return_events', 'returns', 'review_media', 'reviews', 'shipments', 'store_follows', 'stores',
         'support_thread_events', 'support_threads', 'template_attributes', 'user_shared_state', 'users', 'visitor_sessions',
-        'admin_coupon_audit_events',
+        'admin_coupon_audit_events', 'android_push_endpoints',
         'seller_applicant_sessions', 'seller_application_command_receipts',
         'seller_application_events', 'seller_application_verification_requests',
         'seller_application_terms_authority', 'seller_application_terms_authority_events',
@@ -231,6 +272,7 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
          WHERE table_schema = 'public'
            AND (table_name, column_name) IN (
               ('users', 'auth_enabled'),
+              ('seller_applications', 'applicant_user_id'),
               ('products', 'normalized_sku'),
               ('products', 'revision'),
               ('categories', 'path'),
@@ -266,7 +308,7 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
               ('seller_order_items', 'source_item_index')
            )`
     );
-    assert.equal(requiredColumns.rowCount, 34);
+    assert.equal(requiredColumns.rowCount, 35);
 
     const triggers = await admin.query(
         `SELECT trigger_name
@@ -326,7 +368,8 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'chk_return_events_actor_role', 'chk_return_events_event_type',
         'chk_return_events_payload_object', 'chk_seller_order_items_source_index',
         'chk_coupon_reservations_status', 'chk_coupon_reservations_terminal_times',
-        'uq_coupon_reservations_order', 'uq_coupon_reservations_coupon_order'
+        'uq_coupon_reservations_order', 'uq_coupon_reservations_coupon_order',
+        'fk_seller_applications_applicant_user'
     ].sort();
     const constraints = await admin.query(
         `SELECT conname
@@ -356,6 +399,15 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         safetyIndexes.rows.find((row) => row.indexname === 'idx_product_media_one_main').indexdef,
         /WHERE \(is_main = true\)/i
     );
+    const applicantBindingIndex = await admin.query(
+        `SELECT indexdef
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'idx_seller_applications_applicant_user_updated'`
+    );
+    assert.equal(applicantBindingIndex.rowCount, 1);
+    assert.doesNotMatch(applicantBindingIndex.rows[0].indexdef, /CREATE UNIQUE INDEX/i);
+    assert.match(applicantBindingIndex.rows[0].indexdef, /applicant_user_id IS NOT NULL/i);
     const framingProduct = await admin.query(
         `INSERT INTO products (name, price)
          VALUES ('Main-6Y partial framing probe', 1)
@@ -499,7 +551,7 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
     assert.deepEqual(snapshotAfterSecond, snapshotAfterFirst);
     assert.deepEqual(await tableCounts(), protectedCountsBefore);
 
-    console.log('staging migration PostgreSQL integration smoke passed: 26 scenarios');
+    console.log('staging migration PostgreSQL integration smoke passed: 27 scenarios');
 })().finally(async () => {
     await admin.end().catch(() => {});
 }).catch((error) => {

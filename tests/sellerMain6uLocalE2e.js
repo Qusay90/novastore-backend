@@ -15,6 +15,9 @@ const { createSellerApplicationService } = require('../services/sellerApplicatio
 const { createSellerApplicationController } = require('../controllers/sellerApplicationController');
 const { createSellerApplicantAuth } = require('../middlewares/sellerApplicantAuth');
 const { createSellerApplicationRouter } = require('../routes/sellerApplicationRoutes');
+const { createSellerAuthMiddleware } = require('../middlewares/sellerAuthMiddleware');
+const { createSellerTenantContextMiddleware } = require('../middlewares/sellerTenantContext');
+const { createSellerAccessTokenService } = require('../services/sellerAccessTokenService');
 const { getSellerApplicationTermsAuthority } = require('../config/sellerApplicationTerms');
 
 const connectionString = process.env.MAIN6U_DATABASE_URL;
@@ -26,6 +29,7 @@ if (!['127.0.0.1', 'localhost', '::1'].includes(parsed.hostname) || !parsed.path
 
 const RECOVERY_SECRET = 'local-main6u-recovery-secret-0000000000000001';
 const APPLICATION_SECRET = 'local-main6u-application-secret-0000000000001';
+const ACCESS_TOKEN_SECRET = 'local-main6u-access-token-secret-00000000000001';
 const TERMS_AUTHORITY = getSellerApplicationTermsAuthority();
 const TERMS_REVISION = TERMS_AUTHORITY?.revision;
 if (TERMS_REVISION !== 'seller-terms-local-test-v1' || TERMS_AUTHORITY.generation !== 1) {
@@ -35,6 +39,9 @@ const pool = new Pool({ connectionString, ssl: false, application_name: 'novasto
 const deliveryBoundary = createSellerPasswordRecoveryDeliveryBoundary({ syntheticEnabled: true });
 const recoveryService = createSellerPasswordRecoveryService({ database: pool, secret: RECOVERY_SECRET, deliveryBoundary: deliveryBoundary.deliver });
 const applicationService = createSellerApplicationService({ database: pool, secret: APPLICATION_SECRET, termsAuthority: TERMS_AUTHORITY });
+const accessTokenService = createSellerAccessTokenService({ secret: ACCESS_TOKEN_SECRET });
+const sellerAuth = createSellerAuthMiddleware({ verifyAccessToken: accessTokenService.verify });
+const sellerTenant = createSellerTenantContextMiddleware();
 
 const app = express();
 app.use(express.json({ limit: '32kb' }));
@@ -45,16 +52,19 @@ app.use('/api/seller/v1', createSellerPasswordRecoveryRouter({
 }));
 app.use('/api/seller/v1', createSellerApplicationRouter({
     controller: createSellerApplicationController({ service: applicationService }),
-    applicantAuth: createSellerApplicantAuth({ service: applicationService })
+    applicantAuth: createSellerApplicantAuth({ service: applicationService }),
+    auth: sellerAuth,
+    tenant: sellerTenant
 }));
 const server = http.createServer(app);
 
-const request = async (base, method, path, { applicantSecret, body, token, idempotency } = {}) => {
+const request = async (base, method, path, { applicantSecret, applicantToken, body, token, idempotency } = {}) => {
     const response = await fetch(`${base}${path}`, {
         method,
         headers: {
             ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(applicantToken ? { 'Applicant-Token': applicantToken } : {}),
             ...(idempotency ? { 'Idempotency-Key': idempotency } : {}),
             ...(applicantSecret ? { 'Applicant-Secret': applicantSecret } : {})
         },
@@ -223,6 +233,65 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     assert.equal(createReplay.body.application.id, applicationId);
     assert.equal(createReplay.body.applicant_token, applicantToken);
     assert.equal(createReplay.body.application.terms_revision, TERMS_REVISION);
+
+    const linkedSellerSessionId = crypto.randomUUID();
+    await pool.query(
+        "INSERT INTO seller_sessions (id, user_id, organization_id, membership_id, audience, status, membership_revision, security_stamp, expires_at) VALUES ($1, $2, $3, $4, 'seller', 'active', $5, $6, CURRENT_TIMESTAMP + INTERVAL '1 day')",
+        [linkedSellerSessionId, user.id, organization.id, membership.id, membership.membership_revision, membership.security_stamp]
+    );
+    const sellerAccessToken = accessTokenService.issue({ sessionId: linkedSellerSessionId, userId: user.id });
+    assert.equal((await request(base, 'POST', '/api/seller/v1/applications/current/account-link', {
+        token: sellerAccessToken,
+        body: {}
+    })).status, 401);
+    assert.equal((await request(base, 'POST', '/api/seller/v1/applications/current/account-link', {
+        token: sellerAccessToken,
+        applicantToken,
+        body: { applicant_user_id: user.id }
+    })).status, 400);
+    const linkedAccount = await request(base, 'POST', '/api/seller/v1/applications/current/account-link', {
+        token: sellerAccessToken,
+        applicantToken,
+        body: {}
+    });
+    assert.equal(linkedAccount.status, 200);
+    assert.deepEqual(linkedAccount.body, { linked: true, idempotent: false, application_id: applicationId });
+    assert.equal(Number((await pool.query(
+        'SELECT applicant_user_id FROM seller_applications WHERE id = $1',
+        [applicationId]
+    )).rows[0].applicant_user_id), Number(user.id));
+    const linkedAccountReplay = await request(base, 'POST', '/api/seller/v1/applications/current/account-link', {
+        token: sellerAccessToken,
+        applicantToken,
+        body: {}
+    });
+    assert.equal(linkedAccountReplay.status, 200);
+    assert.equal(linkedAccountReplay.body.idempotent, true);
+
+    const foreignSellerUser = (await pool.query(
+        "INSERT INTO users (full_name, email, password, role) VALUES ($1, $2, $3, 'customer') RETURNING id",
+        ['Foreign Seller', `foreign-seller-${suffix}@example.test`, await bcrypt.hash(oldPassword, 12)]
+    )).rows[0];
+    const foreignSellerMembership = (await pool.query(
+        "INSERT INTO seller_memberships (organization_id, user_id, role_id, status, security_stamp) VALUES ($1, $2, $3, 'active', $4) RETURNING id, membership_revision, security_stamp",
+        [organization.id, foreignSellerUser.id, ownerRole.id, crypto.randomUUID()]
+    )).rows[0];
+    const foreignSellerSessionId = crypto.randomUUID();
+    await pool.query(
+        "INSERT INTO seller_sessions (id, user_id, organization_id, membership_id, audience, status, membership_revision, security_stamp, expires_at) VALUES ($1, $2, $3, $4, 'seller', 'active', $5, $6, CURRENT_TIMESTAMP + INTERVAL '1 day')",
+        [foreignSellerSessionId, foreignSellerUser.id, organization.id, foreignSellerMembership.id, foreignSellerMembership.membership_revision, foreignSellerMembership.security_stamp]
+    );
+    const foreignSellerAccessToken = accessTokenService.issue({ sessionId: foreignSellerSessionId, userId: foreignSellerUser.id });
+    assert.equal((await request(base, 'POST', '/api/seller/v1/applications/current/account-link', {
+        token: foreignSellerAccessToken,
+        applicantToken,
+        body: {}
+    })).status, 409);
+    assert.equal(Number((await pool.query(
+        'SELECT applicant_user_id FROM seller_applications WHERE id = $1',
+        [applicationId]
+    )).rows[0].applicant_user_id), Number(user.id));
+
     assert.equal((await request(base, 'POST', '/api/seller/v1/applications', {
         applicantSecret: applicantBootstrapSecret,
         body: firstCreateBody,
@@ -586,6 +655,7 @@ const verify = (base, challengeId, code) => request(base, 'POST', `/api/seller/v
     console.log('RESET_SIBLING_AUTHORITY_SUPERSESSION=PASS');
     console.log('SELLER_SESSION_REVOCATION=PASS');
     console.log('APPLICANT_BOOTSTRAP_AUTHORITY=PASS');
+    console.log('APPLICATION_ACCOUNT_LINK_DUAL_AUTHORITY=PASS');
     console.log('UNVERIFIED_IDENTITY_SQUATTING_PREVENTION=PASS');
     console.log('APPLICATION_IDOR=PASS');
     console.log('APPLICATION_REVISION_IDEMPOTENCY=PASS');

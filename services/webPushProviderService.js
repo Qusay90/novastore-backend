@@ -20,6 +20,10 @@ const resolveWebPushConfiguration = (env = process.env) => {
     const publicKey = String(env.VAPID_PUBLIC_KEY || '').trim();
     const privateKey = String(env.VAPID_PRIVATE_KEY || '').trim();
     const subject = String(env.WEB_PUSH_SUBJECT || '').trim();
+    const timeoutRequested = Number(env.WEB_PUSH_REQUEST_TIMEOUT_MS);
+    const timeoutMs = Number.isSafeInteger(timeoutRequested)
+        ? Math.max(1000, Math.min(timeoutRequested, 15000))
+        : 5000;
     const complete = Boolean(publicKey && privateKey && SUBJECT_PATTERN.test(subject));
     return Object.freeze({
         configured: complete,
@@ -27,7 +31,8 @@ const resolveWebPushConfiguration = (env = process.env) => {
         subjectConfigured: Boolean(subject),
         privateKeyConfigured: Boolean(privateKey),
         subject: complete ? subject : null,
-        privateKey: complete ? privateKey : null
+        privateKey: complete ? privateKey : null,
+        timeoutMs
     });
 };
 
@@ -123,7 +128,8 @@ const createWebPushProvider = ({
                     {
                         TTL: notification.priority === 'CRITICAL' ? 900 : 3600,
                         urgency: ['CRITICAL', 'HIGH'].includes(notification.priority) ? 'high' : 'normal',
-                        topic: `novastore-${Number(notification.id)}`.slice(0, 32)
+                        topic: `novastore-${Number(notification.id)}`.slice(0, 32),
+                        timeout: config.timeoutMs
                     }
                 );
                 return Object.freeze({

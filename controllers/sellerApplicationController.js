@@ -4,6 +4,7 @@ const { toSafeApplicationError } = require('../services/sellerApplicationService
 
 const idempotencyKey = (req) => req.get?.('Idempotency-Key') || req.headers?.['idempotency-key'];
 const applicantSecret = (req) => req.get?.('Applicant-Secret') || req.headers?.['applicant-secret'];
+const applicantToken = (req) => req.get?.('Applicant-Token') || req.headers?.['applicant-token'];
 
 const failure = (res, error) => {
     const safe = toSafeApplicationError(error);
@@ -21,6 +22,12 @@ const createSellerApplicationController = ({ service } = {}) => {
             try { return res.status(200).json({ application: await service.current(req.sellerApplicant) }); }
             catch (error) { return failure(res, error); }
         },
+        linkAccount: async (req, res) => {
+            try {
+                const applicant = await service.authenticate(applicantToken(req));
+                return res.status(200).json(await service.linkAccount(applicant, req.sellerSession, req.body || {}));
+            } catch (error) { return failure(res, error); }
+        },
         updateStep: async (req, res) => {
             try { return res.status(200).json(await service.updateStep(req.sellerApplicant, req.params.step, req.body, idempotencyKey(req))); }
             catch (error) { return failure(res, error); }
@@ -32,4 +39,4 @@ const createSellerApplicationController = ({ service } = {}) => {
     });
 };
 
-module.exports = Object.freeze({ applicantSecret, createSellerApplicationController, failure, idempotencyKey });
+module.exports = Object.freeze({ applicantSecret, applicantToken, createSellerApplicationController, failure, idempotencyKey });

@@ -500,7 +500,12 @@ if (localSellerApiEnabled) {
 
     app.use('/api/seller/v1', createSellerAuthRouter({ auth, controller: authController }));
     app.use('/api/seller/v1', createSellerPasswordRecoveryRouter({ controller: passwordRecoveryController }));
-    app.use('/api/seller/v1', createSellerApplicationRouter({ controller: applicationController, applicantAuth }));
+    app.use('/api/seller/v1', createSellerApplicationRouter({
+        controller: applicationController,
+        applicantAuth,
+        auth,
+        tenant
+    }));
     app.use('/api/seller/v1', createSellerContextRouter({ enabled: true, auth, tenant, controller: contextController }));
     app.use('/api/seller/v1', createSellerNotificationRouter({ enabled: true, auth, tenant }));
     app.use('/api/seller/v1', createSellerBusinessRouter({

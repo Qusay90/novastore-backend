@@ -1,5 +1,10 @@
 'use strict';
 
+const {
+    allowedSellerNotificationEventTypes,
+    withLiveSellerNotificationScope
+} = require('./sellerNotificationAuthorizationService');
+
 class NotificationReadError extends Error {
     constructor(message, code = 'NOTIFICATION_REQUEST_INVALID', statusCode = 400) {
         super(message);
@@ -52,7 +57,16 @@ const normalizeScope = (scope) => {
     const storeIds = role === 'seller'
         ? [...new Set((scope.storeIds || []).map(Number).filter((id) => Number.isSafeInteger(id) && id > 0))]
         : [];
-    return Object.freeze({ userId, role, organizationId, storeIds: Object.freeze(storeIds) });
+    const allowedEventTypes = role === 'seller'
+        ? allowedSellerNotificationEventTypes(scope.permissions)
+        : Object.freeze([]);
+    return Object.freeze({
+        userId,
+        role,
+        organizationId,
+        storeIds: Object.freeze(storeIds),
+        allowedEventTypes
+    });
 };
 
 const scopeSql = (scope, startIndex = 1) => {
@@ -72,8 +86,26 @@ const scopeSql = (scope, startIndex = 1) => {
         clause: `(recipient_role = 'seller'
                   AND user_id = $${startIndex}
                   AND recipient_organization_id = $${startIndex + 1}
-                  AND (recipient_store_id IS NULL OR recipient_store_id = ANY($${startIndex + 2}::BIGINT[])))`,
-        values: [scope.userId, scope.organizationId, scope.storeIds]
+                  AND type = ANY($${startIndex + 3}::VARCHAR[])
+                  AND (
+                    (
+                      type = 'SELLER_APPLICATION_STATUS_CHANGED'
+                      AND recipient_store_id IS NULL
+                      AND entity_type = 'seller_application'
+                      AND entity_id IS NULL
+                      AND EXISTS (
+                        SELECT 1
+                          FROM seller_applications application
+                         WHERE application.id::TEXT = LOWER(entity_key)
+                           AND application.applicant_user_id = $${startIndex}
+                      )
+                    )
+                    OR (
+                      type <> 'SELLER_APPLICATION_STATUS_CHANGED'
+                      AND recipient_store_id = ANY($${startIndex + 2}::BIGINT[])
+                    )
+                  ))`,
+        values: [scope.userId, scope.organizationId, scope.storeIds, scope.allowedEventTypes]
     });
 };
 
@@ -81,51 +113,64 @@ const selectColumns = `id, type, category, priority, title, message,
     COALESCE(is_read, FALSE) AS is_read, read_at,
     entity_type, entity_id, entity_key, created_at, updated_at`;
 
+const withCurrentNotificationScope = async (database, rawScope, work) => {
+    const requestedRole = String(rawScope?.role || '').trim().toLowerCase();
+    if (requestedRole !== 'seller') return work(database, normalizeScope(rawScope));
+    return withLiveSellerNotificationScope(database, {
+        sessionId: rawScope?.sessionId,
+        userId: rawScope?.userId,
+        organizationId: rawScope?.organizationId,
+        membershipId: rawScope?.membershipId
+    }, async (client, liveScope) => work(client, normalizeScope(liveScope)));
+};
+
 const listNotifications = async (database, rawScope, options = {}) => {
-    const scope = normalizeScope(rawScope);
     const limit = parseLimit(options.limit);
     const cursor = decodeCursor(options.cursor);
-    const scoped = scopeSql(scope, 1);
-    const cursorOffset = scoped.values.length + 1;
-    const result = await database.query(
-        `SELECT ${selectColumns}
-           FROM notifications
-          WHERE ${scoped.clause}
-            AND ($${cursorOffset}::TIMESTAMPTZ IS NULL
-                 OR (created_at, id) < ($${cursorOffset}::TIMESTAMPTZ, $${cursorOffset + 1}::INTEGER))
-          ORDER BY created_at DESC, id DESC
-          LIMIT $${cursorOffset + 2}`,
-        [
-            ...scoped.values,
-            cursor?.createdAt || null,
-            cursor?.id || null,
-            limit + 1
-        ]
-    );
-    const hasMore = result.rows.length > limit;
-    const items = result.rows.slice(0, limit);
-    return Object.freeze({
-        items: Object.freeze(items.map((row) => Object.freeze(row))),
-        page: Object.freeze({
-            limit,
-            hasMore,
-            nextCursor: hasMore && items.length ? encodeCursor(items[items.length - 1]) : null
-        })
+    return withCurrentNotificationScope(database, rawScope, async (queryable, scope) => {
+        const scoped = scopeSql(scope, 1);
+        const cursorOffset = scoped.values.length + 1;
+        const result = await queryable.query(
+            `SELECT ${selectColumns}
+               FROM notifications
+              WHERE ${scoped.clause}
+                AND ($${cursorOffset}::TIMESTAMPTZ IS NULL
+                     OR (created_at, id) < ($${cursorOffset}::TIMESTAMPTZ, $${cursorOffset + 1}::INTEGER))
+              ORDER BY created_at DESC, id DESC
+              LIMIT $${cursorOffset + 2}`,
+            [
+                ...scoped.values,
+                cursor?.createdAt || null,
+                cursor?.id || null,
+                limit + 1
+            ]
+        );
+        const hasMore = result.rows.length > limit;
+        const items = result.rows.slice(0, limit);
+        return Object.freeze({
+            items: Object.freeze(items.map((row) => Object.freeze(row))),
+            page: Object.freeze({
+                limit,
+                hasMore,
+                nextCursor: hasMore && items.length ? encodeCursor(items[items.length - 1]) : null
+            })
+        });
     });
 };
 
 const getUnreadCount = async (database, rawScope) => {
-    const scope = normalizeScope(rawScope);
-    const scoped = scopeSql(scope, 1);
-    const result = await database.query(
-        `SELECT COUNT(*)::INT AS unread_count
-           FROM notifications
-          WHERE ${scoped.clause}
-            AND read_at IS NULL
-            AND COALESCE(is_read, FALSE) = FALSE`,
-        scoped.values
-    );
-    return Number(result.rows[0]?.unread_count || 0);
+    return withCurrentNotificationScope(database, rawScope, async (queryable, scope) => {
+        const scoped = scopeSql(scope, 1);
+        const result = await queryable.query(
+            `SELECT COUNT(*)::INT AS unread_count
+               FROM notifications
+              WHERE ${scoped.clause}
+                AND read_at IS NULL
+                AND COALESCE(is_read, FALSE) = FALSE`,
+            scoped.values
+        );
+        return Number(result.rows[0]?.unread_count || 0);
+    });
 };
 
 const parseNotificationId = (value) => {
@@ -137,37 +182,39 @@ const parseNotificationId = (value) => {
 };
 
 const markNotificationRead = async (database, rawScope, rawId) => {
-    const scope = normalizeScope(rawScope);
     const id = parseNotificationId(rawId);
-    const scoped = scopeSql(scope, 2);
-    const result = await database.query(
-        `UPDATE notifications
-            SET is_read = TRUE,
-                read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
-          WHERE id = $1
-            AND ${scoped.clause}
-      RETURNING ${selectColumns}`,
-        [id, ...scoped.values]
-    );
-    if (result.rows.length === 0) {
-        throw new NotificationReadError('Bildirim bulunamadı.', 'NOTIFICATION_NOT_FOUND', 404);
-    }
-    return Object.freeze(result.rows[0]);
+    return withCurrentNotificationScope(database, rawScope, async (queryable, scope) => {
+        const scoped = scopeSql(scope, 2);
+        const result = await queryable.query(
+            `UPDATE notifications
+                SET is_read = TRUE,
+                    read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
+              WHERE id = $1
+                AND ${scoped.clause}
+          RETURNING ${selectColumns}`,
+            [id, ...scoped.values]
+        );
+        if (result.rows.length === 0) {
+            throw new NotificationReadError('Bildirim bulunamadı.', 'NOTIFICATION_NOT_FOUND', 404);
+        }
+        return Object.freeze(result.rows[0]);
+    });
 };
 
 const markAllNotificationsRead = async (database, rawScope) => {
-    const scope = normalizeScope(rawScope);
-    const scoped = scopeSql(scope, 1);
-    const result = await database.query(
-        `UPDATE notifications
-            SET is_read = TRUE,
-                read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
-          WHERE ${scoped.clause}
-            AND read_at IS NULL
-      RETURNING id`,
-        scoped.values
-    );
-    return result.rows.length;
+    return withCurrentNotificationScope(database, rawScope, async (queryable, scope) => {
+        const scoped = scopeSql(scope, 1);
+        const result = await queryable.query(
+            `UPDATE notifications
+                SET is_read = TRUE,
+                    read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
+              WHERE ${scoped.clause}
+                AND read_at IS NULL
+          RETURNING id`,
+            scoped.values
+        );
+        return result.rows.length;
+    });
 };
 
 module.exports = Object.freeze({

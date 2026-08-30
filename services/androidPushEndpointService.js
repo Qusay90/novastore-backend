@@ -215,15 +215,22 @@ const retirePendingDeliveries = async (client, endpointIds, reason) => {
     const ids = [...new Set(endpointIds.filter(Boolean).map(String))];
     if (ids.length === 0) return 0;
     const result = await client.query(
-        `UPDATE notification_deliveries
+        `WITH terminalizable AS (
+            SELECT id
+              FROM notification_deliveries
+             WHERE android_push_endpoint_id = ANY($1::UUID[])
+               AND status IN ('PENDING', 'RETRYABLE')
+             FOR UPDATE SKIP LOCKED
+        )
+        UPDATE notification_deliveries delivery
             SET status = 'INVALID_SUBSCRIPTION',
                 next_attempt_at = NULL,
                 last_error_code = $2,
                 last_error_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP
-          WHERE android_push_endpoint_id = ANY($1::UUID[])
-            AND status IN ('PENDING', 'RETRYABLE')
-      RETURNING id`,
+           FROM terminalizable
+          WHERE delivery.id = terminalizable.id
+      RETURNING delivery.id`,
         [ids, String(reason).slice(0, 80)]
     );
     return result.rows.length;

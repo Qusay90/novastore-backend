@@ -236,5 +236,12 @@
     "sha256": "67977980f37ea2fa37de3ae84334c6f4a18ebc28892cf233f0715e9768aa94c3",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260830_01_seller_application_user_binding",
+    "path": "migrations/20260830_01_seller_application_user_binding.sql",
+    "sha256": "49ce086c831d1d02dff275205216fec4e3a9a53be70c298ed247b19fe4f6a827",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

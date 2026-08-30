@@ -9,6 +9,7 @@ const { EVENT } = require('./notificationEventCatalog');
 const { enqueueNotificationEvent } = require('./notificationOutboxService');
 
 const APPLICATION_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const EDITABLE_STATUSES = new Set(['DRAFT', 'IN_PROGRESS', 'NEEDS_CORRECTION']);
 const TERMINAL_STATUSES = new Set(['APPROVED', 'REJECTED', 'WITHDRAWN']);
 const STEP_ORDER = Object.freeze(['identity', 'business', 'contact', 'agreements', 'documents', 'payout', 'submission']);
@@ -144,7 +145,7 @@ const mapApplication = (row, currentTermsRevision = null) => {
     });
 };
 
-const applicationSelect = "SELECT id, applicant_authority_hash, applicant_identity_hash, applicant_email, applicant_phone, applicant_display_name, status, revision, current_step, next_allowed_step, correction_steps, terms_revision, step_payload, verification_state, creation_idempotency_key_hash, creation_request_fingerprint, submitted_at, created_at, updated_at FROM seller_applications";
+const applicationSelect = "SELECT id, applicant_authority_hash, applicant_identity_hash, applicant_user_id, applicant_email, applicant_phone, applicant_display_name, status, revision, current_step, next_allowed_step, correction_steps, terms_revision, step_payload, verification_state, creation_idempotency_key_hash, creation_request_fingerprint, submitted_at, created_at, updated_at FROM seller_applications";
 
 const recordEvent = (client, row, eventType, fromStatus, resultCode, metadata = {}) => client.query(
     'INSERT INTO seller_application_events (application_id, event_type, from_status, to_status, application_revision, result_code, metadata_redacted) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)',
@@ -394,6 +395,97 @@ const createSellerApplicationService = ({ database, secret, termsAuthority = nul
         });
     };
 
+    const linkAccount = async (applicant, sellerSession, body = {}) => {
+        plainObject(body, [], 'APPLICATION_ACCOUNT_LINK_INVALID');
+        const applicantSessionId = String(applicant?.sessionId || '').trim().toLowerCase();
+        const applicationId = String(applicant?.applicationId || '').trim().toLowerCase();
+        const sellerSessionId = String(sellerSession?.sessionId || '').trim().toLowerCase();
+        const userId = Number(sellerSession?.userId);
+        const organizationId = Number(sellerSession?.organizationId);
+        const membershipId = Number(sellerSession?.membershipId);
+        if (
+            applicant?.authority !== 'APPLICATION_BOUND'
+            || !UUID_PATTERN.test(applicantSessionId)
+            || !UUID_PATTERN.test(applicationId)
+            || !UUID_PATTERN.test(sellerSessionId)
+            || !Number.isSafeInteger(userId) || userId < 1
+            || !Number.isSafeInteger(organizationId) || organizationId < 1
+            || !Number.isSafeInteger(membershipId) || membershipId < 1
+        ) {
+            throw new SellerApplicationError('APPLICATION_ACCOUNT_LINK_NOT_AVAILABLE', 404);
+        }
+        return withTransaction(database, async (client) => {
+            const result = await client.query(
+                `SELECT application.id,
+                        application.status,
+                        application.revision,
+                        application.applicant_user_id
+                   FROM seller_applications application
+                   JOIN seller_applicant_sessions applicant_session
+                     ON applicant_session.application_id = application.id
+                    AND applicant_session.id = $2::UUID
+                    AND applicant_session.status = 'active'
+                    AND applicant_session.expires_at > CURRENT_TIMESTAMP
+                   JOIN seller_sessions seller_session
+                     ON seller_session.id = $3::UUID
+                    AND seller_session.user_id = $4
+                    AND seller_session.organization_id = $5
+                    AND seller_session.membership_id = $6
+                    AND seller_session.audience = 'seller'
+                    AND seller_session.status = 'active'
+                    AND seller_session.expires_at > CURRENT_TIMESTAMP
+                   JOIN seller_memberships membership
+                     ON membership.organization_id = seller_session.organization_id
+                    AND membership.id = seller_session.membership_id
+                    AND membership.user_id = seller_session.user_id
+                    AND membership.status = 'active'
+                    AND membership.membership_revision = seller_session.membership_revision
+                    AND membership.security_stamp = seller_session.security_stamp
+                   JOIN seller_organizations organization
+                     ON organization.id = membership.organization_id
+                    AND organization.status = 'active'
+                   JOIN seller_roles role_row
+                     ON role_row.id = membership.role_id
+                    AND role_row.is_active = TRUE
+                    AND (role_row.organization_id IS NULL OR role_row.organization_id = membership.organization_id)
+                   JOIN users user_row
+                     ON user_row.id = seller_session.user_id
+                    AND user_row.auth_enabled = TRUE
+                  WHERE application.id = $1::UUID
+                  FOR UPDATE OF application, applicant_session, seller_session, membership, organization, role_row, user_row`,
+                [applicationId, applicantSessionId, sellerSessionId, userId, organizationId, membershipId]
+            );
+            const row = result.rows?.[0];
+            if (!row) throw new SellerApplicationError('APPLICATION_ACCOUNT_LINK_NOT_AVAILABLE', 404);
+            if (row.applicant_user_id != null && Number(row.applicant_user_id) !== userId) {
+                throw new SellerApplicationError('APPLICATION_ACCOUNT_ALREADY_LINKED', 409);
+            }
+            if (row.applicant_user_id == null) {
+                await client.query(
+                    `UPDATE seller_applications
+                        SET applicant_user_id = $2,
+                            updated_at = CURRENT_TIMESTAMP
+                      WHERE id = $1::UUID
+                        AND applicant_user_id IS NULL`,
+                    [applicationId, userId]
+                );
+                await recordEvent(
+                    client,
+                    row,
+                    'seller.application.account_linked',
+                    row.status,
+                    'success',
+                    { link_authority: 'APPLICANT_AND_LIVE_SELLER_SESSION' }
+                );
+            }
+            return Object.freeze({
+                linked: true,
+                idempotent: row.applicant_user_id != null,
+                application_id: applicationId
+            });
+        });
+    };
+
     const updateStep = async (applicant, stepValue, body, rawIdempotencyKey = null) => {
         requireConfiguredTermsAuthority();
         const step = cleanText(stepValue, { max: 40 }).toLocaleLowerCase('en-US');
@@ -584,7 +676,7 @@ const createSellerApplicationService = ({ database, secret, termsAuthority = nul
         });
     };
 
-    return Object.freeze({ authenticate, create, current, reviewDecision, updateStep, verificationCommand });
+    return Object.freeze({ authenticate, create, current, linkAccount, reviewDecision, updateStep, verificationCommand });
 };
 
 const toSafeApplicationError = (error) => error instanceof SellerApplicationError

@@ -54,6 +54,7 @@ assert.deepEqual(STEP_ORDER, ['identity', 'business', 'contact', 'agreements', '
 assert.deepEqual(SELLER_APPLICATION_PATHS, [
     '/applications',
     '/applications/current',
+    '/applications/current/account-link',
     '/applications/current/steps/:step',
     '/applications/current/verifications/:channel/commands'
 ]);
@@ -97,6 +98,9 @@ assert.match(applicationSource, /staleTermsReacceptance/u);
 assert.match(applicationSource, /seller-application-terms-authority-v1/u);
 assert.match(applicationSource, /TERMS_REVISION_AUTHORITY_STALE/u);
 assert.match(applicationControllerSource, /Applicant-Secret/u);
+assert.match(applicationControllerSource, /Applicant-Token/u);
+assert.match(applicationSource, /APPLICANT_AND_LIVE_SELLER_SESSION/u);
+assert.doesNotMatch(applicationSource, /LOWER\(.*applicant_email|applicant_email.*LOWER\(/isu);
 assert.match(serverSource, /getSellerApplicationTermsAuthority\(\)/u);
 assert.doesNotMatch(serverSource, /SELLER_APPLICATION_TERMS_REVISION\s*\|\|/u);
 assert.match(envExampleSource, /^SELLER_APPLICATION_TERMS_REVISION=$/mu);
