@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { CustomerAccountRuntime, useCustomerAccountRuntime } from "../src/account";
+import { initializeCustomerSession } from "../src/auth/customerSession";
 import { CustomerNotificationRuntime, useCustomerNotificationRuntime } from "../src/notifications";
 
 function RuntimeProbe() {
@@ -41,12 +42,17 @@ function RuntimeProbe() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <CustomerNotificationRuntime>
-      <CustomerAccountRuntime>
-        <RuntimeProbe />
-      </CustomerAccountRuntime>
-    </CustomerNotificationRuntime>
-  </React.StrictMode>,
-);
+async function bootstrapFixture() {
+  await initializeCustomerSession();
+  ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <CustomerNotificationRuntime>
+        <CustomerAccountRuntime>
+          <RuntimeProbe />
+        </CustomerAccountRuntime>
+      </CustomerNotificationRuntime>
+    </React.StrictMode>,
+  );
+}
+
+void bootstrapFixture();

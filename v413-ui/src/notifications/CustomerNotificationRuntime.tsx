@@ -128,6 +128,10 @@ type PushProviderRestoreFlight = Readonly<{
   promise: Promise<boolean>;
   settle: (registered: boolean) => void;
 }>;
+type PendingNotificationAction = Readonly<{
+  guard: ReturnType<typeof currentCustomerSessionGuard>;
+  payload: CustomerPushPayload;
+}>;
 let pushProviderRestoreFlight: PushProviderRestoreFlight | null = null;
 
 function pushProviderDisabledForCurrentSession() {
@@ -261,6 +265,7 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
   const refreshSequence = useRef(0);
   const receivedIds = useRef(new Set<number>());
   const inAppTimer = useRef<number | null>(null);
+  const pendingNotificationAction = useRef<PendingNotificationAction | null>(null);
 
   const clearPrivateNotificationState = useCallback((nextPhase: NotificationFeedPhase = "guest") => {
     ++refreshSequence.current;
@@ -331,6 +336,17 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
     setItems((current) => current.map((item) => item.isRead ? item : Object.freeze({ ...item, isRead: true, readAt: new Date().toISOString() })));
     setUnreadCount(0);
   }, []);
+
+  const openNotificationAction = useCallback(async (pending: PendingNotificationAction) => {
+    if (!hasVerifiedCustomerSession() || !customerSessionMatchesGuard(pending.guard)) return;
+    const [, target] = await Promise.all([
+      markCustomerNotificationRead(pending.payload.notificationId).catch(() => undefined),
+      authorizeCustomerNotificationTarget(pending.payload.target).catch(() => null),
+    ]);
+    if (!hasVerifiedCustomerSession() || !customerSessionMatchesGuard(pending.guard)) return;
+    void refresh();
+    globalThis.dispatchEvent(notificationOpenEvent(pending.payload.notificationId, target));
+  }, [refresh]);
 
   const inspectPushState = useCallback(async () => {
     if (!native) {
@@ -446,12 +462,14 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
   }, [native]);
 
   const login = useCallback(async (email: string, password: string) => {
+    pendingNotificationAction.current = null;
     clearPrivateNotificationState();
     await loginCustomer(email, password);
   }, [clearPrivateNotificationState]);
 
   const logout = useCallback(async () => {
     const guard = currentCustomerSessionGuard();
+    pendingNotificationAction.current = null;
     pendingPushRegistration = null;
     clearPrivateNotificationState();
     if (native) {
@@ -503,6 +521,7 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
     };
     const onRefresh = () => { if (hasVerifiedCustomerSession()) void refresh(); };
     const onAuthRequired = () => {
+      pendingNotificationAction.current = null;
       pendingPushRegistration = null;
       clearPrivateNotificationState();
       if (native && currentFcmToken()) {
@@ -520,6 +539,9 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
     const onVerified = () => {
       if (!hasVerifiedCustomerSession()) return;
       const guard = currentCustomerSessionGuard();
+      const pending = pendingNotificationAction.current;
+      pendingNotificationAction.current = null;
+      if (pending) void openNotificationAction(pending);
       const activate = async () => {
         if (native && !pushProviderDisabledForCurrentSession() && (currentFcmToken() || pendingPushRegistration)) {
           const restorationWasRequired = pushProviderRestoreRequired;
@@ -598,7 +620,7 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
       globalThis.removeEventListener("novastore:auth-unverified", onAuthUnverified);
       globalThis.removeEventListener("novastore:auth-verified", onVerified);
     };
-  }, [clearPrivateNotificationState, inspectPushState, native, refresh]);
+  }, [clearPrivateNotificationState, inspectPushState, native, openNotificationAction, refresh]);
 
   useEffect(() => {
     if (!native) return;
@@ -684,28 +706,35 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
     }));
     keep(PushNotifications.addListener("pushNotificationActionPerformed", (action: ActionPerformed) => {
       const payload = normalizeCustomerPushPayload(pushData(action.notification));
-      if (!payload || !hasVerifiedCustomerSession()) {
-        if (!hasVerifiedCustomerSession()) {
-          clearPrivateNotificationState();
-          if (!hasCustomerSession()) void retireOrphanedPushDelivery();
-        }
+      if (!payload) {
         globalThis.dispatchEvent(notificationOpenEvent(null, null));
         return;
       }
-      void Promise.all([
-        markCustomerNotificationRead(payload.notificationId).catch(() => undefined),
-        authorizeCustomerNotificationTarget(payload.target).catch(() => null),
-      ]).then(([, target]) => {
-        void refresh();
-        globalThis.dispatchEvent(notificationOpenEvent(payload.notificationId, target));
-      });
+      const pending = Object.freeze({ guard: currentCustomerSessionGuard(), payload });
+      if (!hasVerifiedCustomerSession()) {
+        if (hasCustomerSession()) {
+          // Android can deliver a notification action before the persisted
+          // Customer session finishes its /me verification. Hold the private
+          // target behind the exact session-family guard and release it only
+          // after that same session is verified.
+          pendingNotificationAction.current = pending;
+          return;
+        }
+        pendingNotificationAction.current = null;
+        clearPrivateNotificationState();
+        void retireOrphanedPushDelivery();
+        globalThis.dispatchEvent(notificationOpenEvent(null, null));
+        return;
+      }
+      void openNotificationAction(pending);
     }));
     return () => {
       active = false;
+      pendingNotificationAction.current = null;
       for (const handle of handles) void handle.remove();
       if (inAppTimer.current !== null) globalThis.clearTimeout(inAppTimer.current);
     };
-  }, [clearPrivateNotificationState, native, refresh]);
+  }, [clearPrivateNotificationState, native, openNotificationAction, refresh]);
 
   const value = useMemo<NotificationRuntimeValue>(() => Object.freeze({
     sessionAvailable,
