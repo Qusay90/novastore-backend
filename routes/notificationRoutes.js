@@ -5,6 +5,9 @@ const router = express.Router();
 const controller = require('../controllers/notificationController');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 const { requireCurrentAdmin, requireCurrentAdminIfClaimed } = require('../middlewares/currentAdmin');
+const { privateNoStore } = require('../middlewares/privateNoStore');
+
+router.use(privateNoStore);
 
 router.get('/', authenticate, requireCurrentAdminIfClaimed, controller.getCurrentNotifications);
 router.get('/unread-count', authenticate, requireCurrentAdminIfClaimed, controller.getCurrentUnreadCount);

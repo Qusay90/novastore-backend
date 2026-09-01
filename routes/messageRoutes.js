@@ -7,6 +7,9 @@ const {
     requireAdminCommerceCapabilityIfClaimed
 } = require('../middlewares/adminCommerceCapability');
 const { requireCurrentAdmin, requireCurrentAdminIfClaimed } = require('../middlewares/currentAdmin');
+const { privateNoStore } = require('../middlewares/privateNoStore');
+
+router.use(privateNoStore);
 
 router.get(
     '/history/:userId',

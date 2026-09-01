@@ -40,7 +40,9 @@ const safeDestination = (payload = {}) => {
     if (["order", "payment", "shipment"].includes(type) && id) return `/#/hesabim/siparisler/${id}`;
     if (type === "return_request") return "/#/hesabim/siparisler";
     if (type === "product" && id) return `/#/urun-id/${id}`;
-    if (type === "support_thread") return "/#/iletisim";
+    if (type === "support_thread") return "/#/destek";
+    if (type === "product_question" && id) return "/#/hesabim/sorularim";
+    if (type === "review" && id) return "/#/hesabim/degerlendirmelerim";
   }
   return NOTIFICATION_CENTER[role];
 };

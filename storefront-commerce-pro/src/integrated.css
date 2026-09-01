@@ -757,6 +757,16 @@
   flex-direction: column;
 }
 
+@media (min-width: 981px) {
+  .connected-account-sidebar {
+    max-height: calc(100vh - 174px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+}
+
 .account-logout {
   min-height: 46px;
   display: flex;
@@ -772,6 +782,245 @@
   font-size: 11px;
   font-weight: 750;
   cursor: pointer;
+}
+
+.account-history-list {
+  display: grid;
+  gap: 13px;
+}
+
+.account-history-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--white);
+  box-shadow: 0 8px 24px rgba(3, 29, 57, .045);
+}
+
+.account-history-card__target {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 12px;
+  color: var(--navy-900);
+}
+
+.account-history-card__target img,
+.account-history-card__target > span {
+  width: 56px;
+  height: 56px;
+  border-radius: 9px;
+}
+
+.account-history-card__target img {
+  object-fit: cover;
+}
+
+.account-history-card__target > span {
+  display: grid;
+  place-items: center;
+  background: var(--orange-100);
+  color: var(--orange-600);
+}
+
+.account-history-card__target > span svg {
+  width: 25px;
+  height: 25px;
+}
+
+.account-history-card__target > svg {
+  width: 16px;
+  color: var(--soft-muted);
+}
+
+.account-history-card__target.is-unavailable {
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  cursor: default;
+}
+
+.account-history-card__target.is-unavailable > small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.account-history-card__meta,
+.followed-store-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-history-card__meta time,
+.account-history-answer time {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.account-history-card__copy {
+  padding: 14px;
+  border-radius: 9px;
+  background: var(--page);
+}
+
+.account-history-card__copy > span,
+.account-history-answer span {
+  color: var(--orange-600);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.account-history-card__copy p,
+.account-history-answer p {
+  margin: 5px 0 0;
+  color: var(--navy-900);
+  font-size: 12px;
+  line-height: 1.58;
+}
+
+.account-history-answer,
+.account-history-pending {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #cce2ef;
+  border-radius: 9px;
+  background: #f2f9fd;
+}
+
+.account-history-answer > svg,
+.account-history-pending > svg {
+  flex: 0 0 auto;
+  width: 20px;
+  color: var(--navy-700);
+}
+
+.account-history-answer time {
+  display: block;
+  margin-top: 7px;
+}
+
+.account-history-pending {
+  align-items: center;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.account-review-rating {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--orange-500);
+}
+
+.account-review-rating svg {
+  width: 18px;
+  height: 18px;
+}
+
+.account-review-rating strong {
+  margin-left: 7px;
+  color: var(--navy-900);
+  font-size: 11px;
+}
+
+.followed-store-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 13px;
+}
+
+.followed-store-grid > article {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--white);
+}
+
+.followed-store-card__identity {
+  min-height: 112px;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 12px;
+  padding: 17px;
+}
+
+.followed-store-card__identity > span {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #fff1df, #ffe1bd);
+  color: var(--orange-600);
+}
+
+.followed-store-card__identity > span svg {
+  width: 27px;
+  height: 27px;
+}
+
+.followed-store-card__identity h2,
+.followed-store-card__identity p {
+  margin: 0;
+}
+
+.followed-store-card__identity small,
+.followed-store-card__identity p {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.followed-store-card__identity h2 {
+  margin-block: 4px;
+  color: var(--navy-900);
+  font-size: 17px;
+}
+
+.followed-store-card__identity > svg {
+  width: 16px;
+  color: var(--soft-muted);
+}
+
+.followed-store-card__actions {
+  min-height: 58px;
+  padding: 9px 12px 9px 17px;
+  border-top: 1px solid var(--line);
+  background: var(--page);
+}
+
+.followed-store-card__actions > span,
+.followed-store-card__actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.followed-store-card__actions > span {
+  color: var(--green);
+}
+
+.followed-store-card__actions button {
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--line-dark);
+  border-radius: 7px;
+  background: var(--white);
+  color: var(--navy-800);
+  cursor: pointer;
+}
+
+.followed-store-card__actions button:disabled {
+  opacity: .62;
+  cursor: wait;
 }
 
 .account-stats {
@@ -2732,23 +2981,38 @@
 }
 
 .assistant-fab {
-  min-width: 58px;
-  height: 58px;
+  position: relative;
+  width: 74px;
+  min-width: 74px;
+  height: 74px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  padding: 0 18px;
-  border: 1px solid rgba(255, 255, 255, .18);
+  padding: 5px;
+  border: 2px solid rgba(99, 216, 255, .82);
   border-radius: 999px;
-  background: linear-gradient(135deg, #062640, var(--navy-950));
+  background: radial-gradient(circle at 52% 45%, #164b78 0, #062640 56%, var(--navy-950) 100%);
   color: var(--white);
-  box-shadow: 0 16px 38px rgba(3, 29, 57, .28);
+  box-shadow: 0 0 0 4px rgba(247, 123, 24, .82), 0 0 0 7px rgba(7, 58, 99, .9), 0 18px 42px rgba(3, 29, 57, .34), 0 0 28px rgba(48, 204, 255, .34);
   font: inherit;
   font-size: 11px;
   font-weight: 800;
   cursor: pointer;
   transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+
+.assistant-fab .novabot-artwork {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scale(1.08);
+  filter: drop-shadow(0 5px 8px rgba(0, 13, 34, .32));
+}
+
+.assistant-fab:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 8px;
+  box-shadow: 0 0 0 12px var(--navy-900), 0 18px 42px rgba(3, 29, 57, .34);
 }
 
 .novabot-mark {
@@ -2780,9 +3044,9 @@
 }
 
 .assistant-fab:hover {
-  transform: translateY(-1px);
-  background: linear-gradient(135deg, #0b3858, var(--navy-950));
-  box-shadow: 0 20px 42px rgba(3, 29, 57, .34);
+  transform: translateY(-3px) scale(1.02);
+  background: radial-gradient(circle at 52% 45%, #1d659d 0, #0b3858 58%, var(--navy-950) 100%);
+  box-shadow: 0 0 0 4px rgba(255, 145, 45, .9), 0 0 0 7px rgba(7, 58, 99, .94), 0 22px 46px rgba(3, 29, 57, .38), 0 0 34px rgba(48, 204, 255, .48);
 }
 
 .assistant-fab:active {
@@ -2796,6 +3060,7 @@
   padding: 0;
   background: var(--white);
   color: var(--navy-900);
+  box-shadow: 0 12px 30px rgba(3, 29, 57, .24);
 }
 
 .assistant-window {
@@ -2845,6 +3110,14 @@
   border-radius: 11px;
   background: rgba(255, 255, 255, .1);
   color: #ffad62;
+}
+
+.assistant-window > header .novabot-artwork {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  transform: scale(1.12);
+  filter: drop-shadow(0 4px 7px rgba(0, 8, 26, .35));
 }
 
 .assistant-window > header i svg {
@@ -3907,11 +4180,11 @@ html[data-input-modality="pointer"] .check-option input:focus + span {
 
   .assistant-widget {
     right: 10px;
-    bottom: calc(78px + env(safe-area-inset-bottom));
+    bottom: calc(86px + env(safe-area-inset-bottom));
   }
 
   .assistant-widget.has-comparison {
-    bottom: calc(146px + env(safe-area-inset-bottom));
+    bottom: calc(154px + env(safe-area-inset-bottom));
   }
 
   .comparison-tray {
@@ -3984,9 +4257,10 @@ html[data-input-modality="pointer"] .check-option input:focus + span {
   }
 
   .assistant-fab {
-    height: 52px;
-    min-width: 52px;
-    padding-inline: 15px;
+    width: 60px;
+    height: 60px;
+    min-width: 60px;
+    padding: 4px;
   }
 
   .assistant-product-card {
@@ -4378,8 +4652,8 @@ body {
   }
 
   .assistant-fab {
-    width: 52px;
-    min-width: 52px;
+    width: 60px;
+    min-width: 60px;
     padding-inline: 0;
   }
 

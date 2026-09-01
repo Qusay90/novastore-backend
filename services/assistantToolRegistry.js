@@ -5,6 +5,7 @@ const {
 } = require('./catalogSearchService');
 
 const byPriceAsc = (left, right) => Number(left.price || 0) - Number(right.price || 0);
+const MAX_ASSISTANT_PRODUCT_IDS = 8;
 
 const byRatingDesc = (left, right) => {
     const ratingDiff = Number(right.averageRating || 0) - Number(left.averageRating || 0);
@@ -21,12 +22,15 @@ const uniqueProducts = (products) => {
     });
 };
 
+const normalizeProductIds = (ids = []) => [...new Set(
+    (Array.isArray(ids) ? ids : [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isSafeInteger(id) && id > 0)
+)].slice(0, MAX_ASSISTANT_PRODUCT_IDS);
+
 const resolveProductsByIds = async (ids = []) => {
     const resolved = await Promise.all(
-        ids
-            .map((id) => Number(id))
-            .filter(Number.isInteger)
-            .map((id) => getProductDetails(id))
+        normalizeProductIds(ids).map((id) => getProductDetails(id))
     );
     return uniqueProducts(resolved.filter(Boolean));
 };
@@ -80,6 +84,7 @@ module.exports = {
     getProductDetailsTool,
     getRecommendationsTool,
     getSimilarProductsTool,
+    normalizeProductIds,
     resolveProductsByIds,
     searchProductsTool
 };

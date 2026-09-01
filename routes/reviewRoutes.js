@@ -38,7 +38,7 @@ router.patch(
 );
 
 router.post('/', privateNoStore, authenticateCustomer, addReview);
-router.get('/product/:productId', getProductReviews);
+router.get('/product/:productId', privateNoStore, getProductReviews);
 router.get('/user/:userId', privateNoStore, authenticate, requireSelfOrAdmin('userId'), getUserReviews);
 
 module.exports = router;

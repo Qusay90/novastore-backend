@@ -73,6 +73,10 @@ import {
 } from "./ConnectedCustomerPages.jsx";
 import { ProductCommunity } from "./ProductCommunity.jsx";
 import { AssistantWidget } from "./AssistantWidget.jsx";
+import {
+  assistantConversationOwnerKey,
+  createAssistantConversationState,
+} from "./integration/assistantConversationState.js";
 import { NovaServiceIcon } from "./NovaServiceIcon.jsx";
 import { PublicStorePage } from "./PublicStorePage.jsx";
 import { CustomerProductCard } from "./CustomerProductCard.jsx";
@@ -361,6 +365,9 @@ function parseRoute() {
   if (pathname === "/hesabim/adresler") return { type: "account", section: "addresses", query };
   if (pathname === "/hesabim/kuponlar") return { type: "account", section: "coupons", query };
   if (pathname === "/hesabim/bildirimler") return { type: "account", section: "notifications", query };
+  if (pathname === "/hesabim/sorularim") return { type: "account", section: "questions", query };
+  if (pathname === "/hesabim/degerlendirmelerim") return { type: "account", section: "reviews", query };
+  if (pathname === "/hesabim/takip-ettigim-magazalar") return { type: "account", section: "followed-stores", query };
   if (pathname === "/hesabim/guvenlik") return { type: "account", section: "security", query };
   if (pathname === "/hesabim/siparisler") return { type: "account", section: "orders", query };
   if (pathname.startsWith("/hesabim/siparisler/")) {
@@ -1310,8 +1317,15 @@ function Footer({ businessIdentity = null }) {
   return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="#/hakkimizda">Hakkımızda</a><a href="#/iletisim">İletişim</a><a href="#/pazaryeri-bilgilendirmesi">Pazaryeri bilgilendirmesi</a><a href="#/satici-sozlesmesi">Satıcı sözleşmesi</a></div><div><strong>Yasal</strong><a href="#/gizlilik-politikasi">Gizlilik politikası</a><a href="#/kvkk-aydinlatma-metni">KVKK aydınlatma metni</a><a href="#/cerez-politikasi">Çerez politikası</a><a href="#/kullanim-ve-uyelik-kosullari">Kullanım ve üyelik koşulları</a></div><div><strong>Alışveriş koşulları</strong><a href="#/on-bilgilendirme-formu">Ön bilgilendirme formu</a><a href="#/mesafeli-satis-sozlesmesi">Mesafeli satış sözleşmesi</a><a href="#/iptal-iade-cayma-politikasi">İptal, iade ve cayma</a><a href="#/teslimat-ve-kargo-kosullari">Teslimat ve kargo</a><a href="#/islem-rehberi">İşlem rehberi</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/destek">Güvenli müşteri desteği</a><a href="#/yardim">Yardım merkezi</a><p>Ödeme bilgileri NovaStore sayfasında toplanmaz.</p></div>{identity && <address className="footer-business-identity"><strong>{identity.legalCompanyName}</strong><span>VKN: {identity.taxNumber} · MERSİS: {identity.mersisNumber}</span><span>{identity.registeredAddress}</span><a href={`mailto:${identity.kepAddress}`}>KEP: {identity.kepAddress}</a><a href={`tel:${identity.phone}`}>{identity.phone}</a><a href={`mailto:${identity.email}`}>{identity.email}</a></address>}</div><div className="shell footer-bottom"><span>© 2026 NovaStore.</span><span>{identity ? "İşletme kimliği yapılandırılmış public sözleşmeden yayımlanır." : "Şirket kimliği ve onaylı yasal metinler tamamlandığında burada yayımlanacaktır."}</span></div></footer>;
 }
 
-export function CommerceProRuntimeApp({ runtime }) {
+export function CommerceProRuntimeApp({
+  runtime,
+  assistantConversationState = null,
+  onAssistantConversationStateChange = null,
+}) {
   const { route, loading } = useRoute();
+  const [localAssistantConversationState, setLocalAssistantConversationState] = useState(createAssistantConversationState);
+  const activeAssistantConversationState = assistantConversationState || localAssistantConversationState;
+  const updateAssistantConversationState = onAssistantConversationStateChange || setLocalAssistantConversationState;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart] = useState(() => [...runtime.cart.initialItems]);
@@ -1352,7 +1366,7 @@ export function CommerceProRuntimeApp({ runtime }) {
     if (persist) {
       return runtime.cart.persist(normalized).then(() => true).catch(() => {
         notify("Sepet sunucuya aktarılamadı; yerel değişikliğin korunuyor.");
-        return false;
+        return { appliedLocally: true, persisted: false };
       });
     }
     return Promise.resolve(true);
@@ -1394,8 +1408,8 @@ export function CommerceProRuntimeApp({ runtime }) {
         ? { ...item, quantity: nextQuantity }
         : item)
       : [...current, { productId, quantity: nextQuantity }];
-    const persisted = await replaceCart(next);
-    if (!persisted) return false;
+    const mutationResult = await replaceCart(next);
+    if (mutationResult !== true) return mutationResult;
     notify(nextQuantity - currentQuantity < requestedQuantity
       ? `${product.name} mevcut stok sınırına göre sepete eklendi.`
       : `${product.name} sepete eklendi`);
@@ -1440,8 +1454,11 @@ export function CommerceProRuntimeApp({ runtime }) {
     replaceCart(next);
   }
 
-  function removeFromCart(productId) {
-    replaceCart(cartRef.current.filter((item) => item.productId !== productId));
+  async function removeFromCart(productId) {
+    const current = cartRef.current;
+    const next = current.filter((item) => item.productId !== productId);
+    if (next.length === current.length) return false;
+    return replaceCart(next);
   }
 
   function toggleComparison(productId) {
@@ -1569,7 +1586,7 @@ export function CommerceProRuntimeApp({ runtime }) {
     ? <CustomerAccountPage session={session} account={runtime.customer} section={route.section} orderId={route.orderId} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} reviewOnly={localReviewSession} />
     : authReturn(route.section === "order-detail"
       ? `/hesabim/siparisler/${route.orderId}`
-      : `/hesabim${route.section === "orders" ? "/siparisler" : route.section === "addresses" ? "/adresler" : route.section === "coupons" ? "/kuponlar" : route.section === "notifications" ? "/bildirimler" : route.section === "security" ? "/guvenlik" : ""}`);
+      : `/hesabim${route.section === "orders" ? "/siparisler" : route.section === "addresses" ? "/adresler" : route.section === "coupons" ? "/kuponlar" : route.section === "notifications" ? "/bildirimler" : route.section === "questions" ? "/sorularim" : route.section === "reviews" ? "/degerlendirmelerim" : route.section === "followed-stores" ? "/takip-ettigim-magazalar" : route.section === "security" ? "/guvenlik" : ""}`);
   else if (route.type === "checkout") content = authenticated
     ? <CustomerCheckoutPage step={route.step} session={session} account={runtime.customer} checkout={runtime.checkout} items={cartItems} getProductImage={productImage} onStepChange={(step) => navigate(`/odeme/${step === "delivery" ? "teslimat" : step === "payment" ? "odeme" : "onay"}`)} onNotice={notify} reviewOnly={localReviewSession} />
     : authReturn(`/odeme/${route.step === "delivery" ? "teslimat" : route.step === "payment" ? "odeme" : "onay"}`);
@@ -1600,7 +1617,7 @@ export function CommerceProRuntimeApp({ runtime }) {
       <MobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={categoryDrawerTriggerRef} />
       <CartDrawer open={cartOpen} items={cartItems} onClose={closeCart} onRemove={removeFromCart} onQuantity={updateCartQuantity} returnFocusRef={cartTriggerRef} />
       <MobileBottomNav route={route} cartCount={cartCount} favoriteCount={favorites.size} />
-      {["help", "support"].includes(route.type) && <AssistantWidget route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonVisible} />}
+      <AssistantWidget key={assistantConversationOwnerKey(session)} disabled={runtime.readOnlyPreview === true} route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonVisible} conversationState={activeAssistantConversationState} onConversationStateChange={updateAssistantConversationState} />
       <div className={cx("toast", toast && "is-visible")} role="status" aria-live="polite"><CheckCircle weight="fill" /><span>{toast}</span></div>
     </RuntimeComparisonContext.Provider>
   );
@@ -1633,6 +1650,7 @@ function IntegrationState({ phase, error, onRetry }) {
 
 export function IntegratedApp() {
   const [runtimeRoute, setRuntimeRoute] = useState(parseRoute);
+  const [assistantConversationState, setAssistantConversationState] = useState(createAssistantConversationState);
   useEffect(() => {
     const handleRouteChange = () => setRuntimeRoute(parseRoute());
     window.addEventListener("hashchange", handleRouteChange);
@@ -1660,5 +1678,5 @@ export function IntegratedApp() {
   if (resource.phase !== "ready") {
     return <IntegrationState phase={resource.phase} error={resource.error} onRetry={resource.retry} />;
   }
-  return <CommerceProRuntimeApp runtime={resource.runtime} />;
+  return <CommerceProRuntimeApp runtime={resource.runtime} assistantConversationState={assistantConversationState} onAssistantConversationStateChange={setAssistantConversationState} />;
 }

@@ -7,6 +7,24 @@ const {
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 const DEFAULT_OLLAMA_MODEL = 'llama3.1';
 const FALLBACK_PROVIDER_NAMES = new Set(['mock', 'ollama', 'gemini', 'openai']);
+const AI_PROVIDER_TIMEOUT_MS = 15000;
+
+const fetchProviderResponse = async (url, options = {}, {
+    fetchImpl = globalThis.fetch,
+    timeoutMs = AI_PROVIDER_TIMEOUT_MS
+} = {}) => {
+    if (typeof fetchImpl !== 'function') throw new TypeError('AI provider fetch is unavailable.');
+    const boundedTimeout = Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 60000
+        ? timeoutMs
+        : AI_PROVIDER_TIMEOUT_MS;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort('provider-timeout'), boundedTimeout);
+    try {
+        return await fetchImpl(url, { ...options, signal: controller.signal });
+    } finally {
+        clearTimeout(timer);
+    }
+};
 
 class AiProviderFallbackError extends Error {
     constructor(message, { provider, statusCode = null, retryAfterMs = null, payload = null } = {}) {
@@ -154,6 +172,7 @@ const OPENAI_TOOLS = [
                     productIds: {
                         type: "array",
                         items: { type: "integer" },
+                        maxItems: 8,
                         description: "Karşılaştırılacak ürünlerin ID listesi"
                     }
                 },
@@ -297,6 +316,7 @@ const GEMINI_TOOLS = [
                         productIds: {
                             type: "ARRAY",
                             items: { type: "INTEGER" },
+                            maxItems: 8,
                             description: "Karşılaştırılacak ürünlerin ID listesi"
                         }
                     },
@@ -552,7 +572,7 @@ class GeminiProvider {
 
         while (loopCount < maxLoops) {
             loopCount++;
-            const response = await fetch(`${this.baseUrl.replace(/\/$/, '')}/models/${encodeURIComponent(this.model)}:generateContent`, {
+            const response = await fetchProviderResponse(`${this.baseUrl.replace(/\/$/, '')}/models/${encodeURIComponent(this.model)}:generateContent`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -691,7 +711,7 @@ class OpenAIProvider {
 
         while (loopCount < maxLoops) {
             loopCount++;
-            const response = await fetch(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+            const response = await fetchProviderResponse(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -837,6 +857,7 @@ module.exports = {
     MockAssistantProvider,
     OllamaProvider,
     OpenAIProvider,
+    fetchProviderResponse,
     createAiProvider,
     parseToolArguments
 };

@@ -14,11 +14,11 @@ const cases = [
   ["payment", 77, "#/hesabim/siparisler/77", "orders"],
   ["shipment", 78, "#/hesabim/siparisler/78", "orders"],
   ["product", 72, "#/urun-id/72", "catalog"],
-  ["product_question", 73, "#/hesabim", "questions"],
+  ["product_question", 73, "#/hesabim/sorularim", "questions"],
   ["return_request", 74, "#/hesabim/siparisler", "returns"],
-  ["review", 75, "#/hesabim", "reviews"],
+  ["review", 75, "#/hesabim/degerlendirmelerim", "reviews"],
   ["store", 79, "#/hesabim/bildirimler", "sellerApplications"],
-  ["support_thread", 76, "#/iletisim", "support"],
+  ["support_thread", 76, "#/destek", "support"],
 ];
 
 for (const [entityType, entityId, customerTarget, adminTarget] of cases) {

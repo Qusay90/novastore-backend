@@ -14,6 +14,7 @@ const smokeTests = [
     'tests/legacyLogoutRevocationSmoke.js',
     'tests/webCustomerLogoutSmoke.mjs',
     'tests/sharedStateSmoke.js',
+    'tests/webSharedStatePrincipalIsolationSmoke.js',
     'tests/turkiyeAddressContractSmoke.js',
     'tests/addressCrudSmoke.js',
     'tests/addressMigrationGuardSmoke.js',

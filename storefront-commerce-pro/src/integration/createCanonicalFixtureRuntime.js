@@ -48,6 +48,59 @@ export function createCanonicalFixtureRuntime({ root = globalThis } = {}) {
     createdAt: "2026-07-16T09:00:00.000Z",
     isRead: false,
   }];
+  const questions = Object.freeze([
+    Object.freeze({
+      id: 701,
+      productId: "NS-1001",
+      productName: "iPhone 15 Pro",
+      productImage: "",
+      question: "Bu ürünün garanti süresi nedir?",
+      answer: "Ürün, satıcı mağaza tarafından sağlanan 2 yıl garanti kapsamındadır.",
+      status: "answered",
+      createdAt: "2026-08-28T10:30:00.000Z",
+      answeredAt: "2026-08-28T13:15:00.000Z",
+    }),
+    Object.freeze({
+      id: 702,
+      productId: "NS-1004",
+      productName: "Nova Akıllı Saat",
+      productImage: "",
+      question: "Kordon ölçüsü ayarlanabiliyor mu?",
+      answer: "",
+      status: "pending",
+      createdAt: "2026-08-31T09:00:00.000Z",
+      answeredAt: "",
+    }),
+  ]);
+  const reviews = Object.freeze([
+    Object.freeze({
+      id: 801,
+      productId: "NS-1001",
+      productName: "iPhone 15 Pro",
+      productImage: "",
+      rating: 5,
+      comment: "Paketleme özenliydi ve ürün beklediğim gibi geldi.",
+      status: "PUBLISHED",
+      createdAt: "2026-08-27T16:45:00.000Z",
+    }),
+    Object.freeze({
+      id: 802,
+      productId: "NS-1006",
+      productName: "Nova Kablosuz Kulaklık",
+      productImage: "",
+      rating: 4,
+      comment: "Ses kalitesi iyi; değerlendirmem yayın kontrolünde.",
+      status: "PENDING",
+      createdAt: "2026-08-30T14:20:00.000Z",
+    }),
+  ]);
+  let followedStores = [Object.freeze({
+    slug: "nova-teknoloji",
+    name: "Nova Teknoloji",
+    following: true,
+    followerCount: 1284,
+    followedAt: "2026-08-20T12:00:00.000Z",
+  })];
   let supportMessages = [];
   let pendingPurchase = [];
 
@@ -89,6 +142,15 @@ export function createCanonicalFixtureRuntime({ root = globalThis } = {}) {
       addresses = addresses.map((item) => ({ ...item, isDefault: String(item.id) === String(id) }));
     },
     listCoupons: async () => [],
+    listQuestions: async () => questions.map((question) => ({ ...question })),
+    listReviews: async () => reviews.map((review) => ({ ...review })),
+    listFollowedStores: async () => followedStores.map((store) => ({ ...store })),
+    unfollowStore: async (_activeSession, slug) => {
+      const before = followedStores.length;
+      followedStores = followedStores.filter((store) => store.slug !== slug);
+      if (followedStores.length === before) throw new Error("Fixture mağazası bulunamadı.");
+      return Object.freeze({ following: false });
+    },
     listNotifications: async () => notifications.map((item) => ({ ...item })),
     markNotificationRead: async (id) => {
       notifications = notifications.map((item) => String(item.id) === String(id) ? { ...item, isRead: true } : item);

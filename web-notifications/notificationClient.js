@@ -68,8 +68,9 @@ export const resolveNotificationTarget = (value, role) => {
     if (["order", "payment", "shipment"].includes(target.entityType)) return `#/hesabim/siparisler/${target.entityId}`;
     if (target.entityType === "return_request") return "#/hesabim/siparisler";
     if (target.entityType === "product") return `#/urun-id/${target.entityId}`;
-    if (target.entityType === "support_thread") return "#/iletisim";
-    if (["product_question", "review"].includes(target.entityType)) return "#/hesabim";
+    if (target.entityType === "support_thread") return "#/destek";
+    if (target.entityType === "product_question") return "#/hesabim/sorularim";
+    if (target.entityType === "review") return "#/hesabim/degerlendirmelerim";
     return "#/hesabim/bildirimler";
   }
   return target;

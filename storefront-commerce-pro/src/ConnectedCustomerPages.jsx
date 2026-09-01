@@ -11,6 +11,7 @@ import {
   CreditCard,
   EnvelopeSimple,
   Heart,
+  Headphones,
   Key,
   LockKey,
   MapPin,
@@ -18,14 +19,18 @@ import {
   PaperPlaneTilt,
   PencilSimple,
   Plus,
+  Question,
   Receipt,
   ShieldCheck,
   ShoppingBag,
   SignOut,
+  Star,
+  Storefront,
   Ticket,
   Trash,
   Truck,
   User,
+  UserMinus,
   WarningCircle,
 } from "./CustomerIcon.jsx";
 import { NovaServiceIcon } from "./NovaServiceIcon.jsx";
@@ -292,8 +297,12 @@ const ACCOUNT_ITEMS = Object.freeze([
   [MapPin, "Adreslerim", "#/hesabim/adresler", "addresses"],
   [Receipt, "Siparişlerim", "#/hesabim/siparisler", "orders"],
   [Heart, "Favorilerim", "#/favoriler", "favorites"],
+  [Question, "Sorulan Sorularım", "#/hesabim/sorularim", "questions"],
+  [Star, "Değerlendirmelerim", "#/hesabim/degerlendirmelerim", "reviews"],
+  [Storefront, "Takip Ettiğim Mağazalar", "#/hesabim/takip-ettigim-magazalar", "followed-stores"],
   [Ticket, "Kuponlarım", "#/hesabim/kuponlar", "coupons"],
   [Bell, "Bildirimlerim", "#/hesabim/bildirimler", "notifications"],
+  [Headphones, "Destek Mesajlarım", "#/destek", "support"],
   [LockKey, "Güvenlik", "#/hesabim/guvenlik", "security"],
 ]);
 
@@ -608,6 +617,77 @@ function CouponsSection({ account, onNotice }) {
   return <><div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Kuponlarım</h1><p>Yalnız şu anda aktif olan gerçek kuponlar gösterilir.</p></div></div>{coupons.length ? <div className="connected-coupon-grid">{coupons.map((coupon) => <article key={coupon.id || coupon.code}><Ticket /><div><span>Kupon kodu</span><h2>{coupon.code}</h2><p>{coupon.type === "PERCENT" ? `%${coupon.value} indirim` : `${money.format(coupon.value)} indirim`}{coupon.minOrderAmount > 0 ? ` · En az ${money.format(coupon.minOrderAmount)} sepet` : ""}</p>{coupon.endsAt && <small><Clock /> {formatDate(coupon.endsAt, false)} tarihine kadar</small>}</div><button type="button" onClick={() => copy(coupon.code)}><Copy /> Kopyala</button></article>)}</div> : <div className="connected-empty"><Ticket /><h2>Aktif kupon bulunmuyor</h2><p>Yeni bir kupon tanımlandığında burada görünecek.</p></div>}</>;
 }
 
+function AccountHistoryProductTarget({ item, productById, FallbackIcon }) {
+  const available = productById.has(Number(item.productId));
+  const media = item.productImage ? <img src={item.productImage} alt="" /> : <span><FallbackIcon /></span>;
+  if (available) {
+    return <a className="account-history-card__target" href={`#/urun-id/${item.productId}`} aria-label={`${item.productName} ürününe git`}>
+      {media}<strong>{item.productName}</strong><CaretRight />
+    </a>;
+  }
+  return <div className="account-history-card__target is-unavailable">
+    {media}<strong>{item.productName}</strong><small>Artık satışta değil</small>
+  </div>;
+}
+
+function QuestionsSection({ session, account, productById }) {
+  const resource = useAsyncResource((options) => account.listQuestions(session, options), [account, session]);
+  if (resource.phase !== "ready") return <InlineState phase={resource.phase} error={resource.error} onRetry={resource.reload} />;
+  const questions = resource.data;
+  return <>
+    <div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Sorulan Sorularım</h1><p>Ürünler hakkında sorduğun soruları ve mağaza yanıtlarını kendi hesabından takip et.</p></div></div>
+    {questions.length ? <div className="account-history-list">{questions.map((question) => <article className="account-history-card" key={question.id}>
+      <AccountHistoryProductTarget item={question} productById={productById} FallbackIcon={Question} />
+      <div className="account-history-card__meta"><span className={`status-pill is-${question.status === "answered" ? "success" : "warning"}`}>{question.status === "answered" ? "Yanıtlandı" : "Yanıt bekliyor"}</span><time dateTime={question.createdAt || undefined}>{formatDate(question.createdAt)}</time></div>
+      <div className="account-history-card__copy"><span>Senin sorun</span><p>{question.question}</p></div>
+      {question.answer ? <div className="account-history-answer"><ChatCircleText /><div><span>Mağaza yanıtı</span><p>{question.answer}</p>{question.answeredAt && <time dateTime={question.answeredAt}>{formatDate(question.answeredAt)}</time>}</div></div> : <div className="account-history-pending"><Clock /> Mağaza yanıtladığında burada göreceksin.</div>}
+    </article>)}</div> : <div className="connected-empty"><Question /><h2>Henüz soru sormadın</h2><p>Ürün detayındaki “Soru sor” alanından ilettiğin sorular burada görünür.</p><a className="primary-button" href="#/">Ürünleri keşfet</a></div>}
+  </>;
+}
+
+const REVIEW_STATUS_LABELS = Object.freeze({
+  PENDING: ["İncelemede", "warning"],
+  PUBLISHED: ["Yayında", "success"],
+  HIDDEN: ["Yayından kaldırıldı", "info"],
+});
+
+function ReviewsSection({ session, account, productById }) {
+  const resource = useAsyncResource((options) => account.listReviews(session, options), [account, session]);
+  if (resource.phase !== "ready") return <InlineState phase={resource.phase} error={resource.error} onRetry={resource.reload} />;
+  const reviews = resource.data;
+  return <>
+    <div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Değerlendirmelerim</h1><p>Yaptığın ürün değerlendirmelerini ve güncel yayın durumlarını görüntüle.</p></div></div>
+    {reviews.length ? <div className="account-history-list">{reviews.map((review) => { const [statusLabel, statusTone] = REVIEW_STATUS_LABELS[review.status] || REVIEW_STATUS_LABELS.PENDING; return <article className="account-history-card" key={review.id}>
+      <AccountHistoryProductTarget item={review} productById={productById} FallbackIcon={Star} />
+      <div className="account-history-card__meta"><span className={`status-pill is-${statusTone}`}>{statusLabel}</span><time dateTime={review.createdAt || undefined}>{formatDate(review.createdAt)}</time></div>
+      <div className="account-review-rating" role="img" aria-label={`5 üzerinden ${review.rating} puan`}>{Array.from({ length: 5 }, (_, index) => <Star key={index} weight={index < review.rating ? "fill" : "regular"} />)}<strong>{review.rating}.0</strong></div>
+      <div className="account-history-card__copy"><span>Değerlendirmen</span><p>{review.comment || "Bu değerlendirmede yazılı yorum bulunmuyor."}</p></div>
+    </article>; })}</div> : <div className="connected-empty"><Star /><h2>Henüz değerlendirmen yok</h2><p>Teslim edilen ürünler için yaptığın doğrulanmış değerlendirmeler burada gösterilir.</p><a className="primary-button" href="#/hesabim/siparisler">Siparişlerime git</a></div>}
+  </>;
+}
+
+function FollowedStoresSection({ session, account, onNotice }) {
+  const resource = useAsyncResource((options) => account.listFollowedStores(session, options), [account, session]);
+  const [busySlug, setBusySlug] = useState("");
+  const [error, setError] = useState("");
+  if (resource.phase !== "ready") return <InlineState phase={resource.phase} error={resource.error} onRetry={resource.reload} />;
+  const stores = resource.data;
+  const unfollow = async (store) => {
+    setBusySlug(store.slug); setError("");
+    try { await account.unfollowStore(session, store.slug); onNotice(`${store.name} mağazası takipten çıkarıldı.`); resource.reload(); }
+    catch (requestError) { setError(errorMessage(requestError, "Mağaza takipten çıkarılamadı.")); }
+    finally { setBusySlug(""); }
+  };
+  return <>
+    <div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Takip Ettiğim Mağazalar</h1><p>Takip ettiğin ve müşterilere açık olan mağazalara güvenli biçimde ulaş.</p></div></div>
+    {error && <div className="form-message is-error" role="alert"><WarningCircle />{error}</div>}
+    {stores.length ? <div className="followed-store-grid">{stores.map((store) => <article key={store.slug}>
+      <a className="followed-store-card__identity" href={`#/magaza/${store.slug}`}><span><Storefront /></span><div><small>Takip edilen mağaza</small><h2>{store.name}</h2><p>{store.followerCount.toLocaleString("tr-TR")} takipçi</p></div><CaretRight /></a>
+      <div className="followed-store-card__actions"><span><CheckCircle /> Takip ediliyor</span><button type="button" disabled={Boolean(busySlug)} onClick={() => unfollow(store)}><UserMinus /> {busySlug === store.slug ? "Çıkarılıyor…" : "Takibi bırak"}</button></div>
+    </article>)}</div> : <div className="connected-empty"><Storefront /><h2>Takip ettiğin mağaza yok</h2><p>Bir mağazayı takip ettiğinde güncel ve müşterilere açık mağazalar burada görünür.</p><a className="primary-button" href="#/">Mağazaları keşfet</a></div>}
+  </>;
+}
+
 const notificationIcon = (type) => {
   if (/ORDER|SHIPMENT|TRACKING/u.test(type)) return Truck;
   if (/REVIEW|QUESTION|SUPPORT/u.test(type)) return ChatCircleText;
@@ -714,6 +794,9 @@ export function CustomerAccountPage({
   else if (section === "orders" || section === "order-detail") content = <OrdersSection session={session} account={account} orderId={orderId} productById={productById} getProductImage={getProductImage} onNotice={onNotice} />;
   else if (section === "addresses") content = <AddressesSection account={account} user={session.user} onNotice={onNotice} />;
   else if (section === "coupons") content = <CouponsSection account={account} onNotice={onNotice} />;
+  else if (section === "questions") content = <QuestionsSection session={session} account={account} productById={productById} />;
+  else if (section === "reviews") content = <ReviewsSection session={session} account={account} productById={productById} />;
+  else if (section === "followed-stores") content = <FollowedStoresSection session={session} account={account} onNotice={onNotice} />;
   else if (section === "notifications") content = <NotificationsSection session={session} account={account} onNotice={onNotice} />;
   else if (section === "security") content = <SecuritySection account={account} onNotice={onNotice} reviewOnly={reviewOnly} />;
   else content = <div className="connected-empty"><WarningCircle /><h2>Hesap bölümü bulunamadı</h2><a className="primary-button" href="#/hesabim">Hesap özetine dön</a></div>;

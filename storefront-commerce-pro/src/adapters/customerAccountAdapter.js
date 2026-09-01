@@ -199,6 +199,69 @@ export const normalizeCustomerMessage = (value, customerId) => {
   });
 };
 
+const normalizeStoreSlug = (value) => {
+  const slug = asTrimmedString(value).toLocaleLowerCase("en-US");
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && slug.length <= 160 ? slug : null;
+};
+
+export const normalizeCustomerQuestion = (value) => {
+  if (!value || typeof value !== "object") return null;
+  const id = toPositiveInteger(value.id);
+  const productId = toPositiveInteger(value.product_id || value.productId);
+  const question = asTrimmedString(value.question);
+  const productName = asTrimmedString(value.product_name || value.productName);
+  if (!id || !productId || !question || !productName) return null;
+  const answer = asTrimmedString(value.answer) || null;
+  return Object.freeze({
+    id,
+    productId,
+    productName,
+    productImage: safeMediaUrl(value.product_image || value.productImage || value.image_url),
+    question,
+    answer,
+    status: answer ? "answered" : "pending",
+    createdAt: value.created_at || value.createdAt || null,
+    answeredAt: value.answered_at || value.answeredAt || null,
+  });
+};
+
+const REVIEW_STATUSES = new Set(["PENDING", "PUBLISHED", "HIDDEN"]);
+
+export const normalizeCustomerReview = (value) => {
+  if (!value || typeof value !== "object") return null;
+  const id = toPositiveInteger(value.id);
+  const productId = toPositiveInteger(value.product_id || value.productId);
+  const productName = asTrimmedString(value.product_name || value.productName);
+  const rating = Number(value.rating);
+  if (!id || !productId || !productName || !Number.isInteger(rating) || rating < 1 || rating > 5) return null;
+  const rawStatus = asTrimmedString(value.status).toUpperCase();
+  return Object.freeze({
+    id,
+    productId,
+    productName,
+    productImage: safeMediaUrl(value.image_url || value.product_image || value.productImage),
+    rating,
+    comment: asTrimmedString(value.comment),
+    status: REVIEW_STATUSES.has(rawStatus) ? rawStatus : "PENDING",
+    createdAt: value.created_at || value.createdAt || null,
+  });
+};
+
+export const normalizeFollowedStore = (value) => {
+  if (!value || typeof value !== "object") return null;
+  const slug = normalizeStoreSlug(value.store_slug || value.storeSlug || value.slug);
+  const name = asTrimmedString(value.store_name || value.storeName || value.name);
+  if (!slug || !name || value.following !== true) return null;
+  const followerCount = Number(value.follower_count ?? value.followerCount ?? 0);
+  return Object.freeze({
+    slug,
+    name,
+    following: true,
+    followerCount: Number.isSafeInteger(followerCount) && followerCount >= 0 ? followerCount : 0,
+    followedAt: value.followed_at || value.followedAt || null,
+  });
+};
+
 const requireUserId = (session) => {
   const id = toPositiveInteger(session?.user?.id);
   if (!id) throw new Error("Doğrulanmış müşteri oturumu gereklidir.");
@@ -440,6 +503,34 @@ export function createCustomerAccountAdapter({
     return Object.freeze((Array.isArray(payload) ? payload : []).map(normalizeCustomerOrder).filter(Boolean));
   };
 
+  const listQuestions = async (session, options = {}) => {
+    requireUserId(session);
+    const payload = await http.request("/api/questions/user", { signal: options.signal });
+    return Object.freeze((Array.isArray(payload) ? payload : []).map(normalizeCustomerQuestion).filter(Boolean));
+  };
+
+  const listReviews = async (session, options = {}) => {
+    const userId = requireUserId(session);
+    const payload = await http.request(`/api/reviews/user/${userId}`, { signal: options.signal });
+    return Object.freeze((Array.isArray(payload) ? payload : []).map(normalizeCustomerReview).filter(Boolean));
+  };
+
+  const listFollowedStores = async (session, options = {}) => {
+    requireUserId(session);
+    const payload = await http.request("/api/store-follows", { signal: options.signal });
+    return Object.freeze((Array.isArray(payload) ? payload : []).map(normalizeFollowedStore).filter(Boolean));
+  };
+
+  const unfollowStore = async (session, storeSlug, options = {}) => {
+    requireUserId(session);
+    const slug = normalizeStoreSlug(storeSlug);
+    if (!slug) throw new Error("Geçersiz mağaza kimliği.");
+    return http.request(`/api/store-follows/${encodeURIComponent(slug)}`, {
+      method: "DELETE",
+      signal: options.signal,
+    });
+  };
+
   const cancelOrder = async (order, options = {}) => {
     const orderId = toPositiveInteger(order?.id ?? order);
     if (!orderId) throw new Error("Geçersiz sipariş kimliği.");
@@ -569,6 +660,10 @@ export function createCustomerAccountAdapter({
     deleteAddress,
     setDefaultAddress,
     listOrders,
+    listQuestions,
+    listReviews,
+    listFollowedStores,
+    unfollowStore,
     cancelOrder,
     createReturnRequest,
     listCoupons,
@@ -587,6 +682,7 @@ export const customerAccountAdapterTestUtils = Object.freeze({
   addressFingerprint,
   addressPayload,
   normalizeLegacyAddressPayload,
+  normalizeStoreSlug,
   parseArray,
   readLegacyAddressPayloads,
   readStoredUserId,

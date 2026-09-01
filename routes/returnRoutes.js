@@ -4,8 +4,10 @@ const { createReturnRequest, getReturnById, getAllReturnRequests, getMyReturnReq
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 const { requireCurrentAdmin, requireCurrentAdminIfClaimed } = require('../middlewares/currentAdmin');
 const { requireAdminCommerceCapabilityInStaging } = require('../middlewares/adminCommerceCapability');
+const { privateNoStore } = require('../middlewares/privateNoStore');
 
 const requireStagingReturnWrite = requireAdminCommerceCapabilityInStaging('returnWrite');
+router.use(privateNoStore);
 
 router.post('/', authenticate, requireCurrentAdminIfClaimed, createReturnRequest);
 router.get('/admin/all', authenticate, requireAdmin, requireCurrentAdmin, getAllReturnRequests);

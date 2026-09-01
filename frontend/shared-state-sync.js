@@ -1,10 +1,13 @@
 (function (root) {
     const CART_PREFIX = 'novastore_cart_';
     const CART_MIGRATION_PREFIX = 'novastore_cart_migrated_';
+    const PRINCIPAL_CHANGED_CODE = 'SHARED_STATE_PRINCIPAL_CHANGED';
     const writeQueues = new Map();
     const recentNotices = new Map();
     let hydratePromise = null;
-    let hydrateUserId = null;
+    let hydratePrincipal = null;
+    let activePrincipal = null;
+    let principalSequence = 0;
 
     function storage() {
         return root.localStorage;
@@ -36,7 +39,48 @@
         return Boolean(getToken()) && getUserId() !== 'guest';
     }
 
-    function clearExpiredSession() {
+    function capturePrincipal() {
+        const userId = getUserId();
+        const token = getToken();
+        if (!token || userId === 'guest') {
+            activePrincipal = null;
+            return null;
+        }
+        if (
+            !activePrincipal
+            || activePrincipal.userId !== userId
+            || activePrincipal.token !== token
+        ) {
+            principalSequence += 1;
+            activePrincipal = Object.freeze({
+                userId,
+                token,
+                queueScope: `principal-${principalSequence}`
+            });
+        }
+        return activePrincipal;
+    }
+
+    function isCurrentPrincipal(principal) {
+        return Boolean(principal)
+            && principal === activePrincipal
+            && getUserId() === principal.userId
+            && getToken() === principal.token;
+    }
+
+    function principalChangedError() {
+        const error = new Error('Oturum değiştiği için bekleyen ortak durum işlemi iptal edildi.');
+        error.status = 409;
+        error.code = PRINCIPAL_CHANGED_CODE;
+        return error;
+    }
+
+    function assertCurrentPrincipal(principal) {
+        if (!isCurrentPrincipal(principal)) throw principalChangedError();
+    }
+
+    function clearExpiredSession(principal = null) {
+        if (principal && !isCurrentPrincipal(principal)) return;
         storage().removeItem('nova_user_token');
         storage().removeItem('nova_user_info');
         root.dispatchEvent(new CustomEvent('novastore:auth-required'));
@@ -126,33 +170,44 @@
     }
 
     function shouldRetry(error) {
+        if (error?.code === PRINCIPAL_CHANGED_CODE) return false;
         return !error.status || error.status === 408 || error.status === 429 || error.status >= 500;
     }
 
-    async function apiFetch(path, options = {}, attempt = 0) {
+    async function apiFetch(path, options = {}, attempt = 0, principal = null) {
+        const requestPrincipal = principal || capturePrincipal();
         try {
+            if (requestPrincipal) assertCurrentPrincipal(requestPrincipal);
             const response = await root.fetch(path, {
                 ...options,
                 headers: {
                     'Content-Type': 'application/json',
                     ...(options.headers || {}),
-                    Authorization: `Bearer ${getToken()}`
+                    Authorization: `Bearer ${requestPrincipal?.token || getToken()}`
                 }
             });
             const payload = await readResponsePayload(response);
+            if (requestPrincipal) assertCurrentPrincipal(requestPrincipal);
             if (!response.ok) {
                 const error = new Error(payload.error || payload.message || 'Ortak durum senkronlanamadı.');
                 error.status = response.status;
                 error.code = payload.code;
                 error.payload = payload;
-                if (response.status === 401) clearExpiredSession();
+                if (response.status === 401) clearExpiredSession(requestPrincipal);
                 throw error;
             }
             return payload;
         } catch (error) {
+            if (
+                requestPrincipal
+                && !isCurrentPrincipal(requestPrincipal)
+                && error?.status !== 401
+            ) throw principalChangedError();
             if (attempt === 0 && shouldRetry(error)) {
+                if (requestPrincipal) assertCurrentPrincipal(requestPrincipal);
                 await wait(250);
-                return apiFetch(path, options, attempt + 1);
+                if (requestPrincipal) assertCurrentPrincipal(requestPrincipal);
+                return apiFetch(path, options, attempt + 1, requestPrincipal);
             }
             throw error;
         }
@@ -200,6 +255,7 @@
     }
 
     function reportError(scope, error, message) {
+        if (error?.code === PRINCIPAL_CHANGED_CODE) return;
         console.error(`[NovaStore ${scope} sync]`, {
             status: error?.status || null,
             code: error?.code || null,
@@ -211,50 +267,63 @@
     }
 
     async function loadCart() {
-        if (!isAuthenticated()) return [];
-        const response = await loadCartState();
-        return response.items;
+        const principal = capturePrincipal();
+        if (!principal) return [];
+        const response = await loadCartState(principal);
+        assertCurrentPrincipal(principal);
+        const items = response.items;
+        assertCurrentPrincipal(principal);
+        return items;
     }
 
-    async function loadCartState() {
-        if (!isAuthenticated()) return { exists: false, items: [] };
-        const response = await apiFetch('/api/shared-state/cart');
-        return {
+    async function loadCartState(principal = capturePrincipal()) {
+        if (!principal) return { exists: false, items: [] };
+        const response = await apiFetch('/api/shared-state/cart', {}, 0, principal);
+        assertCurrentPrincipal(principal);
+        const state = {
             exists: response.exists === true,
             updatedAt: response.updatedAt || null,
             payload: response.payload || {},
             items: normalizeCartItems(response.payload && response.payload.items)
         };
+        assertCurrentPrincipal(principal);
+        return state;
     }
 
     async function saveCart(items) {
-        if (!isAuthenticated()) return null;
+        const principal = capturePrincipal();
+        if (!principal) return null;
         const normalized = normalizeCartItems(items);
-        return enqueueWrite('cart', () => apiFetch('/api/shared-state/cart', {
+        return enqueueWrite(`cart:${principal.queueScope}`, () => apiFetch('/api/shared-state/cart', {
             method: 'PUT',
             body: JSON.stringify({ payload: { version: 1, items: normalized } })
-        }));
+        }, 0, principal));
     }
 
     async function saveCheckout(payload) {
-        if (!isAuthenticated()) return null;
+        const principal = capturePrincipal();
+        if (!principal) return null;
         const normalizedPayload = {
             ...(payload || {}),
             items: normalizeCartItems((payload && payload.items) || [])
         };
-        return enqueueWrite('checkout', () => apiFetch('/api/shared-state/checkout', {
+        return enqueueWrite(`checkout:${principal.queueScope}`, () => apiFetch('/api/shared-state/checkout', {
             method: 'PUT',
             body: JSON.stringify({ payload: normalizedPayload })
-        }));
+        }, 0, principal));
     }
 
     async function loadCheckout() {
-        if (!isAuthenticated()) return null;
-        const response = await apiFetch('/api/shared-state/checkout');
-        return {
+        const principal = capturePrincipal();
+        if (!principal) return null;
+        const response = await apiFetch('/api/shared-state/checkout', {}, 0, principal);
+        assertCurrentPrincipal(principal);
+        const checkout = {
             ...(response.payload || {}),
             items: normalizeCartItems(response.payload && response.payload.items)
         };
+        assertCurrentPrincipal(principal);
+        return checkout;
     }
 
     function writeCartLocal(items) {
@@ -263,47 +332,65 @@
         return normalized;
     }
 
-    async function hydrateCartOnce() {
-        if (!isAuthenticated()) return;
-        const key = scopedKey(CART_PREFIX);
+    async function hydrateCartOnce(principal) {
+        if (!principal) return;
+        const key = `${CART_PREFIX}${principal.userId}`;
+        const migrationKey = `${CART_MIGRATION_PREFIX}${principal.userId}`;
         try {
-            const remoteState = await loadCartState();
+            assertCurrentPrincipal(principal);
+            const remoteState = await loadCartState(principal);
+            assertCurrentPrincipal(principal);
             if (remoteState.exists) {
+                assertCurrentPrincipal(principal);
                 storage().setItem(key, JSON.stringify(remoteState.items));
-                markCartMigrationComplete();
+                storage().setItem(migrationKey, '1');
+                assertCurrentPrincipal(principal);
                 root.dispatchEvent(new CustomEvent('novastore:shared-cart-updated', { detail: { items: remoteState.items } }));
                 return;
             }
 
+            assertCurrentPrincipal(principal);
             const localItems = normalizeCartItems(readJson(key, []));
-            if (localItems.length > 0 && !isCartMigrationComplete()) {
-                await saveCart(localItems);
-                markCartMigrationComplete();
+            if (localItems.length > 0 && storage().getItem(migrationKey) !== '1') {
+                await enqueueWrite(`cart:${principal.queueScope}`, () => apiFetch('/api/shared-state/cart', {
+                    method: 'PUT',
+                    body: JSON.stringify({ payload: { version: 1, items: localItems } })
+                }, 0, principal));
+                assertCurrentPrincipal(principal);
+                storage().setItem(migrationKey, '1');
                 storage().setItem(key, JSON.stringify(localItems));
+                assertCurrentPrincipal(principal);
                 root.dispatchEvent(new CustomEvent('novastore:shared-cart-updated', { detail: { items: localItems } }));
             } else {
-                markCartMigrationComplete();
+                assertCurrentPrincipal(principal);
+                storage().setItem(migrationKey, '1');
                 storage().setItem(key, JSON.stringify([]));
+                assertCurrentPrincipal(principal);
                 root.dispatchEvent(new CustomEvent('novastore:shared-cart-updated', { detail: { items: [] } }));
             }
         } catch (error) {
+            if (error?.code === PRINCIPAL_CHANGED_CODE) return;
             reportError('cart', error, 'Sepet şu anda senkronlanamadı. Değişiklikleriniz korunuyor.');
             root.dispatchEvent(new CustomEvent('novastore:shared-state-error', { detail: { error } }));
         }
     }
 
     function hydrateCart() {
-        if (!isAuthenticated()) return Promise.resolve();
-        const userId = getUserId();
-        if (hydratePromise && hydrateUserId === userId) return hydratePromise;
-        hydrateUserId = userId;
-        hydratePromise = hydrateCartOnce().finally(() => {
-            if (hydrateUserId === userId) {
+        const principal = capturePrincipal();
+        if (!principal) return Promise.resolve();
+        if (
+            hydratePromise
+            && hydratePrincipal === principal
+        ) return hydratePromise;
+        hydratePrincipal = principal;
+        const currentPromise = hydrateCartOnce(principal).finally(() => {
+            if (hydratePromise === currentPromise) {
                 hydratePromise = null;
-                hydrateUserId = null;
+                hydratePrincipal = null;
             }
         });
-        return hydratePromise;
+        hydratePromise = currentPromise;
+        return currentPromise;
     }
 
     root.NovaStoreSharedState = {

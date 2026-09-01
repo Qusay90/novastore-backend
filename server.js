@@ -191,7 +191,7 @@ const COMMERCE_PRO_HASH_ROUTES = [
     /^\/arama\/?$/,
     /^\/favoriler\/?$/,
     /^\/sepet\/?$/,
-    /^\/hesabim(?:\/(?:adresler|kuponlar|bildirimler|guvenlik|destek|siparisler(?:\/[^/]+)?))?\/?$/,
+    /^\/hesabim(?:\/(?:adresler|kuponlar|bildirimler|sorularim|degerlendirmelerim|takip-ettigim-magazalar|guvenlik|destek|siparisler(?:\/[^/]+)?))?\/?$/,
     /^\/(?:giris|kayit|sifremi-unuttum|sifre-sifirla)\/?$/,
     /^\/odeme\/(?:teslimat|odeme|onay|sonuc)\/?$/,
     /^\/(?:yardim|siparis-takibi|iletisim|destek|hakkimizda|gizlilik-politikasi|kvkk-aydinlatma-metni|cerez-politikasi|kullanim-ve-uyelik-kosullari|on-bilgilendirme-formu|mesafeli-satis-sozlesmesi|iptal-iade-cayma-politikasi|teslimat-ve-kargo-kosullari|islem-rehberi|pazaryeri-bilgilendirmesi|satici-sozlesmesi)\/?$/
