@@ -1,4 +1,9 @@
 const pool = require('../config/db');
+const {
+    canonicalProvinceDistrict,
+    normalizeTurkishMobilePhone,
+    validateAddressText
+} = require('../services/turkiyeAddressContract');
 
 const REQUIRED_FIELDS = [
     ['title', 'Adres başlığı gerekli.'],
@@ -31,16 +36,32 @@ const normalizeAddressInput = (body = {}) => ({
 const validateAddressInput = (address) => {
     const missing = REQUIRED_FIELDS.find(([field]) => !address[field]);
     if (missing) return missing[1];
-    if (!/^0?5\d{9}$/.test(address.phone.replace(/\s+/g, ''))) {
+    if (!normalizeTurkishMobilePhone(address.phone)) {
         return 'Telefon 05 ile başlayan 11 haneli olmalı.';
+    }
+    if (!validateAddressText(address.title, { minimum: 1, maximum: 80 })) return 'Adres başlığı 1-80 karakter olmalı.';
+    if (!validateAddressText(address.fullName, { minimum: 2, maximum: 160 })) return 'Alıcı adı 2-160 karakter olmalı.';
+    if (!validateAddressText(address.addressLine, { minimum: 5, maximum: 500 })) return 'Açık adres 5-500 karakter olmalı.';
+    if (!canonicalProvinceDistrict(address.city, address.district)) {
+        return 'İl ve ilçe eşleşmesi geçersiz.';
     }
     return null;
 };
 
-const normalizePhone = (phone) => phone.replace(/\s+/g, '');
+const normalizePhone = (phone) => normalizeTurkishMobilePhone(phone);
+
+const canonicalizeAddressInput = (address) => {
+    const geography = canonicalProvinceDistrict(address.city, address.district);
+    return {
+        ...address,
+        phone: normalizePhone(address.phone) || address.phone,
+        city: geography?.province || address.city,
+        district: geography?.district || address.district
+    };
+};
 
 const normalizeAddressId = (value) => {
-    const parsed = Number.parseInt(value, 10);
+    const parsed = Number(value);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
@@ -81,7 +102,7 @@ const listAddresses = async (req, res) => {
 };
 
 const createAddress = async (req, res) => {
-    const address = normalizeAddressInput(req.body);
+    const address = canonicalizeAddressInput(normalizeAddressInput(req.body));
     const validationError = validateAddressInput(address);
     if (validationError) return res.status(400).json({ error: validationError });
 
@@ -127,7 +148,7 @@ const updateAddress = async (req, res) => {
     const addressId = normalizeAddressId(req.params.id);
     if (!addressId) return res.status(400).json({ error: 'Geçersiz adres id.' });
 
-    const address = normalizeAddressInput(req.body);
+    const address = canonicalizeAddressInput(normalizeAddressInput(req.body));
     const validationError = validateAddressInput(address);
     if (validationError) return res.status(400).json({ error: validationError });
 
@@ -262,6 +283,7 @@ module.exports = {
     __test: {
         normalizeAddressInput,
         validateAddressInput,
+        canonicalizeAddressInput,
         normalizeAddressId,
         mapAddressRow,
         normalizePhone

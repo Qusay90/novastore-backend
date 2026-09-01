@@ -4,7 +4,10 @@ const path = require('path');
 
 const workspace = path.resolve(__dirname, '..');
 const profileHtml = fs.readFileSync(path.join(workspace, 'frontend', 'profile.html'), 'utf8');
-const checkoutHtml = fs.readFileSync(path.join(workspace, 'frontend', 'checkout.html'), 'utf8');
+const customerAccountAdapter = fs.readFileSync(
+    path.join(workspace, 'storefront-commerce-pro', 'src', 'adapters', 'customerAccountAdapter.js'),
+    'utf8'
+);
 const androidRepo = fs.readFileSync(
     path.join(workspace, 'app', 'src', 'main', 'java', 'com', 'novastore', 'app', 'data', 'repository', 'CustomerLocalRepository.kt'),
     'utf8'
@@ -13,8 +16,10 @@ const androidRepo = fs.readFileSync(
 assert(profileHtml.includes('novastore_addresses_migrated_${_getUserId()}'));
 assert(profileHtml.includes('loadAddress({ allowMigration: false })'));
 assert(profileHtml.includes('markAddressMigrationComplete()'));
-assert(checkoutHtml.includes('isCheckoutAddressMigrationComplete()'));
-assert(checkoutHtml.includes('markCheckoutAddressMigrationComplete()'));
+assert(customerAccountAdapter.includes('`novastore_addresses_migrated_${userId}`'));
+assert(customerAccountAdapter.includes('storage?.getItem?.(migrationKey) === "1"'));
+assert(customerAccountAdapter.includes('storage?.setItem?.(migrationKey, "1")'));
+assert(customerAccountAdapter.includes('storage?.removeItem?.(`novastore_addresses_${userId}`)'));
 assert(androidRepo.includes('KEY_ADDRESS_MIGRATION_COMPLETE'));
 assert(androidRepo.includes('refreshAddresses(allowMigration: Boolean = true)'));
 assert(androidRepo.includes('refreshAddresses(allowMigration = false)'));

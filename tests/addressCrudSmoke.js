@@ -1,6 +1,6 @@
 const assert = require('assert');
 const pool = require('../config/db');
-const { authenticate } = require('../middlewares/authMiddleware');
+const { authenticateCustomer } = require('../middlewares/authMiddleware');
 const {
     listAddresses,
     createAddress,
@@ -147,7 +147,7 @@ const invoke = async (handler, req) => {
 
 (async () => {
     const authRes = createRes();
-    authenticate({ headers: {} }, authRes, () => {
+    authenticateCustomer({ headers: {} }, authRes, () => {
         throw new Error('Unauthenticated address list should not reach handler');
     });
     assert.strictEqual(authRes.statusCode, 401);
@@ -161,6 +161,17 @@ const invoke = async (handler, req) => {
         addressLine: 'Test Mahallesi No:1'
     };
     assert.strictEqual(__test.validateAddressInput(__test.normalizeAddressInput(firstPayload)), null);
+    for (const phone of ['5551234567', '0555123456', '055512345678', '0555 123 45 67', '05551234abc']) {
+        assert.match(__test.validateAddressInput(__test.normalizeAddressInput({ ...firstPayload, phone })), /11 haneli/);
+    }
+    assert.match(
+        __test.validateAddressInput(__test.normalizeAddressInput({ ...firstPayload, city: 'Kilis', district: 'Kadıköy' })),
+        /eşleşmesi geçersiz/
+    );
+
+    const malformedCreate = await invoke(createAddress, createReq(10, { ...firstPayload, phone: '055512345678' }));
+    assert.strictEqual(malformedCreate.statusCode, 400);
+    assert.strictEqual(rows.length, 0);
 
     const created = await invoke(createAddress, createReq(10, firstPayload));
     assert.strictEqual(created.statusCode, 201);
@@ -179,6 +190,18 @@ const invoke = async (handler, req) => {
 
     const deniedUpdate = await invoke(updateAddress, createReq(11, { ...firstPayload, title: 'Çalıntı' }, { id: String(second.body.id) }));
     assert.strictEqual(deniedUpdate.statusCode, 404);
+    assert.strictEqual(rows.find((row) => row.id === second.body.id).title, 'İş');
+
+    const deniedDefault = await invoke(setDefaultAddress, createReq(11, {}, { id: String(second.body.id) }));
+    assert.strictEqual(deniedDefault.statusCode, 404);
+    assert.strictEqual(rows.find((row) => row.id === second.body.id).user_id, 10);
+
+    const deniedDelete = await invoke(deleteAddress, createReq(11, {}, { id: String(second.body.id) }));
+    assert.strictEqual(deniedDelete.statusCode, 404);
+    assert.ok(rows.some((row) => row.id === second.body.id && row.user_id === 10));
+
+    const malformedId = await invoke(deleteAddress, createReq(10, {}, { id: `${second.body.id}abc` }));
+    assert.strictEqual(malformedId.statusCode, 400);
 
     const updated = await invoke(updateAddress, createReq(10, { ...firstPayload, title: 'Ev Güncel' }, { id: String(created.body.id) }));
     assert.strictEqual(updated.statusCode, 200);

@@ -7,9 +7,9 @@ const {
     deleteAddress,
     setDefaultAddress
 } = require('../controllers/addressController');
-const { authenticate } = require('../middlewares/authMiddleware');
+const { authenticateCustomer } = require('../middlewares/authMiddleware');
 
-router.use(authenticate);
+router.use(authenticateCustomer);
 
 router.get('/', listAddresses);
 router.post('/', createAddress);

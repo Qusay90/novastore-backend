@@ -1,6 +1,7 @@
 ﻿const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { AuthSessionError, issueCustomerSession } = require('../services/authSessionService');
+const { normalizeTurkishMobilePhone } = require('../services/turkiyeAddressContract');
 
 const insertUserWithSchemaFallback = async (fullName, email, hashedPassword) => {
     try {
@@ -200,14 +201,14 @@ const updateMe = async (req, res) => {
     try {
         const fullName = String(req.body.fullName || req.body.full_name || '').trim();
         const rawPhone = req.body.phone === undefined || req.body.phone === null ? null : String(req.body.phone).trim();
-        const phone = rawPhone ? rawPhone.replace(/[^\d+]/g, '').slice(0, 16) : null;
+        const phone = rawPhone ? normalizeTurkishMobilePhone(rawPhone) : null;
 
         if (fullName.length < 2) {
             return res.status(400).json({ error: 'Ad soyad en az 2 karakter olmalıdır.' });
         }
 
-        if (phone && !/^(\+?\d{10,16})$/.test(phone)) {
-            return res.status(400).json({ error: 'Geçerli bir telefon numarası girin.' });
+        if (rawPhone && !phone) {
+            return res.status(400).json({ error: 'Telefon 05 ile başlayan 11 haneli olmalı.' });
         }
 
         const result = await updateUserProfileWithSchemaFallback(req.user.id, fullName, phone);
