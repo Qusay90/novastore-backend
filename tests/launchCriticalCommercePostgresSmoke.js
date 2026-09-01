@@ -47,7 +47,9 @@ Object.assign(process.env, {
     PAYTR_LIVE_REQUESTS_ALLOWED: 'true',
     NOVASTORE_REQUIRE_BUSINESS_IDENTITY_FOR_PAYMENT: 'false',
     BUSINESS_LEGAL_COMPANY_NAME: 'NovaStore Local Integration Test',
+    BUSINESS_TRADE_NAME: 'NovaStore Local Test',
     BUSINESS_TAX_VKN: '1234567890',
+    BUSINESS_TAX_OFFICE: 'Yerel Test Vergi Dairesi',
     BUSINESS_MERSIS_NUMBER: '1234567890123456',
     BUSINESS_REGISTERED_ADDRESS: 'Yalnız yerel entegrasyon testi adresi, İstanbul',
     BUSINESS_KEP_ADDRESS: 'local-integration@example.test',
@@ -135,7 +137,7 @@ let paymentControllerTestApi = null;
     await admin.query('CREATE SCHEMA public');
 
     const registry = loadRegistry();
-    assert.equal(registry.length, 35);
+    assert.equal(registry.length, 36);
     const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));
@@ -182,6 +184,9 @@ let paymentControllerTestApi = null;
     const { calculatePricing } = require('../services/pricingService');
     const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
     const {
+        buildSellerPublicLegalIdentityContentSha256
+    } = require('../services/sellerPublicLegalIdentityService');
+    const {
         ORDER_STATUS,
         PAYMENT_STATUS,
         REFUND_STATUS,
@@ -225,16 +230,25 @@ let paymentControllerTestApi = null;
     const legacyStoreBySlug = new Map(legacyStores.rows.map((row) => [row.slug, Number(row.id)]));
     const legacyStoreAId = legacyStoreBySlug.get('seller-a-store');
     const legacyStoreBId = legacyStoreBySlug.get('seller-b-store');
+    const platformStores = await pool.query(
+        `SELECT id
+           FROM stores
+          WHERE LOWER(slug) = 'novastore-platform'
+            AND is_active = TRUE
+            AND deleted_at IS NULL`
+    );
+    assert.equal(platformStores.rows.length, 1);
+    const platformStoreId = Number(platformStores.rows[0].id);
 
     const products = await pool.query(
         `INSERT INTO products
             (name, price, stock, publication_status, is_customer_visible, store_id, sku, normalized_sku)
          VALUES
-            ('Idempotency Product', 100.00, 5, 'active', TRUE, NULL, 'WAVE-IDEMPOTENT', 'WAVE-IDEMPOTENT'),
-            ('Last Unit Product', 80.00, 1, 'active', TRUE, NULL, 'WAVE-LAST-UNIT', 'WAVE-LAST-UNIT'),
-            ('Seller Projection Product', 250.00, 3, 'active', TRUE, $1, 'WAVE-SELLER-A', 'WAVE-SELLER-A')
+            ('Idempotency Product', 100.00, 5, 'active', TRUE, $1, 'WAVE-IDEMPOTENT', 'WAVE-IDEMPOTENT'),
+            ('Last Unit Product', 80.00, 1, 'active', TRUE, $1, 'WAVE-LAST-UNIT', 'WAVE-LAST-UNIT'),
+            ('Seller Projection Product', 250.00, 3, 'active', TRUE, $2, 'WAVE-SELLER-A', 'WAVE-SELLER-A')
          RETURNING id, name`,
-        [legacyStoreAId]
+        [platformStoreId, legacyStoreAId]
     );
     const productIdByName = new Map(products.rows.map((row) => [row.name, Number(row.id)]));
     const idempotencyProductId = productIdByName.get('Idempotency Product');
@@ -251,6 +265,43 @@ let paymentControllerTestApi = null;
     const organizationIdByName = new Map(organizations.rows.map((row) => [row.display_name, Number(row.id)]));
     const organizationAId = organizationIdByName.get('Seller A Organization');
     const organizationBId = organizationIdByName.get('Seller B Organization');
+    await assert.rejects(
+        () => pool.query(
+            `INSERT INTO seller_public_legal_identities
+                (organization_id, version, public_legal_name, public_trade_name,
+                 public_disclosure_text, content_sha256, status,
+                 created_by_admin_user_id)
+             VALUES ($1, 'invalid-customer-creator', 'Rejected Test Tüzel Kişisi',
+                     'Rejected Test', 'Customer role cannot create an identity.',
+                     $2, 'draft', $3)`,
+            [organizationAId, '0'.repeat(64), customerId]
+        ),
+        /creator must be an admin user/i
+    );
+    for (const [organizationId, suffix] of [[organizationAId, 'A'], [organizationBId, 'B']]) {
+        const identity = {
+            version: 'local-test-v1',
+            publicLegalName: `Seller ${suffix} Test Tüzel Kişisi`,
+            publicTradeName: `Seller ${suffix} Test`,
+            publicDisclosureText: `Yalnız yerel entegrasyon testi için doğrulanmış Seller ${suffix} kamusal açıklaması.`
+        };
+        await pool.query(
+            `INSERT INTO seller_public_legal_identities
+                (organization_id, version, public_legal_name, public_trade_name,
+                 public_disclosure_text, content_sha256, status,
+                 created_by_admin_user_id)
+             VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7)`,
+            [
+                organizationId,
+                identity.version,
+                identity.publicLegalName,
+                identity.publicTradeName,
+                identity.publicDisclosureText,
+                buildSellerPublicLegalIdentityContentSha256(identity),
+                adminId
+            ]
+        );
+    }
     const managerRole = await pool.query("SELECT id FROM seller_roles WHERE organization_id IS NULL AND code = 'manager'");
     const managerRoleId = Number(managerRole.rows[0].id);
     const memberships = await pool.query(
@@ -322,6 +373,77 @@ let paymentControllerTestApi = null;
          VALUES ($1, $2, $3, 'SELLER-A-WAVE-1', 25000, 'TRY', 'active')`,
         [organizationAId, sellerStoreAId, Number(offer.rows[0].id)]
     );
+    const sellerAgreementPreview = () => invoke(getCheckoutAgreementPreview, {
+        user: { id: customerId, principal: 'customer', role: 'customer' },
+        body: {
+            addressId: paymentAddressId,
+            cartItems: [{ id: sellerProductId, quantity: 1 }],
+            couponCode: null
+        }
+    });
+    const sellerAIdentityRow = (await pool.query(
+        `SELECT id, content_sha256
+           FROM seller_public_legal_identities
+          WHERE organization_id = $1 AND status = 'draft'`,
+        [organizationAId]
+    )).rows[0];
+    assert.ok(sellerAIdentityRow);
+
+    const unapprovedSellerPreview = await sellerAgreementPreview();
+    assert.equal(unapprovedSellerPreview.statusCode, 503);
+    assert.equal(unapprovedSellerPreview.payload.code, 'SELLER_PUBLIC_LEGAL_IDENTITY_REQUIRED');
+    await assert.rejects(
+        () => pool.query(
+            `UPDATE seller_public_legal_identities
+                SET status = 'approved', approved_by_admin_user_id = $2, approved_at = CURRENT_TIMESTAMP
+              WHERE id = $1`,
+            [sellerAIdentityRow.id, customerId]
+        ),
+        /approver must be an admin user/i
+    );
+    await pool.query(
+        `UPDATE seller_public_legal_identities
+            SET status = 'approved', approved_by_admin_user_id = $2, approved_at = CURRENT_TIMESTAMP
+          WHERE id = $1`,
+        [sellerAIdentityRow.id, adminId]
+    );
+
+    await assert.rejects(
+        () => pool.query(
+            'UPDATE seller_public_legal_identities SET content_sha256 = $2 WHERE id = $1',
+            [sellerAIdentityRow.id, '0'.repeat(64)]
+        ),
+        /immutable|new version/i
+    );
+    const identityEvents = await pool.query(
+        `SELECT event_type
+           FROM seller_public_legal_identity_events
+          WHERE identity_id = $1
+          ORDER BY id`,
+        [sellerAIdentityRow.id]
+    );
+    assert.deepEqual(identityEvents.rows.map((row) => row.event_type), ['created', 'approved']);
+    await assert.rejects(
+        () => pool.query(
+            `UPDATE seller_public_legal_identity_events
+                SET metadata_redacted = '{"tampered":true}'::jsonb
+              WHERE identity_id = $1`,
+            [sellerAIdentityRow.id]
+        ),
+        /append-only/i
+    );
+
+    const verifiedSellerPreview = await sellerAgreementPreview();
+    assert.equal(verifiedSellerPreview.statusCode, 200, JSON.stringify(verifiedSellerPreview.payload));
+    assert.equal(verifiedSellerPreview.payload.context.delivery.email, 'wave-customer@example.test');
+    assert.equal(verifiedSellerPreview.payload.context.businessIdentity.tradeName, 'NovaStore Local Test');
+    assert.equal(verifiedSellerPreview.payload.context.businessIdentity.taxOffice, 'Yerel Test Vergi Dairesi');
+    assert.equal(verifiedSellerPreview.payload.context.sellers.length, 1);
+    assert.equal(verifiedSellerPreview.payload.context.sellers[0].organizationId, organizationAId);
+    assert.equal(verifiedSellerPreview.payload.context.sellers[0].legalIdentity.organizationId, organizationAId);
+    assert.equal(verifiedSellerPreview.payload.context.sellers[0].legalIdentity.publicLegalName, 'Seller A Test Tüzel Kişisi');
+    assert.equal(verifiedSellerPreview.payload.context.sellers[0].legalIdentity.contentSha256, sellerAIdentityRow.content_sha256);
+    assert.doesNotMatch(JSON.stringify(verifiedSellerPreview.payload), /Seller B Test Tüzel Kişisi/);
     await pool.query(
         `INSERT INTO coupons
             (code, discount_type, discount_value, min_order_amount, usage_limit, used_count, is_active)
@@ -507,6 +629,28 @@ let paymentControllerTestApi = null;
     assert.equal(Number(sellerInitialize.payload.totals.couponDiscount), 25);
     assert.equal(Number(sellerInitialize.payload.totals.total), 225);
     const canonicalOrderId = Number(sellerInitialize.payload.orderId);
+    const storedSellerAgreement = await pool.query(
+        'SELECT raw_request FROM payments WHERE order_id = $1',
+        [canonicalOrderId]
+    );
+    const storedSellerRawRequest = typeof storedSellerAgreement.rows[0].raw_request === 'string'
+        ? JSON.parse(storedSellerAgreement.rows[0].raw_request)
+        : storedSellerAgreement.rows[0].raw_request;
+    const storedAgreementSnapshot = storedSellerRawRequest.checkoutAgreementSnapshot;
+    assert.equal(storedAgreementSnapshot.schemaVersion, 'checkout-agreements-v2');
+    assert.equal(Number.isFinite(Date.parse(storedAgreementSnapshot.acceptedAt)), true);
+    assert.equal(storedAgreementSnapshot.context.delivery.email, 'wave-customer@example.test');
+    assert.equal(storedAgreementSnapshot.context.businessIdentity.tradeName, 'NovaStore Local Test');
+    assert.equal(storedAgreementSnapshot.context.businessIdentity.taxOffice, 'Yerel Test Vergi Dairesi');
+    assert.equal(storedAgreementSnapshot.context.sellers.length, 1);
+    assert.equal(storedAgreementSnapshot.context.sellers[0].organizationId, organizationAId);
+    assert.equal(storedAgreementSnapshot.context.sellers[0].legalIdentity.organizationId, organizationAId);
+    assert.equal(storedAgreementSnapshot.context.sellers[0].legalIdentity.publicLegalName, 'Seller A Test Tüzel Kişisi');
+    assert.equal(storedAgreementSnapshot.context.sellers[0].legalIdentity.contentSha256, sellerAIdentityRow.content_sha256);
+    assert.ok(storedAgreementSnapshot.documents.every((document) => /^[a-f0-9]{64}$/.test(document.sourceTemplateSha256)));
+    assert.ok(storedAgreementSnapshot.documents.every((document) => /^[a-f0-9]{64}$/.test(document.sourceContentSha256)));
+    assert.ok(storedAgreementSnapshot.documents.every((document) => /^[a-f0-9]{64}$/.test(document.contentSha256)));
+    assert.doesNotMatch(JSON.stringify(storedSellerRawRequest), /Seller B Test Tüzel Kişisi/);
     const reservedCoupon = await pool.query(
         'SELECT status FROM coupon_reservations WHERE order_id = $1',
         [canonicalOrderId]

@@ -243,5 +243,12 @@
     "sha256": "49ce086c831d1d02dff275205216fec4e3a9a53be70c298ed247b19fe4f6a827",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260901_01_seller_public_legal_identity",
+    "path": "migrations/20260901_01_seller_public_legal_identity.sql",
+    "sha256": "8a37833e0af141a7e024bb0b1ddb0441410786ec6b2aca08f49cad53c7eba0d5",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

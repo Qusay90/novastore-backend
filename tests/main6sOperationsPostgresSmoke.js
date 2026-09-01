@@ -163,7 +163,7 @@ const customerActor = (id) => ({ id: Number(id), role: 'customer', principal: 'c
         const migrationCount = await pool.query(
             'SELECT COUNT(*)::INTEGER AS count FROM novastore_schema_migrations'
         );
-        assert.equal(migrationCount.rows[0].count, 35, 'Combined DB must have exactly 35 migrations.');
+        assert.equal(migrationCount.rows[0].count, 36, 'Combined DB must have exactly 36 migrations.');
 
         const storeResult = await pool.query(
             `SELECT id, slug

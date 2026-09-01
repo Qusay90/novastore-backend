@@ -84,7 +84,7 @@ const database = {
     const operationInit = serverSource.indexOf('await applyLocalMain6sOperationMigrations();');
     assert(analyticsInit >= 0 && operationInit > analyticsInit);
 
-    console.log('local Main6S schema init smoke passed: migrations=4 rollback=PASS ordering=PASS');
+    console.log(`local shared schema init smoke passed: migrations=${MAIN6S_OPERATION_MIGRATION_IDS.length} rollback=PASS ordering=PASS`);
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;

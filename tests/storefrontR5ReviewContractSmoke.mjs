@@ -11,6 +11,7 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8");
 const server = read("scripts", "serveOfficialRuntimeReview.mjs");
 const app = read("storefront-commerce-pro", "src", "IntegratedApp.jsx");
 const connected = read("storefront-commerce-pro", "src", "ConnectedCustomerPages.jsx");
+const cutoverConfig = read("storefront-commerce-pro", "vite.cutover.config.mjs");
 const community = read("storefront-commerce-pro", "src", "ProductCommunity.jsx");
 const assistant = read("storefront-commerce-pro", "src", "AssistantWidget.jsx");
 const icon = read("storefront-commerce-pro", "src", "NovaServiceIcon.jsx");
@@ -65,7 +66,11 @@ assert.match(app, /const openCart = useCallback/);
 assert.match(app, /const closeCart = useCallback/);
 assert.match(app, /onQuantity=\{updateCartQuantity\}/);
 assert.match(app, /cart-line__product-link/);
-assert.match(app, /const localReviewSurface = window\.location\.protocol === "http:"[\s\S]*?window\.location\.port === "5273"/);
+assert.match(app, /const LOCAL_REVIEW_RUNTIME_ENABLED = __NOVASTORE_LOCAL_REVIEW_RUNTIME__/);
+assert.match(app, /const localReviewSurface = LOCAL_REVIEW_RUNTIME_ENABLED[\s\S]*?window\.location\.protocol === "http:"[\s\S]*?window\.location\.port === "5273"/);
+assert.match(app, /LOCAL_REVIEW_RUNTIME_ENABLED \? \{ reviewOnly: localReviewSurface \} : \{\}/);
+assert.match(connected, /LOCAL_REVIEW_RUNTIME_ENABLED \? Boolean\(props\.reviewOnly\) : false/);
+assert.match(cutoverConfig, /__NOVASTORE_LOCAL_REVIEW_RUNTIME__: "false"/);
 assert.match(connected, /function LocalReviewAuthBoundary/);
 assert.match(connected, /href="\/__review\/customer"/);
 assert.match(connected, /couponIntentKeyRef/);
@@ -86,7 +91,12 @@ assert.match(app, /<NovaServiceIcon kind="help" \/>/);
 assert.match(app, /<NovaServiceIcon kind="returns" \/>/);
 assert.match(connected, /<NovaServiceIcon kind="delivery" \/>/);
 assert.match(connected, /<NovaServiceIcon kind="support" \/>/);
-assert.match(assistant, /<NovaServiceIcon kind="bot" compact \/>/);
+assert.match(assistant, /import novabotArtwork from "\.\/assets\/NovaBot\.png";/);
+assert.equal(
+  (assistant.match(/<img className="novabot-artwork" src=\{novabotArtwork\} alt="" \/>/g) || []).length,
+  2,
+  "NovaBot must keep the accepted decorative artwork in the dialog and floating action button."
+);
 assert.doesNotMatch(icon, /https?:\/\//);
 
 const finalTypography = css.lastIndexOf("R5 review runtime: final semantic type and interaction layer.");

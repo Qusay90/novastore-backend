@@ -8,6 +8,10 @@ const paymentController = require('../controllers/paymentController');
 const { getPaymentStatus, initializePayment, __test: paymentTest } = paymentController;
 const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
 const { buildCheckoutAgreementPreview } = require('../services/legalDocumentService');
+const {
+    buildLegacyImplicitPlatformAgreementFixture,
+    buildVerifiedCheckoutAgreementAllocationFixture
+} = require('./helpers/checkoutAgreementAllocationFixture');
 
 const trackedEnv = [
     'NODE_ENV',
@@ -24,7 +28,9 @@ const trackedEnv = [
     'PAYTR_DEBUG_ON',
     'PAYTR_LIVE_REQUESTS_ALLOWED',
     'BUSINESS_LEGAL_COMPANY_NAME',
+    'BUSINESS_TRADE_NAME',
     'BUSINESS_TAX_VKN',
+    'BUSINESS_TAX_OFFICE',
     'BUSINESS_MERSIS_NUMBER',
     'BUSINESS_REGISTERED_ADDRESS',
     'BUSINESS_KEP_ADDRESS',
@@ -78,7 +84,9 @@ const applyPaytrEnv = () => {
     process.env.PAYTR_DEBUG_ON = 'true';
     process.env.PAYTR_LIVE_REQUESTS_ALLOWED = 'true';
     process.env.BUSINESS_LEGAL_COMPANY_NAME = 'Test Nova Teknoloji Anonim Şirketi';
+    process.env.BUSINESS_TRADE_NAME = 'NovaStore Test';
     process.env.BUSINESS_TAX_VKN = '1234567890';
+    process.env.BUSINESS_TAX_OFFICE = 'Test Vergi Dairesi';
     process.env.BUSINESS_MERSIS_NUMBER = '1234567890123456';
     process.env.BUSINESS_REGISTERED_ADDRESS = 'Test Mahallesi Test Sokak No 1 İstanbul';
     process.env.BUSINESS_KEP_ADDRESS = 'test@hs01.kep.tr';
@@ -168,9 +176,31 @@ const createInitializeClient = ({ existingPaymentRows = [] } = {}) => {
                 };
             }
 
+            if (/product\.id AS product_id/i.test(sql)) {
+                return {
+                    rows: [{
+                        product_id: 101,
+                        product_store_id: 501,
+                        legacy_store_id: 501,
+                        legacy_store_slug: 'novastore-platform',
+                        legacy_store_is_active: true,
+                        legacy_store_deleted_at: null,
+                        seller_store_id: null
+                    }]
+                };
+            }
+
             if (/FROM products/i.test(sql)) {
                 return {
-                    rows: [{ id: 101, name: 'Test Telefon', price: 1000, old_price: null, stock: 5, image_url: 'phone.png' }]
+                    rows: [{
+                        id: 101,
+                        name: 'Test Telefon',
+                        price: 1000,
+                        old_price: null,
+                        stock: 5,
+                        image_url: 'phone.png',
+                        store_id: 501
+                    }]
                 };
             }
 
@@ -243,7 +273,9 @@ const getAgreementSnapshotSha256 = () => buildCheckoutAgreementPreview({
     checkoutContext: paymentTest.buildCheckoutAgreementContext({
         identitySnapshot: {
             legalCompanyName: process.env.BUSINESS_LEGAL_COMPANY_NAME,
+            tradeName: process.env.BUSINESS_TRADE_NAME,
             taxNumber: process.env.BUSINESS_TAX_VKN,
+            taxOffice: process.env.BUSINESS_TAX_OFFICE,
             mersisNumber: process.env.BUSINESS_MERSIS_NUMBER,
             registeredAddress: process.env.BUSINESS_REGISTERED_ADDRESS,
             kepAddress: process.env.BUSINESS_KEP_ADDRESS,
@@ -254,6 +286,7 @@ const getAgreementSnapshotSha256 = () => buildCheckoutAgreementPreview({
         addressId: 301,
         customer: {
             fullName: 'Test Kullanıcı',
+            email: 'test@example.com',
             phone: '05551234567',
             address: 'Ev: Test Mahallesi Test Sokak No 1 Merkez / Kilis'
         },
@@ -261,6 +294,11 @@ const getAgreementSnapshotSha256 = () => buildCheckoutAgreementPreview({
             items: [{ id: 101, name: 'Test Telefon', quantity: 1, price: 1000, line_total: 1000 }],
             totals: { currency: 'TRY', subtotal: 1000, bundleDiscount: 0, couponDiscount: 0, shippingFee: 49.9, total: 1049.9 },
             coupon: { applied: false, code: null, discountAmount: 0 }
+        },
+        platformAllocation: {
+            currency: 'TRY',
+            grossMinor: 100000,
+            productIds: [101]
         },
         sellerProjection: []
     })
@@ -334,6 +372,13 @@ const createCallbackState = (overrides = {}) => ({
     orderFailedUpdates: 0,
     cartMutations: 0,
     notificationShouldFail: false,
+    rawRequest: {
+        ...buildVerifiedCheckoutAgreementAllocationFixture(),
+        coupon: { applied: true, couponId: 901 },
+        stockReserved: true,
+        reservationExpiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        finalizesOnWebhook: true
+    },
     queries: [],
     ...overrides
 });
@@ -345,12 +390,7 @@ const makePaymentRow = (state) => ({
     payment_ref: state.paymentRef,
     amount: state.amount,
     status: state.paymentStatus,
-    raw_request: JSON.stringify({
-        coupon: { applied: true, couponId: 901 },
-        stockReserved: true,
-        reservationExpiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        finalizesOnWebhook: true
-    }),
+    raw_request: JSON.stringify(state.rawRequest),
     items: JSON.stringify([{ id: 101, name: 'Test Telefon', quantity: 1 }]),
     user_id: 10,
     customer_name: 'Test Kullanici',
@@ -638,6 +678,32 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
             return originalModuleLoad.call(this, request, parent, isMain);
         };
 
+        const verifiedAllocationFixture = buildVerifiedCheckoutAgreementAllocationFixture();
+        const legacyAllocationFixture = buildLegacyImplicitPlatformAgreementFixture();
+        assert.strictEqual(paymentTest.hasVerifiedStoredCheckoutAgreementAllocation(verifiedAllocationFixture), true);
+        assert.strictEqual(paymentTest.hasVerifiedStoredCheckoutAgreementAllocation(legacyAllocationFixture), false);
+        const hashMismatchFixture = JSON.parse(JSON.stringify(verifiedAllocationFixture));
+        hashMismatchFixture.checkoutAgreementSnapshot.contextSha256 = '0'.repeat(64);
+        assert.strictEqual(paymentTest.hasVerifiedStoredCheckoutAgreementAllocation(hashMismatchFixture), false);
+        const projectionMismatchFixture = JSON.parse(JSON.stringify(verifiedAllocationFixture));
+        projectionMismatchFixture.platformAllocation.grossMinor += 1;
+        assert.strictEqual(paymentTest.hasVerifiedStoredCheckoutAgreementAllocation(projectionMismatchFixture), false);
+        const guardedLegacyCapture = paymentTest.guardActiveCaptureAgreementAllocation({
+            decision: 'CAPTURE_ACTIVE',
+            currentOrderStatus: ORDER_STATUS.ODEME_BEKLIYOR,
+            targetOrderStatus: ORDER_STATUS.HAZIRLANIYOR,
+            targetRefundStatus: null,
+            runCommerceSideEffects: true,
+            reserveStock: true,
+            reconciliationRequired: false,
+            reconciliationReason: null
+        }, legacyAllocationFixture);
+        assert.strictEqual(guardedLegacyCapture.decision, 'CAPTURE_RECONCILIATION');
+        assert.strictEqual(guardedLegacyCapture.targetRefundStatus, REFUND_STATUS.PENDING);
+        assert.strictEqual(guardedLegacyCapture.runCommerceSideEffects, false);
+        assert.strictEqual(guardedLegacyCapture.reserveStock, false);
+        assert.strictEqual(guardedLegacyCapture.reconciliationReason, 'CHECKOUT_AGREEMENT_ALLOCATION_UNVERIFIED');
+
         const initRun = await callInitialize();
         assert.strictEqual(initRun.res.code, 201);
         assert.strictEqual(initRun.res.body.provider, 'paytr');
@@ -656,6 +722,8 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
         assert.strictEqual(initRawRequest.checkoutAgreementSnapshot.snapshotSha256, getAgreementSnapshotSha256());
         assert.strictEqual(initRawRequest.checkoutAgreementSnapshot.context.delivery.addressId, 301);
         assert.strictEqual(initRawRequest.checkoutAgreementSnapshot.context.totals.total, 1049.9);
+        assert.deepStrictEqual(initRawRequest.checkoutAgreementSnapshot.context.platformAllocation.productIds, [101]);
+        assert.deepStrictEqual(initRawRequest.platformAllocation.productIds, [101]);
         assert.ok(initRawRequest.checkoutAgreementSnapshot.documents.every((document) => document.text.includes('NovaStore sunucu doğrulamalı işlem özeti')));
         assertNoSecrets(initRun.res.body);
         assertNoSecrets(paymentInsert.params);
@@ -705,6 +773,32 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
             assert.strictEqual(successState.orderItemWrites, 1);
             assert.strictEqual(successState.successNotifications, 2);
             assertNoSecrets(response);
+        });
+
+        const legacyAllocationState = createCallbackState({
+            rawRequest: {
+                ...buildLegacyImplicitPlatformAgreementFixture(),
+                coupon: { applied: true, couponId: 901 },
+                stockReserved: true,
+                finalizesOnWebhook: true
+            }
+        });
+        await withServer(legacyAllocationState, async (server) => {
+            const response = await postForm(server, buildPayload({ status: 'success' }));
+            assert.strictEqual(response.statusCode, 200, response.text);
+            assert.strictEqual(response.text, 'OK');
+            assert.strictEqual(legacyAllocationState.paymentStatus, PAYMENT_STATUS.PAID);
+            assert.strictEqual(legacyAllocationState.orderPaymentStatus, PAYMENT_STATUS.PAID);
+            assert.strictEqual(legacyAllocationState.orderStatus, ORDER_STATUS.ODEME_BEKLIYOR);
+            assert.strictEqual(legacyAllocationState.orderRefundStatus, REFUND_STATUS.PENDING);
+            assert.strictEqual(legacyAllocationState.stockDecrements, 0);
+            assert.strictEqual(legacyAllocationState.couponIncrements, 0);
+            assert.strictEqual(legacyAllocationState.orderItemWrites, 0);
+            assert.strictEqual(legacyAllocationState.paymentSuccessEvents, 0);
+            assert.strictEqual(legacyAllocationState.successNotifications, 0);
+            assert.strictEqual(legacyAllocationState.reconciliationMetadataWrites, 1);
+            assert.strictEqual(legacyAllocationState.reconciliationRequiredEvents, 1);
+            assert.strictEqual(legacyAllocationState.durableReconciliationNotifications, 1);
         });
 
         const notificationFailureState = createCallbackState({ notificationShouldFail: true });

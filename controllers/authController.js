@@ -147,7 +147,7 @@ const forgotPassword = async (req, res) => {
         const resend = new Resend(process.env.RESEND_API_KEY);
 
         const { error } = await resend.emails.send({
-            from: 'NovaStore Destek <destek@novastore.tr>',
+            from: getMailFrom(),
             to: user.email,
             subject: 'NovaStore - Şifre Sıfırlama Talebi',
             html: `

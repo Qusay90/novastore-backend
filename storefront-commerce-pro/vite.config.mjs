@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
 export default defineConfig({
+  define: {
+    __NOVASTORE_LOCAL_REVIEW_RUNTIME__: "true",
+  },
   build: {
     assetsInlineLimit: 30_000_000,
     cssCodeSplit: false,

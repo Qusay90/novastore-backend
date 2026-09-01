@@ -47,7 +47,9 @@ const {
 const root = path.resolve(__dirname, '..');
 const validIdentityEnv = Object.freeze({
     BUSINESS_LEGAL_COMPANY_NAME: 'NovaStore Teknoloji Anonim Şirketi',
+    BUSINESS_TRADE_NAME: 'NovaStore',
     BUSINESS_TAX_VKN: '1234567890',
+    BUSINESS_TAX_OFFICE: 'Test Vergi Dairesi',
     BUSINESS_MERSIS_NUMBER: '0123456789012345',
     BUSINESS_REGISTERED_ADDRESS: 'Örnek Mahallesi, Güvenli Sokak No: 1 İstanbul',
     BUSINESS_KEP_ADDRESS: 'novastore@hs01.kep.tr',
@@ -63,6 +65,8 @@ const validIdentityEnv = Object.freeze({
 const identity = assertBusinessIdentityReadyForPayment(validIdentityEnv);
 const snapshot = buildBusinessIdentitySnapshot(identity);
 assert.equal(snapshot.legalCompanyName, validIdentityEnv.BUSINESS_LEGAL_COMPANY_NAME);
+assert.equal(snapshot.tradeName, validIdentityEnv.BUSINESS_TRADE_NAME);
+assert.equal(snapshot.taxOffice, validIdentityEnv.BUSINESS_TAX_OFFICE);
 assert.equal(snapshot.customerDomain, validIdentityEnv.CUSTOMER_PUBLIC_DOMAIN);
 assert.equal(Object.prototype.hasOwnProperty.call(snapshot, 'adminDomain'), false);
 assert.equal(Object.prototype.hasOwnProperty.call(snapshot, 'sellerAndroidAppId'), false);
@@ -70,8 +74,41 @@ assert.equal(getPublicBusinessIdentity(validIdentityEnv).status, 'configured');
 assert.deepEqual(getPublicBusinessIdentity({ BUSINESS_LEGAL_COMPANY_NAME: 'Temporary Name' }), {
     status: 'pending_owner_company_formation',
     identity: null,
-    issueCount: 7
+    issueCount: 8
 });
+assert.equal(
+    getPublicBusinessIdentity({ ...validIdentityEnv, BUSINESS_TAX_OFFICE: '' }).status,
+    'configured',
+    'tax office stays optional until owner/legal/PayTR confirms it is required'
+);
+const identityWithoutTaxOffice = { ...validIdentityEnv };
+delete identityWithoutTaxOffice.BUSINESS_TAX_OFFICE;
+assert.equal(
+    buildBusinessIdentitySnapshot(assertBusinessIdentityReadyForPayment(identityWithoutTaxOffice)).taxOffice,
+    null,
+    'an absent optional identity field must remain allowed for payment readiness'
+);
+
+for (const [environmentKey, invalidValue] of [
+    ['BUSINESS_TAX_OFFICE', 'X'],
+    ['BUSINESS_TAX_OFFICE', 'A'.repeat(161)],
+    ['BUSINESS_TAX_OFFICE', 'Kadıköy Vergi Dairesi\nYetkisiz ek satır'],
+    ['ADMIN_PUBLIC_DOMAIN', 'http://admin.novastore.example'],
+    ['SELLER_WEB_PUBLIC_DOMAIN', 'https://seller.novastore.example/path'],
+    ['CUSTOMER_ANDROID_APP_ID', 'invalid-app-id'],
+    ['SELLER_ANDROID_APP_ID', 'invalid-app-id']
+]) {
+    assert.throws(
+        () => assertBusinessIdentityReadyForPayment({
+            ...validIdentityEnv,
+            [environmentKey]: invalidValue
+        }),
+        (error) => error instanceof BusinessIdentityConfigError
+            && error.code === 'BUSINESS_IDENTITY_INCOMPLETE'
+            && error.details.includes(environmentKey),
+        `present optional ${environmentKey} must be valid for payment readiness`
+    );
+}
 
 assert.throws(
     () => assertBusinessIdentityReadyForPayment({ ...validIdentityEnv, BUSINESS_TAX_VKN: '123' }),

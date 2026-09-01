@@ -11,6 +11,16 @@ const frontendRoot = path.join(repositoryRoot, 'frontend');
 const artifactPath = path.join(frontendRoot, 'commerce-pro', 'index.html');
 const artifactRelativePath = 'frontend/commerce-pro/index.html';
 const artifactAttributeRule = '/frontend/commerce-pro/index.html text eol=lf';
+const SERVED_RUNTIME_SCRIPTS = Object.freeze([
+    Object.freeze({
+        requestPath: '/shared-state-sync.js',
+        sourcePath: path.join(frontendRoot, 'shared-state-sync.js')
+    }),
+    Object.freeze({
+        requestPath: '/favorites-sync.js',
+        sourcePath: path.join(frontendRoot, 'favorites-sync.js')
+    })
+]);
 const packageLockPaths = Object.freeze([
     'package-lock.json',
     'storefront-commerce-pro/package-lock.json',
@@ -25,6 +35,85 @@ const EXPECTED = Object.freeze({
     'src/catalog.js': 'a38d2e5f5a09fdc47bd9102800b04c423cf19b8d4d6bc952b77a5b77dc74062d',
     'src/canonical.css': '5b8e0d4a4eb1fb954e089f5c0e9dbabcad8217032ef12e3a67a03d89072e0896'
 });
+
+const PRODUCTION_ARTIFACT_HYGIENE_RULES = Object.freeze([
+    Object.freeze({
+        pattern: /createCanonicalFixtureRuntime|main-integrated-fixture|fixture-integrated/i,
+        label: 'fixture runtime',
+        probe: 'createCanonicalFixtureRuntime'
+    }),
+    Object.freeze({
+        pattern: /commerce-pro-(?:preview|integration-preview)|noindex|nofollow/i,
+        label: 'preview/noindex',
+        probe: 'commerce-pro-preview'
+    }),
+    Object.freeze({
+        pattern: /\b(?:localhost|127\.0\.0\.1)\b/i,
+        label: 'local host',
+        probe: 'localhost'
+    }),
+    Object.freeze({
+        pattern: /\b(?:5273|55437)\b/,
+        label: 'local review/demo port',
+        probe: '5273'
+    }),
+    Object.freeze({
+        pattern: /(?:@local\.invalid|@novastore\.test|@example\.invalid)\b/i,
+        label: 'local/test customer identity',
+        probe: 'buyer@local.invalid'
+    }),
+    Object.freeze({
+        pattern: /(?:\blocal-review-|isIsolatedLocalReview|\breviewOnly\b|LocalReview(?:Auth|Payment)Boundary|LOCAL_REVIEW_RUNTIME_ENABLED|__NOVASTORE_LOCAL_REVIEW_RUNTIME__|Yerel inceleme|Sentetik inceleme|Bu sunucu gerçek üyelik)/iu,
+        label: 'local review authority',
+        probe: 'isIsolatedLocalReview'
+    }),
+    Object.freeze({
+        pattern: /(?:\bfriend[-_ ]demo\b|novastore_friend_demo_20260831|customer-credential\.xml|start-customer-demo\.ps1|sync-real-public-catalog\.ps1|deneme\.novastore\.tr)/i,
+        label: 'friend-demo dependency',
+        probe: 'friend-demo'
+    }),
+    Object.freeze({
+        pattern: /\bnovastore_(?:friend_demo(?:_\d+)?|preview|test|ci)(?:_[a-z0-9_-]+)?\b/i,
+        label: 'demo/test database',
+        probe: 'novastore_test_checkout'
+    }),
+    Object.freeze({
+        pattern: /\b(?:PAYTR_MERCHANT_KEY|PAYTR_MERCHANT_SALT|JWT_SECRET|DATABASE_URL|RESEND_API_KEY|VAPID_PRIVATE_KEY|FIREBASE_PRIVATE_KEY|CLOUDINARY_API_SECRET)\b/i,
+        label: 'private secret environment name',
+        probe: 'PAYTR_MERCHANT_SALT'
+    }),
+    Object.freeze({
+        pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/i,
+        label: 'private key material',
+        probe: '-----BEGIN PRIVATE KEY-----'
+    }),
+    Object.freeze({
+        pattern: /\bpostgres(?:ql)?:\/\/[^\s"'`<>]+/i,
+        label: 'database connection string',
+        probe: 'postgresql://user:secret@db.internal/novastore'
+    }),
+    Object.freeze({
+        pattern: /\bBearer[ \t]+[A-Za-z0-9._~+/=-]{20,}(?![A-Za-z0-9._~+/=-])/,
+        label: 'embedded bearer credential',
+        probe: 'Bearer abcdefghijklmnopqrstuvwx'
+    }),
+    Object.freeze({ pattern: /file:\/\//i, label: 'file URL', probe: 'file:///tmp/release.html' }),
+    Object.freeze({
+        pattern: /[A-Za-z]:[\\/](?:Users|Windows|Program Files|AppData|Temp)[\\/]/i,
+        label: 'Windows absolute path',
+        probe: 'C:\\Users\\owner\\release.html'
+    }),
+    Object.freeze({
+        pattern: /(?:AppData[\\/]Local[\\/]Temp|novastore-commerce-pro-cutover-)/i,
+        label: 'temp path',
+        probe: 'novastore-commerce-pro-cutover-owned'
+    }),
+    Object.freeze({
+        pattern: /(?:@vite\/client|vite\/dist\/client|sourceMappingURL)/i,
+        label: 'dev/sourcemap marker',
+        probe: '@vite/client'
+    })
+]);
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const readCommerce = (relativePath, encoding = null) => fs.readFileSync(path.join(commerceRoot, relativePath), encoding || undefined);
@@ -419,6 +508,17 @@ const assertArtifactInterFonts = (documentSource) => {
     }
 };
 
+const assertProductionArtifactHygiene = (sources) => {
+    const productionClosure = typeof sources === 'string'
+        ? [{ label: 'generated HTML', content: sources }]
+        : sources;
+    for (const { label: sourceLabel, content } of productionClosure) {
+        for (const { pattern, label } of PRODUCTION_ARTIFACT_HYGIENE_RULES) {
+            assert.doesNotMatch(content, pattern, `${sourceLabel} must exclude ${label}`);
+        }
+    }
+};
+
 for (const [relativePath, expectedHash] of Object.entries(EXPECTED)) {
     assert.equal(sha256(readCommerce(relativePath)), expectedHash, `${relativePath} canonical hash must remain locked`);
 }
@@ -505,17 +605,70 @@ assert.match(
     'shared state owner must load before favorites owner'
 );
 
-for (const [pattern, label] of [
-    [/createCanonicalFixtureRuntime|main-integrated-fixture|fixture-integrated/i, 'fixture runtime marker'],
-    [/commerce-pro-(?:preview|integration-preview)|noindex|nofollow/i, 'preview/noindex marker'],
-    [/https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?/i, 'local development URL'],
-    [/file:\/\//i, 'file URL'],
-    [/[A-Za-z]:[\\/](?:Users|Windows|Program Files|AppData|Temp)[\\/]/i, 'Windows absolute path'],
-    [/(?:AppData[\\/]Local[\\/]Temp|novastore-commerce-pro-cutover-)/i, 'temporary path'],
-    [/(?:@vite\/client|vite\/dist\/client|sourceMappingURL)/i, 'dev/sourcemap marker']
-]) {
-    assert(!pattern.test(html), `production artifact must exclude ${label}`);
+const productionClosure = Object.freeze([
+    Object.freeze({ label: 'generated HTML', content: html }),
+    ...SERVED_RUNTIME_SCRIPTS.map(({ requestPath, sourcePath }) => Object.freeze({
+        label: `frontend${requestPath}`,
+        content: fs.readFileSync(sourcePath, 'utf8')
+    }))
+]);
+assert.doesNotThrow(
+    () => assertProductionArtifactHygiene(productionClosure),
+    'the clean generated HTML and exact served runtime script closure must pass hygiene'
+);
+const allowedAgreementPreviewRoute = '<script>const agreementEndpoint="/api/payments/agreements/preview";</script>';
+assert.doesNotThrow(
+    () => assertProductionArtifactHygiene(allowedAgreementPreviewRoute),
+    'the canonical agreement preview API route must remain allowed'
+);
+for (const { label, probe } of PRODUCTION_ARTIFACT_HYGIENE_RULES) {
+    assert.throws(
+        () => assertProductionArtifactHygiene(`${allowedAgreementPreviewRoute}\n${probe}`),
+        new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+        `injected ${label} must fail closed`
+    );
 }
+for (const marker of ['local-review-mutation-probe', 'isIsolatedLocalReview']) {
+    const mutatedExternalRuntimeClosure = productionClosure.map((source) => (
+        source.label === 'frontend/favorites-sync.js'
+            ? { ...source, content: `${source.content}\n// ${marker}` }
+            : source
+    ));
+    assert.throws(
+        () => assertProductionArtifactHygiene(mutatedExternalRuntimeClosure),
+        /frontend\/favorites-sync\.js must exclude local review authority/i,
+        `external favorites runtime marker ${marker} must fail closed`
+    );
+}
+const finalizerSource = readCommerce('scripts/finalize-cutover.mjs', 'utf8');
+for (const { pattern, label } of PRODUCTION_ARTIFACT_HYGIENE_RULES) {
+    assert(
+        finalizerSource.includes(`pattern: ${pattern.toString()},`)
+        &&
+        finalizerSource.includes(`label: "${label}"`),
+        `cutover finalizer must retain the exact ${label} hygiene rule`
+    );
+}
+for (const { requestPath } of SERVED_RUNTIME_SCRIPTS) {
+    assert(
+        finalizerSource.includes(`requestPath: "${requestPath}"`),
+        `cutover finalizer must scan served runtime script ${requestPath}`
+    );
+}
+assert.match(
+    finalizerSource,
+    /const productionClosure = \[[\s\S]*?SERVED_RUNTIME_SCRIPTS\.map\(\(\{ requestPath \}\)[\s\S]*?assertProductionClosureHygiene\(productionClosure\);/,
+    'cutover finalizer must apply hygiene to the generated HTML and served runtime closure'
+);
+assert.match(
+    finalizerSource,
+    /const servedRuntimeSources = await Promise\.all\(SERVED_RUNTIME_SCRIPTS\.map\([\s\S]*?content: await readFile\(sourcePath, "utf8"\)[\s\S]*?validateArtifact\(artifact, servedRuntimeSources\);/,
+    'cutover finalizer must read the exact served runtime sources before artifact acceptance'
+);
+console.log(`PRODUCTION_ARTIFACT_HYGIENE_RULE_COUNT=${PRODUCTION_ARTIFACT_HYGIENE_RULES.length}`);
+console.log(`PRODUCTION_ARTIFACT_HYGIENE_MUTATION_PROBES=${PRODUCTION_ARTIFACT_HYGIENE_RULES.length}`);
+console.log('EXTERNAL_RUNTIME_HYGIENE_MUTATION_PROBES=2');
+console.log('AGREEMENT_PREVIEW_ROUTE_ALLOW_PROBE=PASS');
 
 assert(!html.includes('\r'), 'artifact must use LF line endings');
 assert(html.endsWith('\n'), 'artifact must end with one newline');

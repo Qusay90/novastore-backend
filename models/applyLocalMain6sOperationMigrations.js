@@ -6,7 +6,8 @@ const MAIN6S_OPERATION_MIGRATION_IDS = Object.freeze([
     '20260813_03_coupon_operations',
     '20260813_04_product_media_operations',
     '20260828_01_launch_critical_commerce_readiness',
-    '20260828_02_unified_notification_core'
+    '20260828_02_unified_notification_core',
+    '20260901_01_seller_public_legal_identity'
 ]);
 
 const selectOperationMigrations = (registry) => {

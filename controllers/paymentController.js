@@ -60,7 +60,8 @@ const {
     buildCheckoutAgreementPreview,
     buildCheckoutAgreementSnapshot,
     getCheckoutAgreementDocuments,
-    getCheckoutAgreementReadiness
+    getCheckoutAgreementReadiness,
+    normalizeCheckoutAgreementContext
 } = require('../services/legalDocumentService');
 const { calculatePricing } = require('../services/pricingService');
 const {
@@ -73,7 +74,7 @@ const {
     releaseExpiredPaymentReservations
 } = require('../services/paymentReservationService');
 const {
-    buildSellerOrderProjection,
+    buildCheckoutSalesPartyProjection,
     materializeSellerOrderProjection
 } = require('../services/sellerOrderProjectionService');
 
@@ -215,6 +216,124 @@ const safeJsonParse = (value, fallback = {}) => {
     } catch (_) {
         return fallback;
     }
+};
+
+const CHECKOUT_AGREEMENT_SCHEMA_VERSION = 'checkout-agreements-v2';
+const CHECKOUT_AGREEMENT_ALLOCATION_RECONCILIATION_REASON = 'CHECKOUT_AGREEMENT_ALLOCATION_UNVERIFIED';
+
+const summarizeStoredProjectionProductIds = (allocation) => {
+    if (!Array.isArray(allocation?.productIds) || !Array.isArray(allocation?.items)) return null;
+    const productIds = allocation.productIds.map(Number).sort((left, right) => left - right);
+    const itemProductIds = allocation.items.map((item) => Number(item?.productId)).sort((left, right) => left - right);
+    if (
+        productIds.some((productId) => !Number.isSafeInteger(productId) || productId <= 0)
+        || itemProductIds.some((productId) => !Number.isSafeInteger(productId) || productId <= 0)
+        || stableStringify(productIds) !== stableStringify(itemProductIds)
+    ) {
+        return null;
+    }
+    return productIds;
+};
+
+const summarizeStoredSellerProjection = (sellerProjection) => {
+    if (!Array.isArray(sellerProjection)) return null;
+    const summaries = sellerProjection.map((seller) => {
+        const productIds = summarizeStoredProjectionProductIds(seller);
+        if (!productIds) return null;
+        return {
+            organizationId: Number(seller.organizationId),
+            storeId: Number(seller.storeId),
+            currency: String(seller.currency || '').trim().toUpperCase(),
+            grossMinor: Number(seller.grossMinor),
+            productIds
+        };
+    });
+    if (summaries.some((summary) => !summary)) return null;
+    return summaries.sort((left, right) => (
+        left.organizationId - right.organizationId || left.storeId - right.storeId
+    ));
+};
+
+const summarizeStoredPlatformAllocation = (platformAllocation) => {
+    if (platformAllocation === null || platformAllocation === undefined) return null;
+    const productIds = summarizeStoredProjectionProductIds(platformAllocation);
+    const storeId = Number(platformAllocation.storeId);
+    if (
+        !productIds
+        || !Number.isSafeInteger(storeId)
+        || storeId <= 0
+        || String(platformAllocation.storeSlug || '').trim().toLowerCase() !== 'novastore-platform'
+    ) {
+        return undefined;
+    }
+    return {
+        currency: String(platformAllocation.currency || '').trim().toUpperCase(),
+        grossMinor: Number(platformAllocation.grossMinor),
+        productIds
+    };
+};
+
+const hasVerifiedStoredCheckoutAgreementAllocation = (rawRequest) => {
+    try {
+        if (!rawRequest || typeof rawRequest !== 'object' || Array.isArray(rawRequest)) return false;
+        const snapshot = rawRequest.checkoutAgreementSnapshot;
+        if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return false;
+        if (snapshot.schemaVersion !== CHECKOUT_AGREEMENT_SCHEMA_VERSION) return false;
+        const normalizedContext = normalizeCheckoutAgreementContext(snapshot.context);
+        const expectedContextSha256 = crypto
+            .createHash('sha256')
+            .update(stableStringify(normalizedContext), 'utf8')
+            .digest('hex');
+        if (String(snapshot.contextSha256 || '').trim().toLowerCase() !== expectedContextSha256) return false;
+        const storedSellerSummaries = summarizeStoredSellerProjection(rawRequest.sellerProjection);
+        const storedPlatformSummary = summarizeStoredPlatformAllocation(rawRequest.platformAllocation);
+        if (!storedSellerSummaries || storedPlatformSummary === undefined) return false;
+        const snapshotSellerSummaries = normalizedContext.sellers.map((seller) => ({
+            organizationId: seller.organizationId,
+            storeId: seller.storeId,
+            currency: seller.currency,
+            grossMinor: seller.grossMinor,
+            productIds: [...seller.productIds]
+        })).sort((left, right) => (
+            left.organizationId - right.organizationId || left.storeId - right.storeId
+        ));
+        const snapshotPlatformSummary = normalizedContext.platformAllocation
+            ? {
+                currency: normalizedContext.platformAllocation.currency,
+                grossMinor: normalizedContext.platformAllocation.grossMinor,
+                productIds: [...normalizedContext.platformAllocation.productIds]
+            }
+            : null;
+        return stableStringify({
+            platformAllocation: storedPlatformSummary,
+            sellers: storedSellerSummaries
+        }) === stableStringify({
+            platformAllocation: snapshotPlatformSummary,
+            sellers: snapshotSellerSummaries
+        });
+    } catch (_) {
+        return false;
+    }
+};
+
+const guardActiveCaptureAgreementAllocation = (plan, rawRequest) => {
+    if (
+        plan.decision !== PAYMENT_CALLBACK_DECISION.CAPTURE_ACTIVE
+        || hasVerifiedStoredCheckoutAgreementAllocation(rawRequest)
+    ) {
+        return plan;
+    }
+    return Object.freeze({
+        ...plan,
+        decision: PAYMENT_CALLBACK_DECISION.CAPTURE_RECONCILIATION,
+        targetOrderStatus: plan.currentOrderStatus,
+        targetRefundStatus: REFUND_STATUS.PENDING,
+        runCommerceSideEffects: false,
+        reserveStock: false,
+        releaseStockReservation: false,
+        reconciliationRequired: true,
+        reconciliationReason: CHECKOUT_AGREEMENT_ALLOCATION_RECONCILIATION_REASON
+    });
 };
 
 const finalizeCouponReservationForCapture = async ({
@@ -684,12 +803,14 @@ const buildCheckoutAgreementContext = ({
     addressId,
     customer,
     pricing,
-    sellerProjection
+    sellerProjection,
+    platformAllocation
 }) => ({
     businessIdentity: identitySnapshot,
     delivery: {
         addressId,
         fullName: customer.fullName,
+        email: customer.email,
         phone: customer.phone,
         address: customer.address
     },
@@ -706,9 +827,19 @@ const buildCheckoutAgreementContext = ({
         code: pricing.coupon?.applied === true ? pricing.coupon.code : null,
         discountAmount: Number(pricing.coupon?.discountAmount || 0)
     },
+    platformAllocation: platformAllocation
+        ? {
+            currency: platformAllocation.currency,
+            grossMinor: Number(platformAllocation.grossMinor),
+            productIds: (platformAllocation.productIds || []).map(Number)
+        }
+        : null,
     sellers: (Array.isArray(sellerProjection) ? sellerProjection : []).map((seller) => ({
         organizationId: Number(seller.organizationId),
+        organizationDisplayName: seller.organizationDisplayName,
         storeId: Number(seller.storeId),
+        storeDisplayName: seller.storeDisplayName,
+        legalIdentity: seller.legalIdentity,
         currency: seller.currency,
         grossMinor: Number(seller.grossMinor),
         productIds: (seller.items || []).map((item) => Number(item.productId))
@@ -753,18 +884,25 @@ const loadAuthoritativeCheckoutState = async ({
     const customer = buildCustomerFromCheckoutAddress(checkoutAddress);
     const pricing = await calculatePricing({ cartItems, couponCode, client, lockCoupon });
     assertRequestedCouponApplied(couponCode, pricing.coupon);
-    const sellerProjection = await buildSellerOrderProjection(client, pricing.items);
+    const { sellerProjection, platformAllocation } = await buildCheckoutSalesPartyProjection(client, pricing.items);
     const checkoutAgreementSnapshot = buildCheckoutAgreementSnapshot(agreementAcceptances, {
         checkoutContext: buildCheckoutAgreementContext({
             identitySnapshot,
             addressId,
             customer,
             pricing,
-            sellerProjection
+            sellerProjection,
+            platformAllocation
         }),
         expectedSnapshotSha256: expectedAgreementSnapshotSha256
     });
-    return Object.freeze({ customer, pricing, sellerProjection, checkoutAgreementSnapshot });
+    return Object.freeze({
+        customer,
+        pricing,
+        sellerProjection,
+        platformAllocation,
+        checkoutAgreementSnapshot
+    });
 };
 
 const buildPaytrPayloadBindingHash = (payload) => crypto
@@ -851,14 +989,15 @@ const getCheckoutAgreementPreview = async (req, res) => {
             })
         };
         const pricing = await calculatePricing({ cartItems, couponCode, client });
-        const sellerProjection = await buildSellerOrderProjection(client, pricing.items);
+        const { sellerProjection, platformAllocation } = await buildCheckoutSalesPartyProjection(client, pricing.items);
         const preview = buildCheckoutAgreementPreview({
             checkoutContext: buildCheckoutAgreementContext({
                 identitySnapshot: launchPolicy.identitySnapshot,
                 addressId,
                 customer,
                 pricing,
-                sellerProjection
+                sellerProjection,
+                platformAllocation
             })
         });
         return res.status(200).json({
@@ -969,12 +1108,13 @@ const finalizePaytrCallback = async (payload, callbackOutcome) => {
         }
 
         const stockReservationState = getStockReservationState(payment);
-        const plan = planPaymentCallback({
+        let plan = planPaymentCallback({
             paymentStatus: payment.status,
             orderStatus: payment.order_status,
             callbackOutcome,
             stockReservationState
         });
+        plan = guardActiveCaptureAgreementAllocation(plan, rawRequest);
         const parsedItemsRaw = safeJsonParse(payment.items, []);
         const parsedItems = Array.isArray(parsedItemsRaw) ? parsedItemsRaw : [];
         const failedReason = [payload.failed_reason_code, payload.failed_reason_msg]
@@ -1499,7 +1639,7 @@ const initializePayment = async (req, res) => {
             paymentMethod,
             businessIdentitySnapshot: launchPolicy.identitySnapshot
         });
-        const { sellerProjection, checkoutAgreementSnapshot } = finalState;
+        const { sellerProjection, platformAllocation, checkoutAgreementSnapshot } = finalState;
         const couponReservation = await reserveCouponUsageForOrder(client, {
             coupon: pricing.coupon,
             orderId: order.id,
@@ -1529,6 +1669,7 @@ const initializePayment = async (req, res) => {
             ...reservationMetadata,
             finalizesOnWebhook: true,
             idempotency: idempotencyContext,
+            platformAllocation,
             sellerProjection
         };
 
@@ -1810,13 +1951,14 @@ const webhookIyzico = async (req, res) => {
         }
 
         const stockReservationState = getStockReservationState(payment);
-        const plan = planPaymentCallback({
+        let plan = planPaymentCallback({
             paymentStatus: payment.status,
             orderStatus: payment.order_status,
             callbackOutcome,
             stockReservationState
         });
         const rawRequest = safeJsonParse(payment.raw_request, {});
+        plan = guardActiveCaptureAgreementAllocation(plan, rawRequest);
         const parsedItemsRaw = safeJsonParse(payment.items, []);
         const parsedItems = Array.isArray(parsedItemsRaw) ? parsedItemsRaw : [];
 
@@ -2080,6 +2222,8 @@ module.exports = {
     __test: {
         buildCheckoutAgreementContext,
         formatCheckoutAddress,
+        guardActiveCaptureAgreementAllocation,
+        hasVerifiedStoredCheckoutAgreementAllocation,
         loadOwnedCheckoutAddress,
         normalizeCheckoutAddressId,
         readStoredPaytrAction,

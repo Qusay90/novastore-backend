@@ -2,7 +2,9 @@
 
 const BUSINESS_IDENTITY_FIELDS = Object.freeze([
     Object.freeze({ key: 'legalCompanyName', environmentKey: 'BUSINESS_LEGAL_COMPANY_NAME', requiredForPayment: true }),
+    Object.freeze({ key: 'tradeName', environmentKey: 'BUSINESS_TRADE_NAME', requiredForPayment: true }),
     Object.freeze({ key: 'taxNumber', environmentKey: 'BUSINESS_TAX_VKN', requiredForPayment: true }),
+    Object.freeze({ key: 'taxOffice', environmentKey: 'BUSINESS_TAX_OFFICE', requiredForPayment: false }),
     Object.freeze({ key: 'mersisNumber', environmentKey: 'BUSINESS_MERSIS_NUMBER', requiredForPayment: true }),
     Object.freeze({ key: 'registeredAddress', environmentKey: 'BUSINESS_REGISTERED_ADDRESS', requiredForPayment: true }),
     Object.freeze({ key: 'kepAddress', environmentKey: 'BUSINESS_KEP_ADDRESS', requiredForPayment: true }),
@@ -20,6 +22,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const APP_ID_PATTERN = /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*){2,}$/;
 const PUBLIC_IDENTITY_KEYS = Object.freeze([
     'legalCompanyName',
+    'tradeName',
     'taxNumber',
     'mersisNumber',
     'registeredAddress',
@@ -28,6 +31,7 @@ const PUBLIC_IDENTITY_KEYS = Object.freeze([
     'email',
     'customerDomain'
 ]);
+const OPTIONAL_PUBLIC_IDENTITY_KEYS = Object.freeze(['taxOffice']);
 
 class BusinessIdentityConfigError extends Error {
     constructor(missingEnvironmentKeys) {
@@ -63,7 +67,9 @@ const validText = (value, minimum, maximum) => (
 const isValidBusinessIdentityValue = (key, value) => {
     if (!value) return false;
     if (key === 'legalCompanyName') return validText(value, 2, 200);
+    if (key === 'tradeName') return validText(value, 2, 160);
     if (key === 'taxNumber') return /^\d{10}$/.test(value);
+    if (key === 'taxOffice') return validText(value, 2, 160);
     if (key === 'mersisNumber') return /^\d{16}$/.test(value);
     if (key === 'registeredAddress') return validText(value, 10, 500);
     if (key === 'kepAddress' || key === 'email') return value.length <= 254 && EMAIL_PATTERN.test(value);
@@ -86,7 +92,9 @@ const getMissingBusinessIdentityKeys = (env = process.env, { paymentOnly = false
 
 const getInvalidBusinessIdentityKeys = (env = process.env, { paymentOnly = false } = {}) => (
     BUSINESS_IDENTITY_FIELDS
-        .filter(({ requiredForPayment }) => !paymentOnly || requiredForPayment)
+        .filter(({ requiredForPayment, environmentKey }) => (
+            !paymentOnly || requiredForPayment || Boolean(text(env?.[environmentKey]))
+        ))
         .filter(({ key, environmentKey }) => {
             const value = text(env?.[environmentKey]);
             return value && !isValidBusinessIdentityValue(key, value);
@@ -107,7 +115,9 @@ const assertBusinessIdentityReadyForPayment = (env = process.env) => {
 
 const buildBusinessIdentitySnapshot = (identity) => Object.freeze({
     legalCompanyName: identity.legalCompanyName,
+    tradeName: identity.tradeName,
     taxNumber: identity.taxNumber,
+    taxOffice: identity.taxOffice || null,
     mersisNumber: identity.mersisNumber,
     registeredAddress: identity.registeredAddress,
     kepAddress: identity.kepAddress,
@@ -126,7 +136,12 @@ const getPublicBusinessIdentity = (env = process.env) => {
     return Object.freeze({
         status: configured ? 'configured' : 'pending_owner_company_formation',
         identity: configured
-            ? Object.freeze(Object.fromEntries(PUBLIC_IDENTITY_KEYS.map((key) => [key, identity[key]])))
+            ? Object.freeze(Object.fromEntries([
+                ...PUBLIC_IDENTITY_KEYS.map((key) => [key, identity[key]]),
+                ...OPTIONAL_PUBLIC_IDENTITY_KEYS
+                    .filter((key) => isValidBusinessIdentityValue(key, text(identity[key])))
+                    .map((key) => [key, identity[key]])
+            ]))
             : null,
         issueCount: issues.length
     });
@@ -134,6 +149,8 @@ const getPublicBusinessIdentity = (env = process.env) => {
 
 module.exports = Object.freeze({
     BUSINESS_IDENTITY_FIELDS,
+    OPTIONAL_PUBLIC_IDENTITY_KEYS,
+    PUBLIC_IDENTITY_KEYS,
     BusinessIdentityConfigError,
     assertBusinessIdentityReadyForPayment,
     buildBusinessIdentitySnapshot,

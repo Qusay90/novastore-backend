@@ -36,10 +36,6 @@
         return Boolean(getToken()) && getUserId() !== 'guest';
     }
 
-    function isIsolatedLocalReview() {
-        return getToken().startsWith('local-review-');
-    }
-
     function favoritesKey(userId = getUserId()) {
         return `${FAVORITES_PREFIX}${userId}`;
     }
@@ -154,7 +150,6 @@
 
     async function syncLocalFavoritesOnce() {
         if (!isAuthenticated()) return null;
-        if (isIsolatedLocalReview()) return null;
 
         const userId = getUserId();
         const guestIds = readLocalIds('guest');

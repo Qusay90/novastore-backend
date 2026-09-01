@@ -68,6 +68,9 @@ function productionOriginGuard() {
 }
 
 export default defineConfig({
+  define: {
+    __NOVASTORE_LOCAL_REVIEW_RUNTIME__: "false",
+  },
   root: projectRoot,
   base: "/commerce-pro/",
   build: {

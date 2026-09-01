@@ -5,6 +5,7 @@ const Module = require('module');
 const pool = require('../config/db');
 const { ORDER_STATUS, PAYMENT_STATUS } = require('../constants/orderStatus');
 const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
+const { buildVerifiedCheckoutAgreementAllocationFixture } = require('./helpers/checkoutAgreementAllocationFixture');
 
 const trackedEnv = [
     'NODE_ENV',
@@ -110,7 +111,8 @@ const makePaymentRow = (state) => ({
     payment_ref: merchantOid,
     amount: state.amount,
     status: state.paymentStatus,
-    raw_request: JSON.stringify({
+    raw_request: JSON.stringify(state.rawRequest || {
+        ...buildVerifiedCheckoutAgreementAllocationFixture(),
         coupon: { applied: true, couponId: 901 },
         stockReserved: false,
         finalizesOnWebhook: true,

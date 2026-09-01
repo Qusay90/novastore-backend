@@ -40,6 +40,8 @@ import {
 } from "../../web-notifications/notificationClient.js";
 import turkeyLocations from "../../shared/turkiye-provinces-districts.v1.json";
 
+const LOCAL_REVIEW_RUNTIME_ENABLED = __NOVASTORE_LOCAL_REVIEW_RUNTIME__;
+
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
   currency: "TRY",
@@ -163,21 +165,22 @@ function LocalReviewAuthBoundary({ password = false }) {
   </div></main>;
 }
 
-export function CustomerAuthPage({
-  account,
-  initialMode = "login",
-  returnPath = "/hesabim",
-  onAuthenticated,
-  reviewOnly = false,
-}) {
+export function CustomerAuthPage(props) {
+  const {
+    account,
+    initialMode = "login",
+    returnPath = "/hesabim",
+    onAuthenticated,
+  } = props;
   const [mode, setMode] = useState(initialMode === "register" ? "register" : "login");
   const [phase, setPhase] = useState("idle");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const localReviewOnly = LOCAL_REVIEW_RUNTIME_ENABLED ? Boolean(props.reviewOnly) : false;
 
   useEffect(() => setMode(initialMode === "register" ? "register" : "login"), [initialMode]);
 
-  if (reviewOnly) return <LocalReviewAuthBoundary />;
+  if (localReviewOnly) return <LocalReviewAuthBoundary />;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -235,13 +238,15 @@ export function CustomerAuthPage({
   </div></main>;
 }
 
-export function CustomerPasswordPage({ account, mode, token = "", reviewOnly = false }) {
+export function CustomerPasswordPage(props) {
+  const { account, mode, token = "" } = props;
   const reset = mode === "reset";
   const [phase, setPhase] = useState("idle");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const localReviewOnly = LOCAL_REVIEW_RUNTIME_ENABLED ? Boolean(props.reviewOnly) : false;
 
-  if (reviewOnly) return <LocalReviewAuthBoundary password />;
+  if (localReviewOnly) return <LocalReviewAuthBoundary password />;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -753,12 +758,14 @@ function NotificationsSection({ session, account, onNotice }) {
   return <><div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Bildirimlerim</h1><p>Sipariş ve hesap güncellemelerini tüm cihazlarında aynı okunma durumuyla izle.</p></div>{notifications.some((item) => !item.isRead) && <button className="secondary-action" type="button" onClick={markAll} disabled={busy}>Tümünü okundu yap</button>}</div>{error && <div className="form-message is-error" role="alert"><WarningCircle />{error}</div>}<CustomerWebPushSettings api={account.webPush} />{notifications.length ? <div className="notification-list connected-notifications">{notifications.map((item) => { const Icon = notificationIcon(item.type); return <button key={item.id} type="button" className={item.isRead ? "is-read" : "is-unread"} onClick={() => markOne(item)} disabled={busy} aria-label={`${item.title}, ${item.isRead ? "okundu" : "okunmadı"}`}><Icon /><span><strong>{item.title}</strong><small>{item.message}</small><small>{item.category} · {formatDate(item.createdAt)}</small></span>{!item.isRead && <i aria-label="Okunmadı" />}</button>; })}</div> : <div className="connected-empty"><Bell /><h2>Henüz bildirimin yok</h2><p>Sipariş ve hesap güncellemeleri burada gösterilecek.</p></div>}</>;
 }
 
-function SecuritySection({ account, onNotice, reviewOnly = false }) {
+function SecuritySection(props) {
+  const { account, onNotice } = props;
   const [phase, setPhase] = useState("idle");
   const [error, setError] = useState("");
+  const localReviewOnly = LOCAL_REVIEW_RUNTIME_ENABLED ? Boolean(props.reviewOnly) : false;
   const submit = async (event) => {
     event.preventDefault();
-    if (reviewOnly) return;
+    if (localReviewOnly) return;
     const form = new FormData(event.currentTarget);
     const currentPassword = String(form.get("currentPassword") || "");
     const newPassword = String(form.get("newPassword") || "");
@@ -771,22 +778,22 @@ function SecuritySection({ account, onNotice, reviewOnly = false }) {
     catch (requestError) { setError(errorMessage(requestError, "Şifre güncellenemedi.")); }
     finally { setPhase("idle"); }
   };
-  return <><div className="commerce-heading"><div><span className="section-kicker">Hesap güvenliği</span><h1>Şifremi değiştir</h1><p>{reviewOnly ? "Yerel inceleme oturumu gerçek parola işlemi yapmaz." : "Yeni şifren en az 8 karakter, bir harf ve bir rakam içermelidir."}</p></div></div><form className="security-form connected-form" onSubmit={submit}><Key />{reviewOnly && <div className="form-message is-warning" role="status"><ShieldCheck />Parola değiştirme, üretim kimliği gerektirdiği için bu yerel oturumda devre dışıdır.</div>}{error && <div className="form-message is-error"><WarningCircle />{error}</div>}<label>Mevcut şifre<input name="currentPassword" type="password" autoComplete="current-password" required disabled={reviewOnly} /></label><label>Yeni şifre<input name="newPassword" type="password" autoComplete="new-password" minLength="8" required disabled={reviewOnly} /></label><label>Yeni şifre tekrarı<input name="confirmation" type="password" autoComplete="new-password" minLength="8" required disabled={reviewOnly} /></label><button className="primary-button" type="submit" disabled={reviewOnly || phase === "submitting"}>{reviewOnly ? "Yerel incelemede kullanılamaz" : phase === "submitting" ? "Güncelleniyor…" : "Şifremi güncelle"}</button></form></>;
+  return <><div className="commerce-heading"><div><span className="section-kicker">Hesap güvenliği</span><h1>Şifremi değiştir</h1><p>{localReviewOnly ? "Yerel inceleme oturumu gerçek parola işlemi yapmaz." : "Yeni şifren en az 8 karakter, bir harf ve bir rakam içermelidir."}</p></div></div><form className="security-form connected-form" onSubmit={submit}><Key />{localReviewOnly && <div className="form-message is-warning" role="status"><ShieldCheck />Parola değiştirme, üretim kimliği gerektirdiği için bu yerel oturumda devre dışıdır.</div>}{error && <div className="form-message is-error"><WarningCircle />{error}</div>}<label>Mevcut şifre<input name="currentPassword" type="password" autoComplete="current-password" required disabled={localReviewOnly} /></label><label>Yeni şifre<input name="newPassword" type="password" autoComplete="new-password" minLength="8" required disabled={localReviewOnly} /></label><label>Yeni şifre tekrarı<input name="confirmation" type="password" autoComplete="new-password" minLength="8" required disabled={localReviewOnly} /></label><button className="primary-button" type="submit" disabled={localReviewOnly || phase === "submitting"}>{localReviewOnly ? "Yerel incelemede kullanılamaz" : phase === "submitting" ? "Güncelleniyor…" : "Şifremi güncelle"}</button></form></>;
 }
 
-export function CustomerAccountPage({
-  session,
-  account,
-  section = "overview",
-  orderId = null,
-  favoriteCount = 0,
-  products = [],
-  getProductImage,
-  onSessionUpdated,
-  onLogout,
-  onNotice,
-  reviewOnly = false,
-}) {
+export function CustomerAccountPage(props) {
+  const {
+    session,
+    account,
+    section = "overview",
+    orderId = null,
+    favoriteCount = 0,
+    products = [],
+    getProductImage,
+    onSessionUpdated,
+    onLogout,
+    onNotice,
+  } = props;
   const productById = useMemo(() => new Map(products.map((product) => [Number(product.id), product])), [products]);
   const activeSection = section === "order-detail" ? "orders" : section;
   let content;
@@ -798,7 +805,7 @@ export function CustomerAccountPage({
   else if (section === "reviews") content = <ReviewsSection session={session} account={account} productById={productById} />;
   else if (section === "followed-stores") content = <FollowedStoresSection session={session} account={account} onNotice={onNotice} />;
   else if (section === "notifications") content = <NotificationsSection session={session} account={account} onNotice={onNotice} />;
-  else if (section === "security") content = <SecuritySection account={account} onNotice={onNotice} reviewOnly={reviewOnly} />;
+  else if (section === "security") content = <SecuritySection account={account} onNotice={onNotice} {...(LOCAL_REVIEW_RUNTIME_ENABLED ? { reviewOnly: props.reviewOnly } : {})} />;
   else content = <div className="connected-empty"><WarningCircle /><h2>Hesap bölümü bulunamadı</h2><a className="primary-button" href="#/hesabim">Hesap özetine dön</a></div>;
 
   return <main id="main-content" className="page commerce-page"><div className="shell"><div className="account-layout"><ConnectedAccountSidebar section={activeSection} onLogout={onLogout} /><section className="account-content">{content}</section></div></div></main>;
@@ -841,17 +848,17 @@ function CheckoutAgreementReview({ state, definitions, accepted, onAcceptedChang
   </div>;
 }
 
-export function CustomerCheckoutPage({
-  step,
-  session,
-  account,
-  checkout,
-  items,
-  getProductImage,
-  onStepChange,
-  onNotice,
-  reviewOnly = false,
-}) {
+export function CustomerCheckoutPage(props) {
+  const {
+    step,
+    session,
+    account,
+    checkout,
+    items,
+    getProductImage,
+    onStepChange,
+    onNotice,
+  } = props;
   const addressesResource = useAsyncResource((options) => account.listAddresses(options), [account]);
   const capabilityResource = useAsyncResource((options) => checkout.getCapability(options), [checkout]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
@@ -870,6 +877,7 @@ export function CustomerCheckoutPage({
   const [agreementPreviewRevision, setAgreementPreviewRevision] = useState(0);
   const [submitPhase, setSubmitPhase] = useState("idle");
   const [submitError, setSubmitError] = useState("");
+  const localReviewOnly = LOCAL_REVIEW_RUNTIME_ENABLED ? Boolean(props.reviewOnly) : false;
   const hasStockIssues = items.some(({ product, quantity }) => product.stock <= 0 || quantity > product.stock);
 
   const loadQuote = useCallback(async (couponCode = null, signal = undefined) => {
@@ -907,6 +915,8 @@ export function CustomerCheckoutPage({
   const quote = quoteState.data;
   const capability = capabilityResource.phase === "ready" ? capabilityResource.data : null;
   const capabilityAgreements = Array.isArray(capability?.agreements) ? capability.agreements : [];
+  const agreementPreviewPrerequisitesReady = capability?.requirements?.businessIdentityReady === true
+    && capability?.requirements?.legalDocumentsReady === true;
   const capabilityAgreementSignature = capabilityAgreements
     .map((agreement) => `${agreement.slug}:${agreement.version || "pending"}:${agreement.status}`)
     .sort()
@@ -920,7 +930,7 @@ export function CustomerCheckoutPage({
       agreement.status === "published" && agreement.version
     ));
     if (
-      capability?.ready !== true
+      !agreementPreviewPrerequisitesReady
       || !definitionsReady
       || !selectedAddress
       || quoteState.phase !== "ready"
@@ -950,7 +960,7 @@ export function CustomerCheckoutPage({
   }, [
     agreementPreviewRevision,
     appliedCoupon,
-    capability?.ready,
+    agreementPreviewPrerequisitesReady,
     capabilityAgreementSignature,
     cartFingerprint,
     checkout,
@@ -1029,7 +1039,7 @@ export function CustomerCheckoutPage({
   };
 
   const submitPayment = async () => {
-    if (reviewOnly) return;
+    if (localReviewOnly) return;
     if (!selectedAddress) { setSubmitError("Teslimat adresi seçmelisin."); onStepChange("delivery"); return; }
     if (capabilityResource.phase !== "ready" || capability?.ready !== true) { setSubmitError(capability?.message || "Güvenli ödeme hizmeti aktivasyon sürecindedir."); onStepChange("payment"); return; }
     if (!agreementsReady) { setSubmitError("Güncel ön bilgilendirme ve mesafeli satış sözleşmesini onaylamalısın."); onStepChange("payment"); return; }
@@ -1087,11 +1097,11 @@ export function CustomerCheckoutPage({
         {selectedAddress ? <div className="review-box"><span>Teslimat</span><strong>{selectedAddress.title}</strong><p>{selectedAddress.fullName} · {selectedAddress.addressLine}, {selectedAddress.district} / {selectedAddress.city}</p></div> : <div className="form-message is-error"><WarningCircle />Teslimat adresi seçilmedi.</div>}
         <div className="review-products">{items.map(({ product, quantity }) => <div key={product.id}><img src={getProductImage(product)} alt="" /><span><strong>{product.name}</strong><small>{quantity} adet</small></span><b>{money.format(product.price * quantity)}</b></div>)}</div>
         <div className="review-provider-state"><ShieldCheck /><span><strong>{capability?.ready ? capability.testMode ? "PayTR test ödemesi" : "PayTR güvenli ödeme" : "Ödeme aktivasyonu bekleniyor"}</strong><small>{capability?.message || "Sağlayıcı durumu doğrulanmadan ödeme başlatılmaz."}{capability?.ready && capability.testMode ? " Gerçek tahsilat yapılmaz." : ""}</small></span></div>
-        {reviewOnly && <div className="form-message is-warning" role="status"><ShieldCheck />Yerel incelemede gerçek ödeme, sipariş oluşturma ve sağlayıcı yönlendirmesi yapılmaz.</div>}
-        <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("payment")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={reviewOnly || submitPhase === "submitting" || quoteState.phase !== "ready" || !selectedAddress || !paymentReady} onClick={submitPayment}><ShieldCheck /> {reviewOnly ? "Yerel incelemede ödeme kapalı" : !capability?.ready ? "Ödeme aktivasyonu bekleniyor" : !agreementsReady ? "Sözleşme onayı gerekli" : submitPhase === "submitting" ? "Güvenli ödeme hazırlanıyor…" : "PayTR güvenli ödeme ekranına geç"}</button></div>
+        {localReviewOnly && <div className="form-message is-warning" role="status"><ShieldCheck />Yerel incelemede gerçek ödeme, sipariş oluşturma ve sağlayıcı yönlendirmesi yapılmaz.</div>}
+        <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("payment")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={localReviewOnly || submitPhase === "submitting" || quoteState.phase !== "ready" || !selectedAddress || !paymentReady} onClick={submitPayment}><ShieldCheck /> {localReviewOnly ? "Yerel incelemede ödeme kapalı" : !capability?.ready ? "Ödeme aktivasyonu bekleniyor" : !agreementsReady ? "Sözleşme onayı gerekli" : submitPhase === "submitting" ? "Güvenli ödeme hazırlanıyor…" : "PayTR güvenli ödeme ekranına geç"}</button></div>
       </>}
     </section><CheckoutSummary quote={quote} phase={quoteState.phase} error={quoteState.error} couponInput={couponInput} onCouponInput={setCouponInput} onApplyCoupon={applyCoupon} onClearCoupon={clearCoupon} couponBusy={couponBusy} /></div>
-    {step === "review" && quoteState.phase === "ready" && <div className="mobile-checkout-bar"><span><small>Doğrulanmış toplam</small><strong>{money.format(quote.totals.total)}</strong></span><button type="button" disabled={reviewOnly || submitPhase === "submitting" || !selectedAddress || !paymentReady} onClick={submitPayment}><ShieldCheck /> {reviewOnly ? "Ödeme kapalı" : capability?.ready ? "PayTR'a geç" : "Aktivasyon bekleniyor"}</button></div>}
+    {step === "review" && quoteState.phase === "ready" && <div className="mobile-checkout-bar"><span><small>Doğrulanmış toplam</small><strong>{money.format(quote.totals.total)}</strong></span><button type="button" disabled={localReviewOnly || submitPhase === "submitting" || !selectedAddress || !paymentReady} onClick={submitPayment}><ShieldCheck /> {localReviewOnly ? "Ödeme kapalı" : capability?.ready ? "PayTR'a geç" : "Aktivasyon bekleniyor"}</button></div>}
   </div></main>;
 }
 
@@ -1182,7 +1192,7 @@ export function CustomerPublicContactPage({ businessIdentity }) {
   const identity = businessIdentity?.status === "configured" ? businessIdentity.identity : null;
   return <main id="main-content" className="page help-page"><div className="shell"><article className="legal-document-card contact-review-card">
     <span className="section-kicker">Kurumsal iletişim</span><h1>İletişim</h1>
-    {identity ? <address><strong>{identity.legalCompanyName}</strong><span>{identity.registeredAddress}</span><span>VKN: {identity.taxNumber} · MERSİS: {identity.mersisNumber}</span><a href={`mailto:${identity.kepAddress}`}>KEP: {identity.kepAddress}</a><a href={`tel:${identity.phone}`}>{identity.phone}</a><a href={`mailto:${identity.email}`}>{identity.email}</a></address> : <div className="legal-document-pending" role="status"><ShieldCheck /><div><strong>Gerçek şirket iletişim bilgileri bekleniyor</strong><p>Şirket kimliği, VKN, MERSİS, KEP, adres, telefon ve e-posta sahibi tarafından doğrulanmadan bu sayfada yayımlanmaz.</p></div></div>}
+    {identity ? <address><strong>{identity.legalCompanyName}</strong><span>Ticari unvan: {identity.tradeName}</span><span>{identity.registeredAddress}</span><span>VKN: {identity.taxNumber}{identity.taxOffice ? ` · Vergi dairesi: ${identity.taxOffice}` : ""} · MERSİS: {identity.mersisNumber}</span><a href={`mailto:${identity.kepAddress}`}>KEP: {identity.kepAddress}</a><a href={`tel:${identity.phone}`}>{identity.phone}</a><a href={`mailto:${identity.email}`}>{identity.email}</a></address> : <div className="legal-document-pending" role="status"><ShieldCheck /><div><strong>Gerçek şirket iletişim bilgileri bekleniyor</strong><p>Şirket kimliği, ticari unvan, VKN, MERSİS, KEP, adres, telefon ve e-posta sahibi tarafından doğrulanmadan bu sayfada yayımlanmaz.</p></div></div>}
     <p className="contact-review-support">Müşteri hesabınla ilgili destek için <a href="#/destek">güvenli destek kanalına</a> giriş yapabilirsin.</p>
   </article></div></main>;
 }

@@ -21,6 +21,16 @@ const repositoryRoot = path.resolve(root, "..");
 const targetPath = path.join(repositoryRoot, "frontend", "commerce-pro", "index.html");
 const configPath = path.join(root, "vite.cutover.config.mjs");
 const tempPrefix = "novastore-commerce-pro-cutover-";
+const SERVED_RUNTIME_SCRIPTS = Object.freeze([
+  Object.freeze({
+    requestPath: "/shared-state-sync.js",
+    sourcePath: path.join(repositoryRoot, "frontend", "shared-state-sync.js"),
+  }),
+  Object.freeze({
+    requestPath: "/favorites-sync.js",
+    sourcePath: path.join(repositoryRoot, "frontend", "favorites-sync.js"),
+  }),
+]);
 
 const EXPECTED = Object.freeze({
   canonical: "8b6301362b6c01b649db1d7cfa4dc00d5b4392309e4ece2c7c14870cab0f2b0d",
@@ -28,6 +38,70 @@ const EXPECTED = Object.freeze({
   catalog: "a38d2e5f5a09fdc47bd9102800b04c423cf19b8d4d6bc952b77a5b77dc74062d",
   css: "5b8e0d4a4eb1fb954e089f5c0e9dbabcad8217032ef12e3a67a03d89072e0896",
 });
+
+const PRODUCTION_ARTIFACT_HYGIENE_RULES = Object.freeze([
+  Object.freeze({
+    pattern: /createCanonicalFixtureRuntime|main-integrated-fixture|fixture-integrated/i,
+    label: "fixture runtime",
+  }),
+  Object.freeze({
+    pattern: /commerce-pro-(?:preview|integration-preview)|noindex|nofollow/i,
+    label: "preview/noindex",
+  }),
+  Object.freeze({
+    pattern: /\b(?:localhost|127\.0\.0\.1)\b/i,
+    label: "local host",
+  }),
+  Object.freeze({
+    pattern: /\b(?:5273|55437)\b/,
+    label: "local review/demo port",
+  }),
+  Object.freeze({
+    pattern: /(?:@local\.invalid|@novastore\.test|@example\.invalid)\b/i,
+    label: "local/test customer identity",
+  }),
+  Object.freeze({
+    pattern: /(?:\blocal-review-|isIsolatedLocalReview|\breviewOnly\b|LocalReview(?:Auth|Payment)Boundary|LOCAL_REVIEW_RUNTIME_ENABLED|__NOVASTORE_LOCAL_REVIEW_RUNTIME__|Yerel inceleme|Sentetik inceleme|Bu sunucu gerçek üyelik)/iu,
+    label: "local review authority",
+  }),
+  Object.freeze({
+    pattern: /(?:\bfriend[-_ ]demo\b|novastore_friend_demo_20260831|customer-credential\.xml|start-customer-demo\.ps1|sync-real-public-catalog\.ps1|deneme\.novastore\.tr)/i,
+    label: "friend-demo dependency",
+  }),
+  Object.freeze({
+    pattern: /\bnovastore_(?:friend_demo(?:_\d+)?|preview|test|ci)(?:_[a-z0-9_-]+)?\b/i,
+    label: "demo/test database",
+  }),
+  Object.freeze({
+    pattern: /\b(?:PAYTR_MERCHANT_KEY|PAYTR_MERCHANT_SALT|JWT_SECRET|DATABASE_URL|RESEND_API_KEY|VAPID_PRIVATE_KEY|FIREBASE_PRIVATE_KEY|CLOUDINARY_API_SECRET)\b/i,
+    label: "private secret environment name",
+  }),
+  Object.freeze({
+    pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/i,
+    label: "private key material",
+  }),
+  Object.freeze({
+    pattern: /\bpostgres(?:ql)?:\/\/[^\s"'`<>]+/i,
+    label: "database connection string",
+  }),
+  Object.freeze({
+    pattern: /\bBearer[ \t]+[A-Za-z0-9._~+/=-]{20,}(?![A-Za-z0-9._~+/=-])/,
+    label: "embedded bearer credential",
+  }),
+  Object.freeze({ pattern: /file:\/\//i, label: "file URL" }),
+  Object.freeze({
+    pattern: /[A-Za-z]:[\\/](?:Users|Windows|Program Files|AppData|Temp)[\\/]/i,
+    label: "Windows absolute path",
+  }),
+  Object.freeze({
+    pattern: /(?:AppData[\\/]Local[\\/]Temp|novastore-commerce-pro-cutover-)/i,
+    label: "temp path",
+  }),
+  Object.freeze({
+    pattern: /(?:@vite\/client|vite\/dist\/client|sourceMappingURL)/i,
+    label: "dev/sourcemap marker",
+  }),
+]);
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
@@ -119,7 +193,23 @@ function assertIntegratedSourceChain(sources) {
   }
 }
 
-function validateArtifact(buffer) {
+function assertProductionClosureHygiene(sources) {
+  for (const { label: sourceLabel, content } of sources) {
+    for (const { pattern, label } of PRODUCTION_ARTIFACT_HYGIENE_RULES) {
+      if (pattern.test(content)) {
+        throw new Error(`Production artifact closure ${sourceLabel} yasaklı ${label} içeriyor.`);
+      }
+    }
+
+    const origins = [...content.matchAll(/https?:\/\/[^"'`\s<>\)]+/g)].map((match) => match[0]);
+    const unexpectedOrigins = origins.filter((origin) => !origin.startsWith("http://www.w3.org/"));
+    if (unexpectedOrigins.length > 0) {
+      throw new Error(`Production artifact closure ${sourceLabel} beklenmeyen external origin içeriyor: ${[...new Set(unexpectedOrigins)].join(", ")}`);
+    }
+  }
+}
+
+function validateArtifact(buffer, servedRuntimeSources) {
   const html = buffer.toString("utf8");
   for (const required of [
     "novastore-artifact-kind",
@@ -163,24 +253,21 @@ function validateArtifact(buffer) {
     throw new Error("Production artifact shared cart/favorites owner sırasını korumuyor.");
   }
 
-  const forbiddenPatterns = [
-    [/createCanonicalFixtureRuntime|main-integrated-fixture|fixture-integrated/i, "fixture runtime"],
-    [/commerce-pro-(?:preview|integration-preview)|noindex|nofollow/i, "preview/noindex"],
-    [/https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?/i, "local development URL"],
-    [/file:\/\//i, "file URL"],
-    [/[A-Za-z]:[\\/](?:Users|Windows|Program Files|AppData|Temp)[\\/]/i, "Windows absolute path"],
-    [/(?:AppData[\\/]Local[\\/]Temp|novastore-commerce-pro-cutover-)/i, "temp path"],
-    [/(?:@vite\/client|vite\/dist\/client|sourceMappingURL)/i, "dev/sourcemap marker"],
+  const servedSourceByPath = new Map(servedRuntimeSources.map(({ requestPath, content }) => [requestPath, content]));
+  if (servedSourceByPath.size !== SERVED_RUNTIME_SCRIPTS.length) {
+    throw new Error("Production artifact served runtime script closure eksik veya tekrarlı.");
+  }
+  const productionClosure = [
+    { label: "generated HTML", content: html },
+    ...SERVED_RUNTIME_SCRIPTS.map(({ requestPath }) => {
+      const content = servedSourceByPath.get(requestPath);
+      if (typeof content !== "string") {
+        throw new Error(`Production artifact served runtime script closure eksik: ${requestPath}`);
+      }
+      return { label: requestPath, content };
+    }),
   ];
-  for (const [pattern, label] of forbiddenPatterns) {
-    if (pattern.test(html)) throw new Error(`Production artifact yasaklı ${label} içeriyor.`);
-  }
-
-  const origins = [...html.matchAll(/https?:\/\/[^"'`\s<>\)]+/g)].map((match) => match[0]);
-  const unexpectedOrigins = origins.filter((origin) => !origin.startsWith("http://www.w3.org/"));
-  if (unexpectedOrigins.length > 0) {
-    throw new Error(`Production artifact beklenmeyen external origin içeriyor: ${[...new Set(unexpectedOrigins)].join(", ")}`);
-  }
+  assertProductionClosureHygiene(productionClosure);
 
   if (!html.endsWith("\n") || html.includes("\r")) {
     throw new Error("Production artifact LF/final newline sözleşmesini karşılamıyor.");
@@ -248,7 +335,11 @@ try {
   const built = await readFile(path.join(tempRoot, "cutover.html"), "utf8");
   const normalized = `${built.replace(/\r\n?/g, "\n").trimEnd()}\n`;
   const artifact = Buffer.from(normalized, "utf8");
-  validateArtifact(artifact);
+  const servedRuntimeSources = await Promise.all(SERVED_RUNTIME_SCRIPTS.map(async ({ requestPath, sourcePath }) => ({
+    requestPath,
+    content: await readFile(sourcePath, "utf8"),
+  })));
+  validateArtifact(artifact, servedRuntimeSources);
 
   const candidatePath = path.join(tempRoot, "production-index.html");
   await writeFile(candidatePath, artifact);

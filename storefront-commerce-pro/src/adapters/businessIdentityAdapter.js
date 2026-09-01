@@ -1,5 +1,6 @@
 const PUBLIC_IDENTITY_FIELDS = Object.freeze([
   "legalCompanyName",
+  "tradeName",
   "taxNumber",
   "mersisNumber",
   "registeredAddress",
@@ -8,6 +9,7 @@ const PUBLIC_IDENTITY_FIELDS = Object.freeze([
   "email",
   "customerDomain",
 ]);
+const OPTIONAL_PUBLIC_IDENTITY_FIELDS = Object.freeze(["taxOffice"]);
 
 const pendingProjection = () => Object.freeze({
   status: "pending_owner_company_formation",
@@ -23,6 +25,10 @@ const normalizeIdentity = (payload) => {
     String(payload.identity[field] || "").trim(),
   ]));
   if (Object.values(identity).some((value) => !value)) return pendingProjection();
+  for (const field of OPTIONAL_PUBLIC_IDENTITY_FIELDS) {
+    const value = String(payload.identity[field] || "").trim();
+    if (value) identity[field] = value;
+  }
   return Object.freeze({ status: "configured", identity: Object.freeze(identity) });
 };
 
@@ -39,6 +45,7 @@ export function createBusinessIdentityAdapter(http) {
 
 export const businessIdentityAdapterTestUtils = Object.freeze({
   PUBLIC_IDENTITY_FIELDS,
+  OPTIONAL_PUBLIC_IDENTITY_FIELDS,
   normalizeIdentity,
   pendingProjection,
 });

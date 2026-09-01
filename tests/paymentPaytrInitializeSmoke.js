@@ -13,7 +13,8 @@ const trackedEnv = [
     'NODE_ENV', 'APP_BASE_URL', 'PAYMENT_PROVIDER', 'PAYTR_MERCHANT_ID', 'PAYTR_MERCHANT_KEY',
     'PAYTR_MERCHANT_SALT', 'PAYTR_BASE_URL', 'PAYTR_CALLBACK_URL', 'PAYTR_SUCCESS_URL',
     'PAYTR_FAIL_URL', 'PAYTR_TEST_MODE', 'PAYTR_DEBUG_ON', 'PAYTR_LIVE_REQUESTS_ALLOWED',
-    'BUSINESS_LEGAL_COMPANY_NAME', 'BUSINESS_TAX_VKN', 'BUSINESS_MERSIS_NUMBER',
+    'BUSINESS_LEGAL_COMPANY_NAME', 'BUSINESS_TRADE_NAME', 'BUSINESS_TAX_VKN',
+    'BUSINESS_TAX_OFFICE', 'BUSINESS_MERSIS_NUMBER',
     'BUSINESS_REGISTERED_ADDRESS', 'BUSINESS_KEP_ADDRESS', 'BUSINESS_PHONE', 'BUSINESS_EMAIL',
     'CUSTOMER_PUBLIC_DOMAIN', 'NOVASTORE_LEGAL_PRE_INFORMATION_APPROVED',
     'NOVASTORE_LEGAL_PRE_INFORMATION_VERSION', 'NOVASTORE_LEGAL_PRE_INFORMATION_TEXT',
@@ -58,7 +59,9 @@ const applyPaytrEnv = () => {
 
 const applyIdentityEnv = () => {
     process.env.BUSINESS_LEGAL_COMPANY_NAME = 'Test Nova Teknoloji Anonim Şirketi';
+    process.env.BUSINESS_TRADE_NAME = 'NovaStore Test';
     process.env.BUSINESS_TAX_VKN = '1234567890';
+    process.env.BUSINESS_TAX_OFFICE = 'Test Vergi Dairesi';
     process.env.BUSINESS_MERSIS_NUMBER = '1234567890123456';
     process.env.BUSINESS_REGISTERED_ADDRESS = 'Test Mahallesi Test Sokak No 1 İstanbul';
     process.env.BUSINESS_KEP_ADDRESS = 'test@hs01.kep.tr';
@@ -90,7 +93,9 @@ const acceptances = () => ([
 const agreementContext = () => paymentTest.buildCheckoutAgreementContext({
     identitySnapshot: {
         legalCompanyName: process.env.BUSINESS_LEGAL_COMPANY_NAME,
+        tradeName: process.env.BUSINESS_TRADE_NAME,
         taxNumber: process.env.BUSINESS_TAX_VKN,
+        taxOffice: process.env.BUSINESS_TAX_OFFICE,
         mersisNumber: process.env.BUSINESS_MERSIS_NUMBER,
         registeredAddress: process.env.BUSINESS_REGISTERED_ADDRESS,
         kepAddress: process.env.BUSINESS_KEP_ADDRESS,
@@ -101,6 +106,7 @@ const agreementContext = () => paymentTest.buildCheckoutAgreementContext({
     addressId: 301,
     customer: {
         fullName: 'Test Kullanıcı',
+        email: 'customer@example.test',
         phone: '05551234567',
         address: 'Ev: Test Mahallesi Test Sokak No 1 Merkez / Kilis'
     },
@@ -108,6 +114,11 @@ const agreementContext = () => paymentTest.buildCheckoutAgreementContext({
         items: [{ id: 101, name: 'Test Telefon', quantity: 1, price: 1000, line_total: 1000 }],
         totals: { currency: 'TRY', subtotal: 1000, bundleDiscount: 0, couponDiscount: 0, shippingFee: 49.9, total: 1049.9 },
         coupon: { applied: false, code: null, discountAmount: 0 }
+    },
+    platformAllocation: {
+        currency: 'TRY',
+        grossMinor: 100000,
+        productIds: [101]
     },
     sellerProjection: []
 });
@@ -186,11 +197,33 @@ const createFakeClient = ({
                 }] : [];
                 return { rows, rowCount: rows.length };
             }
+            if (/product\.id AS product_id/i.test(sql)) {
+                return {
+                    rows: [{
+                        product_id: 101,
+                        product_store_id: 501,
+                        legacy_store_id: 501,
+                        legacy_store_slug: 'novastore-platform',
+                        legacy_store_is_active: true,
+                        legacy_store_deleted_at: null,
+                        seller_store_id: null
+                    }],
+                    rowCount: 1
+                };
+            }
             if (/FROM products/i.test(sql)) {
                 const price = productPrices[Math.min(productReadCount, productPrices.length - 1)];
                 productReadCount += 1;
                 return {
-                    rows: [{ id: 101, name: 'Test Telefon', price, old_price: null, stock: 5, image_url: 'phone.png' }],
+                    rows: [{
+                        id: 101,
+                        name: 'Test Telefon',
+                        price,
+                        old_price: null,
+                        stock: 5,
+                        image_url: 'phone.png',
+                        store_id: 501
+                    }],
                     rowCount: 1
                 };
             }
@@ -340,7 +373,11 @@ const hasMutation = (client) => client.calls.some(({ sql }) => (
             }
         });
         assert.strictEqual(changedAfterToken.res.code, 409);
-        assert.strictEqual(changedAfterToken.res.body.code, 'PAYMENT_PROVIDER_PAYLOAD_STALE');
+        assert.strictEqual(
+            changedAfterToken.res.body.code,
+            'CHECKOUT_AGREEMENT_SNAPSHOT_STALE',
+            'Buyer email is now part of the accepted agreement snapshot and must fail stale first.'
+        );
         assert.strictEqual(Object.prototype.hasOwnProperty.call(changedAfterToken.res.body, 'paymentAction'), false);
         assert.strictEqual(staleProviderCalls, 1);
         assert.strictEqual(hasMutation(changedAfterToken.client), false);
@@ -382,6 +419,8 @@ const hasMutation = (client) => client.calls.some(({ sql }) => (
         assert.strictEqual(rawRequest.checkoutAgreementSnapshot.context.delivery.addressId, 301);
         assert.strictEqual(rawRequest.checkoutAgreementSnapshot.context.delivery.phone, '05551234567');
         assert.strictEqual(rawRequest.checkoutAgreementSnapshot.context.items[0].productId, 101);
+        assert.deepStrictEqual(rawRequest.checkoutAgreementSnapshot.context.platformAllocation.productIds, [101]);
+        assert.deepStrictEqual(rawRequest.platformAllocation.productIds, [101]);
         assert.strictEqual(rawRequest.checkoutAgreementSnapshot.context.totals.total, 1049.9);
         assert.strictEqual(ready.client.calls.some(({ sql }) => /UPDATE products\s+SET stock = stock -/i.test(sql)), true);
         assert.strictEqual(ready.client.calls.some(({ sql }) => /UPDATE coupons SET used_count/i.test(sql)), false);

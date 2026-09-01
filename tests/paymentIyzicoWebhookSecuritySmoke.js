@@ -4,6 +4,10 @@ const pool = require('../config/db');
 const { ORDER_STATUS, PAYMENT_STATUS, REFUND_STATUS } = require('../constants/orderStatus');
 const { buildWebhookSignature } = require('../services/paymentProviderService');
 const { webhookIyzico } = require('../controllers/paymentController');
+const {
+    buildLegacyImplicitPlatformAgreementFixture,
+    buildVerifiedCheckoutAgreementAllocationFixture
+} = require('./helpers/checkoutAgreementAllocationFixture');
 
 const trackedEnv = [
     'NODE_ENV',
@@ -97,6 +101,7 @@ const makePaymentRow = (state) => ({
     currency: state.currency,
     status: state.paymentStatus,
     raw_request: JSON.stringify(state.rawRequest || {
+        ...buildVerifiedCheckoutAgreementAllocationFixture(),
         coupon: { applied: false },
         stockReserved: false,
         finalizesOnWebhook: true
@@ -343,6 +348,34 @@ const signHeaders = (payload, secret) => ({
         assert.strictEqual(result.res.code, 200);
         assert.strictEqual(signedSuccessState.paymentPaidUpdates, 1);
         assert.strictEqual(signedSuccessState.orderPaidUpdates, 1);
+
+        const legacyAllocationState = createPaymentState({
+            rawRequest: {
+                ...buildLegacyImplicitPlatformAgreementFixture(),
+                coupon: { applied: false },
+                stockReserved: false,
+                finalizesOnWebhook: true
+            }
+        });
+        payload = createPayload({ eventId: 'iyzico-legacy-allocation' });
+        result = await runWebhook({
+            state: legacyAllocationState,
+            payload,
+            headers: signHeaders(payload, process.env.IYZICO_WEBHOOK_SECRET)
+        });
+        assert.strictEqual(result.res.code, 200);
+        assert.strictEqual(result.res.body.reconciliationRequired, true);
+        assert.strictEqual(result.res.body.reconciliationReason, 'CHECKOUT_AGREEMENT_ALLOCATION_UNVERIFIED');
+        assert.strictEqual(legacyAllocationState.paymentPaidUpdates, 1);
+        assert.strictEqual(legacyAllocationState.orderPaidUpdates, 1);
+        assert.strictEqual(legacyAllocationState.orderStatus, ORDER_STATUS.ODEME_BEKLIYOR);
+        assert.strictEqual(legacyAllocationState.orderRefundStatus, REFUND_STATUS.PENDING);
+        assert.strictEqual(legacyAllocationState.stockUpdates, 0);
+        assert.strictEqual(legacyAllocationState.orderItemWrites, 0);
+        assert.strictEqual(legacyAllocationState.reconciliationEvents, 1);
+        assert.strictEqual(legacyAllocationState.reconciliationRequiredEvents, 1);
+        assert.strictEqual(legacyAllocationState.reconciliationMetadataWrites, 1);
+        assert.strictEqual(legacyAllocationState.notificationInserts, 1);
 
         const sameProviderEventFirstState = createPaymentState();
         payload = createPayload({ eventId: 'iyzico-shared-provider-event' });

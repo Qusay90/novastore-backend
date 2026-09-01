@@ -595,7 +595,9 @@ test("commerce runtime katalog kesintisini varsayılan olarak reddeder, açık i
     status: "configured",
     identity: Object.freeze({
       legalCompanyName: "Sentetik Entegrasyon Testi İşletmesi",
+      tradeName: "NovaStore Sentetik Test",
       taxNumber: "0000000000",
+      taxOffice: "Sentetik Test Vergi Dairesi",
       mersisNumber: "0000000000000000",
       registeredAddress: "Sentetik test adresi",
       kepAddress: "test-kep@example.test",
@@ -1377,6 +1379,24 @@ test("checkout capability yalnız public readiness endpointini okur", async () =
   assert.equal(calls[0].path, "/api/payments/capability");
   assert.equal(calls[0].options.signal, signal);
   assert.equal(calls[0].options.method, undefined, "capability sorgusu yan etkisiz GET kalmalı");
+});
+
+test("public identity ve sözleşme önizlemesi provider aktivasyonundan ayrı fail-closed kalır", async () => {
+  const [integratedApp, customerPages] = await Promise.all([
+    readFile(new URL("../src/IntegratedApp.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/ConnectedCustomerPages.jsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(integratedApp, /Ticari unvan: \{identity\.tradeName\}/);
+  assert.match(integratedApp, /identity\.taxOffice \? ` · Vergi dairesi: \$\{identity\.taxOffice\}` : ""/);
+  assert.match(customerPages, /Ticari unvan: \{identity\.tradeName\}/);
+  assert.match(customerPages, /identity\.taxOffice \? ` · Vergi dairesi: \$\{identity\.taxOffice\}` : ""/);
+  assert.match(
+    customerPages,
+    /agreementPreviewPrerequisitesReady = capability\?\.requirements\?\.businessIdentityReady === true\s*&& capability\?\.requirements\?\.legalDocumentsReady === true/,
+  );
+  assert.match(customerPages, /!agreementPreviewPrerequisitesReady/);
+  assert.match(customerPages, /paymentReady = capability\?\.ready === true && agreementsReady/);
 });
 
 test("public legal adapter ve footer aynı sürümlü hukuk rota sözleşmesini kullanır", async () => {

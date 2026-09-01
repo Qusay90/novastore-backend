@@ -37,7 +37,7 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const storefrontSha256 = sha256(storefrontArtifact);
 const adminSha256 = sha256(adminArtifact);
 const expectedArtifactSha256 = Object.freeze({
-  storefront: "f626545987bd103ac8e346441b4c8e14f1862b52ba437ca8ff829226e309cfba",
+  storefront: "f414a62296459dc6abd6161e2b75d3ffc4abe507489193fa010b0d0433031ac9",
   admin: "be3e64dad0abfbfcb68cda8b5639c1a433fe534f6f9d9a101bc21941f886226c",
 });
 if (storefrontSha256 !== expectedArtifactSha256.storefront) {

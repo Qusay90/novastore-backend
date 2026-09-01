@@ -9,6 +9,7 @@ const { webhookPaytr } = require('../controllers/paymentController');
 const pool = require('../config/db');
 const { PAYMENT_STATUS, ORDER_STATUS } = require('../constants/orderStatus');
 const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
+const { buildVerifiedCheckoutAgreementAllocationFixture } = require('./helpers/checkoutAgreementAllocationFixture');
 const {
     COUPON_USAGE_LIMIT_EXHAUSTED_CODE,
     consumeCouponUsageIfNeeded
@@ -115,6 +116,7 @@ const makePaymentRow = () => ({
     amount: '1049.90',
     status: PAYMENT_STATUS.REQUIRES_ACTION,
     raw_request: JSON.stringify({
+        ...buildVerifiedCheckoutAgreementAllocationFixture(),
         coupon: { applied: true, couponId: 901 },
         stockReserved: false,
         finalizesOnWebhook: true

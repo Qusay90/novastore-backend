@@ -1,6 +1,10 @@
 'use strict';
 
 const crypto = require('crypto');
+const { getPublicBusinessIdentity } = require('../config/businessIdentityConfig');
+const {
+    buildSellerPublicLegalIdentityContentSha256
+} = require('./sellerPublicLegalIdentityService');
 
 const LEGAL_DOCUMENT_DEFINITIONS = Object.freeze([
     Object.freeze({ slug: 'about', path: '/hakkimizda', title: 'Hakkımızda', envKey: 'ABOUT', requiredForCheckout: false }),
@@ -20,6 +24,21 @@ const LEGAL_DOCUMENT_DEFINITIONS = Object.freeze([
 const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000\u000b\u000c\u007f]/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const LEGAL_TEMPLATE_TOKEN_PATTERN = /\{\{(business\.[A-Za-z][A-Za-z0-9]*)\}\}/g;
+const LEGAL_TEMPLATE_BRACE_PATTERN = /\{\{|\}\}/;
+const LEGAL_TEMPLATE_TOKEN_TO_IDENTITY_KEY = Object.freeze({
+    'business.legalCompanyName': 'legalCompanyName',
+    'business.tradeName': 'tradeName',
+    'business.taxNumber': 'taxNumber',
+    'business.taxOffice': 'taxOffice',
+    'business.mersisNumber': 'mersisNumber',
+    'business.registeredAddress': 'registeredAddress',
+    'business.kepAddress': 'kepAddress',
+    'business.phone': 'phone',
+    'business.email': 'email',
+    'business.customerDomain': 'customerDomain'
+});
 const exactTrue = (value) => String(value || '').trim().toLowerCase() === 'true';
 const definitionBySlug = new Map(LEGAL_DOCUMENT_DEFINITIONS.map((definition) => [definition.slug, definition]));
 
@@ -38,6 +57,12 @@ const cleanMoney = (value) => {
     if (!Number.isFinite(numeric) || numeric < 0) return null;
     return Number(numeric.toFixed(2));
 };
+const moneyToMinor = (value) => {
+    const money = cleanMoney(value);
+    if (money === null) return null;
+    const minor = Math.round((money + Number.EPSILON) * 100);
+    return Number.isSafeInteger(minor) ? minor : null;
+};
 
 const normalizeCheckoutAgreementContext = (input) => {
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -53,6 +78,11 @@ const normalizeCheckoutAgreementContext = (input) => {
     const totals = input.totals || {};
     const items = Array.isArray(input.items) ? input.items : [];
     const sellers = Array.isArray(input.sellers) ? input.sellers : [];
+    const hasPlatformAllocation = input.platformAllocation !== undefined
+        && input.platformAllocation !== null;
+    const platformAllocationInputInvalid = hasPlatformAllocation
+        && (!input.platformAllocation || typeof input.platformAllocation !== 'object' || Array.isArray(input.platformAllocation));
+    const platformAllocation = platformAllocationInputInvalid ? {} : input.platformAllocation;
     const addressId = Number(delivery.addressId);
     const currency = cleanText(totals.currency, 3).toUpperCase();
     const normalizedTotals = {
@@ -72,15 +102,39 @@ const normalizeCheckoutAgreementContext = (input) => {
     }));
     const normalizedSellers = sellers.map((seller) => ({
         organizationId: Number(seller.organizationId),
+        organizationDisplayName: cleanText(seller.organizationDisplayName, 160),
         storeId: Number(seller.storeId),
+        storeDisplayName: cleanText(seller.storeDisplayName, 160),
+        legalIdentity: {
+            id: Number(seller.legalIdentity?.id),
+            organizationId: Number(seller.legalIdentity?.organizationId),
+            version: cleanText(seller.legalIdentity?.version, 80),
+            publicLegalName: cleanText(seller.legalIdentity?.publicLegalName, 200),
+            publicTradeName: cleanText(seller.legalIdentity?.publicTradeName, 160),
+            publicDisclosureText: cleanText(seller.legalIdentity?.publicDisclosureText, 4000),
+            contentSha256: cleanText(seller.legalIdentity?.contentSha256, 64).toLowerCase(),
+            approvedAt: cleanText(seller.legalIdentity?.approvedAt, 64)
+        },
         currency: cleanText(seller.currency, 3).toUpperCase(),
         grossMinor: Number(seller.grossMinor),
         productIds: Object.freeze((Array.isArray(seller.productIds) ? seller.productIds : []).map(Number).sort((a, b) => a - b))
     }));
+    const normalizedPlatformAllocation = hasPlatformAllocation
+        ? {
+            currency: cleanText(platformAllocation?.currency, 3).toUpperCase(),
+            grossMinor: Number(platformAllocation?.grossMinor),
+            productIds: Object.freeze(
+                (Array.isArray(platformAllocation?.productIds) ? platformAllocation.productIds : [])
+                    .map(Number)
+                    .sort((a, b) => a - b)
+            )
+        }
+        : null;
 
-    const invalid = !Number.isSafeInteger(addressId)
+    const structuralInvalid = !Number.isSafeInteger(addressId)
         || addressId <= 0
         || !cleanText(delivery.fullName, 200)
+        || !EMAIL_PATTERN.test(cleanText(delivery.email, 254))
         || !cleanText(delivery.address, 1000)
         || !/^05\d{9}$/.test(cleanText(delivery.phone, 11))
         || currency !== 'TRY'
@@ -95,16 +149,83 @@ const normalizeCheckoutAgreementContext = (input) => {
             || item.unitPrice === null
             || item.lineTotal === null
         ))
+        || platformAllocationInputInvalid
+        || (normalizedPlatformAllocation !== null && (
+            normalizedPlatformAllocation.currency !== 'TRY'
+            || !Number.isSafeInteger(normalizedPlatformAllocation.grossMinor)
+            || normalizedPlatformAllocation.grossMinor < 0
+            || normalizedPlatformAllocation.productIds.length === 0
+            || normalizedPlatformAllocation.productIds.some((productId) => (
+                !Number.isSafeInteger(productId) || productId <= 0
+            ))
+        ))
         || normalizedSellers.some((seller) => (
             !Number.isSafeInteger(seller.organizationId)
             || seller.organizationId <= 0
+            || !seller.organizationDisplayName
             || !Number.isSafeInteger(seller.storeId)
             || seller.storeId <= 0
+            || !seller.storeDisplayName
+            || !Number.isSafeInteger(seller.legalIdentity.id)
+            || seller.legalIdentity.id <= 0
+            || !Number.isSafeInteger(seller.legalIdentity.organizationId)
+            || seller.legalIdentity.organizationId !== seller.organizationId
+            || !VERSION_PATTERN.test(seller.legalIdentity.version)
+            || !seller.legalIdentity.publicLegalName
+            || !seller.legalIdentity.publicTradeName
+            || !seller.legalIdentity.publicDisclosureText
+            || !SHA256_PATTERN.test(seller.legalIdentity.contentSha256)
+            || seller.legalIdentity.contentSha256 !== buildSellerPublicLegalIdentityContentSha256(seller.legalIdentity)
+            || !Number.isFinite(Date.parse(seller.legalIdentity.approvedAt))
             || seller.currency !== 'TRY'
             || !Number.isSafeInteger(seller.grossMinor)
             || seller.grossMinor < 0
+            || seller.productIds.length === 0
             || seller.productIds.some((productId) => !Number.isSafeInteger(productId) || productId <= 0)
         ));
+    let allocationInvalid = structuralInvalid;
+    if (!allocationInvalid) {
+        const itemIds = normalizedItems.map((item) => item.productId);
+        const itemIdSet = new Set(itemIds);
+        const itemLineMinorByProductId = new Map(
+            normalizedItems.map((item) => [item.productId, moneyToMinor(item.lineTotal)])
+        );
+        const allocations = [
+            ...(normalizedPlatformAllocation ? [normalizedPlatformAllocation] : []),
+            ...normalizedSellers
+        ];
+        const allocatedProductIds = new Set();
+        let allocatedGrossMinor = 0;
+        if (itemIdSet.size !== itemIds.length) allocationInvalid = true;
+        for (const allocation of allocations) {
+            let expectedGrossMinor = 0;
+            const allocationIdSet = new Set(allocation.productIds);
+            if (allocationIdSet.size !== allocation.productIds.length) allocationInvalid = true;
+            for (const productId of allocation.productIds) {
+                const lineMinor = itemLineMinorByProductId.get(productId);
+                if (lineMinor === undefined || lineMinor === null || allocatedProductIds.has(productId)) {
+                    allocationInvalid = true;
+                    continue;
+                }
+                allocatedProductIds.add(productId);
+                expectedGrossMinor += lineMinor;
+                if (!Number.isSafeInteger(expectedGrossMinor)) allocationInvalid = true;
+            }
+            if (allocation.grossMinor !== expectedGrossMinor) allocationInvalid = true;
+            allocatedGrossMinor += allocation.grossMinor;
+            if (!Number.isSafeInteger(allocatedGrossMinor)) allocationInvalid = true;
+        }
+        const subtotalMinor = moneyToMinor(normalizedTotals.subtotal);
+        if (
+            allocatedProductIds.size !== itemIdSet.size
+            || itemIds.some((productId) => !allocatedProductIds.has(productId))
+            || subtotalMinor === null
+            || allocatedGrossMinor !== subtotalMinor
+        ) {
+            allocationInvalid = true;
+        }
+    }
+    const invalid = structuralInvalid || allocationInvalid;
     if (invalid) {
         throw new LegalDocumentError(
             'CHECKOUT_AGREEMENT_CONTEXT_INVALID',
@@ -116,7 +237,9 @@ const normalizeCheckoutAgreementContext = (input) => {
     const normalized = {
         businessIdentity: {
             legalCompanyName: cleanText(identity.legalCompanyName, 200),
+            tradeName: cleanText(identity.tradeName, 160),
             taxNumber: cleanText(identity.taxNumber, 20),
+            taxOffice: cleanText(identity.taxOffice, 160) || null,
             mersisNumber: cleanText(identity.mersisNumber, 30),
             registeredAddress: cleanText(identity.registeredAddress, 500),
             kepAddress: cleanText(identity.kepAddress, 254),
@@ -127,6 +250,7 @@ const normalizeCheckoutAgreementContext = (input) => {
         delivery: {
             addressId,
             fullName: cleanText(delivery.fullName, 200),
+            email: cleanText(delivery.email, 254).toLowerCase(),
             phone: cleanText(delivery.phone, 11),
             address: cleanText(delivery.address, 1000)
         },
@@ -137,9 +261,21 @@ const normalizeCheckoutAgreementContext = (input) => {
             code: input.coupon?.applied === true ? cleanText(input.coupon?.code, 80) : null,
             discountAmount: cleanMoney(input.coupon?.discountAmount) ?? 0
         },
+        platformAllocation: normalizedPlatformAllocation,
         sellers: normalizedSellers
     };
-    if (Object.values(normalized.businessIdentity).some((value) => !value)) {
+    const requiredBusinessIdentityKeys = [
+        'legalCompanyName',
+        'tradeName',
+        'taxNumber',
+        'mersisNumber',
+        'registeredAddress',
+        'kepAddress',
+        'phone',
+        'email',
+        'customerDomain'
+    ];
+    if (requiredBusinessIdentityKeys.some((key) => !normalized.businessIdentity[key])) {
         throw new LegalDocumentError(
             'CHECKOUT_AGREEMENT_CONTEXT_INVALID',
             409,
@@ -153,7 +289,13 @@ const normalizeCheckoutAgreementContext = (input) => {
         items: Object.freeze(normalized.items.map(Object.freeze)),
         totals: Object.freeze(normalized.totals),
         coupon: Object.freeze(normalized.coupon),
-        sellers: Object.freeze(normalized.sellers.map(Object.freeze))
+        platformAllocation: normalized.platformAllocation
+            ? Object.freeze(normalized.platformAllocation)
+            : null,
+        sellers: Object.freeze(normalized.sellers.map((seller) => Object.freeze({
+            ...seller,
+            legalIdentity: Object.freeze(seller.legalIdentity)
+        })))
     });
 };
 
@@ -163,11 +305,16 @@ const renderCheckoutContext = (context) => {
     const itemLines = context.items.map((item) => (
         `- ${item.name} (Ürün #${item.productId}) | ${item.quantity} adet | Birim ${formatMoney(item.unitPrice, context.totals.currency)} | Satır ${formatMoney(item.lineTotal, context.totals.currency)}`
     ));
-    const sellerLines = context.sellers.length > 0
-        ? context.sellers.map((seller) => (
-            `- Organizasyon #${seller.organizationId} / Mağaza #${seller.storeId} | Brüt ${formatMoney(seller.grossMinor / 100, seller.currency)} | Ürünler: ${seller.productIds.join(', ')}`
+    const salesPartyLines = [
+        ...(context.platformAllocation
+            ? [
+                `- Platform satıcısı: ${context.businessIdentity.legalCompanyName} (${context.businessIdentity.tradeName}) | Brüt ${formatMoney(context.platformAllocation.grossMinor / 100, context.platformAllocation.currency)} | Ürünler: ${context.platformAllocation.productIds.join(', ')}`
+            ]
+            : []),
+        ...context.sellers.map((seller) => (
+            `- Pazaryeri satıcısı: ${seller.legalIdentity.publicLegalName} (${seller.legalIdentity.publicTradeName}) | Mağaza: ${seller.storeDisplayName} | Kamusal kimlik sürümü: ${seller.legalIdentity.version} / ${seller.legalIdentity.contentSha256} | Açıklama: ${seller.legalIdentity.publicDisclosureText} | Brüt ${formatMoney(seller.grossMinor / 100, seller.currency)} | Ürünler: ${seller.productIds.join(', ')}`
         ))
-        : ['- Bu sepet için ayrı bir satıcı operasyon dağılımı bulunmuyor.'];
+    ];
     const couponLine = context.coupon.applied
         ? `${context.coupon.code} (${formatMoney(context.coupon.discountAmount, context.totals.currency)} indirim)`
         : 'Uygulanmadı';
@@ -175,7 +322,9 @@ const renderCheckoutContext = (context) => {
         'NovaStore sunucu doğrulamalı işlem özeti',
         '',
         `Aracı hizmet sağlayıcı: ${context.businessIdentity.legalCompanyName}`,
+        `Ticari unvan: ${context.businessIdentity.tradeName}`,
         `VKN: ${context.businessIdentity.taxNumber}`,
+        ...(context.businessIdentity.taxOffice ? [`Vergi dairesi: ${context.businessIdentity.taxOffice}`] : []),
         `MERSİS: ${context.businessIdentity.mersisNumber}`,
         `Kayıtlı adres: ${context.businessIdentity.registeredAddress}`,
         `KEP: ${context.businessIdentity.kepAddress}`,
@@ -183,6 +332,7 @@ const renderCheckoutContext = (context) => {
         `Müşteri alan adı: ${context.businessIdentity.customerDomain}`,
         '',
         `Alıcı: ${context.delivery.fullName}`,
+        `E-posta: ${context.delivery.email}`,
         `Telefon: ${context.delivery.phone}`,
         `Teslimat adresi (#${context.delivery.addressId}): ${context.delivery.address}`,
         '',
@@ -197,7 +347,7 @@ const renderCheckoutContext = (context) => {
         `Kupon: ${couponLine}`,
         '',
         'Satıcı işlem dağılımı:',
-        ...sellerLines
+        ...salesPartyLines
     ].join('\n');
 };
 
@@ -212,14 +362,44 @@ class LegalDocumentError extends Error {
     }
 }
 
+const renderLegalTemplate = (template, env = process.env) => {
+    const source = String(template || '').trim();
+    if (!source) return null;
+    const matches = [...source.matchAll(LEGAL_TEMPLATE_TOKEN_PATTERN)];
+    const tokenTexts = new Set(matches.map((match) => match[0]));
+    const sourceWithoutKnownTokens = [...tokenTexts].reduce(
+        (value, tokenText) => value.replaceAll(tokenText, ''),
+        source
+    );
+    if (LEGAL_TEMPLATE_BRACE_PATTERN.test(sourceWithoutKnownTokens)) return null;
+    if (matches.length === 0) return source;
+
+    const projection = getPublicBusinessIdentity(env);
+    if (projection.status !== 'configured' || !projection.identity) return null;
+    let rendered = source;
+    for (const match of matches) {
+        const token = match[1];
+        const identityKey = LEGAL_TEMPLATE_TOKEN_TO_IDENTITY_KEY[token];
+        const value = String(projection.identity[identityKey] || '').trim();
+        if (!identityKey || !value || CONTROL_CHARACTER_PATTERN.test(value)) return null;
+        rendered = rendered.replaceAll(match[0], value);
+    }
+    return LEGAL_TEMPLATE_BRACE_PATTERN.test(rendered) ? null : rendered;
+};
+
 const readConfiguredDocument = (definition, env = process.env) => {
     const prefix = `NOVASTORE_LEGAL_${definition.envKey}`;
     const approved = exactTrue(env[`${prefix}_APPROVED`]);
     const version = String(env[`${prefix}_VERSION`] || '').trim();
-    const text = String(env[`${prefix}_TEXT`] || '').trim();
-    const published = approved
+    const template = String(env[`${prefix}_TEXT`] || '').trim();
+    const templateValid = approved
         && VERSION_PATTERN.test(version)
-        && text.length > 0
+        && template.length > 0
+        && template.length <= 30000
+        && !CONTROL_CHARACTER_PATTERN.test(template);
+    const text = templateValid ? renderLegalTemplate(template, env) : null;
+    const published = templateValid
+        && text !== null
         && text.length <= 30000
         && !CONTROL_CHARACTER_PATTERN.test(text);
     return Object.freeze({
@@ -229,7 +409,9 @@ const readConfiguredDocument = (definition, env = process.env) => {
         requiredForCheckout: definition.requiredForCheckout,
         status: published ? 'published' : 'owner_external_required',
         version: published ? version : null,
-        text: published ? text : null
+        text: published ? text : null,
+        sourceTemplateSha256: published ? sha256(template) : null,
+        renderedContentSha256: published ? sha256(text) : null
     });
 };
 
@@ -278,16 +460,18 @@ const buildCheckoutAgreementPreview = ({ checkoutContext, env = process.env } = 
             title: document.title,
             version: document.version,
             text: renderedText,
-            sourceContentSha256: sha256(document.text),
+            sourceTemplateSha256: document.sourceTemplateSha256,
+            sourceContentSha256: document.renderedContentSha256,
             contentSha256: sha256(renderedText)
         });
     });
     const snapshotSha256 = sha256(stableStringify({
         schemaVersion: 'checkout-agreements-v2',
         contextSha256,
-        documents: documents.map(({ slug, version, sourceContentSha256, contentSha256 }) => ({
+        documents: documents.map(({ slug, version, sourceTemplateSha256, sourceContentSha256, contentSha256 }) => ({
             slug,
             version,
+            sourceTemplateSha256,
             sourceContentSha256,
             contentSha256
         }))
@@ -337,6 +521,7 @@ const buildCheckoutAgreementSnapshot = (acceptances, {
             title: document.title,
             version: document.version,
             text: document.text,
+            sourceTemplateSha256: document.sourceTemplateSha256,
             sourceContentSha256: document.sourceContentSha256,
             contentSha256: document.contentSha256
         });
@@ -353,6 +538,7 @@ const buildCheckoutAgreementSnapshot = (acceptances, {
 
 module.exports = Object.freeze({
     LEGAL_DOCUMENT_DEFINITIONS,
+    LEGAL_TEMPLATE_TOKEN_TO_IDENTITY_KEY,
     LegalDocumentError,
     buildCheckoutAgreementPreview,
     buildCheckoutAgreementSnapshot,
@@ -363,6 +549,7 @@ module.exports = Object.freeze({
     listLegalDocuments,
     normalizeCheckoutAgreementContext,
     readConfiguredDocument,
+    renderLegalTemplate,
     renderCheckoutContext,
     stableStringify
 });

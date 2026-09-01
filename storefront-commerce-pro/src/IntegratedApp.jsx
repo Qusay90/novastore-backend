@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { normalizeSearchText } from "./searchText.js";
+
+const LOCAL_REVIEW_RUNTIME_ENABLED = __NOVASTORE_LOCAL_REVIEW_RUNTIME__;
 import {
   ArrowLeft,
   ArrowsLeftRight,
@@ -1314,7 +1316,7 @@ function LocalReviewPaymentBoundary() {
 
 function Footer({ businessIdentity = null }) {
   const identity = businessIdentity?.status === "configured" ? businessIdentity.identity : null;
-  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="#/hakkimizda">Hakkımızda</a><a href="#/iletisim">İletişim</a><a href="#/pazaryeri-bilgilendirmesi">Pazaryeri bilgilendirmesi</a><a href="#/satici-sozlesmesi">Satıcı sözleşmesi</a></div><div><strong>Yasal</strong><a href="#/gizlilik-politikasi">Gizlilik politikası</a><a href="#/kvkk-aydinlatma-metni">KVKK aydınlatma metni</a><a href="#/cerez-politikasi">Çerez politikası</a><a href="#/kullanim-ve-uyelik-kosullari">Kullanım ve üyelik koşulları</a></div><div><strong>Alışveriş koşulları</strong><a href="#/on-bilgilendirme-formu">Ön bilgilendirme formu</a><a href="#/mesafeli-satis-sozlesmesi">Mesafeli satış sözleşmesi</a><a href="#/iptal-iade-cayma-politikasi">İptal, iade ve cayma</a><a href="#/teslimat-ve-kargo-kosullari">Teslimat ve kargo</a><a href="#/islem-rehberi">İşlem rehberi</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/destek">Güvenli müşteri desteği</a><a href="#/yardim">Yardım merkezi</a><p>Ödeme bilgileri NovaStore sayfasında toplanmaz.</p></div>{identity && <address className="footer-business-identity"><strong>{identity.legalCompanyName}</strong><span>VKN: {identity.taxNumber} · MERSİS: {identity.mersisNumber}</span><span>{identity.registeredAddress}</span><a href={`mailto:${identity.kepAddress}`}>KEP: {identity.kepAddress}</a><a href={`tel:${identity.phone}`}>{identity.phone}</a><a href={`mailto:${identity.email}`}>{identity.email}</a></address>}</div><div className="shell footer-bottom"><span>© 2026 NovaStore.</span><span>{identity ? "İşletme kimliği yapılandırılmış public sözleşmeden yayımlanır." : "Şirket kimliği ve onaylı yasal metinler tamamlandığında burada yayımlanacaktır."}</span></div></footer>;
+  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="#/hakkimizda">Hakkımızda</a><a href="#/iletisim">İletişim</a><a href="#/pazaryeri-bilgilendirmesi">Pazaryeri bilgilendirmesi</a><a href="#/satici-sozlesmesi">Satıcı sözleşmesi</a></div><div><strong>Yasal</strong><a href="#/gizlilik-politikasi">Gizlilik politikası</a><a href="#/kvkk-aydinlatma-metni">KVKK aydınlatma metni</a><a href="#/cerez-politikasi">Çerez politikası</a><a href="#/kullanim-ve-uyelik-kosullari">Kullanım ve üyelik koşulları</a></div><div><strong>Alışveriş koşulları</strong><a href="#/on-bilgilendirme-formu">Ön bilgilendirme formu</a><a href="#/mesafeli-satis-sozlesmesi">Mesafeli satış sözleşmesi</a><a href="#/iptal-iade-cayma-politikasi">İptal, iade ve cayma</a><a href="#/teslimat-ve-kargo-kosullari">Teslimat ve kargo</a><a href="#/islem-rehberi">İşlem rehberi</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/destek">Güvenli müşteri desteği</a><a href="#/yardim">Yardım merkezi</a><p>Ödeme bilgileri NovaStore sayfasında toplanmaz.</p></div>{identity && <address className="footer-business-identity"><strong>{identity.legalCompanyName}</strong><span>Ticari unvan: {identity.tradeName}</span><span>VKN: {identity.taxNumber}{identity.taxOffice ? ` · Vergi dairesi: ${identity.taxOffice}` : ""} · MERSİS: {identity.mersisNumber}</span><span>{identity.registeredAddress}</span><a href={`mailto:${identity.kepAddress}`}>KEP: {identity.kepAddress}</a><a href={`tel:${identity.phone}`}>{identity.phone}</a><a href={`mailto:${identity.email}`}>{identity.email}</a></address>}</div><div className="shell footer-bottom"><span>© 2026 NovaStore.</span><span>{identity ? "İşletme kimliği yapılandırılmış public sözleşmeden yayımlanır." : "Şirket kimliği ve onaylı yasal metinler tamamlandığında burada yayımlanacaktır."}</span></div></footer>;
 }
 
 export function CommerceProRuntimeApp({
@@ -1524,10 +1526,15 @@ export function CommerceProRuntimeApp({
       window.clearInterval(interval);
     };
   }, [authenticated, refreshNotificationUnreadCount]);
-  const localReviewSurface = window.location.protocol === "http:"
+  const localReviewSurface = LOCAL_REVIEW_RUNTIME_ENABLED
+    && window.location.protocol === "http:"
     && ["127.0.0.1", "localhost"].includes(window.location.hostname)
     && window.location.port === "5273";
-  const localReviewSession = authenticated && String(session?.user?.email || "").endsWith("@local.invalid");
+  const localReviewSession = LOCAL_REVIEW_RUNTIME_ENABLED
+    && authenticated
+    && String(session?.user?.email || "").endsWith("@local.invalid");
+  const localReviewSurfaceProps = LOCAL_REVIEW_RUNTIME_ENABLED ? { reviewOnly: localReviewSurface } : {};
+  const localReviewSessionProps = LOCAL_REVIEW_RUNTIME_ENABLED ? { reviewOnly: localReviewSession } : {};
   const comparisonVisible = comparisonIds.size > 0 && COMPARISON_TRAY_ROUTE_TYPES.has(route.type);
   const comparisonContext = { available: true, ids: comparisonIds, toggle: toggleComparison };
   const handleAuthenticated = async (nextSession, returnPath) => {
@@ -1543,7 +1550,7 @@ export function CommerceProRuntimeApp({
     }
     navigate(returnPath);
   };
-  const authReturn = (path) => <CustomerAuthPage account={runtime.customer} returnPath={path} onAuthenticated={handleAuthenticated} reviewOnly={localReviewSurface} />;
+  const authReturn = (path) => <CustomerAuthPage account={runtime.customer} returnPath={path} onAuthenticated={handleAuthenticated} {...localReviewSurfaceProps} />;
   const handleSessionUpdated = (user) => setSession((current) => Object.freeze({ ...current, status: "authenticated", user, warning: null }));
   const handleLogout = async () => {
     const result = await runtime.customer.logout();
@@ -1579,16 +1586,16 @@ export function CommerceProRuntimeApp({
   else if (route.type === "favorites") content = <CanonicalFavoritesPage favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
   else if (route.type === "cart-page") content = <CartPage items={cartItems} onQuantity={updateCartQuantity} onRemove={removeFromCart} onCheckout={handoffToCheckout} />;
   else if (route.type === "auth") content = authenticated
-    ? <CustomerAccountPage session={session} account={runtime.customer} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} reviewOnly={localReviewSession} />
-    : <CustomerAuthPage account={runtime.customer} initialMode={route.mode} returnPath={safeDecodeReturn(route.query.get("return"), "/hesabim")} onAuthenticated={handleAuthenticated} reviewOnly={localReviewSurface} />;
-  else if (route.type === "password") content = <CustomerPasswordPage account={runtime.customer} mode={route.mode} token={route.query.get("token") || ""} reviewOnly={localReviewSurface} />;
+    ? <CustomerAccountPage session={session} account={runtime.customer} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} {...localReviewSessionProps} />
+    : <CustomerAuthPage account={runtime.customer} initialMode={route.mode} returnPath={safeDecodeReturn(route.query.get("return"), "/hesabim")} onAuthenticated={handleAuthenticated} {...localReviewSurfaceProps} />;
+  else if (route.type === "password") content = <CustomerPasswordPage account={runtime.customer} mode={route.mode} token={route.query.get("token") || ""} {...localReviewSurfaceProps} />;
   else if (route.type === "account") content = authenticated
-    ? <CustomerAccountPage session={session} account={runtime.customer} section={route.section} orderId={route.orderId} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} reviewOnly={localReviewSession} />
+    ? <CustomerAccountPage session={session} account={runtime.customer} section={route.section} orderId={route.orderId} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} {...localReviewSessionProps} />
     : authReturn(route.section === "order-detail"
       ? `/hesabim/siparisler/${route.orderId}`
       : `/hesabim${route.section === "orders" ? "/siparisler" : route.section === "addresses" ? "/adresler" : route.section === "coupons" ? "/kuponlar" : route.section === "notifications" ? "/bildirimler" : route.section === "questions" ? "/sorularim" : route.section === "reviews" ? "/degerlendirmelerim" : route.section === "followed-stores" ? "/takip-ettigim-magazalar" : route.section === "security" ? "/guvenlik" : ""}`);
   else if (route.type === "checkout") content = authenticated
-    ? <CustomerCheckoutPage step={route.step} session={session} account={runtime.customer} checkout={runtime.checkout} items={cartItems} getProductImage={productImage} onStepChange={(step) => navigate(`/odeme/${step === "delivery" ? "teslimat" : step === "payment" ? "odeme" : "onay"}`)} onNotice={notify} reviewOnly={localReviewSession} />
+    ? <CustomerCheckoutPage step={route.step} session={session} account={runtime.customer} checkout={runtime.checkout} items={cartItems} getProductImage={productImage} onStepChange={(step) => navigate(`/odeme/${step === "delivery" ? "teslimat" : step === "payment" ? "odeme" : "onay"}`)} onNotice={notify} {...localReviewSessionProps} />
     : authReturn(`/odeme/${route.step === "delivery" ? "teslimat" : route.step === "payment" ? "odeme" : "onay"}`);
   else if (route.type === "payment-result") content = authenticated
     ? localReviewSession ? <LocalReviewPaymentBoundary /> : <CustomerPaymentResultPage checkout={runtime.checkout} paymentRef={route.query.get("paymentRef") || ""} orderId={route.query.get("orderId") || ""} onFinalized={handlePaymentFinalized} />
