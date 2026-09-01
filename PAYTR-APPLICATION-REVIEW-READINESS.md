@@ -79,6 +79,7 @@ Exact anahtar sayımı: `PASS=8`, `OWNER_EXTERNAL_REQUIRED=4`, `PAYTR_CREDENTIAL
 Kart ödeme başlatma aşağıdaki alanların eksik veya geçersiz olmasına izin vermez:
 
 - `BUSINESS_LEGAL_COMPANY_NAME`
+- `BUSINESS_TRADE_NAME`
 - `BUSINESS_TAX_VKN`
 - `BUSINESS_MERSIS_NUMBER`
 - `BUSINESS_REGISTERED_ADDRESS`
@@ -86,6 +87,11 @@ Kart ödeme başlatma aşağıdaki alanların eksik veya geçersiz olmasına izi
 - `BUSINESS_PHONE`
 - `BUSINESS_EMAIL`
 - `CUSTOMER_PUBLIC_DOMAIN`
+
+`BUSINESS_TAX_OFFICE` kanonik BusinessIdentity içinde opsiyoneldir. Owner/hukuk
+veya PayTR başvuru sözleşmesi zorunlu kılarsa sağlanır. Onaylı bir legal
+template `{{business.taxOffice}}` kullanıyorsa, geçerli değer bulunmadan o belge
+yayımlanmaz.
 
 `ADMIN_PUBLIC_DOMAIN`, `SELLER_WEB_PUBLIC_DOMAIN`, `CUSTOMER_ANDROID_APP_ID` ve `SELLER_ANDROID_APP_ID` public işletme envanterinin parçalarıdır; mevcut card payment gate'inde hepsi zorunlu değildir. Başvuru formuna veya provider'a gönderilecek kapsam PayTR ile ayrıca doğrulanır. Hiçbir değer kod ekibi tarafından uydurulmaz.
 
@@ -98,7 +104,21 @@ Kod, checkout için iki belgeyi zorunlu kabul eder:
 | Ön Bilgilendirme Formu | `NOVASTORE_LEGAL_PRE_INFORMATION_APPROVED` | `NOVASTORE_LEGAL_PRE_INFORMATION_VERSION` | `NOVASTORE_LEGAL_PRE_INFORMATION_TEXT` |
 | Mesafeli Satış Sözleşmesi | `NOVASTORE_LEGAL_DISTANCE_SALE_APPROVED` | `NOVASTORE_LEGAL_DISTANCE_SALE_VERSION` | `NOVASTORE_LEGAL_DISTANCE_SALE_TEXT` |
 
-Belge ancak onay exact `true`, sürüm geçerli ve metin doluysa yayımlanır. Checkout, yayımdaki iki metni sunucu-doğrulamalı adres, ürünler, tutarlar, kupon ve satıcı dağılımıyla birleştirerek `checkout-agreements-v2` preview'ı üretir. Müşteri tam metni aynı `snapshotSha256` ile kabul eder; initialize bağlamı yeniden hesaplar, eski/değiştirilmiş hash'i reddeder ve kabul edilen tam metin + bağlam + hash'i ödeme kaydında saklar. Metnin hukuki doğruluğunu kod değil şirket/hukuk sahibi onaylar.
+Belge ancak onay exact `true`, sürüm geçerli ve metin doluysa yayımlanır.
+Şirket alanları ikinci bir legal kimlik kaynağından kopyalanmaz; template yalnız
+strict business placeholder allowlist'indeki alanları kanonik
+BusinessIdentity projection'ından çözebilir. Bilinmeyen, bozuk veya çözülemeyen
+placeholder yayını fail-closed tutar. Public kayıt kaynak-template ve render
+edilmiş içerik hash'lerini ayrı izler.
+
+Checkout, yayımdaki iki metni sunucu-doğrulamalı adres, ürünler, tutarlar,
+kupon ve approved organization-bound satıcı public legal identity snapshot'ı
+ile birleştirerek `checkout-agreements-v2` preview'ı üretir. Müşteri tam metni
+aynı `snapshotSha256` ile kabul eder; initialize bağlamı yeniden hesaplar,
+eski/değiştirilmiş hash'i reddeder ve kabul edilen tam metin + bağlam + hash'i
+ödeme kaydında saklar. Satıcı application beyanı, private belge veya payout
+verisi Customer disclosure kaynağı değildir. Metnin hukuki doğruluğunu kod
+değil şirket/hukuk sahibi onaylar.
 
 Public sistemde ayrıca gizlilik, KVKK, çerez, üyelik, iptal/iade/cayma, teslimat/kargo, işlem rehberi, pazaryeri bilgilendirmesi ve satıcı sözleşmesi için sürümlü yayın altyapısı vardır. Bu sayfaların PayTR başvurusunda hangilerinin zorunlu olduğu provider'ın güncel resmi incelemesiyle teyit edilir; burada varsayılmaz.
 
@@ -143,3 +163,17 @@ Provider UAT tamamlanmadan production'a geçilmez. UAT tamamlanması da producti
 Dış kanıtlar gelene kadar kullanılabilecek en güçlü doğru ifade şudur:
 
 > PayTR ilk-satış entegrasyonunun kod ve dokümantasyon tabanı review-ready durumdadır; başvuru, sağlayıcı aktivasyonu, Pazaryeri transfer sözleşmesi, UAT ve production ilk satış henüz dış onay/kanıt beklemektedir.
+
+## R3 public review belge seti
+
+- `NOVASTORE-PUBLIC-REVIEW-CURRENT-STATE.md`
+- `OWNER-BUSINESS-IDENTITY-INPUT.md`
+- `NOVASTORE-PUBLIC-LEGAL-DRAFTS-TR.md`
+- `PRODUCTION-FIRST-SALE-ENV-MANIFEST.md`
+- `PAYTR-PAZARYERI-APPLICATION-PACKET.md`
+- `PAYTR-CREDENTIAL-INJECTION-RUNBOOK.md`
+- `FIRST-REAL-PAYMENT-UAT-RUNBOOK.md`
+- `FIRST-SALE-EXTERNAL-GATE-LEDGER.md`
+
+Bu belgeler gerçek değer, provider onayı, deployment veya ödeme yetkisi
+yerine geçmez.

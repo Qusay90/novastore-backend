@@ -56,9 +56,9 @@ npm test
 npm run test:integration
 ```
 
-`npm test`, paket içindeki 24 testi çalıştırır; kabul edilen sonuç **24/24
-PASS**'tir. `npm run test:integration`, 21 integration-boundary testini
-çalıştırır.
+`npm test`, paket içindeki 58 testi çalıştırır; kabul edilen sonuç **58/58
+PASS**'tir. `npm run test:integration`, 28 integration-boundary testini
+çalıştırır; kabul edilen sonuç **28/28 PASS**'tir.
 
 Repository kökünden Commerce Pro foundation ve ilgili mağaza smoke testleri:
 
@@ -144,3 +144,38 @@ seviyesinde, ayrı rezervasyon ve onayla yapılmalıdır.
 
 Bu artifact üretiminde production/uzak DB kullanılmaz ve gerçek ödeme isteği
 gönderilmez. Commit, push, PR, merge ve deploy ayrı yetki kapılarıdır.
+
+## Public first-sale hukuk ve kimlik sınırı
+
+Production Customer uygulaması şirket kimliğini
+`/api/business-identity` kanonik projection'ından tüketir. Uydurma
+fallback göstermez. Kimlik eksikse Hakkımızda/İletişim yüzeyi
+owner_external_required durumunda kalır; gerçek kart ödeme capability'si de
+hazır sayılmaz.
+
+Public hukuk navigasyonu backend'deki 12 kanonik rotayı kullanır. Metinler
+runtime'da owner/legal onaylı `TEXT + VERSION + APPROVED` üçlüsünden gelir.
+Template yalnız strict business placeholder allowlist'iyle BusinessIdentity
+alanlarını çözebilir. Bilinmeyen veya çözülemeyen placeholder fail-closed
+kalır. `pre-information` ve `distance-sale`, ödeme öncesinde
+server-authoritative customer/address/product/price/seller context ve
+snapshot hash'iyle kabul edilir.
+
+Ürün/sipariş seller açıklaması client metninden türetilmez. Organization/store
+bağından gelen admin-approved public seller legal identity ve mağaza görünümü
+checkout snapshot'ına girer; private seller belgesi veya payout verisi
+Customer'a taşınmaz.
+
+Production artifact:
+
+- local-review kodu ve `localhost`, `127.0.0.1`, `@local.invalid` marker'larını
+  içermemeli;
+- fixture/demo credential, synthetic authority veya source map gömmemeli;
+- API için same-origin davranışı korumalı;
+- PayTR credential'ı veya kart alanı içermemeli;
+- provider config yokken doğru aktivasyon bekliyor durumunu göstermelidir.
+
+Public novastore.tr deployment'ı, owner/legal onayı, PayTR başvurusu,
+credential injection, provider UAT ve gerçek ödeme bu README ile yapılmış
+sayılmaz. Operasyon belgeleri repository kökündeki
+`NOVASTORE-PUBLIC-REVIEW-CURRENT-STATE.md` ve bağlantılı R3 runbook'larındadır.

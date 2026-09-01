@@ -98,14 +98,30 @@ Callback'i görmeden success sayfasına dönmek, iFrame'in kapanması, istemci m
 | `PAYTR_TEST_MODE` | `true` | Provider test işareti; tek başına güvenlik veya aktivasyon sağlamaz |
 | `PAYTR_DEBUG_ON` | `false` | Review-ready örneğinde kapalıdır |
 
-Gerçek işletme kimliği için `BUSINESS_LEGAL_COMPANY_NAME`, `BUSINESS_TAX_VKN`, `BUSINESS_MERSIS_NUMBER`, `BUSINESS_REGISTERED_ADDRESS`, `BUSINESS_KEP_ADDRESS`, `BUSINESS_PHONE`, `BUSINESS_EMAIL` ve `CUSTOMER_PUBLIC_DOMAIN` sahibi tarafından sağlanmalıdır. Kod format kontrolü yapar; değer üretmez.
+Gerçek işletme kimliği için `BUSINESS_LEGAL_COMPANY_NAME`,
+`BUSINESS_TRADE_NAME`, `BUSINESS_TAX_VKN`, `BUSINESS_MERSIS_NUMBER`,
+`BUSINESS_REGISTERED_ADDRESS`, `BUSINESS_KEP_ADDRESS`, `BUSINESS_PHONE`,
+`BUSINESS_EMAIL` ve `CUSTOMER_PUBLIC_DOMAIN` sahibi tarafından sağlanmalıdır.
+`BUSINESS_TAX_OFFICE` opsiyoneldir; owner/hukuk/provider gereksinimi veya bir
+legal template içindeki `{{business.taxOffice}}` kullanımı onu ilgili belge
+için zorunlu hale getirir. Kod format kontrolü yapar; değer üretmez.
 
 Checkout için iki belge birlikte yayımlanmalıdır:
 
 - `NOVASTORE_LEGAL_PRE_INFORMATION_APPROVED`, `NOVASTORE_LEGAL_PRE_INFORMATION_VERSION`, `NOVASTORE_LEGAL_PRE_INFORMATION_TEXT`
 - `NOVASTORE_LEGAL_DISTANCE_SALE_APPROVED`, `NOVASTORE_LEGAL_DISTANCE_SALE_VERSION`, `NOVASTORE_LEGAL_DISTANCE_SALE_TEXT`
 
-`*_APPROVED=true` tek başına yeterli değildir. Sürüm geçerli formatta, metin dolu ve müşteri kabulü aynı sürümde olmalıdır. Hiçbir şirket, hukuk veya PayTR değeri bu depoda tahmin edilmez.
+`*_APPROVED=true` tek başına yeterli değildir. Sürüm geçerli formatta, metin
+dolu ve müşteri kabulü aynı sürümde olmalıdır. Legal template yalnız kanonik
+BusinessIdentity kaynağına bağlı strict business placeholder allowlist'ini
+kullanır; bilinmeyen/bozuk/çözülemeyen placeholder belgeyi yayımlamaz.
+Kaynak-template ve render edilmiş içerik hash'leri ayrıdır.
+
+Checkout seller disclosure; server fiyatlı ürünün organization/store bağından
+yüklenen admin-approved, versioned public seller legal identity ile mağaza
+görünümünü snapshot'a alır. Seller application payload'ı, private doğrulama
+belgesi veya payout verisi public hukuk kaynağı olamaz. Hiçbir şirket, hukuk
+veya PayTR değeri bu depoda tahmin edilmez.
 
 ## Bu Tabanın Dışında Kalanlar
 
@@ -127,3 +143,21 @@ Bu dokümantasyon tabanı yalnız aşağıdaki ifadeyle kabul edilir:
 > Kod sözleşmesi PayTR incelemesine hazırdır; gerçek provider aktivasyonu, şirket/hukuk verileri, public deployment, Pazaryeri transfer sözleşmesi, UAT ve production izni dış kapıdır.
 
 “Canlı ödeme hazır”, “başvuru tamam”, “merchant onaylı” veya “ilk satış yapılabilir” ifadeleri, dış kanıt olmadan kullanılamaz.
+
+## R3 public review devam belgeleri
+
+Güncel 12 rota taslağı, owner girdisi, production environment manifesti,
+application checklist'i, credential/UAT planı ve dış gate ledger'ı şu
+belgelerde tutulur:
+
+- `NOVASTORE-PUBLIC-REVIEW-CURRENT-STATE.md`
+- `OWNER-BUSINESS-IDENTITY-INPUT.md`
+- `NOVASTORE-PUBLIC-LEGAL-DRAFTS-TR.md`
+- `PRODUCTION-FIRST-SALE-ENV-MANIFEST.md`
+- `PAYTR-PAZARYERI-APPLICATION-PACKET.md`
+- `PAYTR-CREDENTIAL-INJECTION-RUNBOOK.md`
+- `FIRST-REAL-PAYMENT-UAT-RUNBOOK.md`
+- `FIRST-SALE-EXTERNAL-GATE-LEDGER.md`
+
+Bu belge seti PayTR başvurusu göndermemiştir, credential enjekte etmemiştir ve
+public deployment ya da gerçek ödeme yetkisi vermez.
