@@ -1,6 +1,6 @@
 # NovaStore Dış Servisler ve Entegrasyonlar
 
-Son doğrulama: 28 Ağustos 2026
+Son doğrulama: 1 Eylül 2026
 
 Bu dosya NovaStore'un kullandığı, kullanıma hazır tuttuğu veya canlıya çıkmadan önce bağlaması gereken dış servislerin tek kaynak listesidir. Anahtar, parola, token ve bağlantı şifresi gibi gizli değerler bu dosyaya **asla yazılmaz**.
 
@@ -25,16 +25,22 @@ Bu dosya NovaStore'un kullandığı, kullanıma hazır tuttuğu veya canlıya ç
 
 ## Ödeme Servisleri
 
-Ödeme tarafında production için **tek bir ana sağlayıcı seçilmelidir**. PayTR ve iyzico'nun ikisini birden zorunlu kabul etmiyoruz.
+İlk satış kart akışının tek seçilebilir sağlayıcısı **PayTR**'dır. `PAYMENT_PROVIDER=paytr` açıkça verilmelidir; eksik veya farklı değer fail-closed olur. Kart ödemesinde mock sağlayıcı ve otomatik sağlayıcı fallback'i yoktur. Kodda kalan iyzico callback uyumluluğu, bu çalışma hattında iyzico'yu seçilebilir veya mock ilk-satış sağlayıcısı yapmaz.
 
-| Servis | Durum | Ne işe yarıyor? | Mevcut gerçek durum | Canlı kullanım için gerekenler |
+| Servis | Durum | Ne işe yarıyor? | Mevcut gerçek durum | Dış kapılar |
 |---|---|---|---|---|
-| **iyzico** | Hazır / mock | Kart ödeme başlatma, 3D yönlendirme, webhook ile ödeme sonucunu kesinleştirme | `PAYMENT_PROVIDER` tanımlı değilse kod varsayılan olarak iyzico'yu seçiyor; ancak başlatma akışı şu anda gerçek iyzico API çağrısı yapmıyor ve mock davranıyor. Production secret yapılandırması doğrulanmadı. | iyzico production hesabı ve sözleşmesi, gerçek API istemcisi/kimlik bilgileri, callback-webhook ayarları, `IYZICO_WEBHOOK_SECRET`, yalnızca yerel/test simülasyonu için `IYZICO_ALLOW_UNSIGNED_WEBHOOKS`, `IYZICO_MOCK_MODE`, imza doğrulaması ve uçtan uca UAT |
-| **PayTR** | Hazır / provider-aktivasyon adayı | iFrame ödeme token'ı, güvenli ödeme sayfası, callback hash doğrulaması ve başarılı/başarısız ödeme finalizasyonu | Backend sözleşmesi mevcut; merchant onayı, gerçek secret ve yetkili provider UAT kanıtı yoktur. İlk güvenli staging sözleşmesi tüm PayTR credential adlarını ve ödeme yan etkilerini özellikle yasaklar. | `PAYMENT_PROVIDER=paytr`, merchant onayı, `PAYTR_MERCHANT_ID`, `PAYTR_MERCHANT_KEY`, `PAYTR_MERCHANT_SALT`, HTTPS callback/success/fail URL'leri ve ayrı yetkilendirilmiş provider sandbox/production UAT'i |
+| **PayTR** | Kod tabanı review-ready; dış aktivasyon bekliyor | iFrame token isteği, yalnız izinli PayTR güvenli ödeme URL'si, callback hash doğrulaması ve idempotent ödeme/sipariş finalizasyonu | Sağlayıcı allowlist'i yalnız `paytr` kabul eder. Token hedefi kodda `https://www.paytr.com/odeme/api/get-token` olarak sabittir; `PAYTR_BASE_URL` yalnız `https://www.paytr.com` olabilir. `.env.example` gerçek değer içermez ve `PAYTR_LIVE_REQUESTS_ALLOWED=false` ile dış isteği kapalı tutar. Bu hazırlıkta gerçek credential kullanılmadı, PayTR'a istek atılmadı, ödeme veya sipariş oluşturulmadı. | Şirket sahibi tarafından doğrulanmış kimlik ve public alan adları; hukuk/şirket onaylı sürümlü checkout metinleri; PayTR başvuru ve merchant onayı; secret yöneticisinden sağlanan `PAYTR_MERCHANT_ID`, `PAYTR_MERCHANT_KEY`, `PAYTR_MERCHANT_SALT`; gerçek HTTPS callback/success/fail URL'leri; ayrıca yetkilendirilmiş provider UAT, operasyon/mutabakat ve production açılış onayı |
+| **iyzico** | İlk satış için seçilemez / legacy callback sınırı | Eski iyzico ödeme kayıtlarından gelebilecek imzalı callback uyumluluğu | Aktif sağlayıcı allowlist'inde yoktur; yeni kart ödemesi başlatamaz ve PayTR için fallback değildir. Mock ödeme sağlayıcısı olarak kullanılmaz. | Bu hattın dışındadır. Ayrı bir sağlayıcı değişikliği ancak yeni kapsam, sözleşme, güvenlik incelemesi ve UAT ile ele alınabilir. |
 
-Ödeme finalizasyonunda stok, kupon kullanımı, bildirim, sipariş durumu, sahiplik kontrolü ve idempotency davranışları korunmalıdır. Kart sağlayıcısı değiştirilirken bu yan etkiler istemciye taşınmamalıdır.
+Kart başlatma kapısı yalnız provider ayarına bakmaz. Gerçek `BusinessIdentity` alanları ile `NOVASTORE_LEGAL_PRE_INFORMATION_*` ve `NOVASTORE_LEGAL_DISTANCE_SALE_*` onay/sürüm/metin kapıları da eksiksiz olmalıdır. Checkout, istemciden serbest metin teslimat adresi değil, oturum sahibine ait gerçek `addressId` alır; backend adresi kullanıcı sahipliğiyle yeniden yükler.
 
-İlk güvenli staging ile sağlayıcı UAT ortamı aynı kapı değildir. Sağlayıcı secret'ı ve ödeme çağrısı, yalnız ayrıca yetkilendirilmiş provider UAT çalışma zamanında açılabilir. Mutabakat ve yetkili ödeme-onay operasyonu bulunmadığından production havale/EFT de fail-closed tutulur.
+PayTR `user_ip` değeri ham `X-Forwarded-For` başlığından okunmaz. Express yalnız `NOVASTORE_TRUST_PROXY_HOPS` ile açıkça güvenilen hop sayısını kullanır; doğrudan/yerel çalışmada değer `0` kalır. Render üzerinde gerçek proxy zinciri yayın ortamında gözlemlenip doğrulanmadan bu değer tahmin edilmez ve PayTR capability kapısı açılmaz. Production'da `PAYTR_TEST_MODE=true` de müşteri ödemesini fail-closed tutar.
+
+PayTR success/fail dönüş sayfaları ödeme otoritesi değildir. Yalnız doğrulanmış provider callback'i ödeme durumunu ve buna bağlı stok, kupon, sipariş, satıcı projeksiyonu ve bildirim yan etkilerini kesinleştirir. Sonuç ekranı sahiplik kontrollü status API'sinden kaydı okur.
+
+NovaStore içindeki satıcı sipariş projeksiyonu, ledger ve settlement kayıtları bir PayTR Pazaryeri para-transferi değildir. Alt üye işyeri modeli, komisyon/split, bloke/valör, satıcı doğrulaması, iade/chargeback etkisi ve gerçek satıcı transferi PayTR ile imzalanacak dış sağlayıcı sözleşmesinin ve ayrıca yetkilendirilecek entegrasyonun konusudur. Bu değerler veya kurallar koddan türetilmez ve belgelerde uydurulmaz.
+
+İlk güvenli staging ile sağlayıcı UAT ortamı aynı kapı değildir. Staging güvenlik politikası dış ödeme yan etkilerini ve provider credential'larını kapalı tutar. Secret ve ödeme çağrısı yalnız ayrıca yetkilendirilmiş provider UAT/production çalışma zamanında açılabilir. Production havale/EFT de gerçek hesap, mutabakat ve yetkili onay olmadan fail-closed kalır.
 
 ## Yapay Zekâ Alternatifleri
 
@@ -79,7 +85,7 @@ Bunlar hesap/secret gerektiren ana backend uygulamaları değildir; web arayüz�
 ## Tespit Edilen Yapılandırma Eksikleri
 
 1. `.env.example` dosyasında kodun kullandığı `RESEND_API_KEY` değişkeni bulunmuyor; yeni ortam kurulumunda unutulabilir.
-2. `PAYMENT_PROVIDER` yerel `.env` içinde tanımlı değil; kod bu nedenle iyzico varsayılanına düşüyor fakat iyzico akışı gerçek production entegrasyonu değil.
+2. PayTR merchant onayı, gerçek secret'lar, HTTPS callback/success/fail URL'leri ve yetkili provider UAT kanıtı dışarıdan sağlanmadı; `PAYTR_LIVE_REQUESTS_ALLOWED=false` olarak kalmalıdır.
 3. OpenAI anahtarı mevcut olsa da `AI_PROVIDER_FALLBACKS` tanımlı olmadığı için Gemini arızasında OpenAI'ye değil doğrudan proje içi mock sağlayıcıya geçiliyor.
 4. Kargo ve fatura akışları production sağlayıcısına bağlı değil.
 5. Hosting sağlayıcısına ait gizli değişkenlerin yalnızca panelde tutulduğu doğrulanmalı; hiçbir secret Git'e eklenmemeli.
