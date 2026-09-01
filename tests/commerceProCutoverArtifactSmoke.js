@@ -456,7 +456,13 @@ for (const required of [
     '/api/public/collections',
     '/api/addresses',
     '/api/campaigns/quote',
+    '/api/payments/capability',
+    '/api/payments/agreements/preview',
     '/api/payments/initialize',
+    'agreementSnapshotSha256',
+    'checkout-agreements-v2',
+    '/api/public/legal',
+    '/paytr-checkout.html',
     '/api/notifications?limit=50',
     '/api/notifications/unread-count',
     '/api/notifications/web-push/config',
@@ -538,7 +544,31 @@ for (const reference of referencedPaths) {
 }
 
 const serverSource = fs.readFileSync(path.join(repositoryRoot, 'server.js'), 'utf8');
-assert(!serverSource.includes('commerce-pro/index.html'), 'artifact tour must not activate a server route');
+for (const required of [
+    'COMMERCE_PRO_STOREFRONT_ARTIFACT',
+    'COMMERCE_PRO_DOCUMENT_ALIASES',
+    'COMMERCE_PRO_DOCUMENT_ROUTES',
+    'sendCommerceProStorefront',
+    "frame-ancestors 'none'",
+    "X-Frame-Options', 'DENY'"
+]) {
+    assert(serverSource.includes(required), `server cutover must retain ${required}`);
+}
+assert.match(
+    serverSource,
+    /const sendCommerceProStorefront = \(res\) => \{[\s\S]*?setDenyFrameHeaders\(res\);[\s\S]*?res\.sendFile\(COMMERCE_PRO_STOREFRONT_ARTIFACT\);[\s\S]*?\};/,
+    'Commerce Pro responses must retain deny-frame headers and the canonical artifact'
+);
+assert.match(
+    serverSource,
+    /COMMERCE_PRO_DOCUMENT_ALIASES\.has\(req\.path\) \|\| COMMERCE_PRO_DOCUMENT_ROUTES\.test\(req\.path\)[\s\S]*?return sendCommerceProStorefront\(res\);/,
+    'document aliases and canonical routes must serve the Commerce Pro artifact'
+);
+assert.match(
+    serverSource,
+    /\['\/checkout\.html', '\/payment-result\.html'\]\.includes\(req\.path\)[\s\S]*?return sendCommerceProStorefront\(res\);/,
+    'legacy checkout/result document aliases must serve the canonical Commerce Pro artifact'
+);
 for (const legacyFile of [
     'index.html',
     'categories.html',

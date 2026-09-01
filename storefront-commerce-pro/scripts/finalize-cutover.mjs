@@ -11,7 +11,10 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { build } from "vite";
+
+const previousNodeEnvironment = process.env.NODE_ENV;
+process.env.NODE_ENV = "production";
+const { build } = await import("vite");
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = path.resolve(root, "..");
@@ -256,6 +259,8 @@ try {
   console.log(`cutover artifact verified: ${sha256(artifact)}`);
   console.log(`cutover artifact write: ${writeStatus}`);
 } finally {
+  if (previousNodeEnvironment === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = previousNodeEnvironment;
   if (previousOutputRoot === undefined) delete process.env.NOVASTORE_CUTOVER_OUT_DIR;
   else process.env.NOVASTORE_CUTOVER_OUT_DIR = previousOutputRoot;
   assertSafeTempRoot(tempRoot);

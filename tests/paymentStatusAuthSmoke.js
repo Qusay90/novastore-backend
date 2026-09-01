@@ -18,21 +18,34 @@ const createRes = () => ({
 });
 
 const callStatus = async ({ user = { id: 10 }, row, query = { paymentRef: 'PAY-1', orderId: '7001' } }) => {
-    const originalQuery = pool.query;
+    const originalConnect = pool.connect;
     const calls = [];
-    pool.query = async (sql, params) => {
-        calls.push({ sql, params });
-        assert.match(sql, /SELECT/i);
-        assert.match(sql, /o\.user_id AS order_user_id/i);
-        return { rows: row ? [row] : [] };
+    const client = {
+        async query(sql, params = []) {
+            calls.push({ sql, params });
+            if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) return { rows: [], rowCount: 0 };
+            assert.match(sql, /WITH locked_order AS MATERIALIZED/i);
+            assert.match(sql, /payment_lookup\.payment_ref = \$1/i);
+            assert.match(sql, /o\.user_id = \$2/i);
+            assert.match(sql, /\(\$3::bigint IS NULL OR o\.id = \$3\)/i);
+            assert.match(sql, /FOR UPDATE OF p/i);
+            const orderMatches = params[2] === null || Number(row?.order_id) === Number(params[2]);
+            const owned = row
+                && String(row.payment_ref) === String(params[0])
+                && Number(row.order_user_id) === Number(params[1])
+                && orderMatches;
+            return { rows: owned ? [row] : [], rowCount: owned ? 1 : 0 };
+        },
+        release() {}
     };
+    pool.connect = async () => client;
 
     try {
         const res = createRes();
         await getPaymentStatus({ query, user }, res);
         return { res, calls };
     } finally {
-        pool.query = originalQuery;
+        pool.connect = originalConnect;
     }
 };
 
@@ -70,7 +83,22 @@ const callStatus = async ({ user = { id: 10 }, row, query = { paymentRef: 'PAY-1
     assert.strictEqual(ownPayment.res.body.paymentStatus, PAYMENT_STATUS.PAID);
     assert.strictEqual(ownPayment.res.body.finalized, true);
 
+    const ownPaymentWithoutOrderId = await callStatus({
+        query: { paymentRef: 'PAY-1' },
+        row: {
+            payment_ref: 'PAY-1',
+            payment_status: PAYMENT_STATUS.PAID,
+            provider: 'iyzico',
+            order_id: 7001,
+            order_status: ORDER_STATUS.HAZIRLANIYOR,
+            order_user_id: 10
+        }
+    });
+    assert.strictEqual(ownPaymentWithoutOrderId.res.code, 200);
+    assert.strictEqual(ownPaymentWithoutOrderId.res.body.orderId, 7001);
+
     const otherUserPayment = await callStatus({
+        query: { paymentRef: 'PAY-1' },
         row: {
             payment_ref: 'PAY-1',
             payment_status: PAYMENT_STATUS.PAID,

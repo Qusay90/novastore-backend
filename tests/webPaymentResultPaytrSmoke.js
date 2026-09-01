@@ -7,10 +7,12 @@ const root = path.resolve(__dirname, '..');
 const paymentResultPath = path.join(root, 'frontend', 'payment-result.html');
 const checkoutPath = path.join(root, 'frontend', 'checkout.html');
 const paytrCheckoutPath = path.join(root, 'frontend', 'paytr-checkout.html');
+const checkoutAdapterPath = path.join(root, 'storefront-commerce-pro', 'src', 'adapters', 'checkoutAdapter.js');
 
 const paymentResultHtml = fs.readFileSync(paymentResultPath, 'utf8');
 const checkoutHtml = fs.readFileSync(checkoutPath, 'utf8');
 const paytrCheckoutHtml = fs.readFileSync(paytrCheckoutPath, 'utf8');
+const checkoutAdapter = fs.readFileSync(checkoutAdapterPath, 'utf8');
 
 const inlineScripts = (html) => [...html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
     .map((match) => match[1]);
@@ -298,7 +300,9 @@ const runPaymentResult = async ({ href, statusPayload, responseFactory = null })
     assert.strictEqual(paymentResultScriptText.includes("qs('token')"), false);
     assert.strictEqual(paymentResultHtml.includes('iframeUrl'), false);
     assert.strictEqual(paymentResultHtml.includes('token-should-not-render'), false);
-    assert.match(checkoutHtml, /paytr-checkout\.html\?\$\{params\.toString\(\)\}/);
+    assert.match(checkoutHtml, /window\.location\.replace\('\/#\/odeme\/teslimat'\)/);
+    assert.strictEqual(checkoutHtml.includes('payment-result.html'), false);
+    assert.match(checkoutAdapter, /paytr-checkout\.html\?\$\{params\.toString\(\)\}/);
     assert.match(paytrCheckoutHtml, /sessionStorage\.getItem\(`novastore\.paytrCheckout\.\$\{paymentRef\}`\)/);
 
     console.log('web payment-result PayTR smoke passed');

@@ -33,6 +33,7 @@ import {
   createWebPushController,
   WEB_PUSH_STATE,
 } from "../../web-notifications/notificationClient.js";
+import turkeyLocations from "../../shared/turkiye-provinces-districts.v1.json";
 
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -90,6 +91,16 @@ const PAYMENT_STATUS_LABELS = Object.freeze({
 
 const paymentStatusLabel = (value) => PAYMENT_STATUS_LABELS[String(value || "").trim().toUpperCase()]
   || String(value || "Durum bilgisi bekleniyor");
+
+const locationSearchKey = (value) => String(value || "")
+  .trim()
+  .toLocaleLowerCase("tr-TR")
+  .replaceAll("ı", "i")
+  .normalize("NFD")
+  .replace(/\p{M}+/gu, "");
+const PROVINCE_OPTIONS = Object.freeze(turkeyLocations.provinces.map((province) => province.name));
+const DISTRICTS_BY_PROVINCE = new Map(turkeyLocations.provinces.map((province) => [province.name, Object.freeze(province.districts)]));
+const EMPTY_LOCATION_OPTIONS = Object.freeze([]);
 
 function useAsyncResource(loader, dependencies = []) {
   const [attempt, setAttempt] = useState(0);
@@ -165,7 +176,8 @@ export function CustomerAuthPage({
 
   const submit = async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const email = String(form.get("email") || "").trim();
     const password = String(form.get("password") || "");
     setPhase("submitting");
@@ -180,9 +192,9 @@ export function CustomerAuthPage({
           throw new Error("Şifre en az 8 karakter, bir harf ve bir rakam içermelidir.");
         }
         await account.register({ fullName, email, password });
+        formElement.reset();
         setMode("login");
         setMessage("Hesabın oluşturuldu. Şimdi güvenle giriş yapabilirsin.");
-        event.currentTarget.reset();
       } else {
         const session = await account.login({ email, password });
         await onAuthenticated(session, safeReturnPath(returnPath));
@@ -335,7 +347,7 @@ function ProfileForm({ user, account, onUpdated, onNotice }) {
       setPhase("idle");
     }
   };
-  return <form className="profile-editor connected-form" onSubmit={submit}><div className="profile-editor__head"><span><User /><strong>Profil bilgileri</strong><small>Ödeme ve teslimat iletişiminde kullanılacak temel bilgiler.</small></span></div>{error && <div className="form-message is-error" role="alert"><WarningCircle />{error}</div>}<div className="profile-editor__fields"><label>Ad soyad<input name="fullName" defaultValue={user.fullName} minLength="2" required /></label><label>E-posta<input value={user.email} readOnly aria-describedby="email-note" /><small id="email-note">E-posta bu ekrandan değiştirilemez.</small></label><label>Telefon<input name="phone" defaultValue={user.phone || ""} inputMode="tel" autoComplete="tel" placeholder="05xxxxxxxxx" /></label></div><button className="primary-button" type="submit" disabled={phase === "submitting"}>{phase === "submitting" ? "Kaydediliyor…" : "Bilgilerimi kaydet"}</button></form>;
+  return <form className="profile-editor connected-form" onSubmit={submit}><div className="profile-editor__head"><span><User /><strong>Profil bilgileri</strong><small>Ödeme ve teslimat iletişiminde kullanılacak temel bilgiler.</small></span></div>{error && <div className="form-message is-error" role="alert"><WarningCircle />{error}</div>}<div className="profile-editor__fields"><label>Ad soyad<input name="fullName" defaultValue={user.fullName} minLength="2" required /></label><label>E-posta<input value={user.email} readOnly aria-describedby="email-note" /><small id="email-note">E-posta bu ekrandan değiştirilemez.</small></label><label>Telefon<input name="phone" defaultValue={user.phone || ""} inputMode="numeric" autoComplete="tel" minLength="11" maxLength="11" pattern="05[0-9]{9}" placeholder="05xxxxxxxxx" /><small>11 haneli Türkiye cep telefonu: 05xxxxxxxxx</small></label></div><button className="primary-button" type="submit" disabled={phase === "submitting"}>{phase === "submitting" ? "Kaydediliyor…" : "Bilgilerimi kaydet"}</button></form>;
 }
 
 function AccountOverview({ session, account, favoriteCount, onSessionUpdated, onNotice, productById, getProductImage }) {
@@ -437,21 +449,110 @@ const EMPTY_ADDRESS = Object.freeze({
   isDefault: false,
 });
 
+function SearchableLocationSelect({ label, value, options, disabled = false, onChange, autoComplete, testId }) {
+  const [query, setQuery] = useState(value || "");
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const listId = `${testId}-options`;
+  const filtered = useMemo(() => {
+    const needle = locationSearchKey(query);
+    return needle ? options.filter((option) => locationSearchKey(option).includes(needle)) : options;
+  }, [options, query]);
+
+  useEffect(() => setQuery(value || ""), [value]);
+  useEffect(() => setActiveIndex(-1), [query, options]);
+
+  const select = (option) => {
+    setQuery(option);
+    onChange(option);
+    setOpen(false);
+  };
+  const onKeyDown = (event) => {
+    if (disabled) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((index) => Math.min(Math.max(0, index + 1), Math.max(0, filtered.length - 1)));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((index) => index < 0 ? Math.max(0, filtered.length - 1) : Math.max(0, index - 1));
+    } else if (event.key === "Enter" && open && filtered[activeIndex]) {
+      event.preventDefault();
+      select(filtered[activeIndex]);
+    } else if (event.key === "Escape") {
+      setOpen(false);
+      setQuery(value || "");
+    }
+  };
+
+  return <div className="location-combobox"><label htmlFor={`${testId}-input`}>{label}</label><span onBlur={(event) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    setOpen(false);
+    setQuery(value || "");
+  }}><input
+    data-testid={testId}
+    id={`${testId}-input`}
+    value={query}
+    disabled={disabled}
+    autoComplete={autoComplete}
+    role="combobox"
+    aria-autocomplete="list"
+    aria-expanded={open}
+    aria-controls={listId}
+    aria-activedescendant={open && filtered[activeIndex] ? `${listId}-${activeIndex}` : undefined}
+    aria-describedby={disabled ? `${testId}-hint` : undefined}
+    required
+    onFocus={() => setOpen(true)}
+    onClick={() => setOpen(true)}
+    onKeyDown={onKeyDown}
+    onChange={(event) => {
+      setQuery(event.target.value);
+      onChange("");
+      setOpen(true);
+    }}
+  />{disabled && <small id={`${testId}-hint`}>Önce il seçmelisin.</small>}{open && !disabled && <ul id={listId} role="listbox" data-option-count={options.length}>
+    {filtered.length ? filtered.map((option, index) => <li key={option} role="presentation"><button
+      id={`${listId}-${index}`}
+      type="button"
+      role="option"
+      aria-selected={option === value}
+      className={index === activeIndex ? "is-active" : ""}
+      onMouseDown={(event) => event.preventDefault()}
+      onMouseEnter={() => setActiveIndex(index)}
+      onClick={() => select(option)}
+    >{option}</button></li>) : <li className="location-combobox__empty">Eşleşen seçenek bulunamadı.</li>}
+  </ul>}</span></div>;
+}
+
 function AddressEditor({ initial = EMPTY_ADDRESS, onSubmit, onCancel, busy }) {
+  const [phone, setPhone] = useState(initial.phone || "");
+  const [phoneError, setPhoneError] = useState("");
+  const initialCity = PROVINCE_OPTIONS.includes(initial.city) ? initial.city : "";
+  const initialDistricts = DISTRICTS_BY_PROVINCE.get(initialCity) || EMPTY_LOCATION_OPTIONS;
+  const [city, setCity] = useState(initialCity);
+  const [district, setDistrict] = useState(initialDistricts.includes(initial.district) ? initial.district : "");
+  const districtOptions = DISTRICTS_BY_PROVINCE.get(city) || EMPTY_LOCATION_OPTIONS;
   const submit = (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     onSubmit({
       title: form.get("title"),
       fullName: form.get("fullName"),
-      phone: form.get("phone"),
-      city: form.get("city"),
-      district: form.get("district"),
+      phone,
+      city,
+      district,
       addressLine: form.get("addressLine"),
       isDefault: form.get("isDefault") === "on",
     });
   };
-  return <form className="address-editor connected-form" onSubmit={submit}><div className="address-editor__grid"><label>Adres başlığı<input name="title" defaultValue={initial.title} placeholder="Ev, İş…" required /></label><label>Alıcı adı<input name="fullName" defaultValue={initial.fullName} autoComplete="name" required /></label><label>Telefon<input name="phone" defaultValue={initial.phone} inputMode="tel" autoComplete="tel" placeholder="05xxxxxxxxx" required /></label><label>İl<input name="city" defaultValue={initial.city} autoComplete="address-level1" required /></label><label>İlçe<input name="district" defaultValue={initial.district} autoComplete="address-level2" required /></label><label className="is-wide">Açık adres<textarea name="addressLine" defaultValue={initial.addressLine} rows="4" autoComplete="street-address" required /></label><label className="connected-check is-wide"><input name="isDefault" type="checkbox" defaultChecked={initial.isDefault} /> Bu adresi varsayılan yap</label></div><div className="form-actions"><button type="button" onClick={onCancel}>Vazgeç</button><button className="primary-button" type="submit" disabled={busy}>{busy ? "Kaydediliyor…" : "Adresi kaydet"}</button></div></form>;
+  return <form className="address-editor connected-form" onSubmit={submit}><div className="address-editor__grid"><label>Adres başlığı<input name="title" defaultValue={initial.title} maxLength="80" placeholder="Ev, İş…" required /></label><label>Alıcı adı<input name="fullName" defaultValue={initial.fullName} minLength="2" maxLength="160" autoComplete="name" required /></label><label>Telefon<input name="phone" value={phone} inputMode="numeric" autoComplete="tel" placeholder="05xxxxxxxxx" minLength="11" maxLength="11" pattern="05[0-9]{9}" aria-describedby="address-phone-hint" required onChange={(event) => {
+    const next = event.target.value;
+    if (!/^\d*$/.test(next)) { setPhoneError("Telefon yalnız rakamlardan oluşmalıdır."); return; }
+    if (next.length > 11) { setPhoneError("Telefon 11 haneden uzun olamaz."); return; }
+    setPhone(next);
+    setPhoneError(next && !/^05\d{9}$/.test(next) ? "Telefon 05 ile başlayan 11 haneli olmalı." : "");
+  }} /><small id="address-phone-hint" className={phoneError ? "is-error" : ""}>{phoneError || "11 haneli Türkiye cep telefonu: 05xxxxxxxxx"}</small></label><SearchableLocationSelect label="İl" value={city} options={PROVINCE_OPTIONS} autoComplete="address-level1" testId="province-select" onChange={(nextCity) => { setCity(nextCity); setDistrict(""); }} /><SearchableLocationSelect label="İlçe" value={district} options={districtOptions} disabled={!city} autoComplete="address-level2" testId="district-select" onChange={setDistrict} /><label className="is-wide">Açık adres<textarea name="addressLine" defaultValue={initial.addressLine} minLength="5" maxLength="500" rows="4" autoComplete="street-address" required /></label><label className="connected-check is-wide"><input name="isDefault" type="checkbox" defaultChecked={initial.isDefault} /> Bu adresi varsayılan yap</label></div><div className="form-actions"><button type="button" onClick={onCancel}>Vazgeç</button><button className="primary-button" type="submit" disabled={busy || Boolean(phoneError) || !city || !district}>{busy ? "Kaydediliyor…" : "Adresi kaydet"}</button></div></form>;
 }
 
 function AddressesSection({ account, user, onNotice }) {
@@ -627,8 +728,8 @@ function CheckoutStepper({ step }) {
 }
 
 function CheckoutSummary({ quote, phase, error, couponInput, onCouponInput, onApplyCoupon, onClearCoupon, couponBusy }) {
-  if (phase === "loading") return <aside className="order-summary checkout-summary"><div className="connected-inline-state"><span className="integration-spinner" /><strong>Fiyatlar doğrulanıyor</strong></div></aside>;
-  if (phase === "error" || !quote) return <aside className="order-summary checkout-summary"><div className="connected-inline-state is-error"><WarningCircle /><strong>{errorMessage(error, "Güncel fiyatlar alınamadı.")}</strong></div></aside>;
+  if (phase === "loading") return <aside className="order-summary checkout-summary"><div className="connected-inline-state" role="status" aria-live="polite"><span className="integration-spinner" /><strong>Fiyatlar doğrulanıyor</strong></div></aside>;
+  if (phase === "error" || !quote) return <aside className="order-summary checkout-summary"><div className="connected-inline-state is-error" role="alert"><WarningCircle /><strong>{errorMessage(error, "Güncel fiyatlar alınamadı.")}</strong></div></aside>;
   const totals = quote.totals;
   const couponApplied = quote.coupon?.applied === true;
   return <aside className="order-summary checkout-summary"><h2>Sipariş Özeti</h2><dl><div><dt>Ara toplam</dt><dd>{money.format(totals.subtotal)}</dd></div>{totals.bundleDiscount > 0 && <div className="discount-row"><dt>Sepet avantajı</dt><dd>−{money.format(totals.bundleDiscount)}</dd></div>}{totals.couponDiscount > 0 && <div className="discount-row"><dt>Kupon indirimi</dt><dd>−{money.format(totals.couponDiscount)}</dd></div>}<div><dt>Kargo</dt><dd>{totals.shippingFee > 0 ? money.format(totals.shippingFee) : "Ücretsiz"}</dd></div><div className="order-total"><dt>Toplam</dt><dd>{money.format(totals.total)}</dd></div></dl><form className="coupon-form connected-coupon-form" onSubmit={onApplyCoupon}><label htmlFor="connected-coupon">İndirim kodu</label><div><input id="connected-coupon" value={couponInput} onChange={(event) => onCouponInput(event.target.value)} placeholder="Kupon kodunu gir" disabled={couponBusy} /><button type="submit" disabled={couponBusy || !couponInput.trim()}>{couponBusy ? "Kontrol…" : "Uygula"}</button></div>{quote.coupon?.code && <small className={couponApplied ? "is-success" : "is-error"}>{couponApplied ? `${quote.coupon.code} uygulandı.` : quote.coupon.reason || "Kupon uygulanamadı."}{couponApplied && <button type="button" onClick={onClearCoupon}>Kaldır</button>}</small>}</form><small className="summary-security"><ShieldCheck /> Tutarlar NovaStore fiyatlandırma servisiyle doğrulandı.</small></aside>;
@@ -636,6 +737,25 @@ function CheckoutSummary({ quote, phase, error, couponInput, onCouponInput, onAp
 
 function CheckoutAddressCards({ addresses, selectedId, onSelect }) {
   return <div className="address-grid connected-checkout-addresses">{addresses.map((address) => <label key={address.id} className={Number(selectedId) === Number(address.id) ? "is-selected" : ""}><input type="radio" name="checkoutAddress" checked={Number(selectedId) === Number(address.id)} onChange={() => onSelect(address.id)} /><strong>{address.title}{address.isDefault ? " · Varsayılan" : ""}</strong><span>{address.fullName}</span><p>{address.addressLine}<br />{address.district} / {address.city}<br />{address.phone}</p></label>)}</div>;
+}
+
+function CheckoutAgreementReview({ state, definitions, accepted, onAcceptedChange, onRetry }) {
+  if (state.phase === "loading") {
+    return <div className="agreement-preview-state" role="status" aria-live="polite"><span className="integration-spinner" /><span><strong>Siparişe özel sözleşmeler hazırlanıyor</strong><small>Adres, ürünler, satıcı dağılımı ve doğrulanmış toplam sunucuda eşleştiriliyor.</small></span></div>;
+  }
+  if (state.phase === "error") {
+    return <div className="agreement-preview-state is-error" role="alert"><WarningCircle /><span><strong>Sipariş sözleşmeleri hazırlanamadı</strong><small>{errorMessage(state.error, "Güncel sözleşmeler doğrulanmadan ödeme başlatılmaz.")}</small><button type="button" onClick={onRetry}>Yeniden dene</button></span></div>;
+  }
+  if (state.phase !== "ready") {
+    return definitions.length ? <div className="agreement-preview-pending" role="status">{definitions.map((agreement) => <p key={agreement.slug}><a href={`#${agreement.path}`} target="_blank" rel="noopener noreferrer">{agreement.title}</a><small>{agreement.version ? `Yayımlanan sürüm: ${agreement.version}` : "Şirket ve hukuk onaylı sürüm bekleniyor."}</small></p>)}</div> : <div className="form-message is-warning" role="status"><WarningCircle />Gerekli sözleşme sürümleri henüz yayımlanmadı.</div>;
+  }
+  return <div className="exact-agreement-list">
+    <p className="agreement-snapshot-reference">Siparişe bağlı kayıt: <code>{state.data.snapshotSha256.slice(0, 12)}…</code></p>
+    {state.data.documents.map((agreement) => <section className="exact-agreement" key={agreement.slug}>
+      <details><summary>{agreement.title} · sürüm {agreement.version}</summary><div className="exact-agreement__text">{agreement.text}</div></details>
+      <label className="secure-consent"><input type="checkbox" checked={accepted.has(agreement.slug)} onChange={(event) => onAcceptedChange(agreement.slug, event.target.checked)} /><span>Yukarıdaki siparişe özel <strong>{agreement.title}</strong> metnini inceledim ve onaylıyorum.<small>İçerik özeti: {agreement.contentSha256.slice(0, 12)}…</small></span></label>
+    </section>)}
+  </div>;
 }
 
 export function CustomerCheckoutPage({
@@ -650,6 +770,7 @@ export function CustomerCheckoutPage({
   reviewOnly = false,
 }) {
   const addressesResource = useAsyncResource((options) => account.listAddresses(options), [account]);
+  const capabilityResource = useAsyncResource((options) => checkout.getCapability(options), [checkout]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [showAddressEditor, setShowAddressEditor] = useState(false);
   const [addressBusy, setAddressBusy] = useState(false);
@@ -661,7 +782,9 @@ export function CustomerCheckoutPage({
   const couponRequestRef = useRef(false);
   const couponIntentKeyRef = useRef("");
   const skipCouponEffectRef = useRef(false);
-  const [consent, setConsent] = useState(false);
+  const [acceptedAgreements, setAcceptedAgreements] = useState(() => new Set());
+  const [agreementPreviewState, setAgreementPreviewState] = useState({ phase: "idle", data: null, error: null });
+  const [agreementPreviewRevision, setAgreementPreviewRevision] = useState(0);
   const [submitPhase, setSubmitPhase] = useState("idle");
   const [submitError, setSubmitError] = useState("");
   const hasStockIssues = items.some(({ product, quantity }) => product.stock <= 0 || quantity > product.stock);
@@ -696,12 +819,76 @@ export function CustomerCheckoutPage({
     if (preferred) setSelectedAddressId(preferred.id);
   }, [addressesResource.phase, addressesResource.data, selectedAddressId]);
 
-  if (!items.length) return <main id="main-content" className="page commerce-page"><div className="shell"><div className="large-empty"><ShoppingBag /><h1>Ödemeye devam etmek için sepetine ürün ekle</h1><p>Sepetin boş olduğu için ödeme işlemi başlatılmadı.</p><a className="primary-button" href="#/">Ürünleri keşfet</a></div></div></main>;
-  if (hasStockIssues) return <main id="main-content" className="page commerce-page"><div className="shell"><div className="large-empty"><WarningCircle /><h1>Sepetindeki stok sorununu düzelt</h1><p>Stokta olmayan veya miktarı güncel stoğu aşan ürünler için ödeme başlatılmaz. Sepete dönüp miktarı azaltarak ya da ürünü kaldırarak devam edebilirsin.</p><a className="primary-button" href="#/sepet">Sepete dön</a></div></div></main>;
-
   const addresses = addressesResource.data || [];
   const selectedAddress = addresses.find((address) => Number(address.id) === Number(selectedAddressId)) || null;
   const quote = quoteState.data;
+  const capability = capabilityResource.phase === "ready" ? capabilityResource.data : null;
+  const capabilityAgreements = Array.isArray(capability?.agreements) ? capability.agreements : [];
+  const capabilityAgreementSignature = capabilityAgreements
+    .map((agreement) => `${agreement.slug}:${agreement.version || "pending"}:${agreement.status}`)
+    .sort()
+    .join("|");
+  const cartFingerprint = items
+    .map(({ product, quantity }) => `${product.id}:${quantity}`)
+    .sort()
+    .join("|");
+  useEffect(() => {
+    const definitionsReady = capabilityAgreements.length > 0 && capabilityAgreements.every((agreement) => (
+      agreement.status === "published" && agreement.version
+    ));
+    if (
+      capability?.ready !== true
+      || !definitionsReady
+      || !selectedAddress
+      || quoteState.phase !== "ready"
+    ) {
+      setAgreementPreviewState({ phase: "idle", data: null, error: null });
+      setAcceptedAgreements(new Set());
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setAgreementPreviewState({ phase: "loading", data: null, error: null });
+    setAcceptedAgreements(new Set());
+    checkout.previewAgreements({
+      session,
+      address: selectedAddress,
+      items,
+      couponCode: appliedCoupon,
+    }, { signal: controller.signal }).then((data) => {
+      setQuoteState({ phase: "ready", data: data.quote, error: null });
+      setAgreementPreviewState({ phase: "ready", data, error: null });
+    }).catch((error) => {
+      if (error?.code !== "CUSTOMER_ABORTED") {
+        setAgreementPreviewState({ phase: "error", data: null, error });
+      }
+    });
+    return () => controller.abort("agreement-preview-refresh");
+  }, [
+    agreementPreviewRevision,
+    appliedCoupon,
+    capability?.ready,
+    capabilityAgreementSignature,
+    cartFingerprint,
+    checkout,
+    items,
+    quoteState.phase,
+    selectedAddress,
+    session,
+  ]);
+
+  if (!items.length) return <main id="main-content" className="page commerce-page"><div className="shell"><div className="large-empty"><ShoppingBag /><h1>Ödemeye devam etmek için sepetine ürün ekle</h1><p>Sepetin boş olduğu için ödeme işlemi başlatılmadı.</p><a className="primary-button" href="#/">Ürünleri keşfet</a></div></div></main>;
+  if (hasStockIssues) return <main id="main-content" className="page commerce-page"><div className="shell"><div className="large-empty"><WarningCircle /><h1>Sepetindeki stok sorununu düzelt</h1><p>Stokta olmayan veya miktarı güncel stoğu aşan ürünler için ödeme başlatılmaz. Sepete dönüp miktarı azaltarak ya da ürünü kaldırarak devam edebilirsin.</p><a className="primary-button" href="#/sepet">Sepete dön</a></div></div></main>;
+
+  const requiredAgreements = agreementPreviewState.phase === "ready"
+    ? agreementPreviewState.data.documents
+    : capabilityAgreements;
+  const agreementsReady = requiredAgreements.length > 0 && requiredAgreements.every((agreement) => (
+    agreementPreviewState.phase === "ready"
+    && agreement.version
+    && acceptedAgreements.has(agreement.slug)
+  )) && /^[a-f0-9]{64}$/.test(agreementPreviewState.data?.snapshotSha256 || "");
+  const paymentReady = capability?.ready === true && agreementsReady;
 
   const addAddress = async (value) => {
     setAddressBusy(true); setAddressError("");
@@ -761,7 +948,8 @@ export function CustomerCheckoutPage({
   const submitPayment = async () => {
     if (reviewOnly) return;
     if (!selectedAddress) { setSubmitError("Teslimat adresi seçmelisin."); onStepChange("delivery"); return; }
-    if (!consent) { setSubmitError("Ödeme yönlendirmesinden önce bilgilendirmeyi onaylamalısın."); onStepChange("payment"); return; }
+    if (capabilityResource.phase !== "ready" || capability?.ready !== true) { setSubmitError(capability?.message || "Güvenli ödeme hizmeti aktivasyon sürecindedir."); onStepChange("payment"); return; }
+    if (!agreementsReady) { setSubmitError("Güncel ön bilgilendirme ve mesafeli satış sözleşmesini onaylamalısın."); onStepChange("payment"); return; }
     if (quoteState.phase !== "ready" || !quote) { setSubmitError("Güncel sipariş toplamı doğrulanmadan ödeme başlatılamaz."); return; }
     setSubmitPhase("submitting"); setSubmitError("");
     try {
@@ -770,6 +958,12 @@ export function CustomerCheckoutPage({
         address: selectedAddress,
         items,
         couponCode: appliedCoupon,
+        agreementSnapshotSha256: agreementPreviewState.data.snapshotSha256,
+        agreementAcceptances: requiredAgreements.map((agreement) => ({
+          slug: agreement.slug,
+          version: agreement.version,
+          accepted: acceptedAgreements.has(agreement.slug),
+        })),
       });
       checkout.handoff(result, items);
     } catch (error) {
@@ -793,20 +987,28 @@ export function CustomerCheckoutPage({
       </>}
       {step === "payment" && <>
         <div className="checkout-panel__head"><div><CreditCard /><span><strong>Ödeme Yöntemi</strong><small>Kart bilgileri NovaStore arayüzünde alınmaz veya saklanmaz.</small></span></div></div>
-        <div className="payment-method is-selected connected-payment-method"><CreditCard /><span><strong>Kredi / Banka Kartı</strong><small>{reviewOnly ? "Yerel incelemede sağlayıcı açılmaz; bu adım yalnız arayüz ve toplam doğrulaması içindir." : "Devam ettiğinde yapılandırılmış güvenli ödeme sağlayıcısı ekranı açılır."}</small></span><ShieldCheck weight="fill" /></div>
+        <div className="payment-method is-selected connected-payment-method"><CreditCard /><span><strong>Kredi / Banka Kartı</strong><small>{capability?.ready ? "Devam ettiğinde PayTR tarafından barındırılan güvenli ödeme ekranı açılır." : "Ödeme sağlayıcısı etkinleştirildiğinde kart işlemi güvenli ödeme ekranında tamamlanacaktır."}</small></span><ShieldCheck weight="fill" /></div>
         <div className="payment-provider-disclosure"><LockKey /><div><strong>Kart bilgilerin ödeme sağlayıcısına girilir</strong><p>NovaStore yalnız sipariş, teslimat ve doğrulanmış toplam bilgilerini iletir. Bu sayfa kart numarası, son kullanma tarihi veya CVV toplamaz.</p></div></div>
-        <label className="secure-consent"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /> <span>Sipariş özetini kontrol ettiğimi ve kart bilgilerimi güvenli ödeme sağlayıcısı ekranında gireceğimi onaylıyorum.</span></label>
-        <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("delivery")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={!consent} onClick={() => onStepChange("review")}>Siparişi kontrol et <CaretRight /></button></div>
+        {capabilityResource.phase === "loading" && <div className="payment-activation-panel" role="status" aria-live="polite"><span className="integration-spinner" /><div><strong>Güvenli ödeme durumu kontrol ediliyor</strong><p>PayTR aktivasyon ve sözleşme durumu sunucudan doğrulanıyor.</p></div></div>}
+        {capabilityResource.phase === "error" && <div className="payment-activation-panel is-unavailable" role="alert"><WarningCircle /><div><strong>Güvenli ödeme durumu alınamadı</strong><p>Ödeme başlatılmaz. Bağlantını kontrol edip yeniden deneyebilirsin.</p><button type="button" onClick={capabilityResource.reload}>Yeniden dene</button></div></div>}
+        {capability && <div className={`payment-activation-panel ${capability.ready ? "is-ready" : "is-unavailable"}`} role="status"><ShieldCheck /><div><strong>{capability.ready ? capability.testMode ? "PayTR test ödeme alanı hazır" : "PayTR güvenli ödeme alanı hazır" : "Güvenli ödeme hizmeti aktivasyon sürecindedir"}</strong><p>{capability.message}{capability.ready && capability.testMode ? " Bu test oturumu gerçek tahsilat oluşturmaz." : ""}</p></div></div>}
+        <fieldset className="checkout-agreements"><legend>Ödeme öncesi sözleşmeler</legend><CheckoutAgreementReview state={agreementPreviewState} definitions={capabilityAgreements} accepted={acceptedAgreements} onRetry={() => setAgreementPreviewRevision((value) => value + 1)} onAcceptedChange={(slug, checked) => setAcceptedAgreements((current) => {
+          const next = new Set(current);
+          if (checked) next.add(slug); else next.delete(slug);
+          return next;
+        })} /></fieldset>
+        <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("delivery")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={quoteState.phase !== "ready" || !selectedAddress} onClick={() => onStepChange("review")}>Siparişi kontrol et <CaretRight /></button></div>
       </>}
       {step === "review" && <>
         <div className="checkout-panel__head"><div><Receipt /><span><strong>Siparişini Kontrol Et</strong><small>Ödeme sağlayıcısına geçmeden önce adres ve ürünleri doğrula.</small></span></div></div>
         {selectedAddress ? <div className="review-box"><span>Teslimat</span><strong>{selectedAddress.title}</strong><p>{selectedAddress.fullName} · {selectedAddress.addressLine}, {selectedAddress.district} / {selectedAddress.city}</p></div> : <div className="form-message is-error"><WarningCircle />Teslimat adresi seçilmedi.</div>}
         <div className="review-products">{items.map(({ product, quantity }) => <div key={product.id}><img src={getProductImage(product)} alt="" /><span><strong>{product.name}</strong><small>{quantity} adet</small></span><b>{money.format(product.price * quantity)}</b></div>)}</div>
+        <div className="review-provider-state"><ShieldCheck /><span><strong>{capability?.ready ? capability.testMode ? "PayTR test ödemesi" : "PayTR güvenli ödeme" : "Ödeme aktivasyonu bekleniyor"}</strong><small>{capability?.message || "Sağlayıcı durumu doğrulanmadan ödeme başlatılmaz."}{capability?.ready && capability.testMode ? " Gerçek tahsilat yapılmaz." : ""}</small></span></div>
         {reviewOnly && <div className="form-message is-warning" role="status"><ShieldCheck />Yerel incelemede gerçek ödeme, sipariş oluşturma ve sağlayıcı yönlendirmesi yapılmaz.</div>}
-        <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("payment")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={reviewOnly || submitPhase === "submitting" || quoteState.phase !== "ready" || !selectedAddress || !consent} onClick={submitPayment}><ShieldCheck /> {reviewOnly ? "Yerel incelemede ödeme kapalı" : submitPhase === "submitting" ? "Güvenli ödeme hazırlanıyor…" : "Güvenli ödeme ekranına geç"}</button></div>
+        <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("payment")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={reviewOnly || submitPhase === "submitting" || quoteState.phase !== "ready" || !selectedAddress || !paymentReady} onClick={submitPayment}><ShieldCheck /> {reviewOnly ? "Yerel incelemede ödeme kapalı" : !capability?.ready ? "Ödeme aktivasyonu bekleniyor" : !agreementsReady ? "Sözleşme onayı gerekli" : submitPhase === "submitting" ? "Güvenli ödeme hazırlanıyor…" : "PayTR güvenli ödeme ekranına geç"}</button></div>
       </>}
     </section><CheckoutSummary quote={quote} phase={quoteState.phase} error={quoteState.error} couponInput={couponInput} onCouponInput={setCouponInput} onApplyCoupon={applyCoupon} onClearCoupon={clearCoupon} couponBusy={couponBusy} /></div>
-    {step === "review" && quoteState.phase === "ready" && <div className="mobile-checkout-bar"><span><small>Doğrulanmış toplam</small><strong>{money.format(quote.totals.total)}</strong></span><button type="button" disabled={reviewOnly || submitPhase === "submitting" || !selectedAddress || !consent} onClick={submitPayment}><ShieldCheck /> {reviewOnly ? "Ödeme kapalı" : "Ödemeye geç"}</button></div>}
+    {step === "review" && quoteState.phase === "ready" && <div className="mobile-checkout-bar"><span><small>Doğrulanmış toplam</small><strong>{money.format(quote.totals.total)}</strong></span><button type="button" disabled={reviewOnly || submitPhase === "submitting" || !selectedAddress || !paymentReady} onClick={submitPayment}><ShieldCheck /> {reviewOnly ? "Ödeme kapalı" : capability?.ready ? "PayTR'a geç" : "Aktivasyon bekleniyor"}</button></div>}
   </div></main>;
 }
 
@@ -878,4 +1080,26 @@ export function CustomerSupportPage({ session, account, onNotice }) {
     finally { setPhase("idle"); }
   };
   return <main id="main-content" className="page help-page"><div className="shell"><div className="help-hero compact"><NovaServiceIcon kind="support" /><span className="section-kicker">Nova destek</span><h1>Destek ekibiyle görüş</h1><p>Mesajların yalnız doğrulanmış müşteri hesabın ve NovaStore destek ekibi arasında tutulur.</p></div><section className="support-panel"><div className="support-panel__head"><span><ChatCircleText /><strong>Destek mesajları</strong><small>{session.user.email}</small></span><button type="button" onClick={resource.reload}>Yenile</button></div>{resource.phase !== "ready" ? <InlineState phase={resource.phase} error={resource.error} onRetry={resource.reload} /> : <div className="support-thread" aria-live="polite">{resource.data.length ? resource.data.map((item) => <article key={item.id} className={item.isSystem ? "is-system" : item.sentByCustomer ? "is-sent" : "is-received"}><p>{item.isSystem ? item.message.replace("[AI DESTEK DEVRI]", "").trim() : item.message}</p><small>{formatDate(item.createdAt)}</small></article>) : <div className="connected-empty is-compact"><ChatCircleText /><h2>Henüz mesaj yok</h2><p>Sorunu aşağıdaki alandan destek ekibine iletebilirsin.</p></div>}</div>}{error && <div className="form-message is-error"><WarningCircle />{error}</div>}<form className="support-composer" onSubmit={submit}><label htmlFor="support-message">Mesajın</label><textarea id="support-message" value={message} onChange={(event) => setMessage(event.target.value)} rows="4" maxLength="2000" required placeholder="Nasıl yardımcı olabiliriz?" /><button className="primary-button" type="submit" disabled={phase === "submitting" || !message.trim()}>{phase === "submitting" ? "Gönderiliyor…" : "Mesajı gönder"}<PaperPlaneTilt /></button></form></section></div></main>;
+}
+
+export function CustomerLegalDocumentPage({ slug, legal }) {
+  const resource = useAsyncResource((options) => legal.load(slug, options), [legal, slug]);
+  if (resource.phase !== "ready") return <main id="main-content" className="page help-page"><div className="shell"><section className="legal-document-card"><InlineState phase={resource.phase} error={resource.error} onRetry={resource.reload} /></section></div></main>;
+  const document = resource.data;
+  const published = document.status === "published";
+  return <main id="main-content" className="page help-page"><div className="shell"><article className={`legal-document-card ${published ? "is-published" : "is-pending"}`}>
+    <span className="section-kicker">NovaStore yasal bilgilendirme</span>
+    <h1>{document.title}</h1>
+    {published ? <><p className="legal-document-version">Yürürlükteki sürüm: <strong>{document.version}</strong></p><div className="legal-document-copy">{document.text.split(/\n{2,}/).map((paragraph, index) => <p key={`${document.slug}-${index}`}>{paragraph}</p>)}</div></> : <div className="legal-document-pending" role="status"><ShieldCheck /><div><strong>Şirket ve hukuk onaylı metin bekleniyor</strong><p>Bu belgeye ait doğrulanmış içerik henüz yayımlanmadı. NovaStore burada süre, şirket bilgisi veya hukuki koşul uydurmaz.</p></div></div>}
+    <nav aria-label="Yasal sayfa bağlantıları"><a href="#/iletisim">İletişim bilgileri</a><a href="#/islem-rehberi">İşlem rehberi</a><a href="#/gizlilik-politikasi">Gizlilik politikası</a></nav>
+  </article></div></main>;
+}
+
+export function CustomerPublicContactPage({ businessIdentity }) {
+  const identity = businessIdentity?.status === "configured" ? businessIdentity.identity : null;
+  return <main id="main-content" className="page help-page"><div className="shell"><article className="legal-document-card contact-review-card">
+    <span className="section-kicker">Kurumsal iletişim</span><h1>İletişim</h1>
+    {identity ? <address><strong>{identity.legalCompanyName}</strong><span>{identity.registeredAddress}</span><span>VKN: {identity.taxNumber} · MERSİS: {identity.mersisNumber}</span><a href={`mailto:${identity.kepAddress}`}>KEP: {identity.kepAddress}</a><a href={`tel:${identity.phone}`}>{identity.phone}</a><a href={`mailto:${identity.email}`}>{identity.email}</a></address> : <div className="legal-document-pending" role="status"><ShieldCheck /><div><strong>Gerçek şirket iletişim bilgileri bekleniyor</strong><p>Şirket kimliği, VKN, MERSİS, KEP, adres, telefon ve e-posta sahibi tarafından doğrulanmadan bu sayfada yayımlanmaz.</p></div></div>}
+    <p className="contact-review-support">Müşteri hesabınla ilgili destek için <a href="#/destek">güvenli destek kanalına</a> giriş yapabilirsin.</p>
+  </article></div></main>;
 }

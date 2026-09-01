@@ -1,22 +1,28 @@
 const crypto = require('crypto');
+const net = require('net');
 const pool = require('../config/db');
 const { sendAuthError } = require('../middlewares/authMiddleware');
 const { EVENT } = require('../services/notificationEventCatalog');
 const { enqueueNotificationEvent } = require('../services/notificationOutboxService');
-const { initializeIyzicoPayment, verifyWebhookSignature } = require('../services/paymentProviderService');
+const { verifyWebhookSignature } = require('../services/paymentProviderService');
 const {
     PaymentProviderConfigError,
     assertPaytrEnvReady,
-    getPaymentProviderName
+    assertPaytrProviderReady,
+    getPaymentProviderCapability,
+    getPaymentProviderName,
+    isProductionEnvironment
 } = require('../config/paymentProviderConfig');
 const {
-    buildMockPaytrTokenResponse,
-    buildPaytrIframeUrl,
+    buildPaytrMerchantOid,
     buildPaytrTokenPayload,
+    PaytrProviderTransportError,
+    requestPaytrIframeSession,
     verifyPaytrCallbackHash
 } = require('../services/paytrPaymentService');
 const {
-    createPendingPaymentOrder,
+    assertRequestedCouponApplied,
+    createPendingPaymentOrderFromPricing,
     reserveStock,
     releaseStockReservation,
     appendOrderEvent,
@@ -45,15 +51,33 @@ const {
     PaymentLaunchPolicyError,
     assertPaymentLaunchPolicy
 } = require('../config/paymentLaunchPolicy');
-const { BusinessIdentityConfigError } = require('../config/businessIdentityConfig');
+const {
+    BusinessIdentityConfigError,
+    getBusinessIdentityIssueKeys
+} = require('../config/businessIdentityConfig');
+const {
+    LegalDocumentError,
+    buildCheckoutAgreementPreview,
+    buildCheckoutAgreementSnapshot,
+    getCheckoutAgreementDocuments,
+    getCheckoutAgreementReadiness
+} = require('../services/legalDocumentService');
+const { calculatePricing } = require('../services/pricingService');
+const {
+    canonicalProvinceDistrict,
+    normalizeTurkishMobilePhone
+} = require('../services/turkiyeAddressContract');
 const {
     buildReservationMetadata,
+    expireLockedPaymentReservation,
     releaseExpiredPaymentReservations
 } = require('../services/paymentReservationService');
 const {
     buildSellerOrderProjection,
     materializeSellerOrderProjection
 } = require('../services/sellerOrderProjectionService');
+
+let paytrIframeSessionRequester = requestPaytrIframeSession;
 
 const rejectBlockedExternalSideEffect = (res, effect) => {
     try {
@@ -89,13 +113,12 @@ const createDeterministicKeyFromBody = (body, userId = null) => {
             ? `user:${Number(userId)}`
             : `guest:${String(body.analyticsSessionKey || body.email || '').trim().toLowerCase()}`,
         analyticsSessionKey: body.analyticsSessionKey,
-        fullName: body.fullName,
-        email: body.email,
-        phone: body.phone,
-        address: body.address,
+        addressId: body.addressId,
         cartItems: body.cartItems,
         couponCode: body.couponCode,
-        paymentMethod: body.paymentMethod
+        paymentMethod: body.paymentMethod,
+        agreementAcceptances: body.agreementAcceptances,
+        agreementSnapshotSha256: body.agreementSnapshotSha256
     });
 
     return `AUTO-${crypto.createHash('sha256').update(seed).digest('hex').slice(0, 32)}`;
@@ -123,13 +146,18 @@ const hashIdempotencyPart = (value) => (
 
 const normalizeIdempotencyBody = (body = {}) => ({
     analyticsSessionKey: String(body.analyticsSessionKey || '').trim(),
-    fullName: String(body.fullName || '').trim(),
-    email: String(body.email || '').trim().toLowerCase(),
-    phone: String(body.phone || '').trim(),
-    address: body.address,
+    addressId: Number(body.addressId || 0),
     cartItems: Array.isArray(body.cartItems) ? body.cartItems : [],
     couponCode: body.couponCode || null,
-    paymentMethod: body.paymentMethod || 'card'
+    paymentMethod: body.paymentMethod || 'card',
+    agreementSnapshotSha256: String(body.agreementSnapshotSha256 || '').trim().toLowerCase(),
+    agreementAcceptances: Array.isArray(body.agreementAcceptances)
+        ? body.agreementAcceptances.map((item) => ({
+            slug: String(item?.slug || '').trim(),
+            version: String(item?.version || '').trim(),
+            accepted: item?.accepted === true
+        })).sort((left, right) => left.slug.localeCompare(right.slug))
+        : []
 });
 
 const buildPaymentIdempotencyContext = ({ body = {}, userId = null, idempotencyKey }) => {
@@ -159,8 +187,15 @@ const idempotencyContextMatches = (storedContext, expectedContext) => (
 );
 
 const readClientIp = (req) => {
-    const forwardedFor = String((req.headers && req.headers['x-forwarded-for']) || '').split(',')[0].trim();
-    return forwardedFor || req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || '127.0.0.1';
+    const raw = String(req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || '').trim();
+    const candidate = raw.startsWith('::ffff:') ? raw.slice(7) : raw;
+    if (!net.isIP(candidate)) {
+        const error = new Error('Payment client IP is unavailable.');
+        error.code = 'PAYMENT_CLIENT_IP_INVALID';
+        error.statusCode = 400;
+        throw error;
+    }
+    return candidate;
 };
 
 const truthyEnvValues = new Set(['1', 'true', 'yes', 'on']);
@@ -168,7 +203,7 @@ const truthyEnvValues = new Set(['1', 'true', 'yes', 'on']);
 const isTruthyEnv = (value) => truthyEnvValues.has(String(value || '').trim().toLowerCase());
 
 const isUnsignedIyzicoWebhookMockAllowed = () => (
-    process.env.NODE_ENV !== 'production' &&
+    !isProductionEnvironment(process.env) &&
     isTruthyEnv(process.env.IYZICO_ALLOW_UNSIGNED_WEBHOOKS)
 );
 
@@ -223,8 +258,12 @@ const finalizeCouponReservationForCapture = async ({
 
 const normalizePaytrCallbackPayload = (payload = {}) => ({
     merchant_oid: String(payload.merchant_oid || '').trim(),
-    status: String(payload.status || '').trim(),
+    status: String(payload.status || '').trim().toLowerCase(),
     total_amount: String(payload.total_amount || '').trim(),
+    payment_amount: String(payload.payment_amount || '').trim(),
+    payment_type: String(payload.payment_type || '').trim().toLowerCase(),
+    currency: String(payload.currency || '').trim().toUpperCase(),
+    test_mode: String(payload.test_mode || '').trim(),
     hash: String(payload.hash || '').trim(),
     failed_reason_code: String(payload.failed_reason_code || '').trim() || null,
     failed_reason_msg: String(payload.failed_reason_msg || '').trim() || null
@@ -256,22 +295,10 @@ const readIyzicoPayloadCurrency = (payload = {}) => String(
     payload.currency ?? payload.currencyCode ?? payload.currency_code ?? ''
 ).trim().toUpperCase();
 
-const PAYTR_FAILED_STATUSES = new Set([
-    'failed',
-    'fail',
-    'cancel',
-    'canceled',
-    'cancelled',
-    'declined',
-    'timeout',
-    'expired',
-    'error'
-]);
-
 const IYZICO_SUCCESS_STATUSES = new Set(['SUCCESS', 'PAID']);
 const IYZICO_FAILED_STATUSES = new Set(['FAILURE', 'FAILED']);
 
-const isPaytrFailedStatus = (status) => PAYTR_FAILED_STATUSES.has(String(status || '').trim().toLowerCase());
+const isPaytrFailedStatus = (status) => String(status || '').trim().toLowerCase() === 'failed';
 
 const buildPaytrWebhookEventId = (merchantOid, callbackOutcome) => {
     const paymentRefHash = crypto.createHash('sha256').update(String(merchantOid || '')).digest('hex');
@@ -314,6 +341,41 @@ const lockPaymentAndOrderByRef = async (client, paymentRef) => {
          WHERE p.payment_ref = $1
          FOR UPDATE OF p`,
         [paymentRef]
+    );
+
+    return paymentResult.rows[0] || null;
+};
+
+const lockOwnedPaymentAndOrderForStatus = async (client, { paymentRef, orderId, userId }) => {
+    const paymentResult = await client.query(
+        `WITH locked_order AS MATERIALIZED (
+             SELECT o.*
+             FROM orders o
+             JOIN payments payment_lookup ON payment_lookup.order_id = o.id
+             WHERE payment_lookup.payment_ref = $1
+               AND o.user_id = $2
+               AND ($3::bigint IS NULL OR o.id = $3)
+             FOR UPDATE OF o
+         )
+         SELECT p.id,
+                p.payment_ref,
+                p.status,
+                p.status AS payment_status,
+                p.provider,
+                p.raw_request,
+                p.raw_response,
+                o.items,
+                o.user_id AS order_user_id,
+                o.id AS order_id,
+                o.status AS order_status,
+                o.payment_status AS order_payment_status,
+                o.refund_status,
+                CURRENT_TIMESTAMP AS reservation_checked_at
+         FROM locked_order o
+         JOIN payments p ON p.order_id = o.id
+         WHERE p.payment_ref = $1
+         FOR UPDATE OF p`,
+        [paymentRef, userId, orderId]
     );
 
     return paymentResult.rows[0] || null;
@@ -463,9 +525,29 @@ const buildPaymentStatusResponse = (row) => {
     const reconciliationTask = paymentMetadata && typeof paymentMetadata.reconciliationTask === 'object'
         ? paymentMetadata.reconciliationTask
         : null;
-    const paymentReconciliationPending = reconciliationTask
+    const currentOrderStatus = Object.values(ORDER_STATUS).includes(orderStatus) ? orderStatus : null;
+    const orderPaymentStatus = String(row.order_payment_status || '').trim().toUpperCase() || null;
+    const paidOrderStates = new Set([
+        ORDER_STATUS.HAZIRLANIYOR,
+        ORDER_STATUS.KARGOYA_VERILDI,
+        ORDER_STATUS.TESLIM_EDILDI
+    ]);
+    let stateCoherenceReason = null;
+    if (orderPaymentStatus && orderPaymentStatus !== paymentStatus) {
+        stateCoherenceReason = 'PAYMENT_ORDER_PAYMENT_STATUS_MISMATCH';
+    } else if (isPaid && !refundReviewPending && !paidOrderStates.has(currentOrderStatus)) {
+        stateCoherenceReason = 'PAID_ORDER_STATE_MISMATCH';
+    } else if (isFailed && currentOrderStatus !== ORDER_STATUS.IPTAL_EDILDI) {
+        stateCoherenceReason = 'FAILED_ORDER_STATE_MISMATCH';
+    } else if (isRefunded && (
+        refundStatus !== REFUND_STATUS.COMPLETED
+        || ![ORDER_STATUS.IPTAL_EDILDI, ORDER_STATUS.IADE_EDILDI].includes(currentOrderStatus)
+    )) {
+        stateCoherenceReason = 'REFUNDED_ORDER_STATE_MISMATCH';
+    }
+    const paymentReconciliationPending = (reconciliationTask
         ? String(reconciliationTask.status || '').trim().toUpperCase() === 'OPEN'
-        : paymentMetadata.reconciliationRequired === true;
+        : paymentMetadata.reconciliationRequired === true) || Boolean(stateCoherenceReason);
     const commerceFinalized = providerFinalized && !refundReviewPending && !paymentReconciliationPending;
 
     let message = '\u00D6deme durumunuz kontrol ediliyor.';
@@ -512,10 +594,312 @@ const buildPaymentStatusResponse = (row) => {
         commerceFinalized,
         reconciliationRequired: refundReviewPending || paymentReconciliationPending,
         reconciliationReason: paymentReconciliationPending
-            ? (reconciliationTask?.reasonCode || paymentMetadata.reconciliationReason || null)
+            ? (stateCoherenceReason || reconciliationTask?.reasonCode || paymentMetadata.reconciliationReason || null)
             : null,
         message,
         nextAction
+    };
+};
+
+const getPaymentCapability = (_req, res) => {
+    const provider = getPaymentProviderCapability();
+    const agreements = getCheckoutAgreementReadiness();
+    const identityReady = getBusinessIdentityIssueKeys(process.env, { paymentOnly: true }).length === 0;
+    const ready = provider.ready && agreements.ready && identityReady;
+    const state = !provider.ready
+        ? provider.state
+        : !identityReady
+            ? 'company_identity_required'
+            : !agreements.ready
+                ? 'legal_documents_required'
+                : 'ready';
+    const messages = {
+        provider_not_configured: 'Güvenli ödeme hizmeti aktivasyon sürecindedir.',
+        credentials_required: 'PayTR Pazaryeri sağlayıcı bilgileri bekleniyor.',
+        client_ip_config_required: 'Yayın proxy zinciri doğrulanmadan müşteri IP bilgisi PayTR\'a gönderilemez.',
+        production_test_mode_forbidden: 'PayTR test modu production müşteri ödemelerinde kullanılamaz.',
+        activation_required: 'PayTR güvenli ödeme bağlantısı henüz yetkili olarak etkinleştirilmedi.',
+        company_identity_required: 'Gerçek şirket kimliği tamamlanmadan ödeme açılamaz.',
+        legal_documents_required: 'Güncel ödeme sözleşmeleri yayımlanmadan ödeme açılamaz.',
+        ready: 'PayTR güvenli ödeme alanı kullanıma hazır.'
+    };
+    return res.status(200).json({
+        provider: provider.provider,
+        ready,
+        state,
+        message: messages[state],
+        testMode: ready ? provider.testMode === true : null,
+        requirements: {
+            providerReady: provider.ready,
+            businessIdentityReady: identityReady,
+            legalDocumentsReady: agreements.ready
+        },
+        agreements: getCheckoutAgreementDocuments().map((document) => ({
+            slug: document.slug,
+            path: document.path,
+            title: document.title,
+            status: document.status,
+            version: document.version
+        }))
+    });
+};
+
+const normalizeCheckoutAddressId = (value) => {
+    const addressId = Number(value);
+    return Number.isInteger(addressId) && addressId > 0 ? addressId : null;
+};
+
+const loadOwnedCheckoutAddress = async (client, addressId, userId) => {
+    const result = await client.query(
+        `SELECT address_row.id, address_row.title, address_row.full_name, address_row.phone,
+                address_row.city, address_row.district, address_row.address_line, user_row.email
+         FROM customer_addresses address_row
+         JOIN users user_row ON user_row.id = address_row.user_id
+         WHERE address_row.id = $1 AND address_row.user_id = $2
+         LIMIT 1`,
+        [addressId, userId]
+    );
+    return result.rows[0] || null;
+};
+
+const loadPaymentByIdempotencyKey = async (client, idempotencyKey) => {
+    const result = await client.query(
+        `SELECT p.*, o.id AS order_id, o.user_id AS order_user_id
+         FROM payments p
+         JOIN orders o ON o.id = p.order_id
+         WHERE p.idempotency_key = $1`,
+        [idempotencyKey]
+    );
+    return result.rows[0] || null;
+};
+
+const formatCheckoutAddress = (address) => [
+    address.title ? `${address.title}:` : '',
+    address.address_line,
+    [address.district, address.city].filter(Boolean).join(' / ')
+].filter(Boolean).join(' ');
+
+const buildCheckoutAgreementContext = ({
+    identitySnapshot,
+    addressId,
+    customer,
+    pricing,
+    sellerProjection
+}) => ({
+    businessIdentity: identitySnapshot,
+    delivery: {
+        addressId,
+        fullName: customer.fullName,
+        phone: customer.phone,
+        address: customer.address
+    },
+    items: pricing.items.map((item) => ({
+        productId: Number(item.id),
+        name: item.name,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.price),
+        lineTotal: Number(item.line_total)
+    })),
+    totals: pricing.totals,
+    coupon: {
+        applied: pricing.coupon?.applied === true,
+        code: pricing.coupon?.applied === true ? pricing.coupon.code : null,
+        discountAmount: Number(pricing.coupon?.discountAmount || 0)
+    },
+    sellers: (Array.isArray(sellerProjection) ? sellerProjection : []).map((seller) => ({
+        organizationId: Number(seller.organizationId),
+        storeId: Number(seller.storeId),
+        currency: seller.currency,
+        grossMinor: Number(seller.grossMinor),
+        productIds: (seller.items || []).map((item) => Number(item.productId))
+    }))
+});
+
+const buildCustomerFromCheckoutAddress = (checkoutAddress) => {
+    const canonicalGeography = checkoutAddress
+        ? canonicalProvinceDistrict(checkoutAddress.city, checkoutAddress.district)
+        : null;
+    const canonicalPhone = checkoutAddress ? normalizeTurkishMobilePhone(checkoutAddress.phone) : null;
+    if (!checkoutAddress || !canonicalGeography || !canonicalPhone) {
+        const error = new Error('Teslimat adresi bulunamadı.');
+        error.code = 'CHECKOUT_ADDRESS_NOT_FOUND';
+        error.statusCode = 404;
+        throw error;
+    }
+    return Object.freeze({
+        fullName: String(checkoutAddress.full_name || '').trim(),
+        email: String(checkoutAddress.email || '').trim().toLowerCase(),
+        phone: canonicalPhone,
+        address: formatCheckoutAddress({
+            ...checkoutAddress,
+            city: canonicalGeography.province,
+            district: canonicalGeography.district
+        })
+    });
+};
+
+const loadAuthoritativeCheckoutState = async ({
+    client,
+    addressId,
+    userId,
+    cartItems,
+    couponCode,
+    agreementAcceptances,
+    expectedAgreementSnapshotSha256,
+    identitySnapshot,
+    lockCoupon
+}) => {
+    const checkoutAddress = await loadOwnedCheckoutAddress(client, addressId, userId);
+    const customer = buildCustomerFromCheckoutAddress(checkoutAddress);
+    const pricing = await calculatePricing({ cartItems, couponCode, client, lockCoupon });
+    assertRequestedCouponApplied(couponCode, pricing.coupon);
+    const sellerProjection = await buildSellerOrderProjection(client, pricing.items);
+    const checkoutAgreementSnapshot = buildCheckoutAgreementSnapshot(agreementAcceptances, {
+        checkoutContext: buildCheckoutAgreementContext({
+            identitySnapshot,
+            addressId,
+            customer,
+            pricing,
+            sellerProjection
+        }),
+        expectedSnapshotSha256: expectedAgreementSnapshotSha256
+    });
+    return Object.freeze({ customer, pricing, sellerProjection, checkoutAgreementSnapshot });
+};
+
+const buildPaytrPayloadBindingHash = (payload) => crypto
+    .createHash('sha256')
+    .update(stableStringify(payload))
+    .digest('hex');
+
+const paytrPayloadBindingsMatch = (left, right) => crypto.timingSafeEqual(
+    Buffer.from(buildPaytrPayloadBindingHash(left), 'hex'),
+    Buffer.from(buildPaytrPayloadBindingHash(right), 'hex')
+);
+
+const buildExistingPaymentResult = ({ row, idempotencyContext, idempotencyKey, userId }) => {
+    if (!row) return null;
+    const storedIdempotency = readStoredIdempotencyContext(row.raw_request);
+    if (!idempotencyContextMatches(storedIdempotency, idempotencyContext)) {
+        return Object.freeze({
+            statusCode: 409,
+            body: { error: 'Idempotency key farklı bir ödeme isteği için kullanılmış.' }
+        });
+    }
+    const ownerUserId = row.order_user_id === null || row.order_user_id === undefined
+        ? null
+        : Number(row.order_user_id);
+    if (ownerUserId !== userId) {
+        return Object.freeze({
+            statusCode: 409,
+            body: { error: 'Idempotency key farklı bir kullanıcıya ait.' }
+        });
+    }
+    return Object.freeze({
+        statusCode: 200,
+        body: {
+            message: 'Idempotent tekrar isteği, mevcut ödeme döndürüldü.',
+            orderId: row.order_id,
+            paymentRef: row.payment_ref,
+            paymentStatus: row.status,
+            provider: row.provider,
+            idempotencyKey,
+            paymentAction: row.provider === 'paytr' && row.status === PAYMENT_STATUS.REQUIRES_ACTION
+                ? readStoredPaytrAction(row.raw_response)
+                : null,
+            reused: true
+        }
+    });
+};
+
+const getCheckoutAgreementPreview = async (req, res) => {
+    const user = req.user;
+    if (!user || user.principal !== 'customer' || user.role !== 'customer') {
+        return res.status(401).json({
+            code: 'PAYMENT_CUSTOMER_SESSION_REQUIRED',
+            error: 'Sözleşme özeti için doğrulanmış müşteri oturumu gereklidir.'
+        });
+    }
+
+    let client = null;
+    try {
+        const addressId = normalizeCheckoutAddressId(req.body?.addressId);
+        const cartItems = req.body?.cartItems;
+        const couponCode = req.body?.couponCode || null;
+        if (!addressId) return res.status(400).json({ error: 'Geçerli teslimat adresi seçilmelidir.' });
+        if (!Array.isArray(cartItems) || cartItems.length === 0) return res.status(400).json({ error: 'Sepet boş olamaz.' });
+
+        const userId = Number(user.id);
+        const launchPolicy = assertPaymentLaunchPolicy({ paymentMethod: 'card' });
+        client = await pool.connect();
+        const checkoutAddress = await loadOwnedCheckoutAddress(client, addressId, userId);
+        const canonicalGeography = checkoutAddress
+            ? canonicalProvinceDistrict(checkoutAddress.city, checkoutAddress.district)
+            : null;
+        const canonicalPhone = checkoutAddress ? normalizeTurkishMobilePhone(checkoutAddress.phone) : null;
+        if (!checkoutAddress || !canonicalGeography || !canonicalPhone) {
+            return res.status(404).json({ error: 'Teslimat adresi bulunamadı.' });
+        }
+        const customer = {
+            fullName: String(checkoutAddress.full_name || '').trim(),
+            email: String(checkoutAddress.email || '').trim().toLowerCase(),
+            phone: canonicalPhone,
+            address: formatCheckoutAddress({
+                ...checkoutAddress,
+                city: canonicalGeography.province,
+                district: canonicalGeography.district
+            })
+        };
+        const pricing = await calculatePricing({ cartItems, couponCode, client });
+        const sellerProjection = await buildSellerOrderProjection(client, pricing.items);
+        const preview = buildCheckoutAgreementPreview({
+            checkoutContext: buildCheckoutAgreementContext({
+                identitySnapshot: launchPolicy.identitySnapshot,
+                addressId,
+                customer,
+                pricing,
+                sellerProjection
+            })
+        });
+        return res.status(200).json({
+            ...preview,
+            quote: {
+                totals: pricing.totals,
+                campaigns: pricing.campaigns,
+                coupon: pricing.coupon,
+                items: pricing.items
+            }
+        });
+    } catch (error) {
+        const policyError = error instanceof PaymentLaunchPolicyError
+            || error instanceof BusinessIdentityConfigError
+            || error instanceof LegalDocumentError;
+        const statusCode = policyError ? error.statusCode : (error.statusCode || 400);
+        if (!policyError && statusCode >= 500) console.error('Sözleşme özeti hatası:', error.code || 'CHECKOUT_AGREEMENT_PREVIEW_ERROR');
+        return res.status(statusCode).json({
+            code: error.code || undefined,
+            error: policyError ? error.publicMessage : (statusCode < 500 ? error.message : 'Sözleşme özeti oluşturulamadı.')
+        });
+    } finally {
+        client?.release();
+    }
+};
+
+const readStoredPaytrAction = (rawResponse) => {
+    const action = safeJsonParse(rawResponse, null);
+    if (!action || action.type !== 'iframe' || !action.token || !action.iframeUrl) return null;
+    try {
+        const url = new URL(action.iframeUrl);
+        if (url.protocol !== 'https:' || url.hostname !== 'www.paytr.com' || !url.pathname.startsWith('/odeme/guvenli/')) return null;
+    } catch (_) {
+        return null;
+    }
+    return {
+        type: 'iframe',
+        token: String(action.token),
+        iframeUrl: String(action.iframeUrl),
+        successUrl: String(action.successUrl || ''),
+        failUrl: String(action.failUrl || '')
     };
 };
 
@@ -558,10 +942,28 @@ const finalizePaytrCallback = async (payload, callbackOutcome) => {
         }
 
         const expectedAmount = toPaytrMinorUnits(payment.amount || payment.order_total_amount);
-        const callbackAmount = Number(payload.total_amount);
-        if (!Number.isSafeInteger(expectedAmount) || expectedAmount !== callbackAmount) {
+        const callbackPaymentAmount = Number(payload.payment_amount);
+        const callbackChargedAmount = Number(payload.total_amount);
+        if (
+            !Number.isSafeInteger(expectedAmount)
+            || expectedAmount !== callbackPaymentAmount
+            || !Number.isSafeInteger(callbackChargedAmount)
+            || callbackChargedAmount < callbackPaymentAmount
+            || payload.payment_type !== 'card'
+            || payload.currency !== 'TL'
+        ) {
             await client.query('ROLLBACK');
             const err = new Error('PayTR payment amount mismatch.');
+            err.statusCode = 409;
+            throw err;
+        }
+
+        const rawRequest = safeJsonParse(payment.raw_request, {});
+        const storedTestMode = String(rawRequest.paytr?.testMode ?? '0') === '1';
+        const callbackTestMode = payload.test_mode === '1';
+        if (!['', '0', '1'].includes(payload.test_mode) || callbackTestMode !== storedTestMode) {
+            await client.query('ROLLBACK');
+            const err = new Error('PayTR payment mode mismatch.');
             err.statusCode = 409;
             throw err;
         }
@@ -573,7 +975,6 @@ const finalizePaytrCallback = async (payload, callbackOutcome) => {
             callbackOutcome,
             stockReservationState
         });
-        const rawRequest = safeJsonParse(payment.raw_request, {});
         const parsedItemsRaw = safeJsonParse(payment.items, []);
         const parsedItems = Array.isArray(parsedItemsRaw) ? parsedItemsRaw : [];
         const failedReason = [payload.failed_reason_code, payload.failed_reason_msg]
@@ -824,12 +1225,23 @@ const webhookPaytr = async (req, res) => {
     try {
         const payload = normalizePaytrCallbackPayload(req.body || {});
 
-        if (!payload.merchant_oid || !payload.status || !payload.total_amount) {
-            return res.status(400).json({ error: 'merchant_oid, status ve total_amount zorunludur.' });
+        if (
+            !payload.merchant_oid
+            || !payload.status
+            || !payload.total_amount
+            || !payload.payment_amount
+            || !payload.payment_type
+            || !payload.currency
+        ) {
+            return res.status(400).json({ error: 'PayTR callback alanları eksik.' });
         }
 
         if (!payload.hash) {
             return res.status(400).json({ error: 'PayTR callback hash zorunludur.' });
+        }
+
+        if (isProductionEnvironment(process.env) && payload.test_mode === '1') {
+            return res.status(409).json({ error: 'PayTR test callback production ortamında kabul edilmez.' });
         }
 
         const paytrConfig = assertPaytrEnvReady();
@@ -847,21 +1259,13 @@ const webhookPaytr = async (req, res) => {
             return res.type('text/plain').status(200).send('OK');
         }
 
-        return res.status(202).json({
-            ok: true,
-            provider: 'paytr',
-            merchantOid: payload.merchant_oid,
-            status: payload.status,
-            finalizationImplemented: false,
-            message: 'PayTR callback hash dogrulandi; bilinmeyen status finalize edilmedi.'
-        });
+        return res.status(400).json({ error: 'Desteklenmeyen PayTR callback durumu.' });
     } catch (err) {
         const statusCode = err instanceof PaymentProviderConfigError ? err.statusCode : (err.statusCode || 500);
         return res.status(statusCode).json({
             error: err instanceof PaymentProviderConfigError
                 ? 'PayTR callback config eksik.'
-                : (err.message || 'PayTR callback islenemedi.'),
-            details: err instanceof PaymentProviderConfigError ? err.details : undefined
+                : (err.message || 'PayTR callback islenemedi.')
         });
     }
 };
@@ -877,23 +1281,26 @@ const initializePayment = async (req, res) => {
         });
     }
 
-    const client = await pool.connect();
+    let preflightClient = null;
+    let client = null;
+    let transactionOpen = false;
+    let idempotencySessionLockHeld = false;
+    let heldIdempotencyKey = null;
+    let discardClient = false;
 
     try {
         const {
-            fullName,
-            email,
-            phone,
-            address,
+            addressId,
             cartItems,
             couponCode = null,
             paymentMethod = 'card',
-            analyticsSessionKey = null
+            analyticsSessionKey = null,
+            agreementAcceptances = [],
+            agreementSnapshotSha256 = ''
         } = req.body;
 
-        if (!fullName || !email || !address) {
-            return res.status(400).json({ error: 'M\u00FC\u015Fteri bilgileri eksik.' });
-        }
+        const normalizedAddressId = normalizeCheckoutAddressId(addressId);
+        if (!normalizedAddressId) return res.status(400).json({ error: 'Geçerli teslimat adresi seçilmelidir.' });
 
         if (!Array.isArray(cartItems) || cartItems.length === 0) {
             return res.status(400).json({ error: 'Sepet bo\u015F olamaz.' });
@@ -908,6 +1315,33 @@ const initializePayment = async (req, res) => {
 
         const userId = Number(user.id);
 
+        const selectedCardPaymentProvider = paymentMethod === 'havale' ? null : getPaymentProviderName();
+        const paytrProviderConfig = selectedCardPaymentProvider === 'paytr' ? assertPaytrProviderReady() : null;
+        if (paymentMethod === 'card' && selectedCardPaymentProvider !== 'paytr') {
+            throw new PaymentProviderConfigError(
+                'PayTR payment provider is not configured.',
+                [],
+                'PAYMENT_PROVIDER_NOT_CONFIGURED'
+            );
+        }
+        const launchPolicy = assertPaymentLaunchPolicy({ paymentMethod });
+        const agreementReadiness = getCheckoutAgreementReadiness();
+        if (!agreementReadiness.ready) {
+            throw new LegalDocumentError(
+                'CHECKOUT_LEGAL_DOCUMENTS_NOT_PUBLISHED',
+                503,
+                'Ödeme için gerekli güncel sözleşmeler henüz yayımlanmadı.',
+                agreementReadiness.missingSlugs
+            );
+        }
+        const normalizedAgreementSnapshotSha256 = String(agreementSnapshotSha256 || '').trim().toLowerCase();
+        if (!/^[a-f0-9]{64}$/.test(normalizedAgreementSnapshotSha256)) {
+            return res.status(400).json({
+                code: 'CHECKOUT_AGREEMENT_SNAPSHOT_REQUIRED',
+                error: 'Güncel sipariş sözleşmesi incelenip onaylanmalıdır.'
+            });
+        }
+
         const idempotencyKey = readIdempotencyKey(req) || createDeterministicKeyFromBody(req.body, userId);
         const idempotencyContext = buildPaymentIdempotencyContext({
             body: req.body,
@@ -915,12 +1349,64 @@ const initializePayment = async (req, res) => {
             idempotencyKey
         });
 
-        const selectedCardPaymentProvider = paymentMethod === 'havale' ? null : getPaymentProviderName();
-        const paytrProviderConfig = selectedCardPaymentProvider === 'paytr' ? assertPaytrEnvReady() : null;
-        const launchPolicy = assertPaymentLaunchPolicy({ paymentMethod });
+        const clientIp = paymentMethod === 'card' ? readClientIp(req) : null;
 
+        // Strictly read-only preflight. This connection is released before the
+        // PayTR request, so provider latency cannot hold a transaction or lock,
+        // reserve stock/coupon quota, or consume an order sequence value.
+        preflightClient = await pool.connect();
+        const preflightExisting = buildExistingPaymentResult({
+            row: await loadPaymentByIdempotencyKey(preflightClient, idempotencyKey),
+            idempotencyContext,
+            idempotencyKey,
+            userId
+        });
+        if (preflightExisting) {
+            return res.status(preflightExisting.statusCode).json(preflightExisting.body);
+        }
+        const preflight = await loadAuthoritativeCheckoutState({
+            client: preflightClient,
+            addressId: normalizedAddressId,
+            userId,
+            cartItems,
+            couponCode,
+            agreementAcceptances,
+            expectedAgreementSnapshotSha256: normalizedAgreementSnapshotSha256,
+            identitySnapshot: launchPolicy.identitySnapshot,
+            lockCoupon: false
+        });
+        preflightClient.release();
+        preflightClient = null;
+
+        let preflightPaymentRef = null;
+        let preflightProviderResponse = null;
+        let preflightTokenPayload = null;
+        if (paymentMethod === 'card') {
+            preflightPaymentRef = buildPaytrMerchantOid();
+            preflightTokenPayload = buildPaytrTokenPayload({
+                config: paytrProviderConfig,
+                customer: preflight.customer,
+                items: preflight.pricing.items,
+                amount: preflight.pricing.totals.total,
+                userIp: clientIp,
+                merchantOid: preflightPaymentRef
+            });
+            preflightProviderResponse = await paytrIframeSessionRequester({
+                payload: preflightTokenPayload,
+                config: paytrProviderConfig
+            });
+        }
+
+        client = await pool.connect();
+        // Acquire the idempotency lock before BEGIN. A transaction-level lock
+        // SELECT would establish a REPEATABLE READ snapshot while waiting and
+        // could miss the winner's newly committed payment row.
+        await client.query('SELECT pg_advisory_lock(hashtextextended($1, 0))', [idempotencyKey]);
+        idempotencySessionLockHeld = true;
+        heldIdempotencyKey = idempotencyKey;
         await client.query('BEGIN');
-        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [idempotencyKey]);
+        transactionOpen = true;
+        await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
 
         const existingPayment = await client.query(
             `SELECT p.*, o.id AS order_id, o.user_id AS order_user_id
@@ -936,6 +1422,7 @@ const initializePayment = async (req, res) => {
 
             if (!idempotencyContextMatches(storedIdempotency, idempotencyContext)) {
                 await client.query('COMMIT');
+                transactionOpen = false;
                 return res.status(409).json({
                     error: 'Idempotency key farklı bir ödeme isteği için kullanılmış.'
                 });
@@ -947,12 +1434,14 @@ const initializePayment = async (req, res) => {
 
             if (userId !== null && ownerUserId !== userId) {
                 await client.query('COMMIT');
+                transactionOpen = false;
                 return res.status(409).json({
                     error: 'Idempotency key farklı bir kullanıcıya ait.'
                 });
             }
 
             await client.query('COMMIT');
+            transactionOpen = false;
             return res.status(200).json({
                 message: 'Idempotent tekrar iste\u011Fi, mevcut \u00F6deme d\u00F6n\u00FCld\u00FC.',
                 orderId: row.order_id,
@@ -960,39 +1449,73 @@ const initializePayment = async (req, res) => {
                 paymentStatus: row.status,
                 provider: row.provider,
                 idempotencyKey,
+                paymentAction: row.provider === 'paytr' && row.status === PAYMENT_STATUS.REQUIRES_ACTION
+                    ? readStoredPaytrAction(row.raw_response)
+                    : null,
                 reused: true
             });
         }
 
         await releaseExpiredPaymentReservations(client);
-        const reservationMetadata = buildReservationMetadata({ paymentMethod });
-
-        const { order, pricing } = await createPendingPaymentOrder({
+        const finalState = await loadAuthoritativeCheckoutState({
             client,
+            addressId: normalizedAddressId,
             userId,
-            analyticsSessionKey,
-            fullName,
-            email,
-            phone,
-            address,
             cartItems,
             couponCode,
+            agreementAcceptances,
+            expectedAgreementSnapshotSha256: normalizedAgreementSnapshotSha256,
+            identitySnapshot: launchPolicy.identitySnapshot,
+            lockCoupon: true
+        });
+
+        if (paymentMethod === 'card') {
+            const finalTokenPayload = buildPaytrTokenPayload({
+                config: paytrProviderConfig,
+                customer: finalState.customer,
+                items: finalState.pricing.items,
+                amount: finalState.pricing.totals.total,
+                userIp: clientIp,
+                merchantOid: preflightPaymentRef
+            });
+            if (!paytrPayloadBindingsMatch(preflightTokenPayload, finalTokenPayload)) {
+                const error = new Error('Ödeme özeti sağlayıcı oturumu hazırlanırken değişti; lütfen yeniden deneyin.');
+                error.code = 'PAYMENT_PROVIDER_PAYLOAD_STALE';
+                error.statusCode = 409;
+                throw error;
+            }
+        }
+
+        const reservationMetadata = buildReservationMetadata({ paymentMethod });
+        const { order, pricing } = await createPendingPaymentOrderFromPricing({
+            client,
+            pricing: finalState.pricing,
+            userId,
+            analyticsSessionKey,
+            fullName: finalState.customer.fullName,
+            email: finalState.customer.email,
+            phone: finalState.customer.phone,
+            address: finalState.customer.address,
             paymentMethod,
             businessIdentitySnapshot: launchPolicy.identitySnapshot
         });
-        const sellerProjection = await buildSellerOrderProjection(client, pricing.items);
+        const { sellerProjection, checkoutAgreementSnapshot } = finalState;
         const couponReservation = await reserveCouponUsageForOrder(client, {
             coupon: pricing.coupon,
             orderId: order.id,
             expiresAt: reservationMetadata.reservationExpiresAt
         });
 
-        let paymentProvider = 'iyzico';
-        let paymentRef = null;
-        let paymentStatus = PAYMENT_STATUS.REQUIRES_ACTION;
-        let providerResponse = null;
+        let paymentProvider = paymentMethod === 'havale' ? 'bank_transfer' : selectedCardPaymentProvider;
+        let paymentRef = paymentMethod === 'card' ? preflightPaymentRef : null;
+        let paymentStatus = paymentMethod === 'havale'
+            ? PAYMENT_STATUS.WAITING_TRANSFER
+            : PAYMENT_STATUS.REQUIRES_ACTION;
+        let providerResponse = paymentMethod === 'card' ? preflightProviderResponse : null;
         let rawRequestPayload = {
             paymentMethod,
+            addressId: normalizedAddressId,
+            checkoutAgreementSnapshot,
             couponCode,
             coupon: pricing.coupon,
             couponReservation: couponReservation.reserved
@@ -1010,71 +1533,27 @@ const initializePayment = async (req, res) => {
         };
 
         if (paymentMethod === 'havale') {
-            paymentProvider = 'bank_transfer';
             paymentRef = `HVL-${order.id}-${crypto.randomBytes(6).toString('hex')}`;
-            paymentStatus = PAYMENT_STATUS.WAITING_TRANSFER;
             providerResponse = {
                 accountName: launchPolicy.bankTransfer.accountName,
                 iban: launchPolicy.bankTransfer.iban,
                 dueHours: 24
             };
         } else {
-            paymentProvider = selectedCardPaymentProvider;
-
-            if (paymentProvider === 'paytr') {
-                const paytrConfig = paytrProviderConfig || assertPaytrEnvReady();
-                const tokenPayload = buildPaytrTokenPayload({
-                    config: paytrConfig,
-                    order,
-                    customer: {
-                        fullName,
-                        email,
-                        phone,
-                        address: typeof address === 'string' ? address : JSON.stringify(address)
-                    },
-                    items: pricing.items,
-                    amount: pricing.totals.total,
-                    userIp: readClientIp(req)
-                });
-                const mockTokenResponse = buildMockPaytrTokenResponse({
-                    merchantOid: tokenPayload.merchant_oid,
-                    paymentAmount: tokenPayload.payment_amount
-                });
-
-                paymentRef = tokenPayload.merchant_oid;
-                paymentStatus = PAYMENT_STATUS.REQUIRES_ACTION;
-                providerResponse = {
-                    type: 'iframe',
-                    token: mockTokenResponse.token,
-                    iframeUrl: buildPaytrIframeUrl(mockTokenResponse.token, paytrConfig),
-                    successUrl: tokenPayload.merchant_ok_url,
-                    failUrl: tokenPayload.merchant_fail_url,
-                    mock: true
-                };
-                rawRequestPayload = {
-                    ...rawRequestPayload,
-                    paytr: {
-                        merchantOid: tokenPayload.merchant_oid,
-                        paymentAmount: tokenPayload.payment_amount,
-                        userBasket: tokenPayload.user_basket,
-                        callbackUrl: paytrConfig.callbackUrl,
-                        successUrl: tokenPayload.merchant_ok_url,
-                        failUrl: tokenPayload.merchant_fail_url,
-                        testMode: tokenPayload.test_mode,
-                        debugOn: tokenPayload.debug_on,
-                        mock: true
-                    }
-                };
-            } else {
-                const iyzicoInit = await initializeIyzicoPayment({
-                    orderId: order.id,
-                    amount: pricing.totals.total,
-                    currency: pricing.totals.currency
-                });
-                paymentRef = iyzicoInit.paymentRef;
-                paymentStatus = PAYMENT_STATUS.REQUIRES_ACTION;
-                providerResponse = iyzicoInit;
-            }
+            rawRequestPayload = {
+                ...rawRequestPayload,
+                paytr: {
+                    merchantOid: preflightTokenPayload.merchant_oid,
+                    paymentAmount: preflightTokenPayload.payment_amount,
+                    userBasket: preflightTokenPayload.user_basket,
+                    callbackUrl: paytrProviderConfig.callbackUrl,
+                    successUrl: preflightTokenPayload.merchant_ok_url,
+                    failUrl: preflightTokenPayload.merchant_fail_url,
+                    testMode: preflightTokenPayload.test_mode,
+                    debugOn: preflightTokenPayload.debug_on,
+                    payloadBindingSha256: buildPaytrPayloadBindingHash(preflightTokenPayload)
+                }
+            };
         }
 
         await client.query(
@@ -1120,6 +1599,7 @@ const initializePayment = async (req, res) => {
         });
 
         await client.query('COMMIT');
+        transactionOpen = false;
 
         res.status(201).json({
             orderId: order.id,
@@ -1136,69 +1616,104 @@ const initializePayment = async (req, res) => {
                 : '3D \u00F6deme ad\u0131m\u0131 ba\u015Flat\u0131ld\u0131.'
         });
     } catch (err) {
-        await client.query('ROLLBACK');
-        const policyError = err instanceof PaymentLaunchPolicyError || err instanceof BusinessIdentityConfigError;
+        if (client && transactionOpen) {
+            try {
+                await client.query('ROLLBACK');
+            } catch (_) {
+                discardClient = true;
+            }
+            transactionOpen = false;
+        }
+        const policyError = err instanceof PaymentLaunchPolicyError
+            || err instanceof BusinessIdentityConfigError
+            || err instanceof LegalDocumentError;
         if (!policyError && err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
-        const statusCode = err instanceof PaymentProviderConfigError || policyError ? err.statusCode : (err.statusCode || 500);
-        console.error('\u00D6deme initialize hatas\u0131:', err.message);
+        const providerError = err instanceof PaymentProviderConfigError || err instanceof PaytrProviderTransportError;
+        const transactionConflict = err?.code === '40001' || err?.code === '40P01';
+        const statusCode = transactionConflict
+            ? 409
+            : (providerError || policyError ? err.statusCode : (err.statusCode || 500));
+        console.error('\u00D6deme initialize hatas\u0131:', err.code || 'PAYMENT_INITIALIZE_ERROR');
         res.status(statusCode).json({
-            code: err.code || undefined,
-            error: policyError ? err.publicMessage : (err.message || '\u00D6deme ba\u015Flat\u0131lamad\u0131.'),
-            details: err instanceof PaymentProviderConfigError || policyError ? err.details : undefined
+            code: transactionConflict ? 'PAYMENT_CONCURRENT_STATE_CHANGED' : (err.code || undefined),
+            error: transactionConflict
+                ? 'Sepet veya stok durumu eşzamanlı olarak değişti. Güncel özeti kontrol edip yeniden deneyin.'
+                : providerError
+                ? (err.publicMessage || 'Güvenli ödeme hizmeti aktivasyon sürecindedir.')
+                : policyError
+                    ? err.publicMessage
+                    : (statusCode < 500 ? err.message : '\u00D6deme ba\u015Flat\u0131lamad\u0131.')
         });
     } finally {
-        client.release();
+        preflightClient?.release();
+        if (client && idempotencySessionLockHeld && !discardClient) {
+            try {
+                const unlock = await client.query(
+                    'SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked',
+                    [heldIdempotencyKey]
+                );
+                if (unlock.rows?.[0]?.unlocked !== true) discardClient = true;
+            } catch (_) {
+                discardClient = true;
+            }
+        }
+        client?.release(discardClient ? new Error('PAYMENT_IDEMPOTENCY_LOCK_RELEASE_FAILED') : undefined);
     }
 };
 
 const getPaymentStatus = async (req, res) => {
+    let client = null;
+    let transactionOpen = false;
     try {
         const paymentRef = String(req.query.paymentRef || '').trim();
-        const orderId = Number(req.query.orderId || 0);
+        const hasOrderId = req.query.orderId !== undefined && String(req.query.orderId).trim() !== '';
+        const orderId = hasOrderId ? Number(req.query.orderId) : null;
         const userId = Number(req.user && req.user.id);
 
-        if (!paymentRef || !Number.isInteger(orderId) || orderId <= 0) {
-            return res.status(400).json({ error: 'paymentRef ve orderId zorunludur.' });
+        if (!/^[A-Za-z0-9._:-]{1,120}$/.test(paymentRef)) {
+            return res.status(400).json({ error: 'Geçerli paymentRef zorunludur.' });
+        }
+        if (hasOrderId && (!Number.isInteger(orderId) || orderId <= 0)) {
+            return res.status(400).json({ error: 'orderId sağlanırsa pozitif tamsayı olmalıdır.' });
         }
 
         if (!Number.isInteger(userId) || userId <= 0) {
             return res.status(401).json({ error: 'Authentication required.' });
         }
 
-        const paymentResult = await pool.query(
-            `SELECT p.payment_ref,
-                    p.status AS payment_status,
-                    p.provider,
-                    p.raw_request,
-                    o.id AS order_id,
-                    o.status AS order_status,
-                    o.refund_status,
-                    o.user_id AS order_user_id
-             FROM payments p
-             JOIN orders o ON o.id = p.order_id
-             WHERE p.payment_ref = $1
-               AND o.id = $2
-             LIMIT 1`,
-            [paymentRef, orderId]
-        );
+        client = await pool.connect();
+        await client.query('BEGIN');
+        transactionOpen = true;
 
-        if (paymentResult.rows.length === 0) {
+        const paymentRow = await lockOwnedPaymentAndOrderForStatus(client, {
+            paymentRef,
+            orderId,
+            userId
+        });
+        if (!paymentRow) {
+            await client.query('ROLLBACK');
+            transactionOpen = false;
             return res.status(404).json({ error: '\u00D6deme kayd\u0131 bulunamad\u0131.' });
         }
 
-        const paymentRow = paymentResult.rows[0];
-        const ownerUserId = paymentRow.order_user_id === null || paymentRow.order_user_id === undefined
-            ? null
-            : Number(paymentRow.order_user_id);
+        const expiration = await expireLockedPaymentReservation(client, paymentRow, {
+            now: paymentRow.reservation_checked_at
+        });
+        await client.query('COMMIT');
+        transactionOpen = false;
 
-        if (!Number.isInteger(ownerUserId) || ownerUserId <= 0 || ownerUserId !== userId) {
-            return res.status(404).json({ error: '\u00D6deme kayd\u0131 bulunamad\u0131.' });
-        }
-
-        res.status(200).json(buildPaymentStatusResponse(paymentRow));
+        res.status(200).json(buildPaymentStatusResponse(expiration.payment));
     } catch (err) {
-        console.error('\u00D6deme durum kontrol hatas\u0131:', err.message);
-        res.status(500).json({ error: err.message || '\u00D6deme durumu kontrol edilemedi.' });
+        if (client && transactionOpen) {
+            try {
+                await client.query('ROLLBACK');
+            } catch (_) {}
+            transactionOpen = false;
+        }
+        console.error('\u00D6deme durum kontrol hatas\u0131:', err.code || 'PAYMENT_STATUS_ERROR');
+        res.status(500).json({ error: '\u00D6deme durumu kontrol edilemedi.' });
+    } finally {
+        client?.release();
     }
 };
 
@@ -1555,9 +2070,30 @@ const webhookIyzico = async (req, res) => {
 
 module.exports = {
     buildPaymentStatusResponse,
+    getCheckoutAgreementPreview,
+    getPaymentCapability,
     getPaymentStatus,
     initializePayment,
     normalizePaytrCallbackPayload,
     webhookPaytr,
-    webhookIyzico
+    webhookIyzico,
+    __test: {
+        buildCheckoutAgreementContext,
+        formatCheckoutAddress,
+        loadOwnedCheckoutAddress,
+        normalizeCheckoutAddressId,
+        readStoredPaytrAction,
+        resetPaytrIframeSessionRequester() {
+            paytrIframeSessionRequester = requestPaytrIframeSession;
+        },
+        setPaytrIframeSessionRequester(requester) {
+            if (String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production') {
+                const error = new Error('PayTR test requester overrides are disabled in production.');
+                error.code = 'PAYMENT_TEST_HOOK_DISABLED';
+                throw error;
+            }
+            if (typeof requester !== 'function') throw new TypeError('requester must be a function.');
+            paytrIframeSessionRequester = requester;
+        }
+    }
 };

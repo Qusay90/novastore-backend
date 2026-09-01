@@ -57,8 +57,8 @@ function productionOriginGuard() {
     },
     buildEnd(error) {
       if (error) return;
-      if (localFallbackCount !== 7) {
-        throw new Error(`Production origin guard 7 yerine ${localFallbackCount} local fallback dönüştürdü.`);
+      if (localFallbackCount !== 6) {
+        throw new Error(`Production origin guard 6 yerine ${localFallbackCount} local fallback dönüştürdü.`);
       }
       if (reactErrorLinkCount < 1) {
         throw new Error("React production error origin guard beklenen kaynağı bulamadı.");

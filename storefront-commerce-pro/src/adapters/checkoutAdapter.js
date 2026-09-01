@@ -79,6 +79,48 @@ export const normalizeQuote = (payload = {}) => Object.freeze({
   items: Object.freeze(Array.isArray(payload.items) ? payload.items : []),
 });
 
+const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+
+export const normalizeAgreementPreview = (payload = {}) => {
+  const snapshotSha256 = asString(payload.snapshotSha256).toLowerCase();
+  const contextSha256 = asString(payload.contextSha256).toLowerCase();
+  const documents = Array.isArray(payload.documents) ? payload.documents.map((document) => ({
+    slug: asString(document?.slug),
+    path: asString(document?.path),
+    title: asString(document?.title),
+    version: asString(document?.version),
+    text: asString(document?.text),
+    sourceContentSha256: asString(document?.sourceContentSha256).toLowerCase(),
+    contentSha256: asString(document?.contentSha256).toLowerCase(),
+  })) : [];
+  const valid = payload.schemaVersion === "checkout-agreements-v2"
+    && SHA256_PATTERN.test(snapshotSha256)
+    && SHA256_PATTERN.test(contextSha256)
+    && documents.length > 0
+    && documents.every((document) => (
+      document.slug
+      && document.path.startsWith("/")
+      && document.title
+      && document.version
+      && document.text
+      && SHA256_PATTERN.test(document.sourceContentSha256)
+      && SHA256_PATTERN.test(document.contentSha256)
+    ));
+  if (!valid) throw new Error("Sunucu sözleşme özeti doğrulanamadı.");
+  const quote = normalizeQuote(payload.quote);
+  const contextTotals = normalizeTotals(payload.context?.totals || {});
+  if (JSON.stringify(quote.totals) !== JSON.stringify(contextTotals)) {
+    throw new Error("Sözleşme ve ödeme toplamları eşleşmiyor.");
+  }
+  return Object.freeze({
+    schemaVersion: payload.schemaVersion,
+    snapshotSha256,
+    contextSha256,
+    quote,
+    documents: Object.freeze(documents.map(Object.freeze)),
+  });
+};
+
 export const isSafePaytrIframeUrl = (value) => {
   try {
     const url = new URL(value);
@@ -111,12 +153,6 @@ const resolveStorefrontEntry = (location) => {
   return candidate;
 };
 
-const formatAddress = (address) => [
-  address?.title ? `${asString(address.title)}:` : "",
-  asString(address?.addressLine || address?.detail),
-  [asString(address?.district), asString(address?.city)].filter(Boolean).join(" / "),
-].filter(Boolean).join(" ");
-
 export function createCheckoutAdapter({
   http,
   root = globalThis,
@@ -139,26 +175,59 @@ export function createCheckoutAdapter({
     return normalizeQuote(payload);
   };
 
-  const initialize = async ({ session, address, items, couponCode = null }, options = {}) => {
+  const getCapability = async (options = {}) => http.request('/api/payments/capability', { signal: options.signal });
+
+  const previewAgreements = async ({ session, address, items, couponCode = null }, options = {}) => {
+    const user = session?.user;
+    if (!["authenticated", "unverified"].includes(session?.status) || !user?.id) {
+      throw new Error("Sözleşme özeti için müşteri oturumu gereklidir.");
+    }
+    const cartItems = toCheckoutCartItems(items);
+    if (!cartItems.length) throw new Error("Sözleşme özeti için sepet boş olamaz.");
+    const addressId = Number(address?.id);
+    if (!Number.isInteger(addressId) || addressId <= 0) throw new Error("Teslimat adresi seçilmelidir.");
+    const payload = await http.request("/api/payments/agreements/preview", {
+      method: "POST",
+      body: {
+        addressId,
+        cartItems,
+        couponCode: asString(couponCode) || null,
+      },
+      signal: options.signal,
+    });
+    return normalizeAgreementPreview(payload);
+  };
+
+  const initialize = async ({
+    session,
+    address,
+    items,
+    couponCode = null,
+    agreementAcceptances = [],
+    agreementSnapshotSha256 = "",
+  }, options = {}) => {
     const user = session?.user;
     if (!["authenticated", "unverified"].includes(session?.status) || !user?.id) {
       throw new Error("Ödemeyi başlatmak için müşteri oturumu gereklidir.");
     }
     const cartItems = toCheckoutCartItems(items);
     if (!cartItems.length) throw new Error("Ödemeyi başlatmak için sepet boş olamaz.");
-    const addressText = formatAddress(address);
-    if (!addressText) throw new Error("Teslimat adresi seçilmelidir.");
+    const addressId = Number(address?.id);
+    if (!Number.isInteger(addressId) || addressId <= 0) throw new Error("Teslimat adresi seçilmelidir.");
 
     return http.request("/api/payments/initialize", {
       method: "POST",
       body: {
-        fullName: asString(address?.fullName || user.fullName),
-        email: asString(user.email),
-        phone: asString(address?.phone || user.phone),
-        address: addressText,
+        addressId,
         cartItems,
         couponCode: asString(couponCode) || null,
         paymentMethod: "card",
+        agreementSnapshotSha256: asString(agreementSnapshotSha256).toLowerCase(),
+        agreementAcceptances: Array.isArray(agreementAcceptances) ? agreementAcceptances.map((agreement) => ({
+          slug: asString(agreement?.slug),
+          version: asString(agreement?.version),
+          accepted: agreement?.accepted === true,
+        })) : [],
         analyticsSessionKey: typeof root?.NovaAnalytics?.getSessionId === "function"
           ? root.NovaAnalytics.getSessionId()
           : null,
@@ -183,8 +252,14 @@ export function createCheckoutAdapter({
   };
 
   const handoff = (result, items) => {
-    const { orderId, paymentRef } = rememberPending(result, items);
     const action = result?.paymentAction || null;
+    const iframeUrl = action?.type === "iframe" ? asString(action.iframeUrl) : "";
+    if (result?.provider !== "paytr" || !iframeUrl || !isSafePaytrIframeUrl(iframeUrl) || !asString(action?.token)) {
+      const error = new Error("Güvenli ödeme hizmeti aktivasyon sürecindedir.");
+      error.code = "PAYMENT_PROVIDER_NOT_CONFIGURED";
+      throw error;
+    }
+    const { orderId, paymentRef } = rememberPending(result, items);
     const storefrontEntry = resolveStorefrontEntry(location);
     const bridgeKey = `novastore.paytrCheckout.${paymentRef}`;
     const bridgeSession = {
@@ -193,45 +268,29 @@ export function createCheckoutAdapter({
       storefrontEntry,
       createdAt: Date.now(),
     };
-    const iframeUrl = action?.type === "iframe" ? asString(action.iframeUrl) : "";
-    if (iframeUrl && isSafePaytrIframeUrl(iframeUrl)) {
-      sessionStorage?.setItem?.(bridgeKey, JSON.stringify({
-        ...bridgeSession,
-        iframeUrl,
-        token: asString(action.token),
-        successUrl: asString(action.successUrl),
-        failUrl: asString(action.failUrl),
-      }));
-      const params = new URLSearchParams({ paymentRef, orderId: String(orderId) });
-      const path = `/paytr-checkout.html?${params.toString()}`;
-      location?.assign?.(path);
-      return path;
-    }
-
-    const origin = location?.origin || "http://localhost";
-    const providerSuccess = safeSameOriginLocation(action?.action?.successUrl, origin);
     sessionStorage?.setItem?.(bridgeKey, JSON.stringify({
       ...bridgeSession,
-      successUrl: asString(action?.action?.successUrl),
-      failUrl: asString(action?.action?.failUrl),
+      iframeUrl,
+      token: asString(action.token),
+      successUrl: asString(action.successUrl),
+      failUrl: asString(action.failUrl),
     }));
     const params = new URLSearchParams({ paymentRef, orderId: String(orderId) });
-    const fallback = `/payment-result.html?${params.toString()}`;
-    const next = providerSuccess || fallback;
-    location?.assign?.(next);
-    return next;
+    const path = `/paytr-checkout.html?${params.toString()}`;
+    location?.assign?.(path);
+    return path;
   };
 
   const getPaymentStatus = async ({ paymentRef, orderId }, options = {}) => {
     const normalizedRef = asString(paymentRef);
-    const normalizedOrderId = Number(orderId);
-    if (!normalizedRef || !Number.isInteger(normalizedOrderId) || normalizedOrderId <= 0) {
-      throw new Error("Ödeme durumu için geçerli referans ve sipariş kimliği gereklidir.");
+    const suppliedOrderId = asString(orderId);
+    const normalizedOrderId = suppliedOrderId ? Number(suppliedOrderId) : null;
+    if (!normalizedRef) throw new Error("Ödeme durumu için geçerli ödeme referansı gereklidir.");
+    if (suppliedOrderId && (!Number.isInteger(normalizedOrderId) || normalizedOrderId <= 0)) {
+      throw new Error("Sipariş kimliği sağlanırsa pozitif tamsayı olmalıdır.");
     }
-    const params = new URLSearchParams({
-      paymentRef: normalizedRef,
-      orderId: String(normalizedOrderId),
-    });
+    const params = new URLSearchParams({ paymentRef: normalizedRef });
+    if (normalizedOrderId) params.set("orderId", String(normalizedOrderId));
     return http.request(`/api/payments/status?${params.toString()}`, { signal: options.signal });
   };
 
@@ -258,6 +317,8 @@ export function createCheckoutAdapter({
 
   return Object.freeze({
     quote,
+    getCapability,
+    previewAgreements,
     initialize,
     handoff,
     getPaymentStatus,
@@ -266,7 +327,6 @@ export function createCheckoutAdapter({
 }
 
 export const checkoutAdapterTestUtils = Object.freeze({
-  formatAddress,
   nonNegativeMoney,
   normalizeTotals,
   readUserId,

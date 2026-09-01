@@ -4,11 +4,14 @@ const http = require('http');
 const Module = require('module');
 const pool = require('../config/db');
 const { ORDER_STATUS, PAYMENT_STATUS, REFUND_STATUS } = require('../constants/orderStatus');
-const { getPaymentStatus, initializePayment } = require('../controllers/paymentController');
+const paymentController = require('../controllers/paymentController');
+const { getPaymentStatus, initializePayment, __test: paymentTest } = paymentController;
 const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
+const { buildCheckoutAgreementPreview } = require('../services/legalDocumentService');
 
 const trackedEnv = [
     'NODE_ENV',
+    'APP_BASE_URL',
     'PAYMENT_PROVIDER',
     'PAYTR_MERCHANT_ID',
     'PAYTR_MERCHANT_KEY',
@@ -19,6 +22,21 @@ const trackedEnv = [
     'PAYTR_FAIL_URL',
     'PAYTR_TEST_MODE',
     'PAYTR_DEBUG_ON',
+    'PAYTR_LIVE_REQUESTS_ALLOWED',
+    'BUSINESS_LEGAL_COMPANY_NAME',
+    'BUSINESS_TAX_VKN',
+    'BUSINESS_MERSIS_NUMBER',
+    'BUSINESS_REGISTERED_ADDRESS',
+    'BUSINESS_KEP_ADDRESS',
+    'BUSINESS_PHONE',
+    'BUSINESS_EMAIL',
+    'CUSTOMER_PUBLIC_DOMAIN',
+    'NOVASTORE_LEGAL_PRE_INFORMATION_APPROVED',
+    'NOVASTORE_LEGAL_PRE_INFORMATION_VERSION',
+    'NOVASTORE_LEGAL_PRE_INFORMATION_TEXT',
+    'NOVASTORE_LEGAL_DISTANCE_SALE_APPROVED',
+    'NOVASTORE_LEGAL_DISTANCE_SALE_VERSION',
+    'NOVASTORE_LEGAL_DISTANCE_SALE_TEXT',
     'FREE_SHIPPING_THRESHOLD',
     'DEFAULT_SHIPPING_FEE'
 ];
@@ -42,10 +60,12 @@ const restoreState = () => {
     pool.query = originalPoolQuery;
     Module._load = originalModuleLoad;
     console.error = originalConsoleError;
+    paymentTest.resetPaytrIframeSessionRequester();
 };
 
 const applyPaytrEnv = () => {
     process.env.NODE_ENV = 'test';
+    process.env.APP_BASE_URL = 'https://example.test';
     process.env.PAYMENT_PROVIDER = 'paytr';
     process.env.PAYTR_MERCHANT_ID = 'merchant-id';
     process.env.PAYTR_MERCHANT_KEY = 'merchant-key-secret';
@@ -56,6 +76,21 @@ const applyPaytrEnv = () => {
     process.env.PAYTR_FAIL_URL = 'https://example.test/payment-result.html';
     process.env.PAYTR_TEST_MODE = 'true';
     process.env.PAYTR_DEBUG_ON = 'true';
+    process.env.PAYTR_LIVE_REQUESTS_ALLOWED = 'true';
+    process.env.BUSINESS_LEGAL_COMPANY_NAME = 'Test Nova Teknoloji Anonim Şirketi';
+    process.env.BUSINESS_TAX_VKN = '1234567890';
+    process.env.BUSINESS_MERSIS_NUMBER = '1234567890123456';
+    process.env.BUSINESS_REGISTERED_ADDRESS = 'Test Mahallesi Test Sokak No 1 İstanbul';
+    process.env.BUSINESS_KEP_ADDRESS = 'test@hs01.kep.tr';
+    process.env.BUSINESS_PHONE = '+905551112233';
+    process.env.BUSINESS_EMAIL = 'test@example.test';
+    process.env.CUSTOMER_PUBLIC_DOMAIN = 'https://example.test/';
+    process.env.NOVASTORE_LEGAL_PRE_INFORMATION_APPROVED = 'true';
+    process.env.NOVASTORE_LEGAL_PRE_INFORMATION_VERSION = 'security-pre-v1';
+    process.env.NOVASTORE_LEGAL_PRE_INFORMATION_TEXT = 'Güvenlik testi için onaylanmış ön bilgilendirme metni.';
+    process.env.NOVASTORE_LEGAL_DISTANCE_SALE_APPROVED = 'true';
+    process.env.NOVASTORE_LEGAL_DISTANCE_SALE_VERSION = 'security-distance-v1';
+    process.env.NOVASTORE_LEGAL_DISTANCE_SALE_TEXT = 'Güvenlik testi için onaylanmış mesafeli satış metni.';
     process.env.FREE_SHIPPING_THRESHOLD = '1500';
     process.env.DEFAULT_SHIPPING_FEE = '49.9';
 };
@@ -78,6 +113,9 @@ const buildPayload = (overrides = {}) => {
         merchant_oid: merchantOid,
         status: 'success',
         total_amount: '104990',
+        payment_amount: '104990',
+        payment_type: 'card',
+        currency: 'TL',
         failed_reason_code: '',
         failed_reason_msg: '',
         ...overrides
@@ -113,6 +151,21 @@ const createInitializeClient = ({ existingPaymentRows = [] } = {}) => {
 
             if (/FROM payments p/i.test(sql)) {
                 return { rows: existingPaymentRows };
+            }
+
+            if (/FROM customer_addresses address_row/i.test(sql)) {
+                return {
+                    rows: [{
+                        id: 301,
+                        title: 'Ev',
+                        full_name: 'Test Kullanıcı',
+                        phone: '05551234567',
+                        city: 'Kilis',
+                        district: 'Merkez',
+                        address_line: 'Test Mahallesi Test Sokak No 1',
+                        email: 'test@example.com'
+                    }]
+                };
             }
 
             if (/FROM products/i.test(sql)) {
@@ -186,6 +239,33 @@ const createInitializeClient = ({ existingPaymentRows = [] } = {}) => {
     };
 };
 
+const getAgreementSnapshotSha256 = () => buildCheckoutAgreementPreview({
+    checkoutContext: paymentTest.buildCheckoutAgreementContext({
+        identitySnapshot: {
+            legalCompanyName: process.env.BUSINESS_LEGAL_COMPANY_NAME,
+            taxNumber: process.env.BUSINESS_TAX_VKN,
+            mersisNumber: process.env.BUSINESS_MERSIS_NUMBER,
+            registeredAddress: process.env.BUSINESS_REGISTERED_ADDRESS,
+            kepAddress: process.env.BUSINESS_KEP_ADDRESS,
+            phone: process.env.BUSINESS_PHONE,
+            email: process.env.BUSINESS_EMAIL,
+            customerDomain: process.env.CUSTOMER_PUBLIC_DOMAIN
+        },
+        addressId: 301,
+        customer: {
+            fullName: 'Test Kullanıcı',
+            phone: '05551234567',
+            address: 'Ev: Test Mahallesi Test Sokak No 1 Merkez / Kilis'
+        },
+        pricing: {
+            items: [{ id: 101, name: 'Test Telefon', quantity: 1, price: 1000, line_total: 1000 }],
+            totals: { currency: 'TRY', subtotal: 1000, bundleDiscount: 0, couponDiscount: 0, shippingFee: 49.9, total: 1049.9 },
+            coupon: { applied: false, code: null, discountAmount: 0 }
+        },
+        sellerProjection: []
+    })
+}).snapshotSha256;
+
 const makeInitializeReq = () => ({
     user: { id: 10, role: 'customer', principal: 'customer' },
     headers: {
@@ -194,13 +274,15 @@ const makeInitializeReq = () => ({
     },
     ip: '203.0.113.10',
     body: {
-        fullName: 'Test Kullanici',
-        email: 'test@example.com',
-        phone: '05551234567',
-        address: 'Test Mahallesi',
+        addressId: 301,
         cartItems: [{ productId: 101, quantity: 1 }],
         paymentMethod: 'card',
-        analyticsSessionKey: 'guest-session-security'
+        analyticsSessionKey: 'guest-session-security',
+        agreementSnapshotSha256: getAgreementSnapshotSha256(),
+        agreementAcceptances: [
+            { slug: 'pre-information', version: 'security-pre-v1', accepted: true },
+            { slug: 'distance-sale', version: 'security-distance-v1', accepted: true }
+        ]
     }
 });
 
@@ -208,6 +290,13 @@ const callInitialize = async ({ env = applyPaytrEnv, existingPaymentRows = [] } 
     const client = createInitializeClient({ existingPaymentRows });
     pool.connect = async () => client;
     env();
+    paymentTest.setPaytrIframeSessionRequester(async ({ payload }) => ({
+        type: 'iframe',
+        token: 'security-provider-token',
+        iframeUrl: 'https://www.paytr.com/odeme/guvenli/security-provider-token',
+        successUrl: payload.merchant_ok_url,
+        failUrl: payload.merchant_fail_url
+    }));
 
     const res = createRes();
     await initializePayment(makeInitializeReq(), res);
@@ -509,18 +598,38 @@ const assertNoFinalization = (state, { auditEvents = 0 } = {}) => {
 
 const callStatus = async ({ row, user = { id: 10 } }) => {
     const calls = [];
-    pool.query = async (sql, params) => {
-        calls.push({ sql, params });
-        assert.match(sql, /^SELECT/i);
-        return { rows: row ? [row] : [] };
+    const client = {
+        async query(sql, params = []) {
+            if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) return { rows: [], rowCount: 0 };
+            calls.push({ sql, params });
+            assert.match(sql, /WITH locked_order AS MATERIALIZED/i);
+            assert.match(sql, /payment_lookup\.payment_ref = \$1/i);
+            assert.match(sql, /o\.user_id = \$2/i);
+            const owned = row
+                && String(row.payment_ref) === String(params[0])
+                && Number(row.order_user_id) === Number(params[1])
+                && (params[2] === null || Number(row.order_id) === Number(params[2]));
+            return { rows: owned ? [{ ...row, status: row.status || row.payment_status }] : [], rowCount: owned ? 1 : 0 };
+        },
+        release() {}
     };
+    pool.connect = async () => client;
     const res = createRes();
-    await getPaymentStatus({ query: { paymentRef: 'PAYTR-STATUS', orderId: '9001' }, user }, res);
+    await getPaymentStatus({
+        query: { paymentRef: String(row?.payment_ref || 'PAYTR-STATUS'), orderId: String(row?.order_id || 9001) },
+        user
+    }, res);
     return { res, calls };
 };
 
 (async () => {
     try {
+        process.env.NODE_ENV = 'production';
+        assert.throws(
+            () => paymentTest.setPaytrIframeSessionRequester(async () => null),
+            (error) => error?.code === 'PAYMENT_TEST_HOOK_DISABLED'
+        );
+
         applyPaytrEnv();
         Module._load = function patchedLoad(request, parent, isMain) {
             if (request === '../server' || request.endsWith('/server')) {
@@ -542,6 +651,12 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
         assert.strictEqual(initRawRequest.idempotency.key, 'idem-paytr-security');
         assert.match(initRawRequest.idempotency.ownerKey, /^[a-f0-9]{64}$/);
         assert.match(initRawRequest.idempotency.requestHash, /^[a-f0-9]{64}$/);
+        assert.strictEqual(initRawRequest.addressId, 301);
+        assert.strictEqual(initRawRequest.checkoutAgreementSnapshot.schemaVersion, 'checkout-agreements-v2');
+        assert.strictEqual(initRawRequest.checkoutAgreementSnapshot.snapshotSha256, getAgreementSnapshotSha256());
+        assert.strictEqual(initRawRequest.checkoutAgreementSnapshot.context.delivery.addressId, 301);
+        assert.strictEqual(initRawRequest.checkoutAgreementSnapshot.context.totals.total, 1049.9);
+        assert.ok(initRawRequest.checkoutAgreementSnapshot.documents.every((document) => document.text.includes('NovaStore sunucu doğrulamalı işlem özeti')));
         assertNoSecrets(initRun.res.body);
         assertNoSecrets(paymentInsert.params);
 
@@ -552,7 +667,8 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
                 status: PAYMENT_STATUS.REQUIRES_ACTION,
                 provider: 'paytr',
                 order_user_id: 10,
-                raw_request: paymentInsert.params[7]
+                raw_request: paymentInsert.params[7],
+                raw_response: paymentInsert.params[8]
             }]
         });
         assert.strictEqual(duplicateInit.res.code, 200);
@@ -716,8 +832,8 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
         const unknownStatusState = createCallbackState();
         await withServer(unknownStatusState, async (server) => {
             const response = await postForm(server, buildPayload({ status: 'pending_review' }));
-            assert.strictEqual(response.statusCode, 202);
-            assert.strictEqual(response.body.finalizationImplemented, false);
+            assert.strictEqual(response.statusCode, 400);
+            assert.match(response.body.error, /Desteklenmeyen PayTR callback durumu/);
             assertNoFinalization(unknownStatusState);
             assertNoSecrets(response);
         });

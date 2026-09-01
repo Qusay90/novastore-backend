@@ -6,6 +6,7 @@ import { createCatalogAdapter } from "../adapters/catalogAdapter.js";
 import { createCheckoutAdapter } from "../adapters/checkoutAdapter.js";
 import { createCustomerAccountAdapter } from "../adapters/customerAccountAdapter.js";
 import { createFavoritesAdapter } from "../adapters/favoritesAdapter.js";
+import { createLegalAdapter } from "../adapters/legalAdapter.js";
 import { createProductCommunityAdapter } from "../adapters/productCommunityAdapter.js";
 import { createPublicStoreAdapter } from "../adapters/publicStoreAdapter.js";
 import { createStoreFollowAdapter } from "../adapters/storeFollowAdapter.js";
@@ -19,6 +20,14 @@ import { createCustomerHttp } from "./customerHttp.js";
 const READ_ONLY_PREVIEW_SESSION = Object.freeze({ status: "guest", user: null, warning: null });
 const READ_ONLY_PREVIEW_IDS = Object.freeze(new Set());
 const READ_ONLY_PREVIEW_ITEMS = Object.freeze([]);
+const UNAVAILABLE_CATALOG = Object.freeze({
+  categories: Object.freeze([]),
+  products: Object.freeze([]),
+  navigation: Object.freeze({ code: "main", name: "Kategori ağı", source: "unavailable", items: Object.freeze([]) }),
+  collections: Object.freeze([]),
+  collectionDetails: Object.freeze([]),
+  warnings: Object.freeze(["Katalog şu anda alınamıyor; bu sayfa katalogdan bağımsız güvenli modda açıldı."]),
+});
 
 const previewMutationBlocked = async () => {
   const error = new Error("Müşteri önizlemesi salt okunur modda çalışır.");
@@ -40,6 +49,7 @@ export function createCommerceRuntime({
   });
   const catalogAdapter = createCatalogAdapter(http);
   const businessIdentityAdapter = createBusinessIdentityAdapter(http);
+  const legalAdapter = createLegalAdapter(http);
   const authAdapter = createAuthAdapter({ http, storage, location });
   const customerHttp = createCustomerHttp({
     fetchImpl,
@@ -63,9 +73,12 @@ export function createCommerceRuntime({
   const publicStoreAdapter = createPublicStoreAdapter(http);
   const storeFollowAdapter = createStoreFollowAdapter(customerHttp);
 
-  const initialize = async ({ signal, readOnlyPreview = false } = {}) => {
+  const initialize = async ({ signal, readOnlyPreview = false, allowUnavailableCatalog = false } = {}) => {
     const [catalog, businessIdentity] = await Promise.all([
-      catalogAdapter.load({ signal }),
+      catalogAdapter.load({ signal }).catch((error) => {
+        if (error?.code === "STOREFRONT_ABORTED" || !allowUnavailableCatalog) throw error;
+        return UNAVAILABLE_CATALOG;
+      }),
       businessIdentityAdapter.load({ signal }).catch(() => Object.freeze({
         status: "pending_owner_company_formation",
         identity: null,
@@ -127,6 +140,7 @@ export function createCommerceRuntime({
     return Object.freeze({
       catalog: runtimeCatalog,
       businessIdentity,
+      legal: legalAdapter,
       session,
       warnings: Object.freeze([...(catalog.warnings || []), session.warning].filter(Boolean)),
       favorites: Object.freeze({

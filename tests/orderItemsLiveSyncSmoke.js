@@ -2,9 +2,9 @@ const assert = require('assert');
 const path = require('path');
 const { spawnLocalServer, stopServerProcess } = require('./helpers/localServerProcess');
 const pool = require('../config/db');
-const createCoreSchema = require('../models/createCoreDb');
-const createCommerceSchema = require('../models/createCommerceDb');
-const createNotificationsTable = require('../models/createNotificationDb');
+const { LOCAL_TEST_CAPABILITY } = require('../scripts/staging-migrations/guard');
+const { loadRegistry } = require('../scripts/staging-migrations/registry');
+const { runApply } = require('../scripts/staging-migrations/runner');
 const { reconcileOrderItemsForOrder } = require('../services/orderService');
 const { getPublicCollection } = require('../services/collectionService');
 const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
@@ -14,13 +14,21 @@ const { resolveStartupSafety } = require('../config/startupSafety');
 const root = path.join(__dirname, '..');
 const port = 5201;
 const paytrEnv = {
+    DATABASE_URL: process.env.DATABASE_URL,
+    DB_HOST: process.env.DB_HOST,
+    DB_PORT: process.env.DB_PORT,
+    DB_NAME: process.env.DB_NAME,
+    DB_USER: process.env.DB_USER,
+    DB_PASSWORD: process.env.DB_PASSWORD,
+    DB_SSL: process.env.DB_SSL || 'false',
+    APP_BASE_URL: 'https://local-order-sync.example',
     PAYTR_MERCHANT_ID: 'live-sync-merchant',
     PAYTR_MERCHANT_KEY: 'live-sync-key',
     PAYTR_MERCHANT_SALT: 'live-sync-salt',
     PAYTR_BASE_URL: 'https://www.paytr.com',
-    PAYTR_CALLBACK_URL: `http://127.0.0.1:${port}/api/payments/webhook/paytr`,
-    PAYTR_SUCCESS_URL: 'http://127.0.0.1/payment-result.html',
-    PAYTR_FAIL_URL: 'http://127.0.0.1/payment-result.html',
+    PAYTR_CALLBACK_URL: 'https://local-order-sync.example/api/payments/webhook/paytr',
+    PAYTR_SUCCESS_URL: 'https://local-order-sync.example/payment-result.html',
+    PAYTR_FAIL_URL: 'https://local-order-sync.example/payment-result.html',
     PAYTR_TEST_MODE: 'true',
     PAYTR_DEBUG_ON: 'true',
     PAYMENT_PROVIDER: 'paytr'
@@ -48,6 +56,10 @@ const postPaytrCallback = async ({ paymentRef, status, totalAmount = '30000' }) 
         merchant_oid: paymentRef,
         status,
         total_amount: totalAmount,
+        payment_amount: totalAmount,
+        payment_type: 'card',
+        currency: 'TL',
+        test_mode: '1',
         failed_reason_code: status === 'success' ? '' : '99',
         failed_reason_msg: status === 'success' ? '' : 'Declined'
     };
@@ -90,7 +102,7 @@ const insertPendingPayment = async ({ productId, paymentRef, status = PAYMENT_ST
         order.id,
         paymentRef,
         status,
-        JSON.stringify({ stockReserved: false, finalizesOnWebhook: true })
+        JSON.stringify({ stockReserved: false, finalizesOnWebhook: true, paytr: { testMode: '1' } })
     ]);
     return { order, items };
 };
@@ -108,9 +120,22 @@ const expectCollection404 = async (slug) => {
     assert.strictEqual(safety.target.database, 'novastore_category_v2_test');
 
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-    await createCoreSchema();
-    await createNotificationsTable();
-    await createCommerceSchema();
+    const migrationEnv = {
+        NODE_ENV: 'test',
+        NOVASTORE_DEPLOY_ENV: 'staging',
+        NOVASTORE_STAGING_MIGRATIONS_ENABLED: 'true',
+        NOVASTORE_STAGING_BOOTSTRAP_ENABLED: 'true',
+        NOVASTORE_ALLOW_REMOTE_DB: 'true',
+        NOVASTORE_EXPECTED_DATABASE_HOST: safety.target.host,
+        NOVASTORE_EXPECTED_DATABASE_NAME: safety.target.database,
+        [LOCAL_TEST_CAPABILITY]: 'true',
+        DATABASE_URL: process.env.DATABASE_URL
+    };
+    const registry = loadRegistry();
+    const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
+    const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
+    assert.strictEqual(firstApply.applied.length, registry.length);
+    assert.strictEqual(secondApply.applied.length, 0);
 
     const productResult = await pool.query(`
         INSERT INTO products (
@@ -149,8 +174,9 @@ const expectCollection404 = async (slug) => {
         paymentRef: successPaymentRef,
         status: 'success'
     });
-    assert.strictEqual(successResponse.status, 200);
-    assert.strictEqual(await successResponse.text(), 'OK');
+    const successResponseText = await successResponse.text();
+    assert.strictEqual(successResponse.status, 200, successResponseText);
+    assert.strictEqual(successResponseText, 'OK');
 
     const successState = await pool.query(`
         SELECT
@@ -175,8 +201,9 @@ const expectCollection404 = async (slug) => {
         paymentRef: successPaymentRef,
         status: 'success'
     });
-    assert.strictEqual(duplicateResponse.status, 200);
-    assert.strictEqual(await duplicateResponse.text(), 'OK');
+    const duplicateResponseText = await duplicateResponse.text();
+    assert.strictEqual(duplicateResponse.status, 200, duplicateResponseText);
+    assert.strictEqual(duplicateResponseText, 'OK');
     const duplicateCount = await pool.query(
         'SELECT COUNT(*)::INTEGER AS count FROM order_items WHERE order_id = $1',
         [success.order.id]
@@ -187,8 +214,9 @@ const expectCollection404 = async (slug) => {
         paymentRef: failedPaymentRef,
         status: 'failed'
     });
-    assert.strictEqual(failedResponse.status, 200);
-    assert.strictEqual(await failedResponse.text(), 'OK');
+    const failedResponseText = await failedResponse.text();
+    assert.strictEqual(failedResponse.status, 200, failedResponseText);
+    assert.strictEqual(failedResponseText, 'OK');
     const nonSuccessfulCount = await pool.query(`
         SELECT
             COUNT(*) FILTER (WHERE order_id = $1)::INTEGER AS pending_count,

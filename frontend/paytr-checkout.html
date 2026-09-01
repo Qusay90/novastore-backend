@@ -95,15 +95,15 @@
         <header class="paytr-header">
             <div>
                 <div class="brand">NovaStore</div>
-                <div class="status" id="paytr-status">Güvenli ödeme ekranı yükleniyor.</div>
+                <div class="status" id="paytr-status" role="status" aria-live="polite">PayTR güvenli ödeme formu hazırlanıyor.</div>
                 <div class="meta" id="paytr-meta"></div>
             </div>
             <a class="btn" href="checkout.html">Ödeme Adımına Dön</a>
         </header>
 
-        <section class="error" id="paytr-error"></section>
+        <section class="error" id="paytr-error" role="alert" aria-live="assertive"></section>
         <section class="frame-wrap" id="paytr-frame-wrap">
-            <iframe id="paytr-frame" title="PayTR güvenli ödeme ekranı" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <iframe id="paytr-frame" title="PayTR güvenli ödeme ekranı" referrerpolicy="no-referrer"></iframe>
         </section>
     </main>
 
@@ -165,13 +165,12 @@
             document.getElementById('paytr-meta').innerText = `Sipariş No: ${orderId} · Ödeme Referansı: ${paymentRef}`;
             const frame = document.getElementById('paytr-frame');
             frame.addEventListener('load', () => {
-                document.getElementById('paytr-status').innerText = 'Güvenli ödeme ekranı hazır.';
+                document.getElementById('paytr-status').innerText = 'PayTR ödeme formu görüntülendi. Ödeme sonucu sağlayıcı doğrulamasından sonra kesinleşir.';
             }, { once: true });
             frame.src = iframeUrl;
         }
 
         renderPaytrIframe();
     </script>
-    <script src="footer.js"></script>
 </body>
 </html>

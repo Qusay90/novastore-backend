@@ -1,35 +1,37 @@
+'use strict';
+
 const assert = require('assert');
 const pool = require('../config/db');
 const { ORDER_STATUS, PAYMENT_STATUS } = require('../constants/orderStatus');
-const { getPaymentStatus, initializePayment } = require('../controllers/paymentController');
+const paymentController = require('../controllers/paymentController');
+const { buildCheckoutAgreementPreview } = require('../services/legalDocumentService');
+const { PaytrProviderTransportError } = require('../services/paytrPaymentService');
+
+const { getCheckoutAgreementPreview, getPaymentStatus, initializePayment, __test: paymentTest } = paymentController;
 
 const trackedEnv = [
-    'NODE_ENV',
-    'PAYMENT_PROVIDER',
-    'PAYTR_MERCHANT_ID',
-    'PAYTR_MERCHANT_KEY',
-    'PAYTR_MERCHANT_SALT',
-    'PAYTR_BASE_URL',
-    'PAYTR_CALLBACK_URL',
-    'PAYTR_SUCCESS_URL',
-    'PAYTR_FAIL_URL',
-    'PAYTR_TEST_MODE',
-    'PAYTR_DEBUG_ON',
-    'NOVASTORE_REQUIRE_BUSINESS_IDENTITY_FOR_PAYMENT',
-    'FREE_SHIPPING_THRESHOLD',
-    'DEFAULT_SHIPPING_FEE'
+    'NODE_ENV', 'APP_BASE_URL', 'PAYMENT_PROVIDER', 'PAYTR_MERCHANT_ID', 'PAYTR_MERCHANT_KEY',
+    'PAYTR_MERCHANT_SALT', 'PAYTR_BASE_URL', 'PAYTR_CALLBACK_URL', 'PAYTR_SUCCESS_URL',
+    'PAYTR_FAIL_URL', 'PAYTR_TEST_MODE', 'PAYTR_DEBUG_ON', 'PAYTR_LIVE_REQUESTS_ALLOWED',
+    'BUSINESS_LEGAL_COMPANY_NAME', 'BUSINESS_TAX_VKN', 'BUSINESS_MERSIS_NUMBER',
+    'BUSINESS_REGISTERED_ADDRESS', 'BUSINESS_KEP_ADDRESS', 'BUSINESS_PHONE', 'BUSINESS_EMAIL',
+    'CUSTOMER_PUBLIC_DOMAIN', 'NOVASTORE_LEGAL_PRE_INFORMATION_APPROVED',
+    'NOVASTORE_LEGAL_PRE_INFORMATION_VERSION', 'NOVASTORE_LEGAL_PRE_INFORMATION_TEXT',
+    'NOVASTORE_LEGAL_DISTANCE_SALE_APPROVED', 'NOVASTORE_LEGAL_DISTANCE_SALE_VERSION',
+    'NOVASTORE_LEGAL_DISTANCE_SALE_TEXT', 'FREE_SHIPPING_THRESHOLD', 'DEFAULT_SHIPPING_FEE'
 ];
-
 const originalEnv = Object.fromEntries(trackedEnv.map((key) => [key, process.env[key]]));
+const originalConnect = pool.connect;
+const originalQuery = pool.query;
 
-const restoreEnv = () => {
+const restore = () => {
     for (const key of trackedEnv) {
-        if (originalEnv[key] === undefined) {
-            delete process.env[key];
-        } else {
-            process.env[key] = originalEnv[key];
-        }
+        if (originalEnv[key] === undefined) delete process.env[key];
+        else process.env[key] = originalEnv[key];
     }
+    pool.connect = originalConnect;
+    pool.query = originalQuery;
+    paymentTest.resetPaytrIframeSessionRequester();
 };
 
 const applyBaseEnv = () => {
@@ -40,363 +42,456 @@ const applyBaseEnv = () => {
 
 const applyPaytrEnv = () => {
     applyBaseEnv();
+    process.env.APP_BASE_URL = 'https://example.test';
     process.env.PAYMENT_PROVIDER = 'paytr';
     process.env.PAYTR_MERCHANT_ID = 'merchant-id';
     process.env.PAYTR_MERCHANT_KEY = 'merchant-key-secret';
     process.env.PAYTR_MERCHANT_SALT = 'merchant-salt-secret';
     process.env.PAYTR_BASE_URL = 'https://www.paytr.com';
     process.env.PAYTR_CALLBACK_URL = 'https://example.test/api/payments/webhook/paytr';
-    process.env.PAYTR_SUCCESS_URL = 'https://example.test/payment-result.html';
-    process.env.PAYTR_FAIL_URL = 'https://example.test/payment-result.html';
+    process.env.PAYTR_SUCCESS_URL = 'https://example.test/#/odeme/sonuc';
+    process.env.PAYTR_FAIL_URL = 'https://example.test/#/odeme/sonuc';
     process.env.PAYTR_TEST_MODE = 'true';
     process.env.PAYTR_DEBUG_ON = 'true';
+    process.env.PAYTR_LIVE_REQUESTS_ALLOWED = 'true';
 };
+
+const applyIdentityEnv = () => {
+    process.env.BUSINESS_LEGAL_COMPANY_NAME = 'Test Nova Teknoloji Anonim Şirketi';
+    process.env.BUSINESS_TAX_VKN = '1234567890';
+    process.env.BUSINESS_MERSIS_NUMBER = '1234567890123456';
+    process.env.BUSINESS_REGISTERED_ADDRESS = 'Test Mahallesi Test Sokak No 1 İstanbul';
+    process.env.BUSINESS_KEP_ADDRESS = 'test@hs01.kep.tr';
+    process.env.BUSINESS_PHONE = '+905551112233';
+    process.env.BUSINESS_EMAIL = 'test@example.test';
+    process.env.CUSTOMER_PUBLIC_DOMAIN = 'https://example.test/';
+};
+
+const applyLegalEnv = () => {
+    process.env.NOVASTORE_LEGAL_PRE_INFORMATION_APPROVED = 'true';
+    process.env.NOVASTORE_LEGAL_PRE_INFORMATION_VERSION = 'test-pre-v1';
+    process.env.NOVASTORE_LEGAL_PRE_INFORMATION_TEXT = 'Test ortamı için sahibince onaylanmış ön bilgilendirme metni.';
+    process.env.NOVASTORE_LEGAL_DISTANCE_SALE_APPROVED = 'true';
+    process.env.NOVASTORE_LEGAL_DISTANCE_SALE_VERSION = 'test-distance-v1';
+    process.env.NOVASTORE_LEGAL_DISTANCE_SALE_TEXT = 'Test ortamı için sahibince onaylanmış mesafeli satış metni.';
+};
+
+const applyReadyEnv = () => {
+    applyPaytrEnv();
+    applyIdentityEnv();
+    applyLegalEnv();
+};
+
+const acceptances = () => ([
+    { slug: 'pre-information', version: 'test-pre-v1', accepted: true },
+    { slug: 'distance-sale', version: 'test-distance-v1', accepted: true }
+]);
+
+const agreementContext = () => paymentTest.buildCheckoutAgreementContext({
+    identitySnapshot: {
+        legalCompanyName: process.env.BUSINESS_LEGAL_COMPANY_NAME,
+        taxNumber: process.env.BUSINESS_TAX_VKN,
+        mersisNumber: process.env.BUSINESS_MERSIS_NUMBER,
+        registeredAddress: process.env.BUSINESS_REGISTERED_ADDRESS,
+        kepAddress: process.env.BUSINESS_KEP_ADDRESS,
+        phone: process.env.BUSINESS_PHONE,
+        email: process.env.BUSINESS_EMAIL,
+        customerDomain: process.env.CUSTOMER_PUBLIC_DOMAIN
+    },
+    addressId: 301,
+    customer: {
+        fullName: 'Test Kullanıcı',
+        phone: '05551234567',
+        address: 'Ev: Test Mahallesi Test Sokak No 1 Merkez / Kilis'
+    },
+    pricing: {
+        items: [{ id: 101, name: 'Test Telefon', quantity: 1, price: 1000, line_total: 1000 }],
+        totals: { currency: 'TRY', subtotal: 1000, bundleDiscount: 0, couponDiscount: 0, shippingFee: 49.9, total: 1049.9 },
+        coupon: { applied: false, code: null, discountAmount: 0 }
+    },
+    sellerProjection: []
+});
+
+const agreementSnapshotSha256 = () => buildCheckoutAgreementPreview({
+    checkoutContext: agreementContext()
+}).snapshotSha256;
 
 const createRes = () => ({
     code: null,
     body: null,
-    status(code) {
-        this.code = code;
-        return this;
-    },
-    json(body) {
-        this.body = body;
-        return this;
-    }
+    status(code) { this.code = code; return this; },
+    json(body) { this.body = body; return this; }
 });
 
-const createFakeClient = ({ existingPaymentRows = [] } = {}) => {
+const createFakeClient = ({
+    existingPaymentRows = [],
+    existingPaymentRowsByRead = null,
+    ownedAddress = true,
+    addressEmails = ['customer@example.test'],
+    productPrices = [1000]
+} = {}) => {
     const calls = [];
-
+    let transactionOpen = false;
+    let paymentReadCount = 0;
+    let addressReadCount = 0;
+    let productReadCount = 0;
+    let releaseCount = 0;
+    let sessionLockHeld = false;
     return {
         calls,
+        get transactionOpen() { return transactionOpen; },
+        get releaseCount() { return releaseCount; },
+        get sessionLockHeld() { return sessionLockHeld; },
         async query(sql, params = []) {
             calls.push({ sql, params });
-
-            if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
-                return { rows: [] };
+            if (/SELECT pg_advisory_lock/i.test(sql)) {
+                assert.strictEqual(transactionOpen, false);
+                sessionLockHeld = true;
+                return { rows: [{ locked: true }], rowCount: 1 };
             }
-
-            if (/FROM payments p/i.test(sql)) {
-                return { rows: existingPaymentRows };
+            if (/SELECT pg_advisory_unlock/i.test(sql)) {
+                assert.strictEqual(transactionOpen, false);
+                const unlocked = sessionLockHeld;
+                sessionLockHeld = false;
+                return { rows: [{ unlocked }], rowCount: 1 };
             }
-
+            if (sql === 'BEGIN') {
+                transactionOpen = true;
+                return { rows: [], rowCount: 0 };
+            }
+            if (['COMMIT', 'ROLLBACK'].includes(sql)) {
+                transactionOpen = false;
+                return { rows: [], rowCount: 0 };
+            }
+            if (/FROM payments p|JOIN payments p/i.test(sql)) {
+                const rows = Array.isArray(existingPaymentRowsByRead)
+                    ? (existingPaymentRowsByRead[Math.min(paymentReadCount, existingPaymentRowsByRead.length - 1)] || [])
+                    : existingPaymentRows;
+                paymentReadCount += 1;
+                return { rows, rowCount: rows.length };
+            }
+            if (/FROM customer_addresses address_row/i.test(sql)) {
+                assert.deepStrictEqual(params, [301, 10]);
+                const email = addressEmails[Math.min(addressReadCount, addressEmails.length - 1)];
+                addressReadCount += 1;
+                const rows = ownedAddress ? [{
+                    id: 301,
+                    title: 'Ev',
+                    full_name: 'Test Kullanıcı',
+                    phone: '05551234567',
+                    city: 'Kilis',
+                    district: 'Merkez',
+                    address_line: 'Test Mahallesi Test Sokak No 1',
+                    email
+                }] : [];
+                return { rows, rowCount: rows.length };
+            }
             if (/FROM products/i.test(sql)) {
+                const price = productPrices[Math.min(productReadCount, productPrices.length - 1)];
+                productReadCount += 1;
                 return {
-                    rows: [
-                        { id: 101, name: 'Test Telefon', price: 1000, old_price: null, stock: 5, image_url: 'phone.png' }
-                    ]
+                    rows: [{ id: 101, name: 'Test Telefon', price, old_price: null, stock: 5, image_url: 'phone.png' }],
+                    rowCount: 1
                 };
             }
-
-            if (/INSERT INTO orders/i.test(sql)) {
-                assert.strictEqual(params[2], ORDER_STATUS.ODEME_BEKLIYOR);
-                return {
-                    rows: [
-                        {
-                            id: 7001,
-                            user_id: params[0],
-                            status: params[2],
-                            items: params[7],
-                            payment_status: params[8]
-                        }
-                    ]
-                };
-            }
-
-            if (/INSERT INTO payments/i.test(sql)) {
-                return { rows: [] };
-            }
-
-            if (/UPDATE orders\s+SET payment_ref/i.test(sql)) {
-                assert.strictEqual(params[1], PAYMENT_STATUS.REQUIRES_ACTION);
-                return { rows: [] };
-            }
-
-            if (/INSERT INTO order_events/i.test(sql)) {
-                return { rows: [] };
-            }
-
-            if (/UPDATE products\s+SET stock = stock -/i.test(sql)) {
-                return { rows: [{ id: params[1], stock: 4 }] };
-            }
-
-            if (/UPDATE coupons SET used_count/i.test(sql)) {
-                throw new Error('initialize must not increment coupon usage');
-            }
-
-            return { rows: [] };
+            if (/INSERT INTO orders/i.test(sql)) return {
+                rows: [{ id: 7001, user_id: params[0], status: params[2], items: params[7], payment_status: params[8] }],
+                rowCount: 1
+            };
+            if (/UPDATE products\s+SET stock = stock -/i.test(sql)) return { rows: [{ id: params[1], stock: 4 }], rowCount: 1 };
+            if (/INSERT INTO payments/i.test(sql)) return { rows: [], rowCount: 1 };
+            if (/UPDATE orders\s+SET payment_ref/i.test(sql)) return { rows: [], rowCount: 1 };
+            if (/UPDATE coupons SET used_count/i.test(sql)) throw new Error('initialize must not consume coupon usage');
+            return { rows: [], rowCount: 0 };
         },
-        release() {}
+        release() { releaseCount += 1; }
     };
 };
 
-const makeReq = ({ body = {}, headers = {} } = {}) => ({
+const makeReq = (body = {}, headers = {}) => ({
     user: { id: 10, role: 'customer', principal: 'customer' },
-    headers: {
-        'idempotency-key': 'idem-paytr-1',
-        'x-forwarded-for': '203.0.113.10',
-        ...headers
-    },
+    headers: { 'idempotency-key': 'idem-paytr-1', ...headers },
     ip: '203.0.113.10',
     body: {
-        fullName: 'Test Kullanici',
-        email: 'test@example.com',
-        phone: '05551234567',
-        address: 'Test Mahallesi, Test Sokak No:1',
+        addressId: 301,
         cartItems: [{ productId: 101, quantity: 1 }],
         paymentMethod: 'card',
-        analyticsSessionKey: 'guest-session-1',
+        analyticsSessionKey: 'customer-session-1',
+        agreementAcceptances: acceptances(),
+        agreementSnapshotSha256: (() => {
+            try { return agreementSnapshotSha256(); } catch (_) { return ''; }
+        })(),
         ...body
     }
 });
 
-const callInitialize = async ({ configureEnv, clientOptions = {}, reqOptions = {} }) => {
-    const originalConnect = pool.connect;
+const runInitialize = async ({
+    configure = applyReadyEnv,
+    clientOptions = {},
+    body = {},
+    requester,
+    requesterFactory
+} = {}) => {
+    for (const key of trackedEnv) delete process.env[key];
+    configure();
     const client = createFakeClient(clientOptions);
-    pool.connect = async () => client;
-    configureEnv();
-
-    try {
-        const res = createRes();
-        await initializePayment(makeReq(reqOptions), res);
-        return { client, res };
-    } finally {
-        pool.connect = originalConnect;
-    }
+    let connectCount = 0;
+    pool.connect = async () => { connectCount += 1; return client; };
+    paymentTest.setPaytrIframeSessionRequester(
+        (requesterFactory ? requesterFactory(client) : requester) || (async ({ payload }) => ({
+        type: 'iframe',
+        token: 'provider-token-123',
+        iframeUrl: 'https://www.paytr.com/odeme/guvenli/provider-token-123',
+        successUrl: payload.merchant_ok_url,
+        failUrl: payload.merchant_fail_url
+        }))
+    );
+    const res = createRes();
+    await initializePayment(makeReq(body), res);
+    return { client, connectCount, res };
 };
 
-const findPaymentInsert = (client) => client.calls.find((call) => /INSERT INTO payments/i.test(call.sql));
-const findOrderPaymentUpdate = (client) => client.calls.find((call) => /UPDATE orders\s+SET payment_ref/i.test(call.sql));
+const hasMutation = (client) => client.calls.some(({ sql }) => (
+    /^\s*(?:INSERT|UPDATE|DELETE)\b/i.test(sql) || /\bnextval\s*\(/i.test(sql)
+));
 
 (async () => {
+    const originalConsoleError = console.error;
     try {
-        const paytrRun = await callInitialize({ configureEnv: applyPaytrEnv });
-        const paytrRes = paytrRun.res;
-        const paytrClient = paytrRun.client;
-
-        assert.strictEqual(paytrRes.code, 201);
-        assert.strictEqual(paytrRes.body.provider, 'paytr');
-        assert.strictEqual(paytrRes.body.paymentStatus, PAYMENT_STATUS.REQUIRES_ACTION);
-        assert.strictEqual(paytrRes.body.orderId, 7001);
-        assert.strictEqual(paytrRes.body.idempotencyKey, 'idem-paytr-1');
-        assert.strictEqual(paytrRes.body.totals.total, 1049.9);
-        assert.strictEqual(paytrRes.body.coupon.applied, false);
-        assert.strictEqual(paytrRes.body.campaigns.freeShippingApplied, false);
-        assert.strictEqual(paytrRes.body.paymentAction.type, 'iframe');
-        assert.ok(paytrRes.body.paymentAction.token);
-        assert.ok(paytrRes.body.paymentAction.iframeUrl.includes(paytrRes.body.paymentAction.token));
-        assert.ok(paytrRes.body.paymentAction.successUrl);
-        assert.ok(paytrRes.body.paymentAction.failUrl);
-        assert.match(paytrRes.body.paymentRef, /^NST-PAYTR-7001-[a-f0-9]{16}$/);
-        assert.strictEqual(paytrRes.body.paymentRef, paytrRes.body.paymentAction.successUrl.match(/paymentRef=([^&]+)/)[1]);
-        assert.strictEqual(JSON.stringify(paytrRes.body).includes(process.env.PAYTR_MERCHANT_KEY), false);
-        assert.strictEqual(JSON.stringify(paytrRes.body).includes(process.env.PAYTR_MERCHANT_SALT), false);
-
-        const paytrPaymentInsert = findPaymentInsert(paytrClient);
-        assert.ok(paytrPaymentInsert, 'PayTR initialize should insert a payment record');
-        assert.strictEqual(paytrPaymentInsert.params[1], 'paytr');
-        assert.strictEqual(paytrPaymentInsert.params[3], paytrRes.body.paymentRef);
-        assert.strictEqual(paytrPaymentInsert.params[6], PAYMENT_STATUS.REQUIRES_ACTION);
-
-        const rawRequest = JSON.parse(paytrPaymentInsert.params[7]);
-        const rawResponse = JSON.parse(paytrPaymentInsert.params[8]);
-        assert.strictEqual(rawRequest.stockReserved, true);
-        assert.match(rawRequest.reservationExpiresAt, /^\d{4}-\d{2}-\d{2}T/);
-        assert.strictEqual(rawRequest.finalizesOnWebhook, true);
-        assert.strictEqual(rawRequest.paytr.merchantOid, paytrRes.body.paymentRef);
-        assert.strictEqual(rawRequest.idempotency.key, 'idem-paytr-1');
-        assert.match(rawRequest.idempotency.ownerKey, /^[a-f0-9]{64}$/);
-        assert.match(rawRequest.idempotency.requestHash, /^[a-f0-9]{64}$/);
-        assert.strictEqual(rawResponse.type, 'iframe');
-        assert.strictEqual(rawResponse.token, paytrRes.body.paymentAction.token);
-
-        const serializedRaw = `${paytrPaymentInsert.params[7]} ${paytrPaymentInsert.params[8]}`;
-        assert.strictEqual(serializedRaw.includes(process.env.PAYTR_MERCHANT_KEY), false);
-        assert.strictEqual(serializedRaw.includes(process.env.PAYTR_MERCHANT_SALT), false);
-        assert.strictEqual(serializedRaw.includes('merchant-key-secret'), false);
-        assert.strictEqual(serializedRaw.includes('merchant-salt-secret'), false);
-
-        const orderUpdate = findOrderPaymentUpdate(paytrClient);
-        assert.strictEqual(orderUpdate.params[0], paytrRes.body.paymentRef);
-        assert.strictEqual(orderUpdate.params[1], PAYMENT_STATUS.REQUIRES_ACTION);
-        assert.strictEqual(
-            paytrClient.calls.some((call) => /UPDATE products\s+SET stock = stock -/i.test(call.sql)),
-            true
-        );
-        assert.strictEqual(
-            paytrClient.calls.some((call) => /UPDATE coupons SET used_count/i.test(call.sql)),
-            false
-        );
-        assert.strictEqual(
-            paytrClient.calls.some((call) => /PAYMENT_SUCCESS|PAYMENT_FAILED|Hazırlanıyor/i.test(call.sql)),
-            false
-        );
-
-        const duplicateRun = await callInitialize({
-            configureEnv: applyPaytrEnv,
-            clientOptions: {
-                existingPaymentRows: [
-                    {
-                        order_id: 7001,
-                        payment_ref: paytrRes.body.paymentRef,
-                        status: PAYMENT_STATUS.REQUIRES_ACTION,
-                        provider: 'paytr',
-                        order_user_id: 10,
-                        raw_request: paytrPaymentInsert.params[7]
-                    }
-                ]
-            }
-        });
-        assert.strictEqual(duplicateRun.res.code, 200);
-        assert.strictEqual(duplicateRun.res.body.reused, true);
-        assert.strictEqual(duplicateRun.res.body.provider, 'paytr');
-        assert.strictEqual(duplicateRun.res.body.paymentStatus, PAYMENT_STATUS.REQUIRES_ACTION);
-        assert.strictEqual(duplicateRun.res.body.paymentRef, paytrRes.body.paymentRef);
-        assert.strictEqual(duplicateRun.client.calls.some((call) => call.sql === 'BEGIN'), true);
-        assert.strictEqual(duplicateRun.client.calls.some((call) => /pg_advisory_xact_lock/i.test(call.sql)), true);
-        assert.strictEqual(duplicateRun.client.calls.some((call) => /INSERT INTO orders/i.test(call.sql)), false);
-        assert.strictEqual(duplicateRun.client.calls.some((call) => /INSERT INTO payments/i.test(call.sql)), false);
-        assert.strictEqual(duplicateRun.client.calls.some((call) => /UPDATE products\s+SET stock = stock -/i.test(call.sql)), false);
-        assert.strictEqual(duplicateRun.client.calls.some((call) => /UPDATE coupons SET used_count/i.test(call.sql)), false);
-
-        const bodyMismatchRun = await callInitialize({
-            configureEnv: applyPaytrEnv,
-            reqOptions: { body: { phone: '05550000000' } },
-            clientOptions: {
-                existingPaymentRows: [
-                    {
-                        order_id: 7001,
-                        payment_ref: paytrRes.body.paymentRef,
-                        status: PAYMENT_STATUS.REQUIRES_ACTION,
-                        provider: 'paytr',
-                        order_user_id: 10,
-                        raw_request: paytrPaymentInsert.params[7]
-                    }
-                ]
-            }
-        });
-        assert.strictEqual(bodyMismatchRun.res.code, 409);
-        assert.match(bodyMismatchRun.res.body.error, /Idempotency key/i);
-        assert.strictEqual(bodyMismatchRun.client.calls.some((call) => /INSERT INTO orders|INSERT INTO payments/i.test(call.sql)), false);
-
-        const guestSessionMismatchRun = await callInitialize({
-            configureEnv: applyPaytrEnv,
-            reqOptions: { body: { analyticsSessionKey: 'guest-session-2' } },
-            clientOptions: {
-                existingPaymentRows: [
-                    {
-                        order_id: 7001,
-                        payment_ref: paytrRes.body.paymentRef,
-                        status: PAYMENT_STATUS.REQUIRES_ACTION,
-                        provider: 'paytr',
-                        order_user_id: 10,
-                        raw_request: paytrPaymentInsert.params[7]
-                    }
-                ]
-            }
-        });
-        assert.strictEqual(guestSessionMismatchRun.res.code, 409);
-        assert.strictEqual(guestSessionMismatchRun.client.calls.some((call) => /INSERT INTO orders|INSERT INTO payments/i.test(call.sql)), false);
-
-        const iyzicoRun = await callInitialize({
-            configureEnv: () => {
-                applyBaseEnv();
-                delete process.env.PAYMENT_PROVIDER;
-            }
-        });
-        assert.strictEqual(iyzicoRun.res.code, 201);
-        assert.strictEqual(iyzicoRun.res.body.provider, 'iyzico');
-        assert.strictEqual(iyzicoRun.res.body.paymentStatus, PAYMENT_STATUS.REQUIRES_ACTION);
-        assert.strictEqual(iyzicoRun.res.body.paymentAction.provider, 'iyzico');
-        assert.strictEqual(findPaymentInsert(iyzicoRun.client).params[1], 'iyzico');
-
-        const originalConsoleError = console.error;
         console.error = () => {};
-        let missingEnvRun;
-        try {
-            missingEnvRun = await callInitialize({
-                configureEnv: () => {
-                    applyBaseEnv();
-                    process.env.PAYMENT_PROVIDER = 'paytr';
-                    delete process.env.PAYTR_MERCHANT_ID;
-                    delete process.env.PAYTR_MERCHANT_KEY;
-                    delete process.env.PAYTR_MERCHANT_SALT;
-                    delete process.env.PAYTR_CALLBACK_URL;
-                    delete process.env.PAYTR_SUCCESS_URL;
-                    delete process.env.PAYTR_FAIL_URL;
-                }
-            });
-        } finally {
-            console.error = originalConsoleError;
-        }
-        assert.strictEqual(missingEnvRun.res.code, 503);
-        assert.ok(missingEnvRun.res.body.details.includes('PAYTR_MERCHANT_ID'));
-        assert.strictEqual(JSON.stringify(missingEnvRun.res.body).includes('merchant-key-secret'), false);
-        assert.strictEqual(JSON.stringify(missingEnvRun.res.body).includes('merchant-salt-secret'), false);
-        assert.strictEqual(missingEnvRun.client.calls.some((call) => /INSERT INTO orders/i.test(call.sql)), false);
-        assert.strictEqual(findPaymentInsert(missingEnvRun.client), undefined);
-        assert.ok(missingEnvRun.client.calls.some((call) => call.sql === 'ROLLBACK'));
 
-        let missingBusinessIdentityRun;
-        console.error = () => {};
-        try {
-            missingBusinessIdentityRun = await callInitialize({
-                configureEnv: () => {
-                    applyPaytrEnv();
-                    process.env.NOVASTORE_REQUIRE_BUSINESS_IDENTITY_FOR_PAYMENT = 'true';
-                }
-            });
-        } finally {
-            console.error = originalConsoleError;
-        }
-        assert.strictEqual(missingBusinessIdentityRun.res.code, 503);
-        assert.strictEqual(missingBusinessIdentityRun.res.body.code, 'BUSINESS_IDENTITY_INCOMPLETE');
-        assert.match(missingBusinessIdentityRun.res.body.error, /İşletme kimliği/);
-        assert.ok(missingBusinessIdentityRun.res.body.details.includes('BUSINESS_LEGAL_COMPANY_NAME'));
-        assert.strictEqual(missingBusinessIdentityRun.client.calls.some((call) => /INSERT INTO orders/i.test(call.sql)), false);
-        assert.ok(missingBusinessIdentityRun.client.calls.some((call) => call.sql === 'ROLLBACK'));
+        const absent = await runInitialize({ configure: () => { applyBaseEnv(); delete process.env.PAYMENT_PROVIDER; } });
+        assert.strictEqual(absent.res.code, 503);
+        assert.strictEqual(absent.res.body.code, 'PAYMENT_PROVIDER_NOT_CONFIGURED');
+        assert.strictEqual(absent.connectCount, 0);
+        assert.strictEqual(hasMutation(absent.client), false);
+        assert.strictEqual(JSON.stringify(absent.res.body).includes('PAYTR_MERCHANT_KEY'), false);
 
-        const originalQuery = pool.query;
-        const statusCalls = [];
-        pool.query = async (sql, params) => {
-            statusCalls.push({ sql, params });
-            assert.match(sql, /^SELECT/i);
-            return {
-                rows: [
-                    {
-                        payment_ref: paytrRes.body.paymentRef,
-                        payment_status: PAYMENT_STATUS.REQUIRES_ACTION,
-                        provider: 'paytr',
-                        order_id: 7001,
-                        order_status: ORDER_STATUS.ODEME_BEKLIYOR,
-                        order_user_id: 10
-                    }
-                ]
-            };
-        };
+        const identityMissing = await runInitialize({ configure: () => { applyPaytrEnv(); applyLegalEnv(); } });
+        assert.strictEqual(identityMissing.res.code, 503);
+        assert.strictEqual(identityMissing.res.body.code, 'BUSINESS_IDENTITY_INCOMPLETE');
+        assert.strictEqual(identityMissing.connectCount, 0);
 
-        try {
-            const statusRes = createRes();
-            await getPaymentStatus({
-                query: { paymentRef: paytrRes.body.paymentRef, orderId: '7001' },
-                user: { id: 10 }
-            }, statusRes);
-            assert.strictEqual(statusRes.code, 200);
-            assert.strictEqual(statusRes.body.paymentStatus, PAYMENT_STATUS.REQUIRES_ACTION);
-            assert.strictEqual(statusRes.body.finalized, false);
-            assert.strictEqual(statusRes.body.provider, 'paytr');
-            assert.strictEqual(statusCalls.length, 1);
-        } finally {
-            pool.query = originalQuery;
-        }
+        const legalMissing = await runInitialize({ configure: () => { applyPaytrEnv(); applyIdentityEnv(); } });
+        assert.strictEqual(legalMissing.res.code, 503);
+        assert.strictEqual(legalMissing.res.body.code, 'CHECKOUT_LEGAL_DOCUMENTS_NOT_PUBLISHED');
+        assert.strictEqual(legalMissing.connectCount, 0);
+
+        for (const key of trackedEnv) delete process.env[key];
+        applyReadyEnv();
+        const previewClient = createFakeClient();
+        pool.connect = async () => previewClient;
+        const previewRes = createRes();
+        await getCheckoutAgreementPreview({
+            user: { id: 10, role: 'customer', principal: 'customer' },
+            body: {
+                addressId: 301,
+                cartItems: [{ productId: 101, quantity: 1 }],
+                couponCode: null
+            }
+        }, previewRes);
+        assert.strictEqual(previewRes.code, 200);
+        assert.strictEqual(previewRes.body.schemaVersion, 'checkout-agreements-v2');
+        assert.strictEqual(previewRes.body.snapshotSha256, agreementSnapshotSha256());
+        assert.strictEqual(previewRes.body.context.delivery.addressId, 301);
+        assert.strictEqual(previewRes.body.context.totals.total, 1049.9);
+        assert.ok(previewRes.body.documents.every((document) => document.text.includes('NovaStore sunucu doğrulamalı işlem özeti')));
+        assert.strictEqual(hasMutation(previewClient), false);
+
+        const foreignAddress = await runInitialize({ clientOptions: { ownedAddress: false } });
+        assert.strictEqual(foreignAddress.res.code, 404);
+        assert.match(foreignAddress.res.body.error, /Teslimat adresi bulunamadı/);
+        assert.strictEqual(hasMutation(foreignAddress.client), false);
+
+        let providerFailureCalls = 0;
+        const providerFailure = await runInitialize({
+            requesterFactory: (client) => async () => {
+                providerFailureCalls += 1;
+                assert.strictEqual(client.transactionOpen, false);
+                assert.strictEqual(client.calls.some(({ sql }) => sql === 'BEGIN'), false);
+                assert.strictEqual(client.releaseCount, 1);
+                throw new PaytrProviderTransportError('PAYTR_NETWORK_ERROR');
+            }
+        });
+        assert.strictEqual(providerFailure.res.code, 502);
+        assert.strictEqual(providerFailure.res.body.code, 'PAYTR_NETWORK_ERROR');
+        assert.strictEqual(providerFailureCalls, 1);
+        assert.strictEqual(providerFailure.connectCount, 1);
+        assert.strictEqual(hasMutation(providerFailure.client), false);
+        assert.strictEqual(providerFailure.client.calls.some(({ sql }) => sql === 'BEGIN'), false);
+        assert.strictEqual(providerFailure.client.calls.some(({ sql }) => /\bnextval\s*\(/i.test(sql)), false);
+
+        let staleProviderCalls = 0;
+        const changedAfterToken = await runInitialize({
+            clientOptions: {
+                addressEmails: ['customer@example.test', 'changed-after-token@example.test']
+            },
+            requesterFactory: (client) => async ({ payload }) => {
+                staleProviderCalls += 1;
+                assert.strictEqual(client.transactionOpen, false);
+                assert.strictEqual(client.releaseCount, 1);
+                return {
+                    type: 'iframe',
+                    token: 'orphan-provider-token',
+                    iframeUrl: 'https://www.paytr.com/odeme/guvenli/orphan-provider-token',
+                    successUrl: payload.merchant_ok_url,
+                    failUrl: payload.merchant_fail_url
+                };
+            }
+        });
+        assert.strictEqual(changedAfterToken.res.code, 409);
+        assert.strictEqual(changedAfterToken.res.body.code, 'PAYMENT_PROVIDER_PAYLOAD_STALE');
+        assert.strictEqual(Object.prototype.hasOwnProperty.call(changedAfterToken.res.body, 'paymentAction'), false);
+        assert.strictEqual(staleProviderCalls, 1);
+        assert.strictEqual(hasMutation(changedAfterToken.client), false);
+        assert.strictEqual(changedAfterToken.client.calls.some(({ sql }) => sql === 'ROLLBACK'), true);
+
+        const ready = await runInitialize();
+        assert.strictEqual(ready.res.code, 201);
+        assert.strictEqual(ready.res.body.provider, 'paytr');
+        assert.strictEqual(ready.res.body.paymentStatus, PAYMENT_STATUS.REQUIRES_ACTION);
+        assert.strictEqual(ready.res.body.orderId, 7001);
+        assert.match(ready.res.body.paymentRef, /^NSTPAYTR[a-f0-9]{40}$/);
+        assert.deepStrictEqual(ready.res.body.paymentAction, {
+            type: 'iframe',
+            token: 'provider-token-123',
+            iframeUrl: 'https://www.paytr.com/odeme/guvenli/provider-token-123',
+            successUrl: ready.res.body.paymentAction.successUrl,
+            failUrl: ready.res.body.paymentAction.failUrl
+        });
+        assert.strictEqual(new URL(ready.res.body.paymentAction.successUrl).searchParams.has('status'), false);
+        const successHashParams = new URLSearchParams(new URL(ready.res.body.paymentAction.successUrl).hash.split('?')[1]);
+        assert.strictEqual(successHashParams.get('paymentRef'), ready.res.body.paymentRef);
+        assert.strictEqual(successHashParams.has('orderId'), false);
+        assert.strictEqual(JSON.stringify(ready.res.body).includes('merchant-key-secret'), false);
+        assert.strictEqual(JSON.stringify(ready.res.body).includes('merchant-salt-secret'), false);
+
+        const paymentInsert = ready.client.calls.find(({ sql }) => /INSERT INTO payments/i.test(sql));
+        assert.ok(paymentInsert);
+        assert.strictEqual(paymentInsert.params[1], 'paytr');
+        const rawRequest = JSON.parse(paymentInsert.params[7]);
+        assert.strictEqual(rawRequest.addressId, 301);
+        assert.strictEqual(rawRequest.checkoutAgreementSnapshot.schemaVersion, 'checkout-agreements-v2');
+        assert.strictEqual(rawRequest.checkoutAgreementSnapshot.snapshotSha256, agreementSnapshotSha256());
+        assert.deepStrictEqual(rawRequest.checkoutAgreementSnapshot.documents.map(({ slug, version }) => ({ slug, version })), [
+            { slug: 'pre-information', version: 'test-pre-v1' },
+            { slug: 'distance-sale', version: 'test-distance-v1' }
+        ]);
+        assert.ok(rawRequest.checkoutAgreementSnapshot.documents.every((document) => /^[a-f0-9]{64}$/.test(document.contentSha256)));
+        assert.ok(rawRequest.checkoutAgreementSnapshot.documents.every((document) => document.text.includes('NovaStore sunucu doğrulamalı işlem özeti')));
+        assert.strictEqual(rawRequest.checkoutAgreementSnapshot.context.delivery.addressId, 301);
+        assert.strictEqual(rawRequest.checkoutAgreementSnapshot.context.delivery.phone, '05551234567');
+        assert.strictEqual(rawRequest.checkoutAgreementSnapshot.context.items[0].productId, 101);
+        assert.strictEqual(rawRequest.checkoutAgreementSnapshot.context.totals.total, 1049.9);
+        assert.strictEqual(ready.client.calls.some(({ sql }) => /UPDATE products\s+SET stock = stock -/i.test(sql)), true);
+        assert.strictEqual(ready.client.calls.some(({ sql }) => /UPDATE coupons SET used_count/i.test(sql)), false);
+        const lockIndex = ready.client.calls.findIndex(({ sql }) => /SELECT pg_advisory_lock/i.test(sql));
+        const beginIndex = ready.client.calls.findIndex(({ sql }) => sql === 'BEGIN');
+        const unlockIndex = ready.client.calls.findIndex(({ sql }) => /SELECT pg_advisory_unlock/i.test(sql));
+        assert.ok(lockIndex >= 0 && beginIndex > lockIndex && unlockIndex > beginIndex);
+        assert.strictEqual(ready.client.sessionLockHeld, false);
+
+        const storedAction = JSON.stringify(ready.res.body.paymentAction);
+        let concurrentProviderCalls = 0;
+        const concurrentDuplicate = await runInitialize({
+            clientOptions: {
+                existingPaymentRowsByRead: [[], [{
+                    order_id: 7001,
+                    payment_ref: ready.res.body.paymentRef,
+                    status: PAYMENT_STATUS.REQUIRES_ACTION,
+                    provider: 'paytr',
+                    order_user_id: 10,
+                    raw_request: paymentInsert.params[7],
+                    raw_response: storedAction
+                }]]
+            },
+            requesterFactory: (client) => async ({ payload }) => {
+                concurrentProviderCalls += 1;
+                assert.strictEqual(client.transactionOpen, false);
+                assert.strictEqual(client.releaseCount, 1);
+                return {
+                    type: 'iframe',
+                    token: 'unreturned-concurrent-token',
+                    iframeUrl: 'https://www.paytr.com/odeme/guvenli/unreturned-concurrent-token',
+                    successUrl: payload.merchant_ok_url,
+                    failUrl: payload.merchant_fail_url
+                };
+            }
+        });
+        assert.strictEqual(concurrentDuplicate.res.code, 200);
+        assert.strictEqual(concurrentDuplicate.res.body.reused, true);
+        assert.deepStrictEqual(concurrentDuplicate.res.body.paymentAction, ready.res.body.paymentAction);
+        assert.strictEqual(concurrentProviderCalls, 1);
+        assert.strictEqual(hasMutation(concurrentDuplicate.client), false);
+        assert.strictEqual(concurrentDuplicate.client.calls.some(({ sql }) => /INSERT INTO orders/i.test(sql)), false);
+
+        const duplicate = await runInitialize({
+            clientOptions: {
+                existingPaymentRows: [{
+                    order_id: 7001,
+                    payment_ref: ready.res.body.paymentRef,
+                    status: PAYMENT_STATUS.REQUIRES_ACTION,
+                    provider: 'paytr',
+                    order_user_id: 10,
+                    raw_request: paymentInsert.params[7],
+                    raw_response: storedAction
+                }]
+            }
+        });
+        assert.strictEqual(duplicate.res.code, 200);
+        assert.strictEqual(duplicate.res.body.reused, true);
+        assert.deepStrictEqual(duplicate.res.body.paymentAction, ready.res.body.paymentAction);
+        assert.strictEqual(hasMutation(duplicate.client), false);
+
+        const changedAddress = await runInitialize({
+            body: { addressId: 302 },
+            clientOptions: {
+                existingPaymentRows: [{
+                    order_id: 7001,
+                    payment_ref: ready.res.body.paymentRef,
+                    status: PAYMENT_STATUS.REQUIRES_ACTION,
+                    provider: 'paytr',
+                    order_user_id: 10,
+                    raw_request: paymentInsert.params[7],
+                    raw_response: storedAction
+                }]
+            }
+        });
+        assert.strictEqual(changedAddress.res.code, 409);
+        assert.strictEqual(hasMutation(changedAddress.client), false);
+
+        const statusClient = createFakeClient({ existingPaymentRows: [{
+            id: 7101,
+            payment_ref: ready.res.body.paymentRef,
+            status: PAYMENT_STATUS.REQUIRES_ACTION,
+            payment_status: PAYMENT_STATUS.REQUIRES_ACTION,
+            provider: 'paytr',
+            order_id: 7001,
+            order_status: ORDER_STATUS.ODEME_BEKLIYOR,
+            order_payment_status: PAYMENT_STATUS.REQUIRES_ACTION,
+            order_user_id: 10,
+            raw_request: {
+                stockReserved: true,
+                reservationExpiresAt: new Date(Date.now() + 60_000).toISOString()
+            }
+        }] });
+        pool.connect = async () => statusClient;
+        const statusRes = createRes();
+        await getPaymentStatus({
+            query: { paymentRef: ready.res.body.paymentRef, orderId: '7001' },
+            user: { id: 10 }
+        }, statusRes);
+        assert.strictEqual(statusRes.code, 200);
+        assert.strictEqual(statusRes.body.finalized, false);
+        assert.strictEqual(statusRes.body.provider, 'paytr');
 
         console.log('payment PayTR initialize smoke passed');
     } finally {
-        restoreEnv();
+        console.error = originalConsoleError;
+        restore();
     }
-})().catch((err) => {
-    restoreEnv();
-    console.error(err);
+})().catch((error) => {
+    restore();
+    console.error(error);
     process.exit(1);
 });

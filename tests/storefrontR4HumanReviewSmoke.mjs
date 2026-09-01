@@ -15,7 +15,7 @@ assert.match(app, /type: "return-exchange"/);
 assert.match(app, /function ReturnExchangePage\(\)/);
 assert.match(app, /Bu bilgi sayfası yeni bir iade ya da stok işlemi oluşturmaz\./);
 assert.match(app, /İade\/geri ödeme ve stok işlemlerinin tam backend akışı/);
-assert.match(app, /href="#\/iade-degisim">İade & değişim/);
+assert.match(app, /href="#\/iptal-iade-cayma-politikasi">İptal, iade ve cayma/);
 assert.doesNotMatch(app.slice(app.indexOf("function Footer()")), /href="#\/yardim">İade & değişim/);
 
 assert.match(css, /\.comparison-dialog\s*\{[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\)/);
@@ -35,6 +35,6 @@ assert.match(css, /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.assis
 
 console.log("COMPARISON_SCROLL_END_SOURCE_CONTRACT=PASS");
 console.log("HELP_HERO_RESPONSIVE_SOURCE_CONTRACT=PASS");
-console.log("FOOTER_RETURN_EXCHANGE_ROUTE=DEDICATED_RETURN_EXCHANGE_ROUTE");
+console.log("FOOTER_RETURN_EXCHANGE_ROUTE=CANONICAL_LEGAL_DOCUMENT_ROUTE");
 console.log("NOVABOT_ICON_VECTOR_SOURCE_CONTRACT=PASS");
 console.log("STOREFRONT_R4_HUMAN_REVIEW_SMOKE=PASS");

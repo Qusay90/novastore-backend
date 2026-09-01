@@ -71,7 +71,14 @@ const fetchHtml = (baseUrl, pathname) => fetch(`${baseUrl}${pathname}`, {
 
         for (const pathname of [
             '/admin-commerce-pro.html',
-            '/admin-commerce-pro-live.html'
+            '/admin-commerce-pro-live.html',
+            '/paytr-checkout.html',
+            '/',
+            '/index.html',
+            '/checkout.html',
+            '/payment-result.html',
+            '/product.html',
+            '/commerce-pro/index.html'
         ]) {
             const response = await fetchHtml(baseUrl, pathname);
             assert.equal(response.status, 200, `${pathname} sunulmalı`);
@@ -87,7 +94,7 @@ const fetchHtml = (baseUrl, pathname) => fetch(`${baseUrl}${pathname}`, {
             );
         }
 
-        for (const pathname of ['/index.html', '/checkout.html', '/admin.html']) {
+        for (const pathname of ['/admin.html']) {
             const response = await fetchHtml(baseUrl, pathname);
             assert.equal(response.status, 200, `${pathname} sunulmalı`);
             assert.equal(

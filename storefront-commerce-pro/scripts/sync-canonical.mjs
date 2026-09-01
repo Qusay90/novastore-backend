@@ -40,6 +40,27 @@ export const CANONICAL_HOME_DECORATION = '<span className="section-kicker"><Spar
 export const RUNTIME_HOME_DECORATION = '<span className="section-kicker">Nova seçkisi</span>';
 export const CANONICAL_PRICE_NOTIFICATION_ICON = '<article><Sparkle /><span><strong>Favori ürününde fiyat avantajı var</strong>';
 export const RUNTIME_PRICE_NOTIFICATION_ICON = '<article><BadgePercent /><span><strong>Favori ürününde fiyat avantajı var</strong>';
+export const CANONICAL_TRUST_DELIVERY_CLAIM = '<span><Truck weight="bold" /> 1.500 TL üzeri ücretsiz kargo</span>';
+export const RUNTIME_TRUST_DELIVERY_CLAIM = '<span><Truck weight="bold" /> Teslimat seçenekleri ödeme adımında</span>';
+export const CANONICAL_TRUST_RETURN_CLAIM = '<span><ArrowsClockwise weight="bold" /> 14 gün içinde kolay iade</span>';
+export const RUNTIME_TRUST_RETURN_CLAIM = '<span><ArrowsClockwise weight="bold" /> İade koşulları onaylı politikada</span>';
+export const CANONICAL_BENEFIT_CLAIMS = `    [Truck, "Ücretsiz kargo", "1.500 TL üzeri siparişlerde"],
+    [ShieldCheck, "Güvenli alışveriş", "3D Secure ödeme altyapısı"],
+    [ArrowsClockwise, "Kolay iade", "14 gün içinde ücretsiz"],
+    [Headphones, "Nova desteği", "Satış öncesi ve sonrası"],`;
+export const RUNTIME_BENEFIT_CLAIMS = `    [Truck, "Teslimat seçenekleri", "Ödeme adımında doğrulanır"],
+    [ShieldCheck, "Güvenli ödeme", "Kart verisi sağlayıcı ekranında girilir"],
+    [ArrowsClockwise, "İade koşulları", "Onaylı politikadan görüntülenir"],
+    [Headphones, "Nova desteği", "Yardım merkezinden erişilir"],`;
+export const CANONICAL_PRODUCT_GUARANTEE_CLAIM = '<div><dt>Garanti</dt><dd>2 yıl</dd></div>';
+export const CANONICAL_PRODUCT_DELIVERY_CLAIM = '<p>Siparişler 24 saat içinde hazırlanır. 1.500 TL üzerindeki siparişlerde kargo ücretsizdir. Teslimden itibaren 14 gün içinde kolay iade talebi oluşturabilirsin.</p>';
+export const RUNTIME_PRODUCT_DELIVERY_CLAIM = '<p>Teslimat yöntemi, kargo ücreti ve geçerli iade koşulları güvenli ödeme ve müşteri hesabı adımlarında doğrulanır.</p>';
+export const CANONICAL_PRODUCT_INSTALLMENT_CLAIM = '<p className="installment">Peşin fiyatına <strong>3 taksit</strong> · Aylık {money.format(Math.ceil(product.price / 3))}</p>';
+export const RUNTIME_PRODUCT_INSTALLMENT_CLAIM = '<p className="installment">Teslimat, indirim ve ödeme seçenekleri <strong>ödeme adımında</strong> doğrulanır.</p>';
+export const CANONICAL_PRODUCT_STOCK_CLAIM = '<div className="stock-line">{soldOut ? <><X /> Stokta yok</> : <><CheckCircle weight="fill" /> Stokta · 24 saat içinde kargoda</>}</div>';
+export const RUNTIME_PRODUCT_STOCK_CLAIM = '<div className="stock-line">{soldOut ? <><X /> Stokta yok</> : <><CheckCircle weight="fill" /> Stokta · {product.stock} adet</>}</div>';
+export const CANONICAL_PRODUCT_BENEFIT_CLAIMS = '<div className="detail-benefits"><div><Truck /><span><strong>Ücretsiz teslimat</strong><small>1–2 iş günü</small></span></div><div><ArrowsClockwise /><span><strong>Kolay iade</strong><small>14 gün içinde</small></span></div><div><ShieldCheck /><span><strong>2 yıl garanti</strong><small>NovaStore güvencesi</small></span></div></div>';
+export const RUNTIME_PRODUCT_BENEFIT_CLAIMS = '<div className="detail-benefits"><div><Truck /><span><strong>Teslimat seçenekleri</strong><small>Ödeme adımında hesaplanır</small></span></div><div><ArrowsClockwise /><span><strong>İade koşulları</strong><small>Onaylı politikadan görüntülenir</small></span></div><div><ShieldCheck /><span><strong>Güvenli ödeme</strong><small>Sağlayıcı ekranında tamamlanır</small></span></div></div>';
 export const CANONICAL_MODAL_BACKGROUND_QUERY = 'const backgroundNodes = [...document.querySelectorAll("#root > .skip-link, #root > .site-header, #root > main, #root > .site-footer, #root > .mobile-bottom-nav")];';
 export const RUNTIME_MODAL_BACKGROUND_QUERY = 'const backgroundNodes = [...document.querySelectorAll("#root > *")];';
 export const RUNTIME_COMPARISON_IMPORT = 'import { RuntimeComparisonContext } from "./integration/RuntimeComparisonContext.jsx";';
@@ -159,6 +180,14 @@ export const createRuntimePresentation = (canonicalApp) => {
   runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_DEALS_ICON, RUNTIME_DEALS_ICON, "Canonical deals semantic icon");
   runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_HOME_DECORATION, RUNTIME_HOME_DECORATION, "Canonical home decorative sparkle");
   runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_PRICE_NOTIFICATION_ICON, RUNTIME_PRICE_NOTIFICATION_ICON, "Canonical notification semantic icon");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_TRUST_DELIVERY_CLAIM, RUNTIME_TRUST_DELIVERY_CLAIM, "Canonical trust delivery claim");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_TRUST_RETURN_CLAIM, RUNTIME_TRUST_RETURN_CLAIM, "Canonical trust return claim");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_BENEFIT_CLAIMS, RUNTIME_BENEFIT_CLAIMS, "Canonical benefit claims");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_PRODUCT_GUARANTEE_CLAIM, "", "Canonical product guarantee claim");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_PRODUCT_DELIVERY_CLAIM, RUNTIME_PRODUCT_DELIVERY_CLAIM, "Canonical product delivery claim");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_PRODUCT_INSTALLMENT_CLAIM, RUNTIME_PRODUCT_INSTALLMENT_CLAIM, "Canonical product installment claim");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_PRODUCT_STOCK_CLAIM, RUNTIME_PRODUCT_STOCK_CLAIM, "Canonical product stock claim");
+  runtimePresentation = replaceExactOnce(runtimePresentation, CANONICAL_PRODUCT_BENEFIT_CLAIMS, RUNTIME_PRODUCT_BENEFIT_CLAIMS, "Canonical product benefit claims");
 
   runtimePresentation = replaceExactOnce(
     runtimePresentation,
@@ -301,6 +330,12 @@ export const createRuntimePresentation = (canonicalApp) => {
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_GALLERY_CLASS, 1, "Runtime product gallery class");
   assertExactCount(runtimePresentation, RUNTIME_PRODUCT_FAVORITE_BUTTON, 1, "Runtime shared product detail favorite owner");
   assertExactCount(runtimePresentation, RUNTIME_REVIEW_TARGET, 1, "Runtime review anchor");
+  assertExactCount(runtimePresentation, CANONICAL_TRUST_DELIVERY_CLAIM, 0, "Runtime false delivery trust claim");
+  assertExactCount(runtimePresentation, CANONICAL_TRUST_RETURN_CLAIM, 0, "Runtime false return trust claim");
+  assertExactCount(runtimePresentation, CANONICAL_BENEFIT_CLAIMS, 0, "Runtime false benefit claims");
+  assertExactCount(runtimePresentation, CANONICAL_PRODUCT_GUARANTEE_CLAIM, 0, "Runtime false product guarantee claim");
+  assertExactCount(runtimePresentation, CANONICAL_PRODUCT_INSTALLMENT_CLAIM, 0, "Runtime false installment claim");
+  assertExactCount(runtimePresentation, CANONICAL_PRODUCT_BENEFIT_CLAIMS, 0, "Runtime false product benefit claims");
 
   return `${runtimePresentation.trimEnd()}\n${RUNTIME_EXPORTS}`;
 };

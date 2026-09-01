@@ -16,6 +16,7 @@ const {
 
 const trackedEnv = [
     'NODE_ENV',
+    'APP_BASE_URL',
     'PAYMENT_PROVIDER',
     'PAYTR_MERCHANT_ID',
     'PAYTR_MERCHANT_KEY',
@@ -47,6 +48,7 @@ const restoreState = () => {
 
 const applyPaytrEnv = () => {
     process.env.NODE_ENV = 'test';
+    process.env.APP_BASE_URL = 'https://example.test';
     process.env.PAYMENT_PROVIDER = 'paytr';
     process.env.PAYTR_MERCHANT_ID = 'merchant-id';
     process.env.PAYTR_MERCHANT_KEY = 'merchant-key-secret';
@@ -86,6 +88,9 @@ const buildPayload = (overrides = {}) => {
         merchant_oid: 'NST-PAYTR-COUPON-LIMIT',
         status: 'success',
         total_amount: '104990',
+        payment_amount: '104990',
+        payment_type: 'card',
+        currency: 'TL',
         failed_reason_code: '',
         failed_reason_msg: '',
         ...overrides

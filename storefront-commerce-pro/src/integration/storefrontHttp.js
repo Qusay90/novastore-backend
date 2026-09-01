@@ -6,6 +6,7 @@ const ALLOWED_READ_PATHS = Object.freeze([
   /^\/api\/public\/navigation\/(?:main|mobile|home|footer)(?:\?.*)?$/,
   /^\/api\/public\/collections(?:\/[^/?#]+)?(?:\?.*)?$/,
   /^\/api\/public\/stores\/[a-z0-9]+(?:-[a-z0-9]+)*$/,
+  /^\/api\/public\/legal(?:\/[a-z][a-z0-9-]{1,63})?$/,
   /^\/api\/business-identity$/,
   /^\/api\/users\/me$/,
 ]);

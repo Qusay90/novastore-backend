@@ -14,6 +14,12 @@ import {
   CANONICAL_PRODUCT_DETAIL_SIGNATURE,
   CANONICAL_PRODUCT_FAVORITE_BUTTON,
   CANONICAL_PRODUCT_GALLERY_CLASS,
+  CANONICAL_PRODUCT_GUARANTEE_CLAIM,
+  CANONICAL_PRODUCT_INSTALLMENT_CLAIM,
+  CANONICAL_PRODUCT_BENEFIT_CLAIMS,
+  CANONICAL_TRUST_DELIVERY_CLAIM,
+  CANONICAL_TRUST_RETURN_CLAIM,
+  CANONICAL_BENEFIT_CLAIMS,
   CANONICAL_REACT_IMPORT,
   EXPECTED_CANONICAL_HOME_HREF_COUNT,
   EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT,
@@ -41,7 +47,7 @@ const canonicalAppPath = path.join(root, "src", "App.jsx");
 const runtimePresentationPath = path.join(root, "src", "CanonicalRuntimePresentation.jsx");
 const EXPECTED_SHA256 = "8b6301362b6c01b649db1d7cfa4dc00d5b4392309e4ece2c7c14870cab0f2b0d";
 const EXPECTED_APP_SHA256 = "d31e7642f6bccb75094361be3dc2dd3b85cc38a4d968bbfd57ee3ee7ffd80fb6";
-const EXPECTED_RUNTIME_SHA256 = "cd8156acb7b65a0d07b09ae6bed8cbb41618e35609728c712e9303b4e600054b";
+const EXPECTED_RUNTIME_SHA256 = "33779b3b53fded33a086bf46b6db732bec3578de314c0894a839286391851bc2";
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const NON_HOME_HASH_ROUTES = Object.freeze([
   "#/kategori/",
@@ -154,6 +160,16 @@ test("runtime presentation is generated directly from canonical App.jsx", async 
     EXPECTED_CANONICAL_MOBILE_HOME_ITEM_COUNT,
   );
   assert.match(runtimePresentation, /return product\?\.imageUrl \|\| IMAGE_MAP\[product\?\.imageKey\] \|\| phoneImage/);
+  for (const falseRuntimeClaim of [
+    CANONICAL_TRUST_DELIVERY_CLAIM,
+    CANONICAL_TRUST_RETURN_CLAIM,
+    CANONICAL_BENEFIT_CLAIMS,
+    CANONICAL_PRODUCT_GUARANTEE_CLAIM,
+    CANONICAL_PRODUCT_INSTALLMENT_CLAIM,
+    CANONICAL_PRODUCT_BENEFIT_CLAIMS,
+  ]) {
+    assert.equal(countExactOccurrences(runtimePresentation, falseRuntimeClaim), 0);
+  }
 
   for (const route of NON_HOME_HASH_ROUTES) {
     const expectedCount = countExactOccurrences(canonicalApp, route) - (route === "#/urun/" ? 2 : 0);

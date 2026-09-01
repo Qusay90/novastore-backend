@@ -212,9 +212,9 @@ const run = async () => {
 
     const approved = await getPolicyAnswer('İade süresi nedir?', {
         env: {
-            NOVASTORE_POLICY_RETURNS_APPROVED: 'true',
-            NOVASTORE_POLICY_RETURNS_VERSION: 'legal-2026-08-13',
-            NOVASTORE_POLICY_RETURNS_TEXT: 'Hukuk biriminin sağladığı sentetik onaylı metin.'
+            NOVASTORE_LEGAL_CANCELLATION_RETURN_APPROVED: 'true',
+            NOVASTORE_LEGAL_CANCELLATION_RETURN_VERSION: 'legal-2026-08-13',
+            NOVASTORE_LEGAL_CANCELLATION_RETURN_TEXT: 'Hukuk biriminin sağladığı sentetik onaylı metin.'
         }
     });
     assert.equal(approved.published, true);
@@ -291,7 +291,8 @@ const run = async () => {
 
     const policy = read('services/policyService.js');
     assert.doesNotMatch(policy, /14 gün|1-3 iş günü|2-3 iş günü|Yurtici Kargo/i);
-    assert.match(policy, /NOVASTORE_POLICY_\$\{config\.envKey\}/);
+    assert.match(policy, /getLegalDocument\(config\.legalSlug, env\)/);
+    assert.doesNotMatch(policy, /NOVASTORE_POLICY_/);
 
     console.log('support notification operations smoke passed');
 };

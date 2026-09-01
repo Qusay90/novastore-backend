@@ -8,6 +8,7 @@ const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
 
 const trackedEnv = [
     'NODE_ENV',
+    'APP_BASE_URL',
     'PAYMENT_PROVIDER',
     'PAYTR_MERCHANT_ID',
     'PAYTR_MERCHANT_KEY',
@@ -44,6 +45,7 @@ const restoreState = () => {
 
 const applyPaytrEnv = () => {
     process.env.NODE_ENV = 'test';
+    process.env.APP_BASE_URL = 'https://example.test';
     process.env.PAYMENT_PROVIDER = 'paytr';
     process.env.PAYTR_MERCHANT_ID = 'merchant-id';
     process.env.PAYTR_MERCHANT_KEY = 'merchant-key-secret';
@@ -61,6 +63,9 @@ const buildPayload = (overrides = {}) => {
         merchant_oid: merchantOid,
         status: 'failed',
         total_amount: '104990',
+        payment_amount: '104990',
+        payment_type: 'card',
+        currency: 'TL',
         failed_reason_code: '99',
         failed_reason_msg: 'Bank declined',
         ...overrides
@@ -734,8 +739,8 @@ const assertNoSecrets = (response, state) => {
         const unknownStatusState = createPaymentState();
         await withServer(unknownStatusState, async (server) => {
             const response = await postForm(server, '/api/payments/webhook/paytr', buildPayload({ status: 'pending_review' }));
-            assert.strictEqual(response.statusCode, 202);
-            assert.strictEqual(response.body.finalizationImplemented, false);
+            assert.strictEqual(response.statusCode, 400);
+            assert.match(response.body.error, /Desteklenmeyen PayTR callback durumu/);
             assertNoAnyFinalizationSideEffects(unknownStatusState);
         });
 

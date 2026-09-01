@@ -108,6 +108,16 @@ export function createCanonicalFixtureRuntime({ root = globalThis } = {}) {
   });
 
   const checkout = Object.freeze({
+    getCapability: async () => Object.freeze({
+      provider: "paytr",
+      ready: false,
+      state: "credentials_required",
+      message: "Yerel fixture gerçek ödeme sağlayıcısı açmaz.",
+      agreements: Object.freeze([
+        Object.freeze({ slug: "pre-information", path: "/on-bilgilendirme-formu", title: "Ön Bilgilendirme Formu", status: "owner_external_required", version: null }),
+        Object.freeze({ slug: "distance-sale", path: "/mesafeli-satis-sozlesmesi", title: "Mesafeli Satış Sözleşmesi", status: "owner_external_required", version: null }),
+      ]),
+    }),
     quote: async (items, couponCode = null) => {
       const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
       const couponApplied = String(couponCode || "").toLocaleUpperCase("tr-TR") === "FIXTURE100";
@@ -174,12 +184,25 @@ export function createCanonicalFixtureRuntime({ root = globalThis } = {}) {
     }),
     escalate: async () => ({ message: "Yerel fixture destek devrini kaydetti." }),
   });
+  const legal = Object.freeze({
+    list: async () => Object.freeze([]),
+    load: async (slug) => Object.freeze({
+      slug,
+      path: `/${slug}`,
+      title: "Yasal bilgilendirme",
+      status: "owner_external_required",
+      requiredForCheckout: ["pre-information", "distance-sale"].includes(slug),
+      version: null,
+      text: null,
+    }),
+  });
 
   return Object.freeze({
     businessIdentity: Object.freeze({
       status: "pending_owner_company_formation",
       identity: null,
     }),
+    legal,
     catalog: Object.freeze({
       categories: canonicalCategories,
       products: visibleProducts,

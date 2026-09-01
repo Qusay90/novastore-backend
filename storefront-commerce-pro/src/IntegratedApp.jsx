@@ -64,8 +64,10 @@ import {
   CustomerAccountPage,
   CustomerAuthPage,
   CustomerCheckoutPage,
+  CustomerLegalDocumentPage,
   CustomerPasswordPage,
   CustomerPaymentResultPage,
+  CustomerPublicContactPage,
   CustomerSupportPage,
   CustomerTrackingPage,
 } from "./ConnectedCustomerPages.jsx";
@@ -181,6 +183,20 @@ const COMPARISON_TRAY_ROUTE_TYPES = new Set([
   "collection",
   "favorites",
 ]);
+const LEGAL_ROUTE_SLUGS = Object.freeze(new Map([
+  ["/hakkimizda", "about"],
+  ["/gizlilik-politikasi", "privacy"],
+  ["/kvkk-aydinlatma-metni", "kvkk"],
+  ["/cerez-politikasi", "cookies"],
+  ["/kullanim-ve-uyelik-kosullari", "membership-terms"],
+  ["/on-bilgilendirme-formu", "pre-information"],
+  ["/mesafeli-satis-sozlesmesi", "distance-sale"],
+  ["/iptal-iade-cayma-politikasi", "cancellation-return"],
+  ["/teslimat-ve-kargo-kosullari", "delivery-shipping"],
+  ["/islem-rehberi", "transaction-guide"],
+  ["/pazaryeri-bilgilendirmesi", "marketplace-disclosure"],
+  ["/satici-sozlesmesi", "seller-agreement"],
+]));
 function cx(...values) {
   return values.filter(Boolean).join(" ");
 }
@@ -286,6 +302,7 @@ function documentRouteRaw() {
   const pathname = window.location.pathname || "/";
   const search = window.location.search || "";
   if (/^\/(?:kategori|urun|koleksiyon|magaza)\//.test(pathname)) return `${pathname}${search}`;
+  if (LEGAL_ROUTE_SLUGS.has(pathname) || ["/yardim", "/siparis-takibi", "/iletisim", "/destek"].includes(pathname)) return `${pathname}${search}`;
   if (pathname.endsWith("/login.html")) return `/giris${search}`;
   if (pathname.endsWith("/forgot-password.html")) return `/sifremi-unuttum${search}`;
   if (pathname.endsWith("/reset-password.html")) return `/sifre-sifirla${search}`;
@@ -362,7 +379,9 @@ function parseRoute() {
   if (pathname === "/yardim") return { type: "help", query };
   if (pathname === "/iade-degisim") return { type: "return-exchange", query };
   if (pathname === "/siparis-takibi") return { type: "tracking", query };
-  if (pathname === "/iletisim") return { type: "contact", query };
+  if (pathname === "/iletisim") return { type: "public-contact", query };
+  if (pathname === "/destek") return { type: "support", query };
+  if (LEGAL_ROUTE_SLUGS.has(pathname)) return { type: "legal", slug: LEGAL_ROUTE_SLUGS.get(pathname), query };
   if (pathname === "/") return { type: "home", query };
   return { type: "not-found", query };
 }
@@ -1288,7 +1307,7 @@ function LocalReviewPaymentBoundary() {
 
 function Footer({ businessIdentity = null }) {
   const identity = businessIdentity?.status === "configured" ? businessIdentity.identity : null;
-  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="#/hesabim">Hesabım</a><a href="#/iletisim">İletişim</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/iade-degisim">İade & değişim</a><a href="#/yardim">Yardım merkezi</a></div><div><strong>Güvenli alışveriş</strong><p>Ödeme bilgileri NovaStore sayfasında toplanmaz; destek kanalları hesabınla korunur.</p></div>{identity && <address className="footer-business-identity"><strong>{identity.legalCompanyName}</strong><span>VKN: {identity.taxNumber} · MERSİS: {identity.mersisNumber}</span><span>{identity.registeredAddress}</span><a href={`mailto:${identity.kepAddress}`}>KEP: {identity.kepAddress}</a><a href={`tel:${identity.phone}`}>{identity.phone}</a><a href={`mailto:${identity.email}`}>{identity.email}</a></address>}</div><div className="shell footer-bottom"><span>© 2026 NovaStore.</span><span>{identity ? "İşletme kimliği yapılandırılmış public sözleşmeden yayımlanır." : "Şirket kimliği ve onaylı yasal metinler tamamlandığında burada yayımlanacaktır."}</span></div></footer>;
+  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href="#/hakkimizda">Hakkımızda</a><a href="#/iletisim">İletişim</a><a href="#/pazaryeri-bilgilendirmesi">Pazaryeri bilgilendirmesi</a><a href="#/satici-sozlesmesi">Satıcı sözleşmesi</a></div><div><strong>Yasal</strong><a href="#/gizlilik-politikasi">Gizlilik politikası</a><a href="#/kvkk-aydinlatma-metni">KVKK aydınlatma metni</a><a href="#/cerez-politikasi">Çerez politikası</a><a href="#/kullanim-ve-uyelik-kosullari">Kullanım ve üyelik koşulları</a></div><div><strong>Alışveriş koşulları</strong><a href="#/on-bilgilendirme-formu">Ön bilgilendirme formu</a><a href="#/mesafeli-satis-sozlesmesi">Mesafeli satış sözleşmesi</a><a href="#/iptal-iade-cayma-politikasi">İptal, iade ve cayma</a><a href="#/teslimat-ve-kargo-kosullari">Teslimat ve kargo</a><a href="#/islem-rehberi">İşlem rehberi</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/destek">Güvenli müşteri desteği</a><a href="#/yardim">Yardım merkezi</a><p>Ödeme bilgileri NovaStore sayfasında toplanmaz.</p></div>{identity && <address className="footer-business-identity"><strong>{identity.legalCompanyName}</strong><span>VKN: {identity.taxNumber} · MERSİS: {identity.mersisNumber}</span><span>{identity.registeredAddress}</span><a href={`mailto:${identity.kepAddress}`}>KEP: {identity.kepAddress}</a><a href={`tel:${identity.phone}`}>{identity.phone}</a><a href={`mailto:${identity.email}`}>{identity.email}</a></address>}</div><div className="shell footer-bottom"><span>© 2026 NovaStore.</span><span>{identity ? "İşletme kimliği yapılandırılmış public sözleşmeden yayımlanır." : "Şirket kimliği ve onaylı yasal metinler tamamlandığında burada yayımlanacaktır."}</span></div></footer>;
 }
 
 export function CommerceProRuntimeApp({ runtime }) {
@@ -1563,9 +1582,11 @@ export function CommerceProRuntimeApp({ runtime }) {
   else if (route.type === "order-success") content = <CanonicalNotFound />;
   else if (route.type === "help") content = <HelpPage />;
   else if (route.type === "return-exchange") content = <ReturnExchangePage />;
-  else if (route.type === "contact") content = authenticated
+  else if (route.type === "public-contact") content = <CustomerPublicContactPage businessIdentity={runtime.businessIdentity} />;
+  else if (route.type === "legal") content = <CustomerLegalDocumentPage slug={route.slug} legal={runtime.legal} />;
+  else if (route.type === "support") content = authenticated
     ? <CustomerSupportPage session={session} account={runtime.customer} onNotice={notify} />
-    : authReturn("/iletisim");
+    : authReturn("/destek");
   else content = <CanonicalNotFound />;
 
   return (
@@ -1579,7 +1600,7 @@ export function CommerceProRuntimeApp({ runtime }) {
       <MobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={categoryDrawerTriggerRef} />
       <CartDrawer open={cartOpen} items={cartItems} onClose={closeCart} onRemove={removeFromCart} onQuantity={updateCartQuantity} returnFocusRef={cartTriggerRef} />
       <MobileBottomNav route={route} cartCount={cartCount} favoriteCount={favorites.size} />
-      {["help", "contact"].includes(route.type) && <AssistantWidget route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonVisible} />}
+      {["help", "support"].includes(route.type) && <AssistantWidget route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonVisible} />}
       <div className={cx("toast", toast && "is-visible")} role="status" aria-live="polite"><CheckCircle weight="fill" /><span>{toast}</span></div>
     </RuntimeComparisonContext.Provider>
   );
@@ -1627,10 +1648,13 @@ export function IntegratedApp() {
     "tracking",
     "help",
     "return-exchange",
-    "contact",
+    "public-contact",
+    "legal",
+    "support",
   ].includes(runtimeRoute.type);
   const resource = useCommerceRuntime({
     allowEmptyCatalog: isPublicStoreRoute || catalogOptionalRoute,
+    allowUnavailableCatalog: catalogOptionalRoute,
     readOnlyPreview: isPublicStoreRoute && runtimeRoute.preview === true,
   });
   if (resource.phase !== "ready") {

@@ -7,6 +7,7 @@ const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
 
 const trackedEnv = [
     'NODE_ENV',
+    'APP_BASE_URL',
     'PAYMENT_PROVIDER',
     'PAYTR_MERCHANT_ID',
     'PAYTR_MERCHANT_KEY',
@@ -37,6 +38,7 @@ const restoreState = () => {
 
 const applyPaytrEnv = () => {
     process.env.NODE_ENV = 'test';
+    process.env.APP_BASE_URL = 'https://example.test';
     process.env.PAYMENT_PROVIDER = 'paytr';
     process.env.PAYTR_MERCHANT_ID = 'merchant-id';
     process.env.PAYTR_MERCHANT_KEY = 'merchant-key-secret';
@@ -54,6 +56,9 @@ const buildValidPayload = () => {
         merchant_oid: 'NST-PAYTR-7001-abcdef1234567890',
         status: 'pending_review',
         total_amount: '104990',
+        payment_amount: '104990',
+        payment_type: 'card',
+        currency: 'TL',
         failed_reason_code: '',
         failed_reason_msg: ''
     };
@@ -126,10 +131,8 @@ const postForm = (server, path, payload) => new Promise((resolve, reject) => {
         server = await createAppServer();
 
         const validResponse = await postForm(server, '/api/payments/webhook/paytr', buildValidPayload());
-        assert.strictEqual(validResponse.statusCode, 202);
-        assert.strictEqual(validResponse.body.ok, true);
-        assert.strictEqual(validResponse.body.provider, 'paytr');
-        assert.strictEqual(validResponse.body.finalizationImplemented, false);
+        assert.strictEqual(validResponse.statusCode, 400);
+        assert.match(validResponse.body.error, /Desteklenmeyen PayTR callback durumu/);
         assert.strictEqual(validResponse.text.includes('OK'), false);
         assert.strictEqual(validResponse.text.includes(process.env.PAYTR_MERCHANT_KEY), false);
         assert.strictEqual(validResponse.text.includes(process.env.PAYTR_MERCHANT_SALT), false);
@@ -154,7 +157,7 @@ const postForm = (server, path, payload) => new Promise((resolve, reject) => {
         delete process.env.PAYTR_MERCHANT_KEY;
         const missingEnvResponse = await postForm(server, '/api/payments/webhook/paytr', buildValidPayload());
         assert.strictEqual(missingEnvResponse.statusCode, 503);
-        assert.ok(missingEnvResponse.body.details.includes('PAYTR_MERCHANT_KEY'));
+        assert.strictEqual(JSON.stringify(missingEnvResponse.body).includes('PAYTR_MERCHANT_KEY'), false);
         assert.strictEqual(missingEnvResponse.text.includes('merchant-salt-secret'), false);
 
         console.log('payment PayTR callback hash smoke passed');

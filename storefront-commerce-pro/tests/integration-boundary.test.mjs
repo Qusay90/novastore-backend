@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { createAssistantAdapter } from "../src/adapters/assistantAdapter.js";
 import { createAuthAdapter } from "../src/adapters/authAdapter.js";
 import { createCartAdapter } from "../src/adapters/cartAdapter.js";
 import { createCatalogAdapter } from "../src/adapters/catalogAdapter.js";
-import { createCheckoutAdapter, normalizeQuote, reconcileFinalizedCart } from "../src/adapters/checkoutAdapter.js";
+import { createCheckoutAdapter, normalizeAgreementPreview, normalizeQuote, reconcileFinalizedCart } from "../src/adapters/checkoutAdapter.js";
 import { createCustomerAccountAdapter } from "../src/adapters/customerAccountAdapter.js";
 import { createFavoritesAdapter } from "../src/adapters/favoritesAdapter.js";
+import { createLegalAdapter } from "../src/adapters/legalAdapter.js";
 import { createProductCommunityAdapter } from "../src/adapters/productCommunityAdapter.js";
 import {
   configureRuntimeCatalog,
@@ -588,6 +590,132 @@ test("commerce runtime gerçek adapterları tek katalog, favori ve sepet durumun
   assert.equal(typeof runtime.refreshCustomerState, "function");
 });
 
+test("commerce runtime katalog kesintisini varsayılan olarak reddeder, açık izinle katalogdan bağımsız public runtime döndürür", async () => {
+  const businessIdentity = Object.freeze({
+    status: "configured",
+    identity: Object.freeze({
+      legalCompanyName: "Sentetik Entegrasyon Testi İşletmesi",
+      taxNumber: "0000000000",
+      mersisNumber: "0000000000000000",
+      registeredAddress: "Sentetik test adresi",
+      kepAddress: "test-kep@example.test",
+      phone: "+900000000000",
+      email: "test-contact@example.test",
+      customerDomain: "https://customer.example.test",
+    }),
+  });
+  const legalDocuments = Object.freeze([Object.freeze({
+    slug: "about",
+    path: "/hakkimizda",
+    title: "Hakkımızda",
+    status: "owner_external_required",
+    requiredForCheckout: false,
+    version: null,
+    text: null,
+  })]);
+  const catalogPaths = new Set([
+    "/api/public/categories?format=tree",
+    "/api/products",
+    "/api/public/collections",
+  ]);
+  const createOutageRoot = () => {
+    const requests = [];
+    const root = {
+      localStorage: createStorage(),
+      sessionStorage: createStorage(),
+      location: { origin: "https://novastore.tr", assign: () => {} },
+      fetch: async (path, options = {}) => {
+        requests.push({ path, method: options.method || "GET" });
+        if (catalogPaths.has(path)) {
+          return new Response(JSON.stringify({ error: "Sentetik katalog kesintisi" }), {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        let payload;
+        if (path === "/api/business-identity") payload = businessIdentity;
+        else if (path === "/api/public/legal") payload = { documents: legalDocuments };
+        else assert.fail(`Katalog kesintisi runtime'ı beklenmeyen istek yaptı: ${path}`);
+        return new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+      NovaStoreFavorites: {
+        loadFavoriteIds: async () => [],
+        setFavorite: async () => {},
+        reportError: () => {},
+        isAuthenticated: () => false,
+      },
+      NovaStoreSharedState: {
+        isAuthenticated: () => false,
+        hydrateCart: async () => {},
+        saveCart: async () => {},
+        saveCheckout: async () => {},
+        writeCartLocal: (items) => items,
+        normalizeCartItems: (items) => items,
+        reportError: () => {},
+      },
+      dispatchEvent: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
+    return { root, requests };
+  };
+
+  const failClosed = createOutageRoot();
+  await assert.rejects(
+    () => createCommerceRuntime({ root: failClosed.root }).initialize(),
+    (error) => error instanceof StorefrontHttpError && error.status === 503,
+  );
+
+  const fallback = createOutageRoot();
+  const runtime = await createCommerceRuntime({ root: fallback.root }).initialize({
+    allowUnavailableCatalog: true,
+  });
+
+  assert.deepEqual(runtime.catalog.categories, []);
+  assert.deepEqual(runtime.catalog.products, []);
+  assert.deepEqual(runtime.catalog.collections, []);
+  assert.deepEqual(runtime.catalog.collectionDetails, []);
+  assert.deepEqual(runtime.catalog.navigation, {
+    code: "main",
+    name: "Kategori ağı",
+    source: "unavailable",
+    items: [],
+  });
+  assert.deepEqual(runtime.warnings, [
+    "Katalog şu anda alınamıyor; bu sayfa katalogdan bağımsız güvenli modda açıldı.",
+  ]);
+  assert.deepEqual(runtime.businessIdentity, businessIdentity);
+  assert.equal(typeof runtime.legal.list, "function");
+  assert.equal(typeof runtime.legal.load, "function");
+  assert.equal(typeof runtime.customer.listSupportMessages, "function");
+  assert.equal(typeof runtime.customer.sendSupportMessage, "function");
+  assert.deepEqual(await runtime.legal.list(), legalDocuments);
+  assert.equal(fallback.requests.some(({ path }) => path === "/api/business-identity"), true);
+  assert.equal(fallback.requests.some(({ path }) => path === "/api/public/legal"), true);
+});
+
+test("IntegratedApp public iletişim, hukuk ve destek rotalarını katalog kesintisinden bağımsız başlatır", async () => {
+  const integratedApp = await readFile(new URL("../src/IntegratedApp.jsx", import.meta.url), "utf8");
+  const optionalStart = integratedApp.indexOf("const catalogOptionalRoute = [");
+  const optionalEnd = integratedApp.indexOf("].includes(runtimeRoute.type);", optionalStart);
+  assert.ok(optionalStart >= 0 && optionalEnd > optionalStart, "catalogOptionalRoute kaynak sözleşmesi bulunmalı");
+  const optionalRouteSource = integratedApp.slice(optionalStart, optionalEnd);
+  for (const routeType of ["public-contact", "legal", "support"]) {
+    assert.ok(optionalRouteSource.includes(`"${routeType}"`), `${routeType} katalogdan bağımsız olmalı`);
+  }
+  assert.match(integratedApp, /allowUnavailableCatalog:\s*catalogOptionalRoute/);
+
+  const routeRenderStart = integratedApp.indexOf("let content;");
+  const routeRenderEnd = integratedApp.indexOf("return (", routeRenderStart);
+  const routeRenderSource = integratedApp.slice(routeRenderStart, routeRenderEnd);
+  assert.ok(routeRenderSource.includes("<CustomerPublicContactPage businessIdentity={runtime.businessIdentity} />"));
+  assert.ok(routeRenderSource.includes("<CustomerLegalDocumentPage slug={route.slug} legal={runtime.legal} />"));
+  assert.ok(routeRenderSource.includes("<CustomerSupportPage session={session} account={runtime.customer}"));
+});
+
 test("Seller müşteri önizlemesi runtime başlangıcında müşteri oturumu, favori veya sepet yan etkisi oluşturmaz", async () => {
   const storage = createStorage({
     nova_user_token: "synthetic-customer-session",
@@ -648,6 +776,14 @@ test("customer HTTP yöntem, rota, sorgu ve müşteri token sınırlarını birl
     { path: "/api/payments/status?paymentRef=ref-1&orderId=7", method: "GET", authenticated: true },
   );
   assert.deepEqual(
+    normalizeCustomerApiRequest("/api/payments/agreements/preview", "POST", "https://novastore.tr"),
+    { path: "/api/payments/agreements/preview", method: "POST", authenticated: true },
+  );
+  assert.deepEqual(
+    normalizeCustomerApiRequest("/api/payments/capability", "GET", "https://novastore.tr"),
+    { path: "/api/payments/capability", method: "GET", authenticated: false },
+  );
+  assert.deepEqual(
     normalizeCustomerApiRequest("/api/reviews/product/202", "GET", "https://novastore.tr"),
     { path: "/api/reviews/product/202", method: "GET", authenticated: "optional" },
   );
@@ -671,6 +807,7 @@ test("customer HTTP yöntem, rota, sorgu ve müşteri token sınırlarını birl
     ["https://evil.example/api/addresses", "GET"],
     ["/api/addresses?role=admin", "GET"],
     ["/api/users/login", "GET"],
+    ["/api/payments/capability?debug=1", "GET"],
     ["/api/payments/status?paymentRef=x&orderId=1&debug=1", "GET"],
   ]) {
     assert.throws(
@@ -992,9 +1129,26 @@ test("checkout adapterı sunucu fiyatını kullanır, kart verisi toplamaz ve Pa
         campaigns: { freeShippingApplied: false },
         items: [],
       };
+      if (path === "/api/payments/agreements/preview") return {
+        schemaVersion: "checkout-agreements-v2",
+        snapshotSha256: "a".repeat(64),
+        contextSha256: "b".repeat(64),
+        context: { totals: { currency: "TRY", subtotal: 900, bundleDiscount: 0, couponDiscount: 100, shippingFee: 49.9, total: 849.9 } },
+        quote: {
+          totals: { currency: "TRY", subtotal: 900, bundleDiscount: 0, couponDiscount: 100, shippingFee: 49.9, total: 849.9 },
+          coupon: { applied: true, code: "REAL100", discountAmount: 100 },
+          campaigns: { freeShippingApplied: false },
+          items: [],
+        },
+        documents: [
+          { slug: "pre-information", path: "/on-bilgilendirme-formu", title: "Ön Bilgilendirme Formu", version: "synthetic-test-v1", text: "Siparişe özel ön bilgilendirme", sourceContentSha256: "c".repeat(64), contentSha256: "d".repeat(64) },
+          { slug: "distance-sale", path: "/mesafeli-satis-sozlesmesi", title: "Mesafeli Satış Sözleşmesi", version: "synthetic-test-v1", text: "Siparişe özel mesafeli satış", sourceContentSha256: "e".repeat(64), contentSha256: "f".repeat(64) },
+        ],
+      };
       if (path === "/api/payments/initialize") return {
         orderId: 44,
         paymentRef: "NST-PAYTR-44-safe",
+        provider: "paytr",
         paymentAction: {
           type: "iframe",
           token: "safe-token",
@@ -1002,6 +1156,11 @@ test("checkout adapterı sunucu fiyatını kullanır, kart verisi toplamaz ve Pa
           successUrl: "https://novastore.tr/payment-result.html",
           failUrl: "https://novastore.tr/payment-result.html",
         },
+      };
+      if (path.startsWith("/api/payments/status?")) return {
+        orderId: 44,
+        paymentRef: "NST-PAYTR-44-safe",
+        paymentStatus: "REQUIRES_ACTION",
       };
       throw new Error(`Beklenmeyen checkout yolu: ${path}`);
     },
@@ -1026,42 +1185,86 @@ test("checkout adapterı sunucu fiyatını kullanır, kart verisi toplamaz ve Pa
     /para birimi TRY/,
   );
   const session = { status: "authenticated", user: { id: 7, fullName: "Nova Müşteri", email: "musteri@example.test" } };
-  const result = await adapter.initialize({
+  const ownedAddress = {
+    id: 17,
+    title: "Ev",
+    fullName: "Nova Müşteri",
+    phone: "05555555555",
+    city: "İstanbul",
+    district: "Kadıköy",
+    addressLine: "Örnek Mahallesi",
+  };
+  const agreementAcceptances = [
+    { slug: "pre-information", version: "synthetic-test-v1", accepted: true, text: "synthetic-test-only" },
+    { slug: "distance-sale", version: "synthetic-test-v1", accepted: true, text: "synthetic-test-only" },
+  ];
+  const agreementPreview = await adapter.previewAgreements({
     session,
-    address: {
-      title: "Ev",
-      fullName: "Nova Müşteri",
-      phone: "05555555555",
-      city: "İstanbul",
-      district: "Kadıköy",
-      addressLine: "Örnek Mahallesi",
-    },
+    address: ownedAddress,
     items,
     couponCode: "REAL100",
   });
-  await adapter.initialize({
-    session: { ...session, status: "unverified" },
-    address: {
-      title: "Ev",
-      fullName: "Nova Müşteri",
-      phone: "05555555555",
-      city: "İstanbul",
-      district: "Kadıköy",
-      addressLine: "Örnek Mahallesi",
-    },
+  assert.equal(agreementPreview.snapshotSha256, "a".repeat(64));
+  assert.equal(agreementPreview.documents.length, 2);
+  assert.throws(() => normalizeAgreementPreview({ schemaVersion: "checkout-agreements-v2", snapshotSha256: "evil" }), /doğrulanamadı/);
+  const result = await adapter.initialize({
+    session,
+    address: ownedAddress,
     items,
     couponCode: "REAL100",
+    agreementSnapshotSha256: agreementPreview.snapshotSha256,
+    agreementAcceptances,
+  });
+  await adapter.initialize({
+    session: { ...session, status: "unverified" },
+    address: ownedAddress,
+    items,
+    couponCode: "REAL100",
+    agreementSnapshotSha256: agreementPreview.snapshotSha256,
+    agreementAcceptances,
   });
   await assert.rejects(() => adapter.initialize({
     session: { status: "guest", user: null },
     address: {},
     items,
   }), /müşteri oturumu/);
-  const initializeBody = calls.find((call) => call.path === "/api/payments/initialize").options.body;
-  assert.equal(initializeBody.paymentMethod, "card");
-  assert.equal(initializeBody.analyticsSessionKey, "analytics-session");
-  for (const forbidden of ["cardNumber", "cardCvv", "expiry", "cvv"]) {
-    assert.equal(Object.hasOwn(initializeBody, forbidden), false);
+  const initializeCalls = calls.filter((call) => call.path === "/api/payments/initialize");
+  assert.equal(initializeCalls.length, 2);
+  for (const { options: { body: initializeBody } } of initializeCalls) {
+    assert.equal(initializeBody.paymentMethod, "card");
+    assert.equal(initializeBody.analyticsSessionKey, "analytics-session");
+    assert.equal(initializeBody.addressId, 17, "checkout yalnız oturum sahibinin kayıtlı adres kimliğini taşımalı");
+    assert.equal(initializeBody.agreementSnapshotSha256, "a".repeat(64));
+    assert.deepEqual(initializeBody.agreementAcceptances, [
+      { slug: "pre-information", version: "synthetic-test-v1", accepted: true },
+      { slug: "distance-sale", version: "synthetic-test-v1", accepted: true },
+    ]);
+    assert.deepEqual(Object.keys(initializeBody).sort(), [
+      "addressId",
+      "agreementAcceptances",
+      "agreementSnapshotSha256",
+      "analyticsSessionKey",
+      "cartItems",
+      "couponCode",
+      "paymentMethod",
+    ]);
+    for (const forbidden of [
+      "cardNumber",
+      "cardCvv",
+      "expiry",
+      "cvv",
+      "fullName",
+      "email",
+      "phone",
+      "address",
+      "title",
+      "city",
+      "district",
+      "addressLine",
+      "businessIdentity",
+    ]) {
+      assert.equal(Object.hasOwn(initializeBody, forbidden), false, `${forbidden} initialize payloadına taşınmamalı`);
+    }
   }
   const handoffPath = adapter.handoff(result, items);
   assert.match(handoffPath, /^\/paytr-checkout\.html\?/);
@@ -1070,6 +1273,12 @@ test("checkout adapterı sunucu fiyatını kullanır, kart verisi toplamaz ve Pa
   assert.equal(
     JSON.parse(sessionStorage.getItem("novastore.paytrCheckout.NST-PAYTR-44-safe")).storefrontEntry,
     "/index.html",
+  );
+  await adapter.getPaymentStatus({ paymentRef: "NST-PAYTR-44-safe", orderId: "" });
+  assert.equal(
+    calls.at(-1).path,
+    "/api/payments/status?paymentRef=NST-PAYTR-44-safe",
+    "PayTR return URL sipariş id taşımadığında sahiplik kontrollü paymentRef sorgusu kullanılmalı",
   );
   const purchased = adapter.consumeFinalizedCheckout({ orderId: 44, paymentRef: "NST-PAYTR-44-safe" });
   assert.deepEqual(purchased, [{ productId: 202, quantity: 1 }]);
@@ -1086,26 +1295,192 @@ test("checkout adapterı sunucu fiyatını kullanır, kart verisi toplamaz ve Pa
   );
   assert.equal(storage.getItem("novastore_pending_checkout_7"), null);
 
-  const redirectResult = {
-    orderId: 45,
-    paymentRef: "NST-IYZICO-45-safe",
-    paymentAction: {
-      action: {
-        type: "REDIRECT",
-        successUrl: "https://novastore.tr/payment-result.html?status=success&paymentRef=NST-IYZICO-45-safe&orderId=45",
-        failUrl: "https://novastore.tr/payment-result.html?status=failed&paymentRef=NST-IYZICO-45-safe&orderId=45",
+  const rejectedHandoffs = [
+    {
+      label: "payment-result redirect fallback",
+      result: {
+        orderId: 45,
+        paymentRef: "NST-PAYTR-45-redirect",
+        provider: "paytr",
+        paymentAction: {
+          action: {
+            type: "REDIRECT",
+            successUrl: "https://novastore.tr/payment-result.html?status=success",
+            failUrl: "https://novastore.tr/payment-result.html?status=failed",
+          },
+        },
       },
     },
-  };
-  const redirectPath = adapter.handoff(redirectResult, items);
-  assert.match(redirectPath, /^\/payment-result\.html\?/);
-  assert.equal(
-    JSON.parse(sessionStorage.getItem("novastore.paytrCheckout.NST-IYZICO-45-safe")).storefrontEntry,
-    "/index.html",
-    "aynı-origin redirect ödeme sonucu da Commerce Pro dönüş bilgisini korumalı",
+    {
+      label: "legacy provider",
+      result: {
+        orderId: 46,
+        paymentRef: "NST-IYZICO-46",
+        provider: "iyzico",
+        paymentAction: {
+          type: "iframe",
+          token: "safe-token",
+          iframeUrl: "https://www.paytr.com/odeme/guvenli/safe-token",
+        },
+      },
+    },
+    {
+      label: "untrusted iframe origin",
+      result: {
+        orderId: 47,
+        paymentRef: "NST-PAYTR-47-evil",
+        provider: "paytr",
+        paymentAction: {
+          type: "iframe",
+          token: "stolen-token",
+          iframeUrl: "https://evil.example/odeme/guvenli/stolen-token",
+        },
+      },
+    },
+  ];
+  for (const candidate of rejectedHandoffs) {
+    assert.throws(
+      () => adapter.handoff(candidate.result, items),
+      (error) => error?.code === "PAYMENT_PROVIDER_NOT_CONFIGURED",
+      candidate.label,
+    );
+    assert.equal(sessionStorage.getItem(`novastore.paytrCheckout.${candidate.result.paymentRef}`), null, candidate.label);
+  }
+  assert.deepEqual(assigned, [handoffPath], "yalnız doğrulanmış PayTR iframe handoffu yönlendirme yapmalı");
+  assert.equal(storage.getItem("novastore_pending_checkout_7"), null, "reddedilen fallback pending ödeme yazmamalı");
+});
+
+test("checkout capability yalnız public readiness endpointini okur", async () => {
+  const signal = { name: "capability-signal" };
+  const calls = [];
+  const expected = Object.freeze({
+    provider: "paytr",
+    ready: false,
+    state: "activation_required",
+    requirements: {
+      providerReady: false,
+      businessIdentityReady: true,
+      legalDocumentsReady: true,
+    },
+  });
+  const adapter = createCheckoutAdapter({
+    http: {
+      request: async (path, options = {}) => {
+        calls.push({ path, options });
+        return expected;
+      },
+    },
+  });
+
+  assert.equal(await adapter.getCapability({ signal }), expected);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].path, "/api/payments/capability");
+  assert.equal(calls[0].options.signal, signal);
+  assert.equal(calls[0].options.method, undefined, "capability sorgusu yan etkisiz GET kalmalı");
+});
+
+test("public legal adapter ve footer aynı sürümlü hukuk rota sözleşmesini kullanır", async () => {
+  const legalRoutes = Object.freeze([
+    ["/hakkimizda", "about"],
+    ["/gizlilik-politikasi", "privacy"],
+    ["/kvkk-aydinlatma-metni", "kvkk"],
+    ["/cerez-politikasi", "cookies"],
+    ["/kullanim-ve-uyelik-kosullari", "membership-terms"],
+    ["/on-bilgilendirme-formu", "pre-information"],
+    ["/mesafeli-satis-sozlesmesi", "distance-sale"],
+    ["/iptal-iade-cayma-politikasi", "cancellation-return"],
+    ["/teslimat-ve-kargo-kosullari", "delivery-shipping"],
+    ["/islem-rehberi", "transaction-guide"],
+    ["/pazaryeri-bilgilendirmesi", "marketplace-disclosure"],
+    ["/satici-sozlesmesi", "seller-agreement"],
+  ]);
+  const documents = legalRoutes.map(([path, slug]) => ({
+    slug,
+    path,
+    title: slug,
+    status: ["pre-information", "distance-sale"].includes(slug) ? "published" : "owner_external_required",
+    requiredForCheckout: ["pre-information", "distance-sale"].includes(slug),
+    version: ["pre-information", "distance-sale"].includes(slug) ? "synthetic-test-v1" : null,
+    text: ["pre-information", "distance-sale"].includes(slug) ? "synthetic-test-only" : null,
+  }));
+  const calls = [];
+  const legal = createLegalAdapter({
+    request: async (path) => {
+      calls.push(path);
+      if (path === "/api/public/legal") return { documents };
+      if (path === "/api/public/legal/marketplace-disclosure") {
+        return documents.find((document) => document.slug === "marketplace-disclosure");
+      }
+      throw new Error(`Beklenmeyen hukuk yolu: ${path}`);
+    },
+  });
+
+  const listed = await legal.list();
+  assert.deepEqual(listed.map(({ path, slug }) => [path, slug]), legalRoutes);
+  assert.deepEqual(await legal.load("marketplace-disclosure"), {
+    slug: "marketplace-disclosure",
+    path: "/pazaryeri-bilgilendirmesi",
+    title: "marketplace-disclosure",
+    status: "owner_external_required",
+    requiredForCheckout: false,
+    version: null,
+    text: null,
+  });
+  await assert.rejects(() => legal.load("../admin"), /kimliği geçersiz/);
+  assert.deepEqual(calls, ["/api/public/legal", "/api/public/legal/marketplace-disclosure"]);
+
+  const integratedApp = await readFile(new URL("../src/IntegratedApp.jsx", import.meta.url), "utf8");
+  for (const [path, slug] of legalRoutes) {
+    assert.ok(integratedApp.includes(`["${path}", "${slug}"]`), `public hukuk route eşlemesi eksik: ${path}`);
+    assert.ok(integratedApp.includes(`href="#${path}"`), `footer hukuk bağlantısı eksik: ${path}`);
+  }
+});
+
+test("aranabilir Türkiye konum sözleşmesi 81 il ve 973 ilçeyi eksiksiz korur", async () => {
+  const [datasetRaw, customerPages] = await Promise.all([
+    readFile(new URL("../../shared/turkiye-provinces-districts.v1.json", import.meta.url), "utf8"),
+    readFile(new URL("../src/ConnectedCustomerPages.jsx", import.meta.url), "utf8"),
+  ]);
+  const dataset = JSON.parse(datasetRaw);
+  const provinceNames = dataset.provinces.map((province) => province.name);
+  const actualDistrictCount = dataset.provinces.reduce((total, province) => total + province.districts.length, 0);
+
+  assert.equal(dataset.schemaVersion, "tr-address-v1");
+  assert.equal(dataset.countryCode, "TR");
+  assert.equal(dataset.provinceCount, 81);
+  assert.equal(dataset.provinces.length, 81);
+  assert.equal(new Set(provinceNames).size, 81, "il adları benzersiz olmalı");
+  assert.equal(dataset.districtCount, 973);
+  assert.equal(actualDistrictCount, 973);
+  for (const province of dataset.provinces) {
+    assert.ok(province.districts.length > 0, `${province.name} en az bir ilçe içermeli`);
+    assert.equal(new Set(province.districts).size, province.districts.length, `${province.name} ilçe adları benzersiz olmalı`);
+  }
+
+  const searchKey = (value) => String(value || "")
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replaceAll("ı", "i")
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "");
+  const search = (options, query) => options.filter((option) => searchKey(option).includes(searchKey(query)));
+  assert.deepEqual(search(provinceNames, "istanbul"), ["İstanbul"]);
+  assert.deepEqual(search(provinceNames, "sirnak"), ["Şırnak"]);
+  assert.deepEqual(
+    search(dataset.provinces.find((province) => province.name === "İstanbul").districts, "uskudar"),
+    ["Üsküdar"],
   );
   assert.deepEqual(
-    adapter.consumeFinalizedCheckout({ orderId: 45, paymentRef: "NST-IYZICO-45-safe" }),
-    [{ productId: 202, quantity: 1 }],
+    search(dataset.provinces.find((province) => province.name === "Ankara").districts, "cankaya"),
+    ["Çankaya"],
   );
+
+  assert.match(customerPages, /import turkeyLocations from "\.\.\/\.\.\/shared\/turkiye-provinces-districts\.v1\.json"/);
+  assert.match(customerPages, /toLocaleLowerCase\("tr-TR"\)/);
+  assert.match(customerPages, /replaceAll\("ı", "i"\)/);
+  assert.match(customerPages, /normalize\("NFD"\)/);
+  assert.match(customerPages, /options\.filter\(\(option\) => locationSearchKey\(option\)\.includes\(needle\)\)/);
+  assert.match(customerPages, /role="combobox"/);
+  assert.match(customerPages, /role="listbox"/);
+  assert.match(customerPages, /data-option-count=\{options\.length\}/);
 });

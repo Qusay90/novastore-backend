@@ -8,6 +8,7 @@ const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
 
 const trackedEnv = [
     'NODE_ENV',
+    'APP_BASE_URL',
     'PAYMENT_PROVIDER',
     'PAYTR_MERCHANT_ID',
     'PAYTR_MERCHANT_KEY',
@@ -40,6 +41,7 @@ const restoreState = () => {
 
 const applyPaytrEnv = () => {
     process.env.NODE_ENV = 'test';
+    process.env.APP_BASE_URL = 'https://example.test';
     process.env.PAYMENT_PROVIDER = 'paytr';
     process.env.PAYTR_MERCHANT_ID = 'merchant-id';
     process.env.PAYTR_MERCHANT_KEY = 'merchant-key-secret';
@@ -59,6 +61,9 @@ const buildPayload = (overrides = {}) => {
         merchant_oid: merchantOid,
         status: 'success',
         total_amount: '104990',
+        payment_amount: '104990',
+        payment_type: 'card',
+        currency: 'TL',
         failed_reason_code: '',
         failed_reason_msg: '',
         ...overrides
@@ -84,6 +89,7 @@ const createPaymentState = (overrides = {}) => ({
     orderStatus: ORDER_STATUS.ODEME_BEKLIYOR,
     amount: '1049.90',
     orderTotalAmount: '1049.90',
+    paytrTestMode: false,
     stockUpdates: 0,
     couponUpdates: 0,
     orderEvents: 0,
@@ -107,7 +113,8 @@ const makePaymentRow = (state) => ({
     raw_request: JSON.stringify({
         coupon: { applied: true, couponId: 901 },
         stockReserved: false,
-        finalizesOnWebhook: true
+        finalizesOnWebhook: true,
+        paytr: { testMode: state.paytrTestMode ? '1' : '0' }
     }),
     items: JSON.stringify([{ id: 101, name: 'Test Telefon', quantity: 1 }]),
     user_id: 10,
@@ -361,6 +368,50 @@ const assertNoSideEffects = (state) => {
             assertNoSideEffects(amountMismatchState);
         });
 
+        const originalAmountMismatchState = createPaymentState();
+        await withServer(originalAmountMismatchState, async (server) => {
+            const response = await postForm(server, '/api/payments/webhook/paytr', buildPayload({ payment_amount: '999' }));
+            assert.strictEqual(response.statusCode, 409);
+            assertNoSideEffects(originalAmountMismatchState);
+        });
+
+        const currencyMismatchState = createPaymentState();
+        await withServer(currencyMismatchState, async (server) => {
+            const response = await postForm(server, '/api/payments/webhook/paytr', buildPayload({ currency: 'USD' }));
+            assert.strictEqual(response.statusCode, 409);
+            assertNoSideEffects(currencyMismatchState);
+        });
+
+        const paymentTypeMismatchState = createPaymentState();
+        await withServer(paymentTypeMismatchState, async (server) => {
+            const response = await postForm(server, '/api/payments/webhook/paytr', buildPayload({ payment_type: 'bank_transfer' }));
+            assert.strictEqual(response.statusCode, 409);
+            assertNoSideEffects(paymentTypeMismatchState);
+        });
+
+        const testModeAgainstLiveAttemptState = createPaymentState();
+        await withServer(testModeAgainstLiveAttemptState, async (server) => {
+            const response = await postForm(server, '/api/payments/webhook/paytr', buildPayload({ test_mode: '1' }));
+            assert.strictEqual(response.statusCode, 409);
+            assertNoSideEffects(testModeAgainstLiveAttemptState);
+        });
+
+        const missingTestModeState = createPaymentState({ paytrTestMode: true });
+        await withServer(missingTestModeState, async (server) => {
+            const response = await postForm(server, '/api/payments/webhook/paytr', buildPayload());
+            assert.strictEqual(response.statusCode, 409);
+            assertNoSideEffects(missingTestModeState);
+        });
+
+        const productionTestCallbackState = createPaymentState({ paytrTestMode: true });
+        process.env.NODE_ENV = ' Production ';
+        await withServer(productionTestCallbackState, async (server) => {
+            const response = await postForm(server, '/api/payments/webhook/paytr', buildPayload({ test_mode: '1' }));
+            assert.strictEqual(response.statusCode, 409);
+            assertNoSideEffects(productionTestCallbackState);
+        });
+        process.env.NODE_ENV = 'test';
+
         const providerMismatchState = createPaymentState({ provider: 'iyzico' });
         await withServer(providerMismatchState, async (server) => {
             const response = await postForm(server, '/api/payments/webhook/paytr', buildPayload());
@@ -378,8 +429,8 @@ const assertNoSideEffects = (state) => {
         const unknownStatusState = createPaymentState();
         await withServer(unknownStatusState, async (server) => {
             const response = await postForm(server, '/api/payments/webhook/paytr', buildPayload({ status: 'pending_review' }));
-            assert.strictEqual(response.statusCode, 202);
-            assert.strictEqual(response.body.finalizationImplemented, false);
+            assert.strictEqual(response.statusCode, 400);
+            assert.match(response.body.error, /Desteklenmeyen PayTR callback durumu/);
             assertNoSideEffects(unknownStatusState);
         });
 

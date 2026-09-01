@@ -279,8 +279,8 @@ function TrustBar() {
   return (
     <div className="trust-bar">
       <div className="shell trust-bar__content">
-        <span><Truck weight="bold" /> 1.500 TL üzeri ücretsiz kargo</span>
-        <span><ArrowsClockwise weight="bold" /> 14 gün içinde kolay iade</span>
+        <span><Truck weight="bold" /> Teslimat seçenekleri ödeme adımında</span>
+        <span><ArrowsClockwise weight="bold" /> İade koşulları onaylı politikada</span>
         <span><ShieldCheck weight="bold" /> Güvenli ödeme</span>
         <a href="#/siparis-takibi">Sipariş takibi</a>
         <a href="#/yardim">Yardım Merkezi</a>
@@ -626,10 +626,10 @@ function ProductGrid({ items, favorites, onFavorite, onAdd, compact = false }) {
 
 function BenefitStrip() {
   const benefits = [
-    [Truck, "Ücretsiz kargo", "1.500 TL üzeri siparişlerde"],
-    [ShieldCheck, "Güvenli alışveriş", "3D Secure ödeme altyapısı"],
-    [ArrowsClockwise, "Kolay iade", "14 gün içinde ücretsiz"],
-    [Headphones, "Nova desteği", "Satış öncesi ve sonrası"],
+    [Truck, "Teslimat seçenekleri", "Ödeme adımında doğrulanır"],
+    [ShieldCheck, "Güvenli ödeme", "Kart verisi sağlayıcı ekranında girilir"],
+    [ArrowsClockwise, "İade koşulları", "Onaylı politikadan görüntülenir"],
+    [Headphones, "Nova desteği", "Yardım merkezinden erişilir"],
   ];
   return <div className="benefit-strip">{benefits.map(([Icon, title, copy]) => <div key={title}><Icon /><span><strong>{title}</strong><small>{copy}</small></span></div>)}</div>;
 }
@@ -897,8 +897,8 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyN
 
   function tabContent(tabId) {
     if (tabId === "description") return <><p>{product.description}</p><ul>{product.features.map((feature) => <li key={feature}><Check />{feature}</li>)}</ul></>;
-    if (tabId === "features") return <dl><div><dt>Marka</dt><dd>{product.brand}</dd></div><div><dt>Renk</dt><dd>{product.color}</dd></div><div><dt>Garanti</dt><dd>2 yıl</dd></div><div><dt>Stok kodu</dt><dd>{product.id}</dd></div></dl>;
-    return <p>Siparişler 24 saat içinde hazırlanır. 1.500 TL üzerindeki siparişlerde kargo ücretsizdir. Teslimden itibaren 14 gün içinde kolay iade talebi oluşturabilirsin.</p>;
+    if (tabId === "features") return <dl><div><dt>Marka</dt><dd>{product.brand}</dd></div><div><dt>Renk</dt><dd>{product.color}</dd></div><div><dt>Stok kodu</dt><dd>{product.id}</dd></div></dl>;
+    return <p>Teslimat yöntemi, kargo ücreti ve geçerli iade koşulları güvenli ödeme ve müşteri hesabı adımlarında doğrulanır.</p>;
   }
 
   return (
@@ -916,12 +916,12 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyN
             <span className="product-brand">{product.brand}</span><h1>{product.name}</h1>
             <div className="detail-rating"><span><Star weight="fill" /> {product.rating.toFixed(1)}</span><button type="button" onClick={() => document.getElementById("community-reviews")?.scrollIntoView({ behavior: "smooth", block: "start" })}>{product.reviews} değerlendirme</button><small>Ürün kodu: {product.id}</small></div>
             <div className="detail-price"><strong>{money.format(product.price)}</strong>{product.oldPrice && <del>{money.format(product.oldPrice)}</del>}</div>
-            <p className="installment">Peşin fiyatına <strong>3 taksit</strong> · Aylık {money.format(Math.ceil(product.price / 3))}</p>
+            <p className="installment">Teslimat, indirim ve ödeme seçenekleri <strong>ödeme adımında</strong> doğrulanır.</p>
             {colorOptions.length > 0 && <div className="variant-group"><div><strong>Renk</strong><span>{colorOptions[0]}</span></div><button className="color-swatch is-active" type="button" aria-label={colorOptions[0]} aria-pressed="true"><i /></button></div>}
             {storageOptions.length > 0 && <div className="variant-group"><div><strong>Kapasite</strong><span>Stokta</span></div><div className="storage-options">{storageOptions.map((storage) => <button key={storage} className={selectedStorage === storage ? "is-active" : ""} type="button" aria-pressed={selectedStorage === storage} onClick={() => setSelectedStorage(storage)}>{storage}</button>)}</div></div>}
             <div className="purchase-row"><div className="quantity-control"><button type="button" disabled={soldOut || quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" disabled={soldOut || quantity >= maxQuantity} onClick={() => setQuantity((value) => Math.min(maxQuantity, value + 1))} aria-label="Adedi artır"><Plus /></button></div><button className="buy-now-button" type="button" disabled={soldOut || buyNowPending || typeof onBuyNow !== "function"} onClick={() => onBuyNow?.(product.id, quantity)}><CreditCard /> {buyNowPending ? "Hazırlanıyor" : "Hemen Al"}</button><button className="primary-button" type="button" disabled={soldOut} onClick={() => onAdd(product.id, quantity)}><ShoppingCart /> {soldOut ? "Tükendi" : "Sepete ekle"}</button></div>
-            <div className="stock-line">{soldOut ? <><X /> Stokta yok</> : <><CheckCircle weight="fill" /> Stokta · 24 saat içinde kargoda</>}</div>
-            <div className="detail-benefits"><div><Truck /><span><strong>Ücretsiz teslimat</strong><small>1–2 iş günü</small></span></div><div><ArrowsClockwise /><span><strong>Kolay iade</strong><small>14 gün içinde</small></span></div><div><ShieldCheck /><span><strong>2 yıl garanti</strong><small>NovaStore güvencesi</small></span></div></div>
+            <div className="stock-line">{soldOut ? <><X /> Stokta yok</> : <><CheckCircle weight="fill" /> Stokta · {product.stock} adet</>}</div>
+            <div className="detail-benefits"><div><Truck /><span><strong>Teslimat seçenekleri</strong><small>Ödeme adımında hesaplanır</small></span></div><div><ArrowsClockwise /><span><strong>İade koşulları</strong><small>Onaylı politikadan görüntülenir</small></span></div><div><ShieldCheck /><span><strong>Güvenli ödeme</strong><small>Sağlayıcı ekranında tamamlanır</small></span></div></div>
           </section>
         </div>
         <section className="detail-tabs" id="reviews">

@@ -456,6 +456,80 @@ const createPendingPaymentOrder = async ({
     };
 };
 
+const createPendingPaymentOrderFromPricing = async ({
+    client = pool,
+    pricing,
+    userId = null,
+    analyticsSessionKey = null,
+    fullName,
+    email,
+    phone,
+    address,
+    paymentMethod = 'card',
+    businessIdentitySnapshot = null
+}) => {
+    const total = Number(pricing?.totals?.total);
+    const currency = String(pricing?.totals?.currency || '').trim().toUpperCase();
+    const invalidItem = !Array.isArray(pricing?.items) || pricing.items.length === 0 || pricing.items.some((item) => (
+        !Number.isSafeInteger(Number(item?.id))
+        || Number(item.id) <= 0
+        || !Number.isSafeInteger(Number(item?.quantity))
+        || Number(item.quantity) <= 0
+        || !Number.isFinite(Number(item?.price))
+        || Number(item.price) < 0
+    ));
+    if (!pricing || invalidItem || !Number.isFinite(total) || total <= 0 || currency !== 'TRY') {
+        const error = new Error('Doğrulanmış ödeme fiyat özeti zorunludur.');
+        error.code = 'PAYMENT_PRICING_SNAPSHOT_INVALID';
+        error.statusCode = 409;
+        throw error;
+    }
+
+    await reserveStock(client, pricing.items);
+
+    const paymentStatus = paymentMethod === 'havale'
+        ? PAYMENT_STATUS.WAITING_TRANSFER
+        : PAYMENT_STATUS.REQUIRES_ACTION;
+    const orderInsert = await client.query(
+        `INSERT INTO orders
+            (user_id, total_amount, status, customer_name, email, phone, address, items, payment_status,
+             payment_method, refund_status, shipment_status, currency, analytics_session_key,
+             business_identity_snapshot)
+         VALUES
+            ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15::jsonb)
+         RETURNING *`,
+        [
+            userId,
+            round2(pricing.totals.total),
+            ORDER_STATUS.ODEME_BEKLIYOR,
+            fullName,
+            email,
+            phone,
+            extractAddressText(address),
+            JSON.stringify(pricing.items),
+            paymentStatus,
+            paymentMethod,
+            REFUND_STATUS.NONE,
+            SHIPMENT_STATUS.NONE,
+            pricing.totals.currency,
+            analyticsSessionKey,
+            businessIdentitySnapshot ? JSON.stringify(businessIdentitySnapshot) : null
+        ]
+    );
+    const order = orderInsert.rows[0];
+
+    await appendOrderEvent(client, order.id, 'PAYMENT_INTENT_CREATED', 'Ödeme bekleyen ara kayıt oluşturuldu.', {
+        analyticsSessionKey,
+        paymentMethod,
+        totals: pricing.totals,
+        campaigns: pricing.campaigns,
+        coupon: pricing.coupon,
+        stockReserved: true
+    });
+
+    return { order, pricing };
+};
+
 const markOrderCancelled = async ({
     client = pool,
     order,
@@ -524,6 +598,8 @@ module.exports = {
     restockItems,
     releaseStockReservation,
     createPendingPaymentOrder,
+    createPendingPaymentOrderFromPricing,
+    assertRequestedCouponApplied,
     createOrderWithReservation,
     markOrderCancelled
 };

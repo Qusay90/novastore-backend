@@ -14,7 +14,7 @@ const host = parsed.hostname.replace(/^\[|\]$/g, '');
 const databaseName = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
 assert(['127.0.0.1', 'localhost', '::1'].includes(host), 'Integration target must be loopback.');
 assert.equal(databaseName, 'novastore_launch_wave1_test', 'Integration target must be the dedicated Wave-1 test database.');
-assert([55432, 55433].includes(Number(parsed.port)), 'Integration target must use the disposable PostgreSQL port.');
+assert([55432, 55433, 55439].includes(Number(parsed.port)), 'Integration target must use an allowlisted disposable PostgreSQL port.');
 
 Object.assign(process.env, {
     NODE_ENV: 'test',
@@ -23,7 +23,13 @@ Object.assign(process.env, {
     SKIP_SCHEMA_INIT: 'true',
     NOVASTORE_ALLOW_SCHEMA_INIT: 'false',
     DATABASE_URL: connectionString,
+    DB_HOST: host,
+    DB_PORT: parsed.port,
+    DB_NAME: databaseName,
+    DB_USER: decodeURIComponent(parsed.username),
+    DB_PASSWORD: decodeURIComponent(parsed.password),
     DB_SSL: 'false',
+    APP_BASE_URL: 'https://novastore.example',
     SUPABASE_USE_POOLER: 'false',
     SUPABASE_POOLER_HOST: '',
     SUPABASE_REGION: '',
@@ -33,12 +39,27 @@ Object.assign(process.env, {
     PAYTR_MERCHANT_KEY: 'local-wave1-key-not-a-secret',
     PAYTR_MERCHANT_SALT: 'local-wave1-salt-not-a-secret',
     PAYTR_BASE_URL: 'https://www.paytr.com',
-    PAYTR_CALLBACK_URL: 'https://api.novastore.example/api/payments/webhook/paytr',
-    PAYTR_SUCCESS_URL: 'https://www.novastore.example/odeme/basarili',
-    PAYTR_FAIL_URL: 'https://www.novastore.example/odeme/basarisiz',
+    PAYTR_CALLBACK_URL: 'https://novastore.example/api/payments/webhook/paytr',
+    PAYTR_SUCCESS_URL: 'https://novastore.example/payment-result.html',
+    PAYTR_FAIL_URL: 'https://novastore.example/payment-result.html',
     PAYTR_TEST_MODE: 'true',
     PAYTR_DEBUG_ON: 'false',
+    PAYTR_LIVE_REQUESTS_ALLOWED: 'true',
     NOVASTORE_REQUIRE_BUSINESS_IDENTITY_FOR_PAYMENT: 'false',
+    BUSINESS_LEGAL_COMPANY_NAME: 'NovaStore Local Integration Test',
+    BUSINESS_TAX_VKN: '1234567890',
+    BUSINESS_MERSIS_NUMBER: '1234567890123456',
+    BUSINESS_REGISTERED_ADDRESS: 'Yalnız yerel entegrasyon testi adresi, İstanbul',
+    BUSINESS_KEP_ADDRESS: 'local-integration@example.test',
+    BUSINESS_PHONE: '+905551110000',
+    BUSINESS_EMAIL: 'local-integration@example.test',
+    CUSTOMER_PUBLIC_DOMAIN: 'https://novastore.example',
+    NOVASTORE_LEGAL_PRE_INFORMATION_APPROVED: 'true',
+    NOVASTORE_LEGAL_PRE_INFORMATION_VERSION: 'local-integration-v1',
+    NOVASTORE_LEGAL_PRE_INFORMATION_TEXT: 'Yalnız yerel entegrasyon testi için ön bilgilendirme metni.',
+    NOVASTORE_LEGAL_DISTANCE_SALE_APPROVED: 'true',
+    NOVASTORE_LEGAL_DISTANCE_SALE_VERSION: 'local-integration-v1',
+    NOVASTORE_LEGAL_DISTANCE_SALE_TEXT: 'Yalnız yerel entegrasyon testi için mesafeli satış metni.',
     NOVASTORE_RETURN_WINDOW_DAYS: '14',
     NOVASTORE_ADMIN_RETURN_WRITE_ENABLED: 'true',
     FREE_SHIPPING_THRESHOLD: '1',
@@ -80,6 +101,7 @@ const invoke = async (handler, request) => {
 };
 
 let paymentCustomerId = null;
+let paymentAddressId = null;
 const paymentRequest = (productId, idempotencyKey, overrides = {}) => ({
     method: 'POST',
     originalUrl: '/api/payments/initialize',
@@ -89,10 +111,7 @@ const paymentRequest = (productId, idempotencyKey, overrides = {}) => ({
     connection: { remoteAddress: '127.0.0.1' },
     user: { id: paymentCustomerId, principal: 'customer', role: 'customer' },
     body: {
-        fullName: 'Wave One Customer',
-        email: 'wave1-customer@example.test',
-        phone: '+905551112233',
-        address: 'İzole test adresi, İstanbul',
+        addressId: paymentAddressId,
         analyticsSessionKey: 'launch-wave1-session',
         cartItems: [{ id: productId, quantity: 1, price: 0.01 }],
         paymentMethod: 'card',
@@ -108,6 +127,7 @@ const expectCode = async (promise, code) => assert.rejects(
 
 const admin = new Client({ connectionString, application_name: 'novastore_launch_wave1_assertions' });
 let pool = null;
+let paymentControllerTestApi = null;
 
 (async () => {
     await admin.connect();
@@ -122,7 +142,26 @@ let pool = null;
     assert.deepEqual(secondApply.applied, []);
 
     pool = require('../config/db');
-    const { initializePayment, webhookPaytr } = require('../controllers/paymentController');
+    const paymentController = require('../controllers/paymentController');
+    const {
+        getCheckoutAgreementPreview,
+        getPaymentStatus,
+        initializePayment,
+        webhookPaytr
+    } = paymentController;
+    paymentControllerTestApi = paymentController.__test;
+    let providerSessionCalls = 0;
+    paymentControllerTestApi.setPaytrIframeSessionRequester(async ({ payload, config }) => {
+        providerSessionCalls += 1;
+        const token = `local_${payload.merchant_oid}`;
+        return Object.freeze({
+            type: 'iframe',
+            token,
+            iframeUrl: `${config.baseUrl}/odeme/guvenli/${token}`,
+            successUrl: payload.merchant_ok_url,
+            failUrl: payload.merchant_fail_url
+        });
+    });
     const { cancelOrder, getUserOrders } = require('../controllers/orderController');
     const { getAllReturnRequests, getReturnById } = require('../controllers/returnController');
     const {
@@ -139,7 +178,6 @@ let pool = null;
         orderCommand,
         readOrder
     } = require('../services/sellerOrderFulfillmentService');
-    const { releaseExpiredPaymentReservations } = require('../services/paymentReservationService');
     const { dispatchNotificationOutboxBatch } = require('../services/notificationOutboxService');
     const { calculatePricing } = require('../services/pricingService');
     const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
@@ -167,6 +205,16 @@ let pool = null;
     const sellerAUserId = userIdByEmail.get('seller-a@example.test');
     const sellerBUserId = userIdByEmail.get('seller-b@example.test');
     paymentCustomerId = customerId;
+
+    const address = await pool.query(
+        `INSERT INTO customer_addresses
+            (user_id, title, full_name, phone, city, district, address_line, is_default)
+         VALUES ($1, 'Ev', 'Wave Customer', '05551110001', 'İstanbul', 'Kadıköy',
+                 'Yalnız yerel entegrasyon testi adresi No: 1', TRUE)
+         RETURNING id`,
+        [customerId]
+    );
+    paymentAddressId = Number(address.rows[0].id);
 
     const legacyStores = await pool.query(
         `INSERT INTO stores (name, slug, owner_user_id)
@@ -228,6 +276,31 @@ let pool = null;
          VALUES ($1, $2, $3), ($4, $5, $6)`,
         [membershipAId, organizationAId, sellerStoreAId, membershipBId, organizationBId, sellerStoreBId]
     );
+
+    const authorizedPaymentRequest = async (productId, idempotencyKey, overrides = {}) => {
+        const request = paymentRequest(productId, idempotencyKey, overrides);
+        const preview = await invoke(getCheckoutAgreementPreview, {
+            user: request.user,
+            body: {
+                addressId: request.body.addressId,
+                cartItems: request.body.cartItems,
+                couponCode: request.body.couponCode || null
+            }
+        });
+        assert.equal(preview.statusCode, 200, `Agreement preview failed: ${JSON.stringify(preview.payload)}`);
+        return {
+            ...request,
+            body: {
+                ...request.body,
+                agreementSnapshotSha256: preview.payload.snapshotSha256,
+                agreementAcceptances: preview.payload.documents.map((document) => ({
+                    slug: document.slug,
+                    version: document.version,
+                    accepted: true
+                }))
+            }
+        };
+    };
     const sellerASession = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
     const sellerBSession = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
     await pool.query(
@@ -278,9 +351,13 @@ let pool = null;
     );
 
     const sameKey = 'launch-idempotency-0001';
+    const [sameRequestA, sameRequestB] = await Promise.all([
+        authorizedPaymentRequest(idempotencyProductId, sameKey),
+        authorizedPaymentRequest(idempotencyProductId, sameKey)
+    ]);
     const [sameA, sameB] = await Promise.all([
-        invoke(initializePayment, paymentRequest(idempotencyProductId, sameKey)),
-        invoke(initializePayment, paymentRequest(idempotencyProductId, sameKey))
+        invoke(initializePayment, sameRequestA),
+        invoke(initializePayment, sameRequestB)
     ]);
     assert.deepEqual([sameA.statusCode, sameB.statusCode].sort(), [200, 201]);
     assert.equal(Number(sameA.payload.orderId), Number(sameB.payload.orderId));
@@ -315,6 +392,10 @@ let pool = null;
         merchant_oid: createdSamePayment.payload.paymentRef,
         status: 'success',
         total_amount: sameTotalAmount,
+        payment_amount: sameTotalAmount,
+        payment_type: 'card',
+        currency: 'TL',
+        test_mode: '1',
         hash: buildPaytrCallbackHash({
             merchantOid: createdSamePayment.payload.paymentRef,
             status: 'success',
@@ -354,9 +435,13 @@ let pool = null;
     assert.equal(Number(cancellationSnapshot.rows[0].stock), 5);
     assert.equal(cancellationSnapshot.rows[0].has_event, true);
 
+    const [lastRequestA, lastRequestB] = await Promise.all([
+        authorizedPaymentRequest(lastUnitProductId, 'launch-last-unit-0001'),
+        authorizedPaymentRequest(lastUnitProductId, 'launch-last-unit-0002')
+    ]);
     const [lastA, lastB] = await Promise.all([
-        invoke(initializePayment, paymentRequest(lastUnitProductId, 'launch-last-unit-0001')),
-        invoke(initializePayment, paymentRequest(lastUnitProductId, 'launch-last-unit-0002'))
+        invoke(initializePayment, lastRequestA),
+        invoke(initializePayment, lastRequestB)
     ]);
     assert.deepEqual([lastA.statusCode, lastB.statusCode].sort(), [201, 409]);
     const lastUnitSnapshot = await pool.query(
@@ -369,23 +454,39 @@ let pool = null;
     assert.deepEqual(lastUnitSnapshot.rows[0], { stock: 0, payments: 1 });
 
     const stockBeforeExpiry = Number((await pool.query('SELECT stock FROM products WHERE id = $1', [idempotencyProductId])).rows[0].stock);
-    const expiring = await invoke(initializePayment, paymentRequest(idempotencyProductId, 'launch-expiry-0001'));
+    const expiring = await invoke(
+        initializePayment,
+        await authorizedPaymentRequest(idempotencyProductId, 'launch-expiry-0001')
+    );
     assert.equal(expiring.statusCode, 201);
     await pool.query(
         `UPDATE payments
          SET raw_request = raw_request || '{"reservationExpiresAt":"2026-08-01T00:00:00.000Z"}'::jsonb
          WHERE idempotency_key = 'launch-expiry-0001'`
     );
-    const expirationClient = await pool.connect();
-    await expirationClient.query('BEGIN');
-    const expirationResult = await releaseExpiredPaymentReservations(expirationClient, { limit: 10 });
-    await expirationClient.query('COMMIT');
-    expirationClient.release();
-    assert.equal(expirationResult.released, 1);
+    const expiredStatus = await invoke(getPaymentStatus, {
+        query: {
+            paymentRef: expiring.payload.paymentRef,
+            orderId: String(expiring.payload.orderId)
+        },
+        user: { id: customerId, principal: 'customer', role: 'customer' }
+    });
+    assert.equal(expiredStatus.statusCode, 200);
+    assert.equal(expiredStatus.payload.paymentStatus, PAYMENT_STATUS.FAILED);
+    assert.equal(expiredStatus.payload.nextAction, 'RETRY_PAYMENT');
+    const duplicateExpiredStatus = await invoke(getPaymentStatus, {
+        query: {
+            paymentRef: expiring.payload.paymentRef,
+            orderId: String(expiring.payload.orderId)
+        },
+        user: { id: customerId, principal: 'customer', role: 'customer' }
+    });
+    assert.equal(duplicateExpiredStatus.statusCode, 200);
+    assert.equal(duplicateExpiredStatus.payload.paymentStatus, PAYMENT_STATUS.FAILED);
     const expirySnapshot = await pool.query(
         `SELECT p.status AS payment_status, o.status AS order_status, product.stock,
                 (SELECT status FROM coupon_reservations reservation WHERE reservation.order_id = o.id) AS coupon_reservation_status,
-                EXISTS (SELECT 1 FROM order_events event WHERE event.order_id = o.id AND event.event_type = 'PAYMENT_RESERVATION_EXPIRED') AS has_event
+                (SELECT COUNT(*)::int FROM order_events event WHERE event.order_id = o.id AND event.event_type = 'PAYMENT_RESERVATION_EXPIRED') AS event_count
          FROM payments p
          JOIN orders o ON o.id = p.order_id
          JOIN products product ON product.id = $1
@@ -395,11 +496,11 @@ let pool = null;
     assert.equal(expirySnapshot.rows[0].payment_status, PAYMENT_STATUS.FAILED);
     assert.equal(expirySnapshot.rows[0].order_status, ORDER_STATUS.IPTAL_EDILDI);
     assert.equal(Number(expirySnapshot.rows[0].stock), stockBeforeExpiry);
-    assert.equal(expirySnapshot.rows[0].has_event, true);
+    assert.equal(expirySnapshot.rows[0].event_count, 1);
 
     const sellerInitialize = await invoke(
         initializePayment,
-        paymentRequest(sellerProductId, 'launch-seller-order-0001', { couponCode: 'LAUNCH10' })
+        await authorizedPaymentRequest(sellerProductId, 'launch-seller-order-0001', { couponCode: 'LAUNCH10' })
     );
     assert.equal(sellerInitialize.statusCode, 201);
     assert.equal(Number(sellerInitialize.payload.totals.subtotal), 250);
@@ -413,7 +514,7 @@ let pool = null;
     assert.equal(reservedCoupon.rows[0].status, 'RESERVED');
     const competingCouponIntent = await invoke(
         initializePayment,
-        paymentRequest(sellerProductId, 'launch-seller-order-0002', { couponCode: 'LAUNCH10' })
+        await authorizedPaymentRequest(sellerProductId, 'launch-seller-order-0002', { couponCode: 'LAUNCH10' })
     );
     assert.equal(competingCouponIntent.statusCode, 409);
     assert.equal(competingCouponIntent.payload.code, 'COUPON_USAGE_LIMIT_RESERVED');
@@ -423,6 +524,10 @@ let pool = null;
         merchant_oid: sellerInitialize.payload.paymentRef,
         status: 'success',
         total_amount: totalAmount,
+        payment_amount: totalAmount,
+        payment_type: 'card',
+        currency: 'TL',
+        test_mode: '1',
         hash: buildPaytrCallbackHash({
             merchantOid: sellerInitialize.payload.paymentRef,
             status: 'success',
@@ -663,14 +768,17 @@ let pool = null;
         sellerOrderRows: paidSnapshot.rows[0].seller_orders,
         returnEventRows: returnSnapshot.rows[0].event_count,
         typedNotificationRows: notificationSnapshot.rows.length,
-        refundProviderExecuted: approved.refundProviderExecuted
+        refundProviderExecuted: approved.refundProviderExecuted,
+        deterministicProviderSessionCalls: providerSessionCalls
     });
+    assert(providerSessionCalls >= 6, 'Expected deterministic local provider session stub calls.');
     console.log(`launch-critical commerce PostgreSQL smoke passed: ${JSON.stringify(result)}`);
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;
 }).finally(async () => {
     Module._load = originalLoad;
+    paymentControllerTestApi?.resetPaytrIframeSessionRequester();
     if (pool) await pool.end().catch(() => {});
     await admin.end().catch(() => {});
 });

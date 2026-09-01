@@ -132,20 +132,14 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         throw new Error('staging payment guard reached the database');
     };
 
-    const paymentProviderService = require('../services/paymentProviderService');
     const paytrPaymentService = require('../services/paytrPaymentService');
-    const originalIyzicoInitialize = paymentProviderService.initializeIyzicoPayment;
     const originalPaytrPayload = paytrPaymentService.buildPaytrTokenPayload;
-    const originalPaytrMock = paytrPaymentService.buildMockPaytrTokenResponse;
-    paymentProviderService.initializeIyzicoPayment = async () => {
-        paymentProviderCalls += 1;
-        return {};
-    };
+    const originalPaytrRequest = paytrPaymentService.requestPaytrIframeSession;
     paytrPaymentService.buildPaytrTokenPayload = () => {
         paymentProviderCalls += 1;
         return {};
     };
-    paytrPaymentService.buildMockPaytrTokenResponse = () => {
+    paytrPaymentService.requestPaytrIframeSession = async () => {
         paymentProviderCalls += 1;
         return {};
     };
@@ -176,9 +170,8 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
     });
 
     pool.connect = originalPoolConnect;
-    paymentProviderService.initializeIyzicoPayment = originalIyzicoInitialize;
     paytrPaymentService.buildPaytrTokenPayload = originalPaytrPayload;
-    paytrPaymentService.buildMockPaytrTokenResponse = originalPaytrMock;
+    paytrPaymentService.requestPaytrIframeSession = originalPaytrRequest;
 
     let resendConstructions = 0;
     let emailDatabaseCalls = 0;
@@ -425,13 +418,22 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         }
     });
 
-    await check('sideEffect', '35 staging does not synthesize provider success or payment tokens', () => {
+    await check('sideEffect', '35 staging does not synthesize provider success or payment tokens', async () => {
         assert.equal(initializeResult.state.payload.code, 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED');
         assert.equal(Object.prototype.hasOwnProperty.call(initializeResult.state.payload, 'token'), false);
-        assert.throws(
-            () => originalPaytrMock({ merchantOid: 'synthetic', paymentAmount: 100 }),
+        let transportCalls = 0;
+        await assert.rejects(
+            originalPaytrRequest({
+                payload: {},
+                config: {},
+                transport: async () => {
+                    transportCalls += 1;
+                    return { status: 'success', token: 'must-not-be-used' };
+                }
+            }),
             ExternalSideEffectBlockedError
         );
+        assert.equal(transportCalls, 0);
     });
 
     await check('runtime', '36 missing or enabled admin write flags reject startup', () => {

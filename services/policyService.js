@@ -1,14 +1,16 @@
 const pool = require('../config/db');
+const {
+    exactTrue,
+    getLegalDocument
+} = require('./legalDocumentService');
 
 const POLICY_TOPIC_CONFIG = Object.freeze({
-    returns: Object.freeze({ title: 'İade ve değişim', envKey: 'RETURNS' }),
-    privacy: Object.freeze({ title: 'Gizlilik', envKey: 'PRIVACY' }),
-    kvkk: Object.freeze({ title: 'KVKK aydınlatma', envKey: 'KVKK' }),
-    payment: Object.freeze({ title: 'Ödeme koşulları', envKey: 'PAYMENT' }),
-    shipping: Object.freeze({ title: 'Kargo ve teslimat', envKey: 'SHIPPING' })
+    returns: Object.freeze({ title: 'İade ve değişim', legalSlug: 'cancellation-return' }),
+    privacy: Object.freeze({ title: 'Gizlilik', legalSlug: 'privacy' }),
+    kvkk: Object.freeze({ title: 'KVKK aydınlatma', legalSlug: 'kvkk' }),
+    payment: Object.freeze({ title: 'Ödeme koşulları', legalSlug: 'pre-information' }),
+    shipping: Object.freeze({ title: 'Kargo ve teslimat', legalSlug: 'delivery-shipping' })
 });
-
-const exactTrue = (value) => String(value || '').trim().toLowerCase() === 'true';
 
 const detectPolicyTopic = (message) => {
     const text = String(message || '').toLocaleLowerCase('tr-TR');
@@ -42,21 +44,9 @@ const getActiveCoupons = async () => {
 const getApprovedPolicyContent = (topic, env = process.env) => {
     const config = POLICY_TOPIC_CONFIG[topic];
     if (!config) return null;
-    const prefix = `NOVASTORE_POLICY_${config.envKey}`;
-    const approved = exactTrue(env[`${prefix}_APPROVED`]);
-    const version = String(env[`${prefix}_VERSION`] || '').trim();
-    const text = String(env[`${prefix}_TEXT`] || '').trim();
-
-    if (
-        !approved ||
-        !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(version) ||
-        !text ||
-        text.length > 8000 ||
-        /[\u0000\u000b\u000c\u007f]/.test(text)
-    ) {
-        return null;
-    }
-    return Object.freeze({ title: config.title, version, text });
+    const document = getLegalDocument(config.legalSlug, env);
+    if (!document || document.status !== 'published') return null;
+    return Object.freeze({ title: config.title, version: document.version, text: document.text });
 };
 
 const unpublishedPolicyAnswer = (topic) => ({

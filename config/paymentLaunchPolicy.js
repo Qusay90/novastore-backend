@@ -44,7 +44,9 @@ const readBankTransferConfig = (env = process.env) => {
 
 const assertPaymentLaunchPolicy = ({ paymentMethod, env = process.env } = {}) => {
     const production = String(env.NODE_ENV || '').trim().toLowerCase() === 'production';
-    const requireBusinessIdentity = production || exactTrue(env.NOVASTORE_REQUIRE_BUSINESS_IDENTITY_FOR_PAYMENT);
+    const requireBusinessIdentity = paymentMethod !== 'havale'
+        || production
+        || exactTrue(env.NOVASTORE_REQUIRE_BUSINESS_IDENTITY_FOR_PAYMENT);
     let identitySnapshot = null;
     if (requireBusinessIdentity) {
         try {
@@ -72,14 +74,6 @@ const assertPaymentLaunchPolicy = ({ paymentMethod, env = process.env } = {}) =>
             );
         }
         return Object.freeze({ production, identitySnapshot, bankTransfer });
-    }
-
-    if (production) {
-        throw new PaymentLaunchPolicyError(
-            'LIVE_PAYMENT_PROVIDER_NOT_ACTIVATED',
-            'Gerçek ödeme sağlayıcısı henüz üretim için etkinleştirilmedi.',
-            ['PAYMENT_PROVIDER_ONBOARDING', 'LIVE_PROVIDER_ADAPTER', 'PRODUCTION_CALLBACK_CONFIGURATION']
-        );
     }
 
     return Object.freeze({ production, identitySnapshot, bankTransfer: null });

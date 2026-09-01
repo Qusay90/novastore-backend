@@ -95,11 +95,12 @@ assert.deepEqual(readBankTransferConfig({}), {
     missing: ['NOVASTORE_BANK_TRANSFER_ENABLED', 'HAVALE_ACCOUNT_NAME', 'HAVALE_IBAN']
 });
 
-assert.throws(
-    () => assertPaymentLaunchPolicy({ paymentMethod: 'card', env: { ...validIdentityEnv, NODE_ENV: 'production' } }),
-    (error) => error instanceof PaymentLaunchPolicyError
-        && error.code === 'LIVE_PAYMENT_PROVIDER_NOT_ACTIVATED'
-);
+const productionCardPolicy = assertPaymentLaunchPolicy({
+    paymentMethod: 'card',
+    env: { ...validIdentityEnv, NODE_ENV: 'production' }
+});
+assert.equal(productionCardPolicy.production, true);
+assert.equal(productionCardPolicy.identitySnapshot.legalCompanyName, validIdentityEnv.BUSINESS_LEGAL_COMPANY_NAME);
 assert.throws(
     () => assertPaymentLaunchPolicy({ paymentMethod: 'havale', env: { NODE_ENV: 'test' } }),
     (error) => error instanceof PaymentLaunchPolicyError
@@ -166,7 +167,13 @@ const migrationSource = fs.readFileSync(
     'utf8'
 );
 const returnSource = fs.readFileSync(path.join(root, 'services', 'returnWorkflowService.js'), 'utf8');
-assert.match(paymentControllerSource, /pg_advisory_xact_lock\(hashtextextended\(\$1, 0\)\)/);
+assert.match(paymentControllerSource, /pg_advisory_lock\(hashtextextended\(\$1, 0\)\)/);
+assert.match(paymentControllerSource, /pg_advisory_unlock\(hashtextextended\(\$1, 0\)\)/);
+assert.match(
+    paymentControllerSource,
+    /pg_advisory_lock\(hashtextextended\(\$1, 0\)\)[\s\S]{0,500}client\.query\('BEGIN'\)/,
+    'idempotency session lock must be acquired before the short mutation transaction begins'
+);
 assert.match(paymentControllerSource, /createPendingPaymentOrder/);
 assert.match(paymentControllerSource, /enqueueNotificationEvent\(client/);
 assert.match(paymentControllerSource, /eventType:\s*EVENT\.(?:ORDER_CREATED|ORDER_CONFIRMED|PAYMENT_SUCCESS|PAYMENT_FAILED)/);

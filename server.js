@@ -34,6 +34,7 @@ const {
 const { assertExternalSideEffectAllowed } = require('./config/stagingRuntimePolicy');
 const pool = require('./config/db');
 const { getAllowedOrigins } = require('./config/appConfig');
+const { getTrustedProxyHops } = require('./config/proxyTrustConfig');
 const { getPublicCategoryBySlug } = require('./services/categoryService');
 const { getPublicCollection } = require('./services/collectionService');
 const {
@@ -47,6 +48,8 @@ const {
 const { socketRevocationService } = require('./services/socketRevocationService');
 
 const app = express();
+const trustedProxyHops = getTrustedProxyHops(process.env);
+if (trustedProxyHops > 0) app.set('trust proxy', trustedProxyHops);
 const server = http.createServer(app);
 
 const allowedOrigins = getAllowedOrigins();
@@ -148,6 +151,8 @@ app.use(simpleRateLimit({ windowMs: 60 * 1000, max: 240 }));
 
 const runtimeMetaRoutes = require('./routes/runtimeMetaRoutes');
 app.use('/api', runtimeMetaRoutes);
+const publicLegalRoutes = require('./routes/publicLegalRoutes');
+app.use('/api/public/legal', publicLegalRoutes);
 
 app.get('/favicon.ico', (req, res) => {
     res.type('image/png');
@@ -177,6 +182,7 @@ const COMMERCE_PRO_DOCUMENT_ALIASES = new Set([
     '/forgot-password.html',
     '/reset-password.html',
     '/checkout.html',
+    '/payment-result.html',
     '/profile.html',
     '/product.html'
 ]);
@@ -185,10 +191,10 @@ const COMMERCE_PRO_HASH_ROUTES = [
     /^\/arama\/?$/,
     /^\/favoriler\/?$/,
     /^\/sepet\/?$/,
-    /^\/hesabim(?:\/(?:adresler|kuponlar|bildirimler|guvenlik|siparisler(?:\/[^/]+)?))?\/?$/,
+    /^\/hesabim(?:\/(?:adresler|kuponlar|bildirimler|guvenlik|destek|siparisler(?:\/[^/]+)?))?\/?$/,
     /^\/(?:giris|kayit|sifremi-unuttum|sifre-sifirla)\/?$/,
-    /^\/odeme\/(?:teslimat|odeme|onay)\/?$/,
-    /^\/(?:yardim|siparis-takibi|iletisim)\/?$/
+    /^\/odeme\/(?:teslimat|odeme|onay|sonuc)\/?$/,
+    /^\/(?:yardim|siparis-takibi|iletisim|destek|hakkimizda|gizlilik-politikasi|kvkk-aydinlatma-metni|cerez-politikasi|kullanim-ve-uyelik-kosullari|on-bilgilendirme-formu|mesafeli-satis-sozlesmesi|iptal-iade-cayma-politikasi|teslimat-ve-kargo-kosullari|islem-rehberi|pazaryeri-bilgilendirmesi|satici-sozlesmesi)\/?$/
 ];
 const COMMERCE_PRO_DOCUMENT_ROUTES = /^\/(?:kategori|urun|koleksiyon|magaza)\/(?:[^/]+(?:\/[^/]+)*)\/?$/;
 
@@ -197,8 +203,24 @@ const requestSearch = (req) => {
     return queryIndex === -1 ? '' : req.originalUrl.slice(queryIndex);
 };
 
+const setDenyFrameHeaders = (res) => {
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+    res.setHeader('X-Frame-Options', 'DENY');
+};
+
+const sendCommerceProStorefront = (res) => {
+    setDenyFrameHeaders(res);
+    return res.sendFile(COMMERCE_PRO_STOREFRONT_ARTIFACT);
+};
+
 app.use((req, res, next) => {
-    if (!commerceProStorefrontEnabled || !['GET', 'HEAD'].includes(req.method)) return next();
+    if (!['GET', 'HEAD'].includes(req.method)) return next();
+
+    if (['/checkout.html', '/payment-result.html'].includes(req.path)) {
+        return sendCommerceProStorefront(res);
+    }
+
+    if (!commerceProStorefrontEnabled) return next();
 
     if (/^\/category\/(?:[^/]+(?:\/[^/]+)*)\/?$/.test(req.path)) {
         const requestedPath = req.path.slice('/category/'.length).replace(/^\/+|\/+$/g, '');
@@ -215,7 +237,7 @@ app.use((req, res, next) => {
     }
 
     if (COMMERCE_PRO_DOCUMENT_ALIASES.has(req.path) || COMMERCE_PRO_DOCUMENT_ROUTES.test(req.path)) {
-        return res.sendFile(COMMERCE_PRO_STOREFRONT_ARTIFACT);
+        return sendCommerceProStorefront(res);
     }
 
     if (COMMERCE_PRO_HASH_ROUTES.some((pattern) => pattern.test(req.path))) {
@@ -226,10 +248,34 @@ app.use((req, res, next) => {
     return next();
 });
 
-const ADMIN_COMMERCE_PRO_HTML_FILES = new Set([
+const DENY_FRAME_HTML_FILES = new Set([
     'admin-commerce-pro.html',
-    'admin-commerce-pro-live.html'
+    'admin-commerce-pro-live.html',
+    'paytr-checkout.html'
 ]);
+const BLOCKED_STOREFRONT_PREVIEW_PREFIXES = Object.freeze([
+    '/commerce-pro-preview',
+    '/commerce-pro-integration-preview'
+]);
+app.use((req, res, next) => {
+    let normalizedPath;
+    try {
+        const decodedPath = decodeURIComponent(req.path);
+        if (/[\u0000-\u001f\u007f]/.test(decodedPath)) {
+            return res.status(400).type('text/plain').send('Bad request');
+        }
+        normalizedPath = path.posix.normalize(decodedPath.replace(/\\/g, '/')).toLowerCase();
+    } catch (_) {
+        return res.status(400).type('text/plain').send('Bad request');
+    }
+
+    if (BLOCKED_STOREFRONT_PREVIEW_PREFIXES.some((prefix) => (
+        normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`)
+    ))) {
+        return res.status(404).type('text/plain').send('Not found');
+    }
+    return next();
+});
 app.use(express.static(path.join(__dirname, 'frontend'), {
     setHeaders: (res, filePath) => {
         const ext = path.extname(filePath).toLowerCase();
@@ -238,9 +284,11 @@ app.use(express.static(path.join(__dirname, 'frontend'), {
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
-            if (ADMIN_COMMERCE_PRO_HTML_FILES.has(path.basename(filePath).toLowerCase())) {
-                res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
-                res.setHeader('X-Frame-Options', 'DENY');
+            if (
+                DENY_FRAME_HTML_FILES.has(path.basename(filePath).toLowerCase())
+                || path.resolve(filePath) === path.resolve(COMMERCE_PRO_STOREFRONT_ARTIFACT)
+            ) {
+                setDenyFrameHeaders(res);
             }
         } else if (ext === '.css') {
             res.setHeader('Content-Type', 'text/css; charset=UTF-8');

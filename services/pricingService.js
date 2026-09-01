@@ -104,7 +104,7 @@ const loadProductsForCart = async (cartItems, client = pool) => {
     return { normalized, productMap };
 };
 
-const resolveCoupon = async (couponCode, subtotal, client = pool) => {
+const resolveCoupon = async (couponCode, subtotal, client = pool, { lock = true } = {}) => {
     if (!couponCode || !couponCode.trim()) {
         return { applied: false, code: null, discountAmount: 0, reason: null, couponId: null };
     }
@@ -124,7 +124,7 @@ const resolveCoupon = async (couponCode, subtotal, client = pool) => {
            AND is_active = TRUE
            AND (starts_at IS NULL OR starts_at <= NOW())
            AND (ends_at IS NULL OR ends_at >= NOW())
-         FOR UPDATE`,
+         ${lock ? 'FOR UPDATE' : ''}`,
         [code]
     );
 
@@ -177,7 +177,7 @@ const resolveCoupon = async (couponCode, subtotal, client = pool) => {
     };
 };
 
-const calculatePricing = async ({ cartItems, couponCode = null, client = pool }) => {
+const calculatePricing = async ({ cartItems, couponCode = null, client = pool, lockCoupon = true }) => {
     const { normalized, productMap } = await loadProductsForCart(cartItems, client);
 
     let subtotal = 0;
@@ -218,7 +218,7 @@ const calculatePricing = async ({ cartItems, couponCode = null, client = pool })
         ? round2(Math.min(subtotal * 0.05, 300))
         : 0;
 
-    const coupon = await resolveCoupon(couponCode, subtotal, client);
+    const coupon = await resolveCoupon(couponCode, subtotal, client, { lock: lockCoupon });
 
     const preShippingTotal = round2(Math.max(0, subtotal - rawBundleDiscount - coupon.discountAmount));
 

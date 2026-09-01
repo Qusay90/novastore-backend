@@ -99,6 +99,29 @@ const assertNotArtifact = async (baseUrl, pathname, options = {}) => {
     return { response, body };
 };
 
+const blockedPreviewPaths = Object.freeze([
+    '/commerce-pro-preview/index.html',
+    '/commerce-pro-integration-preview/index.html',
+    '/commerce%2Dpro-preview/index.html',
+    '/commerce-pro%2Dintegration-preview/index.html',
+    '/%63ommerce-pro-integration-preview/index.html',
+    '/commerce-pro-integration-preview%2Findex.html',
+    '/route-smoke/..%2Fcommerce-pro-integration-preview/index.html',
+    '/Commerce-Pro-Integration-Preview/index.html',
+    '/commerce-pro-integration-preview%5Cindex.html'
+]);
+
+const assertPreviewRoutesBlocked = async (baseUrl, mode) => {
+    for (const pathname of blockedPreviewPaths) {
+        const { response } = await assertNotArtifact(baseUrl, pathname);
+        assert.equal(response.status, 404, `${pathname} must be unreachable in ${mode} mode`);
+    }
+
+    const malformedPath = '/commerce-pro-integration-preview/%E0%A4%A';
+    const { response } = await assertNotArtifact(baseUrl, malformedPath);
+    assert.equal(response.status, 400, `${malformedPath} must fail closed on malformed encoding`);
+};
+
 const withServer = async (mode, verify) => {
     const port = await reserveLoopbackPort();
     const baseUrl = `http://127.0.0.1:${port}`;
@@ -149,6 +172,7 @@ const withServer = async (mode, verify) => {
             '/forgot-password.html',
             '/reset-password.html?token=local-only',
             '/checkout.html',
+            '/payment-result.html?merchant_oid=local-only',
             '/profile.html?tab=favorites',
             '/product.html?id=101'
         ]) {
@@ -187,6 +211,7 @@ const withServer = async (mode, verify) => {
             ['/odeme/teslimat', '/#/odeme/teslimat'],
             ['/odeme/odeme', '/#/odeme/odeme'],
             ['/odeme/onay', '/#/odeme/onay'],
+            ['/odeme/sonuc?paymentRef=local-only&orderId=1', '/#/odeme/sonuc?paymentRef=local-only&orderId=1'],
             ['/yardim', '/#/yardim'],
             ['/siparis-takibi', '/#/siparis-takibi'],
             ['/iletisim', '/#/iletisim']
@@ -204,25 +229,22 @@ const withServer = async (mode, verify) => {
             '/admin-commerce-pro.html',
             '/admin/route-smoke-not-found',
             '/paytr-checkout.html',
-            '/payment-result.html?merchant_oid=local-only',
             '/favicon.ico',
             '/shared-state-sync.js',
             '/route-smoke-not-found',
-            '/odeme/sonuc',
             '/siparis/tamamlandi',
             '/merchant/route-smoke-not-found',
             '/category/%E0%A4%A'
         ]) {
             await assertNotArtifact(baseUrl, pathname);
         }
+        await assertPreviewRoutesBlocked(baseUrl, 'commerce-pro');
         await assertNotArtifact(baseUrl, '/favoriler', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: '{}'
         });
 
-        const paymentResult = await fetchLocal(baseUrl, '/payment-result.html?merchant_oid=local-only');
-        assert((await responseBytes(paymentResult)).equals(legacy.payment));
         const paytrCheckout = await fetchLocal(baseUrl, '/paytr-checkout.html');
         assert((await responseBytes(paytrCheckout)).equals(legacy.paytr));
     });
@@ -240,7 +262,6 @@ const withServer = async (mode, verify) => {
             ['/collections.html', legacy.collection],
             ['/product.html?id=101', legacy.product],
             ['/login.html', legacy.login],
-            ['/payment-result.html?merchant_oid=local-only', legacy.payment],
             ['/paytr-checkout.html', legacy.paytr]
         ]) {
             const response = await fetchLocal(baseUrl, pathname);
@@ -248,9 +269,13 @@ const withServer = async (mode, verify) => {
             assert((await responseBytes(response)).equals(expected));
         }
 
+        await assertArtifactResponse(baseUrl, '/checkout.html');
+        await assertArtifactResponse(baseUrl, '/payment-result.html?merchant_oid=local-only');
+
         await assertNotArtifact(baseUrl, '/favoriler');
         await assertNotArtifact(baseUrl, '/api/route-smoke-not-found');
         await assertNotArtifact(baseUrl, '/admin.html');
+        await assertPreviewRoutesBlocked(baseUrl, 'legacy');
     });
 
     console.log('Commerce Pro cutover route smoke passed');
