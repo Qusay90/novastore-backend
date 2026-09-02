@@ -91,6 +91,12 @@ type CheckoutRequest = Readonly<{
   couponCode?: string | null;
 }>;
 
+type CustomerPaymentInitializeInput = CheckoutRequest & Readonly<{
+  preview: CustomerCheckoutPreview;
+  acceptedSlugs: readonly string[];
+  idempotencyKey: string;
+}>;
+
 const SHA256 = /^[a-f0-9]{64}$/u;
 const PAYTR_PATH_PREFIX = "/odeme/guvenli/";
 const REQUIRED_AGREEMENT_SLUGS = Object.freeze(["pre-information", "distance-sale"] as const);
@@ -304,13 +310,7 @@ export async function previewCustomerCheckout(input: CheckoutRequest): Promise<C
   });
 }
 
-export async function initializeCustomerPayment(
-  input: CheckoutRequest & Readonly<{
-    preview: CustomerCheckoutPreview;
-    acceptedSlugs: readonly string[];
-    idempotencyKey: string;
-  }>,
-): Promise<CustomerPaymentResponse> {
+function createCustomerPaymentInitializeBody(input: CustomerPaymentInitializeInput) {
   const accepted = new Set(input.acceptedSlugs);
   if (input.preview.documents.some((document) => !accepted.has(document.slug))) {
     throw checkoutError("Güncel sözleşmelerin tümünü onaylamalısın.", "CHECKOUT_AGREEMENT_ACCEPTANCE_REQUIRED");
@@ -319,7 +319,7 @@ export async function initializeCustomerPayment(
   if (!/^[A-Za-z0-9._:-]{8,120}$/u.test(idempotencyKey)) {
     throw checkoutError("Ödeme tekrar güvenliği oluşturulamadı.", "CHECKOUT_IDEMPOTENCY_INVALID");
   }
-  const source = objectValue(await requestCustomerApi("/api/payments/initialize", "POST", {
+  return {
     ...requestBody(input),
     paymentMethod: "card",
     idempotency_key: idempotencyKey,
@@ -329,7 +329,15 @@ export async function initializeCustomerPayment(
       version: document.version,
       accepted: true,
     })),
-  }));
+  };
+}
+
+export async function initializeCustomerPayment(
+  input: CustomerPaymentInitializeInput,
+): Promise<CustomerPaymentResponse> {
+  const initializeBody = createCustomerPaymentInitializeBody(input);
+  const idempotencyKey = initializeBody.idempotency_key;
+  const source = objectValue(await requestCustomerApi("/api/payments/initialize", "POST", initializeBody));
   const orderId = positiveId(source?.orderId);
   const paymentRef = text(source?.paymentRef);
   const paymentStatus = text(source?.paymentStatus);
@@ -394,6 +402,7 @@ export function createCheckoutIdempotencyKey() {
 
 export const customerCheckoutApiTestUtils = Object.freeze({
   canonicalCartItems,
+  createCustomerPaymentInitializeBody,
   normalizePaymentAction,
   normalizeTotals,
 });

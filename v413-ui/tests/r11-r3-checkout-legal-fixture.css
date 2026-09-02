@@ -1,0 +1,65 @@
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.r11-r3-checkout-fixture {
+  --shell-safe-bottom: 0px;
+  --shell-nav-bottom: 8px;
+  --shell-content-bottom-reserve: 96px;
+}
+
+.r11-r3-fixture-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.r11-r3-fixture-content {
+  width: min(100%, 680px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 24px 18px var(--shell-content-bottom-reserve);
+  display: grid;
+  gap: 12px;
+}
+
+.r11-r3-fixture-content .checkout-summary {
+  margin-top: 0;
+}
+
+.r11-r3-fixture-nav {
+  border-radius: 36px;
+  background: rgba(255, 255, 255, .97);
+  box-shadow: 0 8px 24px rgba(6, 30, 69, .16);
+}
+
+.r11-r3-fixture-nav > span {
+  min-width: 0;
+  color: var(--nova-deep);
+  display: grid;
+  place-items: center;
+  font-size: 8px;
+}
+
+.r11-r3-provider-lock {
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  color: #fff;
+  background: var(--nova-deep);
+  display: grid;
+  place-items: center;
+}
+
+.layout-tablet .r11-r3-fixture-content {
+  width: min(100%, 920px);
+  padding: 42px 34px 118px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+  align-items: start;
+  gap: 24px;
+}

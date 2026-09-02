@@ -75,6 +75,7 @@ import {
   type CustomerPaymentResponse,
   type CustomerPaymentStatus,
 } from "./checkout/customerCheckoutApi";
+import { CheckoutLegalConsent } from "./checkout/CheckoutLegalConsent";
 import {
   CustomerNotificationApiError,
   normalizeCustomerNotificationTarget,
@@ -2497,6 +2498,15 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
   const canInitialize = previewPhase === "ready" && capability?.ready === true && allAccepted && !couponRejected && !paymentResponse;
   const total = preview?.quote.totals.total ?? 0;
 
+  const updateLegalConsent = (slug: string, accepted: boolean) => {
+    setAcceptedSlugs((current) => {
+      const next = new Set(current);
+      if (accepted) next.add(slug);
+      else next.delete(slug);
+      return next;
+    });
+  };
+
   const initialize = async () => {
     if (!preview || !canInitialize) return;
     setPaymentBusy(true);
@@ -2557,9 +2567,9 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
             <header><LockClosedIcon /><div><h2>Güvenli sağlayıcı alanı</h2><p>{capability?.message || "Ödeme hazırlık durumu doğrulanıyor."}</p></div></header>
             {previewPhase === "loading" && <p className="checkout-provider-state" role="status">Fiyat, stok ve sözleşmeler sunucudan doğrulanıyor…</p>}
             {previewPhase === "error" && <button type="button" className="secondary" onClick={() => setReloadRevision((value) => value + 1)}>Tekrar Dene</button>}
-            {preview && <section className="checkout-legal-documents" aria-label="Sipariş sözleşmeleri">{preview.documents.map((document) => <article key={document.slug}><label><input type="checkbox" checked={acceptedSlugs.has(document.slug)} onChange={(event) => setAcceptedSlugs((current) => { const next = new Set(current); if (event.target.checked) next.add(document.slug); else next.delete(document.slug); return next; })} /><span><b>{document.title}</b><small>Sürüm {document.version}</small></span></label><details><summary>Belgeyi oku</summary><pre>{document.text}</pre></details></article>)}</section>}
-            <small><LockClosedIcon /> Kart bilgileri NovaStore tarafından alınmaz veya saklanmaz.</small>
+            <small className="checkout-provider-privacy"><LockClosedIcon /> Kart bilgileri NovaStore tarafından alınmaz veya saklanmaz.</small>
           </article>
+          {preview && <CheckoutLegalConsent documents={preview.documents} acceptedSlugs={acceptedSlugs} onConsentChange={updateLegalConsent} />}
         </section>
         <aside className="checkout-summary">
           <section className="checkout-summary-card"><h2>Sipariş Özeti</h2><p className="muted">{cartCount} ürün · sunucu doğrulamalı</p>{preview ? <><div className="summary-products">{preview.quote.items.map((item) => <div className="summary-product" data-product-id={item.id} key={item.id}><span>{item.name}<br /><b>{item.quantity} × {formatMoney(item.price)}</b></span></div>)}</div><SummaryRows subtotal={preview.quote.totals.subtotal} discount={preview.quote.totals.discount} shipping={preview.quote.totals.shipping} total={preview.quote.totals.total} /></> : <p className="checkout-provider-state">Güncel toplam bekleniyor.</p>}</section>
