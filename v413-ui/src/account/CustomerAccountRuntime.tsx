@@ -10,11 +10,14 @@ import {
 } from "../notifications";
 import {
   createCustomerAddress,
+  createCustomerReturn,
+  cancelCustomerOrder,
   deleteCustomerAddress,
   getCurrentCustomer,
   getCustomerSecurityStatus,
   listCustomerAddresses,
   listCustomerOrders,
+  listCustomerReturns,
   listCustomerSupportMessages,
   makeDefaultCustomerAddress,
   registerCustomer,
@@ -26,6 +29,7 @@ import {
   type CustomerAddressInput,
   type CustomerOrder,
   type CustomerProfile,
+  type CustomerReturn,
   type CustomerSecurityStatus,
   type CustomerSupportMessage,
 } from "./customerAccountApi";
@@ -37,6 +41,7 @@ type CustomerAccountRuntimeValue = Readonly<{
   user: CustomerProfile | null;
   addresses: readonly CustomerAddress[];
   orders: readonly CustomerOrder[];
+  returns: readonly CustomerReturn[];
   supportMessages: readonly CustomerSupportMessage[];
   securityStatus: CustomerSecurityStatus | null;
   errorMessage: string;
@@ -52,6 +57,8 @@ type CustomerAccountRuntimeValue = Readonly<{
   updateAddress(id: number, value: CustomerAddressInput): Promise<void>;
   deleteAddress(id: number): Promise<void>;
   setDefaultAddress(id: number): Promise<void>;
+  cancelOrder(id: number, expectedStatus: string): Promise<void>;
+  createReturn(orderId: number, reasonCode: string, note?: string): Promise<void>;
   refreshSupport(): Promise<void>;
   sendSupportMessage(message: string): Promise<void>;
 }>;
@@ -77,6 +84,7 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   const [user, setUser] = useState<CustomerProfile | null>(null);
   const [addresses, setAddresses] = useState<readonly CustomerAddress[]>([]);
   const [orders, setOrders] = useState<readonly CustomerOrder[]>([]);
+  const [returns, setReturns] = useState<readonly CustomerReturn[]>([]);
   const [supportMessages, setSupportMessages] = useState<readonly CustomerSupportMessage[]>([]);
   const [securityStatus, setSecurityStatus] = useState<CustomerSecurityStatus | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -88,6 +96,7 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     setUser(null);
     setAddresses([]);
     setOrders([]);
+    setReturns([]);
     setSupportMessages([]);
     setSecurityStatus(null);
     setDataWarnings([]);
@@ -97,14 +106,16 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     const results = await Promise.allSettled([
       listCustomerAddresses(),
       listCustomerOrders(profile.id),
+      listCustomerReturns(),
       listCustomerSupportMessages(profile.id),
       getCustomerSecurityStatus(),
     ] as const);
     if (sequence.current !== currentSequence) return;
     const warnings: string[] = [];
-    const [addressResult, orderResult, supportResult, securityResult] = results;
+    const [addressResult, orderResult, returnResult, supportResult, securityResult] = results;
     if (addressResult.status === "fulfilled") setAddresses(addressResult.value); else { setAddresses([]); warnings.push(warningText("Adresler")); }
     if (orderResult.status === "fulfilled") setOrders(orderResult.value); else { setOrders([]); warnings.push(warningText("Siparişler")); }
+    if (returnResult.status === "fulfilled") setReturns(returnResult.value); else { setReturns([]); warnings.push(warningText("İadeler")); }
     if (supportResult.status === "fulfilled") setSupportMessages(supportResult.value); else { setSupportMessages([]); warnings.push(warningText("Destek geçmişi")); }
     if (securityResult.status === "fulfilled") setSecurityStatus(securityResult.value); else { setSecurityStatus(null); warnings.push(warningText("Güvenlik durumu")); }
     setDataWarnings(Object.freeze(warnings));
@@ -249,6 +260,39 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     setBusy(true); try { await makeDefaultCustomerAddress(id); await refreshAddresses(); } finally { setBusy(false); }
   }, [refreshAddresses]);
 
+  const refreshOrdersAndReturns = useCallback(async () => {
+    if (!user) return;
+    const currentSequence = sequence.current;
+    const customerId = user.id;
+    const [nextOrders, nextReturns] = await Promise.all([listCustomerOrders(customerId), listCustomerReturns()]);
+    if (sequence.current !== currentSequence) return;
+    setOrders(nextOrders);
+    setReturns(nextReturns);
+  }, [user]);
+  const cancelOrder = useCallback(async (id: number, expectedStatus: string) => {
+    const currentSequence = sequence.current;
+    setBusy(true);
+    try {
+      await cancelCustomerOrder(id, expectedStatus);
+      if (sequence.current !== currentSequence) return;
+      await refreshOrdersAndReturns();
+    } catch (error) {
+      if (sequence.current === currentSequence && error instanceof CustomerNotificationApiError && error.status === 409) {
+        try { await refreshOrdersAndReturns(); } catch { /* preserve the original lifecycle error */ }
+      }
+      throw error;
+    } finally { setBusy(false); }
+  }, [refreshOrdersAndReturns]);
+  const createReturn = useCallback(async (orderId: number, reasonCode: string, note = "") => {
+    const currentSequence = sequence.current;
+    setBusy(true);
+    try {
+      await createCustomerReturn(orderId, reasonCode, note);
+      if (sequence.current !== currentSequence) return;
+      await refreshOrdersAndReturns();
+    } finally { setBusy(false); }
+  }, [refreshOrdersAndReturns]);
+
   const refreshSupport = useCallback(async () => {
     if (!user) return;
     setSupportMessages(await listCustomerSupportMessages(user.id));
@@ -284,11 +328,11 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   }, [clearPrivateState, refresh]);
 
   const value = useMemo<CustomerAccountRuntimeValue>(() => Object.freeze({
-    phase, user, addresses, orders, supportMessages, securityStatus, errorMessage, dataWarnings, busy,
+    phase, user, addresses, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy,
     refresh, login, register, requestPasswordRecovery: recover, logout, updateProfile,
-    createAddress, updateAddress, deleteAddress, setDefaultAddress, refreshSupport,
+    createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder, createReturn, refreshSupport,
     sendSupportMessage: sendSupport,
-  }), [phase, user, addresses, orders, supportMessages, securityStatus, errorMessage, dataWarnings, busy, refresh, login, register, recover, logout, updateProfile, createAddress, updateAddress, deleteAddress, setDefaultAddress, refreshSupport, sendSupport]);
+  }), [phase, user, addresses, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy, refresh, login, register, recover, logout, updateProfile, createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder, createReturn, refreshSupport, sendSupport]);
 
   return <CustomerAccountRuntimeContext.Provider value={value}>{children}</CustomerAccountRuntimeContext.Provider>;
 }

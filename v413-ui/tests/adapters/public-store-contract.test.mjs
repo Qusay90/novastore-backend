@@ -60,6 +60,7 @@ test("public store DTO is normalized against the requested slug", () => {
     projection(),
     "main6v-nova-teknoloji",
     "http://10.0.2.2:5000",
+    true,
   );
   assert.equal(value.store.name, "Nova Audio Mağazası");
   assert.equal(value.store.logoUrl, "http://10.0.2.2:5000/uploads/logo.png");
@@ -125,18 +126,23 @@ test("unsafe media schemes and non-loopback cleartext URLs are rejected", () => 
   }
 });
 
-test("cleartext media is accepted only from the exact active loopback origin", () => {
+test("cleartext media requires explicit authorization and the exact active origin", () => {
   const matching = projection();
   matching.products[0].media[0].media_url = "http://10.0.2.2:5000/uploads/side.png";
+  assert.throws(
+    () => normalizePublicStoreProjection(matching, "main6v-nova-teknoloji", "http://10.0.2.2:5000"),
+    /PUBLIC_MEDIA_URL_INVALID/,
+  );
   assert.doesNotThrow(() => normalizePublicStoreProjection(
     matching,
     "main6v-nova-teknoloji",
     "http://10.0.2.2:5000",
+    true,
   ));
 
   for (const origin of ["https://novastore.tr", "http://127.0.0.1:5000", "http://10.0.2.2:5001"]) {
     assert.throws(
-      () => normalizePublicStoreProjection(matching, "main6v-nova-teknoloji", origin),
+      () => normalizePublicStoreProjection(matching, "main6v-nova-teknoloji", origin, true),
       /PUBLIC_MEDIA_URL_INVALID/,
     );
   }

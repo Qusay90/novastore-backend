@@ -62,6 +62,7 @@ public final class NovaPublicStorePlugin extends Plugin {
             JSObject result = new JSObject();
             result.put("projection", JSObject.fromJSONObject(new JSONObject(body)));
             result.put("apiOrigin", apiOrigin(base));
+            result.put("allowCleartextAssets", BuildConfig.DEBUG || BuildConfig.NOVASTORE_LOCAL_UAT);
             call.resolve(result);
         } catch (IOException | JSONException | IllegalArgumentException failure) {
             call.reject("PUBLIC_STORE_REQUEST_FAILED");
@@ -84,7 +85,7 @@ public final class NovaPublicStorePlugin extends Plugin {
         boolean approvedDebug = debug
             && !localUat
             && "http".equals(scheme)
-            && "10.0.2.2".equals(host)
+            && isIpv4Host(host, 10, 0, 2, 2)
             && base.getPort() == 5000
             && "/".equals(base.getPath())
             && base.getRawUserInfo() == null
@@ -92,7 +93,7 @@ public final class NovaPublicStorePlugin extends Plugin {
             && base.getRawFragment() == null;
         boolean approvedLocalUat = localUat
             && "http".equals(scheme)
-            && "127.0.0.1".equals(host)
+            && isIpv4Host(host, 127, 0, 0, 1)
             && base.getPort() == 5000
             && "/".equals(base.getPath())
             && base.getRawUserInfo() == null
@@ -108,6 +109,22 @@ public final class NovaPublicStorePlugin extends Plugin {
             && base.getRawQuery() == null
             && base.getRawFragment() == null;
         return approvedDebug || approvedLocalUat || approvedRelease;
+    }
+
+    private static boolean isIpv4Host(String host, int first, int second, int third, int fourth) {
+        if (host == null) return false;
+        String[] parts = host.split("\\.", -1);
+        if (parts.length != 4) return false;
+        int[] expected = { first, second, third, fourth };
+        for (int index = 0; index < parts.length; index++) {
+            if (parts[index].isEmpty() || (parts[index].length() > 1 && parts[index].startsWith("0"))) return false;
+            try {
+                if (Integer.parseInt(parts[index]) != expected[index]) return false;
+            } catch (NumberFormatException failure) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static String canonicalSlug(String value) {

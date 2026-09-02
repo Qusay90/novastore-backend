@@ -62,6 +62,7 @@ type NovaNotificationApiPlugin = Readonly<{
   request(options: { path: string; method: string; token?: string; body?: Record<string, unknown> }): Promise<NativeApiResponse>;
   getNotificationCapability(): Promise<NativeNotificationCapability>;
   openNotificationSettings(): Promise<void>;
+  openApprovedPaymentUrl(options: { url: string }): Promise<void>;
 }>;
 
 const NovaNotificationApi = registerPlugin<NovaNotificationApiPlugin>("NovaNotificationApi");
@@ -76,6 +77,12 @@ const EXACT_RULES = new Map<string, ReadonlySet<string>>([
   ["/api/auth/forgot-password", new Set(["POST"])],
   ["/api/auth/reset-password", new Set(["POST"])],
   ["/api/addresses", new Set(["GET", "POST"])],
+  ["/api/payments/capability", new Set(["GET"])],
+  ["/api/payments/agreements/preview", new Set(["POST"])],
+  ["/api/payments/initialize", new Set(["POST"])],
+  ["/api/payments/status", new Set(["GET"])],
+  ["/api/returns", new Set(["POST"])],
+  ["/api/returns/mine", new Set(["GET"])],
   ["/api/messages/send", new Set(["POST"])],
   ["/api/questions/user", new Set(["GET"])],
   ["/api/notifications", new Set(["GET"])],
@@ -86,12 +93,14 @@ const EXACT_RULES = new Map<string, ReadonlySet<string>>([
 ]);
 const READ_ONE_PATTERN = /^\/api\/notifications\/[1-9]\d*\/read$/u;
 const CUSTOMER_ORDER_LIST_PATTERN = /^\/api\/orders\/user\/[1-9]\d*$/u;
+const CUSTOMER_ORDER_CANCEL_PATTERN = /^\/api\/orders\/[1-9]\d*\/cancel$/u;
 const CUSTOMER_RETURN_PATTERN = /^\/api\/returns\/[1-9]\d*$/u;
 const CUSTOMER_REVIEW_LIST_PATTERN = /^\/api\/reviews\/user\/[1-9]\d*$/u;
 const CUSTOMER_SUPPORT_HISTORY_PATTERN = /^\/api\/messages\/history\/[1-9]\d*$/u;
 const CUSTOMER_ADDRESS_PATTERN = /^\/api\/addresses\/[1-9]\d*$/u;
 const CUSTOMER_ADDRESS_DEFAULT_PATTERN = /^\/api\/addresses\/[1-9]\d*\/default$/u;
 const PUBLIC_PRODUCT_PATTERN = /^\/api\/products\/[1-9]\d*$/u;
+const PAYMENT_STATUS_PATH = "/api/payments/status";
 const ALLOWED_QUERY_KEYS = new Set(["limit", "cursor"]);
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -124,6 +133,7 @@ function requestRule(path: string, method: string) {
     || (READ_ONE_PATTERN.test(parsed.pathname) && normalizedMethod === "PATCH")
     || (CUSTOMER_ADDRESS_PATTERN.test(parsed.pathname) && (normalizedMethod === "PUT" || normalizedMethod === "DELETE"))
     || (CUSTOMER_ADDRESS_DEFAULT_PATTERN.test(parsed.pathname) && normalizedMethod === "PATCH")
+    || (CUSTOMER_ORDER_CANCEL_PATTERN.test(parsed.pathname) && normalizedMethod === "POST")
     || (normalizedMethod === "GET" && (
       CUSTOMER_ORDER_LIST_PATTERN.test(parsed.pathname)
       || CUSTOMER_RETURN_PATTERN.test(parsed.pathname)
@@ -149,6 +159,16 @@ function requestRule(path: string, method: string) {
     const cursor = parsed.searchParams.get("cursor");
     if (cursor !== null && !/^[A-Za-z0-9_-]{1,1024}$/u.test(cursor)) {
       throw new CustomerNotificationApiError("Bildirim sayfa imleci geçersiz.", 0, "CUSTOMER_NOTIFICATION_QUERY_FORBIDDEN");
+    }
+  } else if (parsed.pathname === PAYMENT_STATUS_PATH && normalizedMethod === "GET") {
+    const keys = [...parsed.searchParams.keys()];
+    if (keys.length < 1 || keys.length > 2 || new Set(keys).size !== keys.length || keys.some((key) => key !== "paymentRef" && key !== "orderId")) {
+      throw new CustomerNotificationApiError("Ödeme durumu sorgusu reddedildi.", 0, "CUSTOMER_NOTIFICATION_QUERY_FORBIDDEN");
+    }
+    const paymentRef = parsed.searchParams.get("paymentRef") || "";
+    const orderId = parsed.searchParams.get("orderId");
+    if (!/^[A-Za-z0-9._:-]{1,160}$/u.test(paymentRef) || (orderId !== null && !/^[1-9]\d{0,18}$/u.test(orderId))) {
+      throw new CustomerNotificationApiError("Ödeme durumu sorgusu geçersiz.", 0, "CUSTOMER_NOTIFICATION_QUERY_FORBIDDEN");
     }
   } else if (parsed.search) {
     throw new CustomerNotificationApiError("Bu bildirim işleminde sorgu alanına izin verilmez.", 0, "CUSTOMER_NOTIFICATION_QUERY_FORBIDDEN");
@@ -669,6 +689,29 @@ export async function getNativeNotificationCapability() {
 
 export async function openNativeNotificationSettings() {
   if (Capacitor.isNativePlatform()) await NovaNotificationApi.openNotificationSettings();
+}
+
+export async function openApprovedPaymentUrl(url: string) {
+  let parsed: URL;
+  try { parsed = new URL(String(url || "").trim()); } catch {
+    throw new CustomerNotificationApiError("Güvenli ödeme adresi geçersiz.", 0, "PAYMENT_PROVIDER_URL_INVALID");
+  }
+  if (
+    parsed.protocol !== "https:"
+    || parsed.hostname.toLowerCase() !== "www.paytr.com"
+    || !parsed.pathname.startsWith("/odeme/guvenli/")
+    || parsed.pathname === "/odeme/guvenli/"
+    || parsed.username
+    || parsed.password
+    || parsed.hash
+  ) {
+    throw new CustomerNotificationApiError("Güvenli ödeme adresi doğrulanamadı.", 0, "PAYMENT_PROVIDER_URL_FORBIDDEN");
+  }
+  if (Capacitor.isNativePlatform()) {
+    await NovaNotificationApi.openApprovedPaymentUrl({ url: parsed.href });
+    return;
+  }
+  globalThis.open?.(parsed.href, "_blank", "noopener,noreferrer");
 }
 
 export function hasCustomerSession() { return Boolean(currentCustomerSession()); }

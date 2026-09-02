@@ -8,6 +8,7 @@ artifacts-v413-*
 android/.gradle/
 android/**/build/
 android/local.properties
+android/app/google-services.json
 *.apk
 *.aab
 *.log

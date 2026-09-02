@@ -130,7 +130,7 @@ function optionalBoolean(value: unknown, fallback = false): boolean {
   return value;
 }
 
-function optionalAssetUrl(value: unknown, assetOrigin?: string): string | null {
+function optionalAssetUrl(value: unknown, assetOrigin?: string, allowCleartextAssetOrigin = false): string | null {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value !== "string") throw new PublicStoreContractError("PUBLIC_MEDIA_URL_INVALID");
   const candidate = value.trim();
@@ -145,13 +145,12 @@ function optionalAssetUrl(value: unknown, assetOrigin?: string): string | null {
   }
   if (url.username || url.password) throw new PublicStoreContractError("PUBLIC_MEDIA_URL_INVALID");
   if (url.protocol === "https:") return url.toString();
-  if (url.protocol === "http:" && assetOrigin) {
+  if (allowCleartextAssetOrigin && url.protocol === "http:" && assetOrigin) {
     try {
       const origin = new URL(assetOrigin);
-      const loopback = ["10.0.2.2", "127.0.0.1", "localhost"].includes(url.hostname);
       if (
-        loopback && origin.protocol === "http:" &&
-        origin.hostname === url.hostname && origin.port === url.port
+        origin.protocol === "http:"
+        && url.origin === origin.origin
       ) {
         return url.toString();
       }
@@ -190,12 +189,12 @@ export function resolveCustomerCardFraming(value: unknown): CustomerCardFraming 
   return Object.freeze({ focalX, focalY, zoom });
 }
 
-function normalizeMedia(value: unknown, productId: string, assetOrigin?: string): CustomerPublicProductMedia | null {
+function normalizeMedia(value: unknown, productId: string, assetOrigin?: string, allowCleartextAssetOrigin = false): CustomerPublicProductMedia | null {
   const source = objectValue(value, "PUBLIC_MEDIA_INVALID");
   assertOnlyFields(source, MEDIA_FIELDS);
   const mediaType = optionalString(source.media_type, 32).toLocaleLowerCase("en-US");
   if (mediaType !== "image") return null;
-  const url = optionalAssetUrl(source.media_url, assetOrigin);
+  const url = optionalAssetUrl(source.media_url, assetOrigin, allowCleartextAssetOrigin);
   if (!url) return null;
   const idValue = source.id;
   const id = typeof idValue === "number" && Number.isSafeInteger(idValue)
@@ -218,7 +217,7 @@ function normalizeMedia(value: unknown, productId: string, assetOrigin?: string)
   });
 }
 
-function normalizeProduct(value: unknown, assetOrigin?: string): CustomerPublicProduct {
+function normalizeProduct(value: unknown, assetOrigin?: string, allowCleartextAssetOrigin = false): CustomerPublicProduct {
   const source = objectValue(value, "PUBLIC_STORE_PRODUCT_INVALID");
   assertOnlyFields(source, PRODUCT_FIELDS);
   const numericId = finiteNumber(source.id, "PUBLIC_STORE_PRODUCT_ID_INVALID");
@@ -238,7 +237,7 @@ function normalizeProduct(value: unknown, assetOrigin?: string): CustomerPublicP
   if (!Array.isArray(rawMedia)) throw new PublicStoreContractError("PUBLIC_MEDIA_INVALID");
   const productId = String(numericId);
   const media = rawMedia
-    .map((item) => normalizeMedia(item, productId, assetOrigin))
+    .map((item) => normalizeMedia(item, productId, assetOrigin, allowCleartextAssetOrigin))
     .filter((item): item is CustomerPublicProductMedia => item !== null);
 
   return Object.freeze({
@@ -249,7 +248,7 @@ function normalizeProduct(value: unknown, assetOrigin?: string): CustomerPublicP
     oldPrice: oldPrice !== null && oldPrice > price ? oldPrice : null,
     stock: nonNegativeInteger(source.stock),
     isPurchasable: optionalBoolean(source.is_purchasable),
-    imageUrl: optionalAssetUrl(source.image_url, assetOrigin),
+    imageUrl: optionalAssetUrl(source.image_url, assetOrigin, allowCleartextAssetOrigin),
     media: Object.freeze(media),
     averageRating: Math.min(5, Math.max(0, rating)),
     reviewCount: nonNegativeInteger(source.review_count),
@@ -260,6 +259,7 @@ export function normalizePublicStoreProjection(
   payload: unknown,
   requestedSlug: string,
   assetOrigin?: string,
+  allowCleartextAssetOrigin = false,
 ): CustomerPublicStoreProjection {
   const expectedSlug = canonicalPublicStoreSlug(requestedSlug);
   const root = objectValue(payload, "PUBLIC_STORE_RESPONSE_INVALID");
@@ -285,8 +285,8 @@ export function normalizePublicStoreProjection(
     slug: responseSlug,
     name: requiredString(sourceStore.name, "PUBLIC_STORE_NAME_MISSING", 160),
     description: optionalString(sourceStore.description, 2_000),
-    logoUrl: optionalAssetUrl(sourceStore.logo_url, assetOrigin),
-    bannerUrl: optionalAssetUrl(sourceStore.banner_url, assetOrigin),
+    logoUrl: optionalAssetUrl(sourceStore.logo_url, assetOrigin, allowCleartextAssetOrigin),
+    bannerUrl: optionalAssetUrl(sourceStore.banner_url, assetOrigin, allowCleartextAssetOrigin),
     status,
     rating,
     reviewCount: nonNegativeInteger(sourceStore.review_count),
@@ -296,7 +296,7 @@ export function normalizePublicStoreProjection(
     shippingSummary: optionalString(sourceStore.shipping_summary, 1_000),
     returnSummary: optionalString(sourceStore.return_summary, 1_000),
   });
-  const products = root.products.map((item) => normalizeProduct(item, assetOrigin));
+  const products = root.products.map((item) => normalizeProduct(item, assetOrigin, allowCleartextAssetOrigin));
   return Object.freeze({ store, products: Object.freeze(products) });
 }
 

@@ -6,6 +6,13 @@ const root = resolve(import.meta.dirname, "..");
 const webRoot = resolve(root, "dist/native");
 const androidRoot = resolve(root, "android/app/src/main/assets/public");
 const allowedAndroidExtras = new Set(["cordova.js", "cordova_plugins.js"]);
+const nativeProfileReceiptPath = "native-build-profile.json";
+const nativeProfiles = new Set(["release", "debug", "uat"]);
+const profileOrigins = Object.freeze({
+  release: Object.freeze({ required: null, forbidden: ["10.0.2.2", "127.0.0.1"] }),
+  debug: Object.freeze({ required: "http://10.0.2.2:5000", forbidden: ["127.0.0.1"] }),
+  uat: Object.freeze({ required: "http://127.0.0.1:5000", forbidden: ["10.0.2.2"] }),
+});
 const forbiddenFragments = [
   "phone-stage",
   "phone-bezel",
@@ -61,6 +68,11 @@ const manifest = webFiles.map((file) => {
   };
 });
 
+const profileReceipt = JSON.parse(readFileSync(resolve(webRoot, nativeProfileReceiptPath), "utf8"));
+if (profileReceipt?.schemaVersion !== 1 || !nativeProfiles.has(profileReceipt?.profile)) {
+  throw new Error("Native build profile receipt is invalid.");
+}
+
 for (const entry of manifest) {
   const synced = resolve(androidRoot, entry.path);
   if (!existsSync(synced)) throw new Error(`Android sync is missing ${entry.path}`);
@@ -88,14 +100,29 @@ const index = readFileSync(resolve(webRoot, "index.html"), "utf8");
 if (!index.includes("connect-src 'none'") || !index.includes("frame-src 'none'")) {
   throw new Error("Native Content-Security-Policy is not fail-closed.");
 }
+if (index.includes("__NOVASTORE_NATIVE_IMAGE_ORIGIN__")) {
+  throw new Error("Native image-origin placeholder reached the built bundle.");
+}
+const profilePolicy = profileOrigins[profileReceipt.profile];
+if (profilePolicy.required && !index.includes(profilePolicy.required)) {
+  throw new Error(`Native ${profileReceipt.profile} image origin is missing.`);
+}
+for (const forbiddenOrigin of profilePolicy.forbidden) {
+  if (manifest.some(({ path }) => /\.(?:css|html|js|json)$/.test(path)
+      && readFileSync(resolve(webRoot, path), "utf8").includes(forbiddenOrigin))) {
+    throw new Error(`Forbidden backend origin reached the native ${profileReceipt.profile} bundle.`);
+  }
+}
 
 const treeInput = manifest.map((entry) => `${entry.path}\0${entry.bytes}\0${entry.sha256}\n`).join("");
 const receipt = {
+  profile: profileReceipt.profile,
   webBuildSha256: sha256(Buffer.from(treeInput)),
   fileCount: manifest.length,
   totalBytes: manifest.reduce((total, entry) => total + entry.bytes, 0),
   syncedAssets: manifest.length,
   allowedCapacitorPlaceholders: androidExtras.sort(),
   forbiddenRuntimeMatches: 0,
+  forbiddenBackendOriginMatches: 0,
 };
 console.log(JSON.stringify(receipt, null, 2));

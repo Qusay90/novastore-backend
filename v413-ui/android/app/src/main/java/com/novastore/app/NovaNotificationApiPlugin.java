@@ -32,6 +32,7 @@ import org.json.JSONTokener;
 public final class NovaNotificationApiPlugin extends Plugin {
     private static final Pattern READ_ONE = Pattern.compile("^/api/notifications/[1-9][0-9]*/read$");
     private static final Pattern CUSTOMER_ORDER_LIST = Pattern.compile("^/api/orders/user/[1-9][0-9]*$");
+    private static final Pattern CUSTOMER_ORDER_CANCEL = Pattern.compile("^/api/orders/[1-9][0-9]*/cancel$");
     private static final Pattern CUSTOMER_RETURN = Pattern.compile("^/api/returns/[1-9][0-9]*$");
     private static final Pattern CUSTOMER_REVIEW_LIST = Pattern.compile("^/api/reviews/user/[1-9][0-9]*$");
     private static final Pattern CUSTOMER_SUPPORT_HISTORY = Pattern.compile("^/api/messages/history/[1-9][0-9]*$");
@@ -39,10 +40,15 @@ public final class NovaNotificationApiPlugin extends Plugin {
     private static final Pattern CUSTOMER_ADDRESS_DEFAULT = Pattern.compile("^/api/addresses/[1-9][0-9]*/default$");
     private static final Pattern PUBLIC_PRODUCT = Pattern.compile("^/api/products/[1-9][0-9]*$");
     private static final Pattern SAFE_CURSOR = Pattern.compile("^[A-Za-z0-9_-]{1,1024}$");
+    private static final Pattern SAFE_PAYMENT_REF = Pattern.compile("^[A-Za-z0-9._:-]{1,160}$");
+    private static final Pattern SAFE_POSITIVE_ID = Pattern.compile("^[1-9][0-9]{0,18}$");
     private static final Set<String> EXACT_GET = immutableSet(
         "/api/users/me",
         "/api/users/security-status",
         "/api/addresses",
+        "/api/payments/capability",
+        "/api/payments/status",
+        "/api/returns/mine",
         "/api/questions/user",
         "/api/notifications/unread-count"
     );
@@ -55,6 +61,9 @@ public final class NovaNotificationApiPlugin extends Plugin {
         "/api/auth/forgot-password",
         "/api/auth/reset-password",
         "/api/addresses",
+        "/api/payments/agreements/preview",
+        "/api/payments/initialize",
+        "/api/returns",
         "/api/messages/send",
         "/api/notifications/android-push/tokens"
     );
@@ -126,6 +135,23 @@ public final class NovaNotificationApiPlugin extends Plugin {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getContext().startActivity(intent);
         call.resolve();
+    }
+
+    @PluginMethod
+    public void openApprovedPaymentUrl(PluginCall call) {
+        String value = call.getString("url");
+        if (!isApprovedPaymentUrl(value)) {
+            call.reject("PAYMENT_PROVIDER_URL_FORBIDDEN");
+            return;
+        }
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(value))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            call.resolve();
+        } catch (RuntimeException failure) {
+            call.reject("PAYMENT_PROVIDER_SURFACE_UNAVAILABLE");
+        }
     }
 
     private void execute(PluginCall call, String path, String method, String token, JSObject body) {
@@ -217,6 +243,22 @@ public final class NovaNotificationApiPlugin extends Plugin {
                 }
                 return path + "?" + query;
             }
+            if ("/api/payments/status".equals(path)) {
+                String query = parsed.getRawQuery();
+                if (query == null || query.isEmpty()) return null;
+                Set<String> seen = new HashSet<>();
+                for (String item : query.split("&")) {
+                    String[] pair = item.split("=", 2);
+                    if (pair.length != 2 || !seen.add(pair[0])) return null;
+                    if ("paymentRef".equals(pair[0])) {
+                        if (!SAFE_PAYMENT_REF.matcher(pair[1]).matches()) return null;
+                    } else if ("orderId".equals(pair[0])) {
+                        if (!SAFE_POSITIVE_ID.matcher(pair[1]).matches()) return null;
+                    } else return null;
+                }
+                if (!seen.contains("paymentRef") || seen.size() > 2) return null;
+                return path + "?" + query;
+            }
             return parsed.getRawQuery() == null ? path : null;
         } catch (IllegalArgumentException failure) {
             return null;
@@ -235,6 +277,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
                 || PUBLIC_PRODUCT.matcher(path).matches()
         )) return true;
         if ("POST".equals(method) && EXACT_POST.contains(path)) return true;
+        if ("POST".equals(method) && CUSTOMER_ORDER_CANCEL.matcher(path).matches()) return true;
         if ("PUT".equals(method) && CUSTOMER_ADDRESS.matcher(path).matches()) return true;
         if ("PATCH".equals(method) && (EXACT_PATCH.contains(path) || READ_ONE.matcher(path).matches() || CUSTOMER_ADDRESS_DEFAULT.matcher(path).matches())) return true;
         return "DELETE".equals(method) && (EXACT_DELETE.contains(path) || CUSTOMER_ADDRESS.matcher(path).matches());
@@ -264,6 +307,23 @@ public final class NovaNotificationApiPlugin extends Plugin {
         String token = value.trim();
         if (token.length() < 16 || token.length() > 8192 || token.chars().anyMatch(Character::isWhitespace)) return null;
         return token;
+    }
+
+    static boolean isApprovedPaymentUrl(String value) {
+        if (value == null || value.length() < 1 || value.length() > 4096) return false;
+        try {
+            URI uri = URI.create(value.trim());
+            String path = uri.getRawPath();
+            return "https".equalsIgnoreCase(uri.getScheme())
+                && "www.paytr.com".equalsIgnoreCase(uri.getHost())
+                && uri.getRawUserInfo() == null
+                && uri.getRawFragment() == null
+                && path != null
+                && path.startsWith("/odeme/guvenli/")
+                && path.length() > "/odeme/guvenli/".length();
+        } catch (IllegalArgumentException failure) {
+            return false;
+        }
     }
 
     private String readBounded(InputStream input) throws IOException {

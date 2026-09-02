@@ -8,6 +8,7 @@ import {
 type NativePublicStoreResponse = Readonly<{
   projection: unknown;
   apiOrigin: string;
+  allowCleartextAssets: boolean;
 }>;
 
 type NovaPublicStorePlugin = Readonly<{
@@ -28,7 +29,12 @@ export async function loadCanonicalPublicStore(
   const storeSlug = canonicalPublicStoreSlug(requestedSlug);
   if (Capacitor.isNativePlatform()) {
     const response = await NovaPublicStore.getPublicStore({ storeSlug });
-    return normalizePublicStoreProjection(response.projection, storeSlug, response.apiOrigin);
+    return normalizePublicStoreProjection(
+      response.projection,
+      storeSlug,
+      response.apiOrigin,
+      response.allowCleartextAssets === true,
+    );
   }
 
   const controller = new AbortController();
@@ -45,7 +51,7 @@ export async function loadCanonicalPublicStore(
     if (!response.ok) {
       throw Object.assign(new Error("PUBLIC_STORE_REQUEST_FAILED"), { status: response.status });
     }
-    return normalizePublicStoreProjection(await response.json(), storeSlug, window.location.origin);
+    return normalizePublicStoreProjection(await response.json(), storeSlug, window.location.origin, import.meta.env.DEV);
   } finally {
     window.clearTimeout(timeout);
   }

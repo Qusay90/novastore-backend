@@ -19,7 +19,14 @@ public final class NovaNotificationApiPluginTest {
         assertTrue(NovaNotificationApiPlugin.allowed("/api/notifications/android-push/tokens/session", "DELETE"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/users/refresh", "POST"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/orders/user/7", "GET"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/orders/7/cancel", "POST"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/returns/7", "GET"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/returns/mine", "GET"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/returns", "POST"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/payments/capability", "GET"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/payments/agreements/preview", "POST"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/payments/initialize", "POST"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/payments/status?paymentRef=PAYTR-abc_123&orderId=7", "GET"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/questions/user", "GET"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/reviews/user/7", "GET"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/messages/history/7", "GET"));
@@ -39,8 +46,23 @@ public final class NovaNotificationApiPluginTest {
         assertFalse(NovaNotificationApiPlugin.allowed("/api/addresses/0", "DELETE"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/notifications/0/read", "PATCH"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/orders/user/0", "GET"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/orders/0/cancel", "POST"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/messages/history/7", "POST"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/users/refresh", "GET"));
+    }
+
+    @Test
+    public void paymentStatusQueriesAndProviderUrlsAreStrictlyBounded() {
+        assertEquals(
+            "/api/payments/status?paymentRef=PAYTR-abc_123&orderId=7",
+            NovaNotificationApiPlugin.canonicalPath("/api/payments/status?paymentRef=PAYTR-abc_123&orderId=7")
+        );
+        assertNull(NovaNotificationApiPlugin.canonicalPath("/api/payments/status?paymentRef=https://evil.invalid"));
+        assertNull(NovaNotificationApiPlugin.canonicalPath("/api/payments/status?paymentRef=ok&userId=7"));
+        assertTrue(NovaNotificationApiPlugin.isApprovedPaymentUrl("https://www.paytr.com/odeme/guvenli/token-123"));
+        assertFalse(NovaNotificationApiPlugin.isApprovedPaymentUrl("http://www.paytr.com/odeme/guvenli/token-123"));
+        assertFalse(NovaNotificationApiPlugin.isApprovedPaymentUrl("https://www.paytr.com.evil.invalid/odeme/guvenli/token-123"));
+        assertFalse(NovaNotificationApiPlugin.isApprovedPaymentUrl("https://www.paytr.com/odeme/guvenli/"));
     }
 
     @Test

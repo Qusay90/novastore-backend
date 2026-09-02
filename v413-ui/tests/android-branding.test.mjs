@@ -88,6 +88,7 @@ test("Android launcher and splash do not retain Capacitor template resources", (
   const manifest = readFileSync(join(project, "android", "app", "src", "main", "AndroidManifest.xml"), "utf8");
   assert.match(manifest, /<uses-permission android:name="android\.permission\.INTERNET" \/>/);
   assert.match(nativeShell, /connect-src 'none'/);
-  assert.match(nativeShell, /img-src 'self' data: blob: https:\/\/novastore\.tr https:\/\/www\.novastore\.tr https:\/\/res\.cloudinary\.com http:\/\/10\.0\.2\.2:5000/);
+  assert.match(nativeShell, /img-src 'self' data: blob: https:\/\/novastore\.tr https:\/\/www\.novastore\.tr https:\/\/res\.cloudinary\.com__NOVASTORE_NATIVE_IMAGE_ORIGIN__/);
+  assert.doesNotMatch(nativeShell, /10\.0\.2\.2|127\.0\.0\.1/);
   assert.doesNotMatch(nativeShell, /img-src[^;"]*\*/);
 });

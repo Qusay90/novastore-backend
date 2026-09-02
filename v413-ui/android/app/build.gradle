@@ -1,4 +1,22 @@
+import groovy.json.JsonSlurper
+
 apply plugin: 'com.android.application'
+
+def releaseSigningInputNames = [
+    'NOVASTORE_RELEASE_STORE_FILE',
+    'NOVASTORE_RELEASE_STORE_PASSWORD',
+    'NOVASTORE_RELEASE_KEY_ALIAS',
+    'NOVASTORE_RELEASE_KEY_PASSWORD',
+]
+def releaseSigningInputs = releaseSigningInputNames.collectEntries { name ->
+    [(name): System.getenv(name)]
+}
+def releaseStoreFile = rootProject.file(releaseSigningInputs['NOVASTORE_RELEASE_STORE_FILE'] ?: '__missing_release_keystore__')
+def releaseSigningReady = releaseSigningInputs.values().every { value ->
+    value != null && !value.trim().isEmpty()
+} && releaseStoreFile.isFile()
+def googleServicesFile = file('google-services.json')
+def googleServicesPluginApplied = false
 
 android {
     namespace = "com.novastore.app"
@@ -8,7 +26,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 41300
-        versionName "4.13.0-owner-preview"
+        versionName "4.13.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "String", "NOVASTORE_API_BASE_URL", '"https://novastore.tr/"'
         buildConfigField "boolean", "NOVASTORE_LOCAL_UAT", "false"
@@ -16,6 +34,16 @@ android {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        if (releaseSigningReady) {
+            release {
+                storeFile releaseStoreFile
+                storePassword releaseSigningInputs['NOVASTORE_RELEASE_STORE_PASSWORD']
+                keyAlias releaseSigningInputs['NOVASTORE_RELEASE_KEY_ALIAS']
+                keyPassword releaseSigningInputs['NOVASTORE_RELEASE_KEY_PASSWORD']
+            }
         }
     }
     buildTypes {
@@ -30,6 +58,7 @@ android {
         uat {
             initWith release
             debuggable true
+            versionNameSuffix "-uat"
             buildConfigField "String", "NOVASTORE_API_BASE_URL", '"http://127.0.0.1:5000/"'
             buildConfigField "boolean", "NOVASTORE_LOCAL_UAT", "true"
             matchingFallbacks = ["release"]
@@ -39,6 +68,9 @@ android {
             buildConfigField "String", "NOVASTORE_API_BASE_URL", '"https://novastore.tr/"'
             buildConfigField "boolean", "NOVASTORE_LOCAL_UAT", "false"
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (releaseSigningReady) {
+                signingConfig signingConfigs.release
+            }
         }
     }
     testBuildType "uat"
@@ -47,8 +79,68 @@ android {
     }
 }
 
-// Release exists only for the required compile/unit gates. Producing, signing,
-// publishing, or installing a release artifact remains separately authorized.
+// Final release tasks fail closed unless the already-authorized signing identity
+// is supplied by the owner-managed environment. Secret values are never stored
+// in this repository.
+gradle.taskGraph.whenReady { graph ->
+    def finalReleaseRequested = graph.allTasks.any { task ->
+        task.project == project && (
+            ['assembleRelease', 'bundleRelease', 'packageRelease', 'signReleaseBundle', 'installRelease'].contains(task.name)
+            || (task.name.startsWith('publish') && task.name.contains('Release'))
+        )
+    }
+    if (finalReleaseRequested) {
+        if (!releaseSigningReady) {
+            throw new GradleException('Authorized NovaStore release-signing inputs are unavailable.')
+        }
+        if (!googleServicesFile.isFile() || googleServicesFile.length() == 0L) {
+            throw new GradleException('Firebase Customer configuration is unavailable for the release build.')
+        }
+        if (!googleServicesPluginApplied) {
+            throw new GradleException('Firebase Customer build plugin is unavailable for the release build.')
+        }
+        def googleServices = new JsonSlurper().parse(googleServicesFile)
+        def matchingClients = (googleServices.client ?: []).findAll { client ->
+            client?.client_info?.android_client_info?.package_name == android.defaultConfig.applicationId
+        }
+        if (matchingClients.size() != 1) {
+            throw new GradleException('Firebase Customer package binding is missing or ambiguous.')
+        }
+        def matchingClient = matchingClients.first()
+        def requiredFirebaseFieldsPresent = [
+            googleServices?.project_info?.project_id,
+            googleServices?.project_info?.project_number,
+            matchingClient?.client_info?.mobilesdk_app_id,
+        ].every { value -> value instanceof String && !value.trim().isEmpty() }
+        def apiKeyPresent = (matchingClient?.api_key ?: []).any { entry ->
+            entry?.current_key instanceof String && !entry.current_key.trim().isEmpty()
+        }
+        if (!requiredFirebaseFieldsPresent || !apiKeyPresent) {
+            throw new GradleException('Firebase Customer release metadata is incomplete.')
+        }
+    }
+}
+
+def nativeProfileByPreBuildTask = [
+    'preDebugBuild': 'debug',
+    'preUatBuild': 'uat',
+    'preReleaseBuild': 'release',
+]
+tasks.configureEach { task ->
+    def expectedProfile = nativeProfileByPreBuildTask[task.name]
+    if (expectedProfile != null) {
+        task.doFirst {
+            def profileFile = file('src/main/assets/public/native-build-profile.json')
+            if (!profileFile.isFile()) {
+                throw new GradleException("Native ${expectedProfile} asset profile is missing; run the matching npm android:sync command.")
+            }
+            def profile = new JsonSlurper().parse(profileFile)
+            if (profile?.schemaVersion != 1 || profile?.profile != expectedProfile) {
+                throw new GradleException("Native asset profile does not match Android ${expectedProfile} build type.")
+            }
+        }
+    }
+}
 
 repositories {
     flatDir{
@@ -70,11 +162,9 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
+if (googleServicesFile.isFile() && googleServicesFile.length() > 0L) {
+    apply plugin: 'com.google.gms.google-services'
+    googleServicesPluginApplied = true
+} else {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }

@@ -1,4 +1,4 @@
-import { copyFileSync, cpSync, mkdirSync, renameSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
@@ -7,6 +7,11 @@ import postcss from "postcss";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const output = resolve(root, "dist/native");
+const nativeProfiles = Object.freeze({
+  release: Object.freeze({ imageOrigin: "" }),
+  debug: Object.freeze({ imageOrigin: "http://10.0.2.2:5000" }),
+  uat: Object.freeze({ imageOrigin: "http://127.0.0.1:5000" }),
+});
 const forbiddenNativeSelectors = [
   ".cal-switcher",
   ".capture-mode",
@@ -50,7 +55,11 @@ const nativeExtracts = [
   "sub-wearable.png",
 ] as const;
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const profileName = mode === "production" ? "release" : mode;
+  const profile = nativeProfiles[profileName as keyof typeof nativeProfiles];
+  if (!profile) throw new Error(`Unsupported native build profile: ${mode}`);
+  return {
   base: "./",
   publicDir: false,
   define: {
@@ -74,6 +83,20 @@ export default defineConfig({
   plugins: [
     react(),
     {
+      name: "novastore-native-build-profile",
+      enforce: "pre",
+      transformIndexHtml(html) {
+        const placeholder = "__NOVASTORE_NATIVE_IMAGE_ORIGIN__";
+        if (html.split(placeholder).length !== 2) {
+          throw new Error("Native image-origin placeholder must occur exactly once.");
+        }
+        return html.replace(
+          placeholder,
+          profile.imageOrigin ? ` ${profile.imageOrigin}` : "",
+        );
+      },
+    },
+    {
       name: "novastore-strip-preview-only-css",
       generateBundle(_options, bundle) {
         for (const outputFile of Object.values(bundle)) {
@@ -92,6 +115,11 @@ export default defineConfig({
       name: "novastore-native-authoritative-assets",
       closeBundle() {
         renameSync(resolve(output, "index-native.html"), resolve(output, "index.html"));
+        writeFileSync(
+          resolve(output, "native-build-profile.json"),
+          `${JSON.stringify({ schemaVersion: 1, profile: profileName })}\n`,
+          "utf8",
+        );
         const destination = resolve(output, "calibration-assets");
         const source = resolve(root, "public/calibration-assets");
         mkdirSync(resolve(destination, "extracts"), { recursive: true });
@@ -107,4 +135,5 @@ export default defineConfig({
       },
     },
   ],
+  };
 });
