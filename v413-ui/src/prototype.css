@@ -44,6 +44,7 @@ button { color: inherit; }
 
 .cal-scroll { height: 100%; background: var(--nova-page); }
 .cal-scroll.with-bottom-nav .mobile-scroll-content { padding-bottom: var(--shell-content-bottom-reserve); }
+.has-global-novabot .cal-scroll.with-bottom-nav .mobile-scroll-content { padding-bottom: calc(var(--shell-content-bottom-reserve) + 74px); }
 .cal-screen { min-height: 100%; min-width: 0; padding: var(--shell-content-top) clamp(10px, 3.9cqw, 16px) 18px; }
 .root-layout, .detail-layout { width: 100%; }
 
@@ -116,6 +117,9 @@ button { color: inherit; }
   background: transparent;
   overflow: visible;
 }
+.global-novabot-launcher { position: absolute; z-index: 14; right: max(14px, calc(var(--novastore-safe-right, 0px) + 14px)); bottom: calc(var(--shell-content-bottom-reserve) - 1px); width: 56px; height: 56px; min-width: 56px; min-height: 56px; padding: 3px; overflow: hidden; border: 2px solid rgba(254,90,2,.82); border-radius: 50%; color: #fff; background: linear-gradient(145deg,#173d69 0%,#061e45 72%,#123f78 100%); box-shadow: 0 9px 22px rgba(6,30,69,.27), 0 0 0 3px rgba(255,255,255,.72); display: grid; place-items: center; cursor: pointer; }
+.global-novabot-launcher::before { content: ""; position: absolute; inset: -5px; }
+.global-novabot-launcher img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; }
 .bottom-nav-surface { position: absolute; z-index: 0; left: -6px; top: -7px; width: calc(100% + 12px); height: 84px; overflow: visible; pointer-events: none; }
 .bottom-nav-surface .nav-surface-shadow { fill: rgba(255,255,255,.72); filter: url(#v4-nav-shadow); }
 .bottom-nav-surface .nav-surface-fill { fill: url(#v4-nav-fill); }
@@ -378,6 +382,7 @@ button { color: inherit; }
 .pdp-topbar h1 { margin: 0; text-align: center; color: #171923; font-family: "Nova Inter",sans-serif; font-size: 20px; font-weight: 600; letter-spacing: -.5px; }
 .pdp-topbar > div { display: flex; align-items: center; gap: 1px; }
 .pdp-topbar .icon-button { width: 40px; height: 40px; min-width: 40px; min-height: 40px; color: #182334; }
+.pdp-topbar .global-novabot-launcher { position: relative; inset: auto; right: auto; bottom: auto; width: 48px; height: 48px; min-width: 48px; min-height: 48px; flex: 0 0 48px; padding: 3px; }
 .pdp-topbar .icon-button.favorite-active { color: var(--nova-orange); background: #fff; }
 .pdp-topbar .repo-icon { width: 20px; height: 20px; }
 .pdp-action-status { position: absolute; top: calc(100% - 2px); right: 50px; z-index: 5; padding: 4px 7px; border-radius: 8px; color: #fff; background: rgba(6,30,69,.9); font-size: 8px; }
@@ -463,7 +468,7 @@ button { color: inherit; }
 .review-stars { display: flex; gap: 5px; }
 .review-stars button { width: 28px; height: 28px; padding: 0; border: 0; color: #c9cdd3; background: transparent; }
 .review-stars button[aria-pressed="true"], .review-stars button:has(~ button[aria-pressed="true"]) { color: var(--nova-orange); }
-.inline-success { margin: 10px 0 0; padding: 9px 10px; border-radius: 10px; color: var(--nova-success) !important; background: rgba(21,148,71,.08); display: flex; align-items: center; gap: 6px; font-size: 9px !important; }
+.inline-success { min-width: 0; margin: 10px 0 0; padding: 9px 10px; border-radius: 10px; color: var(--nova-success) !important; background: rgba(21,148,71,.08); display: flex; align-items: center; gap: 6px; font-size: 9px !important; overflow-wrap: anywhere; }
 .recommendations { min-width: 0; }
 .recommendations .section-title { margin: 12px 1px 7px; }
 .recommendation-carousel { margin-inline: -1px; }
@@ -505,6 +510,8 @@ button { color: inherit; }
 .cart-title { display: flex; align-items: baseline; justify-content: space-between; }
 .cart-title h1 { margin: 0 0 9px; font-size: 23px; }
 .cart-title span { color: var(--nova-muted); font-size: 12px; }
+.cart-title-actions { display: flex; align-items: center; gap: 10px; }
+.cart-title-actions .global-novabot-launcher { position: relative; inset: auto; right: auto; bottom: auto; flex: 0 0 56px; }
 .cart-item { min-height: 132px; padding: 12px; border-radius: 17px; background: #fff; display: grid; grid-template-columns: 104px 1fr 48px; gap: 10px; box-shadow: 0 7px 18px rgba(15,44,78,.06); }
 .cart-item + .cart-item { margin-top: 9px; }
 .cart-item > img { width: 104px; height: 108px; border-radius: 12px; object-fit: cover; }
@@ -642,8 +649,9 @@ button { color: inherit; }
 .account-tiles button svg { width: 28px; height: 28px; }
 .account-tiles button:last-child { grid-column: span 2; }
 .account-list { margin-top: 10px; border-radius: 16px; overflow: hidden; background: #fff; }
-.account-list button, .support-links button { width: 100%; min-height: 38px; padding: 0 13px; border: 0; border-bottom: 1px solid var(--nova-line); background: #fff; display: grid; grid-template-columns: 25px 1fr auto; align-items: center; text-align: left; font-size: 11px; }
-.logout { position: relative; width: 100%; min-height: 35px; margin-top: 5px; border: 0; border-radius: 14px; color: var(--nova-orange-text); background: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; }
+.cal-app.has-global-novabot[data-cal-id="CAL-10"][data-view="root"] .account-list { margin-top: 70px; }
+.account-list button, .support-links button { width: 100%; min-height: 48px; padding: 0 13px; border: 0; border-bottom: 1px solid var(--nova-line); background: #fff; display: grid; grid-template-columns: 25px 1fr auto; align-items: center; text-align: left; font-size: 11px; }
+.logout { position: relative; width: 100%; min-height: 48px; margin-top: 5px; border: 0; border-radius: 14px; color: var(--nova-orange-text); background: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; }
 .logout::before { content: ""; position: absolute; inset: -6px 0; }
 
 .address-book-layout, .notification-center-layout { min-height: 780px; }
@@ -713,7 +721,8 @@ button { color: inherit; }
 
 /* CAL-11 */
 .support-heading { display: flex; align-items: center; justify-content: space-between; }
-.support-heading > button { border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--nova-muted); font-size: 10px; }
+.support-heading > button { min-width: 48px; min-height: 48px; padding: 3px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--nova-muted); font-size: 10px; }
+.support-heading > .global-novabot-launcher { position: relative; inset: auto; right: auto; bottom: auto; width: 56px; height: 56px; min-width: 56px; min-height: 56px; padding: 3px; border: 2px solid rgba(254,90,2,.82); color: #fff; background: linear-gradient(145deg,#173d69 0%,#061e45 72%,#123f78 100%); display: grid; }
 .support-heading > button svg { width: 28px; height: 28px; color: var(--nova-deep); }
 .support-search { width: 100%; min-height: 52px; margin: 15px 0 12px; border: 1px solid var(--nova-line); border-radius: 16px; padding: 0 16px; background: #fff; display: flex; align-items: center; gap: 12px; color: var(--nova-muted); }
 .support-search svg { width: 24px; height: 24px; color: var(--nova-deep); }
@@ -728,6 +737,10 @@ button { color: inherit; }
 .novabot-card h2 { margin: 6px 0 3px; font-size: 18px; }
 .novabot-card p { margin: 0; color: var(--nova-muted); font-size: 10px; }
 .novabot-card p i, .live-support small i, .chat-card header p i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #25bc53; }
+.novabot-availability.unverified i, .novabot-connection.unverified i { background: #7d8793; }
+.novabot-connection.checking i { background: #d69214; }
+.novabot-connection.error i { background: #b53b3b; }
+.novabot-availability.ready i, .novabot-connection.ready i { background: #25bc53; }
 .novabot-card span { display: block; margin-top: 6px; color: var(--nova-muted); font-size: 10px; }
 .novabot-card > button { grid-column: span 2; width: 100%; }
 .live-support { width: 100%; min-height: 79px; margin-top: 14px; border: 1px solid var(--nova-line); border-radius: 17px; padding: 0 16px; background: #fff; display: grid; grid-template-columns: 42px 1fr auto; align-items: center; text-align: left; }
@@ -776,27 +789,34 @@ button { color: inherit; }
 .chat-card header p { margin: 3px 0; color: var(--nova-muted); font-size: 10px; }
 .chat-card header button { min-height: 34px; border: 1px solid var(--nova-orange); border-radius: 10px; color: var(--nova-orange-text); background: #fff; display: flex; align-items: center; gap: 5px; font-size: 9px; }
 .messages { height: 104px; padding: 14px; display: grid; align-content: start; gap: 10px; overflow-y: auto; overscroll-behavior: contain; scroll-padding-bottom: 14px; }
-.chat-card.active-conversation { min-height: 687px; }
-.chat-card.active-conversation .messages { height: 414px; padding-bottom: 86px; scroll-padding-bottom: 86px; }
-.message { display: flex; align-items: end; gap: 7px; }
+.chat-card.active-conversation { min-height: 760px; }
+.chat-card.active-conversation .messages { height: 414px; padding-bottom: 94px; scroll-padding-bottom: 94px; }
+.message { min-width: 0; display: flex; align-items: end; gap: 7px; }
 .message > .novabot-art.small { flex: 0 0 auto; width: 31px; height: 31px; }
 .message > .novabot-art.small img { padding: 2px; }
-.message > div { max-width: 78%; padding: 10px 12px; border: 1px solid var(--nova-line); border-radius: 15px 15px 15px 4px; background: #fff; }
+.message > div { min-width: 0; max-width: 78%; padding: 10px 12px; border: 1px solid var(--nova-line); border-radius: 15px 15px 15px 4px; background: #fff; overflow-wrap: anywhere; }
 .message.user { justify-content: flex-end; }
 .message.user > div { color: #fff; border: 0; border-radius: 15px 15px 4px 15px; background: var(--nova-deep); }
-.message p { margin: 0; font-size: 11px; line-height: 1.35; }
+.message p { margin: 0; font-size: 11px; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
 .message small { display: block; margin-top: 5px; color: var(--nova-muted); font-size: 7px; }
 .message.user small { color: rgba(255,255,255,.7); }
+.message.user.failed > div { color: #7f2929; border: 1px solid rgba(181,59,59,.35); background: #fff3f3; }
+.message.user.failed small { color: #9d3131; }
 .message button { margin-top: 7px; border: 0; background: transparent; color: var(--nova-orange-text); display: flex; gap: 4px; font-size: 9px; }
-.suggestion-row { display: flex; gap: 6px; padding: 0 14px; overflow: hidden; }
-.suggestion-row button { flex: 0 0 auto; min-height: 34px; padding: 0 9px; border: 1px solid var(--nova-deep); border-radius: 10px; background: #fff; font-size: 9px; }
-.escalate { width: calc(100% - 28px); min-height: 47px; margin: 12px 14px 0; border: 0; border-radius: 14px; color: #fff; background: var(--nova-deep); display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 600; }
+.suggestion-row { display: flex; gap: 7px; padding: 0 14px 5px; overflow-x: auto; overflow-y: visible; overscroll-behavior-inline: contain; scrollbar-width: thin; scroll-snap-type: x proximity; }
+.suggestion-row button { flex: 0 0 auto; min-width: 112px; max-width: min(78cqw,280px); min-height: 48px; padding: 8px 10px; border: 1px solid var(--nova-deep); border-radius: 12px; background: #fff; font-size: 9px; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; scroll-snap-align: start; }
+.escalate { width: calc(100% - 28px); min-height: 48px; margin: 12px 14px 0; border: 0; border-radius: 14px; color: #fff; background: var(--nova-deep); display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 600; }
 .handoff-copy { margin: 8px 0; text-align: center; color: var(--nova-muted); font-size: 9px; }
-.composer { position: absolute; left: 12px; right: 12px; bottom: 12px; height: 49px; display: grid; grid-template-columns: 43px 1fr 43px; border: 1px solid var(--nova-line); border-radius: 18px; background: #fff; }
+.composer { position: absolute; left: 12px; right: 12px; bottom: 12px; height: 56px; display: grid; grid-template-columns: 54px minmax(0,1fr) 54px; border: 1px solid var(--nova-line); border-radius: 18px; background: #fff; }
+.composer.native-composer { grid-template-columns: minmax(0,1fr) 54px; }
 .composer input { min-width: 0; border: 0; border-radius: 18px; padding: 0 14px; outline: 0; }
-.composer button { width: 38px; height: 38px; margin: 5px; border: 0; border-radius: 50%; color: var(--nova-orange); background: var(--nova-deep); display: grid; place-items: center; }
+.composer button { width: 48px; height: 48px; margin: 3px; border: 0; border-radius: 50%; color: var(--nova-orange); background: var(--nova-deep); display: grid; place-items: center; }
 .composer .composer-attach { color: var(--nova-deep); background: transparent; }
 .privacy-note { display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--nova-muted); font-size: 9px; }
+.novabot-inline-error { min-width: 0; padding: 10px 12px; border: 1px solid rgba(181,59,59,.28); border-radius: 12px; color: #7f2929; background: #fff3f3; display: grid; grid-template-columns: 22px minmax(0,1fr); align-items: center; gap: 8px; }
+.novabot-inline-error svg { width: 20px; height: 20px; }
+.novabot-inline-error p { margin: 0; font-size: 9px; line-height: 1.4; overflow-wrap: anywhere; }
+.novabot-pending { opacity: .78; }
 
 /* Real density capture: the app is composed at Android logical pixels and rasterized to the requested physical viewport. */
 body:has(.capture-mode) { margin: 0; overflow: hidden; background: var(--nova-page); }
@@ -1152,12 +1172,22 @@ body:has(.capture-mode) .device-screen:has(.capture-mode) > :is(.sheet-overlay, 
 .catalog-authority-state p { color: var(--nova-muted); font-size: 9px; line-height: 1.5; }
 .catalog-authority-state button { min-height: 44px; margin-top: 5px; }
 .account-empty-authoritative > p { color: var(--nova-muted); font-size: 10px; line-height: 1.5; }
+.account-data-warning { min-width: 0; padding: 12px; border: 1px solid rgba(157,49,49,.24); border-radius: 13px; color: #7f2929; background: #fff5f5; display: grid; grid-template-columns: 24px minmax(0,1fr); align-items: center; gap: 8px 10px; }
+.account-data-warning > svg { width: 22px; height: 22px; }
+.account-data-warning > p { min-width: 0; margin: 0; font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.account-data-warning > button { grid-column: 1 / -1; width: 100%; min-height: 48px; padding: 7px 10px; border: 1px solid rgba(157,49,49,.4); border-radius: 10px; color: #7f2929; background: #fff; font-weight: 600; }
+.account-settings-hub > p { margin: -4px 0 8px; color: var(--nova-muted); font-size: 9px; line-height: 1.5; }
+.account-settings-hub > button { width: 100%; min-height: 58px; padding: 8px 2px; border: 0; border-top: 1px solid var(--nova-line); background: transparent; display: grid; grid-template-columns: 32px minmax(0,1fr) 18px; align-items: center; gap: 8px; text-align: left; }
+.account-settings-hub > button > svg:first-child { width: 23px; height: 23px; color: var(--nova-deep); }
+.account-settings-hub > button > span { min-width: 0; display: grid; gap: 3px; }
+.account-settings-hub > button b { font-size: 10px; }
+.account-settings-hub > button small { color: var(--nova-muted); font-size: 8px; line-height: 1.35; }
 .authoritative-security-list { margin-top: 8px; display: grid; gap: 0; }
 .authoritative-security-list p { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--nova-line); display: flex; justify-content: space-between; gap: 12px; font-size: 10px; }
 .authoritative-security-list span { color: var(--nova-muted); }
 
 .account-feature-layout, .order-utility-layout { min-height: 600px; display: grid; align-content: start; }
-.account-feature-card, .invoice-preview, .tracking-preview { padding: 18px; border: 1px solid rgba(15,44,78,.07); border-radius: 19px; background: #fff; box-shadow: 0 8px 22px rgba(15,44,78,.065); }
+.account-feature-card, .invoice-preview, .tracking-preview { min-width: 0; padding: 18px; border: 1px solid rgba(15,44,78,.07); border-radius: 19px; background: #fff; box-shadow: 0 8px 22px rgba(15,44,78,.065); }
 .account-feature-card > svg, .tracking-preview > svg { width: 39px; height: 39px; padding: 9px; border-radius: 13px; color: #fff; background: var(--nova-deep); }
 .account-feature-card > h1, .invoice-preview > h1, .tracking-preview > h1 { margin: 11px 0 14px; font-size: 20px; }
 .account-feature-card > label { margin-top: 10px; display: grid; gap: 5px; color: var(--nova-muted); font-size: 9px; }
@@ -1167,16 +1197,27 @@ body:has(.capture-mode) .device-screen:has(.capture-mode) > :is(.sheet-overlay, 
 .payment-card-mock span, .payment-card-mock small { font-size: 9px; }
 .payment-card-mock b { font-size: 18px; letter-spacing: .08em; }
 .payment-card-mock.secondary-card { color: var(--nova-deep); background: linear-gradient(135deg,#fff7f0,#e9eff7); }
-.coupon-card { min-height: 76px; margin-top: 9px; padding: 12px; border: 1px dashed rgba(254,90,2,.45); border-radius: 14px; background: #fff8f2; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.coupon-card > div { display: grid; gap: 3px; }
+.coupon-card { min-width: 0; min-height: 84px; margin-top: 9px; padding: 12px; border: 1px dashed rgba(254,90,2,.45); border-radius: 14px; background: #fff8f2; display: grid; grid-template-columns: minmax(0,1fr) minmax(92px,40%); align-items: center; gap: 10px; }
+.coupon-card > div { min-width: 0; display: grid; gap: 3px; overflow-wrap: anywhere; }
 .coupon-card b { color: var(--nova-orange-text); font-size: 13px; }
 .coupon-card span { color: var(--nova-muted); font-size: 8px; }
-.coupon-card button { min-height: 34px; padding: 0 10px; border: 1px solid var(--nova-orange); border-radius: 9px; color: var(--nova-orange-text); background: #fff; font-size: 9px; }
+.coupon-card small { color: var(--nova-muted); font-size: 7.5px; }
+.coupon-card button { min-width: 0; width: 100%; min-height: 48px; padding: 7px 10px; border: 1px solid var(--nova-orange); border-radius: 9px; color: var(--nova-orange-text); background: #fff; font-size: 9px; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
 .account-activity-card { margin-top: 10px; padding: 10px; border: 1px solid var(--nova-line); border-radius: 14px; display: grid; grid-template-columns: 74px minmax(0,1fr); gap: 10px; }
 .account-activity-card img { width: 74px; height: 78px; border-radius: 10px; object-fit: cover; }
+.account-activity-fallback { width: 74px; height: 78px; border-radius: 10px; color: var(--nova-deep); background: #eef3f8; display: grid; place-items: center; }
+.account-activity-fallback svg { width: 30px; height: 30px; }
 .account-activity-card > div { min-width: 0; display: grid; align-content: center; gap: 4px; }
 .account-activity-card p, .account-activity-card small { margin: 0; color: var(--nova-muted); font-size: 8px; line-height: 1.4; }
-.account-activity-card button { grid-column: 1 / -1; min-height: 37px; border: 1px solid var(--nova-deep); border-radius: 10px; color: var(--nova-deep); background: #fff; }
+.account-activity-card button { grid-column: 1 / -1; min-height: 48px; border: 1px solid var(--nova-deep); border-radius: 10px; color: var(--nova-deep); background: #fff; }
+.followed-store-card { margin-top: 10px; padding: 11px; border: 1px solid var(--nova-line); border-radius: 14px; display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 8px 10px; align-items: center; }
+.followed-store-card > span { width: 42px; height: 42px; border-radius: 13px; color: #fff; background: var(--nova-deep); display: grid; place-items: center; }
+.followed-store-card > span svg { width: 24px; height: 24px; }
+.followed-store-copy { min-width: 0; display: grid; gap: 3px; overflow-wrap: anywhere; }
+.followed-store-card small { color: var(--nova-muted); font-size: 8px; }
+.followed-store-actions { grid-column: 1 / -1; min-width: 0; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.followed-store-actions > button { min-width: 0; width: 100%; min-height: 48px; padding: 7px 5px; border: 1px solid var(--nova-deep); border-radius: 10px; color: var(--nova-deep); background: #fff; font-size: 9px; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; }
+.followed-store-actions > button.danger-text { color: #9d3131; border-color: rgba(157,49,49,.35); }
 .feature-switch { width: 100%; min-height: 62px; padding: 8px 2px; border: 0; border-top: 1px solid var(--nova-line); background: transparent; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; }
 .feature-switch > span { display: grid; gap: 3px; }
 .feature-switch span b { font-size: 10px; }

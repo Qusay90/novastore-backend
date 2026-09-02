@@ -16,7 +16,11 @@ import {
   getCurrentCustomer,
   getCustomerSecurityStatus,
   listCustomerAddresses,
+  listCustomerCoupons,
+  listCustomerFollowedStores,
   listCustomerOrders,
+  listCustomerQuestions,
+  listCustomerReviews,
   listCustomerReturns,
   listCustomerSupportMessages,
   makeDefaultCustomerAddress,
@@ -27,11 +31,16 @@ import {
   updateCustomerProfile,
   type CustomerAddress,
   type CustomerAddressInput,
+  type CustomerCoupon,
+  type CustomerFollowedStore,
   type CustomerOrder,
   type CustomerProfile,
+  type CustomerQuestion,
+  type CustomerReview,
   type CustomerReturn,
   type CustomerSecurityStatus,
   type CustomerSupportMessage,
+  unfollowCustomerStore,
 } from "./customerAccountApi";
 
 export type CustomerAccountPhase = "loading" | "guest" | "authenticated" | "offline" | "error";
@@ -40,6 +49,10 @@ type CustomerAccountRuntimeValue = Readonly<{
   phase: CustomerAccountPhase;
   user: CustomerProfile | null;
   addresses: readonly CustomerAddress[];
+  coupons: readonly CustomerCoupon[];
+  questions: readonly CustomerQuestion[];
+  reviews: readonly CustomerReview[];
+  followedStores: readonly CustomerFollowedStore[];
   orders: readonly CustomerOrder[];
   returns: readonly CustomerReturn[];
   supportMessages: readonly CustomerSupportMessage[];
@@ -59,6 +72,8 @@ type CustomerAccountRuntimeValue = Readonly<{
   setDefaultAddress(id: number): Promise<void>;
   cancelOrder(id: number, expectedStatus: string): Promise<void>;
   createReturn(orderId: number, reasonCode: string, note?: string): Promise<void>;
+  refreshFollowedStores(): Promise<void>;
+  unfollowStore(storeSlug: string): Promise<void>;
   refreshSupport(): Promise<void>;
   sendSupportMessage(message: string): Promise<void>;
 }>;
@@ -83,6 +98,10 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   const [phase, setPhase] = useState<CustomerAccountPhase>("loading");
   const [user, setUser] = useState<CustomerProfile | null>(null);
   const [addresses, setAddresses] = useState<readonly CustomerAddress[]>([]);
+  const [coupons, setCoupons] = useState<readonly CustomerCoupon[]>([]);
+  const [questions, setQuestions] = useState<readonly CustomerQuestion[]>([]);
+  const [reviews, setReviews] = useState<readonly CustomerReview[]>([]);
+  const [followedStores, setFollowedStores] = useState<readonly CustomerFollowedStore[]>([]);
   const [orders, setOrders] = useState<readonly CustomerOrder[]>([]);
   const [returns, setReturns] = useState<readonly CustomerReturn[]>([]);
   const [supportMessages, setSupportMessages] = useState<readonly CustomerSupportMessage[]>([]);
@@ -91,15 +110,24 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   const [dataWarnings, setDataWarnings] = useState<readonly string[]>([]);
   const [busy, setBusy] = useState(false);
   const sequence = useRef(0);
+  const followedStoresLoadSequence = useRef(0);
+  const unfollowOperationSequence = useRef(0);
 
   const clearPrivateState = useCallback(() => {
     setUser(null);
     setAddresses([]);
+    setCoupons([]);
+    setQuestions([]);
+    setReviews([]);
+    setFollowedStores([]);
     setOrders([]);
     setReturns([]);
     setSupportMessages([]);
     setSecurityStatus(null);
     setDataWarnings([]);
+    setBusy(false);
+    ++followedStoresLoadSequence.current;
+    ++unfollowOperationSequence.current;
   }, []);
 
   const loadPrivateData = useCallback(async (profile: CustomerProfile, currentSequence: number) => {
@@ -109,15 +137,23 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
       listCustomerReturns(),
       listCustomerSupportMessages(profile.id),
       getCustomerSecurityStatus(),
+      listCustomerCoupons(),
+      listCustomerQuestions(),
+      listCustomerReviews(profile.id),
+      listCustomerFollowedStores(),
     ] as const);
     if (sequence.current !== currentSequence) return;
     const warnings: string[] = [];
-    const [addressResult, orderResult, returnResult, supportResult, securityResult] = results;
+    const [addressResult, orderResult, returnResult, supportResult, securityResult, couponResult, questionResult, reviewResult, followedStoreResult] = results;
     if (addressResult.status === "fulfilled") setAddresses(addressResult.value); else { setAddresses([]); warnings.push(warningText("Adresler")); }
     if (orderResult.status === "fulfilled") setOrders(orderResult.value); else { setOrders([]); warnings.push(warningText("Siparişler")); }
     if (returnResult.status === "fulfilled") setReturns(returnResult.value); else { setReturns([]); warnings.push(warningText("İadeler")); }
     if (supportResult.status === "fulfilled") setSupportMessages(supportResult.value); else { setSupportMessages([]); warnings.push(warningText("Destek geçmişi")); }
     if (securityResult.status === "fulfilled") setSecurityStatus(securityResult.value); else { setSecurityStatus(null); warnings.push(warningText("Güvenlik durumu")); }
+    if (couponResult.status === "fulfilled") setCoupons(couponResult.value); else { setCoupons([]); warnings.push(warningText("Kuponlar")); }
+    if (questionResult.status === "fulfilled") setQuestions(questionResult.value); else { setQuestions([]); warnings.push(warningText("Sorular")); }
+    if (reviewResult.status === "fulfilled") setReviews(reviewResult.value); else { setReviews([]); warnings.push(warningText("Değerlendirmeler")); }
+    if (followedStoreResult.status === "fulfilled") setFollowedStores(followedStoreResult.value); else { setFollowedStores([]); warnings.push(warningText("Takip edilen mağazalar")); }
     setDataWarnings(Object.freeze(warnings));
   }, []);
 
@@ -293,6 +329,31 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     } finally { setBusy(false); }
   }, [refreshOrdersAndReturns]);
 
+  const refreshFollowedStores = useCallback(async () => {
+    if (!user) return;
+    const currentSequence = sequence.current;
+    const currentLoadSequence = ++followedStoresLoadSequence.current;
+    const nextStores = await listCustomerFollowedStores();
+    if (sequence.current !== currentSequence || followedStoresLoadSequence.current !== currentLoadSequence) return;
+    setFollowedStores(nextStores);
+    const followedStoresWarning = warningText("Takip edilen mağazalar");
+    setDataWarnings((current) => Object.freeze(current.filter((warning) => warning !== followedStoresWarning)));
+  }, [user]);
+
+  const unfollowStore = useCallback(async (storeSlug: string) => {
+    if (!user) throw new CustomerNotificationApiError("Müşteri oturumu gerekli.", 401, "CUSTOMER_SESSION_MISSING");
+    const guard = currentCustomerSessionGuard();
+    const currentOperation = ++unfollowOperationSequence.current;
+    setBusy(true);
+    try {
+      await unfollowCustomerStore(storeSlug);
+      if (!customerSessionMatchesGuard(guard)) return;
+      await refreshFollowedStores();
+    } finally {
+      if (customerSessionMatchesGuard(guard) && unfollowOperationSequence.current === currentOperation) setBusy(false);
+    }
+  }, [refreshFollowedStores, user]);
+
   const refreshSupport = useCallback(async () => {
     if (!user) return;
     setSupportMessages(await listCustomerSupportMessages(user.id));
@@ -328,11 +389,12 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   }, [clearPrivateState, refresh]);
 
   const value = useMemo<CustomerAccountRuntimeValue>(() => Object.freeze({
-    phase, user, addresses, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy,
+    phase, user, addresses, coupons, questions, reviews, followedStores, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy,
     refresh, login, register, requestPasswordRecovery: recover, logout, updateProfile,
     createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder, createReturn, refreshSupport,
+    refreshFollowedStores, unfollowStore,
     sendSupportMessage: sendSupport,
-  }), [phase, user, addresses, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy, refresh, login, register, recover, logout, updateProfile, createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder, createReturn, refreshSupport, sendSupport]);
+  }), [phase, user, addresses, coupons, questions, reviews, followedStores, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy, refresh, login, register, recover, logout, updateProfile, createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder, createReturn, refreshFollowedStores, unfollowStore, refreshSupport, sendSupport]);
 
   return <CustomerAccountRuntimeContext.Provider value={value}>{children}</CustomerAccountRuntimeContext.Provider>;
 }

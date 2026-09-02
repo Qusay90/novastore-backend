@@ -85,8 +85,57 @@ export type CustomerSecurityStatus = Readonly<{
   hasPassword: boolean;
 }>;
 
+export type CustomerCoupon = Readonly<{
+  id: number;
+  code: string;
+  discountType: "PERCENT" | "FIXED";
+  discountValue: number;
+  minOrderAmount: number;
+  maxDiscountAmount: number | null;
+  startsAt: string | null;
+  endsAt: string | null;
+}>;
+
+export type CustomerQuestion = Readonly<{
+  id: number;
+  productId: number;
+  productName: string;
+  productImage: string;
+  question: string;
+  answer: string | null;
+  status: "pending" | "answered";
+  createdAt: string | null;
+  answeredAt: string | null;
+}>;
+
+export type CustomerReviewStatus = "PENDING" | "PUBLISHED" | "HIDDEN";
+
+export type CustomerReview = Readonly<{
+  id: number;
+  productId: number;
+  productName: string;
+  productImage: string;
+  rating: number;
+  comment: string | null;
+  status: CustomerReviewStatus;
+  createdAt: string | null;
+}>;
+
+export type CustomerFollowedStore = Readonly<{
+  slug: string;
+  name: string;
+  following: true;
+  followerCount: number;
+  followedAt: string | null;
+}>;
+
 const text = (value: unknown) => String(value ?? "").trim();
 const CUSTOMER_RETURN_REASON_CODES = new Set(["DAMAGED", "WRONG_ITEM", "NOT_AS_DESCRIBED", "CHANGED_MIND", "OTHER"]);
+const CUSTOMER_REVIEW_STATUSES = new Set<CustomerReviewStatus>(["PENDING", "PUBLISHED", "HIDDEN"]);
+const COUPON_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,63}$/u;
+const STORE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const MAX_ACCOUNT_LIST_SIZE = 2_000;
+const MAX_MONEY_VALUE = 99_999_999.99;
 
 function positiveInteger(value: unknown) {
   const number = Number(value);
@@ -111,6 +160,43 @@ function safeMediaUrl(value: unknown) {
   }
 }
 
+function boundedText(value: unknown, maxLength: number) {
+  const normalized = text(value);
+  return normalized && normalized.length <= maxLength ? normalized : null;
+}
+
+function optionalTimestamp(value: unknown) {
+  const normalized = text(value);
+  if (!normalized) return null;
+  if (normalized.length > 64 || Number.isNaN(Date.parse(normalized))) return null;
+  return normalized;
+}
+
+function boundedMoney(value: unknown, options: Readonly<{ positive?: boolean; nullable?: boolean }> = {}) {
+  if (options.nullable && (value === null || value === undefined || value === "")) return null;
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount > MAX_MONEY_VALUE || (options.positive ? amount <= 0 : amount < 0)) return null;
+  if (Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) return null;
+  return Number(amount.toFixed(2));
+}
+
+function normalizeList<T>(
+  value: unknown,
+  normalize: (entry: unknown) => T | null,
+  label: string,
+  code: string,
+) {
+  if (!Array.isArray(value) || value.length > MAX_ACCOUNT_LIST_SIZE) {
+    throw new CustomerNotificationApiError(`${label} doğrulanamadı.`, 0, code);
+  }
+  return Object.freeze(value.map(normalize).filter((entry): entry is T => Boolean(entry)));
+}
+
+function normalizeStoreSlug(value: unknown) {
+  const slug = text(value).toLocaleLowerCase("en-US");
+  return slug.length <= 80 && STORE_SLUG_PATTERN.test(slug) ? slug : null;
+}
+
 export function normalizeCustomerProfile(value: unknown): CustomerProfile | null {
   const source = objectValue(value);
   const id = positiveInteger(source?.id);
@@ -123,6 +209,137 @@ export function normalizeCustomerProfile(value: unknown): CustomerProfile | null
     email,
     phone: text(source.phone) || null,
     role: "customer",
+  });
+}
+
+export function normalizeCustomerCoupon(value: unknown): CustomerCoupon | null {
+  const source = objectValue(value);
+  const id = positiveInteger(source?.id);
+  const code = text(source?.code).toLocaleUpperCase("en-US");
+  const discountType = text(source?.discount_type ?? source?.discountType).toLocaleUpperCase("en-US");
+  const discountValue = boundedMoney(source?.discount_value ?? source?.discountValue, { positive: true });
+  const minOrderAmount = boundedMoney(source?.min_order_amount ?? source?.minOrderAmount);
+  const rawMaxDiscountAmount = source?.max_discount_amount ?? source?.maxDiscountAmount;
+  const maxDiscountAmount = boundedMoney(rawMaxDiscountAmount, { positive: true, nullable: true });
+  const rawStartsAt = source?.starts_at ?? source?.startsAt;
+  const rawEndsAt = source?.ends_at ?? source?.endsAt;
+  const startsAt = optionalTimestamp(rawStartsAt);
+  const endsAt = optionalTimestamp(rawEndsAt);
+  if (
+    !source
+    || !id
+    || !COUPON_CODE_PATTERN.test(code)
+    || (discountType !== "PERCENT" && discountType !== "FIXED")
+    || discountValue === null
+    || minOrderAmount === null
+    || (text(rawMaxDiscountAmount) && maxDiscountAmount === null)
+    || (text(rawStartsAt) && startsAt === null)
+    || (text(rawEndsAt) && endsAt === null)
+    || (discountType === "PERCENT" && discountValue > 100)
+  ) return null;
+  return Object.freeze({
+    id,
+    code,
+    discountType,
+    discountValue,
+    minOrderAmount,
+    maxDiscountAmount,
+    startsAt,
+    endsAt,
+  });
+}
+
+export function normalizeCustomerQuestion(value: unknown): CustomerQuestion | null {
+  const source = objectValue(value);
+  const id = positiveInteger(source?.id);
+  const productId = positiveInteger(source?.product_id ?? source?.productId);
+  const productName = boundedText(source?.product_name ?? source?.productName, 240);
+  const question = boundedText(source?.question, 1_000);
+  const answer = text(source?.answer) ? boundedText(source?.answer, 2_000) : null;
+  const rawCreatedAt = source?.created_at ?? source?.createdAt;
+  const rawAnsweredAt = source?.answered_at ?? source?.answeredAt;
+  const createdAt = optionalTimestamp(rawCreatedAt);
+  const answeredAt = optionalTimestamp(rawAnsweredAt);
+  if (
+    !source
+    || !id
+    || !productId
+    || !productName
+    || !question
+    || (text(source.answer) && !answer)
+    || (text(rawCreatedAt) && !createdAt)
+    || (text(rawAnsweredAt) && !answeredAt)
+  ) return null;
+  return Object.freeze({
+    id,
+    productId,
+    productName,
+    productImage: safeMediaUrl(source.product_image ?? source.productImage ?? source.image_url),
+    question,
+    answer,
+    status: answer ? "answered" : "pending",
+    createdAt,
+    answeredAt,
+  });
+}
+
+export function normalizeCustomerReview(value: unknown): CustomerReview | null {
+  const source = objectValue(value);
+  const id = positiveInteger(source?.id);
+  const productId = positiveInteger(source?.product_id ?? source?.productId);
+  const productName = boundedText(source?.product_name ?? source?.productName, 240);
+  const rating = Number(source?.rating);
+  const status = text(source?.status).toLocaleUpperCase("en-US") as CustomerReviewStatus;
+  const rawComment = text(source?.comment);
+  const comment = rawComment ? boundedText(rawComment, 2_000) : null;
+  const rawCreatedAt = source?.created_at ?? source?.createdAt;
+  const createdAt = optionalTimestamp(rawCreatedAt);
+  if (
+    !source
+    || !id
+    || !productId
+    || !productName
+    || !Number.isInteger(rating)
+    || rating < 1
+    || rating > 5
+    || !CUSTOMER_REVIEW_STATUSES.has(status)
+    || (rawComment && !comment)
+    || (text(rawCreatedAt) && !createdAt)
+  ) return null;
+  return Object.freeze({
+    id,
+    productId,
+    productName,
+    productImage: safeMediaUrl(source.image_url ?? source.product_image ?? source.productImage),
+    rating,
+    comment,
+    status,
+    createdAt,
+  });
+}
+
+export function normalizeCustomerFollowedStore(value: unknown): CustomerFollowedStore | null {
+  const source = objectValue(value);
+  const slug = normalizeStoreSlug(source?.store_slug ?? source?.storeSlug ?? source?.slug);
+  const name = boundedText(source?.store_name ?? source?.storeName ?? source?.name, 160);
+  const followerCount = Number(source?.follower_count ?? source?.followerCount ?? 0);
+  const rawFollowedAt = source?.followed_at ?? source?.followedAt;
+  const followedAt = optionalTimestamp(rawFollowedAt);
+  if (
+    !source
+    || !slug
+    || !name
+    || source.following !== true
+    || !Number.isSafeInteger(followerCount)
+    || followerCount < 0
+    || (text(rawFollowedAt) && !followedAt)
+  ) return null;
+  return Object.freeze({
+    slug,
+    name,
+    following: true,
+    followerCount,
+    followedAt,
   });
 }
 
@@ -338,6 +555,38 @@ export async function listCustomerOrders(customerId: number) {
   return Object.freeze(payload.map(normalizeCustomerOrder).filter((item): item is CustomerOrder => Boolean(item)));
 }
 
+export async function listCustomerCoupons() {
+  const payload = await requestCustomerApi("/api/campaigns/coupons/active");
+  return normalizeList(payload, normalizeCustomerCoupon, "Kupon listesi", "CUSTOMER_COUPON_RESPONSE_INVALID");
+}
+
+export async function listCustomerQuestions() {
+  const payload = await requestCustomerApi("/api/questions/user");
+  return normalizeList(payload, normalizeCustomerQuestion, "Soru geçmişi", "CUSTOMER_QUESTION_RESPONSE_INVALID");
+}
+
+export async function listCustomerReviews(currentProfileId: number) {
+  const customerId = requireId(currentProfileId, "Müşteri");
+  const payload = await requestCustomerApi(`/api/reviews/user/${customerId}`);
+  return normalizeList(payload, normalizeCustomerReview, "Değerlendirme geçmişi", "CUSTOMER_REVIEW_RESPONSE_INVALID");
+}
+
+export async function listCustomerFollowedStores() {
+  const payload = await requestCustomerApi("/api/store-follows");
+  return normalizeList(payload, normalizeCustomerFollowedStore, "Takip edilen mağaza listesi", "CUSTOMER_FOLLOWED_STORE_RESPONSE_INVALID");
+}
+
+export async function unfollowCustomerStore(value: string) {
+  const slug = normalizeStoreSlug(value);
+  if (!slug) throw new CustomerNotificationApiError("Mağaza kimliği geçersiz.", 0, "CUSTOMER_STORE_SLUG_INVALID");
+  const source = objectValue(await requestCustomerApi(`/api/store-follows/${encodeURIComponent(slug)}`, "DELETE"));
+  const responseSlug = normalizeStoreSlug(source?.store_slug ?? source?.storeSlug);
+  const followerCount = Number(source?.follower_count ?? source?.followerCount ?? 0);
+  if (!source || responseSlug !== slug || source.following !== false || !Number.isSafeInteger(followerCount) || followerCount < 0) {
+    throw new CustomerNotificationApiError("Mağaza takip yanıtı doğrulanamadı.", 0, "CUSTOMER_FOLLOWED_STORE_RESPONSE_INVALID");
+  }
+}
+
 export async function cancelCustomerOrder(id: number, expectedStatus: string, reasonCode = "CUSTOMER_REQUEST") {
   const orderId = requireId(id, "Sipariş");
   const normalizedStatus = text(expectedStatus);
@@ -399,9 +648,14 @@ export async function sendCustomerSupportMessage(customerId: number, message: st
 
 export const customerAccountApiTestUtils = Object.freeze({
   normalizeCustomerAddress,
+  normalizeCustomerCoupon,
+  normalizeCustomerFollowedStore,
   normalizeCustomerOrder,
+  normalizeCustomerQuestion,
+  normalizeCustomerReview,
   normalizeCustomerReturn,
   normalizeCustomerProfile,
+  normalizeStoreSlug,
   positiveInteger,
   safeMediaUrl,
 });

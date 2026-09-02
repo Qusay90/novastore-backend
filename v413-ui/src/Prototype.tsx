@@ -63,6 +63,7 @@ import {
 import { hasAppOwnedBackEntry, nativeHistoryDepth } from "./native/nativeNavigation";
 import { canonicalNativeRoute, canonicalNativeRouteOrSafeDefault } from "./native/routeContract";
 import { useCustomerAccountRuntime, type CustomerAddressInput, type CustomerOrder } from "./account";
+import { sendCustomerNovaBotMessage } from "./assistant/customerNovaBotApi";
 import {
   createCheckoutIdempotencyKey,
   getCustomerPaymentCapability,
@@ -94,7 +95,7 @@ type CalId =
   | "CAL-01" | "CAL-02" | "CAL-03" | "CAL-04" | "CAL-05" | "CAL-06"
   | "CAL-07" | "CAL-08" | "CAL-09" | "CAL-10" | "CAL-11" | "CAL-12";
 type TabId = "home" | "categories" | "favorites" | "cart" | "support" | "account";
-type ViewId = "" | "login" | "forgot" | "register" | "returns" | "faq" | "history" | "live" | "address" | "addresses" | "notifications" | "success" | "search" | "profile" | "payments" | "coupons" | "reviews" | "questions" | "security" | "settings" | "invoice" | "tracking" | "store";
+type ViewId = "" | "login" | "forgot" | "register" | "returns" | "faq" | "history" | "live" | "address" | "addresses" | "notifications" | "success" | "search" | "profile" | "payments" | "coupons" | "reviews" | "questions" | "followed-stores" | "security" | "settings" | "invoice" | "tracking" | "store";
 type RouteContext = {
   storeSlug?: string;
   productId?: string;
@@ -354,7 +355,7 @@ function readRoute(): Route {
   const rawTab = params.get("tab") as TabId | null;
   const tab = rawTab && navItems.some((item) => item.id === rawTab) ? rawTab : initialTab[cal];
   const rawView = params.get("view") as ViewId | null;
-  const allowedViews: ViewId[] = ["", "login", "forgot", "register", "returns", "faq", "history", "live", "address", "addresses", "notifications", "success", "search", "profile", "payments", "coupons", "reviews", "questions", "security", "settings", "invoice", "tracking", "store"];
+  const allowedViews: ViewId[] = ["", "login", "forgot", "register", "returns", "faq", "history", "live", "address", "addresses", "notifications", "success", "search", "profile", "payments", "coupons", "reviews", "questions", "followed-stores", "security", "settings", "invoice", "tracking", "store"];
   const view = rawView && allowedViews.includes(rawView) ? rawView : "";
   const route: Route = { cal, tab, view };
   const contextRoute = (cal === "CAL-04" && view === "store") || cal === "CAL-06";
@@ -545,6 +546,11 @@ export default function Prototype() {
     return () => window.removeEventListener("novastore:notification-open", onNotificationOpen);
   });
   const showNav = !["CAL-01", "CAL-06"].includes(route.cal);
+  const showGlobalNovaBot = NATIVE_SHELL
+    && !keyboard.visible
+    && !["CAL-01", "CAL-06", "CAL-08", "CAL-12"].includes(route.cal)
+    && route.cal !== "CAL-07"
+    && !(route.cal === "CAL-11" && route.view === "");
   const hasFixedAppHeader = route.cal !== "CAL-06";
   const routeIdentity = `${route.cal}:${route.tab}:${route.view || "root"}:${route.storeSlug || "local"}:${route.productId || "none"}:${route.mode || "customer"}`;
   const scrollSurfaceIdentity = route.cal === "CAL-08" ? `${route.cal}:${route.tab}` : routeIdentity;
@@ -656,7 +662,7 @@ export default function Prototype() {
   return (
     <CommerceContext.Provider value={commerce}>
       <div
-        className={`cal-app layout-${layout}${capture ? " capture-mode" : ""}`}
+        className={`cal-app layout-${layout}${capture ? " capture-mode" : ""}${showGlobalNovaBot ? " has-global-novabot" : ""}`}
         style={style}
         data-focus-modality="pointer"
         data-cal-id={route.cal}
@@ -689,6 +695,9 @@ export default function Prototype() {
           )}
         </RefreshableRouteStage>
         {showNav && <BottomNav route={route} go={go} onReselect={() => requestRefresh("reselect")} />}
+        {showGlobalNovaBot && (
+          <GlobalNovaBotLauncher go={go} />
+        )}
         {!capture && !nativeShell && <CalibrationSwitcher current={route.cal} go={go} />}
       </div>
     </CommerceContext.Provider>
@@ -953,7 +962,7 @@ function RouteTopbar({ route, go, query, setQuery, setSearchPanelOpen }: { route
     if (route.view === "faq" || route.view === "history") return <TopActions title={route.view === "faq" ? "Sıkça Sorulan Sorular" : "Geçmiş İşlemler"} back={() => goBackOr(() => go("CAL-10", "account"))} plainEnd />;
     if (route.view === "addresses") return <TopActions title="Adreslerim" back={() => goBackOr(() => go("CAL-10", "account"))} plainEnd />;
     if (route.view === "notifications") return <TopActions title="Bildirimler" back={() => goBackOr(() => go("CAL-10", "account"))} plainEnd />;
-    const accountTitles: Partial<Record<ViewId, string>> = { profile: "Profil Bilgileri", payments: "Ödeme Yöntemlerim", coupons: "Kuponlarım", reviews: "Değerlendirmelerim", questions: "Sorularım", security: "Gizlilik ve Güvenlik", settings: "Ayarlar" };
+    const accountTitles: Partial<Record<ViewId, string>> = { profile: "Profil Bilgileri", payments: "Ödeme Yöntemlerim", coupons: "Kuponlarım", reviews: "Değerlendirmelerim", questions: "Sorularım", "followed-stores": "Takip Ettiğim Mağazalar", security: "Gizlilik ve Güvenlik", settings: "Ayarlar" };
     if (route.view && accountTitles[route.view]) return <TopActions title={accountTitles[route.view]} back={() => goBackOr(() => go("CAL-10", "account"))} plainEnd />;
     return <TopActions title="Hesabım" settings onSettings={() => go("CAL-10", "account", "settings")} plainStart />;
   }
@@ -982,6 +991,16 @@ function Screen({ route, go, searchQuery, setSearchQuery, searchPanelOpen, setSe
     case "CAL-11": return <SupportHubScreen go={go} view={route.view} />;
     case "CAL-12": return <NovaBotScreen go={go} />;
   }
+}
+
+function GlobalNovaBotLauncher({ go }: { go: Go }) {
+  return <button
+    type="button"
+    className="global-novabot-launcher"
+    data-testid="global-novabot-trigger"
+    aria-label="NovaBot’u aç"
+    onClick={() => go("CAL-12", "support")}
+  ><img src={NOVABOT} alt="" /><span className="visually-hidden">NovaBot’u aç</span></button>;
 }
 
 function CalibrationSwitcher({ current, go }: { current: CalId; go: Go }) {
@@ -2222,8 +2241,9 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
             }
             setShared(true);
           }}><Share1Icon /></IconButton>
-          <IconButton label={readOnlyPreview ? "Favoriye ekle · önizlemede kapalı" : favorite ? "Favoriden çıkar" : "Favoriye ekle"} pressed={favorite} disabled={readOnlyPreview} onClick={() => toggleFavorite(detail.id)} className={favorite ? "favorite-active" : ""}><PhosphorHeartIcon weight={favorite ? "fill" : "regular"} /></IconButton>
-        </div>
+           <IconButton label={readOnlyPreview ? "Favoriye ekle · önizlemede kapalı" : favorite ? "Favoriden çıkar" : "Favoriye ekle"} pressed={favorite} disabled={readOnlyPreview} onClick={() => toggleFavorite(detail.id)} className={favorite ? "favorite-active" : ""}><PhosphorHeartIcon weight={favorite ? "fill" : "regular"} /></IconButton>
+            {NATIVE_SHELL && <GlobalNovaBotLauncher go={go} />}
+          </div>
         {shared && <span className="pdp-action-status" role="status">Paylaşım hazır</span>}
       </header>
       <MobileScroll className="cal-scroll pdp-scroll">
@@ -2332,7 +2352,7 @@ function CartScreen({ go }: { go: Go }) {
   return (
     <div className="root-layout cart-layout">
       <div className="cart-grid">
-        <section className="cart-main"><div className="cart-title"><h1>Sepetim</h1><span>{cartCount} ürün</span></div>{items.map((item) => <article className="cart-item" data-testid={`cart-item-${item.id}`} data-product-id={item.product.id} key={item.id}><img src={item.product.image} alt={item.product.name} /><div><small>{item.product.store}</small><h2>{item.product.name}</h2><p>{NATIVE_SHELL ? `${item.product.stock ?? 0} adet stok` : "Krem · Stokta"}</p><strong>{item.product.price}</strong></div><div className="cart-item-actions"><IconButton label={`${item.product.name} Sil`} onClick={() => removeCartLine(item.id)}><TrashIcon /></IconButton><div className="quantity"><button aria-label={`${item.product.name} adedini azalt`} onClick={() => changeCartQuantity(item.id, -1)}><MinusIcon /></button><b>{item.quantity}</b><button aria-label={`${item.product.name} adedini artır`} disabled={item.quantity >= MAX_CART_QUANTITY_PER_PRODUCT || cartCount >= MAX_CART_TOTAL_QUANTITY} onClick={() => changeCartQuantity(item.id, 1)}><PlusIcon /></button></div></div></article>)}{items.length === 0 ? <div className="empty-state" role="status"><BackpackIcon /><h2>Sepetin boş</h2><button className="primary navy" onClick={() => go("CAL-02", "home")}>Alışverişe Dön</button></div> : <div className="delivery-note"><CubeIcon /><span><strong>Teslimat ödeme adımında netleşir</strong>Ücret ve tarih, adres ile satıcının hazırlık süresine göre hesaplanır.</span></div>}</section>
+        <section className="cart-main"><div className="cart-title"><h1>Sepetim</h1><div className="cart-title-actions"><span>{cartCount} ürün</span>{NATIVE_SHELL && <GlobalNovaBotLauncher go={go} />}</div></div>{items.map((item) => <article className="cart-item" data-testid={`cart-item-${item.id}`} data-product-id={item.product.id} key={item.id}><img src={item.product.image} alt={item.product.name} /><div><small>{item.product.store}</small><h2>{item.product.name}</h2><p>{NATIVE_SHELL ? `${item.product.stock ?? 0} adet stok` : "Krem · Stokta"}</p><strong>{item.product.price}</strong></div><div className="cart-item-actions"><IconButton label={`${item.product.name} Sil`} onClick={() => removeCartLine(item.id)}><TrashIcon /></IconButton><div className="quantity"><button aria-label={`${item.product.name} adedini azalt`} onClick={() => changeCartQuantity(item.id, -1)}><MinusIcon /></button><b>{item.quantity}</b><button aria-label={`${item.product.name} adedini artır`} disabled={item.quantity >= MAX_CART_QUANTITY_PER_PRODUCT || cartCount >= MAX_CART_TOTAL_QUANTITY} onClick={() => changeCartQuantity(item.id, 1)}><PlusIcon /></button></div></div></article>)}{items.length === 0 ? <div className="empty-state" role="status"><BackpackIcon /><h2>Sepetin boş</h2><button className="primary navy" onClick={() => go("CAL-02", "home")}>Alışverişe Dön</button></div> : <div className="delivery-note"><CubeIcon /><span><strong>Teslimat ödeme adımında netleşir</strong>Ücret ve tarih, adres ile satıcının hazırlık süresine göre hesaplanır.</span></div>}</section>
         <aside className="order-summary"><h2>Sipariş Özeti</h2><label>Kupon kodu<div><KeyboardInput value={coupon} onChange={(e) => setCoupon(e.target.value)} /><button onClick={() => applyCartCoupon(coupon)}>Uygula</button></div></label>{couponApplied && <p className="coupon-success" role="status"><CheckIcon /> {appliedCoupon} indirimi uygulandı</p>}{NATIVE_SHELL && appliedCoupon && <p className="coupon-success" role="status">{appliedCoupon} ödeme adımında sunucuda doğrulanacak.</p>}<SummaryRows subtotal={subtotal} discount={discount} total={total} /><button className="primary navy" disabled={!items.length} onClick={() => go("CAL-08", "cart")}>{NATIVE_SHELL ? "Sunucuda Doğrula" : `${formatMoney(total)} · Ödemeye Geç`} <ArrowRightIcon /></button><small className="secure-copy"><LockClosedIcon /> {NATIVE_SHELL ? "Fiyat, stok ve kupon ödeme adımında doğrulanır" : "Güvenli ödeme"}</small></aside>
       </div>
     </div>
@@ -2701,9 +2721,13 @@ function AccountScreen({ go, view }: { go: Go; view: ViewId }) {
   if (view === "faq" || view === "history") return <AccountUtilityScreen go={go} view={view} />;
   if (view === "addresses") return <AddressBookScreen go={go} />;
   if (view === "notifications") return <NotificationCenterScreen go={go} />;
-  if (["profile", "payments", "coupons", "reviews", "questions", "security", "settings"].includes(view)) return <AccountFeatureScreen go={go} view={view as "profile" | "payments" | "coupons" | "reviews" | "questions" | "security" | "settings"} />;
+  if (["profile", "payments", "coupons", "reviews", "questions", "followed-stores", "security", "settings"].includes(view)) return <AccountFeatureScreen go={go} view={view as "profile" | "payments" | "coupons" | "reviews" | "questions" | "followed-stores" | "security" | "settings"} />;
   const tiles: Array<[string, ReactNode, ViewId]> = NATIVE_SHELL ? [
     ["Adreslerim", <MapPinIcon data-icon="location-pin" weight="regular" />, "addresses"],
+    ["Kuponlarım", <CubeIcon />, "coupons"],
+    ["Değerlendirmelerim", <StarFilledIcon />, "reviews"],
+    ["Sorularım", <QuestionMarkCircledIcon />, "questions"],
+    ["Takip Ettiğim Mağazalar", <StorefrontIcon weight="regular" />, "followed-stores"],
   ] : [
     ["Adreslerim", <MapPinIcon data-icon="location-pin" weight="regular" />, "addresses"],
     ["Ödeme Yöntemlerim", <CreditCardIcon data-icon="payment-card" weight="regular" />, "payments"],
@@ -2739,7 +2763,30 @@ function AccountScreen({ go, view }: { go: Go; view: ViewId }) {
   );
 }
 
-function AccountFeatureScreen({ go, view }: { go: Go; view: "profile" | "payments" | "coupons" | "reviews" | "questions" | "security" | "settings" }) {
+function formatAccountDate(value: string | null) {
+  if (!value) return "Tarih bilgisi yok";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Tarih bilgisi yok";
+  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+}
+
+function AccountDataLoadState({ warning, emptyCopy, retryLabel, retrying, testId, onRetry }: {
+  warning: string;
+  emptyCopy: string;
+  retryLabel: string;
+  retrying: boolean;
+  testId: string;
+  onRetry: () => void;
+}) {
+  if (!warning) return <p>{emptyCopy}</p>;
+  return <div className="account-data-warning" data-testid={testId} role="alert">
+    <ReloadIcon />
+    <p>{warning} Bu alan boş kabul edilmedi; yeniden deneyebilirsin.</p>
+    <button type="button" disabled={retrying} onClick={onRetry}>{retrying ? "Yenileniyor…" : retryLabel}</button>
+  </div>;
+}
+
+function AccountFeatureScreen({ go, view }: { go: Go; view: "profile" | "payments" | "coupons" | "reviews" | "questions" | "followed-stores" | "security" | "settings" }) {
   const keyboard = useKeyboard();
   const accountRuntime = useCustomerAccountRuntime();
   const { selectProduct } = useCommerce();
@@ -2748,9 +2795,22 @@ function AccountFeatureScreen({ go, view }: { go: Go; view: "profile" | "payment
     : { name: "Kullanıcı Adı", email: "kullanici@novastore.test", phone: "+90 555 000 00 00" });
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [couponCopied, setCouponCopied] = useState("");
+  const [selectedCoupon, setSelectedCoupon] = useState("");
+  const [followError, setFollowError] = useState("");
+  const [retryingResource, setRetryingResource] = useState("");
   const [preferences, setPreferences] = useState({ twoFactor: true, loginAlerts: true, personalized: false, compact: false });
   const openProduct = () => { selectProduct("pulse-anc"); go("CAL-06", "home"); };
+  const openCanonicalProduct = (productId: number) => {
+    const id = String(productId);
+    selectProduct(id);
+    go("CAL-06", "home", "", { productId: id, mode: "customer" });
+  };
+  const warningFor = (scope: string) => accountRuntime?.dataWarnings.find((warning) => warning === `${scope} şu anda sunucudan alınamadı.`) || "";
+  const retryResource = (scope: string, action: () => Promise<void>) => {
+    if (retryingResource) return;
+    setRetryingResource(scope);
+    void action().catch(() => { /* the matching authoritative warning remains visible */ }).finally(() => setRetryingResource(""));
+  };
 
   useEffect(() => {
     if (!NATIVE_SHELL || !accountRuntime?.user) return;
@@ -2770,11 +2830,35 @@ function AccountFeatureScreen({ go, view }: { go: Go; view: "profile" | "payment
     } else setSaved(true);
   }}><section className="account-feature-card"><PersonIcon /><h1>Profil bilgileri</h1><label>Ad Soyad<KeyboardInput aria-label="Profil adı" value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} /></label><label>E-posta<KeyboardInput aria-label="Profil e-posta" value={profile.email} readOnly={NATIVE_SHELL} onChange={(event) => setProfile({ ...profile, email: event.target.value })} /></label><label>Telefon<KeyboardInput aria-label="Profil telefonu" value={profile.phone} placeholder="Telefon eklenmemiş" onChange={(event) => setProfile({ ...profile, phone: event.target.value })} /></label><button className="primary navy" type="submit" disabled={accountRuntime?.busy}> {accountRuntime?.busy ? "Kaydediliyor…" : "Değişiklikleri Kaydet"}</button>{saved && <p className="inline-success" role="status"><CheckIcon /> Profil bilgilerin sunucudan yeniden doğrulandı.</p>}{saveError && <p className="account-logout-error" role="alert">{saveError}</p>}</section></form>;
 
-  if (NATIVE_SHELL && (view === "coupons" || view === "reviews" || view === "questions")) {
-    return <div className="root-layout account-feature-layout"><section className="account-feature-card account-empty-authoritative">{view === "reviews" ? <StarFilledIcon /> : view === "questions" ? <QuestionMarkCircledIcon /> : <CubeIcon />}<h1>{view === "reviews" ? "Değerlendirmelerim" : view === "questions" ? "Ürün sorularım" : "Kuponlarım"}</h1><p>Bu hesap için doğrulanmış sunucu kaydı bulunmadığı sürece örnek içerik gösterilmez.</p></section></div>;
+  if (NATIVE_SHELL && view === "coupons") {
+    const coupons = accountRuntime?.coupons ?? [];
+    const warning = warningFor("Kuponlar");
+    return <div className="root-layout account-feature-layout"><section className={`account-feature-card${!warning && !coupons.length ? " account-empty-authoritative" : ""}`} data-testid="customer-coupons-screen"><CubeIcon /><h1>Kuponlarım</h1>{warning ? <AccountDataLoadState warning={warning} emptyCopy="" retryLabel="Kuponları Yenile" retrying={retryingResource === "coupons"} testId="customer-coupons-load-warning" onRetry={() => retryResource("coupons", () => accountRuntime?.refresh() ?? Promise.resolve())} /> : coupons.length ? coupons.map((coupon) => {
+      const value = coupon.discountType === "PERCENT" ? `%${coupon.discountValue}` : formatMoney(coupon.discountValue);
+      const condition = coupon.minOrderAmount > 0 ? `${formatMoney(coupon.minOrderAmount)} ve üzeri` : "Alt limit yok";
+      return <article className="coupon-card" key={coupon.id}><div><b>{value} indirim</b><span>{condition}{coupon.maxDiscountAmount ? ` · En fazla ${formatMoney(coupon.maxDiscountAmount)}` : ""}</span><small>Son kullanım: {formatAccountDate(coupon.endsAt)}</small></div><button type="button" aria-label={`Kupon kodunu seç: ${coupon.code}`} onClick={() => setSelectedCoupon(coupon.code)}>{selectedCoupon === coupon.code ? "Seçildi" : coupon.code}</button></article>;
+    }) : <AccountDataLoadState warning="" emptyCopy="Şu anda kullanılabilir aktif kampanya kuponu bulunmuyor. Örnek kupon gösterilmez." retryLabel="Kuponları Yenile" retrying={false} testId="customer-coupons-load-warning" onRetry={() => {}} />}{selectedCoupon && <p className="inline-success" role="status"><CheckIcon /> {selectedCoupon} kupon kodu seçildi. İndirim doğrulaması ödeme adımında PC1 tarafından yapılır.</p>}</section></div>;
   }
 
-  if (view === "coupons") return <div className="root-layout account-feature-layout"><section className="account-feature-card"><CubeIcon /><h1>Kullanılabilir kuponlar</h1>{[["NOVA250", "₺250 indirim", "₺2.000 üzeri"], ["HOSGELDIN", "%10 indirim", "İlk sipariş"]].map(([code, value, condition]) => <article className="coupon-card" key={code}><div><b>{value}</b><span>{condition}</span></div><button type="button" onClick={() => setCouponCopied(code)}>{couponCopied === code ? "Kopyalandı" : code}</button></article>)}{couponCopied && <p className="inline-success" role="status"><CheckIcon /> {couponCopied} kuponu kopyalandı.</p>}</section></div>;
+  if (NATIVE_SHELL && view === "questions") {
+    const questions = accountRuntime?.questions ?? [];
+    const warning = warningFor("Sorular");
+    return <div className="root-layout account-feature-layout"><section className={`account-feature-card${!warning && !questions.length ? " account-empty-authoritative" : ""}`} data-testid="customer-questions-screen"><QuestionMarkCircledIcon /><h1>Sorularım</h1>{warning ? <AccountDataLoadState warning={warning} emptyCopy="" retryLabel="Soruları Yenile" retrying={retryingResource === "questions"} testId="customer-questions-load-warning" onRetry={() => retryResource("questions", () => accountRuntime?.refresh() ?? Promise.resolve())} /> : questions.length ? questions.map((question) => <article className="account-activity-card" key={question.id}>{question.productImage.startsWith("https://") ? <img src={question.productImage} alt="" /> : <span className="account-activity-fallback"><CubeIcon /></span>}<div><b>{question.productName}</b><p>{question.question}</p><small>{question.status === "answered" ? `Yanıtlandı${question.answer ? `: ${question.answer}` : ""}` : "Yanıt bekliyor"} · {formatAccountDate(question.createdAt)}</small></div><button type="button" onClick={() => openCanonicalProduct(question.productId)}>Ürüne Git</button></article>) : <AccountDataLoadState warning="" emptyCopy="Bu hesaba ait ürün sorusu bulunmuyor. Başka müşterilerin soruları gösterilmez." retryLabel="Soruları Yenile" retrying={false} testId="customer-questions-load-warning" onRetry={() => {}} />}</section></div>;
+  }
+
+  if (NATIVE_SHELL && view === "reviews") {
+    const reviews = accountRuntime?.reviews ?? [];
+    const warning = warningFor("Değerlendirmeler");
+    return <div className="root-layout account-feature-layout"><section className={`account-feature-card${!warning && !reviews.length ? " account-empty-authoritative" : ""}`} data-testid="customer-reviews-screen"><StarFilledIcon /><h1>Değerlendirmelerim</h1>{warning ? <AccountDataLoadState warning={warning} emptyCopy="" retryLabel="Değerlendirmeleri Yenile" retrying={retryingResource === "reviews"} testId="customer-reviews-load-warning" onRetry={() => retryResource("reviews", () => accountRuntime?.refresh() ?? Promise.resolve())} /> : reviews.length ? reviews.map((review) => <article className="account-activity-card" key={review.id}>{review.productImage.startsWith("https://") ? <img src={review.productImage} alt="" /> : <span className="account-activity-fallback"><StarFilledIcon /></span>}<div><b>{review.productName}</b><p>{review.rating} / 5 yıldız{review.comment ? ` · ${review.comment}` : ""}</p><small>{review.status === "PUBLISHED" ? "Yayınlandı" : review.status === "PENDING" ? "İnceleniyor" : "Gizli"} · {formatAccountDate(review.createdAt)}</small></div><button type="button" onClick={() => openCanonicalProduct(review.productId)}>Ürüne Git</button></article>) : <AccountDataLoadState warning="" emptyCopy="Bu hesaba ait değerlendirme bulunmuyor. Başka müşterilerin değerlendirmeleri gösterilmez." retryLabel="Değerlendirmeleri Yenile" retrying={false} testId="customer-reviews-load-warning" onRetry={() => {}} />}</section></div>;
+  }
+
+  if (NATIVE_SHELL && view === "followed-stores") {
+    const followedStores = accountRuntime?.followedStores ?? [];
+    const warning = warningFor("Takip edilen mağazalar");
+    return <div className="root-layout account-feature-layout"><section className={`account-feature-card${!warning && !followedStores.length ? " account-empty-authoritative" : ""}`} data-testid="customer-followed-stores-screen"><StorefrontIcon weight="regular" /><h1>Takip Ettiğim Mağazalar</h1>{warning ? <AccountDataLoadState warning={warning} emptyCopy="" retryLabel="Mağazaları Yenile" retrying={retryingResource === "followed-stores"} testId="customer-followed-stores-load-warning" onRetry={() => retryResource("followed-stores", () => accountRuntime?.refreshFollowedStores() ?? Promise.resolve())} /> : followedStores.length ? followedStores.map((store) => <article className="followed-store-card" key={store.slug}><span><StorefrontIcon weight="regular" /></span><div className="followed-store-copy"><b>{store.name}</b><small>{store.followerCount.toLocaleString("tr-TR")} takipçi · {formatAccountDate(store.followedAt)}</small></div><div className="followed-store-actions"><button type="button" onClick={() => go("CAL-04", "home", "store", { storeSlug: store.slug, mode: "customer" })}>Mağazaya Git</button><button className="danger-text" type="button" disabled={accountRuntime?.busy} onClick={() => { setFollowError(""); void accountRuntime?.unfollowStore(store.slug).catch((error) => setFollowError(error instanceof Error ? error.message : "Mağaza takibi bırakılamadı.")); }}>Takibi Bırak</button></div></article>) : <AccountDataLoadState warning="" emptyCopy="Bu hesap henüz bir mağazayı takip etmiyor. Takip durumu yalnız PC1’den alınır." retryLabel="Mağazaları Yenile" retrying={false} testId="customer-followed-stores-load-warning" onRetry={() => {}} />}{followError && <p className="account-logout-error" role="alert">{followError}</p>}</section></div>;
+  }
+
+  if (view === "coupons") return <div className="root-layout account-feature-layout"><section className="account-feature-card"><CubeIcon /><h1>Kullanılabilir kuponlar</h1>{[["NOVA250", "₺250 indirim", "₺2.000 üzeri"], ["HOSGELDIN", "%10 indirim", "İlk sipariş"]].map(([code, value, condition]) => <article className="coupon-card" key={code}><div><b>{value}</b><span>{condition}</span></div><button type="button" onClick={() => setSelectedCoupon(code)}>{selectedCoupon === code ? "Seçildi" : code}</button></article>)}{selectedCoupon && <p className="inline-success" role="status"><CheckIcon /> {selectedCoupon} kupon kodu seçildi.</p>}</section></div>;
 
   if (view === "reviews" || view === "questions") return <div className="root-layout account-feature-layout"><section className="account-feature-card">{view === "reviews" ? <StarFilledIcon /> : <QuestionMarkCircledIcon />}<h1>{view === "reviews" ? "Değerlendirmelerim" : "Ürün sorularım"}</h1><article className="account-activity-card"><img src={PRODUCT_HERO} alt="Nova Pulse ANC Kulaklık" /><div><b>Nova Pulse ANC Kulaklık</b><p>{view === "reviews" ? "5 yıldız · Ses kalitesi ve konfor çok iyi." : "Pil ömrü ANC açıkken kaç saat?"}</p><small>{view === "reviews" ? "Yayınlandı" : "Satıcı yanıtladı: 36 saate kadar."}</small></div><button type="button" onClick={openProduct}>Ürüne Git</button></article></section></div>;
 
@@ -2782,6 +2866,9 @@ function AccountFeatureScreen({ go, view }: { go: Go; view: "profile" | "payment
   if (NATIVE_SHELL && view === "security") {
     const security = accountRuntime?.securityStatus;
     return <div className="root-layout account-feature-layout"><section className="account-feature-card"><LockClosedIcon /><h1>Gizlilik ve güvenlik</h1>{security ? <div className="authoritative-security-list"><p><span>E-posta</span><b>{security.email}</b></p><p><span>Telefon</span><b>{security.phone || "Eklenmemiş"}</b></p><p><span>Şifre</span><b>{security.hasPassword ? "Tanımlı" : "Tanımlı değil"}</b></p><p><span>İki adımlı doğrulama</span><b>{security.twoFactorEnabled ? "Açık" : "Kapalı"}</b></p></div> : <p>Güvenlik durumu sunucudan alınamadı. Örnek değer gösterilmiyor.</p>}</section></div>;
+  }
+  if (NATIVE_SHELL && view === "settings") {
+    return <div className="root-layout account-feature-layout"><section className="account-feature-card account-settings-hub"><GearIcon /><h1>Uygulama ayarları</h1><p>Hesap ayarların ilgili güvenli NovaStore yüzeylerinde yönetilir.</p><button type="button" onClick={() => go("CAL-10", "account", "profile")}><PersonIcon /><span><b>Profil Bilgileri</b><small>Ad soyad ve telefonunu yönet</small></span><CaretRightIcon /></button><button type="button" onClick={() => go("CAL-10", "account", "notifications")}><BellIcon /><span><b>Bildirimler ve Tercihler</b><small>Bildirim izinlerini ve tercihlerini aç</small></span><CaretRightIcon /></button><button type="button" onClick={() => go("CAL-10", "account", "security")}><LockClosedIcon /><span><b>Gizlilik ve Güvenlik</b><small>Doğrulanmış hesap güvenliği durumunu gör</small></span><CaretRightIcon /></button><button type="button" onClick={() => go("CAL-11", "support")}><QuestionMarkCircledIcon /><span><b>Yardım ve Destek</b><small>Destek mesajlarına ve yardım merkezine git</small></span><CaretRightIcon /></button></section></div>;
   }
   const rows: Array<[keyof typeof preferences, string, string]> = settingsMode
     ? [["personalized", "Kişiselleştirilmiş öneriler", "Yerel oturum tercihlerini kullan"], ["compact", "Kompakt görünüm", "Liste yoğunluğunu artır"]]
@@ -3119,10 +3206,10 @@ function SupportHubScreen({ go, view }: { go: Go; view: ViewId }) {
   if (view === "faq" || view === "history" || view === "live") return <SupportSubpage go={go} view={view} />;
   return (
     <div className="root-layout support-layout">
-      <div className="support-heading"><div><h1>Yardım ve Destek</h1></div><button onClick={() => go("CAL-11", "support", "history")}><ClockIcon /><span>Geçmiş</span></button></div>
+      <div className="support-heading"><div><h1>Yardım ve Destek</h1></div>{NATIVE_SHELL && <GlobalNovaBotLauncher go={go} />}<button onClick={() => go("CAL-11", "support", "history")}><ClockIcon /><span>Geçmiş</span></button></div>
       <label className="support-search"><MagnifyingGlassIcon /><KeyboardInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nasıl yardımcı olabiliriz?" aria-label="Destekte ara" /></label>
       <section className="quick-help"><h2>Hızlı Yardım</h2><div><button onClick={() => go("CAL-09", "account")}><CubeIcon />Sipariş ve Teslimat<CaretRightIcon /></button><button onClick={() => go("CAL-10", "account", "returns")}><ReloadIcon />İade ve değişim<CaretRightIcon /></button><button onClick={() => go("CAL-11", "support", "faq")}><CreditCardIcon data-icon="payment-card" weight="regular" />Ödeme Sorunları<CaretRightIcon /></button><button onClick={() => go("CAL-10", "account", "security")}><LockClosedIcon />Hesap ve Güvenlik<CaretRightIcon /></button></div></section>
-      <section className="novabot-card"><span className="novabot-art"><img src={NOVABOT} alt="NovaBot resmi simgesi" /></span><div><h2>NovaBot</h2><p><i /> {NATIVE_SHELL ? "Yakında" : "Çevrimiçi"}</p><span>{NATIVE_SHELL ? "Gerçek servis sözleşmesi etkinleştirildiğinde kullanıma açılacak." : "Sorunu anlat, NovaBot anında yardımcı olsun."}</span></div><button className="primary navy" onClick={() => go("CAL-12", "support")}><PersonIcon /> {NATIVE_SHELL ? "Bilgi Al" : "NovaBot’u Başlat"} <ArrowRightIcon /></button></section>
+      <section className="novabot-card"><span className="novabot-art"><img src={NOVABOT} alt="NovaBot resmi simgesi" /></span><div><h2>NovaBot</h2><p className={NATIVE_SHELL ? "novabot-availability unverified" : "novabot-availability ready"}><i /> {NATIVE_SHELL ? "Bağlantı ilk mesajda doğrulanır" : "Çevrimiçi"}</p><span>Sorunu anlat, NovaBot güvenli PC1 yardım sözleşmesiyle yanıtlasın.</span></div><button className="primary navy" onClick={() => go("CAL-12", "support")}><PersonIcon /> NovaBot’u Başlat <ArrowRightIcon /></button></section>
       <button className="live-support" onClick={() => go("CAL-11", "support", "live")}><PersonIcon /><span><b>{NATIVE_SHELL ? "Destek Mesajları" : "Canlı Desteğe Bağlan"}</b><small><i /> {NATIVE_SHELL ? "PC1 müşteri hesabına bağlı" : "Genellikle hemen yanıtlar"}</small></span><ArrowRightIcon /></button>
       <div className="support-links"><button onClick={() => go("CAL-11", "support", "faq")}><QuestionMarkCircledIcon />Sıkça Sorulan Sorular<CaretRightIcon /></button><button onClick={() => go("CAL-11", "support", "history")}><ChatBubbleIcon />Geçmiş Sohbetler<CaretRightIcon /></button></div>
       {normalizedQuery && <section className="support-search-results" data-testid="support-search-results" aria-label="Destek arama sonuçları"><header><h2>Arama sonuçları</h2><span>{matchingArticles.length} sonuç</span></header>{matchingArticles.length ? <ExpandableLocalList items={matchingArticles} idPrefix="support-search" /> : <div className="support-search-empty" data-testid="support-search-empty" role="status"><MagnifyingGlassIcon /><h3>Sonuç bulunamadı</h3><p>Başka bir sipariş, ödeme veya hesap ifadesi deneyebilirsin.</p></div>}</section>}
@@ -3151,17 +3238,94 @@ function SupportSubpage({ go, view }: { go: Go; view: "faq" | "history" | "live"
   return <div className="root-layout support-subpage"><section className="support-detail-card">{view === "live" ? <PersonIcon /> : view === "history" ? <ClockIcon /> : <QuestionMarkCircledIcon />}<h1>{copy}</h1><p>{view === "live" ? "Canlı destek bağlantısının yerel demo adımlarını güvenle incele." : view === "history" ? "Son destek görüşmelerin ve çözüm durumları." : "En çok sorulan konulardaki kısa ve güvenilir yanıtlar."}</p>{view === "live" ? <><div className="live-support-state" data-testid="live-support-state" data-state={liveState} role="status"><i /><span><b>{liveCopy.title}</b><small>{liveCopy.detail}</small></span></div><div className="live-support-controls"><button type="button" disabled={liveState !== "queued"} onClick={() => setLiveState("ready")}>Bağlantı durumunu yenile <ReloadIcon /></button><button type="button" disabled={liveState !== "ready"} onClick={() => setLiveState("connected")}>Görüşmeyi başlat <ArrowRightIcon /></button></div></> : <ExpandableLocalList items={items} idPrefix={`support-${view}`} />}</section><button className="primary navy" onClick={() => go("CAL-12", "support")}>NovaBot ile Devam Et</button></div>;
 }
 
-type ChatMessage = { id: number; from: "bot" | "user"; text: string; time: string };
+type ChatMessage = { id: number; from: "bot" | "user"; text: string; time: string; delivery?: "pending" | "sent" | "failed" };
+type NovaBotConnectionState = "unverified" | "checking" | "ready" | "error";
+const DEFAULT_NOVABOT_SUGGESTIONS = Object.freeze(["Siparişimi takip et", "İade ve değişim", "Ödeme sorunu"]);
+
+function createInitialNovaBotMessages(): ChatMessage[] {
+  return [{ id: 1, from: "bot", text: "Merhaba! Sana nasıl yardımcı olabilirim?", time: "12:04 · İletildi", delivery: "sent" }];
+}
 
 function NovaBotScreen({ go }: { go: Go }) {
+  const accountRuntime = useCustomerAccountRuntime();
   const [message, setMessage] = useState("");
   const [liveRequested, setLiveRequested] = useState(false);
   const [attachment, setAttachment] = useState<{ name: string; size: string } | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 1, from: "bot", text: "Merhaba! Sana nasıl yardımcı olabilirim?", time: "12:04 · İletildi" },
-  ]);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
+  const [connectionState, setConnectionState] = useState<NovaBotConnectionState>("unverified");
+  const [nativeSuggestions, setNativeSuggestions] = useState<readonly string[]>(DEFAULT_NOVABOT_SUGGESTIONS);
+  const [messages, setMessages] = useState<ChatMessage[]>(createInitialNovaBotMessages);
+  const conversationGeneration = useRef(0);
+  const sessionIdentity = accountRuntime?.user?.id ?? "guest";
+  const previousSessionIdentity = useRef(sessionIdentity);
+
+  useEffect(() => {
+    if (!NATIVE_SHELL || previousSessionIdentity.current === sessionIdentity) return;
+    previousSessionIdentity.current = sessionIdentity;
+    ++conversationGeneration.current;
+    setMessage("");
+    setSending(false);
+    setSendError("");
+    setConnectionState("unverified");
+    setNativeSuggestions(DEFAULT_NOVABOT_SUGGESTIONS);
+    setMessages(createInitialNovaBotMessages());
+  }, [sessionIdentity]);
+
   if (NATIVE_SHELL) {
-    return <div className="root-layout novabot-layout"><section className="support-detail-card account-empty-authoritative"><img className="novabot-runtime-logo" src={NOVABOT} alt="NovaBot" /><h1>NovaBot yakında</h1><p>NovaBot gerçek PC1 sözleşmesine bağlanmadan örnek sohbet üretmez. Gerçek destek için canlı destek kanalını kullanabilirsin.</p><button className="primary navy" onClick={() => go("CAL-11", "support", "live")}>Canlı Desteğe Git</button></section></div>;
+    const sendNativeMessage = async (text: string) => {
+      const clean = text.trim();
+      if (!clean || sending) return;
+      const history = messages
+        .filter((item) => item.delivery !== "pending" && item.delivery !== "failed")
+        .slice(-10)
+        .map((item) => ({ role: item.from === "user" ? "user" as const : "assistant" as const, message: item.text }));
+      const id = Date.now();
+      const operationGeneration = conversationGeneration.current;
+      setSendError("");
+      setNativeSuggestions([]);
+      setConnectionState("checking");
+      setSending(true);
+      setMessage("");
+      setMessages((current) => [...current, { id, from: "user", text: clean, time: "Şimdi · Gönderiliyor", delivery: "pending" }]);
+      try {
+        const reply = await sendCustomerNovaBotMessage({ message: clean, history });
+        if (operationGeneration !== conversationGeneration.current) return;
+        setMessages((current) => [
+          ...current.map((item) => item.id === id ? { ...item, time: "Şimdi · Gönderildi", delivery: "sent" as const } : item),
+          { id: id + 1, from: "bot", text: reply.reply, time: "Şimdi · İletildi", delivery: "sent" },
+        ]);
+        setNativeSuggestions(reply.suggestions);
+        setConnectionState("ready");
+      } catch {
+        if (operationGeneration !== conversationGeneration.current) return;
+        setMessages((current) => current.map((item) => item.id === id ? { ...item, time: "Şimdi · Gönderilemedi", delivery: "failed" as const } : item));
+        setMessage((current) => current.trim() ? current : clean);
+        setSendError("Mesaj gönderilemedi. Mesajın giriş alanına geri getirildi; bağlantını kontrol edip yeniden dene.");
+        setConnectionState("error");
+      } finally {
+        if (operationGeneration === conversationGeneration.current) setSending(false);
+      }
+    };
+    const connectionCopy = connectionState === "checking"
+      ? "PC1 yanıtı bekleniyor"
+      : connectionState === "ready"
+        ? "PC1 bağlantısı doğrulandı"
+        : connectionState === "error"
+          ? "PC1 bağlantısı doğrulanamadı"
+          : "Bağlantı ilk mesajda doğrulanır";
+    return <div className="root-layout novabot-layout">
+      <div className="support-heading novabot-heading"><div><h1>Destek</h1></div><button type="button" onClick={() => go("CAL-11", "support", "history")}><ClockIcon /><span>Geçmiş</span></button></div>
+      <section className={`chat-card${messages.length > 1 ? " active-conversation" : ""}`} aria-busy={sending || undefined}>
+        <header><span className="novabot-art"><img src={NOVABOT} alt="NovaBot resmi simgesi" /></span><div><h1>NovaBot</h1><p className={`novabot-connection ${connectionState}`} data-testid="novabot-connection-state" data-state={connectionState}><i /> {connectionCopy}</p></div></header>
+        <div className="messages" aria-live="polite">{messages.map((item) => <div className={`message ${item.from}${item.delivery ? ` ${item.delivery}` : ""}`} key={item.id}>{item.from === "bot" && <span className="novabot-art small"><img src={NOVABOT} alt="" /></span>}<div><p>{item.text}</p><small>{item.time}</small></div></div>)}{sending && <div className="message bot novabot-pending" role="status"><span className="novabot-art small"><img src={NOVABOT} alt="" /></span><div><p>NovaBot yanıt hazırlıyor…</p></div></div>}{sendError && <div className="novabot-inline-error" data-testid="novabot-send-error" role="alert"><ReloadIcon /><p>{sendError}</p></div>}</div>
+        <div className="suggestion-row" aria-label="NovaBot önerileri">{nativeSuggestions.map((suggestion, index) => <button type="button" disabled={sending} onClick={() => void sendNativeMessage(suggestion)} key={`${suggestion}:${index}`}>{suggestion}</button>)}</div>
+        <button className="escalate" type="button" onClick={() => go("CAL-11", "support", "live")}><PersonIcon /> Destek mesajlarına geç <ArrowRightIcon /></button>
+        <p className="handoff-copy">Gerçek destek mesajların mevcut PC1 destek kanalında tutulur.</p>
+        <form className="composer native-composer" onSubmit={(event) => { event.preventDefault(); void sendNativeMessage(message); }}><KeyboardInput aria-label="NovaBot mesajı" placeholder="Mesajını yaz..." value={message} maxLength={2000} disabled={sending} onChange={(event) => setMessage(event.target.value)} /><button type="submit" aria-label="Mesajı gönder" disabled={sending || !message.trim()}><PaperPlaneIcon /></button></form>
+      </section>
+      <p className="privacy-note"><LockClosedIcon /> Özel hesap işlemleri sunucu yetkisiyle doğrulanır.</p>
+    </div>;
   }
   const sendMessage = (text: string) => {
     const clean = text.trim();

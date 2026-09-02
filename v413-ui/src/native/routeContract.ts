@@ -31,7 +31,8 @@ export const CANONICAL_NATIVE_ROUTE_TUPLES = [
   ["CAL-10", "account", "profile"], ["CAL-10", "account", "payments"],
   ["CAL-10", "account", "coupons"], ["CAL-10", "account", "reviews"],
   ["CAL-10", "account", "questions"], ["CAL-10", "account", "security"],
-  ["CAL-10", "account", "settings"], ["CAL-11", "support", ""],
+  ["CAL-10", "account", "followed-stores"], ["CAL-10", "account", "settings"],
+  ["CAL-11", "support", ""],
   ["CAL-11", "support", "faq"], ["CAL-11", "support", "history"],
   ["CAL-11", "support", "live"], ["CAL-12", "support", ""],
 ] as const;

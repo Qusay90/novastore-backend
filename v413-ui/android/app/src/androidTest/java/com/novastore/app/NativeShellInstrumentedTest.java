@@ -176,7 +176,7 @@ public class NativeShellInstrumentedTest {
     }
 
     @Test
-    public void allThirtySixCanonicalStatesRenderFromEmbeddedAssets() throws Exception {
+    public void allThirtySevenCanonicalStatesRenderFromEmbeddedAssets() throws Exception {
         String[][] routes = new String[][] {
             {"CAL-01", "account", "login"}, {"CAL-01", "account", "forgot"},
             {"CAL-01", "account", "register"}, {"CAL-02", "home", ""},
@@ -193,12 +193,13 @@ public class NativeShellInstrumentedTest {
             {"CAL-10", "account", "profile"}, {"CAL-10", "account", "payments"},
             {"CAL-10", "account", "coupons"}, {"CAL-10", "account", "reviews"},
             {"CAL-10", "account", "questions"}, {"CAL-10", "account", "security"},
-            {"CAL-10", "account", "settings"}, {"CAL-11", "support", ""},
+            {"CAL-10", "account", "followed-stores"}, {"CAL-10", "account", "settings"},
+            {"CAL-11", "support", ""},
             {"CAL-11", "support", "faq"}, {"CAL-11", "support", "history"},
             {"CAL-11", "support", "live"}, {"CAL-12", "support", ""}
         };
 
-        assertEquals(36, routes.length);
+        assertEquals(37, routes.length);
 
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             for (String[] route : routes) {
@@ -321,24 +322,27 @@ public class NativeShellInstrumentedTest {
     }
 
     @Test
-    public void notificationConsumerStartsGuestWithoutRequestingPermission() throws Exception {
+    public void notificationRouteRequiresGuestLoginWithoutRequestingPermission() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             evaluate(scenario,
                 "history.replaceState({novastoreDepth:0},'','/?cal=CAL-10&tab=account&view=notifications&shell=native');" +
                     "dispatchEvent(new PopStateEvent('popstate'));true"
             );
-            Thread.sleep(300);
+            waitForTrue(scenario,
+                "Boolean(document.querySelector('[data-testid=account-guest]'))",
+                "private notification route did not stop at the guest account gate"
+            );
             JSONObject state = evaluateJson(scenario,
                 "(() => ({" +
-                    "feed:document.querySelector('[data-testid=notification-center-screen]')?.dataset.feedState||''," +
-                    "loginRequired:Boolean(document.querySelector('[data-testid=notification-login-required]'))," +
+                    "guestGate:Boolean(document.querySelector('[data-testid=account-guest]'))," +
+                    "notificationScreen:Boolean(document.querySelector('[data-testid=notification-center-screen]'))," +
                     "permissionRequested:localStorage.getItem('novastore.android.notificationPermissionRequested')," +
                     "token:localStorage.getItem('novastore.android.fcmToken')," +
                     "inApp:document.querySelectorAll('.notification-in-app').length" +
                 "}))()"
             );
-            assertEquals("guest", state.getString("feed"));
-            assertTrue(state.getBoolean("loginRequired"));
+            assertTrue(state.getBoolean("guestGate"));
+            assertFalse(state.getBoolean("notificationScreen"));
             assertTrue(state.isNull("permissionRequested"));
             assertTrue(state.isNull("token"));
             assertEquals(0, state.getInt("inApp"));
@@ -368,22 +372,51 @@ public class NativeShellInstrumentedTest {
 
             JSONObject after = productCardGestureState(scenario);
             assertTrue("vertical swipe beginning on product media did not scroll the page: " + after,
-                after.getInt("scrollTop") > 160);
+                after.getInt("scrollTop") > 48);
             assertEquals("vertical swipe changed the product image", 0, after.getInt("page"));
         }
     }
 
     @Test
-    public void circularPdpAndViewerMediaWrapLogicalStateInsideNativeWebView() throws Exception {
+    public void pdpMediaStateMatchesAuthoritativeNativeProjectionAndWrapsWhenMultiple() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             evaluate(scenario,
-                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-06&tab=home&shell=native');" +
+                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-02&tab=home&shell=native');" +
                     "dispatchEvent(new PopStateEvent('popstate'));true"
             );
-            Thread.sleep(350);
+            waitForTrue(scenario,
+                "Boolean(document.querySelector('[data-testid=home-product-card-0] .product-open-media'))",
+                "authoritative public product card did not render"
+            );
+            evaluate(scenario,
+                "document.querySelector('[data-testid=home-product-card-0] .product-open-media')?.click();true"
+            );
+            waitForTrue(scenario,
+                "Boolean(document.querySelector('[data-testid=product-detail-screen] .pdp-media-carousel'))",
+                "authoritative public product detail did not render"
+            );
+
+            JSONObject media = evaluateJson(scenario,
+                "(() => {const carousel=document.querySelector('.pdp-media-carousel');return {" +
+                    "logical:Number(carousel?.dataset.page),physical:Number(carousel?.dataset.physicalPage)," +
+                    "counter:document.querySelector('.pdp-gallery-meta>b')?.textContent?.trim()||''," +
+                    "originals:carousel?.querySelectorAll('.pdp-main-media:not([data-carousel-clone])').length||0," +
+                    "clones:carousel?.querySelectorAll('[data-carousel-clone]').length||0," +
+                    "arrows:document.querySelectorAll('.pdp-gallery-arrows button').length};})()"
+            );
+            int mediaCount = media.getInt("originals");
+            assertTrue("authoritative product must expose at least one image", mediaCount >= 1);
+            if (mediaCount == 1) {
+                assertEquals(0, media.getInt("logical"));
+                assertEquals(0, media.getInt("physical"));
+                assertEquals("1 / 1", media.getString("counter"));
+                assertEquals(0, media.getInt("clones"));
+                assertEquals(0, media.getInt("arrows"));
+                return;
+            }
 
             evaluate(scenario,
-                "document.querySelectorAll('.gallery-dots button')[2]?.click();true"
+                "(() => {const dots=document.querySelectorAll('.gallery-dots button');dots[dots.length-1]?.click();return true})()"
             );
             Thread.sleep(400);
             JSONObject pdpLast = evaluateJson(scenario,
@@ -395,10 +428,10 @@ public class NativeShellInstrumentedTest {
                     "inert:[...(carousel?.querySelectorAll('[data-carousel-clone]')||[])].every(node=>node.inert&&node.getAttribute('aria-hidden')==='true')," +
                     "arrows:[...document.querySelectorAll('.pdp-gallery-arrows button')].every(button=>!button.disabled)};})()"
             );
-            assertEquals(2, pdpLast.getInt("logical"));
-            assertEquals(3, pdpLast.getInt("physical"));
-            assertEquals("3 / 3", pdpLast.getString("counter"));
-            assertEquals(3, pdpLast.getInt("originals"));
+            assertEquals(mediaCount - 1, pdpLast.getInt("logical"));
+            assertEquals(mediaCount, pdpLast.getInt("physical"));
+            assertEquals(mediaCount + " / " + mediaCount, pdpLast.getString("counter"));
+            assertEquals(mediaCount, pdpLast.getInt("originals"));
             assertEquals(2, pdpLast.getInt("clones"));
             assertTrue(pdpLast.getBoolean("inert"));
             assertTrue(pdpLast.getBoolean("arrows"));
@@ -425,12 +458,12 @@ public class NativeShellInstrumentedTest {
                     "logical:Number(carousel?.dataset.page),physical:Number(carousel?.dataset.physicalPage)," +
                     "counter:document.querySelector('.pdp-gallery-meta>b')?.textContent?.trim()||''};})()"
             );
-            assertEquals(2, pdpReverse.getInt("logical"));
-            assertEquals(3, pdpReverse.getInt("physical"));
-            assertEquals("3 / 3", pdpReverse.getString("counter"));
+            assertEquals(mediaCount - 1, pdpReverse.getInt("logical"));
+            assertEquals(mediaCount, pdpReverse.getInt("physical"));
+            assertEquals(mediaCount + " / " + mediaCount, pdpReverse.getString("counter"));
 
             evaluate(scenario,
-                "document.querySelectorAll('.pdp-main-media:not([data-carousel-clone])')[2]?.click();true"
+                "(() => {const slides=document.querySelectorAll('.pdp-main-media:not([data-carousel-clone])');slides[slides.length-1]?.click();return true})()"
             );
             Thread.sleep(300);
             evaluate(scenario, "document.querySelector('.viewer-arrows button:last-child')?.click();true");
@@ -457,9 +490,9 @@ public class NativeShellInstrumentedTest {
                     "logical:Number(carousel?.dataset.page),physical:Number(carousel?.dataset.physicalPage)," +
                     "counter:viewer?.querySelector('header b')?.textContent?.trim()||''};})()"
             );
-            assertEquals(2, viewerLast.getInt("logical"));
-            assertEquals(3, viewerLast.getInt("physical"));
-            assertEquals("3 / 3", viewerLast.getString("counter"));
+            assertEquals(mediaCount - 1, viewerLast.getInt("logical"));
+            assertEquals(mediaCount, viewerLast.getInt("physical"));
+            assertEquals(mediaCount + " / " + mediaCount, viewerLast.getString("counter"));
 
             evaluate(scenario,
                 "window.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));true"
@@ -477,7 +510,68 @@ public class NativeShellInstrumentedTest {
     }
 
     @Test
-    public void legacyMain6sNotificationAssertionIsStaleAndAuthoritativeSupportEscalationWorks() throws Exception {
+    public void globalNovaBotIsSingletonAndClearsNativeNavigationAndPdpControls() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            evaluate(scenario,
+                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-02&tab=home&shell=native');" +
+                    "dispatchEvent(new PopStateEvent('popstate'));true"
+            );
+            Thread.sleep(300);
+            JSONObject home = evaluateJson(scenario,
+                "(() => {const launchers=[...document.querySelectorAll('[data-testid=global-novabot-trigger]')];" +
+                    "const launcher=launchers[0]?.getBoundingClientRect();const nav=document.querySelector('.bottom-nav')?.getBoundingClientRect();" +
+                    "return {count:launchers.length,width:launcher?.width||0,height:launcher?.height||0," +
+                    "navGap:launcher&&nav?nav.top-launcher.bottom:-999,asset:launchers[0]?.querySelector('img')?.getAttribute('src')||''};})()"
+            );
+            assertEquals(1, home.getInt("count"));
+            assertTrue(home.getDouble("width") >= 44);
+            assertTrue(home.getDouble("height") >= 44);
+            assertTrue(home.getDouble("navGap") >= 0);
+            assertTrue(home.getString("asset").endsWith("/calibration-assets/official/support_novastore.png"));
+
+            waitForTrue(scenario,
+                "Boolean(document.querySelector('[data-testid=home-product-card-0] .product-open-media'))",
+                "authoritative public product card did not render before the product launcher check"
+            );
+            evaluate(scenario,
+                "document.querySelector('[data-testid=home-product-card-0] .product-open-media')?.click();true"
+            );
+            waitForTrue(scenario,
+                "Boolean(document.querySelector('[data-testid=product-detail-screen]') && document.querySelector('[data-testid=global-novabot-trigger]'))",
+                "product NovaBot launcher did not render"
+            );
+            JSONObject product = evaluateJson(scenario,
+                "(() => {const launchers=[...document.querySelectorAll('[data-testid=global-novabot-trigger]')];" +
+                    "const launcher=launchers[0]?.getBoundingClientRect();const footer=document.querySelector('.pdp-footer')?.getBoundingClientRect();" +
+                    "return {count:launchers.length,footerGap:launcher&&footer?footer.top-launcher.bottom:-999," +
+                    "inTopbar:Boolean(launchers[0]?.closest('.pdp-topbar'))};})()"
+            );
+            assertEquals(1, product.getInt("count"));
+            assertTrue(product.getDouble("footerGap") >= 0);
+            assertTrue(product.getBoolean("inTopbar"));
+
+            evaluate(scenario,
+                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-08&tab=cart&shell=native');" +
+                    "dispatchEvent(new PopStateEvent('popstate'));true"
+            );
+            Thread.sleep(300);
+            assertEquals("0", evaluate(scenario,
+                "document.querySelectorAll('[data-testid=global-novabot-trigger]').length"
+            ));
+
+            evaluate(scenario,
+                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-12&tab=support&shell=native');" +
+                    "dispatchEvent(new PopStateEvent('popstate'));true"
+            );
+            Thread.sleep(300);
+            assertEquals("0", evaluate(scenario,
+                "document.querySelectorAll('[data-testid=global-novabot-trigger]').length"
+            ));
+        }
+    }
+
+    @Test
+    public void nativeNovaBotUsesExistingSupportChannelWithoutFakeEscalation() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             evaluate(scenario,
                 "history.replaceState({novastoreDepth:0},'','/?cal=CAL-12&tab=support&shell=native');" +
@@ -486,7 +580,7 @@ public class NativeShellInstrumentedTest {
             Thread.sleep(300);
             JSONObject before = evaluateJson(scenario,
                 "(() => {const app=document.querySelector('[data-testid=calibration-app]');return {" +
-                    "cal:app?.dataset.calId||'',legacy:(app?.innerText||'').includes('Destek kaydın temsilciye aktarıldı.')," +
+                    "cal:app?.dataset.calId||'',legacy:(app?.innerText||'').includes('Seni canlı destek sırasına aldım.')," +
                     "button:!!app?.querySelector('.escalate')};})()"
             );
             assertEquals("CAL-12", before.getString("cal"));
@@ -496,10 +590,12 @@ public class NativeShellInstrumentedTest {
             evaluate(scenario, "document.querySelector('.escalate')?.click();true");
             Thread.sleep(200);
             JSONObject after = evaluateJson(scenario,
-                "(() => {const text=document.querySelector('[data-testid=calibration-app]')?.innerText||'';return {" +
-                    "authoritative:text.includes('Seni canlı destek sırasına aldım.')," +
-                    "legacy:text.includes('Destek kaydın temsilciye aktarıldı.')};})()"
+                "(() => {const app=document.querySelector('[data-testid=calibration-app]');const text=app?.innerText||'';return {" +
+                    "cal:app?.dataset.calId||'',view:app?.dataset.view||'',authoritative:text.includes('Destek hesabına giriş yap')," +
+                    "legacy:text.includes('Seni canlı destek sırasına aldım.')};})()"
             );
+            assertEquals("CAL-11", after.getString("cal"));
+            assertEquals("live", after.getString("view"));
             assertTrue(after.getBoolean("authoritative"));
             assertFalse(after.getBoolean("legacy"));
         }
@@ -545,7 +641,7 @@ public class NativeShellInstrumentedTest {
             startX + width * 0.02f, startY - height * 0.004f);
         float wobbleX = startX + width * 0.02f;
         float wobbleY = startY - height * 0.004f;
-        float endY = top + height * 0.40f;
+        float endY = Math.max(top + height * 0.12f, startY - height * 0.28f);
         for (int step = 1; step <= 24; step += 1) {
             Thread.sleep(12);
             float progress = step / 24f;
@@ -614,6 +710,21 @@ public class NativeShellInstrumentedTest {
             Thread.sleep(100);
         } while (SystemClock.elapsedRealtime() < deadline);
         return state;
+    }
+
+    private static void waitForTrue(
+        ActivityScenario<MainActivity> scenario,
+        String script,
+        String failureMessage
+    ) throws Exception {
+        long deadline = SystemClock.elapsedRealtime() + TimeUnit.SECONDS.toMillis(WEB_TIMEOUT_SECONDS);
+        String state;
+        do {
+            state = evaluate(scenario, script);
+            if ("true".equals(state)) return;
+            Thread.sleep(100);
+        } while (SystemClock.elapsedRealtime() < deadline);
+        assertEquals(failureMessage, "true", state);
     }
 
     private static JSONObject evaluateJson(ActivityScenario<MainActivity> scenario, String script)

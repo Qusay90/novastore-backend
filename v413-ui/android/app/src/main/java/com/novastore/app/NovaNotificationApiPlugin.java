@@ -38,6 +38,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
     private static final Pattern CUSTOMER_SUPPORT_HISTORY = Pattern.compile("^/api/messages/history/[1-9][0-9]*$");
     private static final Pattern CUSTOMER_ADDRESS = Pattern.compile("^/api/addresses/[1-9][0-9]*$");
     private static final Pattern CUSTOMER_ADDRESS_DEFAULT = Pattern.compile("^/api/addresses/[1-9][0-9]*/default$");
+    private static final Pattern CUSTOMER_STORE_FOLLOW = Pattern.compile("^/api/store-follows/(?=[a-z0-9-]{1,80}$)[a-z0-9]+(?:-[a-z0-9]+)*$");
     private static final Pattern PUBLIC_PRODUCT = Pattern.compile("^/api/products/[1-9][0-9]*$");
     private static final Pattern SAFE_CURSOR = Pattern.compile("^[A-Za-z0-9_-]{1,1024}$");
     private static final Pattern SAFE_PAYMENT_REF = Pattern.compile("^[A-Za-z0-9._:-]{1,160}$");
@@ -46,6 +47,8 @@ public final class NovaNotificationApiPlugin extends Plugin {
         "/api/users/me",
         "/api/users/security-status",
         "/api/addresses",
+        "/api/campaigns/coupons/active",
+        "/api/store-follows",
         "/api/payments/capability",
         "/api/payments/status",
         "/api/returns/mine",
@@ -65,6 +68,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
         "/api/payments/initialize",
         "/api/returns",
         "/api/messages/send",
+        "/api/assistant/chat",
         "/api/notifications/android-push/tokens"
     );
     private static final Set<String> EXACT_PATCH = immutableSet(
@@ -82,6 +86,9 @@ public final class NovaNotificationApiPlugin extends Plugin {
         "/api/auth/forgot-password",
         "/api/auth/reset-password"
     );
+    private static final Set<String> OPTIONAL_AUTHENTICATION_POST = immutableSet(
+        "/api/assistant/chat"
+    );
     private static final Set<String> SUPPORTED_METHODS = immutableSet("GET", "POST", "PUT", "PATCH", "DELETE");
     private static final Set<String> REFRESH_BODY_KEYS = immutableSet("refreshToken", "sessionId");
     private static final int MAX_RESPONSE_BYTES = 1024 * 1024;
@@ -95,8 +102,14 @@ public final class NovaNotificationApiPlugin extends Plugin {
             call.reject("CUSTOMER_NOTIFICATION_PATH_FORBIDDEN");
             return;
         }
-        String token = canonicalToken(call.getString("token"));
-        boolean authenticated = !("POST".equals(method) && UNAUTHENTICATED_POST.contains(path));
+        String rawToken = call.getString("token");
+        String token = canonicalToken(rawToken);
+        boolean optionalAuthentication = "POST".equals(method) && OPTIONAL_AUTHENTICATION_POST.contains(path);
+        if (optionalAuthentication && rawToken != null && token == null) {
+            call.reject("CUSTOMER_SESSION_INVALID");
+            return;
+        }
+        boolean authenticated = !("POST".equals(method) && (UNAUTHENTICATED_POST.contains(path) || optionalAuthentication));
         if (authenticated && token == null) {
             call.reject("CUSTOMER_SESSION_MISSING");
             return;
@@ -280,7 +293,15 @@ public final class NovaNotificationApiPlugin extends Plugin {
         if ("POST".equals(method) && CUSTOMER_ORDER_CANCEL.matcher(path).matches()) return true;
         if ("PUT".equals(method) && CUSTOMER_ADDRESS.matcher(path).matches()) return true;
         if ("PATCH".equals(method) && (EXACT_PATCH.contains(path) || READ_ONE.matcher(path).matches() || CUSTOMER_ADDRESS_DEFAULT.matcher(path).matches())) return true;
-        return "DELETE".equals(method) && (EXACT_DELETE.contains(path) || CUSTOMER_ADDRESS.matcher(path).matches());
+        return "DELETE".equals(method) && (
+            EXACT_DELETE.contains(path)
+                || CUSTOMER_ADDRESS.matcher(path).matches()
+                || CUSTOMER_STORE_FOLLOW.matcher(path).matches()
+        );
+    }
+
+    static boolean optionalAuthentication(String path, String method) {
+        return "POST".equals(method) && OPTIONAL_AUTHENTICATION_POST.contains(path);
     }
 
     static boolean validRefreshBody(JSObject body) {

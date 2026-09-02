@@ -41,6 +41,11 @@ public final class NovaNotificationApiPluginTest {
         assertTrue(NovaNotificationApiPlugin.allowed("/api/addresses/7/default", "PATCH"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/addresses/7", "DELETE"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/messages/send", "POST"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/campaigns/coupons/active", "GET"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/store-follows", "GET"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/assistant/chat", "POST"));
+        assertTrue(NovaNotificationApiPlugin.optionalAuthentication("/api/assistant/chat", "POST"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/store-follows/main6v-nova-teknoloji", "DELETE"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/admin/notifications", "GET"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/addresses/7", "PATCH"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/addresses/0", "DELETE"));
@@ -49,6 +54,19 @@ public final class NovaNotificationApiPluginTest {
         assertFalse(NovaNotificationApiPlugin.allowed("/api/orders/0/cancel", "POST"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/messages/history/7", "POST"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/users/refresh", "GET"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/assistant/chat", "GET"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/assistant/escalate", "POST"));
+        assertFalse(NovaNotificationApiPlugin.optionalAuthentication("/api/messages/send", "POST"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/store-follows/Main6v-Nova", "DELETE"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/store-follows/-main6v", "DELETE"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/store-follows/main6v-", "DELETE"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/store-follows/main6v--nova", "DELETE"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/store-follows/main6v-nova-teknoloji", "POST"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/store-follows", "DELETE"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/campaigns/coupons/active", "POST"));
+        assertNull(NovaNotificationApiPlugin.canonicalPath("/api/assistant/chat?mode=buddy"));
+        assertNull(NovaNotificationApiPlugin.canonicalPath("/api/store-follows/main6v?redirect=evil"));
+        assertNull(NovaNotificationApiPlugin.canonicalPath("/api/store-follows/main6v%2Fadmin"));
     }
 
     @Test

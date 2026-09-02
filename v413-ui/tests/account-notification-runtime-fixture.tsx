@@ -30,6 +30,16 @@ function RuntimeProbe() {
       <span data-testid="address-count">{account.addresses.length}</span>
       <span data-testid="order-count">{account.orders.length}</span>
       <span data-testid="support-count">{account.supportMessages.length}</span>
+      <span data-testid="coupon-count">{account.coupons.length}</span>
+      <span data-testid="question-count">{account.questions.length}</span>
+      <span data-testid="review-count">{account.reviews.length}</span>
+      <span data-testid="followed-store-count">{account.followedStores.length}</span>
+      <span data-testid="account-parity-data">{[
+        ...account.coupons.map((item) => item.code),
+        ...account.questions.map((item) => item.question),
+        ...account.reviews.map((item) => item.comment || ""),
+        ...account.followedStores.map((item) => item.name),
+      ].join(" | ")}</span>
       <span data-testid="notification-count">{notifications.items.length}</span>
       <div data-testid="notification-titles">{notifications.items.map((item) => <span key={item.id}>{item.title}</span>)}</div>
       <button type="button" onClick={() => void account.refresh()}>Hesabı doğrula</button>

@@ -28,13 +28,14 @@ const canonicalStates = [
   ["CAL-10", "account", "profile"], ["CAL-10", "account", "payments"],
   ["CAL-10", "account", "coupons"], ["CAL-10", "account", "reviews"],
   ["CAL-10", "account", "questions"], ["CAL-10", "account", "security"],
-  ["CAL-10", "account", "settings"], ["CAL-11", "support", ""],
+  ["CAL-10", "account", "followed-stores"], ["CAL-10", "account", "settings"],
+  ["CAL-11", "support", ""],
   ["CAL-11", "support", "faq"], ["CAL-11", "support", "history"],
   ["CAL-11", "support", "live"], ["CAL-12", "support", ""],
 ] as const;
 
-test("native route allowlist contains exactly the 36 owner states", () => {
-  expect(canonicalStates).toHaveLength(36);
+test("native route allowlist contains exactly the 37 owner states", () => {
+  expect(canonicalStates).toHaveLength(37);
   expect(CANONICAL_NATIVE_ROUTE_TUPLES).toEqual(canonicalStates);
   const outputs = new Set<string>();
   for (const [cal, tab, view] of canonicalStates) {
@@ -45,7 +46,7 @@ test("native route allowlist contains exactly the 36 owner states", () => {
     expect(route?.get("shell")).toBe("native");
     outputs.add(route!.toString());
   }
-  expect(outputs.size).toBe(36);
+  expect(outputs.size).toBe(37);
 });
 
 test("every explicit cal, tab, and view permutation is either canonical or rejected", () => {
