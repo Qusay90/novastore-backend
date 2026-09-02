@@ -559,9 +559,21 @@ const createResponse = () => ({
     assert.doesNotMatch(hardDeleteSource, /pool|cloudinary|DELETE FROM/i);
 
     const productRoutesSource = readSource('routes/productRoutes.js');
-    assert.match(productRoutesSource, /authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, previewUpload/);
-    assert.match(productRoutesSource, /authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, upload\.array/);
-    assert.match(productRoutesSource, /router\.delete\('\/:id', authenticate, requireAdmin, requireStagingCatalogProductWrite, requireCurrentAdmin, deleteProduct\)/);
+    assert.match(productRoutesSource, /code: 'LEGACY_ADMIN_PRODUCT_WRITE_RETIRED'/);
+    assert.doesNotMatch(productRoutesSource, /config\/cloudinary|previewUpload|upload\.array|requireAdminCommerceCapabilityInStaging/);
+    assert.doesNotMatch(
+        productRoutesSource,
+        /createProduct|updateProduct|deleteProductMedia|previewProductMediaBackgroundRemoval|applyExistingProductMediaBackgroundRemoval/
+    );
+    for (const line of productRoutesSource.split(/\r?\n/).filter((item) => /router\.(?:post|put|delete)\(/.test(item))) {
+        assert.match(
+            line,
+            /authenticate, requireAdmin, requireCurrentAdmin, retireLegacyAdminProductWrite/,
+            `legacy ürün mutation yolu auth + güncel admin sonrasında fail-closed olmalı: ${line}`
+        );
+    }
+    assert.match(productRoutesSource, /router\.get\('\/', getAllProducts\)/);
+    assert.match(productRoutesSource, /router\.get\('\/:id', getProductById\)/);
     for (const relativePath of [
         'routes/adminAttributeRoutes.js',
         'routes/adminCollectionRoutes.js',
@@ -569,7 +581,7 @@ const createResponse = () => ({
     ]) {
         assert.match(readSource(relativePath), /router\.use\(authenticate, requireAdmin, requireCurrentAdmin\)/);
     }
-    assert.match(readSource('routes/adminCategoryRoutes.js'), /authenticate, requireAdmin, requireStagingCatalogStructureWrite, requireCurrentAdmin/);
+    assert.match(readSource('routes/adminCategoryRoutes.js'), /authenticate, requireAdmin, requireCurrentAdmin, requireCatalogStructureWrite/);
     assert.match(readSource('routes/categoryRoutes.js'), /authenticate, requireAdmin, requireCurrentAdmin/);
 
     const legacyAdminSource = readSource('frontend/admin.html');

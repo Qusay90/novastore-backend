@@ -10,6 +10,7 @@ const {
 } = require('../constants/orderStatus');
 const {
     createOrderWithReservation,
+    convergeSellerOrderProjectionsForCancellation,
     markOrderCancelled,
     parseItems,
     releaseStockReservation
@@ -400,6 +401,10 @@ const cancelOrder = async (req, res) => {
                 const cancellationEvent = await fetchLatestCancellationEvent(client, orderId);
                 validateAdminOrderCancellationReplay({ eventPayload: cancellationEvent, command: adminCommand });
             }
+            await convergeSellerOrderProjectionsForCancellation({
+                client,
+                canonicalOrderId: order.id
+            });
             await client.query('COMMIT');
             transactionOpen = false;
             const refundStatus = order.refund_status || REFUND_STATUS.NONE;

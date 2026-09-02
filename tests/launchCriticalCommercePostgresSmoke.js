@@ -63,7 +63,9 @@ Object.assign(process.env, {
     NOVASTORE_LEGAL_DISTANCE_SALE_VERSION: 'local-integration-v1',
     NOVASTORE_LEGAL_DISTANCE_SALE_TEXT: 'Yalnız yerel entegrasyon testi için mesafeli satış metni.',
     NOVASTORE_RETURN_WINDOW_DAYS: '14',
+    NOVASTORE_ADMIN_CANCEL_WRITE_ENABLED: 'true',
     NOVASTORE_ADMIN_RETURN_WRITE_ENABLED: 'true',
+    NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED: 'true',
     FREE_SHIPPING_THRESHOLD: '1',
     DEFAULT_SHIPPING_FEE: '49.90'
 });
@@ -137,11 +139,36 @@ let paymentControllerTestApi = null;
     await admin.query('CREATE SCHEMA public');
 
     const registry = loadRegistry();
-    assert.equal(registry.length, 36);
+    assert.equal(registry.length, 37);
     const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));
     assert.deepEqual(secondApply.applied, []);
+    const deliveryMigration = registry.at(-1);
+    assert.equal(deliveryMigration.id, '20260902_01_seller_package_delivery_status');
+    const readDeliveryConstraintDefinitions = async () => (
+        await admin.query(
+            `SELECT conname, pg_get_constraintdef(oid) AS definition
+               FROM pg_constraint
+              WHERE conname IN (
+                    'chk_seller_fulfillment_packages_status',
+                    'chk_seller_order_transitions_command'
+              )
+              ORDER BY conname`
+        )
+    ).rows;
+    const deliveryConstraintsBeforeRollbackProbe = await readDeliveryConstraintDefinitions();
+    await admin.query('BEGIN');
+    try {
+        await admin.query(deliveryMigration.executionSql);
+    } finally {
+        await admin.query('ROLLBACK');
+    }
+    assert.deepEqual(
+        await readDeliveryConstraintDefinitions(),
+        deliveryConstraintsBeforeRollbackProbe,
+        'rolling back an idempotent forward execution must preserve the installed constraints exactly'
+    );
 
     pool = require('../config/db');
     const paymentController = require('../controllers/paymentController');
@@ -153,7 +180,7 @@ let paymentControllerTestApi = null;
     } = paymentController;
     paymentControllerTestApi = paymentController.__test;
     let providerSessionCalls = 0;
-    paymentControllerTestApi.setPaytrIframeSessionRequester(async ({ payload, config }) => {
+    const deterministicProviderRequester = async ({ payload, config }) => {
         providerSessionCalls += 1;
         const token = `local_${payload.merchant_oid}`;
         return Object.freeze({
@@ -163,7 +190,8 @@ let paymentControllerTestApi = null;
             successUrl: payload.merchant_ok_url,
             failUrl: payload.merchant_fail_url
         });
-    });
+    };
+    paymentControllerTestApi.setPaytrIframeSessionRequester(deterministicProviderRequester);
     const { cancelOrder, getUserOrders } = require('../controllers/orderController');
     const { getAllReturnRequests, getReturnById } = require('../controllers/returnController');
     const {
@@ -181,6 +209,8 @@ let paymentControllerTestApi = null;
         readOrder
     } = require('../services/sellerOrderFulfillmentService');
     const { dispatchNotificationOutboxBatch } = require('../services/notificationOutboxService');
+    const { recordManualDelivery } = require('../services/manualDeliveryService');
+    const { recordManualShipment } = require('../services/manualShipmentService');
     const { calculatePricing } = require('../services/pricingService');
     const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
     const {
@@ -246,14 +276,18 @@ let paymentControllerTestApi = null;
          VALUES
             ('Idempotency Product', 100.00, 5, 'active', TRUE, $1, 'WAVE-IDEMPOTENT', 'WAVE-IDEMPOTENT'),
             ('Last Unit Product', 80.00, 1, 'active', TRUE, $1, 'WAVE-LAST-UNIT', 'WAVE-LAST-UNIT'),
-            ('Seller Projection Product', 250.00, 3, 'active', TRUE, $2, 'WAVE-SELLER-A', 'WAVE-SELLER-A')
+            ('Seller Projection Product', 250.00, 3, 'active', TRUE, $2, 'WAVE-SELLER-A', 'WAVE-SELLER-A'),
+            ('Seller Projection Product B', 300.00, 4, 'active', TRUE, $3, 'WAVE-SELLER-B', 'WAVE-SELLER-B'),
+            ('Fulfillment Drift Product', 120.00, 6, 'active', TRUE, $1, 'WAVE-DRIFT', 'WAVE-DRIFT')
          RETURNING id, name`,
-        [platformStoreId, legacyStoreAId]
+        [platformStoreId, legacyStoreAId, legacyStoreBId]
     );
     const productIdByName = new Map(products.rows.map((row) => [row.name, Number(row.id)]));
     const idempotencyProductId = productIdByName.get('Idempotency Product');
     const lastUnitProductId = productIdByName.get('Last Unit Product');
     const sellerProductId = productIdByName.get('Seller Projection Product');
+    const sellerProductBId = productIdByName.get('Seller Projection Product B');
+    const fulfillmentDriftProductId = productIdByName.get('Fulfillment Drift Product');
 
     const organizations = await pool.query(
         `INSERT INTO seller_organizations (external_key, display_name)
@@ -373,6 +407,28 @@ let paymentControllerTestApi = null;
          VALUES ($1, $2, $3, 'SELLER-A-WAVE-1', 25000, 'TRY', 'active')`,
         [organizationAId, sellerStoreAId, Number(offer.rows[0].id)]
     );
+    const fulfillmentDriftOffer = await pool.query(
+        `INSERT INTO seller_offers (organization_id, store_id, product_id, status, visibility)
+         VALUES ($1, $2, $3, 'active', 'seller_visible') RETURNING id`,
+        [organizationAId, sellerStoreAId, fulfillmentDriftProductId]
+    );
+    await pool.query(
+        `INSERT INTO seller_offer_variants
+            (organization_id, store_id, offer_id, seller_sku, price_minor, currency, status)
+         VALUES ($1, $2, $3, 'SELLER-A-DRIFT-WAVE-1', 12000, 'TRY', 'active')`,
+        [organizationAId, sellerStoreAId, Number(fulfillmentDriftOffer.rows[0].id)]
+    );
+    const sellerBOffer = await pool.query(
+        `INSERT INTO seller_offers (organization_id, store_id, product_id, status, visibility)
+         VALUES ($1, $2, $3, 'active', 'seller_visible') RETURNING id`,
+        [organizationBId, sellerStoreBId, sellerProductBId]
+    );
+    await pool.query(
+        `INSERT INTO seller_offer_variants
+            (organization_id, store_id, offer_id, seller_sku, price_minor, currency, status)
+         VALUES ($1, $2, $3, 'SELLER-B-WAVE-1', 30000, 'TRY', 'active')`,
+        [organizationBId, sellerStoreBId, Number(sellerBOffer.rows[0].id)]
+    );
     const sellerAgreementPreview = () => invoke(getCheckoutAgreementPreview, {
         user: { id: customerId, principal: 'customer', role: 'customer' },
         body: {
@@ -406,6 +462,12 @@ let paymentControllerTestApi = null;
             SET status = 'approved', approved_by_admin_user_id = $2, approved_at = CURRENT_TIMESTAMP
           WHERE id = $1`,
         [sellerAIdentityRow.id, adminId]
+    );
+    await pool.query(
+        `UPDATE seller_public_legal_identities
+            SET status = 'approved', approved_by_admin_user_id = $2, approved_at = CURRENT_TIMESTAMP
+          WHERE organization_id = $1 AND status = 'draft'`,
+        [organizationBId, adminId]
     );
 
     await assert.rejects(
@@ -449,6 +511,104 @@ let paymentControllerTestApi = null;
             (code, discount_type, discount_value, min_order_amount, usage_limit, used_count, is_active)
          VALUES ('LAUNCH10', 'PERCENT', 10, 0, 1, 0, TRUE)`
     );
+
+    const fulfillmentGuardAcceptances = [
+        { slug: 'pre-information', version: 'local-integration-v1', accepted: true },
+        { slug: 'distance-sale', version: 'local-integration-v1', accepted: true }
+    ];
+    const readFulfillmentGuardSnapshot = async () => (await pool.query(
+        `SELECT
+            (SELECT COUNT(*)::int FROM orders) AS order_rows,
+            (SELECT COUNT(*)::int FROM payments) AS payment_rows,
+            (SELECT COUNT(*)::int FROM coupon_reservations) AS coupon_reservation_rows,
+            (SELECT used_count FROM coupons WHERE code = 'LAUNCH10') AS coupon_used_count,
+            (SELECT jsonb_agg(jsonb_build_object('id', product.id, 'stock', product.stock) ORDER BY product.id)
+               FROM products product
+              WHERE product.id = ANY($1::int[])) AS product_stocks`,
+        [[idempotencyProductId, sellerProductId, sellerProductBId, fulfillmentDriftProductId]]
+    )).rows[0];
+    const fulfillmentGuardBefore = await readFulfillmentGuardSnapshot();
+    const providerCallsBeforeFulfillmentGuard = providerSessionCalls;
+
+    const mixedFulfillmentPreview = await invoke(getCheckoutAgreementPreview, {
+        user: { id: customerId, principal: 'customer', role: 'customer' },
+        body: {
+            addressId: paymentAddressId,
+            cartItems: [
+                { id: idempotencyProductId, quantity: 1 },
+                { id: sellerProductId, quantity: 1 }
+            ],
+            couponCode: null
+        }
+    });
+    assert.equal(mixedFulfillmentPreview.statusCode, 409);
+    assert.equal(mixedFulfillmentPreview.payload.code, 'CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED');
+
+    const mixedFulfillmentInitialize = await invoke(
+        initializePayment,
+        paymentRequest(idempotencyProductId, 'launch-mixed-fulfillment-blocked-0001', {
+            cartItems: [
+                { id: idempotencyProductId, quantity: 1 },
+                { id: sellerProductId, quantity: 1 }
+            ],
+            agreementSnapshotSha256: 'a'.repeat(64),
+            agreementAcceptances: fulfillmentGuardAcceptances
+        })
+    );
+    assert.equal(mixedFulfillmentInitialize.statusCode, 409);
+    assert.equal(mixedFulfillmentInitialize.payload.code, 'CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED');
+
+    const multiSellerInitialize = await invoke(
+        initializePayment,
+        paymentRequest(sellerProductId, 'launch-multi-seller-fulfillment-blocked-0001', {
+            cartItems: [
+                { id: sellerProductId, quantity: 1 },
+                { id: sellerProductBId, quantity: 1 }
+            ],
+            agreementSnapshotSha256: 'b'.repeat(64),
+            agreementAcceptances: fulfillmentGuardAcceptances
+        })
+    );
+    assert.equal(multiSellerInitialize.statusCode, 409);
+    assert.equal(multiSellerInitialize.payload.code, 'CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED');
+    const unsupportedFulfillmentProviderCalls = providerSessionCalls - providerCallsBeforeFulfillmentGuard;
+    assert.equal(unsupportedFulfillmentProviderCalls, 0);
+    assert.deepEqual(await readFulfillmentGuardSnapshot(), fulfillmentGuardBefore);
+
+    const fulfillmentDriftRequest = await authorizedPaymentRequest(
+        idempotencyProductId,
+        'launch-final-fulfillment-drift-blocked-0001',
+        {
+            cartItems: [
+                { id: idempotencyProductId, quantity: 1 },
+                { id: fulfillmentDriftProductId, quantity: 1 }
+            ]
+        }
+    );
+    let fulfillmentDriftProviderCalls = 0;
+    paymentControllerTestApi.setPaytrIframeSessionRequester(async (input) => {
+        fulfillmentDriftProviderCalls += 1;
+        await pool.query(
+            'UPDATE products SET store_id = $1 WHERE id = $2',
+            [legacyStoreAId, fulfillmentDriftProductId]
+        );
+        return deterministicProviderRequester(input);
+    });
+    let fulfillmentDriftInitialize;
+    try {
+        fulfillmentDriftInitialize = await invoke(initializePayment, fulfillmentDriftRequest);
+    } finally {
+        await pool.query(
+            'UPDATE products SET store_id = $1 WHERE id = $2',
+            [platformStoreId, fulfillmentDriftProductId]
+        );
+        paymentControllerTestApi.setPaytrIframeSessionRequester(deterministicProviderRequester);
+    }
+    assert.equal(fulfillmentDriftInitialize.statusCode, 409);
+    assert.equal(fulfillmentDriftInitialize.payload.code, 'CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED');
+    assert.equal(fulfillmentDriftProviderCalls, 1);
+    assert.equal(providerSessionCalls, providerCallsBeforeFulfillmentGuard + 1);
+    assert.deepEqual(await readFulfillmentGuardSnapshot(), fulfillmentGuardBefore);
 
     const unauthenticatedPayment = await invoke(
         initializePayment,
@@ -704,6 +864,116 @@ let paymentControllerTestApi = null;
     assert.equal(paidSnapshot.rows[0].seller_items, 1);
     assert.equal(Number(paidSnapshot.rows[0].coupon_used_count), 1);
     assert.equal(paidSnapshot.rows[0].coupon_reservation_status, 'CONSUMED');
+    await expectCode(
+        recordManualShipment({
+            orderId: canonicalOrderId,
+            idempotencyKey: 'launch-admin-seller-shipment-block-0001',
+            body: {
+                expected_status: ORDER_STATUS.HAZIRLANIYOR,
+                handoff_confirmed: true,
+                provider: 'Nova Kargo',
+                tracking_no: 'ADMIN-MUST-NOT-SHIP-0001'
+            },
+            actor: { id: adminId, principal: 'admin', role: 'admin' }
+        }),
+        'MANUAL_SHIPMENT_SELLER_OWNED_ORDER'
+    );
+    const blockedAdminShipmentSnapshot = await pool.query(
+        `SELECT canonical.status,
+                (SELECT COUNT(*)::int FROM shipments WHERE order_id = canonical.id) AS shipment_rows,
+                (SELECT COUNT(*)::int
+                   FROM order_events event
+                  WHERE event.order_id = canonical.id
+                    AND event.event_type = 'MANUAL_SHIPMENT_RECORDED') AS admin_shipment_events
+           FROM orders canonical
+          WHERE canonical.id = $1`,
+        [canonicalOrderId]
+    );
+    assert.deepEqual(blockedAdminShipmentSnapshot.rows[0], {
+        status: ORDER_STATUS.HAZIRLANIYOR,
+        shipment_rows: 0,
+        admin_shipment_events: 0
+    });
+
+    const sellerStockBeforeCancellationOrder = Number((await pool.query(
+        'SELECT stock FROM products WHERE id = $1',
+        [sellerProductId]
+    )).rows[0].stock);
+    const sellerCancellationInitialize = await invoke(
+        initializePayment,
+        await authorizedPaymentRequest(sellerProductId, 'launch-seller-cancel-order-0001')
+    );
+    assert.equal(sellerCancellationInitialize.statusCode, 201);
+    const sellerCancellationOrderId = Number(sellerCancellationInitialize.payload.orderId);
+    const sellerCancellationTotalAmount = String(
+        Math.round(Number(sellerCancellationInitialize.payload.totals.total) * 100)
+    );
+    const sellerCancellationCallbackBody = {
+        merchant_oid: sellerCancellationInitialize.payload.paymentRef,
+        status: 'success',
+        total_amount: sellerCancellationTotalAmount,
+        payment_amount: sellerCancellationTotalAmount,
+        payment_type: 'card',
+        currency: 'TL',
+        test_mode: '1',
+        hash: buildPaytrCallbackHash({
+            merchantOid: sellerCancellationInitialize.payload.paymentRef,
+            status: 'success',
+            totalAmount: sellerCancellationTotalAmount,
+            merchantKey: process.env.PAYTR_MERCHANT_KEY,
+            merchantSalt: process.env.PAYTR_MERCHANT_SALT
+        })
+    };
+    const sellerCancellationCapture = await invoke(webhookPaytr, {
+        body: sellerCancellationCallbackBody,
+        headers: {},
+        method: 'POST'
+    });
+    assert.equal(sellerCancellationCapture.statusCode, 200);
+    const sellerAdminCancellationRequest = {
+        params: { id: String(sellerCancellationOrderId) },
+        body: {
+            reason_code: 'CUSTOMER_REQUEST',
+            expected_status: ORDER_STATUS.HAZIRLANIYOR,
+            note: 'Yerel satıcı siparişi iptal yakınsama testi'
+        },
+        headers: { 'idempotency-key': 'launch-seller-admin-cancel-0001' },
+        user: { id: adminId, principal: 'admin', role: 'admin' },
+        currentAdmin: { id: adminId, principal: 'admin', role: 'admin' }
+    };
+    const sellerAdminCancellation = await invoke(cancelOrder, sellerAdminCancellationRequest);
+    assert.equal(sellerAdminCancellation.statusCode, 200);
+    assert.equal(sellerAdminCancellation.payload.reused, false);
+    assert.equal(sellerAdminCancellation.payload.order.status, ORDER_STATUS.IPTAL_EDILDI);
+    assert.equal(sellerAdminCancellation.payload.refund.status, REFUND_STATUS.PENDING);
+    const sellerAdminCancellationReplay = await invoke(cancelOrder, sellerAdminCancellationRequest);
+    assert.equal(sellerAdminCancellationReplay.statusCode, 200);
+    assert.equal(sellerAdminCancellationReplay.payload.reused, true);
+    const sellerCancellationSnapshot = await pool.query(
+        `SELECT canonical.status AS order_status,
+                canonical.refund_status,
+                payment.status AS payment_status,
+                product.stock,
+                seller_order.status AS seller_order_status,
+                (SELECT COUNT(*)::int
+                   FROM seller_order_transitions transition
+                  WHERE transition.seller_order_id = seller_order.id
+                    AND transition.from_status = 'new'
+                    AND transition.to_status = 'cancelled'
+                    AND transition.command = 'cancel_request') AS cancellation_transitions
+           FROM orders canonical
+           JOIN payments payment ON payment.order_id = canonical.id
+           JOIN seller_orders seller_order ON seller_order.canonical_order_id = canonical.id
+           JOIN products product ON product.id = $2
+          WHERE canonical.id = $1`,
+        [sellerCancellationOrderId, sellerProductId]
+    );
+    assert.equal(sellerCancellationSnapshot.rows[0].order_status, ORDER_STATUS.IPTAL_EDILDI);
+    assert.equal(sellerCancellationSnapshot.rows[0].refund_status, REFUND_STATUS.PENDING);
+    assert.equal(sellerCancellationSnapshot.rows[0].payment_status, PAYMENT_STATUS.PAID);
+    assert.equal(sellerCancellationSnapshot.rows[0].seller_order_status, 'cancelled');
+    assert.equal(sellerCancellationSnapshot.rows[0].cancellation_transitions, 1);
+    assert.equal(Number(sellerCancellationSnapshot.rows[0].stock), sellerStockBeforeCancellationOrder);
 
     const adminOrderSummaries = await invoke(
         createGetAdminOrderSummaries(pool),
@@ -730,8 +1000,9 @@ let paymentControllerTestApi = null;
         storeIds: [sellerStoreBId]
     });
     const sellerOrders = await listOrders(pool, sellerAContext, {});
-    assert.equal(sellerOrders.length, 1);
-    const sellerOrder = sellerOrders[0];
+    assert.equal(sellerOrders.length, 2);
+    const sellerOrder = sellerOrders.find((entry) => Number(entry.canonical_order_id) === canonicalOrderId);
+    assert.ok(sellerOrder);
     await expectCode(readOrder(pool, sellerBContext, sellerOrder.id), 'RESOURCE_NOT_FOUND');
     const packageId = sellerOrder.packages[0].id;
     const prepared = await orderCommand(pool, sellerAContext, sellerOrder.id, {
@@ -761,10 +1032,89 @@ let paymentControllerTestApi = null;
         tracking_no: 'NOVA-WAVE1-0001'
     });
 
-    await pool.query(
-        'UPDATE orders SET status = $1, shipment_status = $2, delivered_at = NOW(), updated_at = NOW() WHERE id = $3',
-        [ORDER_STATUS.TESLIM_EDILDI, SHIPMENT_STATUS.DELIVERED, canonicalOrderId]
+    const manualDeliveryInput = {
+        orderId: canonicalOrderId,
+        idempotencyKey: 'launch-admin-delivery-0001',
+        body: {
+            expected_status: ORDER_STATUS.KARGOYA_VERILDI,
+            expected_shipment_status: SHIPMENT_STATUS.IN_TRANSIT,
+            delivery_confirmed: true,
+            provider: 'Nova Kargo',
+            tracking_no: 'NOVA-WAVE1-0001'
+        },
+        actor: { id: adminId, principal: 'admin', role: 'admin' }
+    };
+    const manualDelivery = await recordManualDelivery(manualDeliveryInput);
+    assert.equal(manualDelivery.reused, false);
+    assert.equal(manualDelivery.order.status, ORDER_STATUS.TESLIM_EDILDI);
+    assert.equal(manualDelivery.order.shipmentStatus, SHIPMENT_STATUS.DELIVERED);
+    assert.ok(manualDelivery.order.deliveredAt);
+    assert.equal(manualDelivery.shipment.shipmentStatus, SHIPMENT_STATUS.DELIVERED);
+    assert.deepEqual(manualDelivery.sellerProjection, {
+        matchedCount: 1,
+        packageCount: 1,
+        consistent: true,
+        changed: true
+    });
+    const manualDeliveryReplay = await recordManualDelivery(manualDeliveryInput);
+    assert.equal(manualDeliveryReplay.reused, true);
+    assert.deepEqual(manualDeliveryReplay.sellerProjection, {
+        matchedCount: 1,
+        packageCount: 1,
+        consistent: true,
+        changed: false
+    });
+    const deliveredSnapshot = await pool.query(
+        `SELECT canonical.status AS order_status,
+                canonical.shipment_status AS canonical_shipment_status,
+                canonical.delivered_at,
+                shipment.shipment_status,
+                seller_order.status AS seller_order_status,
+                package.status AS package_status,
+                (SELECT COUNT(*)::int
+                   FROM seller_order_transitions transition
+                  WHERE transition.seller_order_id = seller_order.id
+                    AND transition.package_id = package.id
+                    AND transition.from_status = 'shipped'
+                    AND transition.to_status = 'delivered'
+                    AND transition.command = 'delivery_confirm'
+                    AND transition.idempotency_key = $2) AS delivery_transitions,
+                (SELECT COUNT(*)::int
+                   FROM notification_outbox_events outbox
+                  WHERE outbox.event_type = 'ORDER_DELIVERED'
+                    AND outbox.aggregate_type = 'order'
+                    AND outbox.aggregate_id = canonical.id::text) AS delivery_notifications
+           FROM orders canonical
+           JOIN shipments shipment ON shipment.order_id = canonical.id
+           JOIN seller_orders seller_order ON seller_order.canonical_order_id = canonical.id
+           JOIN seller_fulfillment_packages package
+             ON package.organization_id = seller_order.organization_id
+            AND package.seller_order_id = seller_order.id
+          WHERE canonical.id = $1`,
+        [canonicalOrderId, manualDeliveryInput.idempotencyKey]
     );
+    assert.equal(deliveredSnapshot.rows[0].order_status, ORDER_STATUS.TESLIM_EDILDI);
+    assert.equal(deliveredSnapshot.rows[0].canonical_shipment_status, SHIPMENT_STATUS.DELIVERED);
+    assert.ok(deliveredSnapshot.rows[0].delivered_at);
+    assert.equal(deliveredSnapshot.rows[0].shipment_status, SHIPMENT_STATUS.DELIVERED);
+    assert.equal(deliveredSnapshot.rows[0].seller_order_status, 'delivered');
+    assert.equal(deliveredSnapshot.rows[0].package_status, 'delivered');
+    assert.equal(deliveredSnapshot.rows[0].delivery_transitions, 1);
+    assert.equal(deliveredSnapshot.rows[0].delivery_notifications, 1);
+    await admin.query('BEGIN');
+    await assert.rejects(
+        admin.query(
+            "UPDATE seller_fulfillment_packages SET status = 'invalid-delivery-status' WHERE id = $1",
+            [packageId]
+        ),
+        /chk_seller_fulfillment_packages_status/u
+    );
+    await admin.query('ROLLBACK');
+    const packageAfterConstraintRollback = await pool.query(
+        'SELECT status FROM seller_fulfillment_packages WHERE id = $1',
+        [packageId]
+    );
+    assert.equal(packageAfterConstraintRollback.rows[0].status, 'delivered');
     await expectCode(
         createCustomerReturn({
             user: { id: adminId, principal: 'admin', role: 'admin' },
@@ -903,6 +1253,15 @@ let paymentControllerTestApi = null;
         )),
         true
     );
+    assert.equal(
+        notificationSnapshot.rows.some((notification) => (
+            notification.entity_type === 'order'
+            && Number(notification.entity_id) === canonicalOrderId
+            && notification.type === 'ORDER_DELIVERED'
+            && /teslim edildi/i.test(notification.title)
+        )),
+        true
+    );
 
     const result = Object.freeze({
         migrationFirstApply: firstApply.applied.length,
@@ -913,6 +1272,11 @@ let paymentControllerTestApi = null;
         returnEventRows: returnSnapshot.rows[0].event_count,
         typedNotificationRows: notificationSnapshot.rows.length,
         refundProviderExecuted: approved.refundProviderExecuted,
+        mixedFulfillmentGuard: mixedFulfillmentInitialize.payload.code,
+        multiSellerFulfillmentGuard: multiSellerInitialize.payload.code,
+        fulfillmentDriftGuard: fulfillmentDriftInitialize.payload.code,
+        unsupportedFulfillmentProviderCalls,
+        fulfillmentDriftProviderCalls,
         deterministicProviderSessionCalls: providerSessionCalls
     });
     assert(providerSessionCalls >= 6, 'Expected deterministic local provider session stub calls.');

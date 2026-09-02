@@ -2,6 +2,7 @@ const { PLATFORM_STORE } = require('./categoryV2BackfillService');
 const { AdminCatalogMutationError } = require('./adminCatalogMutationPolicy');
 const { executeAdminCatalogMutation } = require('./adminCatalogMutationService');
 const { cardFramingFromStorage, normalizeCardFraming } = require('../shared/productCardFraming');
+const { lockAdminWritablePlatformStore } = require('./adminCatalogStoreAuthorityService');
 
 const MAX_PRODUCT_MEDIA = 10;
 const CLOUDINARY_HOST = 'res.cloudinary.com';
@@ -76,6 +77,7 @@ const loadFirstPartyProduct = async (client, productId) => {
 };
 
 const authorizeFirstPartyMediaTarget = async (client, current) => {
+    await lockAdminWritablePlatformStore(client, { unavailableAsNotFound: true });
     const product = await loadFirstPartyProduct(client, current.id);
     return Object.freeze({ product });
 };
@@ -119,7 +121,7 @@ const updateProductMediaCardFraming = async (database, rawProductId, rawMediaId,
         entityKey: String(productId),
         action: 'update',
         expectedRevision: body?.expected_revision ?? body?.expectedRevision,
-        changedFields: ['product_media.card_framing'],
+        changedFields: ['product_media'],
         requestId,
         metadata: { source: 'admin-commerce-pro', operation: 'media_card_framing', storage_mutation: false },
         authorizeLockedTarget: authorizeFirstPartyMediaTarget,

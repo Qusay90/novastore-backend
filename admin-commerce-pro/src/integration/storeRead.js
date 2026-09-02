@@ -2,6 +2,12 @@ const SUMMARY_KEYS = Object.freeze([
   "id",
   "storeName",
   "operationalStatus",
+  "sellerStoreId",
+  "sellerStoreStatus",
+  "sellerOrganizationId",
+  "sellerOrganizationName",
+  "sellerOrganizationStatus",
+  "ownershipVerified",
   "productCount",
   "customerVisibleProductCount",
   "createdAt",
@@ -44,6 +50,16 @@ const nullableDate = (value, label) => {
   return parsed;
 };
 
+const nullablePositiveInteger = (value, label) => (
+  value === null ? null : positiveInteger(value, label)
+);
+
+const nullableText = (value, label) => {
+  if (value === null) return null;
+  if (typeof value !== "string" || !value.trim()) throw new TypeError(`${label} geçersiz.`);
+  return value.trim();
+};
+
 const normalizeSummary = (value) => {
   const record = assertExactKeys(value, SUMMARY_KEYS, "Mağaza özeti");
   const storeName = String(record.storeName || "").trim();
@@ -51,10 +67,47 @@ const normalizeSummary = (value) => {
   if (!["active", "inactive"].includes(record.operationalStatus)) {
     throw new TypeError("Operasyon durumu geçersiz.");
   }
+  if (typeof record.ownershipVerified !== "boolean") {
+    throw new TypeError("Mağaza sahiplik doğrulaması boolean olmalıdır.");
+  }
+  const sellerStoreId = nullablePositiveInteger(record.sellerStoreId, "Satıcı mağaza kimliği");
+  const sellerStoreStatus = nullableText(record.sellerStoreStatus, "Satıcı mağaza durumu");
+  const sellerOrganizationId = nullablePositiveInteger(record.sellerOrganizationId, "Satıcı organizasyon kimliği");
+  const sellerOrganizationName = nullableText(record.sellerOrganizationName, "Satıcı organizasyon adı");
+  const sellerOrganizationStatus = nullableText(record.sellerOrganizationStatus, "Satıcı organizasyon durumu");
+  const entityStatuses = ["active", "suspended", "closed"];
+  const sellerTupleEmpty = [
+    sellerStoreId,
+    sellerStoreStatus,
+    sellerOrganizationId,
+    sellerOrganizationName,
+    sellerOrganizationStatus,
+  ].every((value) => value === null);
+  const sellerTupleComplete = sellerStoreId !== null
+    && entityStatuses.includes(sellerStoreStatus)
+    && sellerOrganizationId !== null
+    && sellerOrganizationName !== null
+    && entityStatuses.includes(sellerOrganizationStatus);
+  if ((record.ownershipVerified && !sellerTupleComplete) || (!record.ownershipVerified && !sellerTupleEmpty)) {
+    throw new TypeError("Mağaza sahiplik alanları doğrulama durumuyla uyuşmuyor.");
+  }
+  if (record.operationalStatus === "active" && (
+    !record.ownershipVerified
+    || sellerStoreStatus !== "active"
+    || sellerOrganizationStatus !== "active"
+  )) {
+    throw new TypeError("Aktif mağaza doğrulanmış aktif satıcı bağlantısı gerektirir.");
+  }
   return Object.freeze({
     id: positiveInteger(record.id, "Mağaza kimliği"),
     storeName,
     operationalStatus: record.operationalStatus,
+    sellerStoreId,
+    sellerStoreStatus,
+    sellerOrganizationId,
+    sellerOrganizationName,
+    sellerOrganizationStatus,
+    ownershipVerified: record.ownershipVerified,
     productCount: nonNegativeInteger(record.productCount, "Ürün sayısı"),
     customerVisibleProductCount: nonNegativeInteger(record.customerVisibleProductCount, "Görünür ürün sayısı"),
     createdAt: nullableDate(record.createdAt, "Oluşturma tarihi"),
@@ -65,10 +118,13 @@ const normalizeSummary = (value) => {
 export function normalizeAdminStoreSummaryPage(value) {
   const page = assertExactKeys(value, ["items", "limit", "hasMore"], "Mağaza özet sayfası");
   if (!Array.isArray(page.items)) throw new TypeError("Mağaza özetleri dizi olmalıdır.");
+  const limit = positiveInteger(page.limit, "Özet limiti");
+  if (limit > 100) throw new TypeError("Özet limiti 1–100 aralığında olmalıdır.");
+  if (typeof page.hasMore !== "boolean") throw new TypeError("Mağaza hasMore boolean olmalıdır.");
   return Object.freeze({
     items: Object.freeze(page.items.map(normalizeSummary)),
-    limit: nonNegativeInteger(page.limit, "Özet limiti"),
-    hasMore: page.hasMore === true,
+    limit,
+    hasMore: page.hasMore,
   });
 }
 

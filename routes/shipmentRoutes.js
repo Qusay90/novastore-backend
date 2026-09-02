@@ -1,6 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { createManualShipment, createShipment, getShipment } = require('../controllers/shipmentController');
+const {
+    confirmManualDelivery,
+    createManualShipment,
+    createShipment,
+    getShipment
+} = require('../controllers/shipmentController');
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
 const { requireAdminCommerceCapability } = require('../middlewares/adminCommerceCapability');
 const { requireCurrentAdmin, requireCurrentAdminIfClaimed } = require('../middlewares/currentAdmin');
@@ -10,9 +15,17 @@ router.post(
     '/:orderId/manual',
     authenticate,
     requireAdmin,
-    requireAdminCommerceCapability('manualShipmentWrite'),
     requireCurrentAdmin,
+    requireAdminCommerceCapability('manualShipmentWrite'),
     createManualShipment
+);
+router.post(
+    '/:orderId/manual-delivery-confirmation',
+    authenticate,
+    requireAdmin,
+    requireCurrentAdmin,
+    requireAdminCommerceCapability('manualShipmentWrite'),
+    confirmManualDelivery
 );
 router.get('/:orderId', authenticate, requireCurrentAdminIfClaimed, getShipment);
 

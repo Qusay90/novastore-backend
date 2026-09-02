@@ -292,17 +292,78 @@ assert.throws(() => normalizeDashboardStats([]), /nesne/);
 assert.throws(() => normalizeDashboardStats({ totalRevenue: null, totalOrders: 0, totalProducts: 0, totalUsers: 0 }), /totalRevenue/);
 assert.throws(() => normalizeDashboardStats({ totalRevenue: 0, totalOrders: "1.2", totalProducts: 0, totalUsers: 0 }), /tam sayı/);
 
-const normalizedOrderPage = normalizeOrderSummaryPage({
-  items: [{
-    id: 42,
-    customer_name: "Gerçek Müşteri",
-    email: "customer@example.test",
-    total_amount: "499.90",
-    status: "Hazırlanıyor",
-    payment_status: "REQUIRES_ACTION",
-    item_count: 2,
-    created_at: "2026-07-14T10:00:00.000Z",
+const orderPayload = (overrides = {}) => ({
+  id: 42,
+  total_amount: "499.90",
+  currency: "TRY",
+  status: "Hazırlanıyor",
+  customer_name: "Gerçek Müşteri",
+  email: "customer@example.test",
+  created_at: "2026-07-14T10:00:00.000Z",
+  updated_at: "2026-07-14T10:10:00.000Z",
+  payment_status: "REQUIRES_ACTION",
+  refund_status: "NONE",
+  shipment_status: "NONE",
+  shipment_provider: null,
+  tracking_no: null,
+  estimated_delivery_date: null,
+  item_count: 2,
+  items: [
+    { product_id: 12, name: "Ürün A", quantity: 1, unit_price: "250.00", line_total: "250.00", store_id: 73 },
+    { product_id: 13, name: "Ürün B", quantity: 1, unit_price: "249.90", line_total: "249.90", store_id: 73 },
+  ],
+  seller_allocations: [{
+    seller_order_id: 501,
+    organization_id: 273,
+    organization_name: "Lale Organizasyon",
+    store_id: 173,
+    store_name: "Lale Tasarım",
+    status: "new",
+    currency: "TRY",
+    gross_amount: "499.90",
   }],
+  payment_provider: "paytr",
+  payment_ref: "NS-PAY-42",
+  payment_external_ref: null,
+  payment_failure_reason: null,
+  payment_updated_at: "2026-07-14T10:09:00.000Z",
+  ...overrides,
+});
+
+const catalogProductPayload = (overrides = {}) => ({
+  id: 12,
+  name: "Nova Kulaklık",
+  sku: null,
+  brand: "Nova",
+  product_type: "physical",
+  price: "1299.90",
+  old_price: "1499.90",
+  currency: "TRY",
+  stock: "8",
+  publication_status: "active",
+  is_customer_visible: true,
+  created_at: "2026-07-10T09:00:00.000Z",
+  updated_at: null,
+  revision: 4,
+  deleted_at: null,
+  primary_category_id: "4",
+  primary_category_name: "Kulaklık",
+  primary_category_path: "Elektronik / Ses / Kulaklık",
+  category_count: "2",
+  has_media: true,
+  store_id: 10,
+  store_name: "NovaStore",
+  store_slug: "novastore-platform",
+  store_operational_status: "active",
+  seller_organization_id: null,
+  seller_organization_name: null,
+  seller_organization_status: null,
+  admin_editable: true,
+  ...overrides,
+});
+
+const normalizedOrderPage = normalizeOrderSummaryPage({
+  items: [orderPayload()],
   limit: 100,
   hasMore: false,
 });
@@ -315,12 +376,29 @@ assert.equal(normalizedOrder.pendingPayment, true);
 assert.equal(normalizedOrder.shipmentStatus, "NONE");
 assert.equal(normalizedOrder.carrierConfirmed, false);
 assert.equal(normalizedOrder.currency, "TRY");
-assert.equal("sellerId" in normalizedOrder, false, "tek-satıcı siparişe sahte satıcı eklenmemeli");
+assert.equal(normalizedOrder.items[0].storeId, 73);
+assert.equal(normalizedOrder.sellerAllocations[0].organizationId, 273);
+assert.equal(normalizedOrder.paymentProvider, "paytr");
+assert.equal(normalizedOrder.paymentRef, "NS-PAY-42");
 assert.throws(() => normalizeOrderSummaryPage({ rows: [] }), /items/);
-assert.throws(() => normalizeOrderSummaryPage({ items: [{ id: 1 }], limit: 100, hasMore: false }), /created_at|payment_status|total_amount/);
+assert.throws(() => normalizeOrderSummaryPage({ items: [{ id: 1 }], limit: 100, hasMore: false }), /alan sözleşmesi/);
 assert.throws(() => normalizeOrderSummaryPage({ items: [], limit: 101, hasMore: false }), /1–100/);
 const nullableLegacyOrder = normalizeOrderSummaryPage({
-  items: [{ id: 9, customer_name: null, total_amount: "0", status: null, payment_status: null, item_count: 0, created_at: null }],
+  items: [orderPayload({
+    id: 9,
+    customer_name: null,
+    total_amount: "0",
+    status: null,
+    payment_status: null,
+    item_count: 0,
+    items: [],
+    seller_allocations: [],
+    payment_provider: null,
+    payment_ref: null,
+    payment_updated_at: null,
+    created_at: null,
+    updated_at: null,
+  })],
   limit: 100,
   hasMore: false,
 }).items[0];
@@ -329,8 +407,24 @@ assert.equal(nullableLegacyOrder.status, "Durum Bilinmiyor");
 assert.equal(nullableLegacyOrder.paymentStatus, "Bilinmiyor");
 assert.equal(nullableLegacyOrder.createdAt, null);
 assert.throws(
-  () => normalizeOrderSummaryPage({ items: [{ id: 9, customer_name: {}, total_amount: "0", status: "Bekliyor", payment_status: "PENDING", item_count: 0, created_at: null }], limit: 100, hasMore: false }),
+  () => normalizeOrderSummaryPage({ items: [orderPayload({ customer_name: {} })], limit: 100, hasMore: false }),
   /customer_name/,
+);
+assert.throws(
+  () => normalizeOrderSummaryPage({
+    items: [orderPayload({ raw_response: { card: "4111111111111111" } })],
+    limit: 100,
+    hasMore: false,
+  }),
+  /alan sözleşmesi/,
+);
+assert.throws(
+  () => normalizeOrderSummaryPage({
+    items: [orderPayload({ payment_failure_reason: "provider secret text" })],
+    limit: 100,
+    hasMore: false,
+  }),
+  /izin verilen listede/,
 );
 
 const returnPage = normalizeReturnSummaryPage({
@@ -356,26 +450,9 @@ assert.equal(notificationPage.items[0].entityId, 42);
 assert.throws(() => normalizeNotificationSummaryPage({ items: [{ id: 5, is_read: 0 }], limit: 50, hasMore: false }), /boolean/);
 
 const catalogPage = normalizeFirstPartyCatalogPage({
-  catalogMode: "first_party",
-  items: [{
-    id: 12,
-    name: "Nova Kulaklık",
-    price: "1299.90",
-    old_price: "1499.90",
-    currency: "TRY",
-    stock: "8",
-    publication_status: "active",
-    is_customer_visible: true,
-    created_at: "2026-07-10T09:00:00.000Z",
-    updated_at: null,
-    revision: 4,
-    deleted_at: null,
-    primary_category_id: "4",
-    primary_category_name: "Kulaklık",
-    primary_category_path: "Elektronik / Ses / Kulaklık",
-    category_count: "2",
-    has_media: true,
-  }],
+  catalogMode: "marketplace",
+  mutationScope: "first_party",
+  items: [catalogProductPayload()],
   limit: 100,
   hasMore: true,
 });
@@ -387,17 +464,29 @@ assert.equal(catalogPage.items[0].primaryCategoryId, 4);
 assert.equal(catalogPage.items[0].categoryCount, 2);
 assert.equal(catalogPage.items[0].hasMedia, true);
 assert.equal(catalogPage.items[0].deletedAt, null);
-assert.equal("sellerId" in catalogPage.items[0], false, "birinci taraf ürüne sahte satıcı eklenmemeli");
+assert.equal(catalogPage.items[0].storeId, 10);
+assert.equal(catalogPage.items[0].adminEditable, true);
+assert.equal(catalogPage.items[0].sellerOrganizationId, null);
 assert.equal("risk" in catalogPage.items[0], false, "ürün özetine uydurma risk eklenmemeli");
 assert.equal("approvalAction" in catalogPage.items[0], false, "ürün özetine manuel onay aksiyonu eklenmemeli");
 const deletedCatalogProduct = normalizeFirstPartyCatalogPage({
-  catalogMode: "first_party",
-  items: [{
-    id: 13, name: "Arşiv Kayıt", price: 10, old_price: null, currency: "TRY", stock: 0,
-    publication_status: "active", is_customer_visible: true, created_at: null, updated_at: null, revision: 2,
-    deleted_at: "2026-07-14T10:00:00.000Z", primary_category_id: null,
-    primary_category_name: null, primary_category_path: null, category_count: 0, has_media: false,
-  }],
+  catalogMode: "marketplace",
+  mutationScope: "first_party",
+  items: [catalogProductPayload({
+    id: 13,
+    name: "Arşiv Kayıt",
+    price: 10,
+    old_price: null,
+    stock: 0,
+    created_at: null,
+    revision: 2,
+    deleted_at: "2026-07-14T10:00:00.000Z",
+    primary_category_id: null,
+    primary_category_name: null,
+    primary_category_path: null,
+    category_count: 0,
+    has_media: false,
+  })],
   limit: 100,
   hasMore: false,
 }).items[0];
@@ -415,33 +504,66 @@ assert.deepEqual(
   [13],
   "yayın, stok ve Türkçe arama filtreleri birlikte çalışmalı",
 );
-assert.throws(() => normalizeFirstPartyCatalogPage({ catalogMode: "marketplace", items: [], limit: 100, hasMore: false }), /first_party/);
-assert.throws(() => normalizeFirstPartyCatalogPage({ catalogMode: "first_party", items: [], limit: 100, hasMore: "false" }), /boolean/);
+const sellerCatalogProduct = normalizeFirstPartyCatalogPage({
+  catalogMode: "marketplace",
+  mutationScope: "first_party",
+  items: [catalogProductPayload({
+    store_id: 73,
+    store_name: "Lale Tasarım",
+    store_slug: "lale-tasarim",
+    seller_organization_id: 273,
+    seller_organization_name: "Lale Organizasyon",
+    seller_organization_status: "active",
+    admin_editable: false,
+  })],
+  limit: 100,
+  hasMore: false,
+}).items[0];
+assert.equal(sellerCatalogProduct.sellerOrganizationId, 273);
+assert.equal(sellerCatalogProduct.adminEditable, false);
+const orphanCatalogProduct = normalizeFirstPartyCatalogPage({
+  catalogMode: "marketplace",
+  mutationScope: "first_party",
+  items: [catalogProductPayload({
+    store_id: null,
+    store_name: null,
+    store_slug: null,
+    store_operational_status: "inactive",
+    admin_editable: false,
+  })],
+  limit: 100,
+  hasMore: false,
+}).items[0];
+assert.equal(orphanCatalogProduct.storeId, null);
+assert.equal(orphanCatalogProduct.storeName, null);
+assert.equal(orphanCatalogProduct.adminEditable, false);
+assert.throws(() => normalizeFirstPartyCatalogPage({ catalogMode: "first_party", mutationScope: "first_party", items: [], limit: 100, hasMore: false }), /marketplace/);
+assert.throws(() => normalizeFirstPartyCatalogPage({ catalogMode: "marketplace", mutationScope: "first_party", items: [], limit: 100, hasMore: "false" }), /boolean/);
 assert.throws(() => normalizeFirstPartyCatalogPage({
-  catalogMode: "first_party",
+  catalogMode: "marketplace",
+  mutationScope: "first_party",
   items: [{ id: 1 }],
   limit: 100,
   hasMore: false,
-}), /eksik alan/);
+}), /alan sözleşmesi/);
 assert.throws(() => normalizeFirstPartyCatalogPage({
-  catalogMode: "first_party",
-  items: [{
-    id: 1, name: "Ürün", price: 10, old_price: null, currency: "TRY", stock: 0,
-    publication_status: "seller_pending", is_customer_visible: true, created_at: null,
-    updated_at: null, deleted_at: null, revision: 1, primary_category_id: null, primary_category_name: null,
-    primary_category_path: null, category_count: 0, has_media: false,
-  }],
+  catalogMode: "marketplace",
+  mutationScope: "first_party",
+  items: [catalogProductPayload({ publication_status: "seller_pending" })],
   limit: 100,
   hasMore: false,
 }), /yayın durumu/);
 assert.throws(() => normalizeFirstPartyCatalogPage({
-  catalogMode: "first_party",
-  items: [{
-    id: 1, name: "Ürün", price: 10, old_price: null, currency: "TRY", stock: 0,
-    publication_status: "archived", is_customer_visible: false, created_at: null,
-    updated_at: null, deleted_at: "2026-07-14T10:00:00.000Z", revision: 1, primary_category_id: null,
-    primary_category_name: null, primary_category_path: "Yetim yol", category_count: 0, has_media: false,
-  }],
+  catalogMode: "marketplace",
+  mutationScope: "first_party",
+  items: [catalogProductPayload({
+    publication_status: "archived",
+    is_customer_visible: false,
+    deleted_at: "2026-07-14T10:00:00.000Z",
+    primary_category_id: null,
+    primary_category_name: null,
+    primary_category_path: "Yetim yol",
+  })],
   limit: 100,
   hasMore: false,
 }), /kategori yolu/);
@@ -508,13 +630,24 @@ assert.throws(() => normalizeCatalogStructureSummary({
 
 const session = normalizeAdminSession({
   user: { id: 7, role: "admin" },
-  commerceMode: "single_vendor",
+  commerceMode: "marketplace",
+  paymentProvider: { provider: null, ready: false, state: "provider_not_configured" },
   apiVersion: "2026-07-14",
   capabilities: { dashboardRead: true },
 });
-assert.equal(session.commerceMode, "single_vendor");
-assert.throws(() => normalizeAdminSession({ user: { id: 8, role: "customer" } }), /admin/);
-assert.throws(() => normalizeAdminSession({ user: { id: 8, role: "admin" }, commerceMode: "multi_vendor" }), /çalışma modu/);
+assert.equal(session.commerceMode, "marketplace");
+assert.equal(session.paymentProvider.state, "provider_not_configured");
+const readyProviderSession = normalizeAdminSession({
+  ...session,
+  paymentProvider: { provider: "paytr", ready: true, state: "ready", testMode: true },
+});
+assert.equal(readyProviderSession.paymentProvider.testMode, true);
+assert.throws(() => normalizeAdminSession({ ...session, user: { id: 8, role: "customer" } }), /admin/);
+assert.throws(() => normalizeAdminSession({ ...session, commerceMode: "single_vendor" }), /çalışma modu/);
+assert.throws(() => normalizeAdminSession({
+  ...session,
+  paymentProvider: { ...session.paymentProvider, missingEnvNames: ["PAYTR_MERCHANT_KEY"] },
+}), /capability sözleşmesi/);
 
 const fixtureRequests = [];
 const fixtureCalls = [];
@@ -522,22 +655,50 @@ const fixtureHttp = {
   async request(path, options = {}) {
     fixtureRequests.push(path);
     fixtureCalls.push({ path, options });
-    if (path === "/api/admin/session") return { user: { id: 7, role: "admin" }, commerceMode: "single_vendor", capabilities: { dashboardRead: true, ordersRead: true, returnsRead: true, notificationsRead: true, firstPartyCatalogRead: true, catalogStructureRead: true } };
+    if (path === "/api/admin/session") return {
+      user: { id: 7, role: "admin" },
+      commerceMode: "marketplace",
+      paymentProvider: { provider: null, ready: false, state: "provider_not_configured" },
+      apiVersion: "2026-07-14",
+      capabilities: { dashboardRead: true, ordersRead: true, returnsRead: true, notificationsRead: true, firstPartyCatalogRead: true, catalogStructureRead: true },
+    };
     if (path === "/api/admin/stats") return { totalRevenue: "10", totalOrders: 1, totalProducts: 2, totalUsers: 3 };
-    if (path === "/api/admin/orders/summary?limit=100") return { items: [{ id: 1, customer_name: "Müşteri", total_amount: "10", status: "Onay Bekliyor", payment_status: "PAID", item_count: 1, created_at: "2026-07-14T10:00:00.000Z" }], limit: 100, hasMore: false };
+    if (path === "/api/admin/orders/summary?limit=100") return {
+      items: [orderPayload({
+        id: 1,
+        customer_name: "Müşteri",
+        total_amount: "10",
+        status: "Onay Bekliyor",
+        payment_status: "PAID",
+        item_count: 1,
+        items: [{ product_id: 1, name: "Ürün", quantity: 1, unit_price: "10", line_total: "10", store_id: 10 }],
+        seller_allocations: [],
+      })],
+      limit: 100,
+      hasMore: false,
+    };
     if (path === "/api/admin/returns/summary?limit=100") return { items: [{ id: 1, order_id: 1, reason_code: "DİĞER", status: "REQUESTED", refund_amount: "10", revision: 1, currency: "TRY", payment_status: "PAID" }], limit: 100, hasMore: false };
     if (path === "/api/notifications?limit=50") return { items: [{ id: 1, type: "ORDER_CREATED", title: "Yeni sipariş", message: "Yeni sipariş", category: "ORDER", priority: "HIGH", is_read: false, entity_type: "order", entity_id: 1, entity_key: null }], page: { limit: 50, hasMore: false } };
     if (path === "/api/notifications/unread-count") return { unreadCount: 1 };
     if (path === "/api/notifications/1/read") return { read: true };
     if (path === "/api/notifications/read-all") return { updatedCount: 1 };
     if (path === "/api/admin/catalog/products/summary?limit=100") return {
-      catalogMode: "first_party",
-      items: [{
-        id: 1, name: "Ürün", price: "10", old_price: null, currency: "TRY", stock: 1,
-        publication_status: "active", is_customer_visible: true, created_at: null, updated_at: null, revision: 1,
-        deleted_at: null, primary_category_id: null, primary_category_name: null,
-        primary_category_path: null, category_count: 0, has_media: false,
-      }],
+      catalogMode: "marketplace",
+      mutationScope: "first_party",
+      items: [catalogProductPayload({
+        id: 1,
+        name: "Ürün",
+        price: "10",
+        old_price: null,
+        stock: 1,
+        created_at: null,
+        revision: 1,
+        primary_category_id: null,
+        primary_category_name: null,
+        primary_category_path: null,
+        category_count: 0,
+        has_media: false,
+      })],
       limit: 100,
       hasMore: false,
     };

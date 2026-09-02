@@ -1,4 +1,5 @@
 const assert = require('assert');
+const crypto = require('crypto');
 const express = require('express');
 const http = require('http');
 const Module = require('module');
@@ -7,7 +8,14 @@ const { ORDER_STATUS, PAYMENT_STATUS, REFUND_STATUS } = require('../constants/or
 const paymentController = require('../controllers/paymentController');
 const { getPaymentStatus, initializePayment, __test: paymentTest } = paymentController;
 const { buildPaytrCallbackHash } = require('../services/paytrPaymentService');
-const { buildCheckoutAgreementPreview } = require('../services/legalDocumentService');
+const {
+    buildCheckoutAgreementPreview,
+    normalizeCheckoutAgreementContext,
+    stableStringify
+} = require('../services/legalDocumentService');
+const {
+    buildSellerPublicLegalIdentityContentSha256
+} = require('../services/sellerPublicLegalIdentityService');
 const {
     buildLegacyImplicitPlatformAgreementFixture,
     buildVerifiedCheckoutAgreementAllocationFixture
@@ -636,6 +644,102 @@ const assertNoFinalization = (state, { auditEvents = 0 } = {}) => {
     assert.strictEqual(state.orderItemWrites, 0);
 };
 
+const buildVerifiedFulfillmentAllocationFixture = ({
+    includePlatform = false,
+    sellerCount = 1
+} = {}) => {
+    const base = buildVerifiedCheckoutAgreementAllocationFixture();
+    const items = [];
+    const sellerProjection = [];
+    const sellers = [];
+    let subtotal = 0;
+    const platformAllocation = includePlatform ? base.platformAllocation : null;
+    if (platformAllocation) {
+        items.push(base.checkoutAgreementSnapshot.context.items[0]);
+        subtotal += Number(base.checkoutAgreementSnapshot.context.items[0].lineTotal);
+    }
+    for (let index = 0; index < sellerCount; index += 1) {
+        const productId = 102 + index;
+        const organizationId = 801 + index;
+        const storeId = 701 + index;
+        const unitPrice = 500 + (index * 100);
+        const identityInput = {
+            version: `stored-seller-${index + 1}-v1`,
+            publicLegalName: `Stored Seller ${index + 1} Limited Şirketi`,
+            publicTradeName: `Stored Seller ${index + 1}`,
+            publicDisclosureText: `Yalnız callback fulfillment testi için Seller ${index + 1} kamusal açıklaması.`
+        };
+        const legalIdentity = {
+            id: 901 + index,
+            organizationId,
+            ...identityInput,
+            contentSha256: buildSellerPublicLegalIdentityContentSha256(identityInput),
+            approvedAt: '2026-09-01T00:00:00.000Z'
+        };
+        const item = {
+            productId,
+            name: `Stored Seller Product ${index + 1}`,
+            quantity: 1,
+            unitPrice,
+            lineTotal: unitPrice
+        };
+        items.push(item);
+        subtotal += unitPrice;
+        const projection = {
+            organizationId,
+            organizationDisplayName: `Stored Seller Organization ${index + 1}`,
+            storeId,
+            storeDisplayName: `Stored Seller Store ${index + 1}`,
+            legalIdentity,
+            currency: 'TRY',
+            grossMinor: unitPrice * 100,
+            productIds: [productId],
+            items: [{
+                sourceItemIndex: items.length - 1,
+                offerId: 1001 + index,
+                variantId: 1101 + index,
+                productId,
+                quantity: 1,
+                unitPriceMinor: unitPrice * 100
+            }]
+        };
+        sellerProjection.push(projection);
+        sellers.push({
+            organizationId,
+            organizationDisplayName: projection.organizationDisplayName,
+            storeId,
+            storeDisplayName: projection.storeDisplayName,
+            legalIdentity,
+            currency: 'TRY',
+            grossMinor: unitPrice * 100,
+            productIds: [productId]
+        });
+    }
+    const context = normalizeCheckoutAgreementContext({
+        ...base.checkoutAgreementSnapshot.context,
+        items,
+        totals: {
+            currency: 'TRY',
+            subtotal,
+            bundleDiscount: 0,
+            couponDiscount: 0,
+            shippingFee: 49.9,
+            total: subtotal + 49.9
+        },
+        platformAllocation,
+        sellers
+    });
+    return {
+        checkoutAgreementSnapshot: {
+            schemaVersion: 'checkout-agreements-v2',
+            contextSha256: crypto.createHash('sha256').update(stableStringify(context), 'utf8').digest('hex'),
+            context
+        },
+        platformAllocation,
+        sellerProjection
+    };
+};
+
 const callStatus = async ({ row, user = { id: 10 } }) => {
     const calls = [];
     const client = {
@@ -680,7 +784,13 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
 
         const verifiedAllocationFixture = buildVerifiedCheckoutAgreementAllocationFixture();
         const legacyAllocationFixture = buildLegacyImplicitPlatformAgreementFixture();
+        const verifiedSellerOnlyFixture = buildVerifiedFulfillmentAllocationFixture();
+        const verifiedMixedFixture = buildVerifiedFulfillmentAllocationFixture({ includePlatform: true });
+        const verifiedMultiSellerFixture = buildVerifiedFulfillmentAllocationFixture({ sellerCount: 2 });
         assert.strictEqual(paymentTest.hasVerifiedStoredCheckoutAgreementAllocation(verifiedAllocationFixture), true);
+        assert.strictEqual(paymentTest.hasVerifiedStoredCheckoutAgreementAllocation(verifiedSellerOnlyFixture), true);
+        assert.strictEqual(paymentTest.hasVerifiedStoredCheckoutAgreementAllocation(verifiedMixedFixture), false);
+        assert.strictEqual(paymentTest.hasVerifiedStoredCheckoutAgreementAllocation(verifiedMultiSellerFixture), false);
         assert.strictEqual(paymentTest.hasVerifiedStoredCheckoutAgreementAllocation(legacyAllocationFixture), false);
         const hashMismatchFixture = JSON.parse(JSON.stringify(verifiedAllocationFixture));
         hashMismatchFixture.checkoutAgreementSnapshot.contextSha256 = '0'.repeat(64);
@@ -703,6 +813,26 @@ const callStatus = async ({ row, user = { id: 10 } }) => {
         assert.strictEqual(guardedLegacyCapture.runCommerceSideEffects, false);
         assert.strictEqual(guardedLegacyCapture.reserveStock, false);
         assert.strictEqual(guardedLegacyCapture.reconciliationReason, 'CHECKOUT_AGREEMENT_ALLOCATION_UNVERIFIED');
+        for (const unsupportedStoredAllocation of [verifiedMixedFixture, verifiedMultiSellerFixture]) {
+            const guardedUnsupportedCapture = paymentTest.guardActiveCaptureAgreementAllocation({
+                decision: 'CAPTURE_ACTIVE',
+                currentOrderStatus: ORDER_STATUS.ODEME_BEKLIYOR,
+                targetOrderStatus: ORDER_STATUS.HAZIRLANIYOR,
+                targetRefundStatus: null,
+                runCommerceSideEffects: true,
+                reserveStock: true,
+                reconciliationRequired: false,
+                reconciliationReason: null
+            }, unsupportedStoredAllocation);
+            assert.strictEqual(guardedUnsupportedCapture.decision, 'CAPTURE_RECONCILIATION');
+            assert.strictEqual(guardedUnsupportedCapture.targetRefundStatus, REFUND_STATUS.PENDING);
+            assert.strictEqual(guardedUnsupportedCapture.runCommerceSideEffects, false);
+            assert.strictEqual(guardedUnsupportedCapture.reserveStock, false);
+            assert.strictEqual(
+                guardedUnsupportedCapture.reconciliationReason,
+                'CHECKOUT_AGREEMENT_ALLOCATION_UNVERIFIED'
+            );
+        }
 
         const initRun = await callInitialize();
         assert.strictEqual(initRun.res.code, 201);

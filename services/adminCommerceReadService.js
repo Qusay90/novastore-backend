@@ -3,6 +3,7 @@ const {
     getAdminCommerceCapabilities
 } = require('./adminCommerceCapabilityService');
 const { PLATFORM_STORE } = require('./categoryV2BackfillService');
+const { getPaymentProviderCapability } = require('../config/paymentProviderConfig');
 
 const ADMIN_COMMERCE_CAPABILITIES = ADMIN_COMMERCE_CAPABILITY_DEFAULTS;
 
@@ -21,15 +22,53 @@ const toSummaryPage = (rows, limit) => ({
     hasMore: rows.length > limit
 });
 
-const toAdminStoreSummary = (row) => Object.freeze({
-    id: Number(row.id),
-    storeName: String(row.store_name || ''),
-    operationalStatus: row.is_active === true ? 'active' : 'inactive',
-    productCount: Number(row.product_count || 0),
-    customerVisibleProductCount: Number(row.customer_visible_product_count || 0),
-    createdAt: row.created_at || null,
-    updatedAt: row.updated_at || null
-});
+const SELLER_ENTITY_STATUSES = new Set(['active', 'suspended', 'closed']);
+
+const positiveSafeIntegerOrNull = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const normalized = Number(value);
+    return Number.isSafeInteger(normalized) && normalized > 0 ? normalized : null;
+};
+
+const verifiedSellerBinding = (row) => {
+    const bindingCount = Number(row.current_binding_count || 0);
+    const sellerStoreId = positiveSafeIntegerOrNull(row.seller_store_id);
+    const sellerOrganizationId = positiveSafeIntegerOrNull(row.seller_organization_id);
+    const sellerStoreStatus = String(row.seller_store_status || '');
+    const sellerOrganizationStatus = String(row.seller_organization_status || '');
+    const sellerOrganizationName = String(row.seller_organization_name || '').trim();
+    return bindingCount === 1
+        && sellerStoreId !== null
+        && sellerOrganizationId !== null
+        && sellerOrganizationName.length > 0
+        && SELLER_ENTITY_STATUSES.has(sellerStoreStatus)
+        && SELLER_ENTITY_STATUSES.has(sellerOrganizationStatus);
+};
+
+const toAdminStoreSummary = (row) => {
+    const ownershipVerified = verifiedSellerBinding(row);
+    const operational = row.is_active === true
+        && ownershipVerified
+        && row.seller_store_status === 'active'
+        && row.seller_store_closed_at === null
+        && row.seller_organization_status === 'active'
+        && row.seller_organization_closed_at === null;
+    return Object.freeze({
+        id: Number(row.id),
+        storeName: String(row.store_name || ''),
+        operationalStatus: operational ? 'active' : 'inactive',
+        sellerStoreId: ownershipVerified ? Number(row.seller_store_id) : null,
+        sellerStoreStatus: ownershipVerified ? String(row.seller_store_status) : null,
+        sellerOrganizationId: ownershipVerified ? Number(row.seller_organization_id) : null,
+        sellerOrganizationName: ownershipVerified ? String(row.seller_organization_name) : null,
+        sellerOrganizationStatus: ownershipVerified ? String(row.seller_organization_status) : null,
+        ownershipVerified,
+        productCount: Number(row.product_count || 0),
+        customerVisibleProductCount: Number(row.customer_visible_product_count || 0),
+        createdAt: row.created_at || null,
+        updatedAt: row.updated_at || null
+    });
+};
 
 const toAdminStoreDetail = (row, categoryRows) => Object.freeze({
     ...toAdminStoreSummary(row),
@@ -46,7 +85,8 @@ const getAdminSession = (req, res) => {
     }
     return res.status(200).json({
         user: { ...req.currentAdmin },
-        commerceMode: 'single_vendor',
+        commerceMode: 'marketplace',
+        paymentProvider: getPaymentProviderCapability(),
         apiVersion: '2026-07-14',
         capabilities: getAdminCommerceCapabilities()
     });
@@ -70,12 +110,73 @@ const createGetAdminOrderSummaries = (database) => async (req, res) => {
                     o.refund_status,
                     o.shipment_status,
                     o.shipment_provider,
+                    o.tracking_no,
                     o.estimated_delivery_date,
+                    o.updated_at,
+                    COALESCE(item_projection.item_count, 0)::INT AS item_count,
+                    COALESCE(item_projection.items, '[]'::JSONB) AS items,
+                    COALESCE(seller_projection.seller_allocations, '[]'::JSONB) AS seller_allocations,
+                    latest_payment.provider AS payment_provider,
+                    latest_payment.payment_ref,
+                    latest_payment.external_ref AS payment_external_ref,
                     CASE
-                        WHEN jsonb_typeof(o.items) = 'array' THEN jsonb_array_length(o.items)
-                        ELSE 0
-                    END::INT AS item_count
+                        WHEN latest_payment.status = 'FAILED' THEN 'PAYMENT_FAILED'
+                        ELSE NULL
+                    END AS payment_failure_reason,
+                    latest_payment.updated_at AS payment_updated_at
                 FROM orders o
+                LEFT JOIN LATERAL (
+                    SELECT
+                        COUNT(*)::INT AS item_count,
+                        JSONB_AGG(
+                            JSONB_BUILD_OBJECT(
+                                'product_id', item.product_id,
+                                'name', item.product_name,
+                                'quantity', item.quantity,
+                                'unit_price', item.unit_price,
+                                'line_total', item.total_price,
+                                'store_id', product.store_id
+                            )
+                            ORDER BY item.source_item_index ASC NULLS LAST, item.id ASC
+                        ) AS items
+                    FROM order_items item
+                    LEFT JOIN products product ON product.id = item.product_id
+                    WHERE item.order_id = o.id
+                ) item_projection ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT JSONB_AGG(
+                        JSONB_BUILD_OBJECT(
+                            'seller_order_id', seller_order.id,
+                            'organization_id', seller_order.organization_id,
+                            'organization_name', seller_organization.display_name,
+                            'store_id', seller_order.store_id,
+                            'store_name', seller_store.display_name,
+                            'status', seller_order.status,
+                            'currency', seller_order.currency,
+                            'gross_amount', seller_order.gross_minor::NUMERIC / 100
+                        )
+                        ORDER BY seller_order.id ASC
+                    ) AS seller_allocations
+                    FROM seller_orders seller_order
+                    JOIN seller_stores seller_store
+                      ON seller_store.organization_id = seller_order.organization_id
+                     AND seller_store.id = seller_order.store_id
+                    JOIN seller_organizations seller_organization
+                      ON seller_organization.id = seller_order.organization_id
+                    WHERE seller_order.canonical_order_id = o.id
+                ) seller_projection ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT
+                        payment.provider,
+                        payment.payment_ref,
+                        payment.external_ref,
+                        payment.status,
+                        payment.updated_at
+                    FROM payments payment
+                    WHERE payment.order_id = o.id
+                    ORDER BY payment.created_at DESC NULLS LAST, payment.id DESC
+                    LIMIT 1
+                ) latest_payment ON TRUE
                 ORDER BY o.created_at DESC NULLS LAST, o.id DESC
                 LIMIT $1
             `,
@@ -110,6 +211,43 @@ const createGetAdminProductSummaries = (database) => async (req, res) => {
                     p.created_at,
                     p.updated_at,
                     p.revision,
+                    legacy_store.id AS store_id,
+                    legacy_store.name AS store_name,
+                    legacy_store.slug AS store_slug,
+                    CASE
+                        WHEN legacy_store.is_active IS NOT TRUE
+                          OR legacy_store.deleted_at IS NOT NULL
+                        THEN 'inactive'
+                        WHEN LOWER(legacy_store.slug) = LOWER($1)
+                          AND COALESCE(seller_binding.current_binding_count, 0) = 0
+                        THEN 'active'
+                        WHEN COALESCE(seller_binding.current_binding_count, 0) = 1
+                          AND seller_binding.seller_store_status = 'active'
+                          AND seller_binding.seller_store_closed_at IS NULL
+                          AND seller_binding.seller_organization_status = 'active'
+                          AND seller_binding.seller_organization_closed_at IS NULL
+                        THEN 'active'
+                        ELSE 'inactive'
+                    END AS store_operational_status,
+                    CASE
+                        WHEN COALESCE(seller_binding.current_binding_count, 0) = 1
+                        THEN seller_binding.seller_organization_id
+                        ELSE NULL
+                    END AS seller_organization_id,
+                    CASE
+                        WHEN COALESCE(seller_binding.current_binding_count, 0) = 1
+                        THEN seller_binding.seller_organization_name
+                        ELSE NULL
+                    END AS seller_organization_name,
+                    CASE
+                        WHEN COALESCE(seller_binding.current_binding_count, 0) = 1
+                        THEN seller_binding.seller_organization_status
+                        ELSE NULL
+                    END AS seller_organization_status,
+                    COALESCE((
+                        LOWER(legacy_store.slug) = LOWER($1)
+                        AND COALESCE(seller_binding.current_binding_count, 0) = 0
+                    ), FALSE) AS admin_editable,
                     primary_category.id AS primary_category_id,
                     primary_category.name AS primary_category_name,
                     primary_category.path AS primary_category_path,
@@ -124,11 +262,22 @@ const createGetAdminProductSummaries = (database) => async (req, res) => {
                         WHERE media.product_id = p.id
                     ) AS has_media
                 FROM products p
-                INNER JOIN stores first_party_store
-                    ON first_party_store.id = p.store_id
-                   AND LOWER(first_party_store.slug) = LOWER($1)
-                   AND first_party_store.is_active = TRUE
-                   AND first_party_store.deleted_at IS NULL
+                LEFT JOIN stores legacy_store ON legacy_store.id = p.store_id
+                LEFT JOIN LATERAL (
+                    SELECT
+                        COUNT(*)::INT AS current_binding_count,
+                        MIN(seller_store.organization_id) AS seller_organization_id,
+                        MIN(seller_store.status) AS seller_store_status,
+                        MIN(seller_store.closed_at) AS seller_store_closed_at,
+                        MIN(seller_organization.display_name) AS seller_organization_name,
+                        MIN(seller_organization.status) AS seller_organization_status,
+                        MIN(seller_organization.closed_at) AS seller_organization_closed_at
+                    FROM seller_stores seller_store
+                    JOIN seller_organizations seller_organization
+                      ON seller_organization.id = seller_store.organization_id
+                    WHERE seller_store.legacy_store_id = p.store_id
+                      AND seller_store.closed_at IS NULL
+                ) seller_binding ON TRUE
                 LEFT JOIN LATERAL (
                     SELECT category.id, category.name, category.path
                     FROM product_categories primary_link
@@ -144,7 +293,8 @@ const createGetAdminProductSummaries = (database) => async (req, res) => {
             [PLATFORM_STORE.slug, limit + 1]
         );
         return res.status(200).json({
-            catalogMode: 'first_party',
+            catalogMode: 'marketplace',
+            mutationScope: 'first_party',
             ...toSummaryPage(result.rows, limit)
         });
     } catch (error) {
@@ -165,6 +315,14 @@ const createGetAdminStoreSummaries = (database) => async (req, res) => {
                     store.is_active,
                     store.created_at,
                     store.updated_at,
+                    seller_binding.current_binding_count,
+                    seller_binding.seller_store_id,
+                    seller_binding.seller_store_status,
+                    seller_binding.seller_store_closed_at,
+                    seller_binding.seller_organization_id,
+                    seller_binding.seller_organization_name,
+                    seller_binding.seller_organization_status,
+                    seller_binding.seller_organization_closed_at,
                     COUNT(product.id) FILTER (WHERE product.deleted_at IS NULL)::INT AS product_count,
                     COUNT(product.id) FILTER (
                         WHERE product.deleted_at IS NULL
@@ -172,10 +330,35 @@ const createGetAdminStoreSummaries = (database) => async (req, res) => {
                           AND product.is_customer_visible = TRUE
                     )::INT AS customer_visible_product_count
                 FROM stores store
+                LEFT JOIN LATERAL (
+                    SELECT
+                        COUNT(*)::INT AS current_binding_count,
+                        MIN(seller_store.id) AS seller_store_id,
+                        MIN(seller_store.status) AS seller_store_status,
+                        MIN(seller_store.closed_at) AS seller_store_closed_at,
+                        MIN(seller_organization.id) AS seller_organization_id,
+                        MIN(seller_organization.display_name) AS seller_organization_name,
+                        MIN(seller_organization.status) AS seller_organization_status,
+                        MIN(seller_organization.closed_at) AS seller_organization_closed_at
+                    FROM seller_stores seller_store
+                    JOIN seller_organizations seller_organization
+                      ON seller_organization.id = seller_store.organization_id
+                    WHERE seller_store.legacy_store_id = store.id
+                      AND seller_store.closed_at IS NULL
+                ) seller_binding ON TRUE
                 LEFT JOIN products product ON product.store_id = store.id
                 WHERE store.deleted_at IS NULL
                   AND LOWER(store.slug) <> LOWER($1)
-                GROUP BY store.id
+                GROUP BY
+                    store.id,
+                    seller_binding.current_binding_count,
+                    seller_binding.seller_store_id,
+                    seller_binding.seller_store_status,
+                    seller_binding.seller_store_closed_at,
+                    seller_binding.seller_organization_id,
+                    seller_binding.seller_organization_name,
+                    seller_binding.seller_organization_status,
+                    seller_binding.seller_organization_closed_at
                 ORDER BY store.created_at DESC NULLS LAST, store.id DESC
                 LIMIT $2
             `,
@@ -210,6 +393,14 @@ const createGetAdminStoreDetail = (database) => async (req, res) => {
                     store.created_at,
                     store.updated_at,
                     COALESCE(owner.full_name, owner.name) AS owner_name,
+                    seller_binding.current_binding_count,
+                    seller_binding.seller_store_id,
+                    seller_binding.seller_store_status,
+                    seller_binding.seller_store_closed_at,
+                    seller_binding.seller_organization_id,
+                    seller_binding.seller_organization_name,
+                    seller_binding.seller_organization_status,
+                    seller_binding.seller_organization_closed_at,
                     COUNT(product.id) FILTER (WHERE product.deleted_at IS NULL)::INT AS product_count,
                     COUNT(product.id) FILTER (
                         WHERE product.deleted_at IS NULL
@@ -218,11 +409,38 @@ const createGetAdminStoreDetail = (database) => async (req, res) => {
                     )::INT AS customer_visible_product_count
                 FROM stores store
                 LEFT JOIN users owner ON owner.id = store.owner_user_id
+                LEFT JOIN LATERAL (
+                    SELECT
+                        COUNT(*)::INT AS current_binding_count,
+                        MIN(seller_store.id) AS seller_store_id,
+                        MIN(seller_store.status) AS seller_store_status,
+                        MIN(seller_store.closed_at) AS seller_store_closed_at,
+                        MIN(seller_organization.id) AS seller_organization_id,
+                        MIN(seller_organization.display_name) AS seller_organization_name,
+                        MIN(seller_organization.status) AS seller_organization_status,
+                        MIN(seller_organization.closed_at) AS seller_organization_closed_at
+                    FROM seller_stores seller_store
+                    JOIN seller_organizations seller_organization
+                      ON seller_organization.id = seller_store.organization_id
+                    WHERE seller_store.legacy_store_id = store.id
+                      AND seller_store.closed_at IS NULL
+                ) seller_binding ON TRUE
                 LEFT JOIN products product ON product.store_id = store.id
                 WHERE store.id = $1
                   AND store.deleted_at IS NULL
                   AND LOWER(store.slug) <> LOWER($2)
-                GROUP BY store.id, owner.full_name, owner.name
+                GROUP BY
+                    store.id,
+                    owner.full_name,
+                    owner.name,
+                    seller_binding.current_binding_count,
+                    seller_binding.seller_store_id,
+                    seller_binding.seller_store_status,
+                    seller_binding.seller_store_closed_at,
+                    seller_binding.seller_organization_id,
+                    seller_binding.seller_organization_name,
+                    seller_binding.seller_organization_status,
+                    seller_binding.seller_organization_closed_at
             `,
             [storeId, PLATFORM_STORE.slug]
         );

@@ -44,6 +44,18 @@ const toBoolean = (value, field) => {
   return value;
 };
 
+const assertExactRecord = (value, keys, label) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError(`${label} nesne olmalıdır.`);
+  }
+  const unexpected = Object.keys(value).filter((key) => !keys.includes(key));
+  const missing = keys.filter((key) => !Object.prototype.hasOwnProperty.call(value, key));
+  if (unexpected.length > 0 || missing.length > 0) {
+    throw new TypeError(`${label} alan sözleşmesi geçersiz.`);
+  }
+  return value;
+};
+
 const toCurrencyCode = (value, field) => {
   const code = toLegacyNullableText(value, field, "TRY").toUpperCase();
   if (!/^[A-Z]{3}$/.test(code)) throw new TypeError(`${field} üç harfli para birimi kodu olmalıdır.`);
@@ -84,6 +96,31 @@ const toStrictNullableDate = (value, field) => (
   value === null ? null : toDateValue(value, field)
 );
 
+const toStrictNullableBoundedText = (value, field, maxLength) => {
+  if (value === null) return null;
+  const text = toRequiredText(value, field);
+  if (text.length > maxLength || /[\u0000-\u001F\u007F]/u.test(text)) {
+    throw new TypeError(`${field} güvenli metin sınırını aşıyor.`);
+  }
+  return text;
+};
+
+const ORDER_KEYS = Object.freeze([
+  "id", "total_amount", "currency", "status", "customer_name", "email", "created_at",
+  "updated_at", "payment_status", "refund_status", "shipment_status", "shipment_provider",
+  "tracking_no", "estimated_delivery_date", "item_count", "items", "seller_allocations",
+  "payment_provider", "payment_ref", "payment_external_ref", "payment_failure_reason",
+  "payment_updated_at",
+]);
+const ORDER_ITEM_KEYS = Object.freeze([
+  "product_id", "name", "quantity", "unit_price", "line_total", "store_id",
+]);
+const SELLER_ALLOCATION_KEYS = Object.freeze([
+  "seller_order_id", "organization_id", "organization_name", "store_id", "store_name",
+  "status", "currency", "gross_amount",
+]);
+const SAFE_PAYMENT_FAILURE_REASONS = new Set(["PAYMENT_FAILED"]);
+
 export function normalizeDashboardStats(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new TypeError("Dashboard istatistik yanıtı nesne olmalıdır.");
@@ -97,7 +134,7 @@ export function normalizeDashboardStats(payload) {
 }
 
 export function normalizeOrder(row) {
-  if (!row || typeof row !== "object") throw new TypeError("Sipariş özeti nesne olmalıdır.");
+  assertExactRecord(row, ORDER_KEYS, "Sipariş özeti");
   const rawId = toInteger(row.id, "order.id");
   if (rawId < 1) throw new TypeError("order.id pozitif olmalıdır.");
   const createdAt = toLegacyNullableDate(row.created_at, "order.created_at");
@@ -106,6 +143,50 @@ export function normalizeOrder(row) {
   const pendingPayment = backendStatus === "Ödeme Bekliyor" || paymentStatus === "REQUIRES_ACTION";
   const paymentFailed = paymentStatus === "FAILED";
   const status = pendingPayment ? "Ödeme Bekliyor" : paymentFailed ? "Ödeme Başarısız" : backendStatus;
+  if (!Array.isArray(row.items)) throw new TypeError("order.items dizi olmalıdır.");
+  const items = row.items.map((item) => {
+    assertExactRecord(item, ORDER_ITEM_KEYS, "Sipariş kalemi");
+    const quantity = toPositiveInteger(item.quantity, "order.items.quantity");
+    const unitPrice = toFiniteNumber(item.unit_price, "order.items.unit_price");
+    const lineTotal = toFiniteNumber(item.line_total, "order.items.line_total");
+    if (Math.abs((quantity * unitPrice) - lineTotal) > 0.011) {
+      throw new TypeError("order.items.line_total kalem toplamıyla uyuşmalıdır.");
+    }
+    return Object.freeze({
+      productId: toStrictNullablePositiveInteger(item.product_id, "order.items.product_id"),
+      name: toRequiredText(item.name, "order.items.name"),
+      quantity,
+      unitPrice,
+      lineTotal,
+      storeId: toStrictNullablePositiveInteger(item.store_id, "order.items.store_id"),
+    });
+  });
+  if (!Array.isArray(row.seller_allocations)) throw new TypeError("order.seller_allocations dizi olmalıdır.");
+  const sellerAllocations = row.seller_allocations.map((allocation) => {
+    assertExactRecord(allocation, SELLER_ALLOCATION_KEYS, "Satıcı sipariş tahsisi");
+    return Object.freeze({
+      sellerOrderId: toPositiveInteger(allocation.seller_order_id, "order.seller_allocations.seller_order_id"),
+      organizationId: toPositiveInteger(allocation.organization_id, "order.seller_allocations.organization_id"),
+      organizationName: toRequiredText(allocation.organization_name, "order.seller_allocations.organization_name"),
+      storeId: toPositiveInteger(allocation.store_id, "order.seller_allocations.store_id"),
+      storeName: toRequiredText(allocation.store_name, "order.seller_allocations.store_name"),
+      status: toRequiredText(allocation.status, "order.seller_allocations.status"),
+      currency: toCurrencyCode(allocation.currency, "order.seller_allocations.currency"),
+      grossAmount: toFiniteNumber(allocation.gross_amount, "order.seller_allocations.gross_amount"),
+    });
+  });
+  const itemCount = toInteger(row.item_count, "order.item_count");
+  if (itemCount !== items.length) throw new TypeError("order.item_count kalem sayısıyla uyuşmalıdır.");
+  const paymentProvider = toStrictNullableBoundedText(row.payment_provider, "order.payment_provider", 40);
+  if (paymentProvider !== null && !/^[a-z][a-z0-9_-]*$/u.test(paymentProvider)) {
+    throw new TypeError("order.payment_provider geçersiz.");
+  }
+  const paymentFailureReason = row.payment_failure_reason === null
+    ? null
+    : toRequiredText(row.payment_failure_reason, "order.payment_failure_reason");
+  if (paymentFailureReason !== null && !SAFE_PAYMENT_FAILURE_REASONS.has(paymentFailureReason)) {
+    throw new TypeError("order.payment_failure_reason izin verilen listede değil.");
+  }
 
   return Object.freeze({
     id: `NS-${String(rawId).padStart(6, "0")}`,
@@ -123,12 +204,21 @@ export function normalizeOrder(row) {
     refundStatus: String(row.refund_status || "NONE"),
     shipmentStatus: toLegacyNullableText(row.shipment_status, "order.shipment_status", "NONE"),
     shipmentProvider: toLegacyNullableText(row.shipment_provider, "order.shipment_provider", ""),
+    trackingNo: toStrictNullableBoundedText(row.tracking_no, "order.tracking_no", 120),
     estimatedDeliveryAt: toLegacyNullableDate(row.estimated_delivery_date, "order.estimated_delivery_date"),
     carrierConfirmed: false,
     total: toFiniteNumber(row.total_amount, "order.total_amount"),
     currency: toCurrencyCode(row.currency, "order.currency"),
-    itemCount: toInteger(row.item_count, "order.item_count"),
+    itemCount,
+    items: Object.freeze(items),
+    sellerAllocations: Object.freeze(sellerAllocations),
+    paymentProvider,
+    paymentRef: toStrictNullableBoundedText(row.payment_ref, "order.payment_ref", 120),
+    paymentExternalRef: toStrictNullableBoundedText(row.payment_external_ref, "order.payment_external_ref", 120),
+    paymentFailureReason,
+    paymentUpdatedAt: toStrictNullableDate(row.payment_updated_at, "order.payment_updated_at"),
     createdAt,
+    updatedAt: toStrictNullableDate(row.updated_at, "order.updated_at"),
     pendingPayment,
     paymentFailed,
   });
@@ -204,17 +294,14 @@ export function normalizeNotificationSummary(row) {
 }
 
 export function normalizeFirstPartyCatalogProduct(row) {
-  if (!row || typeof row !== "object" || Array.isArray(row)) {
-    throw new TypeError("Birinci taraf ürün özeti nesne olmalıdır.");
-  }
   const requiredFields = [
-    "id", "name", "price", "old_price", "currency", "stock", "publication_status",
+    "id", "name", "sku", "brand", "product_type", "price", "old_price", "currency", "stock", "publication_status",
     "is_customer_visible", "created_at", "updated_at", "deleted_at", "revision", "primary_category_id",
-    "primary_category_name", "primary_category_path", "category_count", "has_media",
+    "primary_category_name", "primary_category_path", "category_count", "has_media", "store_id",
+    "store_name", "store_slug", "store_operational_status", "seller_organization_id",
+    "seller_organization_name", "seller_organization_status", "admin_editable",
   ];
-  if (requiredFields.some((field) => !Object.prototype.hasOwnProperty.call(row, field))) {
-    throw new TypeError("Birinci taraf ürün özeti eksik alan içeriyor.");
-  }
+  assertExactRecord(row, requiredFields, "Pazaryeri ürün özeti");
   const rawId = toInteger(row.id, "product.id");
   if (rawId < 1) throw new TypeError("product.id pozitif olmalıdır.");
   const publicationStatus = toRequiredText(row.publication_status, "product.publication_status");
@@ -230,6 +317,45 @@ export function normalizeFirstPartyCatalogProduct(row) {
   }
   if (primaryCategoryId === null && row.primary_category_path !== null) {
     throw new TypeError("product birincil kategori yolu kategori bağlantısı olmadan gelemez.");
+  }
+  if (!["active", "inactive"].includes(row.store_operational_status)) {
+    throw new TypeError("product.store_operational_status geçersiz.");
+  }
+  const sellerOrganizationId = toStrictNullablePositiveInteger(
+    row.seller_organization_id,
+    "product.seller_organization_id",
+  );
+  const sellerOrganizationName = toStrictNullableText(
+    row.seller_organization_name,
+    "product.seller_organization_name",
+  );
+  const sellerOrganizationStatus = toStrictNullableText(
+    row.seller_organization_status,
+    "product.seller_organization_status",
+  );
+  const sellerTupleEmpty = sellerOrganizationId === null
+    && sellerOrganizationName === null
+    && sellerOrganizationStatus === null;
+  const sellerTupleComplete = sellerOrganizationId !== null
+    && sellerOrganizationName !== null
+    && ["active", "suspended", "closed"].includes(sellerOrganizationStatus);
+  if (!sellerTupleEmpty && !sellerTupleComplete) {
+    throw new TypeError("product satıcı organizasyonu alanları birlikte bulunmalıdır.");
+  }
+  const adminEditable = toBoolean(row.admin_editable, "product.admin_editable");
+  if (adminEditable && !sellerTupleEmpty) {
+    throw new TypeError("Satıcı ürünü birinci taraf mutation kapsamına giremez.");
+  }
+  const storeId = toStrictNullablePositiveInteger(row.store_id, "product.store_id");
+  const storeName = toStrictNullableText(row.store_name, "product.store_name");
+  const storeSlug = toStrictNullableText(row.store_slug, "product.store_slug");
+  const storeTupleEmpty = storeId === null && storeName === null && storeSlug === null;
+  const storeTupleComplete = storeId !== null && storeName !== null && storeSlug !== null;
+  if (!storeTupleEmpty && !storeTupleComplete) {
+    throw new TypeError("product legacy mağaza alanları birlikte bulunmalıdır.");
+  }
+  if (storeTupleEmpty && (row.store_operational_status !== "inactive" || adminEditable || !sellerTupleEmpty)) {
+    throw new TypeError("Atanmamış ürün mağaza ve satıcı açısından fail-closed olmalıdır.");
   }
 
   return Object.freeze({
@@ -256,6 +382,14 @@ export function normalizeFirstPartyCatalogProduct(row) {
     primaryCategoryPath: toStrictNullableText(row.primary_category_path, "product.primary_category_path"),
     categoryCount: toInteger(row.category_count, "product.category_count"),
     hasMedia: toBoolean(row.has_media, "product.has_media"),
+    storeId,
+    storeName,
+    storeSlug,
+    storeOperationalStatus: row.store_operational_status,
+    sellerOrganizationId,
+    sellerOrganizationName,
+    sellerOrganizationStatus,
+    adminEditable,
   });
 }
 
@@ -293,22 +427,55 @@ export function normalizeNotificationSummaryPage(payload) {
 }
 
 export function normalizeFirstPartyCatalogPage(payload) {
-  if (payload?.catalogMode !== "first_party") {
-    throw new TypeError("catalog.catalogMode first_party olmalıdır.");
+  assertExactRecord(payload, ["catalogMode", "mutationScope", "items", "limit", "hasMore"], "Katalog özeti");
+  if (payload.catalogMode !== "marketplace") {
+    throw new TypeError("catalog.catalogMode marketplace olmalıdır.");
+  }
+  if (payload.mutationScope !== "first_party") {
+    throw new TypeError("catalog.mutationScope first_party olmalıdır.");
   }
   return normalizeSummaryPage(payload, normalizeFirstPartyCatalogProduct, "catalog");
 }
 
 export function normalizeAdminSession(payload) {
-  if (!payload || payload.user?.role !== "admin" || !Number.isInteger(Number(payload.user?.id))) {
+  assertExactRecord(payload, ["user", "commerceMode", "paymentProvider", "apiVersion", "capabilities"], "Admin oturumu");
+  assertExactRecord(payload.user, ["id", "role"], "Admin kullanıcısı");
+  if (payload.user.role !== "admin" || !Number.isInteger(Number(payload.user.id))) {
     throw new TypeError("Sunucu geçerli bir admin oturumu döndürmedi.");
   }
-  if (payload.commerceMode !== "single_vendor") {
+  if (payload.commerceMode !== "marketplace") {
     throw new TypeError("Desteklenmeyen Commerce çalışma modu.");
   }
+  const paymentProviderKeys = Object.keys(payload.paymentProvider || {});
+  if (!payload.paymentProvider || paymentProviderKeys.some((key) => !["provider", "ready", "state", "testMode"].includes(key))) {
+    throw new TypeError("Ödeme sağlayıcısı capability sözleşmesi geçersiz.");
+  }
+  const providerStates = new Set([
+    "provider_not_configured", "credentials_required", "client_ip_config_required",
+    "production_test_mode_forbidden", "activation_required", "ready",
+  ]);
+  if (![null, "paytr"].includes(payload.paymentProvider.provider)
+    || typeof payload.paymentProvider.ready !== "boolean"
+    || !providerStates.has(payload.paymentProvider.state)
+    || (payload.paymentProvider.testMode !== undefined && typeof payload.paymentProvider.testMode !== "boolean")
+    || (payload.paymentProvider.ready !== (payload.paymentProvider.state === "ready"))) {
+    throw new TypeError("Ödeme sağlayıcısı capability değeri geçersiz.");
+  }
+  if ((payload.paymentProvider.provider === null) !== (payload.paymentProvider.state === "provider_not_configured")
+    || (payload.paymentProvider.state === "ready" && typeof payload.paymentProvider.testMode !== "boolean")
+    || (payload.paymentProvider.state !== "ready" && payload.paymentProvider.testMode !== undefined)) {
+    throw new TypeError("Ödeme sağlayıcısı capability durumu tutarsız.");
+  }
+  const paymentProvider = Object.freeze({
+    provider: payload.paymentProvider.provider,
+    ready: payload.paymentProvider.ready,
+    state: payload.paymentProvider.state,
+    ...(payload.paymentProvider.testMode === undefined ? {} : { testMode: payload.paymentProvider.testMode }),
+  });
   return Object.freeze({
     user: Object.freeze({ id: Number(payload.user.id), role: "admin" }),
-    commerceMode: "single_vendor",
+    commerceMode: "marketplace",
+    paymentProvider,
     apiVersion: String(payload.apiVersion || ""),
     capabilities: payload.capabilities,
   });

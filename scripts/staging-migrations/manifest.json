@@ -250,5 +250,12 @@
     "sha256": "8a37833e0af141a7e024bb0b1ddb0441410786ec6b2aca08f49cad53c7eba0d5",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260902_01_seller_package_delivery_status",
+    "path": "migrations/20260902_01_seller_package_delivery_status.sql",
+    "sha256": "283882f39fcc9e871aef308e8baaa1eeeba10bc9d246d0570667e33b90b1ea49",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

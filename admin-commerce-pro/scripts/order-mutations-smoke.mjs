@@ -15,8 +15,11 @@ import {
 import { ADMIN_TOKEN_KEY, createAdminHttp } from "../src/integration/adminHttp.js";
 import {
   buildCancelOrderMutation,
+  buildManualDeliveryConfirmationMutation,
   buildManualShipmentMutation,
   createMutationIdempotencyKey,
+  MANUAL_DELIVERY_EXPECTED_SHIPMENT_STATUS,
+  MANUAL_DELIVERY_EXPECTED_STATUS,
   ORDER_CANCEL_NOTE_MAX_LENGTH,
   ORDER_CANCEL_REASONS,
 } from "../src/integration/orderMutations.js";
@@ -79,10 +82,12 @@ const disabled = adapter.mutationActions(resolveCapabilities({
 }));
 assert.equal("cancelOrder" in disabled, false, "boolean olmayan iptal capability'si fail-closed olmalı");
 assert.equal("createManualShipment" in disabled, false, "boolean olmayan kargo capability'si fail-closed olmalı");
+assert.equal("confirmManualDelivery" in disabled, false, "boolean olmayan teslim capability'si fail-closed olmalı");
 
 const cancelOnly = adapter.mutationActions(resolveCapabilities({ orderCancelWrite: true }));
 assert.equal(typeof cancelOnly.cancelOrder, "function");
 assert.equal("createManualShipment" in cancelOnly, false, "kapalı kargo capability'si adapter mutation'ı sunmamalı");
+assert.equal("confirmManualDelivery" in cancelOnly, false, "kapalı kargo capability'si teslim mutation'ı sunmamalı");
 assert.equal("createCatalogProduct" in adapter.mutationActions(resolveCapabilities({ firstPartyCatalogWrite: true })), false, "katalog read olmadan yazma action'ı sunulmamalı");
 assert.equal("createCatalogProduct" in adapter.mutationActions(resolveCapabilities({ firstPartyCatalogRead: true })), false, "katalog write olmadan yazma action'ı sunulmamalı");
 
@@ -123,6 +128,27 @@ assert.deepEqual(JSON.parse(calls[1].init.body), {
   provider: "Yurtiçi Kargo",
   tracking_no: "YK-123456",
   handoff_confirmed: true,
+});
+
+const deliveryKey = "commerce-pro-delivery-12345678";
+await operations.confirmManualDelivery({
+  orderId: 42,
+  expectedStatus: MANUAL_DELIVERY_EXPECTED_STATUS,
+  expectedShipmentStatus: MANUAL_DELIVERY_EXPECTED_SHIPMENT_STATUS,
+  deliveryConfirmed: true,
+  provider: "Yurtiçi Kargo",
+  trackingNo: "YK-123456",
+  idempotencyKey: deliveryKey,
+});
+assert.equal(calls[2].requestPath, "/api/shipments/42/manual-delivery-confirmation");
+assert.equal(calls[2].init.method, "POST");
+assert.equal(calls[2].init.headers["Idempotency-Key"], deliveryKey);
+assert.deepEqual(JSON.parse(calls[2].init.body), {
+  expected_status: "Kargoya Verildi",
+  expected_shipment_status: "IN_TRANSIT",
+  delivery_confirmed: true,
+  provider: "Yurtiçi Kargo",
+  tracking_no: "YK-123456",
 });
 
 const normalizedCatalogProduct = normalizeAdminCatalogProductDetail(catalogDetailPayload);
@@ -229,7 +255,7 @@ await catalogOperations.createCatalogProduct({
 });
 await catalogOperations.updateCatalogProduct({ productId: 12, expectedRevision: 4, changes: { stock: 7 } });
 await catalogOperations.archiveCatalogProduct({ productId: 12, expectedRevision: 4 });
-const catalogCalls = calls.slice(2);
+const catalogCalls = calls.slice(3);
 assert.deepEqual(catalogCalls.map((call) => [call.requestPath, call.init?.method || "GET"]), [
   ["/api/admin/catalog/products/12", "GET"],
   ["/api/admin/catalog/products", "POST"],
@@ -283,6 +309,43 @@ assert.throws(() => buildManualShipmentMutation({
   handoffConfirmed: true,
   idempotencyKey: shipmentKey,
 }), /Takip numarası desteklenmeyen karakter/);
+assert.deepEqual(buildManualDeliveryConfirmationMutation({
+  orderId: 42,
+  expectedStatus: "Kargoya Verildi",
+  expectedShipmentStatus: "IN_TRANSIT",
+  deliveryConfirmed: true,
+  provider: "Yurtiçi Kargo",
+  trackingNo: "YK-123456",
+  idempotencyKey: deliveryKey,
+}), {
+  path: "/api/shipments/42/manual-delivery-confirmation",
+  idempotencyKey: deliveryKey,
+  body: {
+    expected_status: "Kargoya Verildi",
+    expected_shipment_status: "IN_TRANSIT",
+    delivery_confirmed: true,
+    provider: "Yurtiçi Kargo",
+    tracking_no: "YK-123456",
+  },
+});
+assert.throws(() => buildManualDeliveryConfirmationMutation({
+  orderId: 42,
+  expectedStatus: "Hazırlanıyor",
+  expectedShipmentStatus: "IN_TRANSIT",
+  deliveryConfirmed: true,
+  provider: "Kargo",
+  trackingNo: "ABC123",
+  idempotencyKey: deliveryKey,
+}), /yalnız Kargoya Verildi/);
+assert.throws(() => buildManualDeliveryConfirmationMutation({
+  orderId: 42,
+  expectedStatus: "Kargoya Verildi",
+  expectedShipmentStatus: "IN_TRANSIT",
+  deliveryConfirmed: false,
+  provider: "Kargo",
+  trackingNo: "ABC123",
+  idempotencyKey: deliveryKey,
+}), /Fiziksel teslimatın doğrulanması/);
 
 assert.equal(
   createMutationIdempotencyKey("cancel", { randomUUID: () => "00000000-0000-4000-8000-000000000000" }),
@@ -297,6 +360,9 @@ assert.match(appSource, /Sağlayıcı refund'u otomatik çalıştırılmadı/);
 assert.match(appSource, /Taşıyıcı API\/etiket işlemi yapılmadı/);
 assert.match(appSource, /typeof mutationActions\.cancelOrder === "function"/);
 assert.match(appSource, /typeof mutationActions\.createManualShipment === "function"/);
+assert.match(appSource, /typeof mutationActions\.confirmManualDelivery === "function"/);
+assert.match(appSource, /orderMayBeDelivered[\s\S]{0,320}MANUAL_DELIVERY_EXPECTED_STATUS[\s\S]{0,320}MANUAL_DELIVERY_EXPECTED_SHIPMENT_STATUS/);
+assert.match(appSource, /Siparişin bu takip numarasıyla fiziksel olarak müşteriye teslim edildiğini doğruluyorum/);
 assert.match(appSource, /requestError\?\.details\?\.refetchRequired === true/);
 assert.match(appSource, /setSuppressedMutationActions\(mutationActions\)/);
 assert.match(appSource, /İşlem güvenlik kontrolünde durduruldu/);

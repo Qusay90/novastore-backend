@@ -69,6 +69,23 @@ const fetchPaymentsForUpdate = async (client, orderId) => {
     return result.rows;
 };
 
+const assertAdminManualShipmentAuthority = async (client, orderId) => {
+    const result = await client.query(
+        `SELECT id
+         FROM seller_orders
+         WHERE canonical_order_id = $1
+         ORDER BY id
+         LIMIT 1`,
+        [orderId]
+    );
+    if (result.rows?.length > 0) {
+        throw new ManualShipmentError('Satıcı siparişi için kargo devri yalnız satıcı fulfillment akışından yapılabilir.', {
+            code: 'MANUAL_SHIPMENT_SELLER_OWNED_ORDER',
+            statusCode: 409
+        });
+    }
+};
+
 const serializeShipment = (shipment = {}) => ({
     id: Number(shipment.id),
     orderId: Number(shipment.order_id),
@@ -116,7 +133,9 @@ const recordManualShipment = async ({ orderId, idempotencyKey, body, actor }) =>
             });
         }
 
-        // Lock ordering is deliberate: order -> shipment -> every payment row.
+        await assertAdminManualShipmentAuthority(client, command.orderId);
+
+        // Lock ordering is deliberate: order -> seller-ownership guard -> shipment -> every payment row.
         // The order lock serializes first-write races even when no shipment row exists yet.
         const existingShipment = await fetchShipmentForUpdate(client, command.orderId);
         const payments = await fetchPaymentsForUpdate(client, command.orderId);
@@ -249,6 +268,7 @@ const recordManualShipment = async ({ orderId, idempotencyKey, body, actor }) =>
 };
 
 module.exports = {
+    assertAdminManualShipmentAuthority,
     fetchOrderForUpdate,
     fetchPaymentsForUpdate,
     fetchShipmentForUpdate,

@@ -463,14 +463,19 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
             const source = read(file);
             assert.match(source, /catalogStructureWrite/);
             for (const line of source.split(/\r?\n/).filter((item) => /router\.(?:post|patch|delete)\(/.test(item))) {
-                assert.match(line, /requireStagingCatalogStructureWrite/, `${file}: ${line}`);
+                assert.match(line, /requireCatalogStructureWrite/, `${file}: ${line}`);
             }
         }
 
         const productRoutes = read('routes/productRoutes.js');
-        assert.match(productRoutes, /firstPartyCatalogWrite/);
+        assert.match(productRoutes, /LEGACY_ADMIN_PRODUCT_WRITE_RETIRED/);
+        assert.doesNotMatch(productRoutes, /config\/cloudinary|upload\.array|previewUpload|firstPartyCatalogWrite/);
         for (const line of productRoutes.split(/\r?\n/).filter((item) => /router\.(?:post|put|delete)\(/.test(item))) {
-            assert.match(line, /requireStagingCatalogProductWrite/, `routes/productRoutes.js: ${line}`);
+            assert.match(
+                line,
+                /authenticate, requireAdmin, requireCurrentAdmin, retireLegacyAdminProductWrite/,
+                `routes/productRoutes.js: ${line}`
+            );
         }
 
         assert.match(read('routes/adminRoutes.js'), /firstPartyCatalogWrite/);
@@ -530,10 +535,10 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         assert.equal(packageJson.scripts['staging:bootstrap'], 'node scripts/stagingBootstrapCli.js');
     });
 
-    await check('runtime', '42 migration manifest remains the exact 36-file combined registry', () => {
+    await check('runtime', '42 migration manifest remains the exact 37-file combined registry', () => {
         const manifest = JSON.parse(read('scripts/staging-migrations/manifest.json'));
-        assert.equal(manifest.length, 36);
-        assert.equal(new Set(manifest.map((item) => item.path)).size, 36);
+        assert.equal(manifest.length, 37);
+        assert.equal(new Set(manifest.map((item) => item.path)).size, 37);
     });
 
     await check('runtime', '43 local and production behavior stays outside staging policy', () => {

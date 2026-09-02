@@ -1,6 +1,8 @@
 export const ORDER_CANCEL_NOTE_MAX_LENGTH = 300;
 export const ORDER_CANCEL_EXPECTED_STATUSES = Object.freeze(["Onay Bekliyor", "Hazırlanıyor"]);
 export const MANUAL_SHIPMENT_EXPECTED_STATUS = "Hazırlanıyor";
+export const MANUAL_DELIVERY_EXPECTED_STATUS = "Kargoya Verildi";
+export const MANUAL_DELIVERY_EXPECTED_SHIPMENT_STATUS = "IN_TRANSIT";
 
 export const ORDER_CANCEL_REASONS = Object.freeze([
   Object.freeze({ code: "CUSTOMER_REQUEST", label: "Müşteri talebi", noteRequired: false }),
@@ -101,6 +103,42 @@ export function buildManualShipmentMutation(input) {
       provider,
       tracking_no: trackingNo,
       handoff_confirmed: true,
+    }),
+  });
+}
+
+export function buildManualDeliveryConfirmationMutation(input) {
+  const orderId = requireOrderId(input?.orderId);
+  const expectedStatus = requireText(input?.expectedStatus, "Beklenen sipariş durumu", { max: 80 });
+  if (expectedStatus !== MANUAL_DELIVERY_EXPECTED_STATUS) {
+    throw new TypeError("Manuel teslim doğrulaması yalnız Kargoya Verildi durumunda sunulabilir.");
+  }
+  const expectedShipmentStatus = requireText(input?.expectedShipmentStatus, "Beklenen gönderi durumu", { max: 40 });
+  if (expectedShipmentStatus !== MANUAL_DELIVERY_EXPECTED_SHIPMENT_STATUS) {
+    throw new TypeError("Manuel teslim doğrulaması yalnız IN_TRANSIT gönderide sunulabilir.");
+  }
+  const provider = requireText(input?.provider, "Kargo sağlayıcısı", { min: 2, max: 80 });
+  const trackingNo = requireText(input?.trackingNo, "Takip numarası", { min: 3, max: 120 });
+  if (!/^[\p{L}\p{N} .()_-]+$/u.test(provider)) {
+    throw new TypeError("Kargo sağlayıcısı desteklenmeyen karakter içeriyor.");
+  }
+  if (!/^[A-Za-z0-9._/-]+$/.test(trackingNo) || /:\/\//.test(trackingNo)) {
+    throw new TypeError("Takip numarası desteklenmeyen karakter içeriyor.");
+  }
+  if (input?.deliveryConfirmed !== true) {
+    throw new TypeError("Fiziksel teslimatın doğrulanması gerekir.");
+  }
+  const idempotencyKey = requireIdempotencyKey(input?.idempotencyKey);
+
+  return Object.freeze({
+    path: `/api/shipments/${orderId}/manual-delivery-confirmation`,
+    idempotencyKey,
+    body: Object.freeze({
+      expected_status: MANUAL_DELIVERY_EXPECTED_STATUS,
+      expected_shipment_status: MANUAL_DELIVERY_EXPECTED_SHIPMENT_STATUS,
+      delivery_confirmed: true,
+      provider,
+      tracking_no: trackingNo,
     }),
   });
 }

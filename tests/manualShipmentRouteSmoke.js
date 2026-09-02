@@ -1,7 +1,6 @@
 const assert = require('node:assert/strict');
 const express = require('express');
 const http = require('node:http');
-const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 process.env.NODE_ENV = 'test';
 process.env.NOVASTORE_SAFE_LOCAL_BACKEND = 'true';
@@ -18,6 +17,7 @@ process.env.DB_SSL = 'false';
 process.env.SUPABASE_USE_POOLER = 'false';
 process.env.JWT_SECRET = 'manual-shipment-route-smoke-secret';
 
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 const authFixture = createAuthSessionFixture();
 authFixture.install();
 
@@ -64,6 +64,9 @@ const createClient = () => ({
         if (/FROM orders\s+WHERE id = \$1\s+FOR UPDATE/i.test(text)) {
             return { rows: [{ ...state.order }] };
         }
+        if (/FROM seller_orders\s+WHERE canonical_order_id = \$1[\s\S]*LIMIT 1/i.test(text)) {
+            return { rows: [] };
+        }
         if (/FROM shipments\s+WHERE order_id = \$1\s+FOR UPDATE/i.test(text)) {
             return { rows: state.shipment ? [{ ...state.shipment }] : [] };
         }
@@ -99,6 +102,10 @@ const createClient = () => ({
         if (/INSERT INTO order_events/i.test(text)) {
             state.writes += 1;
             return { rows: [{ id: 1 }] };
+        }
+        if (/INSERT INTO notification_outbox_events/i.test(text)) {
+            state.writes += 1;
+            return { rows: [{ id: params[0], inserted: true }] };
         }
         throw new Error(`Unexpected route fake query: ${text}`);
     },
@@ -154,9 +161,11 @@ const body = {
 
         delete process.env.NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED;
         let disabledDbCalls = 0;
-        pool.query = async () => {
+        pool.query = async (sql, params) => {
             disabledDbCalls += 1;
-            throw new Error('disabled route must stop before current-admin query');
+            assert.match(String(sql), /SELECT id, role, auth_enabled FROM users WHERE id = \$1/);
+            assert.deepEqual(params, [17]);
+            return { rows: [{ id: 17, role: 'admin', auth_enabled: true }] };
         };
         pool.connect = async () => {
             disabledDbCalls += 1;
@@ -166,13 +175,13 @@ const body = {
         const disabled = await postJson(server, '/api/shipments/7201/manual', body, authHeaders);
         assert.equal(disabled.status, 503);
         assert.equal(disabled.body.code, 'MANUAL_FULFILLMENT_DISABLED');
-        assert.equal(disabledDbCalls, 0);
+        assert.equal(disabledDbCalls, 1, 'current Admin is revalidated before the disabled capability response');
 
         const anonymous = await postJson(server, '/api/shipments/7201/manual', body, {
             'Idempotency-Key': authHeaders['Idempotency-Key']
         });
         assert.equal(anonymous.status, 401);
-        assert.equal(disabledDbCalls, 0);
+        assert.equal(disabledDbCalls, 1);
 
         process.env.NOVASTORE_MANUAL_FULFILLMENT_WRITE_ENABLED = 'true';
         pool.query = async (sql, params) => {
@@ -197,14 +206,14 @@ const body = {
         assert.equal(first.body.shipment.labelGenerated, false);
         assert.equal(state.currentAdminQueries, 1);
         assert.equal(state.transactionConnects, 1);
-        assert.equal(state.writes, 3);
+        assert.equal(state.writes, 4);
 
         const replay = await postJson(server, '/api/shipments/7201/manual', body, authHeaders);
         assert.equal(replay.status, 200);
         assert.equal(replay.body.reused, true);
         assert.equal(state.currentAdminQueries, 2);
         assert.equal(state.transactionConnects, 2);
-        assert.equal(state.writes, 3, 'route replay must not write again');
+        assert.equal(state.writes, 4, 'route replay must not write again');
 
         const connectsBeforeRejectedXss = state.transactionConnects;
         const rejectedXss = await postJson(server, '/api/shipments/7201/manual', {

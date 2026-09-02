@@ -49,7 +49,7 @@ const createResponse = () => ({
 
 const clone = (value) => (value ? { ...value } : value);
 
-const createState = ({ order = {}, payment = {}, outboxFailure = false } = {}) => ({
+const createState = ({ order = {}, payment = {}, sellerOrders = [], outboxFailure = false } = {}) => ({
     order: {
         id: 7001,
         user_id: null,
@@ -73,6 +73,7 @@ const createState = ({ order = {}, payment = {}, outboxFailure = false } = {}) =
         updated_at: '2026-07-14T10:00:00.000Z',
         ...payment
     }],
+    sellerOrders: sellerOrders.map(clone),
     shipment: null,
     calls: [],
     shipmentInserts: 0,
@@ -93,6 +94,9 @@ const createClient = (state) => ({
         if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(text)) return { rows: [] };
         if (/FROM orders\s+WHERE id = \$1\s+FOR UPDATE/i.test(text)) {
             return { rows: state.order ? [clone(state.order)] : [] };
+        }
+        if (/FROM seller_orders\s+WHERE canonical_order_id = \$1[\s\S]*LIMIT 1/i.test(text)) {
+            return { rows: state.sellerOrders.slice(0, 1).map(clone) };
         }
         if (/FROM shipments\s+WHERE order_id = \$1\s+FOR UPDATE/i.test(text)) {
             return { rows: state.shipment ? [clone(state.shipment)] : [] };
@@ -258,6 +262,7 @@ const runMutation = async (state, requestOptions = {}, dependencies = undefined)
         assert.equal(state.released, true);
 
         const firstOrderLock = state.calls.findIndex(({ sql }) => /FROM orders\s+WHERE id = \$1\s+FOR UPDATE/i.test(sql));
+        const firstSellerOwnershipRead = state.calls.findIndex(({ sql }) => /FROM seller_orders\s+WHERE canonical_order_id = \$1/i.test(sql));
         const firstShipmentLock = state.calls.findIndex(({ sql }) => /FROM shipments\s+WHERE order_id = \$1\s+FOR UPDATE/i.test(sql));
         const firstPaymentsLock = state.calls.findIndex(({ sql }) => /FROM payments\s+WHERE order_id = \$1[\s\S]*FOR UPDATE/i.test(sql));
         const firstShipmentWrite = state.calls.findIndex(({ sql }) => /INSERT INTO shipments/i.test(sql));
@@ -266,7 +271,8 @@ const runMutation = async (state, requestOptions = {}, dependencies = undefined)
         const firstNotificationOutboxWrite = state.calls.findIndex(({ sql }) => /INSERT INTO notification_outbox_events/i.test(sql));
         const firstCommit = state.calls.findIndex(({ sql }) => sql === 'COMMIT');
         assert(firstOrderLock > 0, 'order must be locked after BEGIN');
-        assert(firstShipmentLock > firstOrderLock, 'shipment lock follows order lock');
+        assert(firstSellerOwnershipRead > firstOrderLock, 'seller ownership is checked after the canonical order lock');
+        assert(firstShipmentLock > firstSellerOwnershipRead, 'shipment lock follows the seller ownership guard');
         assert(firstPaymentsLock > firstShipmentLock, 'all payments lock follows shipment lock');
         assert(firstShipmentWrite > firstPaymentsLock, 'shipment write follows every proof lock');
         assert(firstOrderWrite > firstShipmentWrite, 'order update follows shipment insert');
@@ -289,6 +295,22 @@ const runMutation = async (state, requestOptions = {}, dependencies = undefined)
         assert.equal(state.eventPayload.reasonCode, 'MANUAL_HANDOFF_CONFIRMED');
         assert.equal(state.eventPayload.trackingLast4, '0123');
         assert.match(state.eventPayload.trackingHash, /^[a-f0-9]{64}$/);
+
+        const sellerOwnedState = createState({
+            sellerOrders: [{ id: 9901 }]
+        });
+        const sellerOwnedResponse = await runMutation(sellerOwnedState);
+        assert.equal(sellerOwnedResponse.statusCode, 409);
+        assert.equal(sellerOwnedResponse.payload.code, 'MANUAL_SHIPMENT_SELLER_OWNED_ORDER');
+        assert.equal(sellerOwnedState.shipmentInserts, 0);
+        assert.equal(sellerOwnedState.orderUpdates, 0);
+        assert.equal(sellerOwnedState.orderEvents, 0);
+        assert.equal(sellerOwnedState.notificationOutboxInserts, 0);
+        assert.equal(sellerOwnedState.calls.some(({ sql }) => /FROM shipments|FROM payments/i.test(sql)), false);
+        assert.deepEqual(
+            sellerOwnedState.calls.filter(({ sql }) => ['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)).map(({ sql }) => sql),
+            ['BEGIN', 'ROLLBACK']
+        );
 
         const callsBeforeReplay = state.calls.length;
         const replayResponse = await runMutation(state);
@@ -377,7 +399,7 @@ const runMutation = async (state, requestOptions = {}, dependencies = undefined)
         const routeSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'shipmentRoutes.js'), 'utf8');
         assert.match(
             routeSource,
-            /router\.post\(\s*'\/:orderId\/manual',\s*authenticate,\s*requireAdmin,\s*requireAdminCommerceCapability\('manualShipmentWrite'\),\s*requireCurrentAdmin,\s*createManualShipment\s*\)/
+            /router\.post\(\s*'\/:orderId\/manual',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*requireAdminCommerceCapability\('manualShipmentWrite'\),\s*createManualShipment\s*\)/
         );
         assert.match(
             routeSource,

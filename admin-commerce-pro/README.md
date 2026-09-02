@@ -1,30 +1,28 @@
 # NovaStore Admin Commerce Pro
 
-NovaStore'un Commerce Pro görsel yönünü ve gelecekteki çok satıcılı yönetim bilgi mimarisini taşıyan iki ayrı build içerir:
+NovaStore Admin Commerce Pro iki ayrı ve birbirine karıştırılmaması gereken artifact içerir:
 
 - `admin-commerce-pro.html`: gerçek sistemlerden izole, sıfır ağ istekli etkileşimli tasarım önizlemesi.
-- `admin-commerce-pro-live.html`: admin oturumu ile yalnız aynı-origin API'den Dashboard, sipariş, iade, admin bildirimi, NovaStore birinci taraf ürün özeti ve ortak katalog yapısını okuyan; varsayılan kapalı iki kontrollü sipariş operasyonunu capability ile sunan tek-satıcı entegrasyon yüzeyi.
+- `admin-commerce-pro-live.html`: aynı-origin Admin oturumu ve API'leriyle çalışan kanonik operasyon yüzeyi. Varsayılan Admin login hedefi ve legacy Admin üst bağlantısı bu live artifact'e gider.
 
-Mevcut backend bugün tek satıcılıdır; preview içindeki pazaryeri kayıtları çalışan servisler değil, açıkça etiketlenmiş hedef model simülasyonudur. Entegre build bu kayıtları hiçbir koşulda göstermez.
+Live artifact; Dashboard ile birlikte marketplace sipariş, mağaza/Seller bağı, ürün, iade, bildirim ve ortak katalog yapı projection'larını okur. Yazma yetkisi yalnız sunucunun açıkça verdiği capability ve kaynak sahipliği sınırları içinde açılır. Preview verisi, live yüzeye veya API projection'ına hiçbir koşulda taşınmaz.
 
 ## Güvenlik ve entegrasyon sınırı
 
-- Mevcut `frontend/admin.html` çalışan/kabul edilen admin yüzeyi olarak kalır; Commerce Pro entegre build henüz cutover değildir.
 - Preview yalnız yerel örnek veri kullanır. Değişiklikler sayfa yenilendiğinde sıfırlanır; API, WebSocket, production/remote veritabanı, ödeme, auth veya sır/env bağlantısı yoktur.
-- Entegre build `nova_admin_token` ile `/api/admin/session`, `/api/admin/stats`, limitli `/api/admin/orders/summary`, `/api/admin/catalog/products/summary`, `/api/admin/catalog/structure/summary`, `/api/admin/returns/summary` ve `/api/admin/notifications/summary` yollarını okur. Mutlak URL ve cross-origin API yolu reddedilir; hata halinde mock veriye düşülmez.
-- Birinci taraf katalog okuması yalnız aktif ve silinmemiş `novastore-platform` mağazasına bağlı ürünleri açık bir bounded DTO ile döndürür. `store_id`, açıklama, medya URL'si, satıcı/teklif, risk veya manuel ürün onayı alanı taşımaz. `pending_approval`, arayüzde satıcı izni değil `İç yayın incelemesi` olarak gösterilir.
-- Ortak katalog yapısı endpoint'i kategori, özellik tanımı, özellik şablonu, koleksiyon, menü ve menü öğelerini ayrı 1–100 bounded sayfalarda döndürür. Ürün bağlantılı sayaçlar yalnız aktif/silinmemiş `novastore-platform` mağazası ve silinmemiş ürünlerle sınırlıdır; açıklama, görsel/SEO/validation metadata ve ham iç menü URL'si DTO'ya alınmaz.
-- Ürün hard-delete yolu geçerli kimlikte `410 PRODUCT_HARD_DELETE_DISABLED` döndürür; legacy admin silme aksiyonu kaldırılmıştır. Katalog mutation rotaları güncel DB admin rolünü medya middleware'inden önce doğrular.
-- `firstPartyCatalogWrite` ve `catalogStructureWrite` capability'leri varsayılan kapalıdır. Row-level revision ve append-only audit/atomik mutation altyapısı gelecek 3D–3E JSON CRUD'u içindir; Commerce Pro bu turda ürün, yapı veya medya mutation isteği göndermez. Projection sayaçları revision'ın tam snapshot garantisi değildir.
-- Sipariş görünümündeki kargo bilgisi yalnız yerel NovaStore kaydıdır ve arayüzde taşıyıcı tarafından doğrulanmadığı açıkça belirtilir. İade görünümü talep edilen tutarı ve yerel refund durumunu gösterir; ödeme sağlayıcısına refund çağrısı yapıldığı anlamına gelmez.
-- Entegre Commerce Pro arayüzü yalnız sunucunun `orderCancelWrite` veya `manualShipmentWrite` capability'sini tam `true` döndürdüğü oturumlarda kontrollü iptal ve manuel kargo devri isteği sunar. Her istek beklenen durum, idempotency anahtarı ve erişilebilir etki onayı taşır; `409` sonrasında liste yeniden okunur. Bu capability'ler varsayılan kapalıdır ve UI görünürlüğü sunucu yetkilendirmesinin yerine geçmez.
-- İade/bildirim mutation'ı, genel sipariş durumu yazması, gerçek refund, taşıyıcı API/etiket, ürün/kategori/medya CRUD'u, satıcı, müşteri, hakediş, payout, ödeme veya Cloudinary isteği Commerce Pro'dan gönderilmez. Manuel kargo kaydı taşıyıcı doğrulaması veya takip bağlantısı üretmez; admin iptali sağlayıcı refund'unu otomatik çalıştırmaz.
-- Mevcut backend yaşam döngüsü artık generic sipariş durum değişimini ve sipariş hard-delete işlemini kabul etmez. İptal yalnız özel endpoint üzerinden, kilitli payment geçmişi ve doğrulanmış stok rezervasyonu ile çalışır; kargoya çıkmış veya ödeme sonucu beklenen sipariş fail-closed kalır.
-- Taşıyıcı doğrulaması olmadan sahte takip üreten shipment create `410 SHIPMENT_CREATE_DISABLED`; yeni iade/iade durum yazmaları güvenli geri ödeme ve stok zinciri tamamlanana kadar `503 RETURN_WRITES_DISABLED` döndürür. Mevcut shipment/iade kayıtları owner/admin için salt okunur kalır.
-- PayTR/iyzico callback'leri kilitli payment durumunu finansal gerçek kabul eder. İptal/iade/fulfillment sonrasında gelen tahsilat sipariş durumunu ilerletmez; tekrar stok/kupon/sipariş satırı yazmaz, geri ödeme veya operasyon mutabakatı kaydı açar.
-- Revision/audit migration artifact'ı eklendi ancak production veya uzak veritabanına uygulanmadı; dinamik modül yükleme, seller scope/RBAC enforcement ve çok satıcılı backend bu değişiklikte uygulanmaz.
-- Gerçek backend'de dış satıcının ürün yükleyebildiği bir portal, seller offer servisi veya ürün başvuru/onay akışı yoktur. Mevcut ürün CRUD'u admin tarafından yönetilen birinci taraf NovaStore kataloğudur.
-- `frontend/admin.html`, önizlemeyi yeni sekmede açan güvenli bir bağlantı içerir.
+- Live artifact `nova_admin_token` ile yalnız aynı-origin Admin yollarını kullanır. Mutlak URL ve cross-origin API yolu reddedilir; hata halinde preview/mock veriye düşülmez.
+- Varsayılan Admin login başarı hedefi `frontend/admin-commerce-pro-live.html` dosyasıdır. Legacy `frontend/admin.html` içindeki Commerce Pro operasyon bağlantısı da preview yerine live artifact'i açar. Preview artifact'i login veya kanonik operasyon hedefi değildir.
+- Marketplace read projection; sipariş kalemlerini, Seller organizasyon ve mağaza allocation'larını, mağaza sahiplik bağını, ürünün mağaza/Seller bağını, ödeme-refund durumunu ve güvenli provider referanslarını bounded DTO'larla gösterir. Bu alanlar görünürlük sağlar; Admin'e kendiliğinden yazma yetkisi vermez.
+- Ürün projection'ında platform ve Seller ürünleri birlikte görünür. Yalnız `adminEditable: true` olan birinci taraf platform ürünü Admin detay/düzenleme/medya/arşivleme mutation'larına açılabilir. Seller ürünü salt okunurdur; orphan veya doğrulanamayan mağaza bağı Seller sahipliği diye varsayılmaz ve fail-closed salt okunur gösterilir.
+- Mağaza projection'ı Seller mağaza/organizasyon kimliği ve durumlarını gösterir. `ownershipVerified: false` olduğunda sahiplik bağının doğrulanmadığı açıkça belirtilir; görünen ad veya kimlik yetki kanıtı değildir.
+- Ortak katalog yapısı endpoint'i kategori, özellik tanımı, özellik şablonu, koleksiyon, menü ve menü öğelerini bounded sayfalarda döndürür. Ürün hard-delete yolu kapalıdır; katalog mutation rotaları güncel DB Admin rolünü ve capability'yi doğrular.
+- Oturumdaki `paymentProvider` yalnız güvenli readiness özetidir: `provider`, `ready`, `state` ve varsa `testMode`. UI `provider_not_configured`, `credentials_required`, `client_ip_config_required`, `production_test_mode_forbidden`, `activation_required` ve `ready` durumlarını açıkça ayırır; bilinmeyen/eksik state'i fail-closed gösterir. Banner sır, credential veya sağlayıcı erişim kanıtı taşımaz ve ödeme yapıldığını kanıtlamaz.
+- İptal yalnız `orderCancelWrite: true` olduğunda, desteklenen sipariş/ödeme/refund durumunda ve açık etki onayıyla sunulur. İstek beklenen durum ve idempotency anahtarı taşır. Admin iptali provider refund çağrısı çalıştırmaz.
+- Platform manuel kargo devri yalnız `manualShipmentWrite: true`, platform sahipliği, desteklenen `Hazırlanıyor`/ödeme/refund durumu ve açık fiziksel teslim onayıyla sunulur. Seller allocation'ı olan siparişte Admin platform devri açılmaz. Bu işlem taşıyıcı API'si çağırmaz; etiket, takip numarası veya takip URL'si üretmez.
+- Manuel teslim doğrulaması aynı capability altında yalnız `Kargoya Verildi + PAID + refund NONE + shipment IN_TRANSIT`, mevcut provider ve takip numarası koşullarında gösterilir. Platform siparişi veya tek Seller allocation'lı sipariş desteklenir; çok Seller'lı sipariş fail-closed kalır. Açık onay, expected-state ve idempotency zorunludur.
+- Sipariş ekranındaki provider/ref/external ref, ödeme hatası, refund ve kargo alanları NovaStore'un yerel operasyon gerçeğini görünür kılar. Bunlardan refund settlement, taşıyıcı doğrulaması veya dış sağlayıcı işlemi çıkarımı yapılmaz.
+- Live UI gerçek refund, ödeme/provider, taşıyıcı, payout, Cloudinary veya başka bir dış servis çağrısı yapmaz. Kontrollü sipariş mutation'ları yalnız NovaStore same-origin endpoint'lerine gider; `409` veya yetki/durum uyuşmazlığında fail-closed kalır ve projection yeniden okunur.
+- Capability görünürlüğü sunucu yetkilendirmesinin yerine geçmez. Backend her istekte güncel Admin rolünü, kaynak sahipliğini, beklenen durumu ve idempotency sözleşmesini yeniden doğrular.
 
 ## Etkileşim kapsamı
 
@@ -50,7 +48,7 @@ npm ci
 npm run dev
 ```
 
-Vite'ın verdiği yerel adreste preview açılır. Üretimden veya uzak servislerden veri çekilmez.
+Vite'ın verdiği yerel adreste izole preview açılır. Üretimden veya uzak servislerden veri çekilmez; bu geliştirme modu live Admin oturumunun yerine geçmez.
 
 ## Tek dosyalık entegrasyon çıktısı
 
@@ -68,7 +66,7 @@ cd admin-commerce-pro
 npm run build:live:integrated
 ```
 
-Bu komut `frontend/admin-commerce-pro-live.html` üretir. Artifact `connect-src 'self'` CSP'si taşır ve yalnız NovaStore backend ile aynı origin'de çalışır. Admin login dönüş hedefi allowlist ile bu dosyaya yönlendirilebilir. Bu build deployment veya production cutover yapmaz.
+Bu komut `frontend/admin-commerce-pro-live.html` üretir. Artifact `connect-src 'self'` CSP'si taşır ve yalnız NovaStore backend ile aynı origin'de çalışır. Varsayılan Admin login hedefi ve legacy Commerce Pro operasyon bağlantısı bu dosyayı açar. Build komutu tek başına deployment, uzak servis çağrısı veya production yayını yapmaz.
 
 ## Deterministik artifact ve fingerprint sözleşmesi
 
@@ -116,10 +114,12 @@ node tests/adminCommerceProSessionContractSmoke.js
 node tests/adminCatalogMutationFoundationSmoke.js
 node tests/adminLoginNextSmoke.js
 node tests/adminCommerceProLiveSmoke.mjs
+node tests/adminCommerceProFirstSaleUiSmoke.mjs
+node admin-commerce-pro/scripts/order-mutations-smoke.mjs
 COMMERCE_PRO_PREVIEW_PATH=admin-commerce-pro/standalone/index.html node tests/adminCommerceProPreviewSmoke.js
 ```
 
-Testler sayfalama/arama/mağaza kapsamı/ürün doğrulama/CSV güvenliği ve örnek veri ilişkilerine ek olarak gerçek politika kurallarını, eksik girdide fail-closed davranışı, otomatik yayın/istisna/satıcı aksiyonu ayrımını, yayın-stok eksenlerini, `offerId` kimliğini, seller-scope SKU'yu, kanonik içerik yayılımını, haricî teklif alanlarının değişmez sahiplik kimliğiyle korunmasını, açıklanabilir onboarding puanını, eksik belge fail-closed davranışını, eşikleri ve onay engellerini doğrular. Preview için kaynak parmak izi, `connect-src 'none'`, önizleme uyarısı ve sıfır ağ/ödeme çağrısı korunur. Entegre build için aynı-origin yol zorlaması, JWT ön kontrolü, 401/403 ayrımı, güncel DB admin rolü, bounded/PII-azaltılmış sipariş-iade-bildirim DTO'ları, fail-closed `novastore-platform` kapsamlı bounded ürün DTO'su, altı ayrı bounded katalog yapı sayfası, strict katalog mapper/filtreleri, bağımsız capability kapıları, kapalı mutation'ların adapter/UI yüzeyinden düşmesi, idempotency/expected-status gövdeleri, login allowlist'i, `connect-src 'self'` ve mock fallback yasağı test edilir. Katalog foundation smoke iki write capability'sinin default-off/DB öncesi fail-fast davranışını, `428`/`409` revision sözleşmesini, executor-owned row lock + CAS artışını, gerçek create audit anahtarını, append-only audit ve rollback sırasını, ürün hard-delete `410` sonucunu, current-admin guard sırasını ve read DTO revision alanlarını doğrular. Standalone üretici eski bundle'ı güncel kaynaklarla yeniden damgalamayı reddeder. Production DB, gerçek ödeme, refund, Cloudinary veya taşıyıcı testi çalıştırılmaz.
+Testler sayfalama/arama/mağaza kapsamı/ürün doğrulama/CSV güvenliği ve örnek veri ilişkilerine ek olarak preview politika simülasyonlarını doğrular. Preview için kaynak parmak izi, `connect-src 'none'`, önizleme uyarısı ve sıfır ağ/ödeme çağrısı korunur. Live build için aynı-origin yol zorlaması, JWT ön kontrolü, 401/403 ayrımı, güncel DB Admin rolü, bounded/PII-azaltılmış marketplace projection'ları, Seller ürününün salt-okunur sınırı, doğrulanmamış mağaza sahipliği, güvenli payment-provider readiness matrisi, capability kapıları, kapalı mutation'ların adapter/UI yüzeyinden düşmesi, varsayılan login/live hedefi, idempotency ve expected-state gövdeleri test edilir. Sipariş smoke'ları kontrollü iptal, yalnız platform için manuel kargo devri ve platform/tek Seller için koşullu teslim doğrulama sınırlarını; dış provider/refund/taşıyıcı çağrısı yapılmadığını sabitler. Standalone üretici eski bundle'ı güncel kaynaklarla yeniden damgalamayı reddeder. Production DB, gerçek ödeme, refund, Cloudinary veya taşıyıcı testi çalıştırılmaz.
 
 ## Geçici mock önizlemesi
 
@@ -129,8 +129,8 @@ Dağıtım için ayrıca yetki verildiğinde bu dal, sır veya environment varia
 - Publish directory: `frontend`
 - Preview route: `/admin-commerce-pro.html`
 
-Preview production hedefi değildir; gerçek auth, veritabanı veya ödeme environment'ı bağlanmamalıdır. Geri alma; preview deployment'ını silmek ve gerekirse `frontend/admin.html` içindeki bağlantı ile önizleme artifact'ını kaldırmakla sınırlıdır.
+Preview production hedefi değildir; gerçek auth, veritabanı veya ödeme environment'ı bağlanmamalıdır. Preview deployment'ı live Admin artifact'ini, varsayılan login hedefini veya legacy live operasyon bağlantısını değiştirmez. Geri alma yalnız ayrı preview deployment'ını kaldırmaktır.
 
 ## Entegrasyon yürütme planı
 
-Tur sırası, tahminler, değişmez güvenlik kapıları ve route/capability özeti `docs/INTEGRATION-EXECUTION-PLAN.md` içinde tutulur. Mevcut tek satıcılı ürünleri `NOVASTORE_FIRST_PARTY` yapısına güvenli backfill edecek kanonik ürün/seller offer ayrımı, seller-scope/RBAC enforcement, sürümlü yayın politikası, admin override audit'i ve staging UAT ayrı plan/PR'lerle ilerlemelidir. Önizlemedeki eşikler production politikası değildir. Çok satıcılı hedef model için `docs/MULTI-VENDOR-PLAN.md`, bilgi mimarisi ve modül sınırları için `docs/ADMIN-IA-AND-MODULES.md` temel alınır.
+Tur sırası, değişmez güvenlik kapıları ve route/capability özeti `docs/INTEGRATION-EXECUTION-PLAN.md` içinde tutulur. Çalışma zamanı için bu README'deki live marketplace projection, kaynak sahipliği ve capability sınırları esastır. Önizlemedeki kayıtlar, eşikler ve simülasyonlar production politikası değildir. İleriye dönük çok satıcılı tasarım için `docs/MULTI-VENDOR-PLAN.md`, bilgi mimarisi ve modül sınırları için `docs/ADMIN-IA-AND-MODULES.md` referans olabilir; hiçbir plan Seller ürününde Admin yazma yetkisi, dış provider çağrısı veya doğrulanmamış refund/teslim gerçeği oluşturmaz.

@@ -75,6 +75,14 @@ const summaryRow = {
   id: 73,
   store_name: "Lale Tasarım",
   is_active: true,
+  current_binding_count: 1,
+  seller_store_id: 173,
+  seller_store_status: "active",
+  seller_store_closed_at: null,
+  seller_organization_id: 273,
+  seller_organization_name: "Lale Organizasyon",
+  seller_organization_status: "active",
+  seller_organization_closed_at: null,
   product_count: 12,
   customer_visible_product_count: 8,
   created_at: "2026-08-01T08:00:00.000Z",
@@ -99,12 +107,21 @@ assert.deepEqual(Object.keys(summaryResponse.payload.items[0]).sort(), [
   "customerVisibleProductCount",
   "id",
   "operationalStatus",
+  "ownershipVerified",
   "productCount",
+  "sellerOrganizationId",
+  "sellerOrganizationName",
+  "sellerOrganizationStatus",
+  "sellerStoreId",
+  "sellerStoreStatus",
   "storeName",
   "updatedAt",
 ]);
 assert.equal(summaryResponse.payload.items[0].storeName, "Lale Tasarım");
 assert.equal(summaryResponse.payload.items[0].operationalStatus, "active");
+assert.equal(summaryResponse.payload.items[0].ownershipVerified, true);
+assert.equal(summaryResponse.payload.items[0].sellerStoreId, 173);
+assert.equal(summaryResponse.payload.items[0].sellerOrganizationId, 273);
 assert.equal(summaryResponse.payload.hasMore, false);
 const serializedSummary = JSON.stringify(summaryResponse.payload);
 for (const canary of [OWNER_CANARY, CATEGORY_CANARY, FINANCE_CANARY]) {
@@ -113,15 +130,41 @@ for (const canary of [OWNER_CANARY, CATEGORY_CANARY, FINANCE_CANARY]) {
 assert.deepEqual(summaryQueries[0].params, ["novastore-platform", 101]);
 assert.doesNotMatch(summaryQueries[0].sql, /\busers\b|\bcategories\b|\borders\b|commission|revenue|gmv|total_amount|\bSUM\s*\(/i);
 assert.match(summaryQueries[0].sql, /LOWER\(store\.slug\) <> LOWER\(\$1\)/i);
+assert.match(summaryQueries[0].sql, /seller_store\.legacy_store_id = store\.id/i);
+assert.match(summaryQueries[0].sql, /seller_organization\.id = seller_store\.organization_id/i);
+assert.match(summaryQueries[0].sql, /seller_store\.closed_at IS NULL/i);
 
 const normalizedSummary = normalizeAdminStoreSummaryPage(summaryResponse.payload);
 assert.equal(normalizedSummary.items[0].storeName, "Lale Tasarım");
+assert.equal(normalizedSummary.items[0].ownershipVerified, true);
 assert.throws(
   () => normalizeAdminStoreSummaryPage({
     ...summaryResponse.payload,
     items: [{ ...summaryResponse.payload.items[0], ownerName: OWNER_CANARY }],
   }),
   /izin verilmeyen alan/,
+);
+
+const ambiguousBindingResponse = createResponse();
+await createGetAdminStoreSummaries({
+  async query() {
+    return { rows: [{ ...summaryRow, current_binding_count: 2 }] };
+  },
+})({ query: {} }, ambiguousBindingResponse);
+assert.equal(ambiguousBindingResponse.payload.items[0].operationalStatus, "inactive");
+assert.equal(ambiguousBindingResponse.payload.items[0].ownershipVerified, false);
+assert.equal(ambiguousBindingResponse.payload.items[0].sellerStoreId, null);
+assert.equal(ambiguousBindingResponse.payload.items[0].sellerOrganizationId, null);
+assert.doesNotThrow(() => normalizeAdminStoreSummaryPage(ambiguousBindingResponse.payload));
+assert.throws(
+  () => normalizeAdminStoreSummaryPage({
+    ...ambiguousBindingResponse.payload,
+    items: [{
+      ...ambiguousBindingResponse.payload.items[0],
+      sellerStoreId: 173,
+    }],
+  }),
+  /sahiplik alanları/,
 );
 assert.throws(
   () => normalizeAdminStoreSummaryPage({

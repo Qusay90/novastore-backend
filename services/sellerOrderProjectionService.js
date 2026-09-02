@@ -8,14 +8,78 @@ const {
 const PLATFORM_STORE_SLUG = 'novastore-platform';
 
 class SellerOrderProjectionError extends Error {
-    constructor(code, details = null) {
-        super(code);
+    constructor(code, details = null, publicMessage = code) {
+        super(publicMessage);
         this.name = 'SellerOrderProjectionError';
         this.code = code;
         this.statusCode = 409;
         this.details = details;
+        this.publicMessage = publicMessage;
     }
 }
+
+const CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED = 'CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED';
+
+const assertSingleFulfillmentSalesParty = (projection = {}) => {
+    const sellerProjection = projection?.sellerProjection;
+    const platformAllocation = projection?.platformAllocation;
+    const sellerAllocations = Array.isArray(sellerProjection) ? sellerProjection : [];
+    const hasPlatformAllocation = platformAllocation !== null && platformAllocation !== undefined;
+    const sellerStoreKeys = new Set();
+    let projectionShapeValid = Array.isArray(sellerProjection);
+
+    for (const allocation of sellerAllocations) {
+        const organizationId = Number(allocation?.organizationId);
+        const storeId = Number(allocation?.storeId);
+        if (
+            !Number.isSafeInteger(organizationId)
+            || organizationId <= 0
+            || !Number.isSafeInteger(storeId)
+            || storeId <= 0
+        ) {
+            projectionShapeValid = false;
+            continue;
+        }
+        sellerStoreKeys.add(`${organizationId}:${storeId}`);
+    }
+
+    if (
+        hasPlatformAllocation
+        && (
+            !Number.isSafeInteger(Number(platformAllocation?.storeId))
+            || Number(platformAllocation.storeId) <= 0
+        )
+    ) {
+        projectionShapeValid = false;
+    }
+
+    const sellerStoreCount = sellerStoreKeys.size;
+    const fulfillmentSalesPartyCount = (hasPlatformAllocation ? 1 : 0) + sellerStoreCount;
+    const hasDuplicateSellerAllocation = sellerAllocations.length !== sellerStoreCount;
+    if (
+        !projectionShapeValid
+        || hasDuplicateSellerAllocation
+        || fulfillmentSalesPartyCount !== 1
+    ) {
+        throw new SellerOrderProjectionError(
+            CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED,
+            {
+                hasPlatformAllocation,
+                sellerStoreCount,
+                fulfillmentSalesPartyCount,
+                projectionShapeValid,
+                hasDuplicateSellerAllocation
+            },
+            'Sepette birden fazla gönderim tarafına ait ürün bulunuyor. Bu sepet henüz tek ödemede tamamlanamaz.'
+        );
+    }
+
+    return Object.freeze({
+        kind: hasPlatformAllocation ? 'platform' : 'seller',
+        fulfillmentSalesPartyCount,
+        sellerStoreCount
+    });
+};
 
 const moneyToMinor = (value) => {
     const number = Number(value);
@@ -319,7 +383,9 @@ const materializeSellerOrderProjection = async (client, canonicalOrderId, projec
 };
 
 module.exports = Object.freeze({
+    CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED,
     SellerOrderProjectionError,
+    assertSingleFulfillmentSalesParty,
     buildCheckoutSalesPartyProjection,
     buildSellerOrderProjection,
     materializeSellerOrderProjection,

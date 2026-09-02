@@ -91,7 +91,7 @@
 
         function getAdminLoginTarget(search = window.location.search) {
             const requested = new URLSearchParams(search).get('next');
-            return ADMIN_LOGIN_TARGETS.has(requested) ? requested : 'admin.html';
+            return ADMIN_LOGIN_TARGETS.has(requested) ? requested : 'admin-commerce-pro-live.html';
         }
 
         if (new URLSearchParams(window.location.search).get('reason') === 'session-expired') {

@@ -6,6 +6,9 @@ const { ORDER_STATUS, PAYMENT_STATUS } = require('../constants/orderStatus');
 const paymentController = require('../controllers/paymentController');
 const { buildCheckoutAgreementPreview } = require('../services/legalDocumentService');
 const { PaytrProviderTransportError } = require('../services/paytrPaymentService');
+const {
+    buildSellerPublicLegalIdentityContentSha256
+} = require('../services/sellerPublicLegalIdentityService');
 
 const { getCheckoutAgreementPreview, getPaymentStatus, initializePayment, __test: paymentTest } = paymentController;
 
@@ -134,18 +137,90 @@ const createRes = () => ({
     json(body) { this.body = body; return this; }
 });
 
+const platformSalesPartyRow = (productId, storeId = 501) => ({
+    product_id: productId,
+    product_store_id: storeId,
+    legacy_store_id: storeId,
+    legacy_store_slug: 'novastore-platform',
+    legacy_store_is_active: true,
+    legacy_store_deleted_at: null,
+    seller_store_id: null
+});
+
+const sellerSalesPartyRow = (productId, {
+    legacyStoreId = 601,
+    sellerStoreId = 701,
+    organizationId = 801,
+    offerId = 1001,
+    variantId = 1101,
+    suffix = 'A'
+} = {}) => {
+    const identity = {
+        version: `test-seller-${suffix.toLowerCase()}-v1`,
+        publicLegalName: `Test Seller ${suffix} Limited Şirketi`,
+        publicTradeName: `Test Seller ${suffix}`,
+        publicDisclosureText: `Yalnız yerel Seller ${suffix} checkout testi için kamusal açıklama.`
+    };
+    return {
+        product_id: productId,
+        product_store_id: legacyStoreId,
+        legacy_store_id: legacyStoreId,
+        legacy_store_slug: `seller-store-${suffix.toLowerCase()}`,
+        legacy_store_is_active: true,
+        legacy_store_deleted_at: null,
+        seller_store_id: sellerStoreId,
+        organization_id: organizationId,
+        seller_store_display_name: `Test Seller Store ${suffix}`,
+        seller_store_status: 'active',
+        seller_store_closed_at: null,
+        seller_organization_display_name: `Test Seller Organization ${suffix}`,
+        seller_organization_status: 'active',
+        seller_organization_closed_at: null,
+        seller_legal_identity_id: 900 + organizationId,
+        seller_legal_identity_version: identity.version,
+        public_legal_name: identity.publicLegalName,
+        public_trade_name: identity.publicTradeName,
+        public_disclosure_text: identity.publicDisclosureText,
+        seller_legal_identity_content_sha256: buildSellerPublicLegalIdentityContentSha256(identity),
+        seller_legal_identity_status: 'approved',
+        seller_legal_identity_approved_at: '2026-09-01T00:00:00.000Z',
+        offer_id: offerId,
+        offer_status: 'active',
+        variant_id: variantId,
+        variant_status: 'active'
+    };
+};
+
+const cartProductRow = (id, {
+    name = `Test Product ${id}`,
+    price = 1000,
+    stock = 5,
+    storeId = 501
+} = {}) => ({
+    id,
+    name,
+    price,
+    old_price: null,
+    stock,
+    image_url: `product-${id}.png`,
+    store_id: storeId
+});
+
 const createFakeClient = ({
     existingPaymentRows = [],
     existingPaymentRowsByRead = null,
     ownedAddress = true,
     addressEmails = ['customer@example.test'],
-    productPrices = [1000]
+    productPrices = [1000],
+    productRows = null,
+    salesPartyRowsByRead = null
 } = {}) => {
     const calls = [];
     let transactionOpen = false;
     let paymentReadCount = 0;
     let addressReadCount = 0;
     let productReadCount = 0;
+    let salesPartyReadCount = 0;
     let releaseCount = 0;
     let sessionLockHeld = false;
     return {
@@ -198,33 +273,24 @@ const createFakeClient = ({
                 return { rows, rowCount: rows.length };
             }
             if (/product\.id AS product_id/i.test(sql)) {
+                const configuredRows = Array.isArray(salesPartyRowsByRead)
+                    ? (salesPartyRowsByRead[Math.min(salesPartyReadCount, salesPartyRowsByRead.length - 1)] || [])
+                    : [platformSalesPartyRow(101)];
+                salesPartyReadCount += 1;
                 return {
-                    rows: [{
-                        product_id: 101,
-                        product_store_id: 501,
-                        legacy_store_id: 501,
-                        legacy_store_slug: 'novastore-platform',
-                        legacy_store_is_active: true,
-                        legacy_store_deleted_at: null,
-                        seller_store_id: null
-                    }],
-                    rowCount: 1
+                    rows: configuredRows,
+                    rowCount: configuredRows.length
                 };
             }
             if (/FROM products/i.test(sql)) {
                 const price = productPrices[Math.min(productReadCount, productPrices.length - 1)];
                 productReadCount += 1;
+                const configuredRows = Array.isArray(productRows) && productRows.length > 0
+                    ? productRows
+                    : [cartProductRow(101, { name: 'Test Telefon', price })];
                 return {
-                    rows: [{
-                        id: 101,
-                        name: 'Test Telefon',
-                        price,
-                        old_price: null,
-                        stock: 5,
-                        image_url: 'phone.png',
-                        store_id: 501
-                    }],
-                    rowCount: 1
+                    rows: configuredRows,
+                    rowCount: configuredRows.length
                 };
             }
             if (/INSERT INTO orders/i.test(sql)) return {
@@ -330,6 +396,133 @@ const hasMutation = (client) => client.calls.some(({ sql }) => (
         assert.strictEqual(previewRes.body.context.totals.total, 1049.9);
         assert.ok(previewRes.body.documents.every((document) => document.text.includes('NovaStore sunucu doğrulamalı işlem özeti')));
         assert.strictEqual(hasMutation(previewClient), false);
+
+        const splitCartItems = [
+            { productId: 101, quantity: 1 },
+            { productId: 102, quantity: 1 }
+        ];
+        const splitProductRows = [
+            cartProductRow(101, { name: 'Platform Product', price: 400, storeId: 501 }),
+            cartProductRow(102, { name: 'Seller Product', price: 600, storeId: 601 })
+        ];
+        const platformOnlySalesPartyRows = [
+            platformSalesPartyRow(101),
+            platformSalesPartyRow(102)
+        ];
+        const mixedSalesPartyRows = [
+            platformSalesPartyRow(101),
+            sellerSalesPartyRow(102)
+        ];
+        const mixedPreviewClient = createFakeClient({
+            productRows: splitProductRows,
+            salesPartyRowsByRead: [mixedSalesPartyRows]
+        });
+        pool.connect = async () => mixedPreviewClient;
+        const mixedPreviewRes = createRes();
+        await getCheckoutAgreementPreview({
+            user: { id: 10, role: 'customer', principal: 'customer' },
+            body: { addressId: 301, cartItems: splitCartItems, couponCode: null }
+        }, mixedPreviewRes);
+        assert.strictEqual(mixedPreviewRes.code, 409);
+        assert.strictEqual(mixedPreviewRes.body.code, 'CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED');
+        assert.strictEqual(hasMutation(mixedPreviewClient), false);
+
+        let unsupportedProviderCalls = 0;
+        const mixedInitialize = await runInitialize({
+            clientOptions: {
+                productRows: splitProductRows,
+                salesPartyRowsByRead: [mixedSalesPartyRows]
+            },
+            body: {
+                cartItems: splitCartItems,
+                agreementSnapshotSha256: 'a'.repeat(64)
+            },
+            requester: async () => {
+                unsupportedProviderCalls += 1;
+                throw new Error('unsupported checkout must never call the payment provider');
+            }
+        });
+        assert.strictEqual(mixedInitialize.res.code, 409);
+        assert.strictEqual(mixedInitialize.res.body.code, 'CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED');
+        assert.strictEqual(unsupportedProviderCalls, 0);
+        assert.strictEqual(mixedInitialize.connectCount, 1);
+        assert.strictEqual(hasMutation(mixedInitialize.client), false);
+        assert.strictEqual(mixedInitialize.client.calls.some(({ sql }) => sql === 'BEGIN'), false);
+
+        const multiSellerRows = [
+            sellerSalesPartyRow(101),
+            sellerSalesPartyRow(102, {
+                legacyStoreId: 602,
+                sellerStoreId: 702,
+                organizationId: 802,
+                offerId: 1002,
+                variantId: 1102,
+                suffix: 'B'
+            })
+        ];
+        const multiSellerInitialize = await runInitialize({
+            clientOptions: {
+                productRows: splitProductRows,
+                salesPartyRowsByRead: [multiSellerRows]
+            },
+            body: {
+                cartItems: splitCartItems,
+                agreementSnapshotSha256: 'b'.repeat(64)
+            },
+            requester: async () => {
+                unsupportedProviderCalls += 1;
+                throw new Error('multi-Seller checkout must never call the payment provider');
+            }
+        });
+        assert.strictEqual(multiSellerInitialize.res.code, 409);
+        assert.strictEqual(multiSellerInitialize.res.body.code, 'CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED');
+        assert.strictEqual(unsupportedProviderCalls, 0);
+        assert.strictEqual(hasMutation(multiSellerInitialize.client), false);
+        assert.strictEqual(multiSellerInitialize.client.calls.some(({ sql }) => sql === 'BEGIN'), false);
+
+        const preflightPreviewClient = createFakeClient({
+            productRows: splitProductRows,
+            salesPartyRowsByRead: [platformOnlySalesPartyRows]
+        });
+        pool.connect = async () => preflightPreviewClient;
+        const preflightPreviewRes = createRes();
+        await getCheckoutAgreementPreview({
+            user: { id: 10, role: 'customer', principal: 'customer' },
+            body: { addressId: 301, cartItems: splitCartItems, couponCode: null }
+        }, preflightPreviewRes);
+        assert.strictEqual(preflightPreviewRes.code, 200);
+
+        let driftProviderCalls = 0;
+        const changedFulfillmentAfterToken = await runInitialize({
+            clientOptions: {
+                productRows: splitProductRows,
+                salesPartyRowsByRead: [platformOnlySalesPartyRows, mixedSalesPartyRows]
+            },
+            body: {
+                cartItems: splitCartItems,
+                agreementSnapshotSha256: preflightPreviewRes.body.snapshotSha256
+            },
+            requesterFactory: (client) => async ({ payload }) => {
+                driftProviderCalls += 1;
+                assert.strictEqual(client.transactionOpen, false);
+                assert.strictEqual(hasMutation(client), false);
+                return {
+                    type: 'iframe',
+                    token: 'orphan-fulfillment-drift-token',
+                    iframeUrl: 'https://www.paytr.com/odeme/guvenli/orphan-fulfillment-drift-token',
+                    successUrl: payload.merchant_ok_url,
+                    failUrl: payload.merchant_fail_url
+                };
+            }
+        });
+        assert.strictEqual(changedFulfillmentAfterToken.res.code, 409);
+        assert.strictEqual(
+            changedFulfillmentAfterToken.res.body.code,
+            'CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED'
+        );
+        assert.strictEqual(driftProviderCalls, 1);
+        assert.strictEqual(hasMutation(changedFulfillmentAfterToken.client), false);
+        assert.strictEqual(changedFulfillmentAfterToken.client.calls.some(({ sql }) => sql === 'ROLLBACK'), true);
 
         const foreignAddress = await runInitialize({ clientOptions: { ownedAddress: false } });
         assert.strictEqual(foreignAddress.res.code, 404);

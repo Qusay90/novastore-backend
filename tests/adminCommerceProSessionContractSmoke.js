@@ -16,7 +16,8 @@ Object.assign(process.env, {
     DB_PASSWORD: 'novastore_test_only',
     DB_SSL: 'false',
     SUPABASE_USE_POOLER: 'false',
-    JWT_SECRET: 'commerce-pro-session-smoke-secret'
+    JWT_SECRET: 'commerce-pro-session-smoke-secret',
+    PAYMENT_PROVIDER: ''
 });
 
 const { authenticate, requireAdmin } = require('../middlewares/authMiddleware');
@@ -126,7 +127,13 @@ const chainFor = (rows, queries) => [
     assert.equal(validAdmin.statusCode, 200);
     assert.equal(validAdmin.payload.user.id, 17);
     assert.equal(validAdmin.payload.user.role, 'admin');
-    assert.equal(validAdmin.payload.commerceMode, 'single_vendor');
+    assert.equal(validAdmin.payload.commerceMode, 'marketplace');
+    assert.deepEqual(validAdmin.payload.paymentProvider, {
+        provider: null,
+        ready: false,
+        state: 'provider_not_configured'
+    });
+    assert.doesNotMatch(JSON.stringify(validAdmin.payload), /PAYTR_MERCHANT|DATABASE_URL|JWT_SECRET/);
     assert.equal(validAdmin.payload.capabilities.dashboardRead, true);
     assert.equal(validAdmin.payload.capabilities.ordersRead, true);
     assert.equal(validAdmin.payload.capabilities.returnsRead, true);
@@ -226,6 +233,18 @@ const chainFor = (rows, queries) => [
     assert.equal(summaryResponse.payload.items.length, 1);
     assert.deepEqual(summaryQueries[0].params, [101]);
     assert.doesNotMatch(summaryQueries[0].sql, /address|phone/i, 'sipariş özeti gereksiz adres/telefon PII seçmemeli');
+    assert.doesNotMatch(
+        summaryQueries[0].sql,
+        /raw_request|raw_response|\bpan\b|\bcvv\b|merchant_key|merchant_salt/i,
+        'sipariş özeti ham provider payload veya gizli ödeme alanı seçmemeli'
+    );
+    assert.match(summaryQueries[0].sql, /FROM order_items item[\s\S]*item\.order_id = o\.id/i);
+    assert.match(summaryQueries[0].sql, /FROM seller_orders seller_order[\s\S]*seller_order\.canonical_order_id = o\.id/i);
+    assert.match(
+        summaryQueries[0].sql,
+        /seller_store\.organization_id = seller_order\.organization_id[\s\S]*seller_store\.id = seller_order\.store_id/i
+    );
+    assert.match(summaryQueries[0].sql, /FROM payments payment[\s\S]*ORDER BY payment\.created_at DESC NULLS LAST, payment\.id DESC[\s\S]*LIMIT 1/i);
     assert.match(summaryQueries[0].sql, /LIMIT \$1/);
 
     const fullSummaryHandler = createGetAdminOrderSummaries({

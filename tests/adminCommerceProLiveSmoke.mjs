@@ -66,7 +66,7 @@ assert.match(source, /<meta\b[^>]*Content-Security-Policy[^>]*connect-src 'self'
 assert.doesNotMatch(source, /connect-src 'none'/i);
 assert.match(source, new RegExp(`novastore-source-fingerprint" content="${expectedFingerprint}"`, "i"));
 assert.match(source, /data-testid["']?\s*(?:=|:)\s*["']integrated-admin-shell["']/);
-assert.match(source, /Entegre tek-satıcı modu/);
+assert.match(source, /Entegre çok mağazalı operasyon/);
 assert.match(source, /Mock fallback yok/);
 assert.match(source, /Sipariş özeti okuma yeteneği bu admin oturumunda açık değil/);
 assert.match(source, /Dashboard okuma yeteneği bu admin oturumunda açık değil/);
@@ -142,9 +142,11 @@ assert.match(source, /\/api\/shipments\//);
 assert.match(source, /Sağlayıcı refund'u otomatik çalıştırılmadı/);
 assert.match(source, /Taşıyıcı API\/etiket işlemi yapılmadı/);
 assert.match(source, /Paketi fiziksel olarak taşıyıcıya teslim ettiğimi doğruluyorum/);
-assert.match(source, /Birinci taraf ürün özeti tablosu/);
+assert.match(source, /Siparişin bu takip numarasıyla fiziksel olarak müşteriye teslim edildiğini doğruluyorum/);
+assert.match(source, /\/api\/shipments\/[^"']+\/manual-delivery-confirmation/);
+assert.match(source, /Platform ve Seller ürün özeti tablosu/);
 assert.match(source, /İç yayın incelemesi/);
-assert.match(source, /satıcı, teklif veya risk kuyruğu oluşturulmaz/);
+assert.match(source, /Seller ürününde detay mutation, medya yazması ve arşivleme açılmaz/);
 assert.match(source, /daha eski ürünler bu turda gösterilmiyor/);
 assert.match(source, /medyasız ürün JSON CRUD/i);
 assert.match(source, /Tam DTO alınıyor/);
@@ -196,7 +198,8 @@ assert.doesNotMatch(source, /\/api\/shipments\/[^"']+\/create/);
 assert.doesNotMatch(source, /\/api\/orders\/[^"']+\/status/);
 assert.match(source, /\/api\/notifications\/[^"']+\/read/);
 assert.match(adapterSource, /hasCapability\(capabilities, "returnWrite"\)[\s\S]*\/api\/returns\/\$\{encodeURIComponent\(String\(returnId\)\)\}\/status[\s\S]*method: "PATCH"[\s\S]*expected_revision: expectedRevision/);
-assert.doesNotMatch(source, /\/api\/payments\/|paytr|iyzico/i);
+assert.doesNotMatch(source, /\/api\/payments\/|iyzico/i, "Admin artifact ödeme mutation endpoint'i taşımamalı");
+assert.doesNotMatch(source, /\bPAYTR_(?:MERCHANT_KEY|MERCHANT_SALT)|\bJWT_SECRET\b|\bDATABASE_URL\b/i, "güvenli provider adı görünür olabilir; secret/config anahtarları artifacte giremez");
 const stripInlinePayload = (documentSource) => documentSource
   .replace(/(<style\b[^>]*>)[\s\S]*?(<\/style>)/gi, "$1$2")
   .replace(/(<script\b[^>]*>)[\s\S]*?(<\/script>)/gi, "$1$2");

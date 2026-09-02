@@ -13,7 +13,9 @@ Object.assign(process.env, {
 });
 
 const {
+    CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED,
     SellerOrderProjectionError,
+    assertSingleFulfillmentSalesParty,
     buildCheckoutSalesPartyProjection,
     buildSellerOrderProjection
 } = require('../services/sellerOrderProjectionService');
@@ -164,6 +166,16 @@ const expectAgreementInvalid = (context) => assert.throws(
     (error) => error instanceof LegalDocumentError && error.code === 'CHECKOUT_AGREEMENT_CONTEXT_INVALID'
 );
 
+const expectUnsupportedFulfillment = (projection, expectedPartyCount) => assert.throws(
+    () => assertSingleFulfillmentSalesParty(projection),
+    (error) => (
+        error instanceof SellerOrderProjectionError
+        && error.code === CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED
+        && error.statusCode === 409
+        && error.details?.fulfillmentSalesPartyCount === expectedPartyCount
+    )
+);
+
 (async () => {
     const allPlatformItems = [pricedItem(101, 10), pricedItem(102, 20)];
     const allPlatformRows = [platformRow(101), platformRow(102)];
@@ -174,6 +186,11 @@ const expectAgreementInvalid = (context) => assert.throws(
     assert.deepEqual(allPlatform.sellerProjection, []);
     assert.deepEqual(allPlatform.platformAllocation.productIds, [101, 102]);
     assert.equal(allPlatform.platformAllocation.grossMinor, 3000);
+    assert.deepEqual(assertSingleFulfillmentSalesParty(allPlatform), {
+        kind: 'platform',
+        fulfillmentSalesPartyCount: 1,
+        sellerStoreCount: 0
+    });
     assert.deepEqual(
         await buildSellerOrderProjection(queryClient(allPlatformRows), allPlatformItems),
         [],
@@ -195,6 +212,7 @@ const expectAgreementInvalid = (context) => assert.throws(
     assert.equal(mixed.sellerProjection.length, 1);
     assert.deepEqual(mixed.sellerProjection[0].productIds, [201]);
     assert.equal(mixed.sellerProjection[0].grossMinor, 1000);
+    expectUnsupportedFulfillment(mixed, 2);
     const mixedContext = toCheckoutContext(mixedItems, mixed);
     const normalizedMixed = normalizeCheckoutAgreementContext(mixedContext);
     const mixedText = renderCheckoutContext(normalizedMixed);
@@ -209,11 +227,48 @@ const expectAgreementInvalid = (context) => assert.throws(
     );
     assert.equal(sellerOnly.platformAllocation, null);
     assert.deepEqual(sellerOnly.sellerProjection[0].productIds, [202]);
+    assert.deepEqual(assertSingleFulfillmentSalesParty(sellerOnly), {
+        kind: 'seller',
+        fulfillmentSalesPartyCount: 1,
+        sellerStoreCount: 1
+    });
+    assert.throws(
+        () => assertSingleFulfillmentSalesParty({
+            sellerProjection: [sellerOnly.sellerProjection[0], sellerOnly.sellerProjection[0]],
+            platformAllocation: null
+        }),
+        (error) => (
+            error.code === CHECKOUT_MULTI_FULFILLMENT_UNSUPPORTED
+            && error.details?.hasDuplicateSellerAllocation === true
+        )
+    );
     const sellerOnlyText = renderCheckoutContext(normalizeCheckoutAgreementContext(
         toCheckoutContext(sellerOnlyItems, sellerOnly)
     ));
     assert.doesNotMatch(sellerOnlyText, /Platform satıcısı:/);
     assert.match(sellerOnlyText, /Pazaryeri satıcısı: Synthetic Seller Limited Şirketi/);
+
+    const multiSeller = await buildCheckoutSalesPartyProjection(
+        queryClient([
+            sellerRow(203),
+            sellerRow(204, {
+                product_store_id: 602,
+                legacy_store_id: 602,
+                legacy_store_slug: 'seller-store-b',
+                seller_store_id: 702,
+                organization_id: 802,
+                seller_store_display_name: 'Synthetic Seller Store B',
+                seller_organization_display_name: 'Synthetic Seller Organization B',
+                seller_legal_identity_id: 902,
+                offer_id: 1002,
+                variant_id: 1102
+            })
+        ]),
+        [pricedItem(203, 10), pricedItem(204, 20)]
+    );
+    assert.equal(multiSeller.sellerProjection.length, 2);
+    expectUnsupportedFulfillment(multiSeller, 2);
+    expectUnsupportedFulfillment({ sellerProjection: [], platformAllocation: null }, 0);
 
     await expectProjectionUnavailable(
         buildCheckoutSalesPartyProjection(

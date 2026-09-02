@@ -28,6 +28,7 @@ const {
     ADMIN_ORDER_CANCEL_REASON_CODES,
     validateAdminOrderCancellationRequest
 } = require('../services/adminOrderCancellationPolicy');
+const { convergeSellerOrderProjectionsForCancellation } = require('../services/orderService');
 
 const originalPoolConnect = pool.connect;
 const originalPoolQuery = pool.query;
@@ -47,7 +48,7 @@ const createResponse = () => ({
 
 const cloneRow = (row) => (row ? { ...row } : row);
 
-const createLifecycleState = ({ order = {}, payment = {} } = {}) => ({
+const createLifecycleState = ({ order = {}, payment = {}, sellerOrders = [] } = {}) => ({
     order: {
         id: 7001,
         user_id: null,
@@ -68,12 +69,18 @@ const createLifecycleState = ({ order = {}, payment = {} } = {}) => ({
         created_at: '2026-07-14T10:00:00.000Z',
         ...payment
     },
+    sellerOrders: sellerOrders.map(cloneRow),
     calls: [],
     stockReleaseCount: 0,
     paymentProofUpdates: 0,
     orderUpdates: 0,
     orderEvents: 0,
     eventPayloads: [],
+    sellerOrderUpdates: 0,
+    sellerOrderTransitions: 0,
+    sellerTransitionPayloads: [],
+    notificationOutboxInserts: 0,
+    notificationOutboxEvent: null,
     releasedQuantity: 0
 });
 
@@ -96,6 +103,15 @@ const createLifecycleClient = (state) => ({
         if (/SELECT payload[\s\S]*FROM order_events/i.test(text)) {
             const payload = state.eventPayloads.at(-1);
             return { rows: payload ? [{ payload: cloneRow(payload) }] : [] };
+        }
+
+        if (/FROM seller_orders[\s\S]*WHERE canonical_order_id = \$1[\s\S]*FOR UPDATE NOWAIT/i.test(text)) {
+            if (state.sellerLockErrorCode) {
+                const error = new Error('simulated seller projection lock conflict');
+                error.code = state.sellerLockErrorCode;
+                throw error;
+            }
+            return { rows: state.sellerOrders.map(cloneRow) };
         }
 
         if (/UPDATE products\s+SET stock = stock \+/i.test(text)) {
@@ -123,6 +139,21 @@ const createLifecycleClient = (state) => ({
             return { rows: [], rowCount: 0 };
         }
 
+        if (/UPDATE seller_orders[\s\S]*SET status = 'cancelled'/i.test(text)) {
+            const [, organizationId, sellerOrderId, revision, fromStatus] = params;
+            const row = state.sellerOrders.find((entry) => (
+                String(entry.organization_id) === String(organizationId)
+                && String(entry.id) === String(sellerOrderId)
+                && Number(entry.revision) === Number(revision)
+                && String(entry.status) === String(fromStatus)
+            ));
+            if (!row) return { rows: [], rowCount: 0 };
+            row.status = 'cancelled';
+            row.revision = Number(row.revision) + 1;
+            state.sellerOrderUpdates += 1;
+            return { rows: [{ revision: row.revision }], rowCount: 1 };
+        }
+
         if (/UPDATE orders/i.test(text)) {
             state.orderUpdates += 1;
             state.order = {
@@ -138,6 +169,35 @@ const createLifecycleClient = (state) => ({
             state.orderEvents += 1;
             state.eventPayloads.push(params[3] ? JSON.parse(params[3]) : null);
             return { rows: [{ id: state.orderEvents }], rowCount: 1 };
+        }
+
+
+        if (/INSERT INTO seller_order_transitions/i.test(text)) {
+            state.sellerOrderTransitions += 1;
+            state.sellerTransitionPayloads.push({
+                organizationId: params[0],
+                storeId: params[1],
+                sellerOrderId: params[2],
+                fromStatus: params[3],
+                idempotencyKey: params[4]
+            });
+            return { rows: [{ id: state.sellerOrderTransitions }], rowCount: 1 };
+        }
+
+        if (/INSERT INTO notification_outbox_events/i.test(text)) {
+            state.notificationOutboxInserts += 1;
+            state.notificationOutboxEvent = {
+                id: params[0],
+                source_event_key: params[1],
+                event_type: params[2],
+                aggregate_type: params[3],
+                aggregate_id: params[4],
+                aggregate_revision: params[5],
+                payload: JSON.parse(params[6]),
+                status: 'PENDING',
+                inserted: true
+            };
+            return { rows: [cloneRow(state.notificationOutboxEvent)], rowCount: 1 };
         }
 
         throw new Error(`Unexpected lifecycle fake query: ${text}`);
@@ -385,7 +445,13 @@ const runCancellation = async (state, body = {}, request = {}) => {
         assert.equal(staleAdminState.orderEvents, 0);
         assert.equal(staleAdminState.calls.at(-1).sql, 'ROLLBACK');
 
-        const cancellationState = createLifecycleState();
+        const cancellationState = createLifecycleState({
+            sellerOrders: [
+                { id: 8101, organization_id: 901, store_id: 801, status: 'new', revision: 1 },
+                { id: 8102, organization_id: 902, store_id: 802, status: 'cancellation_requested', revision: 2 },
+                { id: 8103, organization_id: 903, store_id: 803, status: 'cancelled', revision: 3 }
+            ]
+        });
         const firstCancellation = await runCancellation(cancellationState, {
             expected_status: ORDER_STATUS.HAZIRLANIYOR,
             note: 'Müşteri talebi'
@@ -400,6 +466,24 @@ const runCancellation = async (state, body = {}, request = {}) => {
         assert.equal(cancellationState.paymentProofUpdates, 1);
         assert.equal(cancellationState.orderUpdates, 1);
         assert.equal(cancellationState.orderEvents, 1);
+        assert.equal(cancellationState.notificationOutboxInserts, 1);
+        assert.equal(cancellationState.sellerOrderUpdates, 2);
+        assert.equal(cancellationState.sellerOrderTransitions, 2);
+        assert.deepEqual(cancellationState.sellerOrders.map(({ status, revision }) => ({ status, revision })), [
+            { status: 'cancelled', revision: 2 },
+            { status: 'cancelled', revision: 3 },
+            { status: 'cancelled', revision: 3 }
+        ]);
+        assert.deepEqual(
+            cancellationState.sellerTransitionPayloads.map(({ fromStatus, idempotencyKey }) => ({
+                fromStatus,
+                idempotencyKey
+            })),
+            [
+                { fromStatus: 'new', idempotencyKey: 'canonical-cancel:7001:seller-order:8101:r1' },
+                { fromStatus: 'cancellation_requested', idempotencyKey: 'canonical-cancel:7001:seller-order:8102:r2' }
+            ]
+        );
         assert.equal(cancellationState.order.status, ORDER_STATUS.IPTAL_EDILDI);
         assert.equal(cancellationState.order.refund_status, REFUND_STATUS.PENDING);
         assert.equal(cancellationState.order.cancel_reason, 'Müşteri talebi');
@@ -424,6 +508,11 @@ const runCancellation = async (state, body = {}, request = {}) => {
             executed: false,
             manualReviewRequired: true
         });
+        assert.deepEqual(cancellationEvent.sellerOrderProjection, {
+            matchedCount: 3,
+            changedCount: 2,
+            reusedCount: 1
+        });
 
         const releaseProof = JSON.parse(cancellationState.payment.raw_request);
         assert.equal(releaseProof.stockReserved, false);
@@ -435,13 +524,17 @@ const runCancellation = async (state, body = {}, request = {}) => {
         const firstPaymentLockIndex = cancellationState.calls.findIndex(({ sql }) => /FROM payments[\s\S]*FOR UPDATE/i.test(sql));
         const firstStockWriteIndex = cancellationState.calls.findIndex(({ sql }) => /UPDATE products\s+SET stock = stock \+/i.test(sql));
         const firstPaymentProofIndex = cancellationState.calls.findIndex(({ sql }) => /UPDATE payments/i.test(sql));
+        const firstSellerLockIndex = cancellationState.calls.findIndex(({ sql }) => /FROM seller_orders[\s\S]*FOR UPDATE NOWAIT/i.test(sql));
+        const firstSellerWriteIndex = cancellationState.calls.findIndex(({ sql }) => /UPDATE seller_orders/i.test(sql));
         const firstOrderWriteIndex = cancellationState.calls.findIndex(({ sql }) => /UPDATE orders/i.test(sql));
         const firstCommitIndex = cancellationState.calls.findIndex(({ sql }) => sql === 'COMMIT');
         assert(firstOrderLockIndex > 0, 'order row must be locked after BEGIN');
         assert(firstPaymentLockIndex > firstOrderLockIndex, 'payment proof must be locked after the order');
         assert(firstStockWriteIndex > firstPaymentLockIndex, 'stock release must happen only after both locks');
         assert(firstPaymentProofIndex > firstStockWriteIndex, 'release proof must be persisted in the same transaction');
-        assert(firstOrderWriteIndex > firstPaymentProofIndex, 'order cancellation follows reservation release proof');
+        assert(firstSellerLockIndex > firstPaymentProofIndex, 'seller projections are locked after reservation release proof');
+        assert(firstSellerWriteIndex > firstSellerLockIndex, 'seller projection cancellation follows its row lock');
+        assert(firstOrderWriteIndex > firstSellerWriteIndex, 'canonical cancellation follows seller projection convergence');
         assert(firstCommitIndex > firstOrderWriteIndex, 'transaction commits only after all mutation writes');
 
         const callsBeforeReplay = cancellationState.calls.length;
@@ -457,6 +550,8 @@ const runCancellation = async (state, body = {}, request = {}) => {
         assert.equal(cancellationState.paymentProofUpdates, 1, 'repeated cancellation must not rewrite release proof');
         assert.equal(cancellationState.orderUpdates, 1, 'repeated cancellation must not rewrite the order');
         assert.equal(cancellationState.orderEvents, 1, 'repeated cancellation must not append another event');
+        assert.equal(cancellationState.sellerOrderUpdates, 2, 'repeated cancellation must not rewrite seller projections');
+        assert.equal(cancellationState.sellerOrderTransitions, 2, 'repeated cancellation must not duplicate seller transitions');
         const replayCalls = cancellationState.calls.slice(callsBeforeReplay);
         assert.match(replayCalls.find(({ sql }) => /FROM orders o/i.test(sql)).sql, /FOR UPDATE OF o/i);
         assert.match(replayCalls.find(({ sql }) => /FROM payments/i.test(sql)).sql, /FOR UPDATE/i);
@@ -465,6 +560,81 @@ const runCancellation = async (state, body = {}, request = {}) => {
             ['BEGIN', 'COMMIT']
         );
         assert.equal(replayCalls.some(({ sql }) => /UPDATE products|UPDATE payments|UPDATE orders|INSERT INTO order_events/i.test(sql)), false);
+
+        const legacyCancelledProjectionState = createLifecycleState({
+            order: {
+                user_id: 42,
+                status: ORDER_STATUS.IPTAL_EDILDI,
+                refund_status: REFUND_STATUS.PENDING
+            },
+            payment: {
+                raw_request: JSON.stringify({
+                    stockReserved: false,
+                    stockReleaseReason: 'CUSTOMER_REQUEST',
+                    stockReleaseCommand: 'cancel',
+                    stockReleasedAt: '2026-09-02T10:00:00.000Z'
+                })
+            },
+            sellerOrders: [
+                { id: 8120, organization_id: 920, store_id: 820, status: 'new', revision: 7 }
+            ]
+        });
+        const legacyCancelledProjectionReplay = await runCancellation(
+            legacyCancelledProjectionState,
+            { expected_status: undefined },
+            { user: { id: 42, principal: 'customer', role: 'customer' } }
+        );
+        assert.equal(legacyCancelledProjectionReplay.statusCode, 200);
+        assert.equal(legacyCancelledProjectionReplay.payload.reused, true);
+        assert.deepEqual(
+            legacyCancelledProjectionState.sellerOrders.map(({ status, revision }) => ({ status, revision })),
+            [{ status: 'cancelled', revision: 8 }]
+        );
+        assert.equal(legacyCancelledProjectionState.sellerOrderUpdates, 1);
+        assert.equal(legacyCancelledProjectionState.sellerOrderTransitions, 1);
+        assert.deepEqual(legacyCancelledProjectionState.sellerTransitionPayloads[0], {
+            organizationId: 920,
+            storeId: 820,
+            sellerOrderId: 8120,
+            fromStatus: 'new',
+            idempotencyKey: 'canonical-cancel:7001:seller-order:8120:r7'
+        });
+        assert.equal(legacyCancelledProjectionState.stockReleaseCount, 0);
+        assert.equal(legacyCancelledProjectionState.paymentProofUpdates, 0);
+        assert.equal(legacyCancelledProjectionState.orderUpdates, 0);
+        assert.equal(legacyCancelledProjectionState.orderEvents, 0);
+        assert.equal(legacyCancelledProjectionState.notificationOutboxInserts, 0);
+        assert.deepEqual(
+            legacyCancelledProjectionState.calls
+                .filter(({ sql }) => ['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql))
+                .map(({ sql }) => sql),
+            ['BEGIN', 'COMMIT']
+        );
+
+        const fulfilledSellerState = createLifecycleState({
+            sellerOrders: [
+                { id: 8110, organization_id: 910, store_id: 810, status: 'shipped', revision: 4 }
+            ]
+        });
+        await assert.rejects(
+            () => convergeSellerOrderProjectionsForCancellation({
+                client: createLifecycleClient(fulfilledSellerState),
+                canonicalOrderId: fulfilledSellerState.order.id
+            }),
+            (error) => error?.code === 'ORDER_SELLER_FULFILLMENT_CONFLICT'
+        );
+        assert.equal(fulfilledSellerState.sellerOrderUpdates, 0);
+        assert.equal(fulfilledSellerState.sellerOrderTransitions, 0);
+
+        const busySellerState = createLifecycleState();
+        busySellerState.sellerLockErrorCode = '55P03';
+        await assert.rejects(
+            () => convergeSellerOrderProjectionsForCancellation({
+                client: createLifecycleClient(busySellerState),
+                canonicalOrderId: busySellerState.order.id
+            }),
+            (error) => error?.code === 'ORDER_SELLER_FULFILLMENT_BUSY'
+        );
 
         const conflictingReplay = await runCancellation(
             cancellationState,
@@ -539,6 +709,10 @@ const runCancellation = async (state, body = {}, request = {}) => {
         const shipmentRouteSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'shipmentRoutes.js'), 'utf8');
         const returnRouteSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'returnRoutes.js'), 'utf8');
         const notificationRouteSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'notificationRoutes.js'), 'utf8');
+        const notificationControllerSource = fs.readFileSync(
+            path.join(__dirname, '..', 'controllers', 'notificationController.js'),
+            'utf8'
+        );
         assert.match(orderRouteSource, /router\.get\('\/',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*getAllOrders\)/);
         assert.match(orderRouteSource, /router\.get\('\/user\/:userId',\s*authenticate,\s*requireSelfOrAdmin\('userId'\),\s*requireCurrentAdminIfClaimed,\s*getUserOrders\)/);
         assert.match(
@@ -551,13 +725,43 @@ const runCancellation = async (state, body = {}, request = {}) => {
         assert.match(shipmentRouteSource, /router\.get\('\/:orderId',\s*authenticate,\s*requireCurrentAdminIfClaimed,\s*getShipment\)/);
         assert.match(returnRouteSource, /router\.post\('\/',\s*authenticate,\s*requireCurrentAdminIfClaimed,\s*createReturnRequest\)/);
         assert.match(returnRouteSource, /router\.get\('\/admin\/all',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*getAllReturnRequests\)/);
-        assert.match(returnRouteSource, /router\.patch\('\/:id\/status',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*requireStagingReturnWrite,\s*updateReturnStatus\)/);
+        assert.match(
+            returnRouteSource,
+            /const requireReturnWrite = requireAdminCommerceCapability\('returnWrite'\);/
+        );
+        assert.match(
+            returnRouteSource,
+            /router\.patch\('\/:id\/status',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*requireReturnWrite,\s*updateReturnStatus\)/
+        );
         assert.match(returnRouteSource, /router\.get\('\/:id',\s*authenticate,\s*requireCurrentAdminIfClaimed,\s*getReturnById\)/);
-        assert.match(notificationRouteSource, /router\.get\('\/user\/:userId',\s*authenticate,\s*requireSelfOrAdmin\('userId'\),\s*requireCurrentAdminIfClaimed,\s*getUserNotifications\)/);
-        assert.match(notificationRouteSource, /router\.get\('\/admin',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*getAdminNotifications\)/);
-        assert.match(notificationRouteSource, /router\.patch\('\/:id\/read',\s*authenticate,\s*requireCurrentAdminIfClaimed,\s*markAsRead\)/);
-        assert.match(notificationRouteSource, /router\.patch\('\/read-all\/:userId',\s*authenticate,\s*requireCurrentAdminIfClaimed,\s*markAllAsRead\)/);
-        assert.match(notificationRouteSource, /router\.post\('\/test',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*sendTestNotification\)/);
+        assert.match(
+            notificationRouteSource,
+            /router\.get\('\/user\/:userId',\s*authenticate,\s*controller\.getUserNotifications\)/
+        );
+        assert.match(
+            notificationControllerSource,
+            /const getUserNotifications = async \(req, res\) => \{\s*if \(Number\(req\.params\.userId\) !== Number\(req\.user\.id\) \|\| req\.user\.principal !== 'customer'\) \{\s*return res\.status\(403\)\.json\(\{ code: 'NOTIFICATION_SCOPE_FORBIDDEN'/
+        );
+        assert.match(
+            notificationRouteSource,
+            /router\.get\('\/admin',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*controller\.getAdminNotifications\)/
+        );
+        assert.match(
+            notificationRouteSource,
+            /router\.patch\('\/:id\/read',\s*authenticate,\s*requireCurrentAdminIfClaimed,\s*controller\.markAsRead\)/
+        );
+        assert.match(
+            notificationRouteSource,
+            /router\.patch\('\/read-all\/:userId',\s*authenticate,\s*requireCurrentAdminIfClaimed,\s*controller\.markAllAsReadLegacy\)/
+        );
+        assert.match(
+            notificationControllerSource,
+            /const markAllAsReadLegacy = async \(req, res\) => \{[\s\S]*const expected = req\.user\.principal === 'admin' \? 'admin' : String\(req\.user\.id\);[\s\S]*NOTIFICATION_SCOPE_FORBIDDEN[\s\S]*return markAllAsRead\(req, res\);\s*\};/
+        );
+        assert.match(
+            notificationRouteSource,
+            /router\.post\('\/test',\s*authenticate,\s*requireAdmin,\s*requireCurrentAdmin,\s*controller\.sendTestNotification\)/
+        );
 
         let currentAdminQueries = 0;
         let storedRole = 'customer';

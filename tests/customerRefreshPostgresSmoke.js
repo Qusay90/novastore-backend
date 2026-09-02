@@ -108,7 +108,7 @@ const captureConsoleOutput = () => {
     await adminClient.end();
 
     const registry = loadRegistry();
-    assert.equal(registry.length, 36);
+    assert.equal(registry.length, 37);
     const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));

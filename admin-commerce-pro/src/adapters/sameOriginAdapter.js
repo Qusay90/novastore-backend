@@ -13,6 +13,7 @@ import {
 } from "../integration/catalogMutations.js";
 import {
   buildCancelOrderMutation,
+  buildManualDeliveryConfirmationMutation,
   buildManualShipmentMutation,
 } from "../integration/orderMutations.js";
 import {
@@ -231,6 +232,15 @@ export function createSameOriginAdapter(http) {
     if (hasCapability(capabilities, "manualShipmentWrite")) {
       actions.createManualShipment = async (input = {}) => {
         const request = buildManualShipmentMutation(input);
+        return http.request(request.path, {
+          method: "POST",
+          headers: { "Idempotency-Key": request.idempotencyKey },
+          body: JSON.stringify(request.body),
+          signal: input.signal,
+        });
+      };
+      actions.confirmManualDelivery = async (input = {}) => {
+        const request = buildManualDeliveryConfirmationMutation(input);
         return http.request(request.path, {
           method: "POST",
           headers: { "Idempotency-Key": request.idempotencyKey },

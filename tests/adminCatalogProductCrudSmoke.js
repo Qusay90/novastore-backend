@@ -1,7 +1,6 @@
 const assert = require('node:assert/strict');
 const express = require('express');
 const http = require('node:http');
-const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 process.env.NODE_ENV = 'test';
 process.env.NOVASTORE_SAFE_LOCAL_BACKEND = 'true';
@@ -14,6 +13,9 @@ process.env.DB_NAME = 'novastore_catalog_product_crud_test';
 process.env.DB_USER = 'novastore_test';
 process.env.DB_SSL = 'false';
 process.env.JWT_SECRET = 'admin-catalog-product-crud-smoke-secret';
+process.env.CLOUDINARY_CLOUD_NAME = 'demo';
+
+const { createAuthSessionFixture } = require('./helpers/createAuthSessionFixture');
 
 const authFixture = createAuthSessionFixture();
 authFixture.install();
@@ -150,7 +152,9 @@ const state = {
     calls: [],
     currentAdminQueries: 0,
     transactionConnects: 0,
-    platformStoreActive: true
+    platformStoreActive: true,
+    platformStoreSellerBound: false,
+    platformStoreClosedBindingPresent: true
 };
 
 const compact = (sql) => String(sql).replace(/\s+/g, ' ').trim();
@@ -176,8 +180,18 @@ const runQuery = async (sql, params = [], { transaction = false } = {}) => {
         const product = state.products.get(Number(params[0]));
         return { rows: product ? [{ id: product.id, revision: product.revision }] : [] };
     }
-    if (/^SELECT id FROM stores/i.test(text) && /FOR SHARE$/i.test(text)) {
+    if (/^SELECT id FROM stores/i.test(text) && /FOR UPDATE$/i.test(text)) {
         return { rows: state.platformStoreActive ? [{ id: 10 }] : [] };
+    }
+    if (/^SELECT id, status, closed_at FROM seller_stores/i.test(text) && /legacy_store_id = \$1/i.test(text)) {
+        const rows = [];
+        if (state.platformStoreClosedBindingPresent) {
+            rows.push({ id: 900, status: 'closed', closed_at: '2026-08-31T00:00:00.000Z' });
+        }
+        if (state.platformStoreSellerBound) {
+            rows.push({ id: 901, status: 'active', closed_at: null });
+        }
+        return { rows };
     }
     if (/FROM products WHERE id = \$1 AND store_id = \$2$/i.test(text)) {
         const product = state.products.get(Number(params[0]));
@@ -495,6 +509,19 @@ const assertBoundedProduct = (payload) => {
         assert.equal(state.calls.filter(({ text }) => /^INSERT INTO products/i.test(text)).length, beforeUnavailableInserts,
             'platform store yokken ürün insert edilmemeli');
 
+        state.platformStoreSellerBound = true;
+        const beforeBoundCreateInserts = state.calls.filter(({ text }) => /^INSERT INTO products/i.test(text)).length;
+        const sellerBoundCreate = await request(server, 'POST', '/api/admin/catalog/products', {
+            token,
+            body: validCreate
+        });
+        state.platformStoreSellerBound = false;
+        assert.equal(sellerBoundCreate.status, 409);
+        assert.equal(sellerBoundCreate.body.code, 'ADMIN_CATALOG_SELLER_BOUND_STORE_READ_ONLY');
+        assert.equal(sellerBoundCreate.body.details.refetchRequired, true);
+        assert.equal(state.calls.filter(({ text }) => /^INSERT INTO products/i.test(text)).length, beforeBoundCreateInserts,
+            'Seller-bound platform store için ürün insert edilmemeli');
+
         const beforeHiddenCategoryInserts = state.calls.filter(({ text }) => /^INSERT INTO products/i.test(text)).length;
         const hiddenCategory = await request(server, 'POST', '/api/admin/catalog/products', {
             token,
@@ -551,6 +578,63 @@ const assertBoundedProduct = (payload) => {
         assert.equal(detail.status, 200);
         assertBoundedProduct(detail.body);
         assert.equal(detail.body.product.revision, 1);
+
+        state.platformStoreSellerBound = true;
+        const beforeSellerBoundWrites = state.calls.filter(({ text }) =>
+            /^(?:INSERT|UPDATE|DELETE)\b/i.test(text)
+            && (/\bproducts\b/i.test(text) || /\bproduct_media\b/i.test(text))
+        ).length;
+        const sellerBoundUpdate = await request(server, 'PATCH', '/api/admin/catalog/products/101', {
+            token,
+            body: { expected_revision: 1, stock: 99 }
+        });
+        const sellerBoundArchive = await request(server, 'PATCH', '/api/admin/catalog/products/101/archive', {
+            token,
+            body: { expected_revision: 1 }
+        });
+        const sellerBoundMedia = await request(server, 'POST', '/api/admin/catalog/products/101/media', {
+            token,
+            body: {
+                expected_revision: 1,
+                media_url: 'https://res.cloudinary.com/demo/image/upload/v1/catalog/seller-bound.webp',
+                media_type: 'image',
+                is_cover: true
+            }
+        });
+        const sellerBoundMediaReorder = await request(server, 'PUT', '/api/admin/catalog/products/101/media/order', {
+            token,
+            body: { expected_revision: 1, media_ids: [7], cover_media_id: 7 }
+        });
+        const sellerBoundMediaFraming = await request(server, 'PATCH', '/api/admin/catalog/products/101/media/7/framing', {
+            token,
+            body: {
+                expected_revision: 1,
+                card_framing: { focal_x: 0.5, focal_y: 0.5, zoom: 1.2 }
+            }
+        });
+        const sellerBoundMediaDelete = await request(server, 'DELETE', '/api/admin/catalog/products/101/media/7', {
+            token,
+            body: { expected_revision: 1 }
+        });
+        state.platformStoreSellerBound = false;
+        for (const [operation, denied] of Object.entries({
+            update: sellerBoundUpdate,
+            archive: sellerBoundArchive,
+            mediaRegister: sellerBoundMedia,
+            mediaReorder: sellerBoundMediaReorder,
+            mediaFraming: sellerBoundMediaFraming,
+            mediaDelete: sellerBoundMediaDelete
+        })) {
+            assert.equal(denied.status, 409, `${operation}: ${JSON.stringify(denied.body)}`);
+            assert.equal(denied.body.code, 'ADMIN_CATALOG_SELLER_BOUND_STORE_READ_ONLY', operation);
+        }
+        assert.equal(state.products.get(101).stock, 8);
+        assert.equal(state.products.get(101).revision, 1);
+        assert.equal(state.calls.filter(({ text }) =>
+            /^(?:INSERT|UPDATE|DELETE)\b/i.test(text)
+            && (/\bproducts\b/i.test(text) || /\bproduct_media\b/i.test(text))
+        ).length, beforeSellerBoundWrites,
+        'Seller-bound ürün ve medya reddinde katalog/provider registry side effect olmamalı');
 
         const scalarNoop = await request(server, 'PATCH', '/api/admin/catalog/products/101', {
             token,

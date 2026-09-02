@@ -2,6 +2,8 @@ const pool = require('../config/db');
 const { isAdminCommerceCapabilityEnabled } = require('../services/adminCommerceCapabilityService');
 const { ManualShipmentError } = require('../services/manualShipmentPolicy');
 const { recordManualShipment } = require('../services/manualShipmentService');
+const { ManualDeliveryError } = require('../services/manualDeliveryPolicy');
+const { recordManualDelivery } = require('../services/manualDeliveryService');
 
 const createShipment = async (req, res) => {
     const orderId = Number(req.params.orderId);
@@ -74,6 +76,59 @@ const createManualShipment = async (
     }
 };
 
+const confirmManualDelivery = async (
+    req,
+    res,
+    {
+        recordManualDeliveryFn = recordManualDelivery
+    } = {}
+) => {
+    const orderId = Number(req.params.orderId);
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) {
+        return res.status(400).json({
+            code: 'MANUAL_DELIVERY_ORDER_ID_INVALID',
+            error: 'Geçersiz sipariş kimliği.'
+        });
+    }
+    if (!isAdminCommerceCapabilityEnabled('manualShipmentWrite')) {
+        return res.status(503).json({
+            code: 'MANUAL_FULFILLMENT_DISABLED',
+            error: 'Manuel fulfillment yazma özelliği bu ortamda kapalıdır.'
+        });
+    }
+
+    try {
+        const result = await recordManualDeliveryFn({
+            orderId,
+            idempotencyKey: getIdempotencyKey(req),
+            body: req.body,
+            actor: req.currentAdmin || req.user
+        });
+        return res.status(200).json({
+            mesaj: result.reused
+                ? 'Teslim doğrulaması daha önce kaydedilmiş.'
+                : 'Teslim doğrulaması kaydedildi.',
+            reused: result.reused,
+            order: result.order,
+            shipment: result.shipment,
+            sellerProjection: result.sellerProjection
+        });
+    } catch (error) {
+        if (error instanceof ManualDeliveryError || Number.isInteger(error?.statusCode)) {
+            return res.status(error.statusCode || 409).json({
+                code: error.code || 'MANUAL_DELIVERY_CONFLICT',
+                error: error.message,
+                ...(error.details ? { details: error.details } : {})
+            });
+        }
+        console.error('Manuel teslim doğrulama hatası:', error.message);
+        return res.status(500).json({
+            code: 'MANUAL_DELIVERY_FAILED',
+            error: 'Teslim doğrulaması kaydedilemedi.'
+        });
+    }
+};
+
 const getShipment = async (req, res) => {
     try {
         const orderId = Number(req.params.orderId);
@@ -119,6 +174,7 @@ const getShipment = async (req, res) => {
 };
 
 module.exports = {
+    confirmManualDelivery,
     createShipment,
     createManualShipment,
     getIdempotencyKey,

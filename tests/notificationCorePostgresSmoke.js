@@ -144,7 +144,7 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
         await admin.query('DROP SCHEMA public CASCADE');
         await admin.query('CREATE SCHEMA public');
         const registry = loadRegistry();
-        assert.equal(registry.length, 36);
+        assert.equal(registry.length, 37);
         const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
         const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
         assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));

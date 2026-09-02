@@ -74,6 +74,7 @@ const {
     releaseExpiredPaymentReservations
 } = require('../services/paymentReservationService');
 const {
+    assertSingleFulfillmentSalesParty,
     buildCheckoutSalesPartyProjection,
     materializeSellerOrderProjection
 } = require('../services/sellerOrderProjectionService');
@@ -288,6 +289,10 @@ const hasVerifiedStoredCheckoutAgreementAllocation = (rawRequest) => {
         const storedSellerSummaries = summarizeStoredSellerProjection(rawRequest.sellerProjection);
         const storedPlatformSummary = summarizeStoredPlatformAllocation(rawRequest.platformAllocation);
         if (!storedSellerSummaries || storedPlatformSummary === undefined) return false;
+        assertSingleFulfillmentSalesParty({
+            sellerProjection: rawRequest.sellerProjection,
+            platformAllocation: rawRequest.platformAllocation
+        });
         const snapshotSellerSummaries = normalizedContext.sellers.map((seller) => ({
             organizationId: seller.organizationId,
             storeId: seller.storeId,
@@ -869,6 +874,18 @@ const buildCustomerFromCheckoutAddress = (checkoutAddress) => {
     });
 };
 
+const assertAuthoritativeCheckoutFulfillment = async ({ client, cartItems }) => {
+    const pricing = await calculatePricing({
+        cartItems,
+        couponCode: null,
+        client,
+        lockCoupon: false
+    });
+    const checkoutSalesPartyProjection = await buildCheckoutSalesPartyProjection(client, pricing.items);
+    assertSingleFulfillmentSalesParty(checkoutSalesPartyProjection);
+    return checkoutSalesPartyProjection;
+};
+
 const loadAuthoritativeCheckoutState = async ({
     client,
     addressId,
@@ -884,7 +901,9 @@ const loadAuthoritativeCheckoutState = async ({
     const customer = buildCustomerFromCheckoutAddress(checkoutAddress);
     const pricing = await calculatePricing({ cartItems, couponCode, client, lockCoupon });
     assertRequestedCouponApplied(couponCode, pricing.coupon);
-    const { sellerProjection, platformAllocation } = await buildCheckoutSalesPartyProjection(client, pricing.items);
+    const checkoutSalesPartyProjection = await buildCheckoutSalesPartyProjection(client, pricing.items);
+    assertSingleFulfillmentSalesParty(checkoutSalesPartyProjection);
+    const { sellerProjection, platformAllocation } = checkoutSalesPartyProjection;
     const checkoutAgreementSnapshot = buildCheckoutAgreementSnapshot(agreementAcceptances, {
         checkoutContext: buildCheckoutAgreementContext({
             identitySnapshot,
@@ -989,7 +1008,9 @@ const getCheckoutAgreementPreview = async (req, res) => {
             })
         };
         const pricing = await calculatePricing({ cartItems, couponCode, client });
-        const { sellerProjection, platformAllocation } = await buildCheckoutSalesPartyProjection(client, pricing.items);
+        const checkoutSalesPartyProjection = await buildCheckoutSalesPartyProjection(client, pricing.items);
+        assertSingleFulfillmentSalesParty(checkoutSalesPartyProjection);
+        const { sellerProjection, platformAllocation } = checkoutSalesPartyProjection;
         const preview = buildCheckoutAgreementPreview({
             checkoutContext: buildCheckoutAgreementContext({
                 identitySnapshot: launchPolicy.identitySnapshot,
@@ -1596,6 +1617,10 @@ const initializePayment = async (req, res) => {
             });
         }
 
+        // Re-read the authoritative product/store bindings after the provider
+        // handoff and before any expiry cleanup, stock, order, or coupon write.
+        // The full state load below repeats the same guard after cleanup.
+        await assertAuthoritativeCheckoutFulfillment({ client, cartItems });
         await releaseExpiredPaymentReservations(client);
         const finalState = await loadAuthoritativeCheckoutState({
             client,

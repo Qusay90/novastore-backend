@@ -15,7 +15,7 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
 
 (async () => {
     const registry = loadRegistry();
-    assert.equal(registry.length, 36);
+    assert.equal(registry.length, 37);
 
     const sellerMigrations = selectSellerMigrations({ registry });
     assert.deepEqual(

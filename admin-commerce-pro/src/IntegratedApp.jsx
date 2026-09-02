@@ -20,6 +20,8 @@ import {
 import { createAdminHttp } from "./integration/adminHttp.js";
 import {
   createMutationIdempotencyKey,
+  MANUAL_DELIVERY_EXPECTED_SHIPMENT_STATUS,
+  MANUAL_DELIVERY_EXPECTED_STATUS,
   MANUAL_SHIPMENT_EXPECTED_STATUS,
   ORDER_CANCEL_EXPECTED_STATUSES,
   ORDER_CANCEL_NOTE_MAX_LENGTH,
@@ -66,6 +68,20 @@ const shipmentStatusLabels = Object.freeze({
   IN_TRANSIT: "Taşımada",
   DELIVERED: "Teslim edildi",
   RETURNED: "Geri döndü",
+});
+
+const paymentProviderStatePresentation = Object.freeze({
+  provider_not_configured: Object.freeze({ label: "Sağlayıcı seçilmedi", detail: "Ödeme başlatma capability'si kullanılamaz." }),
+  credentials_required: Object.freeze({ label: "Sağlayıcı kimlik bilgileri eksik", detail: "Gizli değerler bu ekranda gösterilmez; yapılandırma tamamlanmadan ödeme başlatılamaz." }),
+  client_ip_config_required: Object.freeze({ label: "Müşteri IP yapılandırması eksik", detail: "Sağlayıcı isteği için gerekli güvenli istemci IP sözleşmesi hazır değil." }),
+  production_test_mode_forbidden: Object.freeze({ label: "Üretimde test modu yasak", detail: "Canlı ortam test modu ile ödeme başlatamaz." }),
+  activation_required: Object.freeze({ label: "Canlı istek aktivasyonu gerekli", detail: "Sağlayıcı yapılandırılmış olsa da dış isteğe ayrıca açık izin verilmelidir." }),
+  ready: Object.freeze({ label: "Sağlayıcı hazır", detail: "Bu yalnız yapılandırma readiness bilgisidir; ödeme veya para hareketi kanıtı değildir." }),
+});
+
+const unknownPaymentProviderPresentation = Object.freeze({
+  label: "Ödeme sağlayıcısı durumu doğrulanamadı",
+  detail: "Durum sözleşmesi bilinmediği için ödeme capability'si fail-closed kabul edilir.",
 });
 
 const statusClass = (value) => String(value || "")
@@ -202,6 +218,32 @@ function Kpi({ label, value, note }) {
   );
 }
 
+function PaymentProviderStatus({ paymentProvider }) {
+  const state = String(paymentProvider?.state || "").trim().toLowerCase();
+  const presentation = paymentProviderStatePresentation[state] || unknownPaymentProviderPresentation;
+  const ready = state === "ready" && paymentProvider?.ready === true;
+  const provider = String(paymentProvider?.provider || "").trim();
+  return (
+    <section
+      className={`notice-card live-payment-provider-banner ${ready ? "is-ready" : "is-blocked"}`}
+      role="status"
+      aria-live="polite"
+      data-payment-provider-state={state || "unknown"}
+      data-payment-provider-ready={ready ? "true" : "false"}
+    >
+      <Icon name={ready ? "check" : "warning"} />
+      <div>
+        <strong>{presentation.label}</strong>
+        <p>{presentation.detail}</p>
+      </div>
+      <span className="live-provider-identity">
+        <b>{provider ? provider.toLocaleUpperCase("tr-TR") : "Sağlayıcı tanımsız"}</b>
+        <small>{paymentProvider?.testMode === true ? "Test modu" : ready ? "Canlı moda uygun" : "Ödeme başlatma kapalı"}</small>
+      </span>
+    </section>
+  );
+}
+
 const cancellableOrderStatuses = new Set(ORDER_CANCEL_EXPECTED_STATUSES);
 const noMutationActions = Object.freeze({});
 
@@ -212,24 +254,97 @@ const orderMayBeCancelled = (order) => cancellableOrderStatuses.has(order.backen
 const orderMayBeHandedOff = (order) => order.backendStatus === MANUAL_SHIPMENT_EXPECTED_STATUS
   && order.paymentStatus === "PAID"
   && order.refundStatus === "NONE"
-  && order.shipmentStatus === "NONE";
+  && order.shipmentStatus === "NONE"
+  && Array.isArray(order.sellerAllocations)
+  && order.sellerAllocations.length === 0;
+
+const manualShipmentUnavailableReason = (order) => {
+  if (!Array.isArray(order.sellerAllocations)) {
+    return "Seller sahiplik dağılımı doğrulanamadığı için Admin kargo devri kapalı";
+  }
+  if (order.sellerAllocations.length > 0) {
+    return "Seller sahipli siparişte kargo devri Seller fulfillment otoritesindedir";
+  }
+  return "Sipariş hazırlık, ödeme, refund veya gönderi koşullarında değil";
+};
+
+const orderMayBeDelivered = (order) => order.backendStatus === MANUAL_DELIVERY_EXPECTED_STATUS
+  && order.paymentStatus === "PAID"
+  && order.refundStatus === "NONE"
+  && order.shipmentStatus === MANUAL_DELIVERY_EXPECTED_SHIPMENT_STATUS
+  && Boolean(order.shipmentProvider)
+  && Boolean(order.trackingNo)
+  && Array.isArray(order.sellerAllocations)
+  && order.sellerAllocations.length <= 1;
+
+function OrderSellerSummary({ order, compact }) {
+  const allocations = Array.isArray(order.sellerAllocations) ? order.sellerAllocations : [];
+  if (allocations.length === 0) {
+    return <span className="live-customer-cell"><strong>Platform siparişi</strong><small>Seller organizasyon dağılımı yok</small></span>;
+  }
+  return (
+    <span className="live-order-stack live-seller-allocation-list">
+      {allocations.map((allocation, index) => (
+        <span className="live-order-stack-item" key={`${allocation.sellerOrderId || "allocation"}-${allocation.storeId || index}`}>
+          <strong>{allocation.organizationName || `Organizasyon #${allocation.organizationId}`}</strong>
+          <small>{allocation.storeName || `Mağaza #${allocation.storeId}`} · {allocation.status}</small>
+          {!compact && <small>Seller siparişi #{allocation.sellerOrderId} · {money(allocation.grossAmount, allocation.currency)}</small>}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function OrderItemSummary({ order, compact }) {
+  const items = Array.isArray(order.items) ? order.items : [];
+  if (items.length === 0) return <span className="live-customer-cell"><strong>{order.itemCount} satır</strong><small>Kalem detayı yok</small></span>;
+  return (
+    <span className="live-order-stack live-order-item-list">
+      {items.map((item, index) => (
+        <span className="live-order-stack-item" key={`${item.productId || "item"}-${item.storeId || "store"}-${index}`}>
+          <strong>{item.name} × {item.quantity}</strong>
+          {!compact && <small>{item.productId ? `Ürün #${item.productId}` : "Ürün bağı yok"} · {item.storeId ? `mağaza #${item.storeId}` : "mağaza bağı yok"} · {money(item.lineTotal, order.currency)}</small>}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function OrderPaymentSummary({ order, compact }) {
+  return (
+    <span className="live-order-stack live-payment-truth">
+      <span className="live-order-stack-item">
+        <strong className={order.paymentFailed ? "negative" : order.pendingPayment ? "live-payment-pending" : ""}>{order.paymentStatus}</strong>
+        <small>Yerel refund: {order.refundStatus}</small>
+      </span>
+      {!compact && <>
+        <span className="live-order-stack-item"><strong>{order.paymentProvider ? order.paymentProvider.toLocaleUpperCase("tr-TR") : "Sağlayıcı kaydı yok"}</strong><small>NovaStore ref: {order.paymentRef || "Yok"}</small>{order.paymentExternalRef && <small>Dış ref: {order.paymentExternalRef}</small>}</span>
+        {order.paymentFailureReason && <small className="live-payment-failure">Başarısızlık: {order.paymentFailureReason}</small>}
+        <small>{order.paymentUpdatedAt ? `Ödeme kaydı ${dateTime(order.paymentUpdatedAt)}` : "Ödeme güncelleme tarihi yok"}</small>
+        <small className="live-refund-boundary">Refund durumu yerel kayıttır; sağlayıcı para hareketi ayrıca doğrulanmalıdır.</small>
+      </>}
+    </span>
+  );
+}
 
 function OrdersTable({ orders, compact = false, mutationActions = {}, onOpenOperation }) {
   const cancelEnabled = typeof mutationActions.cancelOrder === "function";
   const shipmentEnabled = typeof mutationActions.createManualShipment === "function";
-  const operationsEnabled = !compact && (cancelEnabled || shipmentEnabled);
+  const deliveryEnabled = typeof mutationActions.confirmManualDelivery === "function";
+  const operationsEnabled = !compact && (cancelEnabled || shipmentEnabled || deliveryEnabled);
   return (
     <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Sipariş özeti tablosu">
       <table className="data-table live-orders-table">
-        <caption className="sr-only">Entegre backend’den okunan salt-okunur sipariş özetleri</caption>
+        <caption className="sr-only">Entegre backend’den okunan sipariş özetleri; izinli işlemler ayrıca capability kontrollüdür</caption>
         <thead>
           <tr>
             <th scope="col">Sipariş</th>
             <th scope="col">Müşteri</th>
             <th scope="col">Durum</th>
-            <th scope="col">Ödeme</th>
+            <th scope="col">Satıcı / mağaza</th>
+            <th scope="col">Kalem / adet</th>
+            <th scope="col">Ödeme / refund</th>
             <th scope="col">Kargo</th>
-            <th scope="col">Satır</th>
             <th scope="col">Tutar</th>
             <th scope="col">Tarih</th>
             {operationsEnabled && <th scope="col">Kontrollü işlem</th>}
@@ -249,22 +364,20 @@ function OrdersTable({ orders, compact = false, mutationActions = {}, onOpenOper
                 <span className={`status status-${statusClass(order.status)}`}>{order.status}</span>
                 {order.statusNote && <small className="live-status-note">{order.statusNote}</small>}
               </td>
-              <td>
-                <span className={order.paymentFailed ? "negative" : order.pendingPayment ? "live-payment-pending" : ""}>
-                  {order.paymentStatus}
-                </span>
-              </td>
+              <td><OrderSellerSummary order={order} compact={compact} /></td>
+              <td><OrderItemSummary order={order} compact={compact} /></td>
+              <td><OrderPaymentSummary order={order} compact={compact} /></td>
               <td>
                 <span className="live-customer-cell">
                   <strong>Yerel: {shipmentStatusLabels[order.shipmentStatus] || order.shipmentStatus}</strong>
-                  {!compact && order.shipmentProvider && <small>{order.shipmentProvider}</small>}
-                  {!order.carrierConfirmed && <small>Taşıyıcı doğrulanmadı</small>}
+                   {!compact && order.shipmentProvider && <small>{order.shipmentProvider}</small>}
+                   {!compact && order.trackingNo && <small>Takip no: {order.trackingNo}</small>}
+                   {!order.carrierConfirmed && <small>Taşıyıcı doğrulanmadı</small>}
                   {!compact && order.estimatedDeliveryAt && <small>Tahmini {dateOnly(order.estimatedDeliveryAt)}</small>}
                 </span>
               </td>
-              <td>{order.itemCount}</td>
               <td><strong>{money(order.total, order.currency)}</strong></td>
-              <td>{dateTime(order.createdAt)}</td>
+              <td><span className="live-customer-cell"><strong>{dateTime(order.createdAt)}</strong>{!compact && order.updatedAt && <small>Güncellendi {dateTime(order.updatedAt)}</small>}</span></td>
               {operationsEnabled && (
                 <td>
                   <span className="live-operation-buttons">
@@ -283,10 +396,19 @@ function OrdersTable({ orders, compact = false, mutationActions = {}, onOpenOper
                         type="button"
                         className="secondary-button small"
                         disabled={!orderMayBeHandedOff(order)}
-                        title={orderMayBeHandedOff(order) ? "Manuel kargo devrini doğrula" : "Sipariş manuel kargo devri koşullarında değil"}
-                        aria-label={orderMayBeHandedOff(order) ? `${order.id} için manuel kargo devrini doğrula` : `${order.id} manuel kargo devri kullanılamıyor; hazırlık, ödeme, refund veya gönderi koşulu uygun değil`}
+                        title={orderMayBeHandedOff(order) ? "Manuel kargo devrini doğrula" : manualShipmentUnavailableReason(order)}
+                        aria-label={orderMayBeHandedOff(order) ? `${order.id} için manuel kargo devrini doğrula` : `${order.id} manuel kargo devri kullanılamıyor; ${manualShipmentUnavailableReason(order)}`}
                         onClick={() => onOpenOperation("shipment", order)}
                       >Kargoya devret</button>
+                    )}
+                    {deliveryEnabled && orderMayBeDelivered(order) && (
+                      <button
+                        type="button"
+                        className="primary-button small"
+                        title="Fiziksel teslimatı doğrula"
+                        aria-label={`${order.id} için fiziksel teslimatı doğrula`}
+                        onClick={() => onOpenOperation("delivery", order)}
+                      >Teslimatı doğrula</button>
                     )}
                   </span>
                 </td>
@@ -324,8 +446,8 @@ function Dashboard({ stats, orderPage, orderPhase, orderError, ordersEnabled, on
       <section className="notice-card live-boundary-notice" role="note">
         <Icon name="shield" />
         <div>
-          <strong>Entegre tek-satıcı sınırı</strong>
-          <p>Satıcı, teklif, hakediş ve payout modelleri backend’de oluşana kadar bu alanlar kapalıdır; mock kayıt gösterilmez.</p>
+          <strong>Entegre çok mağazalı sipariş gerçeği</strong>
+          <p>Seller organizasyonu, mağaza ve kalem dağılımı yalnız backend sözleşmesinden okunur; hakediş veya payout verisi üretilmez ve mock kayıt gösterilmez.</p>
         </div>
       </section>
 
@@ -350,6 +472,8 @@ function OrderOperationSummary({ order }) {
       <div><dt>Beklenen durum</dt><dd>{order.backendStatus}</dd></div>
       <div><dt>Ödeme</dt><dd>{order.paymentStatus}</dd></div>
       <div><dt>Yerel refund</dt><dd>{order.refundStatus}</dd></div>
+      <div><dt>Sağlayıcı</dt><dd>{order.paymentProvider || "Sağlayıcı kaydı yok"}</dd></div>
+      <div><dt>Ödeme referansı</dt><dd>{order.paymentRef || "Referans yok"}</dd></div>
       <div><dt>Tutar</dt><dd>{money(order.total, order.currency)}</dd></div>
     </dl>
   );
@@ -491,7 +615,71 @@ function ManualShipmentDialog({ operation, action, onClose, onConflict, onUnavai
   );
 }
 
-function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities, mutationActions, notificationTarget = null }) {
+function ManualDeliveryDialog({ operation, action, onClose, onConflict, onUnavailable, onComplete }) {
+  const [deliveryConfirmed, setDeliveryConfirmed] = useState(false);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setError(null);
+    if (!deliveryConfirmed) {
+      setError("Siparişin fiziksel olarak teslim edildiğini açıkça doğrulamanız gerekir.");
+      return;
+    }
+    setAttempted(true);
+    setBusy(true);
+    try {
+      const result = await action({
+        orderId: operation.order.rawId,
+        expectedStatus: operation.order.backendStatus,
+        expectedShipmentStatus: operation.order.shipmentStatus,
+        deliveryConfirmed,
+        provider: operation.order.shipmentProvider,
+        trackingNo: operation.order.trackingNo,
+        idempotencyKey: operation.idempotencyKey,
+      });
+      onComplete({ kind: "delivery", reused: result?.reused === true });
+    } catch (requestError) {
+      if (requestError?.status === 409) {
+        onConflict(requestError);
+        return;
+      }
+      if (requestError?.status === 403 || requestError?.status === 503) {
+        onUnavailable(requestError);
+        return;
+      }
+      setError(requestError);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <OperationDialog title={`${operation.order.id} teslimatını doğrula`} busy={busy} onClose={onClose} testId="manual-delivery-dialog">
+      <div className="confirmation-body">
+        <Icon name="check" />
+        <p><strong>Sipariş ve mevcut gönderi “Teslim Edildi” durumuna geçirilecek.</strong> Bu kayıt taşıyıcıya veya ödeme sağlayıcısına istek göndermez; Admin’in açık teslim beyanıdır, harici sağlayıcı kanıtı değildir.</p>
+      </div>
+      <OrderOperationSummary order={operation.order} />
+      <dl className="detail-list live-operation-summary">
+        <div><dt>Kargo sağlayıcısı</dt><dd>{operation.order.shipmentProvider}</dd></div>
+        <div><dt>Takip numarası</dt><dd>{operation.order.trackingNo}</dd></div>
+        <div><dt>Beklenen gönderi</dt><dd>{operation.order.shipmentStatus}</dd></div>
+      </dl>
+      <form className="modal-form live-operation-form" onSubmit={submit} aria-describedby="manual-delivery-boundary manual-delivery-error">
+        <label className="live-handoff-confirmation"><input type="checkbox" checked={deliveryConfirmed} onChange={(event) => { setDeliveryConfirmed(event.target.checked); setError(null); }} disabled={busy || attempted} data-autofocus /><span>Siparişin bu takip numarasıyla fiziksel olarak müşteriye teslim edildiğini doğruluyorum.</span></label>
+        <p className="form-hint" id="manual-delivery-boundary">Bu işlem platform veya Seller sahipliğinden bağımsız olarak yalnız tek taraflı sipariş sözleşmesinde, PAID ödeme ve refund NONE durumunda çalışır. Sağlayıcı para hareketi, kargo API çağrısı veya teslim belgesi üretmez.</p>
+        <OperationError error={error} id="manual-delivery-error" />
+        {attempted && error && <p className="form-hint">Güvenli tekrar için ilk isteğin alanları ve idempotency anahtarı korundu. Güncel durumu değiştirmek için pencereyi kapatıp listeyi yenileyin.</p>}
+        <footer><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Vazgeç</button><button type="submit" className="primary-button" disabled={busy || !deliveryConfirmed}>{busy ? "Doğrulanıyor…" : attempted ? "Aynı isteği tekrar dene" : "Teslim edildi olarak kaydet"}</button></footer>
+      </form>
+    </OperationDialog>
+  );
+}
+
+function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities, mutationActions, paymentProvider, notificationTarget = null }) {
   const orders = orderPage.items;
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Tümü");
@@ -501,7 +689,8 @@ function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities,
   const writesSuppressed = suppressedMutationActions === mutationActions;
   const visibleMutationActions = writesSuppressed ? noMutationActions : mutationActions;
   const operationsEnabled = typeof visibleMutationActions.cancelOrder === "function"
-    || typeof visibleMutationActions.createManualShipment === "function";
+    || typeof visibleMutationActions.createManualShipment === "function"
+    || typeof visibleMutationActions.confirmManualDelivery === "function";
   const statuses = useMemo(() => ["Tümü", ...new Set(orders.map((order) => order.status))], [orders]);
   useEffect(() => {
     if (!notificationTarget?.entityId) return;
@@ -512,7 +701,13 @@ function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities,
     const normalized = query.trim().toLocaleLowerCase("tr-TR");
     return orders.filter((order) => {
       const matchesStatus = status === "Tümü" || order.status === status;
-      const haystack = `${order.id} ${order.rawId || ""} ${order.customerName} ${order.email}`.toLocaleLowerCase("tr-TR");
+      const itemSearch = (Array.isArray(order.items) ? order.items : [])
+        .map((item) => `${item.productId} ${item.name} ${item.storeId}`)
+        .join(" ");
+      const sellerSearch = (Array.isArray(order.sellerAllocations) ? order.sellerAllocations : [])
+        .map((allocation) => `${allocation.sellerOrderId} ${allocation.organizationId} ${allocation.organizationName} ${allocation.storeId} ${allocation.storeName}`)
+        .join(" ");
+      const haystack = `${order.id} ${order.rawId || ""} ${order.customerName} ${order.email} ${order.paymentProvider || ""} ${order.paymentRef || ""} ${order.paymentExternalRef || ""} ${order.trackingNo || ""} ${itemSearch} ${sellerSearch}`.toLocaleLowerCase("tr-TR");
       return matchesStatus && (!normalized || haystack.includes(normalized));
     });
   }, [orders, query, status]);
@@ -546,11 +741,14 @@ function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities,
   };
   const handleComplete = ({ kind, reused }) => {
     setOperation(null);
+    const message = kind === "cancel"
+      ? `Sipariş iptali ${reused ? "aynı güvenli isteğin tekrarı olarak doğrulandı" : "kaydedildi"}. Sağlayıcı refund'u otomatik çalıştırılmadı; finans incelemesini tamamlayın.`
+      : kind === "delivery"
+        ? `Manuel teslim doğrulaması ${reused ? "aynı güvenli isteğin tekrarı olarak doğrulandı" : "kaydedildi"}. Taşıyıcı veya ödeme sağlayıcısı çağrılmadı.`
+        : `Manuel kargo devri ${reused ? "aynı güvenli isteğin tekrarı olarak doğrulandı" : "kaydedildi"}. Taşıyıcı API/etiket işlemi yapılmadı.`;
     setOperationNotice({
       tone: "success",
-      message: kind === "cancel"
-        ? `Sipariş iptali ${reused ? "aynı güvenli isteğin tekrarı olarak doğrulandı" : "kaydedildi"}. Sağlayıcı refund'u otomatik çalıştırılmadı; finans incelemesini tamamlayın.`
-        : `Manuel kargo devri ${reused ? "aynı güvenli isteğin tekrarı olarak doğrulandı" : "kaydedildi"}. Taşıyıcı API/etiket işlemi yapılmadı.`,
+      message,
     });
     onRefresh();
   };
@@ -561,7 +759,7 @@ function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities,
         <div>
           <span className="eyebrow">Entegre backend · {operationsEnabled ? "capability kontrollü" : "salt okunur"}</span>
           <h2 tabIndex="-1">Son sipariş özetleri</h2>
-          <p>En fazla son {orderPage.limit} kayıt gösterilir. Genel durum/toplu yazma kapalıdır; iptal ve manuel kargo yalnız açık sunucu capability'si ve işlem doğrulamasıyla sunulur.</p>
+          <p>En fazla son {orderPage.limit} kayıt gösterilir. Genel durum/toplu yazma kapalıdır; iptal, manuel kargo devri ve uygun tek taraflı teslim doğrulaması yalnız açık sunucu capability'siyle sunulur.</p>
         </div>
         <button className="secondary-button" onClick={onRefresh} disabled={refreshing}>
           <Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}
@@ -569,6 +767,7 @@ function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities,
       </header>
 
       <ResourceWarning error={error} onRetry={onRefresh} />
+      <PaymentProviderStatus paymentProvider={paymentProvider} />
       {operationNotice && <section className={`notice-card live-operation-notice ${operationNotice.tone === "warning" ? "warning-card" : "success-card"}`} role="status"><Icon name={operationNotice.tone === "warning" ? "warning" : "check"} /><div><strong>{operationNotice.tone === "warning" ? "Güncel veri gerekli" : "İşlem kaydedildi"}</strong><p>{operationNotice.message}</p></div></section>}
       <section className="table-card">
         <div className="ledger-toolbar filter-toolbar live-filter-toolbar">
@@ -596,6 +795,7 @@ function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities,
       </section>
       {operation?.kind === "cancel" && typeof visibleMutationActions.cancelOrder === "function" && <CancelOrderDialog operation={operation} action={visibleMutationActions.cancelOrder} onClose={closeOperation} onConflict={handleConflict} onUnavailable={handleUnavailable} onComplete={handleComplete} />}
       {operation?.kind === "shipment" && typeof visibleMutationActions.createManualShipment === "function" && <ManualShipmentDialog operation={operation} action={visibleMutationActions.createManualShipment} onClose={closeOperation} onConflict={handleConflict} onUnavailable={handleUnavailable} onComplete={handleComplete} />}
+      {operation?.kind === "delivery" && typeof visibleMutationActions.confirmManualDelivery === "function" && <ManualDeliveryDialog operation={operation} action={visibleMutationActions.confirmManualDelivery} onClose={closeOperation} onConflict={handleConflict} onUnavailable={handleUnavailable} onComplete={handleComplete} />}
     </section>
   );
 }
@@ -798,7 +998,7 @@ function CatalogProductArchiveDialog({ product, action, onClose, onComplete, onR
       <dl className="detail-list live-operation-summary"><div><dt>Ürün</dt><dd>{product.id}</dd></div><div><dt>Beklenen revision</dt><dd>{product.revision}</dd></div><div><dt>Mevcut yayın</dt><dd>{CATALOG_PUBLICATION_STATUS_LABELS[product.publicationStatus]}</dd></div></dl>
       <form className="modal-form live-operation-form" onSubmit={submit} aria-describedby="catalog-archive-boundary catalog-archive-error">
         <label className="live-handoff-confirmation"><input type="checkbox" checked={confirmed} onChange={(event) => { setConfirmed(event.target.checked); setRequestError(null); }} disabled={busy} data-autofocus /><span>Ürünün müşteri görünürlüğünün kapanacağını ve Tur 3D içinde geri yükleme aksiyonu olmadığını doğruluyorum.</span></label>
-        <p className="form-hint" id="catalog-archive-boundary">Arşivleme yalnız first-party ürün kaydını değiştirir; hard-delete, medya silme veya dış servis çağrısı yapmaz.</p>
+        <p className="form-hint" id="catalog-archive-boundary">Arşivleme yalnız adminEditable=true platform ürün kaydını değiştirir; Seller ürününe, hard-delete işlemine, medya varlığına veya dış servise dokunmaz.</p>
         <OperationError error={requestError} id="catalog-archive-error" />
         <footer><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Vazgeç</button><button type="submit" className="danger-button" disabled={busy || !confirmed}>{busy ? "Arşivleniyor…" : "Ürünü arşivle"}</button></footer>
       </form>
@@ -1091,6 +1291,33 @@ function CatalogMediaDialog({ product: initialProduct, actions, onClose, onCompl
   );
 }
 
+const catalogProductStoreTupleMissing = (product) => product.storeId == null
+  && !product.storeName
+  && !product.storeSlug;
+
+const catalogProductOwnershipUnresolved = (product) => product.adminEditable !== true
+  && !product.sellerOrganizationId
+  && catalogProductStoreTupleMissing(product);
+
+const catalogReadonlyPresentation = (product) => {
+  if (product.sellerOrganizationId) {
+    return {
+      title: "Seller ürünü · salt okunur",
+      detail: "Detay mutation, medya ve arşivleme Admin'de açılmaz.",
+    };
+  }
+  if (catalogProductOwnershipUnresolved(product)) {
+    return {
+      title: "Sahiplik/store bağı doğrulanamadı · salt okunur",
+      detail: "Mağaza ve organizasyon bağı authoritative olarak kurulmadan Admin mutation açılmaz.",
+    };
+  }
+  return {
+    title: "Ürün · salt okunur",
+    detail: "Admin yazma sahipliği doğrulanmadığı için detay ve mutation açılmaz.",
+  };
+};
+
 function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh, onReloadCapabilities, mutationActions }) {
   const products = catalogPage.items;
   const [query, setQuery] = useState("");
@@ -1108,12 +1335,19 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
     && typeof mutationActions.updateCatalogProduct === "function"
     && typeof mutationActions.archiveCatalogProduct === "function";
   const writesBlocked = !writeCapabilityEnabled || writesSuppressed || Boolean(error) || refreshing || sessionRefreshing;
-  const filtered = useMemo(() => filterFirstPartyCatalogProducts(products, {
-    publication,
-    query,
-    stock,
-    visibility,
-  }), [products, publication, query, stock, visibility]);
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase("tr-TR");
+    return filterFirstPartyCatalogProducts(products, {
+      publication,
+      query: "",
+      stock,
+      visibility,
+    }).filter((product) => {
+      const haystack = `${product.id} ${product.rawId} ${product.name} ${product.primaryCategoryName || ""} ${product.primaryCategoryPath || ""} ${product.storeId || ""} ${product.storeName || ""} ${product.storeSlug || ""} ${product.sellerOrganizationId || ""} ${product.sellerOrganizationName || ""}`
+        .toLocaleLowerCase("tr-TR");
+      return !normalized || haystack.includes(normalized);
+    });
+  }, [products, publication, query, stock, visibility]);
 
   useEffect(() => {
     if (!writesBlocked || !operation) return;
@@ -1187,6 +1421,14 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
   const openExactProductOperation = async (kind, summary) => {
     if (writesBlocked || openingProductId !== null) return;
     setOperationNotice(null);
+    if (summary.adminEditable !== true) {
+      const readonlyPresentation = catalogReadonlyPresentation(summary);
+      setOperationNotice({
+        tone: "warning",
+        message: `${readonlyPresentation.title}. Commerce Pro kaydı görünür tutar ancak ${readonlyPresentation.detail}`,
+      });
+      return;
+    }
     setOpeningProductId(summary.rawId);
     try {
       const product = await mutationActions.getCatalogProduct({ productId: summary.rawId });
@@ -1243,25 +1485,25 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
   };
   const archivedProduct = (product) => Boolean(product.deletedAt) || product.publicationStatus === "archived";
   const writeBoundaryMessage = !writeCapabilityEnabled
-    ? "Bu oturum ürün özetlerini salt okunur gösterir; ürün yazma capability'si sunulmadı."
+    ? "Bu oturum bütün ürün özetlerini salt okunur gösterir; platform ürünü yazma capability'si sunulmadı. Seller ürünleri capability'den bağımsız olarak salt okunurdur."
     : writesSuppressed
       ? "Sunucu yazmayı reddettiği için bu görünümdeki ürün aksiyonları oturum yeniden doğrulanana kadar kapatıldı."
       : error
         ? "Son katalog yenilemesi başarısız olduğu için eski revision üzerinde yazma yapılmaz."
         : refreshing || sessionRefreshing
           ? "Katalog veya admin oturumu yenilenirken ürün yazmaları geçici olarak kapalıdır."
-          : "Oluşturma, güncelleme ve arşivleme yalnız first-party ürün JSON sözleşmesi ve güncel revision ile açıktır.";
+          : "Oluşturma, güncelleme ve arşivleme yalnız adminEditable=true platform ürününde ve güncel revision ile açıktır; Seller ürünleri salt okunur kalır.";
 
   return (
     <section className="workspace live-workspace" data-testid="live-catalog">
       <header className="workspace-heading operations-heading">
         <div>
-          <span className="eyebrow">Entegre backend · birinci taraf · {writeCapabilityEnabled ? "capability kontrollü JSON CRUD" : "salt okunur"}</span>
+          <span className="eyebrow">Entegre backend · paylaşımlı katalog · {writeCapabilityEnabled ? "platform yazması capability kontrollü" : "salt okunur"}</span>
           <h2 tabIndex="-1">Ürünler</h2>
-          <p>En fazla son {catalogPage.limit} NovaStore ürün kaydı, ürün kimliği azalan sırada gösterilir.</p>
+          <p>En fazla son {catalogPage.limit} platform ve Seller ürün kaydı, sahiplik ve mağaza gerçeğiyle gösterilir.</p>
         </div>
         <div className="heading-actions live-catalog-heading-actions">
-          {writeCapabilityEnabled && <button className="primary-button" onClick={openCreate} disabled={writesBlocked || openingProductId !== null}><Icon name="package" />Yeni ürün</button>}
+          {writeCapabilityEnabled && <button className="primary-button" onClick={openCreate} disabled={writesBlocked || openingProductId !== null}><Icon name="package" />Yeni platform ürünü</button>}
           <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
         </div>
       </header>
@@ -1271,8 +1513,8 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
       <section className="notice-card live-boundary-notice" role="note">
         <Icon name="shield" />
         <div>
-          <strong>Tek satıcılı first-party katalog · sağlayıcı yazması kapalı</strong>
-          <p>Bu liste yalnız NovaStore ürün kayıtlarını işler. “İç yayın incelemesi” satıcı izni değildir; satıcı, teklif veya risk kuyruğu oluşturulmaz. Doğrulanmış Cloudinary URL kayıtları capability ile sıralanabilir; dosya yükleme/silme, hard-delete ve arşivden geri yükleme bu turda yoktur.</p>
+          <strong>Tek katalog gerçeği · sahiplik tabanlı yazma sınırı</strong>
+          <p>Platform ve Seller ürünleri aynı listede görünür. Yalnız adminEditable=true platform kaydı düzenlenebilir; Seller ürününde detay mutation, medya yazması ve arşivleme açılmaz. Dosya yükleme/silme, hard-delete ve arşivden geri yükleme bu turda yoktur.</p>
         </div>
       </section>
 
@@ -1312,20 +1554,24 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
           <div className="state-panel">
             <Icon name="package" />
             <h3>Henüz ürün kaydı yok</h3>
-            <p>Backend birinci taraf katalog için boş bir liste döndürdü.</p>
+            <p>Backend paylaşımlı katalog için boş bir liste döndürdü.</p>
             <button className="secondary-button" onClick={onRefresh} disabled={refreshing}>{refreshing ? "Yenileniyor" : "Yeniden dene"}</button>
           </div>
         ) : filtered.length > 0 ? (
-          <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Birinci taraf ürün özeti tablosu">
+          <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Platform ve Seller ürün özeti tablosu">
             <table className="data-table live-catalog-table">
-              <caption className="sr-only">Entegre backend'den okunan {writeCapabilityEnabled ? "capability kontrollü" : "salt okunur"} birinci taraf ürün özetleri</caption>
-              <thead><tr><th scope="col">Ürün</th><th scope="col">Birincil kategori</th><th scope="col">Fiyat</th><th scope="col">Stok</th><th scope="col">Yayın</th><th scope="col">Etkin vitrin</th><th scope="col">Medya</th><th scope="col">Güncellendi</th>{writeCapabilityEnabled && <th scope="col">Ürün işlemi</th>}</tr></thead>
+              <caption className="sr-only">Entegre backend'den okunan platform ve Seller ürün özetleri; Seller ürünleri salt okunurdur</caption>
+              <thead><tr><th scope="col">Ürün</th><th scope="col">Mağaza / sahiplik</th><th scope="col">Birincil kategori</th><th scope="col">Fiyat</th><th scope="col">Stok</th><th scope="col">Yayın</th><th scope="col">Etkin vitrin</th><th scope="col">Medya</th><th scope="col">Güncellendi</th><th scope="col">Ürün işlemi</th></tr></thead>
               <tbody>{filtered.map((product) => {
                 const publicationStatus = resolveCatalogPublicationStatus(product);
                 const customerVisible = isCatalogProductEffectivelyVisible(product);
+                const storeTupleMissing = catalogProductStoreTupleMissing(product);
+                const ownershipUnresolved = catalogProductOwnershipUnresolved(product);
+                const readonlyPresentation = catalogReadonlyPresentation(product);
                 return (
                   <tr key={product.id}>
                     <td><span className="live-catalog-product"><Icon name="package" /><span><strong>{product.name}</strong><small>{product.id}</small></span></span></td>
+                    <td><span className="live-order-stack live-product-owner"><span className="live-order-stack-item"><strong>{storeTupleMissing ? "Atanmamış mağaza" : product.storeName || `Mağaza #${product.storeId}`}</strong><small>{storeTupleMissing ? "Mağaza kimliği eksik" : `${product.storeSlug || "Mağaza slug bilgisi yok"} · ${product.storeOperationalStatus}`}</small></span><span className="live-order-stack-item"><strong>{ownershipUnresolved ? "Sahiplik/store bağı doğrulanamadı" : product.sellerOrganizationName || "NovaStore platform"}</strong><small>{product.sellerOrganizationId ? `Organizasyon #${product.sellerOrganizationId} · ${product.sellerOrganizationStatus}` : ownershipUnresolved ? "Organizasyon bağı yok · salt okunur" : "Platform sahipliği"}</small></span></span></td>
                     <td><span className="live-customer-cell"><strong>{product.primaryCategoryName || "Birincil kategori yok"}</strong><small>{product.primaryCategoryPath || `${product.categoryCount} kategori bağlantısı`}</small></span></td>
                     <td><span className="live-customer-cell"><strong>{money(product.price, product.currency)}</strong>{product.oldPrice !== null && <small>Önceki {money(product.oldPrice, product.currency)}</small>}</span></td>
                     <td><span className={`status ${product.stock > 0 ? "status-stokta" : "status-stokta-yok"}`}>{product.stock > 0 ? `${product.stock} adet` : "Tükendi"}</span></td>
@@ -1333,7 +1579,7 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
                     <td><span className={`status ${customerVisible ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{customerVisible ? "Görünür" : "Görünmez"}</span>{!customerVisible && product.customerVisible && <small className="live-status-note">Ham bayrak açık; yayın veya arşiv durumu vitrine kapatır.</small>}</td>
                     <td><span className={`live-media-presence ${product.hasMedia ? "has-media" : "no-media"}`}><Icon name={product.hasMedia ? "check" : "warning"} />{product.hasMedia ? "Mevcut" : "Yok"}</span></td>
                     <td><span className="live-customer-cell"><strong>{dateTime(product.updatedAt || product.createdAt)}</strong><small>{product.updatedAt ? "Son güncelleme" : product.createdAt ? "Oluşturulma" : "Tarih bilgisi yok"}</small></span></td>
-                    {writeCapabilityEnabled && <td>{archivedProduct(product) ? <span className="live-archived-lock"><Icon name="shield" />Arşivli · kilitli</span> : <span className="live-operation-buttons"><button type="button" className="secondary-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("edit", product)}>{openingProductId === product.rawId ? "Tam DTO alınıyor…" : "Düzenle"}</button><button type="button" className="secondary-button small" data-catalog-operation="media" data-product-id={product.rawId} disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("media", product)}>Medya</button><button type="button" className="danger-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("archive", product)}>Arşivle</button></span>}</td>}
+                    <td>{product.adminEditable !== true ? <span className="live-seller-readonly-lock"><Icon name="shield" /><span><strong>{readonlyPresentation.title}</strong><small>{readonlyPresentation.detail}</small></span></span> : !writeCapabilityEnabled ? <span className="live-archived-lock"><Icon name="shield" />Platform yazması kapalı</span> : archivedProduct(product) ? <span className="live-archived-lock"><Icon name="shield" />Arşivli · kilitli</span> : <span className="live-operation-buttons"><button type="button" className="secondary-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("edit", product)}>{openingProductId === product.rawId ? "Tam DTO alınıyor…" : "Düzenle"}</button><button type="button" className="secondary-button small" data-catalog-operation="media" data-product-id={product.rawId} disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("media", product)}>Medya</button><button type="button" className="danger-button small" disabled={writesBlocked || openingProductId !== null} onClick={() => openExactProductOperation("archive", product)}>Arşivle</button></span>}</td>
                   </tr>
                 );
               })}</tbody>
@@ -1347,7 +1593,7 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
             <button className="secondary-button" onClick={resetFilters}>Filtreleri temizle</button>
           </div>
         )}
-        <footer className={`table-footer live-catalog-write-footer ${writesBlocked ? "is-blocked" : "is-ready"}`} role="note"><span><Icon name={writesBlocked ? "shield" : "check"} />{writeBoundaryMessage}</span><strong>{writeCapabilityEnabled ? "JSON CRUD + medya kaydı" : "Salt okunur"}</strong></footer>
+        <footer className={`table-footer live-catalog-write-footer ${writesBlocked ? "is-blocked" : "is-ready"}`} role="note"><span><Icon name={writesBlocked ? "shield" : "check"} />{writeBoundaryMessage}</span><strong>{writeCapabilityEnabled ? "Platform CRUD · Seller salt okunur" : "Salt okunur"}</strong></footer>
       </section>
       {operation?.kind === "create" && typeof mutationActions.createCatalogProduct === "function" && <CatalogProductFormDialog mode="create" action={mutationActions.createCatalogProduct} onClose={() => setOperation(null)} onComplete={handleComplete} onRequestError={handleMutationError} />}
       {operation?.kind === "edit" && typeof mutationActions.updateCatalogProduct === "function" && <CatalogProductFormDialog mode="edit" product={operation.product} action={mutationActions.updateCatalogProduct} onClose={() => setOperation(null)} onComplete={handleComplete} onRequestError={handleMutationError} />}
@@ -1527,7 +1773,7 @@ function CatalogStructure({ structure, error, refreshing, onRefresh }) {
         <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
       </header>
       <ResourceWarning error={error} onRetry={onRefresh} />
-      <section className="notice-card live-boundary-notice" role="note"><Icon name="shield" /><div><strong>Satıcı portalı veya ürün izin kuyruğu değildir</strong><p>Bu ekran bugünkü tek satıcılı NovaStore'un ortak katalog yapısını okur. Satıcı, teklif, risk puanı, onay aksiyonu, medya URL'si veya yazma isteği taşımaz; menülerin iç URL değerleri de DTO'ya alınmaz.</p></div></section>
+      <section className="notice-card live-boundary-notice" role="note"><Icon name="shield" /><div><strong>Satıcı portalı veya ürün izin kuyruğu değildir</strong><p>Bu ekran platform ve Seller ürünlerinin paylaştığı ortak katalog yapısını okur. Seller sahipliği, teklif, risk puanı, onay aksiyonu, medya URL'si veya yazma isteği taşımaz; menülerin iç URL değerleri de DTO'ya alınmaz.</p></div></section>
       <section className="table-card live-structure-card">
         <nav className="ledger-tabs live-structure-tabs" aria-label="Katalog yapı bölümleri">
           {catalogStructureTabs.map(([id, label]) => <button type="button" key={id} className={view === id ? "active" : ""} aria-current={view === id ? "page" : undefined} onClick={() => setView(id)}>{label} <b>{counts[id]}</b></button>)}
@@ -1802,11 +2048,16 @@ function StoreDetailDialog({ resource, storeName, onClose }) {
             </span>
           </section>
           <dl className="store-private-detail-list">
+            <div><dt>Seller organizasyonu</dt><dd>{resource.data.sellerOrganizationName || "Organizasyon bağı yok"}{resource.data.sellerOrganizationId ? ` · #${resource.data.sellerOrganizationId}` : ""}</dd></div>
+            <div><dt>Organizasyon durumu</dt><dd>{resource.data.sellerOrganizationStatus || "Durum doğrulanamadı"}</dd></div>
+            <div><dt>Seller Store kaydı</dt><dd>{resource.data.sellerStoreId ? `#${resource.data.sellerStoreId} · ${resource.data.sellerStoreStatus}` : "Seller Store bağı yok"}</dd></div>
+            <div><dt>Sahiplik bağı</dt><dd><span className={`status ${resource.data.ownershipVerified === true ? "active" : "inactive"}`}>{resource.data.ownershipVerified === true ? "Doğrulandı" : "Doğrulanamadı"}</span></dd></div>
             <div><dt>Mağaza sahibi</dt><dd data-testid="store-owner-detail">{resource.data.ownerName || "Kayıtlı kişi adı yok"}</dd></div>
             <div><dt>Katalog kategorileri</dt><dd data-testid="store-category-detail">{resource.data.catalogCategories.length > 0 ? resource.data.catalogCategories.map((item) => item.name).join(", ") : "Henüz kategori ilişkisi yok"}</dd></div>
             <div><dt>Toplam ürün</dt><dd>{resource.data.productCount}</dd></div>
             <div><dt>Müşteriye görünür ürün</dt><dd>{resource.data.customerVisibleProductCount}</dd></div>
           </dl>
+          {resource.data.ownershipVerified !== true && <section className="notice-card warning-card live-store-ownership-warning" role="alert"><Icon name="warning" /><div><strong>Seller sahiplik bağı doğrulanamadı</strong><p>Organizasyon ve Seller Store kimliği authoritative bağla eşleşmeden bu kayıt üzerinde operasyon yapılmamalıdır.</p></div></section>}
           <p className="form-hint">Kişi ve kategori bilgileri özet yanıtında taşınmaz; yalnız bu açık detay isteğiyle yüklenir.</p>
         </div>
       ) : <StatePanel phase={resource.phase} error={resource.error} onRetry={resource.reload} />}
@@ -1820,32 +2071,36 @@ function SellerApplications({ storePage, detailResource, selectedStoreId, onSele
   const stores = storePage?.items || [];
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("tr-TR");
-    return stores.filter((store) => (
-      (!needle || store.storeName.toLocaleLowerCase("tr-TR").includes(needle))
-      && (status === "all" || store.operationalStatus === status)
-    ));
+    return stores.filter((store) => {
+      const haystack = `${store.storeName} ${store.id} ${store.sellerStoreId || ""} ${store.sellerOrganizationId || ""} ${store.sellerOrganizationName || ""}`.toLocaleLowerCase("tr-TR");
+      return (!needle || haystack.includes(needle))
+        && (status === "all" || store.operationalStatus === status);
+    });
   }, [query, status, stores]);
   const selectedStore = stores.find((store) => store.id === selectedStoreId) || null;
 
   return (
     <section className="workspace live-store-records" data-testid="seller-application-summary">
       <div className="workspace-heading">
-        <div><span className="eyebrow">Admin · mağaza kaydı mahremiyet sınırı</span><h2>Satıcı mağaza kayıtları</h2><p>Özet yalnız operasyonel ve finans dışı alanları taşır. Kişi ve kategori bilgileri açık detay isteğine ayrılmıştır.</p></div>
+        <div><span className="eyebrow">Admin · authoritative Seller Store bağı</span><h2>Satıcı mağaza kayıtları</h2><p>Özet operasyonel mağazayı Seller organizasyonu ve Seller Store kimliğiyle eşler. Kişi ve kategori bilgileri açık detay isteğine ayrılmıştır.</p></div>
         <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
       </div>
       <ResourceWarning error={error} onRetry={onRefresh} />
       <section className="table-card">
         <div className="ledger-toolbar filter-toolbar live-filter-toolbar">
-          <label className="table-search"><Icon name="search" /><span className="sr-only">Mağaza ara</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Mağaza adı ara" /></label>
+          <label className="table-search"><Icon name="search" /><span className="sr-only">Mağaza veya Seller organizasyonu ara</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Mağaza veya organizasyon ara" /></label>
           <label className="heading-select"><span className="sr-only">Operasyon durumuna göre filtrele</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">Tüm durumlar</option><option value="active">Aktif</option><option value="inactive">Pasif</option></select></label>
           <span className="live-result-count">{filtered.length} / {stores.length} mağaza</span>
         </div>
         {stores.length === 0 ? <div className="state-panel"><Icon name="storefront" /><h3>Mağaza kaydı yok</h3><p>Backend bu platform yöneticisi için boş bir mağaza özeti döndürdü.</p></div> : filtered.length === 0 ? <div className="state-panel"><Icon name="search" /><h3>Eşleşen mağaza yok</h3><p>Arama veya durum filtresini değiştirin.</p></div> : (
           <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Satıcı mağaza özeti tablosu">
             <table className="data-table store-summary-table">
-              <thead><tr><th>Mağaza</th><th>Operasyon durumu</th><th>Ürün</th><th>Görünür ürün</th><th>Güncellendi</th><th><span className="sr-only">Detay</span></th></tr></thead>
+              <thead><tr><th>Mağaza</th><th>Seller organizasyonu</th><th>Seller Store</th><th>Sahiplik bağı</th><th>Operasyon durumu</th><th>Ürün</th><th>Görünür ürün</th><th>Güncellendi</th><th><span className="sr-only">Detay</span></th></tr></thead>
               <tbody>{filtered.map((store) => <tr key={store.id}>
                 <td><strong>{store.storeName}</strong><small>Mağaza #{store.id}</small></td>
+                <td><span className="live-customer-cell"><strong>{store.sellerOrganizationName || "Organizasyon bağı yok"}</strong><small>{store.sellerOrganizationId ? `#${store.sellerOrganizationId} · ${store.sellerOrganizationStatus}` : "Kimlik doğrulanamadı"}</small></span></td>
+                <td><span className="live-customer-cell"><strong>{store.sellerStoreId ? `#${store.sellerStoreId}` : "Bağ yok"}</strong><small>{store.sellerStoreStatus || "Durum doğrulanamadı"}</small></span></td>
+                <td><span className={`status ${store.ownershipVerified === true ? "active" : "inactive"}`}>{store.ownershipVerified === true ? "Doğrulandı" : "Doğrulanamadı"}</span></td>
                 <td><span className={`status ${store.operationalStatus === "active" ? "active" : "inactive"}`}>{store.operationalStatus === "active" ? "Aktif" : "Pasif"}</span></td>
                 <td>{store.productCount}</td>
                 <td>{store.customerVisibleProductCount}</td>
@@ -1856,7 +2111,7 @@ function SellerApplications({ storePage, detailResource, selectedStoreId, onSele
           </div>
         )}
       </section>
-      <section className="notice-card workspace-notice" role="note"><Icon name="shield" /><div><strong>Özet mahremiyet korumalıdır</strong><p>Mağaza sahibi ve katalog kategorileri özet API yanıtına, liste durumuna veya gizli DOM’a alınmaz. Finansal metrik üretilmez.</p></div></section>
+      <section className="notice-card workspace-notice" role="note"><Icon name="shield" /><div><strong>Özet mahremiyet korumalı ve sahiplik doğrulamalıdır</strong><p>Seller organizasyonu ile Seller Store kimliği operasyonel bağ için görünürdür; kişi adı ve katalog kategorileri özet API yanıtına, liste durumuna veya gizli DOM’a alınmaz. Finansal metrik üretilmez.</p></div></section>
       {selectedStore && <StoreDetailDialog resource={detailResource} storeName={selectedStore.storeName} onClose={onCloseDetail} />}
     </section>
   );
@@ -2013,7 +2268,7 @@ const notificationsUnavailableError = Object.freeze({
   message: "Bildirim özeti okuma yeteneği bu admin oturumunda açık değil.",
 });
 const catalogUnavailableError = Object.freeze({
-  message: "Birinci taraf katalog okuma yeteneği bu admin oturumunda açık değil.",
+  message: "Paylaşımlı katalog okuma yeteneği bu admin oturumunda açık değil.",
 });
 const catalogStructureUnavailableError = Object.freeze({
   message: "Katalog yapısı okuma yeteneği bu admin oturumunda açık değil.",
@@ -2248,7 +2503,7 @@ export function IntegratedApp() {
     pageContent = !ordersEnabled
       ? <StatePanel phase="forbidden" error={ordersUnavailableError} onRetry={ordersResource.reload} />
       : ordersLoaded
-        ? <Orders orderPage={ordersResource.data} error={ordersResource.error} refreshing={ordersResource.refreshing} onRefresh={ordersResource.reload} onReloadCapabilities={sessionResource.reload} mutationActions={mutationActions} notificationTarget={notificationTarget} />
+        ? <Orders orderPage={ordersResource.data} error={ordersResource.error} refreshing={ordersResource.refreshing} onRefresh={ordersResource.reload} onReloadCapabilities={sessionResource.reload} mutationActions={mutationActions} paymentProvider={sessionResource.data?.paymentProvider} notificationTarget={notificationTarget} />
         : <StatePanel phase={ordersResource.phase} error={ordersResource.error} onRetry={ordersResource.reload} />;
   } else if (page === "returns") {
     pageContent = !returnsEnabled
@@ -2367,7 +2622,7 @@ export function IntegratedApp() {
       )}
       statusbar={(
         <footer className="statusbar">
-          <div className="preview-banner live-banner" role="note" data-testid="live-banner"><Icon name="shield" /><strong>Entegre tek-satıcı modu</strong><span>Mock fallback yok · {cancelWriteEnabled || shipmentWriteEnabled || catalogWriteEnabled ? "yazmalar capability ve doğrulamayla sınırlı" : "bu oturum yazma isteği göndermez"}</span></div>
+          <div className="preview-banner live-banner" role="note" data-testid="live-banner"><Icon name="shield" /><strong>Entegre çok mağazalı operasyon</strong><span>Mock fallback yok · Seller ürünleri salt okunur · {cancelWriteEnabled || shipmentWriteEnabled || catalogWriteEnabled ? "izinli yazmalar capability ve doğrulamayla sınırlı" : "bu oturum yazma isteği göndermez"}</span></div>
           <span className={sessionLoaded ? "healthy" : ""}>{sessionLoaded ? "Oturum doğrulandı" : sessionResource.phase === "error" ? "Bağlantı hatası" : "Bağlantı bekleniyor"}</span>
           <span>{lastUpdatedAt ? `Son veri okuması ${dateTime(lastUpdatedAt)}` : "Entegre veri bekleniyor"}</span>
           <button onClick={reloadAll} disabled={sessionResource.refreshing || statsResource.refreshing || ordersResource.refreshing || returnsResource.refreshing || notificationsResource.refreshing || catalogResource.refreshing || catalogStructureResource.refreshing || storesResource.refreshing}><Icon name="refresh" />Yenile</button>

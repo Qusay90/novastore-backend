@@ -20,6 +20,7 @@ const {
     normalizeArchiveProductPayload
 } = require('./adminCatalogProductPolicy');
 const { cardFramingFromStorage } = require('../shared/productCardFraming');
+const { lockAdminWritablePlatformStore } = require('./adminCatalogStoreAuthorityService');
 
 const CATALOG_MODE = 'first_party';
 const CURRENCY = 'TRY';
@@ -32,14 +33,6 @@ const productNotFound = () => new AdminCatalogMutationError('Katalog kaydı bulu
     code: 'ADMIN_CATALOG_ENTITY_NOT_FOUND',
     statusCode: 404
 });
-
-const platformStoreUnavailable = () => new AdminCatalogMutationError(
-    'Birinci taraf katalog mağazası kullanılamıyor.',
-    {
-        code: 'ADMIN_CATALOG_PLATFORM_STORE_UNAVAILABLE',
-        statusCode: 503
-    }
-);
 
 const alreadyArchived = () => new AdminCatalogMutationError('Ürün zaten arşivlenmiş.', {
     code: 'ADMIN_CATALOG_PRODUCT_ALREADY_ARCHIVED',
@@ -193,24 +186,6 @@ const toMutationEnvelope = (executed) => Object.freeze({
     })
 });
 
-const loadPlatformStore = async (client, { unavailableAsNotFound = false } = {}) => {
-    const result = await client.query(
-        `SELECT id
-         FROM stores
-         WHERE LOWER(slug) = LOWER($1)
-           AND is_active = TRUE
-           AND deleted_at IS NULL
-         ORDER BY id ASC
-         LIMIT 1
-         FOR SHARE`,
-        [PLATFORM_STORE.slug]
-    );
-    if (!result.rows?.length) {
-        throw unavailableAsNotFound ? productNotFound() : platformStoreUnavailable();
-    }
-    return Object.freeze({ id: Number(result.rows[0].id) });
-};
-
 const loadFirstPartyProduct = async (client, id, storeId) => {
     const result = await client.query(
         `SELECT id, name, description, price, old_price, stock, sku, normalized_sku,
@@ -226,7 +201,7 @@ const loadFirstPartyProduct = async (client, id, storeId) => {
 };
 
 const authorizeFirstPartyProductTarget = async (client, current) => {
-    const store = await loadPlatformStore(client, { unavailableAsNotFound: true });
+    const store = await lockAdminWritablePlatformStore(client, { unavailableAsNotFound: true });
     const product = await loadFirstPartyProduct(client, current.id, store.id);
     return Object.freeze({ store, product });
 };
@@ -358,7 +333,7 @@ const createAdminCatalogProduct = async (database, { actor, body, requestId = nu
         requestId,
         metadata: AUDIT_METADATA,
         applyMutation: async (client) => {
-            const store = await loadPlatformStore(client);
+            const store = await lockAdminWritablePlatformStore(client);
             const resolution = await buildCategoryResolution(
                 client,
                 payload.category_ids,

@@ -530,6 +530,113 @@ const createPendingPaymentOrderFromPricing = async ({
     return { order, pricing };
 };
 
+const SELLER_CANCELLABLE_ORDER_STATUSES = Object.freeze([
+    'new',
+    'preparing',
+    'cancellation_requested'
+]);
+const SELLER_FULFILLED_ORDER_STATUSES = Object.freeze(['shipped', 'delivered']);
+
+const convergeSellerOrderProjectionsForCancellation = async ({ client, canonicalOrderId }) => {
+    let lockedResult;
+    try {
+        lockedResult = await client.query(
+            `SELECT id,
+                    organization_id,
+                    store_id,
+                    status,
+                    revision
+             FROM seller_orders
+             WHERE canonical_order_id = $1
+             ORDER BY organization_id, id
+             FOR UPDATE NOWAIT`,
+            [canonicalOrderId]
+        );
+    } catch (error) {
+        if (error?.code === '55P03') {
+            throw new OrderLifecycleError('Satıcı siparişi başka bir fulfillment işlemi tarafından güncelleniyor.', {
+                code: 'ORDER_SELLER_FULFILLMENT_BUSY',
+                details: { refetchRequired: true }
+            });
+        }
+        throw error;
+    }
+
+    const rows = Array.isArray(lockedResult.rows) ? lockedResult.rows : [];
+    const statuses = rows.map((row) => String(row.status || '').trim().toLowerCase());
+    const fulfilledStatuses = [...new Set(statuses.filter((status) => (
+        SELLER_FULFILLED_ORDER_STATUSES.includes(status)
+    )))];
+    if (fulfilledStatuses.length > 0) {
+        throw new OrderLifecycleError('Kargoya verilmiş satıcı siparişi kanonik iptal yolundan iptal edilemez.', {
+            code: 'ORDER_SELLER_FULFILLMENT_CONFLICT',
+            details: {
+                statuses: fulfilledStatuses,
+                refetchRequired: true
+            }
+        });
+    }
+
+    const invalidStatuses = [...new Set(statuses.filter((status) => (
+        status !== 'cancelled' && !SELLER_CANCELLABLE_ORDER_STATUSES.includes(status)
+    )))];
+    if (invalidStatuses.length > 0) {
+        throw new OrderLifecycleError('Satıcı siparişi durumu kanonik iptal ile uyumlu değil.', {
+            code: 'ORDER_SELLER_STATUS_CONFLICT',
+            details: {
+                statuses: invalidStatuses,
+                refetchRequired: true
+            }
+        });
+    }
+
+    let changedCount = 0;
+    let reusedCount = 0;
+    for (const row of rows) {
+        const fromStatus = String(row.status || '').trim().toLowerCase();
+        if (fromStatus === 'cancelled') {
+            reusedCount += 1;
+            continue;
+        }
+
+        const updated = await client.query(
+            `UPDATE seller_orders
+             SET status = 'cancelled',
+                 revision = revision + 1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE canonical_order_id = $1
+               AND organization_id = $2
+               AND id = $3
+               AND revision = $4
+               AND status = $5
+             RETURNING revision`,
+            [canonicalOrderId, row.organization_id, row.id, row.revision, fromStatus]
+        );
+        if (updated.rows?.length !== 1) {
+            throw new OrderLifecycleError('Satıcı siparişi iptal yakınsaması eşzamanlı değişiklik nedeniyle tamamlanamadı.', {
+                code: 'ORDER_SELLER_REVISION_CONFLICT',
+                details: { refetchRequired: true }
+            });
+        }
+
+        const transitionKey = `canonical-cancel:${canonicalOrderId}:seller-order:${row.id}:r${row.revision}`;
+        await client.query(
+            `INSERT INTO seller_order_transitions
+                (organization_id, store_id, seller_order_id, package_id,
+                 from_status, to_status, command, idempotency_key)
+             VALUES ($1, $2, $3, NULL, $4, 'cancelled', 'cancel_request', $5)`,
+            [row.organization_id, row.store_id, row.id, fromStatus, transitionKey]
+        );
+        changedCount += 1;
+    }
+
+    return Object.freeze({
+        matchedCount: rows.length,
+        changedCount,
+        reusedCount
+    });
+};
+
 const markOrderCancelled = async ({
     client = pool,
     order,
@@ -550,6 +657,11 @@ const markOrderCancelled = async ({
             role: String(actor.role || 'unknown')
         }
         : { id: null, role: 'unknown' };
+
+    const sellerOrderProjection = await convergeSellerOrderProjectionsForCancellation({
+        client,
+        canonicalOrderId: order.id
+    });
 
     await client.query(
         `UPDATE orders
@@ -581,7 +693,8 @@ const markOrderCancelled = async ({
         providerRefund: {
             executed: false,
             manualReviewRequired: refundStatus === REFUND_STATUS.PENDING
-        }
+        },
+        sellerOrderProjection
     });
 
     return cancelledStatus;
@@ -601,5 +714,6 @@ module.exports = {
     createPendingPaymentOrderFromPricing,
     assertRequestedCouponApplied,
     createOrderWithReservation,
+    convergeSellerOrderProjectionsForCancellation,
     markOrderCancelled
 };

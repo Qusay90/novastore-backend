@@ -110,5 +110,28 @@ assert.deepEqual(mutationRequests.map((entry) => [entry.options.method, entry.pa
   ["POST", "/api/admin/catalog/products/2/media"],
   [undefined, "/api/admin/catalog/products/2"],
 ]);
+const deliveryActions = adapter.mutationActions({ manualShipmentWrite: true });
+assert.equal(typeof deliveryActions.createManualShipment, "function");
+assert.equal(typeof deliveryActions.confirmManualDelivery, "function");
+await deliveryActions.confirmManualDelivery({
+  orderId: 42,
+  expectedStatus: "Kargoya Verildi",
+  expectedShipmentStatus: "IN_TRANSIT",
+  deliveryConfirmed: true,
+  provider: "Yurtiçi Kargo",
+  trackingNo: "YK-123456",
+  idempotencyKey: "commerce-pro-delivery-contract-12345678",
+});
+const deliveryRequest = requests.at(-1);
+assert.equal(deliveryRequest.pathname, "/api/shipments/42/manual-delivery-confirmation");
+assert.equal(deliveryRequest.options.method, "POST");
+assert.equal(deliveryRequest.options.headers["Idempotency-Key"], "commerce-pro-delivery-contract-12345678");
+assert.deepEqual(JSON.parse(deliveryRequest.options.body), {
+  expected_status: "Kargoya Verildi",
+  expected_shipment_status: "IN_TRANSIT",
+  delivery_confirmed: true,
+  provider: "Yurtiçi Kargo",
+  tracking_no: "YK-123456",
+});
 assert.equal(Object.keys(adapter.mutationActions({})).length, 0);
 console.log("adminOperationsContractSmoke: OK");

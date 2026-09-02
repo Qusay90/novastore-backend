@@ -39,9 +39,9 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 (async () => {
     assert.equal(validateManifest(manifest), true);
     const registry = loadRegistry();
-    assert.equal(registry.length, 36);
+    assert.equal(registry.length, 37);
     assert.equal(registry[0].id, '20260628_staging_schema_baseline');
-    assert.equal(registry.at(-1).id, '20260901_01_seller_public_legal_identity');
+    assert.equal(registry.at(-1).id, '20260902_01_seller_package_delivery_status');
     assert.deepEqual(
         registry.filter((entry) => entry.id.startsWith('20260712_')).map((entry) => entry.path),
         [
@@ -52,7 +52,7 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
     );
     assert.equal(new Set(registry.map((entry) => entry.id)).size, registry.length);
     assert.equal(new Set(registry.map((entry) => entry.path)).size, registry.length);
-    assert.equal(registry.filter((entry) => entry.transactionWrapper).length, 30);
+    assert.equal(registry.filter((entry) => entry.transactionWrapper).length, 31);
     assert.deepEqual(
         registry.filter((entry) => entry.id.includes('_seller_')).map((entry) => entry.path),
         [
@@ -66,7 +66,8 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
             'migrations/20260821_02_seller_applications.sql',
             'migrations/20260822_01_seller_application_terms_authority.sql',
             'migrations/20260830_01_seller_application_user_binding.sql',
-            'migrations/20260901_01_seller_public_legal_identity.sql'
+            'migrations/20260901_01_seller_public_legal_identity.sql',
+            'migrations/20260902_01_seller_package_delivery_status.sql'
         ]
     );
 
@@ -297,7 +298,7 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
     assert.doesNotMatch(stagingSources, /require\([^)]*initDb/i);
     assert.doesNotMatch(stagingSources, /dotenv|cloudinary|nodemailer|resend|fetch\s*\(/i);
 
-    console.log('staging migration foundation smoke passed: manifest=36 verified-tls=15 loopback-no-tls=1');
+    console.log('staging migration foundation smoke passed: manifest=37 verified-tls=15 loopback-no-tls=1');
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;

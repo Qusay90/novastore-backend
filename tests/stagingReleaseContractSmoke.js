@@ -254,9 +254,9 @@ const createFakeGitReader = ({
         assert.equal(FORBIDDEN_PROVIDER_CREDENTIAL_NAMES, FORBIDDEN_PROVIDER_CREDENTIAL_KEYS);
     });
 
-    await check(5, 'migration bytes/checksums 36/36 exact', () => {
+    await check(5, 'migration bytes/checksums 37/37 exact', () => {
         const registry = loadRegistry();
-        assert.equal(registry.length, 36);
+        assert.equal(registry.length, 37);
         for (const migration of registry) {
             const bytes = fs.readFileSync(migration.absolutePath);
             assert.equal(sha256(bytes), migration.sha256);

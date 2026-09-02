@@ -16,7 +16,8 @@ const root = path.join(__dirname, '..');
 const {
     MAX_PRODUCT_MEDIA,
     listProductMedia,
-    normalizeCloudinaryMediaUrl
+    normalizeCloudinaryMediaUrl,
+    updateProductMediaCardFraming
 } = require('../services/adminCatalogMediaService');
 
 assert.equal(MAX_PRODUCT_MEDIA, 10);
@@ -102,11 +103,96 @@ const database = {
     );
     assert.equal(calls.filter((call) => /FROM product_media/i.test(call.text)).length, 1);
 
+    const mutationCalls = [];
+    let productRevision = 1;
+    const mutationQuery = async (sql, params = [], transaction = false) => {
+        const text = String(sql).replace(/\s+/g, ' ').trim();
+        mutationCalls.push({ text, params, transaction });
+        if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(text)) return { rows: [] };
+        if (/^SELECT id, revision FROM products WHERE id = \$1 FOR UPDATE$/i.test(text)) {
+            return { rows: [{ id: 101, revision: productRevision }] };
+        }
+        if (/^SELECT id FROM stores/i.test(text) && /FOR UPDATE$/i.test(text)) {
+            return { rows: [{ id: 10 }] };
+        }
+        if (/^SELECT id, status, closed_at FROM seller_stores/i.test(text) && /FOR SHARE$/i.test(text)) {
+            return {
+                rows: [{
+                    id: 900,
+                    status: 'closed',
+                    closed_at: '2026-08-31T00:00:00.000Z'
+                }]
+            };
+        }
+        if (/FROM products product JOIN stores store/i.test(text)) {
+            return { rows: [{ id: 101, revision: productRevision }] };
+        }
+        if (/^UPDATE product_media SET card_focal_x/i.test(text)) {
+            return { rows: [{ id: 8 }] };
+        }
+        if (/^UPDATE products SET revision = revision \+ 1/i.test(text)) {
+            assert.equal(Number(params[1]), productRevision);
+            productRevision += 1;
+            return { rows: [{ revision: productRevision }] };
+        }
+        if (/^INSERT INTO admin_catalog_audit_events/i.test(text)) {
+            assert.deepEqual(params[7], ['product_media']);
+            return { rows: [{ id: 77, created_at: '2026-08-13T00:01:00.000Z' }] };
+        }
+        if (/FROM product_media WHERE product_id = \$1/i.test(text)) {
+            return {
+                rows: [{
+                    id: 8,
+                    product_id: 101,
+                    media_url: 'https://res.cloudinary.com/demo/image/upload/item.webp',
+                    media_type: 'image',
+                    is_main: true,
+                    sort_order: 0,
+                    card_focal_x: 0.4,
+                    card_focal_y: 0.6,
+                    card_zoom: 1.2,
+                    created_at: '2026-08-13T00:00:00.000Z'
+                }]
+            };
+        }
+        throw new Error(`Unexpected media mutation query: ${text}`);
+    };
+    const mutationDatabase = {
+        query: (sql, params) => mutationQuery(sql, params, false),
+        async connect() {
+            return {
+                query: (sql, params) => mutationQuery(sql, params, true),
+                release() {}
+            };
+        }
+    };
+    const framing = await updateProductMediaCardFraming(mutationDatabase, 101, 8, {
+        actor: { id: 17, role: 'admin' },
+        body: {
+            expected_revision: 1,
+            card_framing: { focal_x: 0.4, focal_y: 0.6, zoom: 1.2 }
+        },
+        requestId: 'media-framing-unbound-control'
+    });
+    assert.equal(framing.revision, 2);
+    assert.equal(framing.storageMutation, false);
+    assert.deepEqual(framing.media[0].cardFraming, { focal_x: 0.4, focal_y: 0.6, zoom: 1.2 });
+    const sellerBindingLock = mutationCalls.find(({ text }) => /^SELECT id, status, closed_at FROM seller_stores/i.test(text));
+    assert.ok(sellerBindingLock);
+    assert.doesNotMatch(sellerBindingLock.text, /closed_at IS NULL/i);
+    assert.match(sellerBindingLock.text, /FOR SHARE$/i);
+    assert.equal(mutationCalls.some(({ text }) => /fetch|axios|cloudinary\.uploader|\.destroy\(/i.test(text)), false);
+
     const service = fs.readFileSync(path.join(root, 'services', 'adminCatalogMediaService.js'), 'utf8');
     const routes = fs.readFileSync(path.join(root, 'routes', 'adminRoutes.js'), 'utf8');
     const migration = fs.readFileSync(path.join(root, 'migrations', '20260813_04_product_media_operations.sql'), 'utf8');
     assert.match(service, /max_sort_order \?\? -1/);
     assert.match(service, /storage_mutation: false/g);
+    assert.equal(
+        (service.match(/authorizeLockedTarget: authorizeFirstPartyMediaTarget/g) || []).length,
+        4,
+        'register, reorder, framing and delete must share the Seller-binding write authority guard'
+    );
     assert.doesNotMatch(service, /fetch\(|axios|cloudinary\.uploader|\.destroy\(/i);
     assert.match(routes, /catalog\/products\/:id\/media[^]*integratedAdminProductWrite/);
     assert.match(migration, /CHECK \(media_type IN \('image', 'video'\)\)/);
