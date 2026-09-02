@@ -783,12 +783,12 @@ inlineScripts.forEach((script, index) => {
     );
 });
 
-const previewLink = adminSource.match(
-    /<a\b(?=[^>]*\bhref=["'](?:\.\/|\/)?admin-commerce-pro\.html["'])[^>]*>/i
+const liveLink = adminSource.match(
+    /<a\b(?=[^>]*\bhref=["'](?:\.\/|\/)?admin-commerce-pro-live\.html["'])[^>]*>/i
 )?.[0];
-assert.ok(previewLink, 'frontend/admin.html Commerce Pro önizlemesine bağlantı vermeli');
-assert.match(previewLink, /\btarget=["']_blank["']/i, 'önizleme bağlantısı yeni sekmede açılmalı');
-assert.match(previewLink, /\brel=["'][^"']*noopener[^"']*["']/i, 'yeni sekme bağlantısı noopener kullanmalı');
+assert.ok(liveLink, 'frontend/admin.html Commerce Pro canlı artefaktına bağlantı vermeli');
+assert.match(liveLink, /\btarget=["']_blank["']/i, 'canlı artefakt bağlantısı yeni sekmede açılmalı');
+assert.match(liveLink, /\brel=["'][^"']*noopener[^"']*["']/i, 'yeni sekme bağlantısı noopener kullanmalı');
 assert.match(
     adminSource,
     /<option\s+value=["']pending_approval["']>Yayın İncelemesinde<\/option>[\s\S]{0,520}satıcı ürün izni değildir\./,
