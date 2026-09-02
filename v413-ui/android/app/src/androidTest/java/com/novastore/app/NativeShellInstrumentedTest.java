@@ -163,12 +163,16 @@ public class NativeShellInstrumentedTest {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             JSONObject stores = evaluateJson(scenario,
                 "(() => {" +
+                    "const allowedLocal=new Set(['novastore.android.installationId','novastore.novabot.presentation.v1']);" +
+                    "const localKeys=Object.keys(localStorage);" +
                     "const values=[...Object.entries(localStorage),...Object.entries(sessionStorage)].flat().join(' ');" +
-                    "return {local:localStorage.length,session:sessionStorage.length,cookie:document.cookie," +
+                    "return {localUnexpected:localKeys.filter(key=>!allowedLocal.has(key)).length," +
+                    "local:localStorage.length,session:sessionStorage.length,cookie:document.cookie," +
                     "secret:/bearer|refresh[_-]?token|access[_-]?token|authorization/i.test(values)};" +
                 "})()"
             );
-            assertEquals(0, stores.getInt("local"));
+            assertTrue(stores.getInt("local") <= 2);
+            assertEquals(0, stores.getInt("localUnexpected"));
             assertEquals(0, stores.getInt("session"));
             assertEquals("", stores.getString("cookie"));
             assertFalse(stores.getBoolean("secret"));
@@ -544,11 +548,13 @@ public class NativeShellInstrumentedTest {
                 "(() => {const launchers=[...document.querySelectorAll('[data-testid=global-novabot-trigger]')];" +
                     "const launcher=launchers[0]?.getBoundingClientRect();const footer=document.querySelector('.pdp-footer')?.getBoundingClientRect();" +
                     "return {count:launchers.length,footerGap:launcher&&footer?footer.top-launcher.bottom:-999," +
-                    "inTopbar:Boolean(launchers[0]?.closest('.pdp-topbar'))};})()"
+                    "inTopbar:Boolean(launchers[0]?.closest('.pdp-topbar'))," +
+                    "inAppRoot:Boolean(launchers[0]?.closest('.cal-app'))};})()"
             );
             assertEquals(1, product.getInt("count"));
             assertTrue(product.getDouble("footerGap") >= 0);
-            assertTrue(product.getBoolean("inTopbar"));
+            assertFalse(product.getBoolean("inTopbar"));
+            assertTrue(product.getBoolean("inAppRoot"));
 
             evaluate(scenario,
                 "history.replaceState({novastoreDepth:0},'','/?cal=CAL-08&tab=cart&shell=native');" +

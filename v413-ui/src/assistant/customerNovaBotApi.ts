@@ -10,10 +10,21 @@ const MAX_HISTORY_TOTAL_LENGTH = 12_000;
 const MAX_REPLY_LENGTH = 8_000;
 const MAX_SUGGESTIONS = 8;
 const MAX_PRODUCTS = 8;
+const MAX_AVAILABLE_MODES = 9;
 const MODES = new Set([
   "professional", "friendly", "buddy", "funny", "witty",
   "quick", "detailed", "technical", "sales",
 ]);
+
+export type CustomerNovaBotModeId =
+  | "professional" | "friendly" | "buddy" | "funny" | "witty"
+  | "quick" | "detailed" | "technical" | "sales";
+
+export type CustomerNovaBotMode = Readonly<{
+  id: CustomerNovaBotModeId;
+  title: string;
+  description: string;
+}>;
 
 export type CustomerNovaBotHistoryItem = Readonly<{
   role: "user" | "assistant";
@@ -48,6 +59,7 @@ export type CustomerNovaBotReply = Readonly<{
   pendingAction: Readonly<{ type: "live_support"; reason: string }> | null;
   allowEscalation: boolean;
   escalated: boolean;
+  availableModes: readonly CustomerNovaBotMode[];
 }>;
 
 function apiError(message: string, code: string) {
@@ -68,7 +80,27 @@ function boundedText(value: unknown, maximum: number) {
 
 function normalizeMode(value: unknown) {
   const mode = boundedText(value, 32)?.toLowerCase() ?? null;
-  return mode && MODES.has(mode) ? mode : null;
+  return mode && MODES.has(mode) ? mode as CustomerNovaBotModeId : null;
+}
+
+function normalizeAvailableModes(value: unknown) {
+  if (value === undefined) return Object.freeze([]) as readonly CustomerNovaBotMode[];
+  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_AVAILABLE_MODES) {
+    throw apiError("NovaBot mod listesi geçersiz.", "NOVABOT_RESPONSE_INVALID");
+  }
+  const seen = new Set<CustomerNovaBotModeId>();
+  const modes = value.map((item) => {
+    const source = record(item);
+    const id = normalizeMode(source?.id);
+    const title = boundedText(source?.title, 80);
+    const description = boundedText(source?.description, 320);
+    if (!source || !id || !title || !description || seen.has(id)) {
+      throw apiError("NovaBot mod listesi geçersiz.", "NOVABOT_RESPONSE_INVALID");
+    }
+    seen.add(id);
+    return Object.freeze({ id, title, description });
+  });
+  return Object.freeze(modes);
 }
 
 function normalizeHistory(value: unknown): readonly CustomerNovaBotHistoryItem[] {
@@ -196,6 +228,10 @@ function normalizeResponse(value: unknown): CustomerNovaBotReply {
     || (source.intent !== undefined && source.intent !== null && !intent)) {
     throw apiError("NovaBot yanıt metadatası geçersiz.", "NOVABOT_RESPONSE_INVALID");
   }
+  const availableModes = normalizeAvailableModes(source.availableModes);
+  if (mode && availableModes.length > 0 && !availableModes.some((item) => item.id === mode)) {
+    throw apiError("NovaBot etkin modu sunucu mod listesiyle eşleşmiyor.", "NOVABOT_RESPONSE_INVALID");
+  }
   return Object.freeze({
     reply,
     mode,
@@ -209,6 +245,7 @@ function normalizeResponse(value: unknown): CustomerNovaBotReply {
     pendingAction: normalizePendingAction(source.pendingAction),
     allowEscalation: source.allowEscalation === true,
     escalated: source.escalated === true,
+    availableModes,
   });
 }
 
@@ -225,6 +262,7 @@ export async function sendCustomerNovaBotMessage(input: CustomerNovaBotInput): P
 
 export const customerNovaBotApiTestUtils = Object.freeze({
   normalizeHistory,
+  normalizeAvailableModes,
   normalizeRequest,
   normalizeResponse,
   safeImageUrl,

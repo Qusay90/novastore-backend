@@ -78,6 +78,7 @@ const EXACT_RULES = new Map<string, ReadonlySet<string>>([
   ["/api/auth/reset-password", new Set(["POST"])],
   ["/api/addresses", new Set(["GET", "POST"])],
   ["/api/campaigns/coupons/active", new Set(["GET"])],
+  ["/api/favorites", new Set(["GET"])],
   ["/api/store-follows", new Set(["GET"])],
   ["/api/assistant/chat", new Set(["POST"])],
   ["/api/payments/capability", new Set(["GET"])],
@@ -88,6 +89,8 @@ const EXACT_RULES = new Map<string, ReadonlySet<string>>([
   ["/api/returns/mine", new Set(["GET"])],
   ["/api/messages/send", new Set(["POST"])],
   ["/api/questions/user", new Set(["GET"])],
+  ["/api/questions/ask", new Set(["POST"])],
+  ["/api/reviews", new Set(["POST"])],
   ["/api/notifications", new Set(["GET"])],
   ["/api/notifications/unread-count", new Set(["GET"])],
   ["/api/notifications/read-all", new Set(["PATCH"])],
@@ -102,7 +105,8 @@ const CUSTOMER_REVIEW_LIST_PATTERN = /^\/api\/reviews\/user\/[1-9]\d*$/u;
 const CUSTOMER_SUPPORT_HISTORY_PATTERN = /^\/api\/messages\/history\/[1-9]\d*$/u;
 const CUSTOMER_ADDRESS_PATTERN = /^\/api\/addresses\/[1-9]\d*$/u;
 const CUSTOMER_ADDRESS_DEFAULT_PATTERN = /^\/api\/addresses\/[1-9]\d*\/default$/u;
-const CUSTOMER_STORE_FOLLOW_PATTERN = /^\/api\/store-follows\/(?=[a-z0-9-]{1,80}$)[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const CUSTOMER_STORE_FOLLOW_PATTERN = /^\/api\/store-follows\/(?=[a-z0-9-]{1,160}$)[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const CUSTOMER_FAVORITE_PATTERN = /^\/api\/favorites\/[1-9]\d*$/u;
 const PUBLIC_PRODUCT_PATTERN = /^\/api\/products\/[1-9]\d*$/u;
 const PAYMENT_STATUS_PATH = "/api/payments/status";
 const ALLOWED_QUERY_KEYS = new Set(["limit", "cursor"]);
@@ -137,7 +141,12 @@ function requestRule(path: string, method: string) {
     || (READ_ONE_PATTERN.test(parsed.pathname) && normalizedMethod === "PATCH")
     || (CUSTOMER_ADDRESS_PATTERN.test(parsed.pathname) && (normalizedMethod === "PUT" || normalizedMethod === "DELETE"))
     || (CUSTOMER_ADDRESS_DEFAULT_PATTERN.test(parsed.pathname) && normalizedMethod === "PATCH")
-    || (CUSTOMER_STORE_FOLLOW_PATTERN.test(parsed.pathname) && normalizedMethod === "DELETE")
+    || (CUSTOMER_STORE_FOLLOW_PATTERN.test(parsed.pathname) && (
+      normalizedMethod === "GET" || normalizedMethod === "POST" || normalizedMethod === "DELETE"
+    ))
+    || (CUSTOMER_FAVORITE_PATTERN.test(parsed.pathname) && (
+      normalizedMethod === "POST" || normalizedMethod === "DELETE"
+    ))
     || (CUSTOMER_ORDER_CANCEL_PATTERN.test(parsed.pathname) && normalizedMethod === "POST")
     || (normalizedMethod === "GET" && (
       CUSTOMER_ORDER_LIST_PATTERN.test(parsed.pathname)

@@ -117,9 +117,28 @@ button { color: inherit; }
   background: transparent;
   overflow: visible;
 }
-.global-novabot-launcher { position: absolute; z-index: 14; right: max(14px, calc(var(--novastore-safe-right, 0px) + 14px)); bottom: calc(var(--shell-content-bottom-reserve) - 1px); width: 56px; height: 56px; min-width: 56px; min-height: 56px; padding: 3px; overflow: hidden; border: 2px solid rgba(254,90,2,.82); border-radius: 50%; color: #fff; background: linear-gradient(145deg,#173d69 0%,#061e45 72%,#123f78 100%); box-shadow: 0 9px 22px rgba(6,30,69,.27), 0 0 0 3px rgba(255,255,255,.72); display: grid; place-items: center; cursor: pointer; }
+.global-novabot-anchor { position: absolute; z-index: 18; left: 0; top: 0; width: 56px; height: 70px; opacity: 0; pointer-events: none; transform: translate3d(var(--novabot-x,0),var(--novabot-y,0),0); transition: transform .22s cubic-bezier(.2,.8,.2,1), opacity .14s ease; contain: layout; }
+.global-novabot-anchor[data-ready="true"] { opacity: 1; }
+.global-novabot-anchor[data-dragging="true"] { transition: none; }
+.global-novabot-anchor[hidden] { display: none; }
+.global-novabot-launcher { position: absolute; z-index: 1; left: 0; top: 14px; width: 56px; height: 56px; min-width: 56px; min-height: 56px; padding: 3px; overflow: hidden; border: 2px solid rgba(254,90,2,.82); border-radius: 50%; color: #fff; background: linear-gradient(145deg,#173d69 0%,#061e45 72%,#123f78 100%); box-shadow: 0 9px 22px rgba(6,30,69,.27), 0 0 0 3px rgba(255,255,255,.72); display: grid; place-items: center; cursor: grab; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
+.global-novabot-anchor[data-movable="false"] .global-novabot-launcher { cursor: pointer; }
+.global-novabot-anchor[data-dragging="true"] .global-novabot-launcher { cursor: grabbing; }
 .global-novabot-launcher::before { content: ""; position: absolute; inset: -5px; }
 .global-novabot-launcher img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; }
+.global-novabot-menu-trigger { position: absolute; z-index: 2; top: 1px; width: 22px; height: 22px; min-width: 22px; min-height: 22px; padding: 0; border: 1px solid rgba(255,255,255,.96); border-radius: 50%; color: #fff; background: var(--nova-deep); box-shadow: 0 4px 12px rgba(6,30,69,.25); display: grid; place-items: center; font: 800 14px/1 "Nova Inter",sans-serif; pointer-events: auto; }
+.global-novabot-menu-trigger::before { content: ""; position: absolute; inset: -11px; border-radius: 50%; }
+.global-novabot-anchor[data-edge="right"] .global-novabot-menu-trigger { right: -4px; }
+.global-novabot-anchor[data-edge="left"] .global-novabot-menu-trigger { left: -4px; }
+.global-novabot-control-menu { position: absolute; z-index: 3; width: min(210px,calc(100cqw - 16px)); padding: 6px; border: 1px solid rgba(15,44,78,.12); border-radius: 14px; background: rgba(255,255,255,.99); box-shadow: 0 12px 28px rgba(6,30,69,.2); display: grid; gap: 2px; pointer-events: auto; }
+.global-novabot-anchor[data-menu-placement="below"] .global-novabot-control-menu { top: calc(100% + 6px); }
+.global-novabot-anchor[data-menu-placement="above"] .global-novabot-control-menu { bottom: calc(100% + 6px); }
+.global-novabot-anchor[data-edge="right"] .global-novabot-control-menu { right: 0; }
+.global-novabot-anchor[data-edge="left"] .global-novabot-control-menu { left: 0; }
+.global-novabot-control-menu button { min-height: 44px; padding: 8px 10px; border: 0; border-radius: 9px; color: var(--nova-deep); background: transparent; text-align: left; font-size: 11px; }
+.global-novabot-control-menu button:is(:hover,:focus-visible) { background: #eef3f8; }
+.global-novabot-control-menu button[aria-current="true"] { color: var(--nova-success); }
+.global-novabot-control-menu button:disabled { opacity: .62; }
 .bottom-nav-surface { position: absolute; z-index: 0; left: -6px; top: -7px; width: calc(100% + 12px); height: 84px; overflow: visible; pointer-events: none; }
 .bottom-nav-surface .nav-surface-shadow { fill: rgba(255,255,255,.72); filter: url(#v4-nav-shadow); }
 .bottom-nav-surface .nav-surface-fill { fill: url(#v4-nav-fill); }
@@ -255,6 +274,7 @@ button { color: inherit; }
 .product-media .icon-button.favorite-motion-add svg { animation: favorite-heart-add .52s cubic-bezier(.2,.85,.25,1) both; }
 .product-media .icon-button.favorite-motion-remove svg { animation: favorite-heart-remove .38s ease-out both; }
 .product-media .icon-button.favorite-motion-add::after { content: ""; position: absolute; z-index: 1; inset: -2px; border: 1.5px solid rgba(254,90,2,.45); border-radius: 50%; animation: favorite-ring .52s ease-out both; pointer-events: none; }
+.product-favorite-error { position: absolute; z-index: 5; top: 43px; right: 8px; max-width: calc(100% - 16px); margin: 0; padding: 5px 7px; border-radius: 8px; color: #fff; background: rgba(136,35,35,.94); box-shadow: 0 4px 12px rgba(46,13,13,.2); font-size: 7.5px; line-height: 1.3; overflow-wrap: anywhere; }
 .discount-badge { position: absolute; z-index: 4; top: 9px; left: 9px; width: 34px; min-width: 34px; min-height: 27px; aspect-ratio: 49 / 39; padding: 0; clip-path: shape(from 34% 0, line to 92% 0, curve to 100% 10% with 97% 0 / 100% 4%, line to 100% 50%, curve to 12% 100% with 100% 78% / 42% 100%, line to 6% 100%, curve to 0 93% with 3% 100% / 0 97%, line to 0 43%, curve to 34% 0 with 0 18% / 17% 0, close); color: #fff; background: #fe6303; font-family: "Nova Inter", sans-serif; font-size: 10.5px; font-weight: 500; line-height: 1; text-align: center; display: grid; place-items: center; }
 .discount-badge > span { display: block; transform: translate(-2.25px,-.5px); }
 .product-copy { --product-copy-surface: shape(from 0 0, line to 100% 0, line to 100% calc(100% - var(--cart-center-inset) - var(--cart-cradle-radius) - var(--cart-cradle-shoulder)), curve to calc(100% - var(--cart-center-inset)) calc(100% - var(--cart-center-inset) - var(--cart-cradle-radius)) with 100% calc(100% - var(--cart-center-inset) - var(--cart-cradle-radius) - var(--cart-cradle-shoulder) + var(--cart-shoulder-ease)) / calc(100% - var(--cart-center-inset) + var(--cart-cradle-circle-handle)) calc(100% - var(--cart-center-inset) - var(--cart-cradle-radius)), curve to calc(100% - var(--cart-center-inset) - var(--cart-cradle-radius)) calc(100% - var(--cart-center-inset)) with calc(100% - var(--cart-center-inset) - var(--cart-cradle-circle-handle)) calc(100% - var(--cart-center-inset) - var(--cart-cradle-radius)) / calc(100% - var(--cart-center-inset) - var(--cart-cradle-radius)) calc(100% - var(--cart-center-inset) - var(--cart-cradle-circle-handle)), curve to calc(100% - var(--cart-center-inset) - var(--cart-cradle-radius) - var(--cart-cradle-tail)) 100% with calc(100% - var(--cart-center-inset) - var(--cart-cradle-radius)) calc(100% - var(--cart-center-inset) + var(--cart-cradle-circle-handle)) / calc(100% - var(--cart-center-inset) - var(--cart-cradle-radius) - var(--cart-cradle-tail) + var(--cart-tail-ease)) 100%, line to 0 100%, close); position: relative; z-index: 1; isolation: isolate; flex: 1 1 auto; min-height: 132px; margin-top: calc(var(--card-wave-right-lift) * -1); padding: calc(var(--card-wave-right-lift) + var(--card-info-top-gap)) var(--card-info-side-padding) 9px; border-radius: 0; background: transparent; }
@@ -382,10 +402,10 @@ button { color: inherit; }
 .pdp-topbar h1 { margin: 0; text-align: center; color: #171923; font-family: "Nova Inter",sans-serif; font-size: 20px; font-weight: 600; letter-spacing: -.5px; }
 .pdp-topbar > div { display: flex; align-items: center; gap: 1px; }
 .pdp-topbar .icon-button { width: 40px; height: 40px; min-width: 40px; min-height: 40px; color: #182334; }
-.pdp-topbar .global-novabot-launcher { position: relative; inset: auto; right: auto; bottom: auto; width: 48px; height: 48px; min-width: 48px; min-height: 48px; flex: 0 0 48px; padding: 3px; }
 .pdp-topbar .icon-button.favorite-active { color: var(--nova-orange); background: #fff; }
 .pdp-topbar .repo-icon { width: 20px; height: 20px; }
 .pdp-action-status { position: absolute; top: calc(100% - 2px); right: 50px; z-index: 5; padding: 4px 7px; border-radius: 8px; color: #fff; background: rgba(6,30,69,.9); font-size: 8px; }
+.pdp-action-status.error { max-width: min(250px,calc(100% - 64px)); background: rgba(136,35,35,.94); overflow-wrap: anywhere; }
 .pdp-grid { display: grid; gap: 0; }
 .pdp-gallery, .pdp-info { min-width: 0; }
 .pdp-gallery { position: relative; z-index: 1; background: #fbfaf9; }
@@ -469,6 +489,10 @@ button { color: inherit; }
 .review-stars button { width: 28px; height: 28px; padding: 0; border: 0; color: #c9cdd3; background: transparent; }
 .review-stars button[aria-pressed="true"], .review-stars button:has(~ button[aria-pressed="true"]) { color: var(--nova-orange); }
 .inline-success { min-width: 0; margin: 10px 0 0; padding: 9px 10px; border-radius: 10px; color: var(--nova-success) !important; background: rgba(21,148,71,.08); display: flex; align-items: center; gap: 6px; font-size: 9px !important; overflow-wrap: anywhere; }
+.pdp-community-success, .pdp-community-error { margin: 10px 0 0; padding: 9px 10px; border-radius: 10px; font-size: 9px; line-height: 1.4; overflow-wrap: anywhere; }
+.pdp-community-success { color: var(--nova-success); background: rgba(21,148,71,.08); display: flex; align-items: center; gap: 6px; }
+.pdp-community-success svg { flex: 0 0 auto; width: 14px; height: 14px; }
+.pdp-community-error { color: #9d3131; background: rgba(157,49,49,.08); }
 .recommendations { min-width: 0; }
 .recommendations .section-title { margin: 12px 1px 7px; }
 .recommendation-carousel { margin-inline: -1px; }
@@ -511,7 +535,6 @@ button { color: inherit; }
 .cart-title h1 { margin: 0 0 9px; font-size: 23px; }
 .cart-title span { color: var(--nova-muted); font-size: 12px; }
 .cart-title-actions { display: flex; align-items: center; gap: 10px; }
-.cart-title-actions .global-novabot-launcher { position: relative; inset: auto; right: auto; bottom: auto; flex: 0 0 56px; }
 .cart-item { min-height: 132px; padding: 12px; border-radius: 17px; background: #fff; display: grid; grid-template-columns: 104px 1fr 48px; gap: 10px; box-shadow: 0 7px 18px rgba(15,44,78,.06); }
 .cart-item + .cart-item { margin-top: 9px; }
 .cart-item > img { width: 104px; height: 108px; border-radius: 12px; object-fit: cover; }
@@ -722,7 +745,6 @@ button { color: inherit; }
 /* CAL-11 */
 .support-heading { display: flex; align-items: center; justify-content: space-between; }
 .support-heading > button { min-width: 48px; min-height: 48px; padding: 3px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--nova-muted); font-size: 10px; }
-.support-heading > .global-novabot-launcher { position: relative; inset: auto; right: auto; bottom: auto; width: 56px; height: 56px; min-width: 56px; min-height: 56px; padding: 3px; border: 2px solid rgba(254,90,2,.82); color: #fff; background: linear-gradient(145deg,#173d69 0%,#061e45 72%,#123f78 100%); display: grid; }
 .support-heading > button svg { width: 28px; height: 28px; color: var(--nova-deep); }
 .support-search { width: 100%; min-height: 52px; margin: 15px 0 12px; border: 1px solid var(--nova-line); border-radius: 16px; padding: 0 16px; background: #fff; display: flex; align-items: center; gap: 12px; color: var(--nova-muted); }
 .support-search svg { width: 24px; height: 24px; color: var(--nova-deep); }
@@ -743,6 +765,8 @@ button { color: inherit; }
 .novabot-availability.ready i, .novabot-connection.ready i { background: #25bc53; }
 .novabot-card span { display: block; margin-top: 6px; color: var(--nova-muted); font-size: 10px; }
 .novabot-card > button { grid-column: span 2; width: 100%; }
+.novabot-recovery-link { width: 100%; min-height: 44px; margin-top: 7px; border: 0; color: var(--nova-deep); background: transparent; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 9px; }
+.novabot-recovery-link svg { width: 17px; height: 17px; }
 .live-support { width: 100%; min-height: 79px; margin-top: 14px; border: 1px solid var(--nova-line); border-radius: 17px; padding: 0 16px; background: #fff; display: grid; grid-template-columns: 42px 1fr auto; align-items: center; text-align: left; }
 .live-support > svg { width: 28px; height: 28px; }
 .live-support span { display: flex; flex-direction: column; gap: 3px; }
@@ -788,9 +812,11 @@ button { color: inherit; }
 .chat-card header h1 { margin: 0; font-size: 19px; }
 .chat-card header p { margin: 3px 0; color: var(--nova-muted); font-size: 10px; }
 .chat-card header button { min-height: 34px; border: 1px solid var(--nova-orange); border-radius: 10px; color: var(--nova-orange-text); background: #fff; display: flex; align-items: center; gap: 5px; font-size: 9px; }
-.messages { height: 104px; padding: 14px; display: grid; align-content: start; gap: 10px; overflow-y: auto; overscroll-behavior: contain; scroll-padding-bottom: 14px; }
+.messages { height: 104px; padding: 14px; display: grid; align-content: start; gap: 10px; overflow-y: auto; overscroll-behavior-y: auto; scroll-padding-bottom: 14px; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 .chat-card.active-conversation { min-height: 760px; }
 .chat-card.active-conversation .messages { height: 414px; padding-bottom: 94px; scroll-padding-bottom: 94px; }
+.chat-card.native-chat-card, .chat-card.native-chat-card.active-conversation { min-height: 0; padding-bottom: 10px; }
+.chat-card.native-chat-card.active-conversation .messages { padding-bottom: 14px; scroll-padding-bottom: 14px; }
 .message { min-width: 0; display: flex; align-items: end; gap: 7px; }
 .message > .novabot-art.small { flex: 0 0 auto; width: 31px; height: 31px; }
 .message > .novabot-art.small img { padding: 2px; }
@@ -809,6 +835,7 @@ button { color: inherit; }
 .handoff-copy { margin: 8px 0; text-align: center; color: var(--nova-muted); font-size: 9px; }
 .composer { position: absolute; left: 12px; right: 12px; bottom: 12px; height: 56px; display: grid; grid-template-columns: 54px minmax(0,1fr) 54px; border: 1px solid var(--nova-line); border-radius: 18px; background: #fff; }
 .composer.native-composer { grid-template-columns: minmax(0,1fr) 54px; }
+.native-chat-card .composer.native-composer { position: relative; left: auto; right: auto; bottom: auto; margin: 8px 14px 0; }
 .composer input { min-width: 0; border: 0; border-radius: 18px; padding: 0 14px; outline: 0; }
 .composer button { width: 48px; height: 48px; margin: 3px; border: 0; border-radius: 50%; color: var(--nova-orange); background: var(--nova-deep); display: grid; place-items: center; }
 .composer .composer-attach { color: var(--nova-deep); background: transparent; }
@@ -1179,12 +1206,20 @@ body:has(.capture-mode) .device-screen:has(.capture-mode) > :is(.sheet-overlay, 
 .account-settings-hub > p { margin: -4px 0 8px; color: var(--nova-muted); font-size: 9px; line-height: 1.5; }
 .account-settings-hub > button { width: 100%; min-height: 58px; padding: 8px 2px; border: 0; border-top: 1px solid var(--nova-line); background: transparent; display: grid; grid-template-columns: 32px minmax(0,1fr) 18px; align-items: center; gap: 8px; text-align: left; }
 .account-settings-hub > button > svg:first-child { width: 23px; height: 23px; color: var(--nova-deep); }
+.account-settings-hub > button > img:first-child { width: 28px; height: 28px; padding: 2px; border-radius: 50%; object-fit: contain; background: #eef3f8; }
 .account-settings-hub > button > span { min-width: 0; display: grid; gap: 3px; }
 .account-settings-hub > button b { font-size: 10px; }
 .account-settings-hub > button small { color: var(--nova-muted); font-size: 8px; line-height: 1.35; }
 .authoritative-security-list { margin-top: 8px; display: grid; gap: 0; }
 .authoritative-security-list p { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--nova-line); display: flex; justify-content: space-between; gap: 12px; font-size: 10px; }
 .authoritative-security-list span { color: var(--nova-muted); }
+.account-password-form { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--nova-line); display: grid; gap: 10px; }
+.account-password-form h2 { margin: 0; color: var(--nova-deep); font-size: 14px; }
+.account-password-form > p { margin: 0; color: var(--nova-muted); font-size: 9px; line-height: 1.45; }
+.account-password-form label { display: grid; gap: 5px; color: var(--nova-muted); font-size: 9px; }
+.account-password-form input { width: 100%; height: 43px; padding: 0 11px; border: 1px solid var(--nova-line); border-radius: 11px; color: var(--nova-deep); background: #f8fafc; }
+.account-password-form > .primary { width: 100%; min-height: 45px; }
+.account-password-form .account-logout-error { margin-inline: 0; }
 
 .account-feature-layout, .order-utility-layout { min-height: 600px; display: grid; align-content: start; }
 .account-feature-card, .invoice-preview, .tracking-preview { min-width: 0; padding: 18px; border: 1px solid rgba(15,44,78,.07); border-radius: 19px; background: #fff; box-shadow: 0 8px 22px rgba(15,44,78,.065); }
@@ -1269,6 +1304,8 @@ body:has(.capture-mode) .device-screen:has(.capture-mode) > :is(.sheet-overlay, 
 .store-profile-row > button.following { color: var(--nova-deep); background: #eaf0f6; }
 .store-profile-row > button:disabled { opacity: .58; cursor: default; }
 .store-profile-row > button svg { width: 15px; height: 15px; }
+.store-follow-feedback { margin: 8px 13px -3px; color: var(--nova-muted); font-size: 8px; line-height: 1.35; text-align: right; }
+.store-follow-feedback.error { color: #9d3131; }
 .store-stats { margin: 12px 13px 13px; padding: 10px 0; border-top: 1px solid #edf0f3; display: grid; grid-template-columns: repeat(3,1fr); }
 .store-stats > div { display: grid; gap: 2px; text-align: center; }
 .store-stats > div + div { border-left: 1px solid #edf0f3; }

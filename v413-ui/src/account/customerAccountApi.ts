@@ -129,11 +129,23 @@ export type CustomerFollowedStore = Readonly<{
   followedAt: string | null;
 }>;
 
+export type CustomerStoreFollowState = Readonly<{
+  slug: string;
+  following: boolean;
+  followerCount: number;
+}>;
+
+export type CustomerFavoriteMutation = Readonly<{
+  productId: number;
+  favorited: boolean;
+}>;
+
 const text = (value: unknown) => String(value ?? "").trim();
 const CUSTOMER_RETURN_REASON_CODES = new Set(["DAMAGED", "WRONG_ITEM", "NOT_AS_DESCRIBED", "CHANGED_MIND", "OTHER"]);
 const CUSTOMER_REVIEW_STATUSES = new Set<CustomerReviewStatus>(["PENDING", "PUBLISHED", "HIDDEN"]);
 const COUPON_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,63}$/u;
 const STORE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u;
 const MAX_ACCOUNT_LIST_SIZE = 2_000;
 const MAX_MONEY_VALUE = 99_999_999.99;
 
@@ -194,7 +206,24 @@ function normalizeList<T>(
 
 function normalizeStoreSlug(value: unknown) {
   const slug = text(value).toLocaleLowerCase("en-US");
-  return slug.length <= 80 && STORE_SLUG_PATTERN.test(slug) ? slug : null;
+  return slug.length <= 160 && STORE_SLUG_PATTERN.test(slug) ? slug : null;
+}
+
+export function normalizeCustomerFavoriteProductIds(value: unknown): readonly number[] | null {
+  const source = objectValue(value);
+  if (!source || !Array.isArray(source.productIds) || source.productIds.length > MAX_ACCOUNT_LIST_SIZE) return null;
+  const ids = source.productIds.map(positiveInteger);
+  if (ids.some((id) => id === null)) return null;
+  const normalized = ids as number[];
+  if (new Set(normalized).size !== normalized.length) return null;
+  return Object.freeze(normalized);
+}
+
+function normalizeCustomerFavoriteMutation(value: unknown, expectedProductId: number, expectedFavorited: boolean): CustomerFavoriteMutation | null {
+  const source = objectValue(value);
+  const productId = positiveInteger(source?.productId ?? source?.product_id);
+  if (!source || productId !== expectedProductId || source.favorited !== expectedFavorited) return null;
+  return Object.freeze({ productId, favorited: expectedFavorited });
 }
 
 export function normalizeCustomerProfile(value: unknown): CustomerProfile | null {
@@ -341,6 +370,20 @@ export function normalizeCustomerFollowedStore(value: unknown): CustomerFollowed
     followerCount,
     followedAt,
   });
+}
+
+export function normalizeCustomerStoreFollowState(value: unknown): CustomerStoreFollowState | null {
+  const source = objectValue(value);
+  const slug = normalizeStoreSlug(source?.store_slug ?? source?.storeSlug);
+  const followerCount = Number(source?.follower_count ?? source?.followerCount);
+  if (
+    !source
+    || !slug
+    || typeof source.following !== "boolean"
+    || !Number.isSafeInteger(followerCount)
+    || followerCount < 0
+  ) return null;
+  return Object.freeze({ slug, following: source.following, followerCount });
 }
 
 export function normalizeCustomerAddress(value: unknown): CustomerAddress | null {
@@ -520,6 +563,30 @@ export async function getCustomerSecurityStatus(): Promise<CustomerSecurityStatu
   });
 }
 
+export async function changeCustomerPassword(currentPassword: string, newPassword: string) {
+  if (
+    typeof currentPassword !== "string"
+    || typeof newPassword !== "string"
+    || !currentPassword
+    || newPassword.length < 8
+    || newPassword.length > 128
+    || !/[A-Za-zÇĞİÖŞÜçğıöşü]/u.test(newPassword)
+    || !/\d/u.test(newPassword)
+    || currentPassword === newPassword
+  ) {
+    throw new CustomerNotificationApiError("Şifre bilgileri geçersiz.", 0, "CUSTOMER_PASSWORD_INPUT_INVALID");
+  }
+  const payload = objectValue(await requestCustomerApi("/api/users/change-password", "POST", {
+    currentPassword,
+    newPassword,
+  }));
+  const message = boundedText(payload?.message, 240);
+  if (!payload || !message) {
+    throw new CustomerNotificationApiError("Şifre güncelleme yanıtı doğrulanamadı.", 0, "CUSTOMER_PASSWORD_RESPONSE_INVALID");
+  }
+  return Object.freeze({ message });
+}
+
 export async function listCustomerAddresses() {
   const payload = await requestCustomerApi("/api/addresses");
   if (!Array.isArray(payload)) throw new CustomerNotificationApiError("Adres listesi doğrulanamadı.", 0, "CUSTOMER_ADDRESS_RESPONSE_INVALID");
@@ -571,20 +638,110 @@ export async function listCustomerReviews(currentProfileId: number) {
   return normalizeList(payload, normalizeCustomerReview, "Değerlendirme geçmişi", "CUSTOMER_REVIEW_RESPONSE_INVALID");
 }
 
+export async function listCustomerFavoriteProductIds() {
+  const ids = normalizeCustomerFavoriteProductIds(await requestCustomerApi("/api/favorites"));
+  if (!ids) throw new CustomerNotificationApiError("Favori listesi doğrulanamadı.", 0, "CUSTOMER_FAVORITES_RESPONSE_INVALID");
+  return ids;
+}
+
+async function requestCustomerFavoriteMutation(value: number, method: "POST" | "DELETE") {
+  const productId = requireId(value, "Ürün");
+  const expectedFavorited = method === "POST";
+  const mutation = normalizeCustomerFavoriteMutation(
+    await requestCustomerApi(`/api/favorites/${productId}`, method),
+    productId,
+    expectedFavorited,
+  );
+  if (!mutation) {
+    throw new CustomerNotificationApiError("Favori işlemi sunucu tarafından doğrulanmadı.", 0, "CUSTOMER_FAVORITE_RESPONSE_INVALID");
+  }
+  return mutation;
+}
+
+export function addCustomerFavorite(value: number) {
+  return requestCustomerFavoriteMutation(value, "POST");
+}
+
+export function removeCustomerFavorite(value: number) {
+  return requestCustomerFavoriteMutation(value, "DELETE");
+}
+
+export async function submitCustomerProductQuestion(productIdValue: number, questionValue: string) {
+  const productId = requireId(productIdValue, "Ürün");
+  const question = typeof questionValue === "string" ? questionValue.trim() : "";
+  if (question.length < 5 || question.length > 1_000 || CONTROL_CHARACTER_PATTERN.test(question)) {
+    throw new CustomerNotificationApiError("Soru 5 ile 1000 karakter arasında olmalıdır.", 0, "CUSTOMER_QUESTION_INPUT_INVALID");
+  }
+  const payload = objectValue(await requestCustomerApi("/api/questions/ask", "POST", { product_id: productId, question }));
+  const created = objectValue(payload?.question);
+  if (
+    !payload
+    || !created
+    || !positiveInteger(created.id)
+    || positiveInteger(created.product_id ?? created.productId) !== productId
+    || text(created.question) !== question
+    || text(created.status).toLowerCase() !== "pending"
+    || created.is_answered !== false
+  ) {
+    throw new CustomerNotificationApiError("Soru gönderme yanıtı doğrulanamadı.", 0, "CUSTOMER_QUESTION_RESPONSE_INVALID");
+  }
+  return Object.freeze({ id: positiveInteger(created.id)!, productId, question, status: "pending" as const });
+}
+
+export async function submitCustomerProductReview(productIdValue: number, ratingValue: number, commentValue: string) {
+  const productId = requireId(productIdValue, "Ürün");
+  const rating = Number(ratingValue);
+  const comment = typeof commentValue === "string" ? commentValue.trim() : "";
+  if (!Number.isSafeInteger(rating) || rating < 1 || rating > 5 || comment.length > 2_000 || CONTROL_CHARACTER_PATTERN.test(comment)) {
+    throw new CustomerNotificationApiError("Değerlendirme bilgileri geçersiz.", 0, "CUSTOMER_REVIEW_INPUT_INVALID");
+  }
+  const payload = objectValue(await requestCustomerApi("/api/reviews", "POST", {
+    productId,
+    rating,
+    comment: comment || null,
+  }));
+  const reviewId = positiveInteger(payload?.reviewId ?? payload?.review_id);
+  if (!payload || !reviewId || text(payload.status).toUpperCase() !== "PENDING") {
+    throw new CustomerNotificationApiError("Değerlendirme yanıtı doğrulanamadı.", 0, "CUSTOMER_REVIEW_RESPONSE_INVALID");
+  }
+  return Object.freeze({ reviewId, productId, status: "PENDING" as const });
+}
+
 export async function listCustomerFollowedStores() {
   const payload = await requestCustomerApi("/api/store-follows");
   return normalizeList(payload, normalizeCustomerFollowedStore, "Takip edilen mağaza listesi", "CUSTOMER_FOLLOWED_STORE_RESPONSE_INVALID");
 }
 
-export async function unfollowCustomerStore(value: string) {
+async function requestCustomerStoreFollowState(value: string, method: "GET" | "POST" | "DELETE") {
   const slug = normalizeStoreSlug(value);
   if (!slug) throw new CustomerNotificationApiError("Mağaza kimliği geçersiz.", 0, "CUSTOMER_STORE_SLUG_INVALID");
-  const source = objectValue(await requestCustomerApi(`/api/store-follows/${encodeURIComponent(slug)}`, "DELETE"));
-  const responseSlug = normalizeStoreSlug(source?.store_slug ?? source?.storeSlug);
-  const followerCount = Number(source?.follower_count ?? source?.followerCount ?? 0);
-  if (!source || responseSlug !== slug || source.following !== false || !Number.isSafeInteger(followerCount) || followerCount < 0) {
+  const state = normalizeCustomerStoreFollowState(
+    await requestCustomerApi(`/api/store-follows/${encodeURIComponent(slug)}`, method),
+  );
+  if (!state || state.slug !== slug) {
     throw new CustomerNotificationApiError("Mağaza takip yanıtı doğrulanamadı.", 0, "CUSTOMER_FOLLOWED_STORE_RESPONSE_INVALID");
   }
+  return state;
+}
+
+export function getCustomerStoreFollowState(value: string) {
+  return requestCustomerStoreFollowState(value, "GET");
+}
+
+export async function followCustomerStore(value: string) {
+  const state = await requestCustomerStoreFollowState(value, "POST");
+  if (!state.following) {
+    throw new CustomerNotificationApiError("Mağaza takip işlemi sunucu tarafından doğrulanmadı.", 0, "CUSTOMER_STORE_FOLLOW_NOT_CONFIRMED");
+  }
+  return state;
+}
+
+export async function unfollowCustomerStore(value: string) {
+  const state = await requestCustomerStoreFollowState(value, "DELETE");
+  if (state.following) {
+    throw new CustomerNotificationApiError("Mağaza takipten çıkarma işlemi sunucu tarafından doğrulanmadı.", 0, "CUSTOMER_STORE_UNFOLLOW_NOT_CONFIRMED");
+  }
+  return state;
 }
 
 export async function cancelCustomerOrder(id: number, expectedStatus: string, reasonCode = "CUSTOMER_REQUEST") {
@@ -650,6 +807,8 @@ export const customerAccountApiTestUtils = Object.freeze({
   normalizeCustomerAddress,
   normalizeCustomerCoupon,
   normalizeCustomerFollowedStore,
+  normalizeCustomerFavoriteProductIds,
+  normalizeCustomerStoreFollowState,
   normalizeCustomerOrder,
   normalizeCustomerQuestion,
   normalizeCustomerReview,

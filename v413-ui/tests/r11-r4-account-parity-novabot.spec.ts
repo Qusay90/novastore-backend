@@ -8,9 +8,10 @@ import { customerNotificationApiTestUtils } from "../src/notifications/customerN
 const assetUrl = new URL("../public/calibration-assets/official/support_novastore.png", import.meta.url);
 const prototypeUrl = new URL("../src/Prototype.tsx", import.meta.url);
 const prototypeCssUrl = new URL("../src/prototype.css", import.meta.url);
+const novabotPresentationUrl = new URL("../src/assistant/novabotPresentation.tsx", import.meta.url);
 
 test("R11-R4 Account parity normalizers preserve only canonical bounded records", () => {
-  const { normalizeCustomerCoupon, normalizeCustomerQuestion, normalizeCustomerReview, normalizeCustomerFollowedStore } = customerAccountApiTestUtils;
+  const { normalizeCustomerCoupon, normalizeCustomerQuestion, normalizeCustomerReview, normalizeCustomerFollowedStore, normalizeCustomerStoreFollowState, normalizeCustomerFavoriteProductIds } = customerAccountApiTestUtils;
   expect(normalizeCustomerCoupon({
     id: 1, code: "nova20", discount_type: "percent", discount_value: 20,
     min_order_amount: 500, max_discount_amount: 250, ends_at: "2026-12-31T21:00:00.000Z",
@@ -27,11 +28,22 @@ test("R11-R4 Account parity normalizers preserve only canonical bounded records"
     store_slug: "nova-audio", store_name: "Nova Audio", following: true,
     follower_count: 42, followed_at: "2026-09-01T10:00:00.000Z",
   })).toMatchObject({ slug: "nova-audio", name: "Nova Audio", following: true });
+  expect(normalizeCustomerStoreFollowState({
+    store_slug: "nova-audio", following: false, follower_count: 41,
+  })).toEqual({ slug: "nova-audio", following: false, followerCount: 41 });
 
   expect(normalizeCustomerCoupon({ id: 1, code: "BAD", discount_type: "percent", discount_value: 101, min_order_amount: 0 })).toBeNull();
   expect(normalizeCustomerQuestion({ id: 2, product_id: 0, product_name: "Yabancı", question: "?" })).toBeNull();
   expect(normalizeCustomerReview({ id: 3, product_id: 71, product_name: "Ürün", rating: 6, status: "published" })).toBeNull();
   expect(normalizeCustomerFollowedStore({ store_slug: "../admin", store_name: "Yabancı", following: true })).toBeNull();
+  expect(normalizeCustomerStoreFollowState({ store_slug: "nova-audio", following: "true", follower_count: 42 })).toBeNull();
+  const longestValidStoreSlug = "a".repeat(160);
+  expect(normalizeCustomerStoreFollowState({ store_slug: longestValidStoreSlug, following: true, follower_count: 1 }))
+    .toEqual({ slug: longestValidStoreSlug, following: true, followerCount: 1 });
+  expect(normalizeCustomerStoreFollowState({ store_slug: `${longestValidStoreSlug}a`, following: true, follower_count: 1 })).toBeNull();
+  expect(normalizeCustomerFavoriteProductIds({ productIds: [71, 72] })).toEqual([71, 72]);
+  expect(normalizeCustomerFavoriteProductIds({ productIds: [71, 71] })).toBeNull();
+  expect(normalizeCustomerFavoriteProductIds({ productIds: [0] })).toBeNull();
   const longestValidCouponCode = `N${"A".repeat(63)}`;
   expect(normalizeCustomerCoupon({ id: 4, code: longestValidCouponCode, discount_type: "fixed", discount_value: 10, min_order_amount: 0 }))
     .toMatchObject({ code: longestValidCouponCode });
@@ -40,9 +52,11 @@ test("R11-R4 Account parity normalizers preserve only canonical bounded records"
 test("R11-R4 UI hardening preserves safe geometry and truthful failure states", () => {
   const source = readFileSync(prototypeUrl, "utf8");
   const css = readFileSync(prototypeCssUrl, "utf8");
+  const presentation = readFileSync(novabotPresentationUrl, "utf8");
 
-  expect(css).toContain("bottom: calc(var(--shell-content-bottom-reserve) - 1px)");
-  expect(css).not.toContain("bottom: calc(var(--shell-safe-bottom) + var(--shell-content-bottom-reserve) + 10px)");
+  expect(css).toMatch(/\.global-novabot-anchor\s*\{[^}]*position:\s*absolute[^}]*transform:\s*translate3d\(var\(--novabot-x,0\),var\(--novabot-y,0\),0\)/u);
+  expect(css).toMatch(/\.global-novabot-anchor\s*\{[^}]*width:\s*56px/u);
+  expect(css).toMatch(/\.global-novabot-launcher\s*\{[^}]*left:\s*0[^}]*top:\s*14px/u);
   expect(css).toMatch(/\.has-global-novabot \.cal-scroll\.with-bottom-nav \.mobile-scroll-content\s*\{[^}]*padding-bottom:/u);
   expect(css).toMatch(/\[data-cal-id="CAL-10"\]\[data-view="root"\] \.account-list\s*\{[^}]*margin-top:\s*70px/u);
   expect(css).toMatch(/\.coupon-card button\s*\{[^}]*min-height:\s*48px[^}]*overflow-wrap:\s*anywhere/u);
@@ -56,10 +70,11 @@ test("R11-R4 UI hardening preserves safe geometry and truthful failure states", 
   expect(source).toContain("setNativeSuggestions([])");
   expect(source).toContain('data-testid="novabot-send-error"');
   expect(source).toContain('previousSessionIdentity.current === sessionIdentity');
-  expect(source).toContain('!["CAL-01", "CAL-06", "CAL-08", "CAL-12"].includes(route.cal)');
-  expect(source).toContain('route.cal !== "CAL-07"');
-  expect(source).toContain('route.cal === "CAL-11" && route.view === ""');
-  expect(source.match(/<GlobalNovaBotLauncher go=\{go\} \/>/g)).toHaveLength(4);
+  expect(source).toContain('!["CAL-01", "CAL-08", "CAL-12"].includes(route.cal)');
+  expect(source.match(/<GlobalNovaBotLauncher assetSrc=\{NOVABOT\}/g)).toHaveLength(1);
+  expect(source).toContain('data-testid="novabot-settings-recovery"');
+  expect(source).toContain('data-testid="novabot-help-recovery"');
+  expect(presentation.match(/data-testid="global-novabot-trigger"/g)).toHaveLength(1);
   expect(source).toContain("Bu alan boş kabul edilmedi; yeniden deneyebilirsin.");
   expect(source).not.toContain("Çevrimiçi · PC1 bağlantılı");
   expect(source).not.toContain("Kopyalandı");
@@ -72,7 +87,16 @@ test("R11-R4 native Account and NovaBot transport allowlists stay exact", () => 
     ["/api/questions/user", "GET"],
     ["/api/reviews/user/17", "GET"],
     ["/api/store-follows", "GET"],
+    ["/api/favorites", "GET"],
+    ["/api/favorites/71", "POST"],
+    ["/api/favorites/71", "DELETE"],
+    ["/api/users/change-password", "POST"],
+    ["/api/questions/ask", "POST"],
+    ["/api/reviews", "POST"],
+    ["/api/store-follows/nova-audio", "GET"],
+    ["/api/store-follows/nova-audio", "POST"],
     ["/api/store-follows/nova-audio", "DELETE"],
+    [`/api/store-follows/${"a".repeat(160)}`, "GET"],
     ["/api/assistant/chat", "POST"],
   ]) expect(requestRule(path, method)).toEqual({ path, method });
 
@@ -81,6 +105,14 @@ test("R11-R4 native Account and NovaBot transport allowlists stay exact", () => 
     ["/api/reviews/user/17", "DELETE"],
     ["/api/store-follows/Nova-Audio", "DELETE"],
     ["/api/store-follows/../admin", "DELETE"],
+    ["/api/store-follows/nova-audio", "PUT"],
+    ["/api/favorites/0", "POST"],
+    ["/api/favorites/71", "GET"],
+    ["/api/favorites/71?debug=1", "POST"],
+    ["/api/questions/ask", "GET"],
+    ["/api/reviews", "GET"],
+    [`/api/store-follows/${"a".repeat(161)}`, "GET"],
+    ["/api/store-follows/nova%2Faudio", "GET"],
     ["/api/assistant/chat?debug=1", "POST"],
     ["/api/assistant/escalate", "POST"],
   ]) expect(() => requestRule(path, method)).toThrow();
@@ -98,10 +130,26 @@ test("R11-R4 NovaBot request and response contracts reject fallback or unbounded
     context: { selectedMode: "friendly" },
   });
   expect(customerNovaBotApiTestUtils.normalizeResponse({
-    reply: "Siparişlerim ekranını açabilirsin.", suggestions: ["Siparişlerime git"], products: [], cards: [],
-  })).toMatchObject({ reply: "Siparişlerim ekranını açabilirsin.", suggestions: ["Siparişlerime git"] });
+    reply: "Siparişlerim ekranını açabilirsin.", mode: "friendly", suggestions: ["Siparişlerime git"], products: [], cards: [],
+    availableModes: [{ id: "friendly", title: "Samimi Mod", description: "Sıcak ve anlaşılır şekilde yardımcı olayım." }],
+  })).toMatchObject({
+    reply: "Siparişlerim ekranını açabilirsin.",
+    suggestions: ["Siparişlerime git"],
+    availableModes: [{ id: "friendly", title: "Samimi Mod" }],
+  });
   expect(() => customerNovaBotApiTestUtils.normalizeRequest({ message: "x".repeat(2001) })).toThrow();
   expect(() => customerNovaBotApiTestUtils.normalizeResponse({ suggestions: [] })).toThrow();
+  expect(() => customerNovaBotApiTestUtils.normalizeResponse({
+    reply: "Yanıt", mode: "friendly",
+    availableModes: [{ id: "buddy", title: "Kanka Modu", description: "Kanka gibi yardımcı olayım." }],
+  })).toThrow();
+  expect(() => customerNovaBotApiTestUtils.normalizeResponse({
+    reply: "Yanıt",
+    availableModes: [
+      { id: "friendly", title: "Samimi Mod", description: "Sıcak ve anlaşılır." },
+      { id: "friendly", title: "Sahte tekrar", description: "Tekrar." },
+    ],
+  })).toThrow();
 });
 
 test("R11-R4 uses the exact approved NovaBot bytes and one shell insertion policy", () => {
@@ -109,8 +157,10 @@ test("R11-R4 uses the exact approved NovaBot bytes and one shell insertion polic
   expect(bytes.byteLength).toBe(1_694_739);
   expect(createHash("sha256").update(bytes).digest("hex")).toBe("fee08aa17ffe034a2406a5d180d19007ab825cda5c1d31c2bb26cbb5468cb81b");
   const source = readFileSync(prototypeUrl, "utf8");
-  expect(source.match(/data-testid="global-novabot-trigger"/g)).toHaveLength(1);
-  expect(source).toContain("![\"CAL-01\", \"CAL-06\", \"CAL-08\", \"CAL-12\"].includes(route.cal)");
+  const presentation = readFileSync(novabotPresentationUrl, "utf8");
+  expect(presentation.match(/data-testid="global-novabot-trigger"/g)).toHaveLength(1);
+  expect(source.match(/<GlobalNovaBotLauncher assetSrc=\{NOVABOT\}/g)).toHaveLength(1);
+  expect(source).toContain("![\"CAL-01\", \"CAL-08\", \"CAL-12\"].includes(route.cal)");
   for (const label of ["Kuponlarım", "Değerlendirmelerim", "Sorularım", "Takip Ettiğim Mağazalar"]) {
     expect(source).toContain(label);
   }

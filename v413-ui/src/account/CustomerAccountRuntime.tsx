@@ -12,21 +12,27 @@ import {
   createCustomerAddress,
   createCustomerReturn,
   cancelCustomerOrder,
+  changeCustomerPassword,
   deleteCustomerAddress,
   getCurrentCustomer,
   getCustomerSecurityStatus,
   listCustomerAddresses,
   listCustomerCoupons,
   listCustomerFollowedStores,
+  listCustomerFavoriteProductIds,
   listCustomerOrders,
   listCustomerQuestions,
   listCustomerReviews,
   listCustomerReturns,
   listCustomerSupportMessages,
   makeDefaultCustomerAddress,
+  addCustomerFavorite,
+  removeCustomerFavorite,
   registerCustomer,
   requestPasswordRecovery,
   sendCustomerSupportMessage,
+  submitCustomerProductQuestion,
+  submitCustomerProductReview,
   updateCustomerAddress,
   updateCustomerProfile,
   type CustomerAddress,
@@ -53,6 +59,7 @@ type CustomerAccountRuntimeValue = Readonly<{
   questions: readonly CustomerQuestion[];
   reviews: readonly CustomerReview[];
   followedStores: readonly CustomerFollowedStore[];
+  favoriteProductIds: readonly number[];
   orders: readonly CustomerOrder[];
   returns: readonly CustomerReturn[];
   supportMessages: readonly CustomerSupportMessage[];
@@ -66,6 +73,7 @@ type CustomerAccountRuntimeValue = Readonly<{
   requestPasswordRecovery(email: string): Promise<void>;
   logout(): Promise<void>;
   updateProfile(fullName: string, phone: string): Promise<void>;
+  changePassword(currentPassword: string, newPassword: string): Promise<void>;
   createAddress(value: CustomerAddressInput): Promise<void>;
   updateAddress(id: number, value: CustomerAddressInput): Promise<void>;
   deleteAddress(id: number): Promise<void>;
@@ -74,6 +82,10 @@ type CustomerAccountRuntimeValue = Readonly<{
   createReturn(orderId: number, reasonCode: string, note?: string): Promise<void>;
   refreshFollowedStores(): Promise<void>;
   unfollowStore(storeSlug: string): Promise<void>;
+  refreshFavoriteProductIds(): Promise<void>;
+  setFavoriteProduct(productId: number, favorited: boolean): Promise<void>;
+  submitProductQuestion(productId: number, question: string): Promise<void>;
+  submitProductReview(productId: number, rating: number, comment: string): Promise<void>;
   refreshSupport(): Promise<void>;
   sendSupportMessage(message: string): Promise<void>;
 }>;
@@ -102,6 +114,7 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   const [questions, setQuestions] = useState<readonly CustomerQuestion[]>([]);
   const [reviews, setReviews] = useState<readonly CustomerReview[]>([]);
   const [followedStores, setFollowedStores] = useState<readonly CustomerFollowedStore[]>([]);
+  const [favoriteProductIds, setFavoriteProductIds] = useState<readonly number[]>([]);
   const [orders, setOrders] = useState<readonly CustomerOrder[]>([]);
   const [returns, setReturns] = useState<readonly CustomerReturn[]>([]);
   const [supportMessages, setSupportMessages] = useState<readonly CustomerSupportMessage[]>([]);
@@ -112,6 +125,9 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   const sequence = useRef(0);
   const followedStoresLoadSequence = useRef(0);
   const unfollowOperationSequence = useRef(0);
+  const favoriteLoadSequence = useRef(0);
+  const favoriteMutationSequence = useRef(0);
+  const communityMutationSequence = useRef(0);
 
   const clearPrivateState = useCallback(() => {
     setUser(null);
@@ -120,6 +136,7 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     setQuestions([]);
     setReviews([]);
     setFollowedStores([]);
+    setFavoriteProductIds([]);
     setOrders([]);
     setReturns([]);
     setSupportMessages([]);
@@ -128,6 +145,9 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     setBusy(false);
     ++followedStoresLoadSequence.current;
     ++unfollowOperationSequence.current;
+    ++favoriteLoadSequence.current;
+    ++favoriteMutationSequence.current;
+    ++communityMutationSequence.current;
   }, []);
 
   const loadPrivateData = useCallback(async (profile: CustomerProfile, currentSequence: number) => {
@@ -141,10 +161,11 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
       listCustomerQuestions(),
       listCustomerReviews(profile.id),
       listCustomerFollowedStores(),
+      listCustomerFavoriteProductIds(),
     ] as const);
     if (sequence.current !== currentSequence) return;
     const warnings: string[] = [];
-    const [addressResult, orderResult, returnResult, supportResult, securityResult, couponResult, questionResult, reviewResult, followedStoreResult] = results;
+    const [addressResult, orderResult, returnResult, supportResult, securityResult, couponResult, questionResult, reviewResult, followedStoreResult, favoriteResult] = results;
     if (addressResult.status === "fulfilled") setAddresses(addressResult.value); else { setAddresses([]); warnings.push(warningText("Adresler")); }
     if (orderResult.status === "fulfilled") setOrders(orderResult.value); else { setOrders([]); warnings.push(warningText("Siparişler")); }
     if (returnResult.status === "fulfilled") setReturns(returnResult.value); else { setReturns([]); warnings.push(warningText("İadeler")); }
@@ -154,6 +175,7 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     if (questionResult.status === "fulfilled") setQuestions(questionResult.value); else { setQuestions([]); warnings.push(warningText("Sorular")); }
     if (reviewResult.status === "fulfilled") setReviews(reviewResult.value); else { setReviews([]); warnings.push(warningText("Değerlendirmeler")); }
     if (followedStoreResult.status === "fulfilled") setFollowedStores(followedStoreResult.value); else { setFollowedStores([]); warnings.push(warningText("Takip edilen mağazalar")); }
+    if (favoriteResult.status === "fulfilled") setFavoriteProductIds(favoriteResult.value); else { setFavoriteProductIds([]); warnings.push(warningText("Favoriler")); }
     setDataWarnings(Object.freeze(warnings));
   }, []);
 
@@ -282,6 +304,18 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     } finally { setBusy(false); }
   }, [establishVerifiedSession]);
 
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    if (!user) throw new CustomerNotificationApiError("Müşteri oturumu gerekli.", 401, "CUSTOMER_SESSION_MISSING");
+    const guard = currentCustomerSessionGuard();
+    setBusy(true);
+    try {
+      await changeCustomerPassword(currentPassword, newPassword);
+      if (!customerSessionMatchesGuard(guard)) return;
+    } finally {
+      if (customerSessionMatchesGuard(guard)) setBusy(false);
+    }
+  }, [user]);
+
   const refreshAddresses = useCallback(async () => setAddresses(await listCustomerAddresses()), []);
   const createAddress = useCallback(async (value: CustomerAddressInput) => {
     setBusy(true); try { await createCustomerAddress(value); await refreshAddresses(); } finally { setBusy(false); }
@@ -354,6 +388,65 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     }
   }, [refreshFollowedStores, user]);
 
+  const refreshFavoriteProductIds = useCallback(async () => {
+    if (!user) return;
+    const currentSequence = sequence.current;
+    const currentLoadSequence = ++favoriteLoadSequence.current;
+    const ids = await listCustomerFavoriteProductIds();
+    if (sequence.current !== currentSequence || favoriteLoadSequence.current !== currentLoadSequence) return;
+    setFavoriteProductIds(ids);
+    const favoriteWarning = warningText("Favoriler");
+    setDataWarnings((current) => Object.freeze(current.filter((warning) => warning !== favoriteWarning)));
+  }, [user]);
+
+  const setFavoriteProduct = useCallback(async (productId: number, favorited: boolean) => {
+    if (!user) throw new CustomerNotificationApiError("Müşteri oturumu gerekli.", 401, "CUSTOMER_SESSION_MISSING");
+    const guard = currentCustomerSessionGuard();
+    const currentOperation = ++favoriteMutationSequence.current;
+    setBusy(true);
+    try {
+      const confirmed = favorited
+        ? await addCustomerFavorite(productId)
+        : await removeCustomerFavorite(productId);
+      if (!customerSessionMatchesGuard(guard) || favoriteMutationSequence.current !== currentOperation) return;
+      setFavoriteProductIds((current) => Object.freeze(confirmed.favorited
+        ? current.includes(confirmed.productId) ? [...current] : [...current, confirmed.productId]
+        : current.filter((id) => id !== confirmed.productId)));
+    } finally {
+      if (customerSessionMatchesGuard(guard) && favoriteMutationSequence.current === currentOperation) setBusy(false);
+    }
+  }, [user]);
+
+  const submitProductQuestion = useCallback(async (productId: number, question: string) => {
+    if (!user) throw new CustomerNotificationApiError("Müşteri oturumu gerekli.", 401, "CUSTOMER_SESSION_MISSING");
+    const guard = currentCustomerSessionGuard();
+    const currentOperation = ++communityMutationSequence.current;
+    setBusy(true);
+    try {
+      await submitCustomerProductQuestion(productId, question);
+      if (!customerSessionMatchesGuard(guard) || communityMutationSequence.current !== currentOperation) return;
+      const nextQuestions = await listCustomerQuestions();
+      if (customerSessionMatchesGuard(guard) && communityMutationSequence.current === currentOperation) setQuestions(nextQuestions);
+    } finally {
+      if (customerSessionMatchesGuard(guard) && communityMutationSequence.current === currentOperation) setBusy(false);
+    }
+  }, [user]);
+
+  const submitProductReview = useCallback(async (productId: number, rating: number, comment: string) => {
+    if (!user) throw new CustomerNotificationApiError("Müşteri oturumu gerekli.", 401, "CUSTOMER_SESSION_MISSING");
+    const guard = currentCustomerSessionGuard();
+    const currentOperation = ++communityMutationSequence.current;
+    setBusy(true);
+    try {
+      await submitCustomerProductReview(productId, rating, comment);
+      if (!customerSessionMatchesGuard(guard) || communityMutationSequence.current !== currentOperation) return;
+      const nextReviews = await listCustomerReviews(user.id);
+      if (customerSessionMatchesGuard(guard) && communityMutationSequence.current === currentOperation) setReviews(nextReviews);
+    } finally {
+      if (customerSessionMatchesGuard(guard) && communityMutationSequence.current === currentOperation) setBusy(false);
+    }
+  }, [user]);
+
   const refreshSupport = useCallback(async () => {
     if (!user) return;
     setSupportMessages(await listCustomerSupportMessages(user.id));
@@ -389,12 +482,12 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   }, [clearPrivateState, refresh]);
 
   const value = useMemo<CustomerAccountRuntimeValue>(() => Object.freeze({
-    phase, user, addresses, coupons, questions, reviews, followedStores, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy,
-    refresh, login, register, requestPasswordRecovery: recover, logout, updateProfile,
+    phase, user, addresses, coupons, questions, reviews, followedStores, favoriteProductIds, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy,
+    refresh, login, register, requestPasswordRecovery: recover, logout, updateProfile, changePassword,
     createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder, createReturn, refreshSupport,
-    refreshFollowedStores, unfollowStore,
+    refreshFollowedStores, unfollowStore, refreshFavoriteProductIds, setFavoriteProduct, submitProductQuestion, submitProductReview,
     sendSupportMessage: sendSupport,
-  }), [phase, user, addresses, coupons, questions, reviews, followedStores, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy, refresh, login, register, recover, logout, updateProfile, createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder, createReturn, refreshFollowedStores, unfollowStore, refreshSupport, sendSupport]);
+  }), [phase, user, addresses, coupons, questions, reviews, followedStores, favoriteProductIds, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy, refresh, login, register, recover, logout, updateProfile, changePassword, createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder, createReturn, refreshFollowedStores, unfollowStore, refreshFavoriteProductIds, setFavoriteProduct, submitProductQuestion, submitProductReview, refreshSupport, sendSupport]);
 
   return <CustomerAccountRuntimeContext.Provider value={value}>{children}</CustomerAccountRuntimeContext.Provider>;
 }

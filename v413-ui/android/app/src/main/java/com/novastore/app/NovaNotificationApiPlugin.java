@@ -38,7 +38,8 @@ public final class NovaNotificationApiPlugin extends Plugin {
     private static final Pattern CUSTOMER_SUPPORT_HISTORY = Pattern.compile("^/api/messages/history/[1-9][0-9]*$");
     private static final Pattern CUSTOMER_ADDRESS = Pattern.compile("^/api/addresses/[1-9][0-9]*$");
     private static final Pattern CUSTOMER_ADDRESS_DEFAULT = Pattern.compile("^/api/addresses/[1-9][0-9]*/default$");
-    private static final Pattern CUSTOMER_STORE_FOLLOW = Pattern.compile("^/api/store-follows/(?=[a-z0-9-]{1,80}$)[a-z0-9]+(?:-[a-z0-9]+)*$");
+    private static final Pattern CUSTOMER_STORE_FOLLOW = Pattern.compile("^/api/store-follows/(?=[a-z0-9-]{1,160}$)[a-z0-9]+(?:-[a-z0-9]+)*$");
+    private static final Pattern CUSTOMER_FAVORITE = Pattern.compile("^/api/favorites/[1-9][0-9]*$");
     private static final Pattern PUBLIC_PRODUCT = Pattern.compile("^/api/products/[1-9][0-9]*$");
     private static final Pattern SAFE_CURSOR = Pattern.compile("^[A-Za-z0-9_-]{1,1024}$");
     private static final Pattern SAFE_PAYMENT_REF = Pattern.compile("^[A-Za-z0-9._:-]{1,160}$");
@@ -48,6 +49,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
         "/api/users/security-status",
         "/api/addresses",
         "/api/campaigns/coupons/active",
+        "/api/favorites",
         "/api/store-follows",
         "/api/payments/capability",
         "/api/payments/status",
@@ -68,6 +70,8 @@ public final class NovaNotificationApiPlugin extends Plugin {
         "/api/payments/initialize",
         "/api/returns",
         "/api/messages/send",
+        "/api/questions/ask",
+        "/api/reviews",
         "/api/assistant/chat",
         "/api/notifications/android-push/tokens"
     );
@@ -279,6 +283,8 @@ public final class NovaNotificationApiPlugin extends Plugin {
     }
 
     static boolean allowed(String pathWithQuery, String method) {
+        String canonical = canonicalPath(pathWithQuery);
+        if (canonical == null || !canonical.equals(pathWithQuery)) return false;
         String path = pathWithQuery.split("\\?", 2)[0];
         if ("GET".equals(method) && (
             EXACT_GET.contains(path)
@@ -287,16 +293,20 @@ public final class NovaNotificationApiPlugin extends Plugin {
                 || CUSTOMER_RETURN.matcher(path).matches()
                 || CUSTOMER_REVIEW_LIST.matcher(path).matches()
                 || CUSTOMER_SUPPORT_HISTORY.matcher(path).matches()
+                || CUSTOMER_STORE_FOLLOW.matcher(path).matches()
                 || PUBLIC_PRODUCT.matcher(path).matches()
         )) return true;
         if ("POST".equals(method) && EXACT_POST.contains(path)) return true;
         if ("POST".equals(method) && CUSTOMER_ORDER_CANCEL.matcher(path).matches()) return true;
+        if ("POST".equals(method) && CUSTOMER_STORE_FOLLOW.matcher(path).matches()) return true;
+        if ("POST".equals(method) && CUSTOMER_FAVORITE.matcher(path).matches()) return true;
         if ("PUT".equals(method) && CUSTOMER_ADDRESS.matcher(path).matches()) return true;
         if ("PATCH".equals(method) && (EXACT_PATCH.contains(path) || READ_ONE.matcher(path).matches() || CUSTOMER_ADDRESS_DEFAULT.matcher(path).matches())) return true;
         return "DELETE".equals(method) && (
             EXACT_DELETE.contains(path)
                 || CUSTOMER_ADDRESS.matcher(path).matches()
                 || CUSTOMER_STORE_FOLLOW.matcher(path).matches()
+                || CUSTOMER_FAVORITE.matcher(path).matches()
         );
     }
 

@@ -63,7 +63,14 @@ import {
 import { hasAppOwnedBackEntry, nativeHistoryDepth } from "./native/nativeNavigation";
 import { canonicalNativeRoute, canonicalNativeRouteOrSafeDefault } from "./native/routeContract";
 import { useCustomerAccountRuntime, type CustomerAddressInput, type CustomerOrder } from "./account";
+import { useCustomerStoreFollowRuntime } from "./account/useCustomerStoreFollowRuntime";
 import { sendCustomerNovaBotMessage } from "./assistant/customerNovaBotApi";
+import {
+  ensureNovaBotComposerVisible,
+  GlobalNovaBotLauncher,
+  requestNovaBotPresentation,
+  useNovaBotBoundaryScrollChain,
+} from "./assistant/novabotPresentation";
 import {
   createCheckoutIdempotencyKey,
   getCustomerPaymentCapability,
@@ -249,7 +256,7 @@ type CommerceState = {
   catalogSelection: CatalogSelection;
   catalogFilters: CatalogFilters;
   catalogSort: CatalogSortKey;
-  toggleFavorite: (id: string) => void;
+  toggleFavorite: (id: string) => Promise<boolean>;
   addToCart: (productId: string, quantity?: number) => CartMutationResult;
   changeCartQuantity: (lineId: string, delta: number) => void;
   removeCartLine: (lineId: string) => void;
@@ -414,6 +421,7 @@ export default function Prototype() {
   const [navigationRevision, setNavigationRevision] = useState(0);
   const [contentRevision, setContentRevision] = useState(0);
   const [refreshRequest, setRefreshRequest] = useState<RefreshRequest>({ id: 0, source: "reselect" });
+  const favoriteMutationLock = useRef(false);
   const notificationRuntime = useCustomerNotificationRuntime();
   const accountRuntime = useCustomerAccountRuntime();
   const capture = !NATIVE_SHELL && params.get("capture") === "1";
@@ -470,6 +478,15 @@ export default function Prototype() {
       isDefault: address.isDefault,
     })));
   }, [accountRuntime?.addresses, accountRuntime?.phase]);
+
+  useEffect(() => {
+    if (!NATIVE_SHELL) return;
+    if (accountRuntime?.phase !== "authenticated") {
+      setFavoriteIds(new Set());
+      return;
+    }
+    setFavoriteIds(new Set(accountRuntime.favoriteProductIds.map(String)));
+  }, [accountRuntime?.favoriteProductIds, accountRuntime?.phase, accountRuntime?.user?.id]);
 
   const registerPublicProducts = useCallback((incoming: readonly Product[]) => {
     setPublicProducts((current) => {
@@ -548,9 +565,7 @@ export default function Prototype() {
   const showNav = !["CAL-01", "CAL-06"].includes(route.cal);
   const showGlobalNovaBot = NATIVE_SHELL
     && !keyboard.visible
-    && !["CAL-01", "CAL-06", "CAL-08", "CAL-12"].includes(route.cal)
-    && route.cal !== "CAL-07"
-    && !(route.cal === "CAL-11" && route.view === "");
+    && !["CAL-01", "CAL-08", "CAL-12"].includes(route.cal);
   const hasFixedAppHeader = route.cal !== "CAL-06";
   const routeIdentity = `${route.cal}:${route.tab}:${route.view || "root"}:${route.storeSlug || "local"}:${route.productId || "none"}:${route.mode || "customer"}`;
   const scrollSurfaceIdentity = route.cal === "CAL-08" ? `${route.cal}:${route.tab}` : routeIdentity;
@@ -574,11 +589,35 @@ export default function Prototype() {
     catalogSelection,
     catalogFilters,
     catalogSort,
-    toggleFavorite: (id) => setFavoriteIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    }),
+    toggleFavorite: async (id) => {
+      const nextFavorited = !favoriteIds.has(id);
+      if (!NATIVE_SHELL) {
+        setFavoriteIds((current) => {
+          const next = new Set(current);
+          if (nextFavorited) next.add(id); else next.delete(id);
+          return next;
+        });
+        return nextFavorited;
+      }
+      if (!accountRuntime || accountRuntime.phase !== "authenticated") {
+        go("CAL-01", "account", "login");
+        return favoriteIds.has(id);
+      }
+      const productId = Number(id);
+      if (!Number.isSafeInteger(productId) || productId < 1) {
+        throw new CustomerNotificationApiError("Ürün favorisi doğrulanamadı.", 0, "CUSTOMER_FAVORITE_PRODUCT_INVALID");
+      }
+      if (favoriteMutationLock.current) {
+        throw new CustomerNotificationApiError("Favori işlemi devam ediyor.", 0, "CUSTOMER_FAVORITE_BUSY");
+      }
+      favoriteMutationLock.current = true;
+      try {
+        await accountRuntime.setFavoriteProduct(productId, nextFavorited);
+        return nextFavorited;
+      } finally {
+        favoriteMutationLock.current = false;
+      }
+    },
     addToCart: (productId, quantity = 1) => {
       const requestedQuantity = Math.max(1, Math.floor(quantity));
       const currentTotal = cartLines.reduce((total, line) => total + line.quantity, 0);
@@ -657,7 +696,7 @@ export default function Prototype() {
     selectCatalog: (category, subcategory = category) => setCatalogSelection({ category, subcategory }),
     applyCatalogFilters: (filters) => setCatalogFilters({ ...filters, applied: true }),
     setCatalogSort,
-  }), [favoriteIds, cartCount, cartLines, appliedCoupon, selectedProductId, selectedOrderId, publicProducts, publicCatalogPhase, addresses, paymentMethods, productReviews, productQuestions, readNotificationIds, notificationPreferences, catalogSelection, catalogFilters, catalogSort, registerPublicProducts]);
+  }), [accountRuntime, favoriteIds, cartCount, cartLines, appliedCoupon, selectedProductId, selectedOrderId, publicProducts, publicCatalogPhase, addresses, paymentMethods, productReviews, productQuestions, readNotificationIds, notificationPreferences, catalogSelection, catalogFilters, catalogSort, registerPublicProducts]);
 
   return (
     <CommerceContext.Provider value={commerce}>
@@ -696,7 +735,7 @@ export default function Prototype() {
         </RefreshableRouteStage>
         {showNav && <BottomNav route={route} go={go} onReselect={() => requestRefresh("reselect")} />}
         {showGlobalNovaBot && (
-          <GlobalNovaBotLauncher go={go} />
+          <GlobalNovaBotLauncher assetSrc={NOVABOT} routeKey={routeIdentity} onOpen={() => go("CAL-12", "support")} />
         )}
         {!capture && !nativeShell && <CalibrationSwitcher current={route.cal} go={go} />}
       </div>
@@ -991,16 +1030,6 @@ function Screen({ route, go, searchQuery, setSearchQuery, searchPanelOpen, setSe
     case "CAL-11": return <SupportHubScreen go={go} view={route.view} />;
     case "CAL-12": return <NovaBotScreen go={go} />;
   }
-}
-
-function GlobalNovaBotLauncher({ go }: { go: Go }) {
-  return <button
-    type="button"
-    className="global-novabot-launcher"
-    data-testid="global-novabot-trigger"
-    aria-label="NovaBot’u aç"
-    onClick={() => go("CAL-12", "support")}
-  ><img src={NOVABOT} alt="" /><span className="visually-hidden">NovaBot’u aç</span></button>;
 }
 
 function CalibrationSwitcher({ current, go }: { current: CalId; go: Go }) {
@@ -1699,7 +1728,8 @@ const STORE_SORT_OPTIONS = PUBLIC_SORT_OPTIONS;
 function StorefrontScreen({ go, route }: { go: Go; route: Route }) {
   const keyboard = useKeyboard();
   const { registerPublicProducts, selectProduct } = useCommerce();
-  const [following, setFollowing] = useState(false);
+  const accountRuntime = useCustomerAccountRuntime();
+  const [demoFollowing, setDemoFollowing] = useState(false);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<"products" | "deals" | "profile">("products");
   const [sort, setSort] = useState<CatalogSortKey>("featured");
@@ -1714,6 +1744,17 @@ function StorefrontScreen({ go, route }: { go: Go; route: Route }) {
   const readOnlyPreview = mode === "preview";
   const liveStore = NATIVE_SHELL || readOnlyPreview || new URLSearchParams(window.location.search).get("publicStore") === "1";
   const requestedSlug = route.storeSlug ?? DEFAULT_PUBLIC_STORE_SLUG;
+  const serverFollowAuthority = NATIVE_SHELL && liveStore && !readOnlyPreview;
+  const storeFollowRuntime = useCustomerStoreFollowRuntime({
+    storeSlug: requestedSlug,
+    enabled: serverFollowAuthority,
+    accountPhase: accountRuntime?.phase ?? "loading",
+    customerId: accountRuntime?.user?.id ?? null,
+    refreshFollowedStores: accountRuntime?.refreshFollowedStores,
+  });
+  const following = serverFollowAuthority
+    ? storeFollowRuntime.confirmed && storeFollowRuntime.following
+    : demoFollowing;
 
   useEffect(() => {
     if (!liveStore) {
@@ -1765,9 +1806,11 @@ function StorefrontScreen({ go, route }: { go: Go; route: Route }) {
   const storeRating = projection
     ? projection.store.rating === null ? "—" : `${(projection.store.rating * 2).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} / 10`
     : liveStore ? "—" : "9,6 / 10";
-  const storeFollowers = projection
-    ? projection.store.followerCount.toLocaleString("tr-TR")
-    : liveStore ? "—" : following ? "18,5 bin" : "18,4 bin";
+  const storeFollowers = serverFollowAuthority && storeFollowRuntime.confirmed
+    ? storeFollowRuntime.followerCount.toLocaleString("tr-TR")
+    : projection
+      ? projection.store.followerCount.toLocaleString("tr-TR")
+      : liveStore ? "—" : following ? "18,5 bin" : "18,4 bin";
   const storeProductCount = projection?.store.productCount ?? (liveStore ? 0 : storeProducts.length);
   const storeLogo = projection?.store.logoUrl ?? LOGO;
   const storeCover = projection?.store.bannerUrl ?? (liveStore ? LOGO : PRODUCT_HERO);
@@ -1786,6 +1829,38 @@ function StorefrontScreen({ go, route }: { go: Go; route: Route }) {
       go("CAL-06", "home");
     }
   };
+  const handleFollowClick = () => {
+    if (readOnlyPreview) return;
+    if (!serverFollowAuthority) {
+      setDemoFollowing((current) => !current);
+      return;
+    }
+    if (storeFollowRuntime.phase === "guest") {
+      go("CAL-01", "account", "login");
+      return;
+    }
+    if (storeFollowRuntime.phase === "error") {
+      if (accountRuntime?.phase === "authenticated") storeFollowRuntime.refresh();
+      else void accountRuntime?.refresh();
+      return;
+    }
+    if (storeFollowRuntime.phase === "ready" && storeFollowRuntime.confirmed && !storeFollowRuntime.busy) {
+      void storeFollowRuntime.toggle();
+    }
+  };
+  const followTruthPending = serverFollowAuthority
+    && (storeFollowRuntime.phase === "disabled" || storeFollowRuntime.phase === "loading");
+  const followButtonLabel = readOnlyPreview
+    ? "Takip et"
+    : serverFollowAuthority && storeFollowRuntime.busy
+      ? "İşleniyor"
+      : followTruthPending
+        ? "Doğrulanıyor"
+        : serverFollowAuthority && storeFollowRuntime.phase === "error"
+          ? "Yeniden dene"
+          : following ? "Takip ediliyor" : "Takip et";
+  const followButtonDisabled = readOnlyPreview
+    || (serverFollowAuthority && (followTruthPending || storeFollowRuntime.busy));
 
   return (
     <>
@@ -1796,8 +1871,23 @@ function StorefrontScreen({ go, route }: { go: Go; route: Route }) {
           <div className="store-profile-row">
             <img className="store-logo" src={storeLogo} alt={`${storeName} mağaza logosu`} />
             <div className="store-profile-copy"><h1 id="store-name"><span>{storeName}</span>{!projection && <SealCheckIcon weight="fill" aria-label="Doğrulanmış mağaza" />}</h1><p>{storeDescription}</p></div>
-            <button type="button" className={following ? "following" : ""} aria-pressed={following} disabled={readOnlyPreview} aria-label={readOnlyPreview ? "Takip et · önizlemede kapalı" : undefined} onClick={() => setFollowing(!following)}>{following ? <><CheckIcon /> Takip ediliyor</> : <><PlusIcon /> Takip et</>}</button>
+            <button
+              type="button"
+              className={following ? "following" : ""}
+              aria-pressed={serverFollowAuthority ? (storeFollowRuntime.confirmed ? following : undefined) : following}
+              aria-busy={serverFollowAuthority && (followTruthPending || storeFollowRuntime.busy)}
+              disabled={followButtonDisabled}
+              aria-label={readOnlyPreview ? "Takip et · önizlemede kapalı" : undefined}
+              data-testid="store-follow-button"
+              data-follow-phase={serverFollowAuthority ? storeFollowRuntime.phase : "demo"}
+              onClick={handleFollowClick}
+            >
+              {serverFollowAuthority && storeFollowRuntime.phase === "error" ? <ReloadIcon /> : following ? <CheckIcon /> : <PlusIcon />}
+              {followButtonLabel}
+            </button>
           </div>
+          {serverFollowAuthority && storeFollowRuntime.phase === "loading" && <p className="store-follow-feedback" role="status" data-testid="store-follow-loading">Takip durumu sunucudan doğrulanıyor.</p>}
+          {serverFollowAuthority && storeFollowRuntime.errorMessage && <p className="store-follow-feedback error" role="alert" data-testid="store-follow-error">{storeFollowRuntime.errorMessage}</p>}
           <dl className="store-stats"><div><dt>Mağaza puanı</dt><dd>{storeRating}</dd></div><div><dt>Takipçi</dt><dd>{storeFollowers}</dd></div><div><dt>Ürün</dt><dd>{storeProductCount}</dd></div></dl>
         </section>
 
@@ -1845,6 +1935,8 @@ function ProductCard({ id, name, store, price, old, image, images, badge, rating
   const [cartAnnouncement, setCartAnnouncement] = useState("");
   const [activeImage, setActiveImage] = useState(0);
   const [favoriteMotion, setFavoriteMotion] = useState<"add" | "remove" | null>(null);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [favoriteError, setFavoriteError] = useState("");
   const priceFit = productCardPriceFit(price);
   const oldPriceFit = old ? productCardPriceFit(old) : undefined;
   const displayRating = rating ?? (NATIVE_SHELL ? null : 4.8);
@@ -1879,20 +1971,23 @@ function ProductCard({ id, name, store, price, old, image, images, badge, rating
     resetTimer.current = window.setTimeout(() => setAdded(false), 950);
     announcementTimer.current = window.setTimeout(() => setCartAnnouncement(""), 2_000);
   };
-  const handleFavorite = () => {
-    if (readOnlyPreview) return;
+  const handleFavorite = async () => {
+    if (readOnlyPreview || favoriteBusy) return;
     if (favoriteTimer.current !== null) window.clearTimeout(favoriteTimer.current);
-    if (favorite) {
-      setFavoriteMotion("remove");
-      favoriteTimer.current = window.setTimeout(() => {
-        toggleFavorite(id);
-        setFavoriteMotion(null);
-      }, 380);
-      return;
+    setFavoriteError("");
+    setFavoriteBusy(true);
+    try {
+      const confirmedFavorited = await toggleFavorite(id);
+      if (confirmedFavorited === favorite) return;
+      const motion = confirmedFavorited ? "add" : "remove";
+      setFavoriteMotion(motion);
+      favoriteTimer.current = window.setTimeout(() => setFavoriteMotion(null), motion === "add" ? 520 : 380);
+    } catch (error) {
+      setFavoriteMotion(null);
+      setFavoriteError(error instanceof Error ? error.message : "Favori işlemi tamamlanamadı.");
+    } finally {
+      setFavoriteBusy(false);
     }
-    setFavoriteMotion("add");
-    toggleFavorite(id);
-    favoriteTimer.current = window.setTimeout(() => setFavoriteMotion(null), 520);
   };
   const showMediaImage = (index: number) => setActiveImage(circularMediaIndex(index, mediaAssets.length));
   const openProduct = () => {
@@ -1945,12 +2040,13 @@ function ProductCard({ id, name, store, price, old, image, images, badge, rating
         <IconButton
           label={favorite ? "Favoriden çıkar" : "Favoriye ekle"}
           pressed={favorite}
-          disabled={readOnlyPreview}
-          onClick={handleFavorite}
+          disabled={readOnlyPreview || favoriteBusy}
+          onClick={() => void handleFavorite()}
           className={`${favorite ? "favorite-active " : ""}${favoriteMotion ? `favorite-motion-${favoriteMotion}` : ""}`.trim()}
         >
           <PhosphorHeartIcon weight={favorite ? "fill" : "regular"} />
         </IconButton>
+        {favoriteError && <p className="product-favorite-error" role="alert">{favoriteError}</p>}
       </div>
       <div className="product-copy"><span className="cart-cutout-shadow" aria-hidden="true"><i /></span>{!isPublicProjection && <span className="bestseller"><img src={`${A}/extracts/bestseller-flame-source.png`} alt="" />Çok Satan</span>}<small>{store}</small><button type="button" className="product-title-action" onClick={openProduct}>{name}</button>{hasPublishedRating ? <div className="rating"><span className="rating-stars"><StarFilledIcon /></span><b>{ratingCopy}</b><span>({displayReviewCount})</span></div> : isPublicProjection ? <div className="rating rating-empty"><span>Henüz değerlendirme yok</span></div> : null}<hr /><div className="price" data-price-fit={priceFit} data-old-price-fit={oldPriceFit}><strong>{price}</strong>{old && <del>{old}</del>}</div><button type="button" className={`add-cart${added ? " feedback" : ""}`} data-state={added ? "confirmed" : "idle"} aria-label={readOnlyPreview ? `${name} sepete ekle · önizlemede kapalı` : added ? `${name} sepete eklendi` : !isPurchasable ? `${name} şu anda satın alınamaz` : `${name} sepete ekle`} aria-pressed={added} disabled={readOnlyPreview || !isPurchasable || added} aria-disabled={readOnlyPreview || !isPurchasable || added} onClick={handleAdd}><span className="add-cart-visual"><span className="cart-idle-glyph"><ShoppingCartSimpleIcon className="cart-resting-icon" weight="regular" /><PlusIcon className="cart-state-mark" /></span><CheckIcon className="cart-confirm-check" /></span></button><span className="visually-hidden" role="status" aria-live="polite">{cartAnnouncement}</span></div>
     </article>
@@ -2026,6 +2122,7 @@ const productDetailData = {
 
 function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   const keyboard = useKeyboard();
+  const accountRuntime = useCustomerAccountRuntime();
   const { favoriteIds, toggleFavorite, addToCart, cartLines, cartCount, selectedProductId, selectProduct, publicProducts, publicCatalogPhase, reloadPublicCatalog, registerPublicProducts, productReviews, productQuestions, publishReview, submitProductQuestion } = useCommerce();
   const readOnlyPreview = route.mode === "preview";
   const routedProduct = route.productId ? publicProducts[route.productId] : undefined;
@@ -2102,12 +2199,20 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   const [reviewDraft, setReviewDraft] = useState("");
   const [questionOpen, setQuestionOpen] = useState(false);
   const [questionDraft, setQuestionDraft] = useState("");
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [favoriteError, setFavoriteError] = useState("");
+  const [communityBusy, setCommunityBusy] = useState(false);
+  const [communityError, setCommunityError] = useState("");
+  const [communitySuccess, setCommunitySuccess] = useState("");
+  const [communityScope, setCommunityScope] = useState<"question" | "review" | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerZoomed, setViewerZoomed] = useState(false);
   const resetTimer = useRef<number | null>(null);
   const reviewSection = useRef<HTMLElement | null>(null);
   const questionSection = useRef<HTMLElement | null>(null);
   const favorite = favoriteIds.has(detail.id);
+  const canonicalProductId = Number(detail.id);
+  const hasCanonicalProductId = Number.isSafeInteger(canonicalProductId) && canonicalProductId > 0;
   const existingCartQuantity = cartLines.find((line) => line.productId === detail.id)?.quantity ?? 0;
   const stockCapacity = catalogProduct.stock === undefined
     ? MAX_CART_QUANTITY_PER_PRODUCT
@@ -2123,7 +2228,7 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   ));
   const reviewsForProduct = productReviews.filter((review) => review.productId === detail.id);
   const ownReview = reviewsForProduct.find((review) => review.ownerId === CURRENT_MOCK_USER_ID);
-  const canReview = !NATIVE_SHELL && !readOnlyPreview && detail.id === "pulse-anc" && !ownReview;
+  const canReview = !readOnlyPreview && (NATIVE_SHELL ? hasCanonicalProductId : detail.id === "pulse-anc" && !ownReview);
   const visibleQuestions = catalogProduct.isPublicProjection
     ? []
     : productQuestions.filter((question) => question.productId === detail.id && (question.status === "answered" || question.ownerId === CURRENT_MOCK_USER_ID));
@@ -2171,6 +2276,10 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
     setReviewsExpanded(false);
     setReviewOpen(false);
     setQuestionOpen(false);
+    setFavoriteError("");
+    setCommunityError("");
+    setCommunitySuccess("");
+    setCommunityScope(null);
     setViewerOpen(false);
     setViewerZoomed(false);
   }, [detail.id]);
@@ -2193,19 +2302,87 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
     if (result.addedQuantity < 1) return;
     go("CAL-08", "cart");
   };
-  const submitReview = (event: FormEvent) => {
+  const requireNativeProductAction = () => {
+    if (accountRuntime?.phase !== "authenticated") {
+      go("CAL-01", "account", "login");
+      return null;
+    }
+    if (!hasCanonicalProductId) {
+      setCommunityError("Ürün kimliği sunucuyla doğrulanamadı.");
+      return null;
+    }
+    return canonicalProductId;
+  };
+  const handlePdpFavorite = async () => {
+    if (readOnlyPreview || favoriteBusy) return;
+    setFavoriteError("");
+    setFavoriteBusy(true);
+    try {
+      await toggleFavorite(detail.id);
+    } catch (error) {
+      setFavoriteError(error instanceof Error ? error.message : "Favori işlemi tamamlanamadı.");
+    } finally {
+      setFavoriteBusy(false);
+    }
+  };
+  const submitReview = async (event: FormEvent) => {
     event.preventDefault();
-    if (NATIVE_SHELL || readOnlyPreview || !reviewDraft.trim()) return;
+    if (readOnlyPreview) return;
+    if (NATIVE_SHELL) {
+      const productId = requireNativeProductAction();
+      if (!productId || !accountRuntime || communityBusy) return;
+      keyboard.hide();
+      setCommunityBusy(true);
+      setCommunityError("");
+      setCommunitySuccess("");
+      setCommunityScope("review");
+      try {
+        await accountRuntime.submitProductReview(productId, reviewRating, reviewDraft);
+        setReviewDraft("");
+        setReviewOpen(false);
+        setCommunitySuccess("Değerlendirmen incelemeye gönderildi.");
+      } catch (error) {
+        setCommunityError(error instanceof Error ? error.message : "Değerlendirme gönderilemedi.");
+      } finally {
+        setCommunityBusy(false);
+      }
+      return;
+    }
+    if (!reviewDraft.trim()) return;
     keyboard.hide();
     publishReview(detail.id, reviewRating, reviewDraft);
     setReviewDraft("");
     setReviewsExpanded(true);
     setReviewOpen(false);
   };
-  const submitQuestion = (event: FormEvent) => {
+  const submitQuestion = async (event: FormEvent) => {
     event.preventDefault();
-    if (NATIVE_SHELL || readOnlyPreview) return;
+    if (readOnlyPreview) return;
     const clean = questionDraft.trim();
+    if (NATIVE_SHELL) {
+      const productId = requireNativeProductAction();
+      if (!productId || !accountRuntime || communityBusy) return;
+      if (clean.length < 5) {
+        setCommunityError("Sorun en az 5 karakter olmalıdır.");
+        return;
+      }
+      keyboard.hide();
+      setCommunityBusy(true);
+      setCommunityError("");
+      setCommunitySuccess("");
+      setCommunityScope("question");
+      try {
+        await accountRuntime.submitProductQuestion(productId, clean);
+        setQuestionDraft("");
+        setQuestionOpen(false);
+        setCommunitySuccess("Sorun satıcıya iletildi.");
+      } catch (error) {
+        setCommunityError(error instanceof Error ? error.message : "Soru gönderilemedi.");
+      } finally {
+        setCommunityBusy(false);
+      }
+      return;
+    }
     if (!clean) return;
     keyboard.hide();
     submitProductQuestion(detail.id, clean);
@@ -2213,9 +2390,27 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
     setQuestionOpen(false);
   };
   const openSellerQuestion = () => {
-    if (NATIVE_SHELL || readOnlyPreview) return;
+    if (readOnlyPreview) return;
+    if (NATIVE_SHELL && accountRuntime?.phase !== "authenticated") {
+      go("CAL-01", "account", "login");
+      return;
+    }
+    setCommunityError("");
+    setCommunitySuccess("");
+    setCommunityScope("question");
     setQuestionOpen(true);
     window.requestAnimationFrame(() => questionSection.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+  const openReview = () => {
+    if (readOnlyPreview) return;
+    if (NATIVE_SHELL && accountRuntime?.phase !== "authenticated") {
+      go("CAL-01", "account", "login");
+      return;
+    }
+    setCommunityError("");
+    setCommunitySuccess("");
+    setCommunityScope("review");
+    setReviewOpen((current) => !current);
   };
   if (route.storeSlug && route.productId && !publicProducts[route.productId] && remoteLoadState === "loading") {
     return <div className="pdp-contract-load-state" data-testid="public-product-loading" role="status"><ReloadIcon /><h1>Ürün yükleniyor</h1><p>Güncel public ürün bilgileri hazırlanıyor.</p></div>;
@@ -2241,10 +2436,10 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
             }
             setShared(true);
           }}><Share1Icon /></IconButton>
-           <IconButton label={readOnlyPreview ? "Favoriye ekle · önizlemede kapalı" : favorite ? "Favoriden çıkar" : "Favoriye ekle"} pressed={favorite} disabled={readOnlyPreview} onClick={() => toggleFavorite(detail.id)} className={favorite ? "favorite-active" : ""}><PhosphorHeartIcon weight={favorite ? "fill" : "regular"} /></IconButton>
-            {NATIVE_SHELL && <GlobalNovaBotLauncher go={go} />}
+           <IconButton label={readOnlyPreview ? "Favoriye ekle · önizlemede kapalı" : favorite ? "Favoriden çıkar" : "Favoriye ekle"} pressed={favorite} disabled={readOnlyPreview || favoriteBusy} onClick={() => void handlePdpFavorite()} className={favorite ? "favorite-active" : ""}><PhosphorHeartIcon weight={favorite ? "fill" : "regular"} /></IconButton>
           </div>
         {shared && <span className="pdp-action-status" role="status">Paylaşım hazır</span>}
+        {favoriteError && <span className="pdp-action-status error" role="alert">{favoriteError}</span>}
       </header>
       <MobileScroll className="cal-scroll pdp-scroll">
         <main className="cal-screen screen-cal-06 has-fixed-pdp-topbar" aria-label="CAL-06 Ürün Detayı">
@@ -2265,7 +2460,7 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
                 {hasPublishedReviews ? <div className="rating large"><StarFilledIcon /><b>{detail.rating}</b><i /><button type="button" onClick={() => reviewSection.current?.scrollIntoView({ behavior: "smooth", block: "center" })}>{displayedReviewCount} değerlendirme</button></div> : <p className="rating-empty">Henüz yayınlanmış değerlendirme yok</p>}
                 <div className="price large"><strong>{detail.price}</strong>{detail.oldPrice && <del>{detail.oldPrice}</del>}{detail.discount && <span>{detail.discount}</span>}</div>
                 {!catalogProduct.isPublicProjection && <div className="variant"><h2>Renk</h2><div>{[{ label: "Kırık Beyaz", className: "cream" }, { label: "Gece Mavisi", className: "navy" }].map((item) => <button type="button" aria-label={item.label} aria-pressed={color === item.label} className={`${item.className}${color === item.label ? " active" : ""}`} onClick={() => setColor(item.label)} key={item.label}><i /><span>{item.label}</span></button>)}</div><small className="variant-selection">Seçim: {color} · {color === "Kırık Beyaz" ? "NS-PA-IV" : "NS-PA-NV"}</small></div>}
-                <section className="pdp-seller-panel" aria-labelledby="pdp-seller-title"><h2 id="pdp-seller-title"><StorefrontIcon weight="duotone" /> Satıcı Bilgisi</h2><div className="pdp-seller-identity"><img src={catalogProduct.storeLogoUrl ?? LOGO} alt="" /><div><strong>{detail.seller.name} {!catalogProduct.isPublicProjection && <SealCheckIcon weight="fill" aria-label="Doğrulanmış satıcı" />}</strong><span>{catalogProduct.isPublicProjection ? "Public mağaza kaydı" : "Güvenilir satıcı · Hızlı gönderici"}</span></div>{detail.seller.score ? <b>{detail.seller.score}</b> : <b>—</b>}</div><div className="pdp-seller-actions"><button type="button" onClick={() => go("CAL-04", "home", "store", { storeSlug: catalogProduct.storeSlug ?? route.storeSlug, mode: route.mode })}>Mağazaya Git</button><button type="button" disabled={NATIVE_SHELL || readOnlyPreview} onClick={openSellerQuestion}>{NATIVE_SHELL ? "Soru kanalı yakında" : "Satıcıya Sor"}</button></div></section>
+                <section className="pdp-seller-panel" aria-labelledby="pdp-seller-title"><h2 id="pdp-seller-title"><StorefrontIcon weight="duotone" /> Satıcı Bilgisi</h2><div className="pdp-seller-identity"><img src={catalogProduct.storeLogoUrl ?? LOGO} alt="" /><div><strong>{detail.seller.name} {!catalogProduct.isPublicProjection && <SealCheckIcon weight="fill" aria-label="Doğrulanmış satıcı" />}</strong><span>{catalogProduct.isPublicProjection ? "Public mağaza kaydı" : "Güvenilir satıcı · Hızlı gönderici"}</span></div>{detail.seller.score ? <b>{detail.seller.score}</b> : <b>—</b>}</div><div className="pdp-seller-actions"><button type="button" onClick={() => go("CAL-04", "home", "store", { storeSlug: catalogProduct.storeSlug ?? route.storeSlug, mode: route.mode })}>Mağazaya Git</button><button type="button" disabled={readOnlyPreview || communityBusy} onClick={openSellerQuestion}>Satıcıya Sor</button></div></section>
                 <div className="pdp-stock"><CheckCircleIcon weight="fill" /><div><strong>{detail.stock}</strong>{detail.seller.invoice && <span>{detail.seller.invoice}</span>}</div></div>
                 {detail.campaign && <p className="campaign-note"><b>Kampanya</b>{detail.campaign}</p>}
                 <section className={`pdp-description-section${readableText ? " is-readable" : ""}`} aria-labelledby="pdp-description-title">
@@ -2281,12 +2476,12 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
             <section className="pdp-extra-sections">
               <article className="pdp-policy-card"><h2>Ürün ve satış bilgileri</h2>{detail.policies.map(([label, value]) => <div key={label}><b>{label}</b><span>{value}</span></div>)}</article>
               <article className="pdp-review-card" ref={reviewSection}>
-                <div className="pdp-review-summary"><div><h2>Değerlendirmeler</h2>{hasPublishedReviews ? <><strong>{detail.rating}<StarFilledIcon /></strong><span>{displayedReviewCount} doğrulanmış değerlendirme</span></> : <span>Henüz yayınlanmış değerlendirme yok</span>}</div><div className="pdp-review-actions">{displayedReviewCount > 0 && <button type="button" onClick={() => setReviewsExpanded(!reviewsExpanded)}>{reviewsExpanded ? "Kapat" : "Tümünü Gör"} <ArrowRightIcon /></button>}{canReview && <button type="button" className="secondary" onClick={() => setReviewOpen(!reviewOpen)}>Değerlendir</button>}</div></div>
+                <div className="pdp-review-summary"><div><h2>Değerlendirmeler</h2>{hasPublishedReviews ? <><strong>{detail.rating}<StarFilledIcon /></strong><span>{displayedReviewCount} doğrulanmış değerlendirme</span></> : <span>Henüz yayınlanmış değerlendirme yok</span>}</div><div className="pdp-review-actions">{displayedReviewCount > 0 && <button type="button" onClick={() => setReviewsExpanded(!reviewsExpanded)}>{reviewsExpanded ? "Kapat" : "Tümünü Gör"} <ArrowRightIcon /></button>}{canReview && <button type="button" className="secondary" disabled={communityBusy} onClick={openReview}>Değerlendir</button>}</div></div>
                 {detail.id !== "pulse-anc" && <p className="review-eligibility-note">Bu ürünü satın aldıktan sonra değerlendirebilirsin.</p>}
                 <div className="review-list">{reviewsForProduct.slice(0, reviewsExpanded ? reviewsForProduct.length : 2).map((review) => <article className="review-preview" key={review.id}><span className="review-avatar" aria-hidden="true"><PersonIcon /></span><div><header><b>{review.authorMasked}</b>{review.verified && <em><CheckIcon /> Doğrulanmış alışveriş</em>}</header><span>{review.copy}</span></div></article>)}</div>
-                {reviewOpen && <form className="pdp-inline-form review-form" onSubmit={submitReview}><h3>Ürünü değerlendir</h3><div className="review-stars" aria-label="Puan seç">{[1, 2, 3, 4, 5].map((value) => <button type="button" key={value} aria-label={`${value} yıldız`} aria-pressed={reviewRating === value} onClick={() => setReviewRating(value)}><StarFilledIcon /></button>)}</div><KeyboardTextarea aria-label="Değerlendirmen" value={reviewDraft} onChange={(event) => setReviewDraft(event.target.value)} placeholder="Deneyimini paylaş" /><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setReviewOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={!reviewDraft.trim()}>Gönder</button></div></form>}
+                {reviewOpen && <form className="pdp-inline-form review-form" data-novabot-avoid="true" onSubmit={(event) => void submitReview(event)}><h3>Ürünü değerlendir</h3><div className="review-stars" aria-label="Puan seç">{[1, 2, 3, 4, 5].map((value) => <button type="button" key={value} aria-label={`${value} yıldız`} aria-pressed={reviewRating === value} onClick={() => setReviewRating(value)}><StarFilledIcon /></button>)}</div><KeyboardTextarea aria-label="Değerlendirmen" maxLength={2000} value={reviewDraft} onChange={(event) => setReviewDraft(event.target.value)} placeholder="Deneyimini paylaş (isteğe bağlı)" /><small>{reviewDraft.length}/2000</small><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setReviewOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={communityBusy || (!NATIVE_SHELL && !reviewDraft.trim())}>{communityBusy ? "Gönderiliyor…" : "Gönder"}</button></div></form>}{communityScope === "review" && communitySuccess && <p className="pdp-community-success" role="status"><CheckIcon /> {communitySuccess}</p>}{communityScope === "review" && communityError && <p className="pdp-community-error" role="alert">{communityError}</p>}
               </article>
-              <article className="pdp-question-card" ref={questionSection}><div className="pdp-question-summary"><div><h2>Ürün soruları</h2><p>{NATIVE_SHELL ? "Yetkili ürün soru sözleşmesi bu sürümde etkin değil." : readOnlyPreview ? "Satıcı önizlemesinde soru gönderimi kapalıdır." : "Ürünle ilgili merak ettiğini satıcıya sor."}</p></div><button type="button" className="secondary" disabled={NATIVE_SHELL || readOnlyPreview} onClick={() => setQuestionOpen(!questionOpen)}>Soru Sor</button></div>{questionOpen && !NATIVE_SHELL && !readOnlyPreview && <form className="pdp-inline-form" onSubmit={submitQuestion}><KeyboardTextarea aria-label="Ürün hakkında sorun" maxLength={300} value={questionDraft} onChange={(event) => setQuestionDraft(event.target.value)} placeholder="Sorunu yaz" /><small>{questionDraft.length}/300</small><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setQuestionOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={!questionDraft.trim()}>Satıcıya Gönder</button></div></form>}<div className="question-thread-list">{visibleQuestions.map((question) => <article className="question-thread" data-status={question.status} key={question.id}><div className="question-block"><b>Soru · {question.authorMasked}</b><p>{question.question}</p></div>{question.status === "answered" ? <div className="answer-block"><b>Satıcı yanıtı</b><p>{question.answer}</p></div> : <small role="status"><ClockIcon /> Satıcı yanıtı bekleniyor · yalnızca sen görebilirsin</small>}</article>)}</div></article>
+              <article className="pdp-question-card" ref={questionSection}><div className="pdp-question-summary"><div><h2>Ürün soruları</h2><p>{readOnlyPreview ? "Satıcı önizlemesinde soru gönderimi kapalıdır." : "Ürünle ilgili merak ettiğini satıcıya sor."}</p></div><button type="button" className="secondary" disabled={readOnlyPreview || communityBusy} onClick={() => questionOpen ? setQuestionOpen(false) : openSellerQuestion()}>Soru Sor</button></div>{questionOpen && !readOnlyPreview && <form className="pdp-inline-form" data-novabot-avoid="true" onSubmit={(event) => void submitQuestion(event)}><KeyboardTextarea aria-label="Ürün hakkında sorun" maxLength={1000} value={questionDraft} onChange={(event) => setQuestionDraft(event.target.value)} placeholder="Sorunu yaz" /><small>{questionDraft.length}/1000</small><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setQuestionOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={communityBusy || questionDraft.trim().length < (NATIVE_SHELL ? 5 : 1)}>{communityBusy ? "Gönderiliyor…" : "Satıcıya Gönder"}</button></div></form>}{communityScope === "question" && communitySuccess && <p className="pdp-community-success" role="status"><CheckIcon /> {communitySuccess}</p>}{communityScope === "question" && communityError && <p className="pdp-community-error" role="alert">{communityError}</p>}<div className="question-thread-list">{visibleQuestions.map((question) => <article className="question-thread" data-status={question.status} key={question.id}><div className="question-block"><b>Soru · {question.authorMasked}</b><p>{question.question}</p></div>{question.status === "answered" ? <div className="answer-block"><b>Satıcı yanıtı</b><p>{question.answer}</p></div> : <small role="status"><ClockIcon /> Satıcı yanıtı bekleniyor · yalnızca sen görebilirsin</small>}</article>)}</div></article>
               <section className="recommendations"><div className="section-title"><h2>Benzer ürünler</h2><button type="button" onClick={() => go("CAL-04", "home", catalogProduct.isPublicProjection ? "store" : "", { storeSlug: catalogProduct.storeSlug, mode: route.mode })}>Tümünü Gör <ArrowRightIcon /></button></div><Carousel ariaLabel="Benzer ürünler" className="recommendation-carousel" contentClassName="recommendation-track">{recommendationProducts.slice(0, 5).map((product) => <ProductCard key={`recommend-${product.id}`} {...product} readOnlyPreview={readOnlyPreview} onClick={() => openRecommendation(product)} />)}</Carousel></section>
             </section>
           </div>
@@ -2333,7 +2528,7 @@ function RecommendationCard({ product, go }: { product: (typeof products)[number
   return (
     <article className="recommendation-card" data-product-id={product.id}>
       <button type="button" className="recommendation-open" onClick={open}><img src={product.image} alt={product.name} /><span>{product.store}</span><b>{product.name}</b><strong>{product.price}</strong></button>
-      <div className="recommendation-actions"><button type="button" aria-label={favorite ? `${product.name} favoriden çıkar` : `${product.name} favoriye ekle`} aria-pressed={favorite} className={favorite ? "favorite-active" : ""} onClick={() => toggleFavorite(product.id)}><PhosphorHeartIcon weight={favorite ? "fill" : "regular"} /></button><button type="button" aria-label={added ? `${product.name} sepete eklendi` : `${product.name} sepete ekle`} aria-pressed={added} disabled={added} onClick={add}>{added ? <CheckIcon className="recommendation-check" /> : <ShoppingCartSimpleIcon weight="bold" />}</button></div>
+      <div className="recommendation-actions"><button type="button" aria-label={favorite ? `${product.name} favoriden çıkar` : `${product.name} favoriye ekle`} aria-pressed={favorite} className={favorite ? "favorite-active" : ""} onClick={() => { void toggleFavorite(product.id); }}><PhosphorHeartIcon weight={favorite ? "fill" : "regular"} /></button><button type="button" aria-label={added ? `${product.name} sepete eklendi` : `${product.name} sepete ekle`} aria-pressed={added} disabled={added} onClick={add}>{added ? <CheckIcon className="recommendation-check" /> : <ShoppingCartSimpleIcon weight="bold" />}</button></div>
     </article>
   );
 }
@@ -2352,7 +2547,7 @@ function CartScreen({ go }: { go: Go }) {
   return (
     <div className="root-layout cart-layout">
       <div className="cart-grid">
-        <section className="cart-main"><div className="cart-title"><h1>Sepetim</h1><div className="cart-title-actions"><span>{cartCount} ürün</span>{NATIVE_SHELL && <GlobalNovaBotLauncher go={go} />}</div></div>{items.map((item) => <article className="cart-item" data-testid={`cart-item-${item.id}`} data-product-id={item.product.id} key={item.id}><img src={item.product.image} alt={item.product.name} /><div><small>{item.product.store}</small><h2>{item.product.name}</h2><p>{NATIVE_SHELL ? `${item.product.stock ?? 0} adet stok` : "Krem · Stokta"}</p><strong>{item.product.price}</strong></div><div className="cart-item-actions"><IconButton label={`${item.product.name} Sil`} onClick={() => removeCartLine(item.id)}><TrashIcon /></IconButton><div className="quantity"><button aria-label={`${item.product.name} adedini azalt`} onClick={() => changeCartQuantity(item.id, -1)}><MinusIcon /></button><b>{item.quantity}</b><button aria-label={`${item.product.name} adedini artır`} disabled={item.quantity >= MAX_CART_QUANTITY_PER_PRODUCT || cartCount >= MAX_CART_TOTAL_QUANTITY} onClick={() => changeCartQuantity(item.id, 1)}><PlusIcon /></button></div></div></article>)}{items.length === 0 ? <div className="empty-state" role="status"><BackpackIcon /><h2>Sepetin boş</h2><button className="primary navy" onClick={() => go("CAL-02", "home")}>Alışverişe Dön</button></div> : <div className="delivery-note"><CubeIcon /><span><strong>Teslimat ödeme adımında netleşir</strong>Ücret ve tarih, adres ile satıcının hazırlık süresine göre hesaplanır.</span></div>}</section>
+        <section className="cart-main"><div className="cart-title"><h1>Sepetim</h1><div className="cart-title-actions"><span>{cartCount} ürün</span></div></div>{items.map((item) => <article className="cart-item" data-testid={`cart-item-${item.id}`} data-product-id={item.product.id} key={item.id}><img src={item.product.image} alt={item.product.name} /><div><small>{item.product.store}</small><h2>{item.product.name}</h2><p>{NATIVE_SHELL ? `${item.product.stock ?? 0} adet stok` : "Krem · Stokta"}</p><strong>{item.product.price}</strong></div><div className="cart-item-actions"><IconButton label={`${item.product.name} Sil`} onClick={() => removeCartLine(item.id)}><TrashIcon /></IconButton><div className="quantity"><button aria-label={`${item.product.name} adedini azalt`} onClick={() => changeCartQuantity(item.id, -1)}><MinusIcon /></button><b>{item.quantity}</b><button aria-label={`${item.product.name} adedini artır`} disabled={item.quantity >= MAX_CART_QUANTITY_PER_PRODUCT || cartCount >= MAX_CART_TOTAL_QUANTITY} onClick={() => changeCartQuantity(item.id, 1)}><PlusIcon /></button></div></div></article>)}{items.length === 0 ? <div className="empty-state" role="status"><BackpackIcon /><h2>Sepetin boş</h2><button className="primary navy" onClick={() => go("CAL-02", "home")}>Alışverişe Dön</button></div> : <div className="delivery-note"><CubeIcon /><span><strong>Teslimat ödeme adımında netleşir</strong>Ücret ve tarih, adres ile satıcının hazırlık süresine göre hesaplanır.</span></div>}</section>
         <aside className="order-summary"><h2>Sipariş Özeti</h2><label>Kupon kodu<div><KeyboardInput value={coupon} onChange={(e) => setCoupon(e.target.value)} /><button onClick={() => applyCartCoupon(coupon)}>Uygula</button></div></label>{couponApplied && <p className="coupon-success" role="status"><CheckIcon /> {appliedCoupon} indirimi uygulandı</p>}{NATIVE_SHELL && appliedCoupon && <p className="coupon-success" role="status">{appliedCoupon} ödeme adımında sunucuda doğrulanacak.</p>}<SummaryRows subtotal={subtotal} discount={discount} total={total} /><button className="primary navy" disabled={!items.length} onClick={() => go("CAL-08", "cart")}>{NATIVE_SHELL ? "Sunucuda Doğrula" : `${formatMoney(total)} · Ödemeye Geç`} <ArrowRightIcon /></button><small className="secure-copy"><LockClosedIcon /> {NATIVE_SHELL ? "Fiyat, stok ve kupon ödeme adımında doğrulanır" : "Güvenli ödeme"}</small></aside>
       </div>
     </div>
@@ -2798,6 +2993,9 @@ function AccountFeatureScreen({ go, view }: { go: Go; view: "profile" | "payment
   const [selectedCoupon, setSelectedCoupon] = useState("");
   const [followError, setFollowError] = useState("");
   const [retryingResource, setRetryingResource] = useState("");
+  const [passwordDraft, setPasswordDraft] = useState({ current: "", next: "", confirm: "" });
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSaved, setPasswordSaved] = useState(false);
   const [preferences, setPreferences] = useState({ twoFactor: true, loginAlerts: true, personalized: false, compact: false });
   const openProduct = () => { selectProduct("pulse-anc"); go("CAL-06", "home"); };
   const openCanonicalProduct = (productId: number) => {
@@ -2810,6 +3008,27 @@ function AccountFeatureScreen({ go, view }: { go: Go; view: "profile" | "payment
     if (retryingResource) return;
     setRetryingResource(scope);
     void action().catch(() => { /* the matching authoritative warning remains visible */ }).finally(() => setRetryingResource(""));
+  };
+  const submitPasswordChange = async (event: FormEvent) => {
+    event.preventDefault();
+    keyboard.hide();
+    setPasswordError("");
+    setPasswordSaved(false);
+    if (!accountRuntime || accountRuntime.phase !== "authenticated") {
+      go("CAL-01", "account", "login");
+      return;
+    }
+    if (passwordDraft.next !== passwordDraft.confirm) {
+      setPasswordError("Yeni şifre tekrarı eşleşmiyor.");
+      return;
+    }
+    try {
+      await accountRuntime.changePassword(passwordDraft.current, passwordDraft.next);
+      setPasswordDraft({ current: "", next: "", confirm: "" });
+      setPasswordSaved(true);
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : "Şifre güncellenemedi.");
+    }
   };
 
   useEffect(() => {
@@ -2865,10 +3084,10 @@ function AccountFeatureScreen({ go, view }: { go: Go; view: "profile" | "payment
   const settingsMode = view === "settings";
   if (NATIVE_SHELL && view === "security") {
     const security = accountRuntime?.securityStatus;
-    return <div className="root-layout account-feature-layout"><section className="account-feature-card"><LockClosedIcon /><h1>Gizlilik ve güvenlik</h1>{security ? <div className="authoritative-security-list"><p><span>E-posta</span><b>{security.email}</b></p><p><span>Telefon</span><b>{security.phone || "Eklenmemiş"}</b></p><p><span>Şifre</span><b>{security.hasPassword ? "Tanımlı" : "Tanımlı değil"}</b></p><p><span>İki adımlı doğrulama</span><b>{security.twoFactorEnabled ? "Açık" : "Kapalı"}</b></p></div> : <p>Güvenlik durumu sunucudan alınamadı. Örnek değer gösterilmiyor.</p>}</section></div>;
+    return <div className="root-layout account-feature-layout"><section className="account-feature-card"><LockClosedIcon /><h1>Gizlilik ve güvenlik</h1>{security ? <div className="authoritative-security-list"><p><span>E-posta</span><b>{security.email}</b></p><p><span>Telefon</span><b>{security.phone || "Eklenmemiş"}</b></p><p><span>Şifre</span><b>{security.hasPassword ? "Tanımlı" : "Tanımlı değil"}</b></p><p><span>İki adımlı doğrulama</span><b>{security.twoFactorEnabled ? "Açık" : "Kapalı"}</b></p></div> : <p>Güvenlik durumu sunucudan alınamadı. Örnek değer gösterilmiyor.</p>}<form className="account-password-form" data-testid="customer-password-form" data-novabot-avoid="true" onSubmit={(event) => void submitPasswordChange(event)}><h2>Şifreni değiştir</h2><p>Şifren en az 8 karakter, bir harf ve bir rakam içermelidir.</p><label>Mevcut şifre<KeyboardInput type="password" autoComplete="current-password" aria-label="Mevcut şifre" value={passwordDraft.current} onChange={(event) => setPasswordDraft({ ...passwordDraft, current: event.target.value })} /></label><label>Yeni şifre<KeyboardInput type="password" autoComplete="new-password" aria-label="Yeni şifre" value={passwordDraft.next} onChange={(event) => setPasswordDraft({ ...passwordDraft, next: event.target.value })} /></label><label>Yeni şifre tekrar<KeyboardInput type="password" autoComplete="new-password" aria-label="Yeni şifre tekrar" value={passwordDraft.confirm} onChange={(event) => setPasswordDraft({ ...passwordDraft, confirm: event.target.value })} /></label><button type="submit" className="primary navy" disabled={accountRuntime?.busy || !passwordDraft.current || passwordDraft.next.length < 8 || !passwordDraft.confirm}>{accountRuntime?.busy ? "Güncelleniyor…" : "Şifreyi Güncelle"}</button>{passwordSaved && <p className="inline-success" role="status"><CheckIcon /> Şifren sunucu tarafından güncellendi.</p>}{passwordError && <p className="account-logout-error" role="alert">{passwordError}</p>}</form></section></div>;
   }
   if (NATIVE_SHELL && view === "settings") {
-    return <div className="root-layout account-feature-layout"><section className="account-feature-card account-settings-hub"><GearIcon /><h1>Uygulama ayarları</h1><p>Hesap ayarların ilgili güvenli NovaStore yüzeylerinde yönetilir.</p><button type="button" onClick={() => go("CAL-10", "account", "profile")}><PersonIcon /><span><b>Profil Bilgileri</b><small>Ad soyad ve telefonunu yönet</small></span><CaretRightIcon /></button><button type="button" onClick={() => go("CAL-10", "account", "notifications")}><BellIcon /><span><b>Bildirimler ve Tercihler</b><small>Bildirim izinlerini ve tercihlerini aç</small></span><CaretRightIcon /></button><button type="button" onClick={() => go("CAL-10", "account", "security")}><LockClosedIcon /><span><b>Gizlilik ve Güvenlik</b><small>Doğrulanmış hesap güvenliği durumunu gör</small></span><CaretRightIcon /></button><button type="button" onClick={() => go("CAL-11", "support")}><QuestionMarkCircledIcon /><span><b>Yardım ve Destek</b><small>Destek mesajlarına ve yardım merkezine git</small></span><CaretRightIcon /></button></section></div>;
+    return <div className="root-layout account-feature-layout"><section className="account-feature-card account-settings-hub"><GearIcon /><h1>Uygulama ayarları</h1><p>Hesap ayarların ilgili güvenli NovaStore yüzeylerinde yönetilir.</p><button type="button" onClick={() => go("CAL-10", "account", "profile")}><PersonIcon /><span><b>Profil Bilgileri</b><small>Ad soyad ve telefonunu yönet</small></span><CaretRightIcon /></button><button type="button" onClick={() => go("CAL-10", "account", "notifications")}><BellIcon /><span><b>Bildirimler ve Tercihler</b><small>Bildirim izinlerini ve tercihlerini aç</small></span><CaretRightIcon /></button><button type="button" onClick={() => go("CAL-10", "account", "security")}><LockClosedIcon /><span><b>Gizlilik ve Güvenlik</b><small>Doğrulanmış hesap güvenliği durumunu gör</small></span><CaretRightIcon /></button><button type="button" onClick={() => go("CAL-11", "support")}><QuestionMarkCircledIcon /><span><b>Yardım ve Destek</b><small>Destek mesajlarına ve yardım merkezine git</small></span><CaretRightIcon /></button><button type="button" data-testid="novabot-settings-recovery" data-novabot-avoid="true" onClick={() => requestNovaBotPresentation("reset")}><img src={NOVABOT} alt="" /><span><b>NovaBot’u Göster</b><small>Gizliyse geri getir, hareketli kullan ve konumunu sıfırla</small></span><ReloadIcon /></button></section></div>;
   }
   const rows: Array<[keyof typeof preferences, string, string]> = settingsMode
     ? [["personalized", "Kişiselleştirilmiş öneriler", "Yerel oturum tercihlerini kullan"], ["compact", "Kompakt görünüm", "Liste yoğunluğunu artır"]]
@@ -3206,10 +3425,11 @@ function SupportHubScreen({ go, view }: { go: Go; view: ViewId }) {
   if (view === "faq" || view === "history" || view === "live") return <SupportSubpage go={go} view={view} />;
   return (
     <div className="root-layout support-layout">
-      <div className="support-heading"><div><h1>Yardım ve Destek</h1></div>{NATIVE_SHELL && <GlobalNovaBotLauncher go={go} />}<button onClick={() => go("CAL-11", "support", "history")}><ClockIcon /><span>Geçmiş</span></button></div>
+      <div className="support-heading"><div><h1>Yardım ve Destek</h1></div><button onClick={() => go("CAL-11", "support", "history")}><ClockIcon /><span>Geçmiş</span></button></div>
       <label className="support-search"><MagnifyingGlassIcon /><KeyboardInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nasıl yardımcı olabiliriz?" aria-label="Destekte ara" /></label>
       <section className="quick-help"><h2>Hızlı Yardım</h2><div><button onClick={() => go("CAL-09", "account")}><CubeIcon />Sipariş ve Teslimat<CaretRightIcon /></button><button onClick={() => go("CAL-10", "account", "returns")}><ReloadIcon />İade ve değişim<CaretRightIcon /></button><button onClick={() => go("CAL-11", "support", "faq")}><CreditCardIcon data-icon="payment-card" weight="regular" />Ödeme Sorunları<CaretRightIcon /></button><button onClick={() => go("CAL-10", "account", "security")}><LockClosedIcon />Hesap ve Güvenlik<CaretRightIcon /></button></div></section>
       <section className="novabot-card"><span className="novabot-art"><img src={NOVABOT} alt="NovaBot resmi simgesi" /></span><div><h2>NovaBot</h2><p className={NATIVE_SHELL ? "novabot-availability unverified" : "novabot-availability ready"}><i /> {NATIVE_SHELL ? "Bağlantı ilk mesajda doğrulanır" : "Çevrimiçi"}</p><span>Sorunu anlat, NovaBot güvenli PC1 yardım sözleşmesiyle yanıtlasın.</span></div><button className="primary navy" onClick={() => go("CAL-12", "support")}><PersonIcon /> NovaBot’u Başlat <ArrowRightIcon /></button></section>
+      {NATIVE_SHELL && <button className="novabot-recovery-link" type="button" data-testid="novabot-help-recovery" data-novabot-avoid="true" onClick={() => requestNovaBotPresentation("reset")}><ReloadIcon /> NovaBot simgesini göster ve konumunu sıfırla</button>}
       <button className="live-support" onClick={() => go("CAL-11", "support", "live")}><PersonIcon /><span><b>{NATIVE_SHELL ? "Destek Mesajları" : "Canlı Desteğe Bağlan"}</b><small><i /> {NATIVE_SHELL ? "PC1 müşteri hesabına bağlı" : "Genellikle hemen yanıtlar"}</small></span><ArrowRightIcon /></button>
       <div className="support-links"><button onClick={() => go("CAL-11", "support", "faq")}><QuestionMarkCircledIcon />Sıkça Sorulan Sorular<CaretRightIcon /></button><button onClick={() => go("CAL-11", "support", "history")}><ChatBubbleIcon />Geçmiş Sohbetler<CaretRightIcon /></button></div>
       {normalizedQuery && <section className="support-search-results" data-testid="support-search-results" aria-label="Destek arama sonuçları"><header><h2>Arama sonuçları</h2><span>{matchingArticles.length} sonuç</span></header>{matchingArticles.length ? <ExpandableLocalList items={matchingArticles} idPrefix="support-search" /> : <div className="support-search-empty" data-testid="support-search-empty" role="status"><MagnifyingGlassIcon /><h3>Sonuç bulunamadı</h3><p>Başka bir sipariş, ödeme veya hesap ifadesi deneyebilirsin.</p></div>}</section>}
@@ -3247,7 +3467,10 @@ function createInitialNovaBotMessages(): ChatMessage[] {
 }
 
 function NovaBotScreen({ go }: { go: Go }) {
+  const keyboard = useKeyboard();
   const accountRuntime = useCustomerAccountRuntime();
+  const messagesRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLFormElement | null>(null);
   const [message, setMessage] = useState("");
   const [liveRequested, setLiveRequested] = useState(false);
   const [attachment, setAttachment] = useState<{ name: string; size: string } | null>(null);
@@ -3259,6 +3482,25 @@ function NovaBotScreen({ go }: { go: Go }) {
   const conversationGeneration = useRef(0);
   const sessionIdentity = accountRuntime?.user?.id ?? "guest";
   const previousSessionIdentity = useRef(sessionIdentity);
+  useNovaBotBoundaryScrollChain(messagesRef);
+
+  const revealComposer = useCallback(() => {
+    window.requestAnimationFrame(() => ensureNovaBotComposerVisible(composerRef.current));
+    window.setTimeout(() => ensureNovaBotComposerVisible(composerRef.current), 280);
+  }, []);
+
+  useLayoutEffect(() => {
+    const list = messagesRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+    if (NATIVE_SHELL) revealComposer();
+  }, [keyboard.height, keyboard.visible, messages, revealComposer, sendError, sending]);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    viewport.addEventListener("resize", revealComposer);
+    return () => viewport.removeEventListener("resize", revealComposer);
+  }, [revealComposer]);
 
   useEffect(() => {
     if (!NATIVE_SHELL || previousSessionIdentity.current === sessionIdentity) return;
@@ -3316,13 +3558,13 @@ function NovaBotScreen({ go }: { go: Go }) {
           : "Bağlantı ilk mesajda doğrulanır";
     return <div className="root-layout novabot-layout">
       <div className="support-heading novabot-heading"><div><h1>Destek</h1></div><button type="button" onClick={() => go("CAL-11", "support", "history")}><ClockIcon /><span>Geçmiş</span></button></div>
-      <section className={`chat-card${messages.length > 1 ? " active-conversation" : ""}`} aria-busy={sending || undefined}>
+      <section className={`chat-card native-chat-card${messages.length > 1 ? " active-conversation" : ""}`} aria-busy={sending || undefined}>
         <header><span className="novabot-art"><img src={NOVABOT} alt="NovaBot resmi simgesi" /></span><div><h1>NovaBot</h1><p className={`novabot-connection ${connectionState}`} data-testid="novabot-connection-state" data-state={connectionState}><i /> {connectionCopy}</p></div></header>
-        <div className="messages" aria-live="polite">{messages.map((item) => <div className={`message ${item.from}${item.delivery ? ` ${item.delivery}` : ""}`} key={item.id}>{item.from === "bot" && <span className="novabot-art small"><img src={NOVABOT} alt="" /></span>}<div><p>{item.text}</p><small>{item.time}</small></div></div>)}{sending && <div className="message bot novabot-pending" role="status"><span className="novabot-art small"><img src={NOVABOT} alt="" /></span><div><p>NovaBot yanıt hazırlıyor…</p></div></div>}{sendError && <div className="novabot-inline-error" data-testid="novabot-send-error" role="alert"><ReloadIcon /><p>{sendError}</p></div>}</div>
+        <div ref={messagesRef} className="messages" data-scroll-drag="ignore" aria-live="polite">{messages.map((item) => <div className={`message ${item.from}${item.delivery ? ` ${item.delivery}` : ""}`} key={item.id}>{item.from === "bot" && <span className="novabot-art small"><img src={NOVABOT} alt="" /></span>}<div><p>{item.text}</p><small>{item.time}</small></div></div>)}{sending && <div className="message bot novabot-pending" role="status"><span className="novabot-art small"><img src={NOVABOT} alt="" /></span><div><p>NovaBot yanıt hazırlıyor…</p></div></div>}{sendError && <div className="novabot-inline-error" data-testid="novabot-send-error" role="alert"><ReloadIcon /><p>{sendError}</p></div>}</div>
         <div className="suggestion-row" aria-label="NovaBot önerileri">{nativeSuggestions.map((suggestion, index) => <button type="button" disabled={sending} onClick={() => void sendNativeMessage(suggestion)} key={`${suggestion}:${index}`}>{suggestion}</button>)}</div>
+        <form ref={composerRef} className="composer native-composer" onFocusCapture={revealComposer} onSubmit={(event) => { event.preventDefault(); void sendNativeMessage(message); }}><KeyboardInput aria-label="NovaBot mesajı" placeholder="Mesajını yaz..." value={message} maxLength={2000} disabled={sending} onChange={(event) => setMessage(event.target.value)} /><button type="submit" aria-label="Mesajı gönder" disabled={sending || !message.trim()}><PaperPlaneIcon /></button></form>
         <button className="escalate" type="button" onClick={() => go("CAL-11", "support", "live")}><PersonIcon /> Destek mesajlarına geç <ArrowRightIcon /></button>
         <p className="handoff-copy">Gerçek destek mesajların mevcut PC1 destek kanalında tutulur.</p>
-        <form className="composer native-composer" onSubmit={(event) => { event.preventDefault(); void sendNativeMessage(message); }}><KeyboardInput aria-label="NovaBot mesajı" placeholder="Mesajını yaz..." value={message} maxLength={2000} disabled={sending} onChange={(event) => setMessage(event.target.value)} /><button type="submit" aria-label="Mesajı gönder" disabled={sending || !message.trim()}><PaperPlaneIcon /></button></form>
       </section>
       <p className="privacy-note"><LockClosedIcon /> Özel hesap işlemleri sunucu yetkisiyle doğrulanır.</p>
     </div>;
@@ -3343,7 +3585,7 @@ function NovaBotScreen({ go }: { go: Go }) {
   return (
     <div className="root-layout novabot-layout">
       <div className="support-heading novabot-heading"><div><h1>Destek</h1></div><button onClick={() => go("CAL-11", "support", "history")}><ClockIcon /><span>Geçmiş</span></button></div>
-      <section className={`chat-card${messages.length > 1 || liveRequested ? " active-conversation" : ""}${attachment ? " has-attachment" : ""}`}><header><span className="novabot-art"><img src={NOVABOT} alt="NovaBot resmi simgesi" /></span><div><h1>NovaBot</h1><p><i /> Çevrimiçi · Anında yanıt</p></div></header><div className="messages" aria-live="polite">{messages.map((item) => <div className={`message ${item.from}`} key={item.id}>{item.from === "bot" && <span className="novabot-art small"><img src={NOVABOT} alt="" /></span>}<div><p>{item.text}</p><small>{item.time}</small></div></div>)}{liveRequested && <div className="message bot" role="status"><span className="novabot-art small"><img src={NOVABOT} alt="" /></span><div><p>Seni canlı destek sırasına aldım. Görüşme özeti güvenli biçimde aktarılacak.</p><small>Şimdi · İletildi</small></div></div>}</div><div className="suggestion-row"><button onClick={() => sendMessage("Siparişimi takip et")}>Siparişimi takip et</button><button onClick={() => go("CAL-10", "account", "returns")}>İade ve değişim</button><button onClick={() => sendMessage("Ödeme sorunu")}>Ödeme sorunu</button></div><button className="escalate" onClick={() => setLiveRequested(true)}><PersonIcon /> Canlı desteğe bağlan <ArrowRightIcon /></button><p className="handoff-copy">NovaBot, görüşmeni destek ekibine aktarır.</p><form className="composer" onSubmit={(event) => { event.preventDefault(); sendComposerMessage(); }}>{attachment && <div className="composer-attachment" data-testid="composer-attachment" role="status"><CubeIcon /><span><b>{attachment.name}</b><small>Yerel ek · {attachment.size}</small></span><button type="button" aria-label={`${attachment.name} ekini kaldır`} onClick={() => setAttachment(null)}><Cross1Icon /></button></div>}<button type="button" className="composer-attach" aria-label="Dosya ekle" aria-pressed={Boolean(attachment)} onClick={() => setAttachment({ name: "siparis-ekrani.png", size: "1,2 MB" })}><PlusIcon /></button><KeyboardInput aria-label="NovaBot mesajı" placeholder="Mesajını yaz..." value={message} onChange={(event) => setMessage(event.target.value)} /><button type="submit" aria-label="Mesajı gönder"><PaperPlaneIcon /></button></form></section><p className="privacy-note"><LockClosedIcon /> Görüşmelerin gizli ve güvenli şekilde korunur.</p>
+      <section className={`chat-card${messages.length > 1 || liveRequested ? " active-conversation" : ""}${attachment ? " has-attachment" : ""}`}><header><span className="novabot-art"><img src={NOVABOT} alt="NovaBot resmi simgesi" /></span><div><h1>NovaBot</h1><p><i /> Çevrimiçi · Anında yanıt</p></div></header><div ref={messagesRef} className="messages" data-scroll-drag="ignore" aria-live="polite">{messages.map((item) => <div className={`message ${item.from}`} key={item.id}>{item.from === "bot" && <span className="novabot-art small"><img src={NOVABOT} alt="" /></span>}<div><p>{item.text}</p><small>{item.time}</small></div></div>)}{liveRequested && <div className="message bot" role="status"><span className="novabot-art small"><img src={NOVABOT} alt="" /></span><div><p>Seni canlı destek sırasına aldım. Görüşme özeti güvenli biçimde aktarılacak.</p><small>Şimdi · İletildi</small></div></div>}</div><div className="suggestion-row"><button onClick={() => sendMessage("Siparişimi takip et")}>Siparişimi takip et</button><button onClick={() => go("CAL-10", "account", "returns")}>İade ve değişim</button><button onClick={() => sendMessage("Ödeme sorunu")}>Ödeme sorunu</button></div><button className="escalate" onClick={() => setLiveRequested(true)}><PersonIcon /> Canlı desteğe bağlan <ArrowRightIcon /></button><p className="handoff-copy">NovaBot, görüşmeni destek ekibine aktarır.</p><form ref={composerRef} className="composer" onFocusCapture={revealComposer} onSubmit={(event) => { event.preventDefault(); sendComposerMessage(); }}>{attachment && <div className="composer-attachment" data-testid="composer-attachment" role="status"><CubeIcon /><span><b>{attachment.name}</b><small>Yerel ek · {attachment.size}</small></span><button type="button" aria-label={`${attachment.name} ekini kaldır`} onClick={() => setAttachment(null)}><Cross1Icon /></button></div>}<button type="button" className="composer-attach" aria-label="Dosya ekle" aria-pressed={Boolean(attachment)} onClick={() => setAttachment({ name: "siparis-ekrani.png", size: "1,2 MB" })}><PlusIcon /></button><KeyboardInput aria-label="NovaBot mesajı" placeholder="Mesajını yaz..." value={message} onChange={(event) => setMessage(event.target.value)} /><button type="submit" aria-label="Mesajı gönder"><PaperPlaneIcon /></button></form></section><p className="privacy-note"><LockClosedIcon /> Görüşmelerin gizli ve güvenli şekilde korunur.</p>
     </div>
   );
 }
