@@ -7,6 +7,7 @@ import { createAuthAdapter } from "../src/adapters/authAdapter.js";
 import { createCartAdapter } from "../src/adapters/cartAdapter.js";
 import { createCatalogAdapter } from "../src/adapters/catalogAdapter.js";
 import { createCheckoutAdapter, normalizeAgreementPreview, normalizeQuote, reconcileFinalizedCart } from "../src/adapters/checkoutAdapter.js";
+import { isCheckoutReviewBlocked, resolveCheckoutVisibleStep } from "../src/checkoutRouteGuard.js";
 import { createCustomerAccountAdapter } from "../src/adapters/customerAccountAdapter.js";
 import { createFavoritesAdapter } from "../src/adapters/favoritesAdapter.js";
 import { createLegalAdapter } from "../src/adapters/legalAdapter.js";
@@ -1396,7 +1397,31 @@ test("public identity ve sözleşme önizlemesi provider aktivasyonundan ayrı f
     /agreementPreviewPrerequisitesReady = capability\?\.requirements\?\.businessIdentityReady === true\s*&& capability\?\.requirements\?\.legalDocumentsReady === true/,
   );
   assert.match(customerPages, /!agreementPreviewPrerequisitesReady/);
+  assert.match(
+    customerPages,
+    /canEnterReview = quoteState\.phase === "ready" && Boolean\(selectedAddress\) && agreementsReady/,
+    "salt-okunur sipariş incelemesi iki güncel sözleşme onaylanmadan ileri alınmamalı",
+  );
+  assert.match(customerPages, /disabled=\{!canEnterReview\}/);
+  assert.match(customerPages, /onClick=\{\(\) => canEnterReview && onStepChange\("review"\)\}/);
+  assert.match(customerPages, /id="checkout-review-consent-requirement"[\s\S]*?iki sözleşmeyi de onaylamalısın/);
+  assert.match(customerPages, /reviewBlocked = isCheckoutReviewBlocked\(step, canEnterReview\)/);
+  assert.match(customerPages, /visibleStep = resolveCheckoutVisibleStep\(step, canEnterReview\)/);
+  assert.match(customerPages, /onStepChange\("payment", \{ replace: true \}\)/);
+  assert.match(integratedApp, /window\.history\.replaceState\(window\.history\.state, "", next\)/);
+  assert.match(integratedApp, /window\.setTimeout\(\(\) => window\.dispatchEvent\(new HashChangeEvent\("hashchange"\)\), 0\)/);
+  assert.match(integratedApp, /onStepChange=\{handleCheckoutStepChange\}/);
   assert.match(customerPages, /paymentReady = capability\?\.ready === true && agreementsReady/);
+});
+
+test("checkout review deep-link ve history dönüşü iki güncel onay olmadan ödeme adımına düşer", () => {
+  assert.equal(isCheckoutReviewBlocked("review", false), true);
+  assert.equal(isCheckoutReviewBlocked("review", undefined), true);
+  assert.equal(resolveCheckoutVisibleStep("review", false), "payment");
+  assert.equal(resolveCheckoutVisibleStep("review", undefined), "payment");
+  assert.equal(resolveCheckoutVisibleStep("review", true), "review");
+  assert.equal(resolveCheckoutVisibleStep("payment", false), "payment");
+  assert.equal(resolveCheckoutVisibleStep("delivery", false), "delivery");
 });
 
 test("public legal adapter ve footer aynı sürümlü hukuk rota sözleşmesini kullanır", async () => {

@@ -376,6 +376,81 @@ const hasMutation = (client) => client.calls.some(({ sql }) => (
         assert.strictEqual(legalMissing.res.body.code, 'CHECKOUT_LEGAL_DOCUMENTS_NOT_PUBLISHED');
         assert.strictEqual(legalMissing.connectCount, 0);
 
+        const assertConsentRejectedBeforeProviderOrWrite = async ({ body, expectedCode }) => {
+            let providerCalls = 0;
+            const rejected = await runInitialize({
+                body,
+                requester: async () => {
+                    providerCalls += 1;
+                    throw new Error('invalid agreement acceptance must never initialize the payment provider');
+                }
+            });
+            assert.strictEqual(rejected.res.code, expectedCode === 'CHECKOUT_AGREEMENT_SNAPSHOT_STALE' ? 409 : 400);
+            assert.strictEqual(rejected.res.body.code, expectedCode);
+            assert.strictEqual(providerCalls, 0);
+            assert.strictEqual(hasMutation(rejected.client), false);
+            assert.strictEqual(rejected.client.calls.some(({ sql }) => sql === 'BEGIN'), false);
+            return rejected;
+        };
+
+        const noAgreementHash = await assertConsentRejectedBeforeProviderOrWrite({
+            body: { agreementSnapshotSha256: '', agreementAcceptances: [] },
+            expectedCode: 'CHECKOUT_AGREEMENT_SNAPSHOT_REQUIRED'
+        });
+        assert.strictEqual(noAgreementHash.connectCount, 0);
+
+        await assertConsentRejectedBeforeProviderOrWrite({
+            body: { agreementAcceptances: [] },
+            expectedCode: 'CHECKOUT_AGREEMENT_ACCEPTANCE_REQUIRED'
+        });
+        await assertConsentRejectedBeforeProviderOrWrite({
+            body: {
+                agreementAcceptances: acceptances().map((acceptance) => ({ ...acceptance, accepted: false }))
+            },
+            expectedCode: 'CHECKOUT_AGREEMENT_ACCEPTANCE_REQUIRED'
+        });
+        await assertConsentRejectedBeforeProviderOrWrite({
+            body: { agreementAcceptances: [acceptances()[0]] },
+            expectedCode: 'CHECKOUT_AGREEMENT_ACCEPTANCE_REQUIRED'
+        });
+        await assertConsentRejectedBeforeProviderOrWrite({
+            body: {
+                agreementAcceptances: [
+                    acceptances()[0],
+                    { ...acceptances()[1], accepted: false }
+                ]
+            },
+            expectedCode: 'CHECKOUT_AGREEMENT_ACCEPTANCE_REQUIRED'
+        });
+        await assertConsentRejectedBeforeProviderOrWrite({
+            body: {
+                agreementAcceptances: [
+                    { ...acceptances()[0], accepted: false },
+                    acceptances()[1]
+                ]
+            },
+            expectedCode: 'CHECKOUT_AGREEMENT_ACCEPTANCE_REQUIRED'
+        });
+        await assertConsentRejectedBeforeProviderOrWrite({
+            body: {
+                agreementAcceptances: acceptances().map((acceptance) => ({ ...acceptance, accepted: 'true' }))
+            },
+            expectedCode: 'CHECKOUT_AGREEMENT_ACCEPTANCE_REQUIRED'
+        });
+        await assertConsentRejectedBeforeProviderOrWrite({
+            body: {
+                agreementAcceptances: [
+                    { ...acceptances()[0], version: 'stale-pre-v0' },
+                    acceptances()[1]
+                ]
+            },
+            expectedCode: 'CHECKOUT_AGREEMENT_ACCEPTANCE_REQUIRED'
+        });
+        await assertConsentRejectedBeforeProviderOrWrite({
+            body: { agreementSnapshotSha256: '0'.repeat(64) },
+            expectedCode: 'CHECKOUT_AGREEMENT_SNAPSHOT_STALE'
+        });
+
         for (const key of trackedEnv) delete process.env[key];
         applyReadyEnv();
         const previewClient = createFakeClient();

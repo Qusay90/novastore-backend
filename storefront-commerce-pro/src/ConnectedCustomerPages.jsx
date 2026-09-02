@@ -39,6 +39,7 @@ import {
   WEB_PUSH_STATE,
 } from "../../web-notifications/notificationClient.js";
 import turkeyLocations from "../../shared/turkiye-provinces-districts.v1.json";
+import { isCheckoutReviewBlocked, resolveCheckoutVisibleStep } from "./checkoutRouteGuard.js";
 
 const LOCAL_REVIEW_RUNTIME_ENABLED = __NOVASTORE_LOCAL_REVIEW_RUNTIME__;
 
@@ -970,9 +971,6 @@ export function CustomerCheckoutPage(props) {
     session,
   ]);
 
-  if (!items.length) return <main id="main-content" className="page commerce-page"><div className="shell"><div className="large-empty"><ShoppingBag /><h1>Ödemeye devam etmek için sepetine ürün ekle</h1><p>Sepetin boş olduğu için ödeme işlemi başlatılmadı.</p><a className="primary-button" href="#/">Ürünleri keşfet</a></div></div></main>;
-  if (hasStockIssues) return <main id="main-content" className="page commerce-page"><div className="shell"><div className="large-empty"><WarningCircle /><h1>Sepetindeki stok sorununu düzelt</h1><p>Stokta olmayan veya miktarı güncel stoğu aşan ürünler için ödeme başlatılmaz. Sepete dönüp miktarı azaltarak ya da ürünü kaldırarak devam edebilirsin.</p><a className="primary-button" href="#/sepet">Sepete dön</a></div></div></main>;
-
   const requiredAgreements = agreementPreviewState.phase === "ready"
     ? agreementPreviewState.data.documents
     : capabilityAgreements;
@@ -981,7 +979,19 @@ export function CustomerCheckoutPage(props) {
     && agreement.version
     && acceptedAgreements.has(agreement.slug)
   )) && /^[a-f0-9]{64}$/.test(agreementPreviewState.data?.snapshotSha256 || "");
+  const canEnterReview = quoteState.phase === "ready" && Boolean(selectedAddress) && agreementsReady;
   const paymentReady = capability?.ready === true && agreementsReady;
+  const reviewBlocked = isCheckoutReviewBlocked(step, canEnterReview);
+  const visibleStep = resolveCheckoutVisibleStep(step, canEnterReview);
+
+  useEffect(() => {
+    if (!reviewBlocked) return;
+    setSubmitError("Sipariş kontrolüne geçmeden önce iki güncel sözleşmeyi de onaylamalısın.");
+    onStepChange("payment", { replace: true });
+  }, [onStepChange, reviewBlocked]);
+
+  if (!items.length) return <main id="main-content" className="page commerce-page"><div className="shell"><div className="large-empty"><ShoppingBag /><h1>Ödemeye devam etmek için sepetine ürün ekle</h1><p>Sepetin boş olduğu için ödeme işlemi başlatılmadı.</p><a className="primary-button" href="#/">Ürünleri keşfet</a></div></div></main>;
+  if (hasStockIssues) return <main id="main-content" className="page commerce-page"><div className="shell"><div className="large-empty"><WarningCircle /><h1>Sepetindeki stok sorununu düzelt</h1><p>Stokta olmayan veya miktarı güncel stoğu aşan ürünler için ödeme başlatılmaz. Sepete dönüp miktarı azaltarak ya da ürünü kaldırarak devam edebilirsin.</p><a className="primary-button" href="#/sepet">Sepete dön</a></div></div></main>;
 
   const addAddress = async (value) => {
     setAddressBusy(true); setAddressError("");
@@ -1067,10 +1077,10 @@ export function CustomerCheckoutPage(props) {
 
   return <main id="main-content" className="page checkout-page"><div className="shell">
     <div className="checkout-title"><span className="section-kicker">NovaStore güvencesi</span><h1>Güvenli Ödeme</h1><p>Adres, fiyat ve ödeme yönlendirmesi gerçek NovaStore sözleşmeleriyle doğrulanır.</p></div>
-    <CheckoutStepper step={step} />
+    <CheckoutStepper step={visibleStep} />
     {submitError && <div className="form-message is-error checkout-global-error" role="alert"><WarningCircle />{submitError}</div>}
     <div className="checkout-layout"><section className="checkout-panel">
-      {step === "delivery" && <>
+      {visibleStep === "delivery" && <>
         <div className="checkout-panel__head"><div><MapPin /><span><strong>Teslimat Bilgileri</strong><small>Kayıtlı adreslerinden birini seç veya yeni adres ekle.</small></span></div><button type="button" aria-expanded={showAddressEditor} onClick={() => setShowAddressEditor((value) => !value)}>Adres ekle</button></div>
         {addressError && <div className="form-message is-error"><WarningCircle />{addressError}</div>}
         {showAddressEditor && <AddressEditor initial={{ ...EMPTY_ADDRESS, fullName: session.user.fullName, phone: session.user.phone || "" }} busy={addressBusy} onSubmit={addAddress} onCancel={() => setShowAddressEditor(false)} />}
@@ -1078,7 +1088,7 @@ export function CustomerCheckoutPage(props) {
         <div className="checkout-delivery-note"><Truck /><span><strong>Standart teslimat</strong><small>Kargo ücreti güncel sepet toplamına göre fiyatlandırma servisi tarafından hesaplanır.</small></span><b>{quoteState.phase === "ready" ? quote.totals.shippingFee > 0 ? money.format(quote.totals.shippingFee) : "Ücretsiz" : "Hesaplanıyor"}</b></div>
         <button className="primary-button checkout-next" type="button" disabled={!selectedAddress || quoteState.phase !== "ready"} onClick={() => onStepChange("payment")}>Ödemeye devam et <CaretRight /></button>
       </>}
-      {step === "payment" && <>
+      {visibleStep === "payment" && <>
         <div className="checkout-panel__head"><div><CreditCard /><span><strong>Ödeme Yöntemi</strong><small>Kart bilgileri NovaStore arayüzünde alınmaz veya saklanmaz.</small></span></div></div>
         <div className="payment-method is-selected connected-payment-method"><CreditCard /><span><strong>Kredi / Banka Kartı</strong><small>{capability?.ready ? "Devam ettiğinde PayTR tarafından barındırılan güvenli ödeme ekranı açılır." : "Ödeme sağlayıcısı etkinleştirildiğinde kart işlemi güvenli ödeme ekranında tamamlanacaktır."}</small></span><ShieldCheck weight="fill" /></div>
         <div className="payment-provider-disclosure"><LockKey /><div><strong>Kart bilgilerin ödeme sağlayıcısına girilir</strong><p>NovaStore yalnız sipariş, teslimat ve doğrulanmış toplam bilgilerini iletir. Bu sayfa kart numarası, son kullanma tarihi veya CVV toplamaz.</p></div></div>
@@ -1089,10 +1099,10 @@ export function CustomerCheckoutPage(props) {
           const next = new Set(current);
           if (checked) next.add(slug); else next.delete(slug);
           return next;
-        })} /></fieldset>
-        <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("delivery")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={quoteState.phase !== "ready" || !selectedAddress} onClick={() => onStepChange("review")}>Siparişi kontrol et <CaretRight /></button></div>
+        })} />{agreementPreviewState.phase === "ready" && !agreementsReady && <p id="checkout-review-consent-requirement" className="form-message is-warning checkout-agreement-forward-warning" role="status"><WarningCircle />Siparişi kontrol etmeden önce iki sözleşmeyi de onaylamalısın.</p>}</fieldset>
+        <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("delivery")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={!canEnterReview} aria-describedby={!canEnterReview && agreementPreviewState.phase === "ready" ? "checkout-review-consent-requirement" : undefined} onClick={() => canEnterReview && onStepChange("review")}>Siparişi kontrol et <CaretRight /></button></div>
       </>}
-      {step === "review" && <>
+      {visibleStep === "review" && <>
         <div className="checkout-panel__head"><div><Receipt /><span><strong>Siparişini Kontrol Et</strong><small>Ödeme sağlayıcısına geçmeden önce adres ve ürünleri doğrula.</small></span></div></div>
         {selectedAddress ? <div className="review-box"><span>Teslimat</span><strong>{selectedAddress.title}</strong><p>{selectedAddress.fullName} · {selectedAddress.addressLine}, {selectedAddress.district} / {selectedAddress.city}</p></div> : <div className="form-message is-error"><WarningCircle />Teslimat adresi seçilmedi.</div>}
         <div className="review-products">{items.map(({ product, quantity }) => <div key={product.id}><img src={getProductImage(product)} alt="" /><span><strong>{product.name}</strong><small>{quantity} adet</small></span><b>{money.format(product.price * quantity)}</b></div>)}</div>
@@ -1101,7 +1111,7 @@ export function CustomerCheckoutPage(props) {
         <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("payment")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={localReviewOnly || submitPhase === "submitting" || quoteState.phase !== "ready" || !selectedAddress || !paymentReady} onClick={submitPayment}><ShieldCheck /> {localReviewOnly ? "Yerel incelemede ödeme kapalı" : !capability?.ready ? "Ödeme aktivasyonu bekleniyor" : !agreementsReady ? "Sözleşme onayı gerekli" : submitPhase === "submitting" ? "Güvenli ödeme hazırlanıyor…" : "PayTR güvenli ödeme ekranına geç"}</button></div>
       </>}
     </section><CheckoutSummary quote={quote} phase={quoteState.phase} error={quoteState.error} couponInput={couponInput} onCouponInput={setCouponInput} onApplyCoupon={applyCoupon} onClearCoupon={clearCoupon} couponBusy={couponBusy} /></div>
-    {step === "review" && quoteState.phase === "ready" && <div className="mobile-checkout-bar"><span><small>Doğrulanmış toplam</small><strong>{money.format(quote.totals.total)}</strong></span><button type="button" disabled={localReviewOnly || submitPhase === "submitting" || !selectedAddress || !paymentReady} onClick={submitPayment}><ShieldCheck /> {localReviewOnly ? "Ödeme kapalı" : capability?.ready ? "PayTR'a geç" : "Aktivasyon bekleniyor"}</button></div>}
+    {visibleStep === "review" && quoteState.phase === "ready" && <div className="mobile-checkout-bar"><span><small>Doğrulanmış toplam</small><strong>{money.format(quote.totals.total)}</strong></span><button type="button" disabled={localReviewOnly || submitPhase === "submitting" || !selectedAddress || !paymentReady} onClick={submitPayment}><ShieldCheck /> {localReviewOnly ? "Ödeme kapalı" : capability?.ready ? "PayTR'a geç" : "Aktivasyon bekleniyor"}</button></div>}
   </div></main>;
 }
 

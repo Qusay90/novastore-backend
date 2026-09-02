@@ -292,9 +292,13 @@ function discoveryHref() {
   return path ? `#/kategori/${path}` : "#/";
 }
 
-function navigate(path) {
+function navigate(path, { replace = false } = {}) {
   const next = path.startsWith("#") ? path : `#${path}`;
   if (window.location.hash === next) window.dispatchEvent(new HashChangeEvent("hashchange"));
+  else if (replace) {
+    window.history.replaceState(window.history.state, "", next);
+    window.setTimeout(() => window.dispatchEvent(new HashChangeEvent("hashchange")), 0);
+  }
   else window.location.hash = next;
 }
 
@@ -1564,6 +1568,10 @@ export function CommerceProRuntimeApp({
     setCart(next);
     runtime.cart.persist(next).catch(() => {});
   }, [runtime]);
+  const handleCheckoutStepChange = useCallback((step, options) => {
+    const segment = step === "delivery" ? "teslimat" : step === "payment" ? "odeme" : "onay";
+    navigate(`/odeme/${segment}`, options);
+  }, []);
 
   let content;
   if (loading) content = <CanonicalLoadingPage />;
@@ -1595,7 +1603,7 @@ export function CommerceProRuntimeApp({
       ? `/hesabim/siparisler/${route.orderId}`
       : `/hesabim${route.section === "orders" ? "/siparisler" : route.section === "addresses" ? "/adresler" : route.section === "coupons" ? "/kuponlar" : route.section === "notifications" ? "/bildirimler" : route.section === "questions" ? "/sorularim" : route.section === "reviews" ? "/degerlendirmelerim" : route.section === "followed-stores" ? "/takip-ettigim-magazalar" : route.section === "security" ? "/guvenlik" : ""}`);
   else if (route.type === "checkout") content = authenticated
-    ? <CustomerCheckoutPage step={route.step} session={session} account={runtime.customer} checkout={runtime.checkout} items={cartItems} getProductImage={productImage} onStepChange={(step) => navigate(`/odeme/${step === "delivery" ? "teslimat" : step === "payment" ? "odeme" : "onay"}`)} onNotice={notify} {...localReviewSessionProps} />
+    ? <CustomerCheckoutPage step={route.step} session={session} account={runtime.customer} checkout={runtime.checkout} items={cartItems} getProductImage={productImage} onStepChange={handleCheckoutStepChange} onNotice={notify} {...localReviewSessionProps} />
     : authReturn(`/odeme/${route.step === "delivery" ? "teslimat" : route.step === "payment" ? "odeme" : "onay"}`);
   else if (route.type === "payment-result") content = authenticated
     ? localReviewSession ? <LocalReviewPaymentBoundary /> : <CustomerPaymentResultPage checkout={runtime.checkout} paymentRef={route.query.get("paymentRef") || ""} orderId={route.query.get("orderId") || ""} onFinalized={handlePaymentFinalized} />
