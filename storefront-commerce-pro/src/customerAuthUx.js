@@ -2,6 +2,10 @@ export const SELLER_RECRUITMENT_URL = "https://novastore-stage.com";
 export const NORMAL_LOGIN_DESTINATION = "/";
 export const PROFILE_COMPLETION_NOTICE_TIMEOUT_MS = 9_000;
 
+export function customerAccountEntryPath(authenticated) {
+  return authenticated ? "/hesabim" : "/giris";
+}
+
 const CONTROL_OR_BACKSLASH = /[\\\u0000-\u001f\u007f]/;
 const TURKISH_MOBILE_PATTERN = /^05[0-9]{9}$/;
 const CUSTOMER_RETURN_PATHS = Object.freeze([

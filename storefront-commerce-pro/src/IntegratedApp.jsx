@@ -85,6 +85,7 @@ import { CustomerProductCard } from "./CustomerProductCard.jsx";
 import { normalizePublicStoreSlug } from "./adapters/publicStoreAdapter.js";
 import { reconcileFinalizedCart } from "./adapters/checkoutAdapter.js";
 import {
+  customerAccountEntryPath,
   getCustomerProfileCompletion,
   NORMAL_LOGIN_DESTINATION,
   PROFILE_COMPLETION_NOTICE_TIMEOUT_MS,
@@ -804,7 +805,7 @@ function BenefitStrip() {
 
 function ProfileCompletionNotice({ missingFields, onDismiss, onOpen }) {
   const missingCopy = missingFields.length ? `${missingFields.join(" ve ")} bilgini tamamla.` : "Profil bilgilerini tamamla.";
-  return <aside className="profile-completion-notice" role="status" aria-live="polite"><button className="profile-completion-notice__body" type="button" onClick={onOpen} aria-label="Eksik hesap bilgilerini tamamla"><span className="profile-completion-notice__icon"><User /></span><span><small>Hesap hatırlatması</small><strong>Hesap bilgilerini tamamla</strong><p>{missingCopy} Teslimat ve hesap işlemlerini daha rahat yönet.</p><b>Bilgilerimi tamamla <CaretRight /></b></span></button><button className="profile-completion-notice__close" type="button" onClick={onDismiss} aria-label="Hesap bilgileri hatırlatmasını kapat"><X /></button></aside>;
+  return <div className="profile-completion-notice" role="status" aria-live="polite"><button className="profile-completion-notice__body" type="button" onClick={onOpen} aria-label="Eksik hesap bilgilerini tamamla"><span className="profile-completion-notice__icon"><User /></span><span><small>Hesap hatırlatması</small><strong>Hesap bilgilerini tamamla</strong><p>{missingCopy} Teslimat ve hesap işlemlerini daha rahat yönet.</p><b>Bilgilerimi tamamla <CaretRight /></b></span></button><button className="profile-completion-notice__close" type="button" onClick={onDismiss} aria-label="Hesap bilgileri hatırlatmasını kapat"><X /></button></div>;
 }
 
 function HomePage({ favorites, onFavorite, onAdd }) {
@@ -1345,6 +1346,8 @@ export function CommerceProRuntimeApp({
   runtime,
   assistantConversationState = null,
   onAssistantConversationStateChange = null,
+  sharedProfileCompletionNotice,
+  onProfileCompletionNoticeChange = null,
 }) {
   const { route, loading } = useRoute();
   const [localAssistantConversationState, setLocalAssistantConversationState] = useState(createAssistantConversationState);
@@ -1360,7 +1363,12 @@ export function CommerceProRuntimeApp({
   const [session, setSession] = useState(runtime.session);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [toast, setToast] = useState("");
-  const [profileCompletionNotice, setProfileCompletionNotice] = useState(null);
+  const [localProfileCompletionNotice, setLocalProfileCompletionNotice] = useState(null);
+  const profileCompletionManagedExternally = typeof onProfileCompletionNoticeChange === "function";
+  const profileCompletionNotice = sharedProfileCompletionNotice === undefined
+    ? localProfileCompletionNotice
+    : sharedProfileCompletionNotice;
+  const setProfileCompletionNotice = onProfileCompletionNoticeChange || setLocalProfileCompletionNotice;
   const [assistantOpen, setAssistantOpen] = useState(false);
   const toastTimer = useRef(null);
   const profileCompletionTimer = useRef(null);
@@ -1387,7 +1395,7 @@ export function CommerceProRuntimeApp({
   const dismissProfileCompletionNotice = useCallback(() => {
     window.clearTimeout(profileCompletionTimer.current);
     setProfileCompletionNotice(null);
-  }, []);
+  }, [setProfileCompletionNotice]);
 
   const showProfileCompletionNotice = useCallback((activeSession, completion) => {
     const sessionKey = String(activeSession?.sessionId || `customer:${activeSession?.user?.id || "unknown"}`);
@@ -1395,11 +1403,13 @@ export function CommerceProRuntimeApp({
     profileNoticeSessionRef.current = sessionKey;
     window.clearTimeout(profileCompletionTimer.current);
     setProfileCompletionNotice(completion);
-    profileCompletionTimer.current = window.setTimeout(
-      () => setProfileCompletionNotice(null),
-      PROFILE_COMPLETION_NOTICE_TIMEOUT_MS,
-    );
-  }, []);
+    if (!profileCompletionManagedExternally) {
+      profileCompletionTimer.current = window.setTimeout(
+        () => setProfileCompletionNotice(null),
+        PROFILE_COMPLETION_NOTICE_TIMEOUT_MS,
+      );
+    }
+  }, [profileCompletionManagedExternally, setProfileCompletionNotice]);
 
   function replaceCart(next, { persist = true } = {}) {
     const normalized = next.map((item) => ({
@@ -1686,7 +1696,7 @@ export function CommerceProRuntimeApp({
   return (
     <RuntimeComparisonContext.Provider value={comparisonContext}>
       <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); focusMainContent({ preventScroll: false }); }}>Ana içeriğe geç</a>
-      <Header cartCount={cartCount} favoriteCount={favorites.size} notificationUnreadCount={notificationUnreadCount} onCartOpen={openCart} onMobileOpen={openCategoryDrawer} onAccountOpen={() => navigate("/hesabim")} accountDetail={authenticated ? session.user.fullName || "Hesabım" : "Giriş yap"} cartTriggerRef={cartTriggerRef} mobileMenuOpen={mobileMenuOpen} cartOpen={cartOpen} />
+      <Header cartCount={cartCount} favoriteCount={favorites.size} notificationUnreadCount={notificationUnreadCount} onCartOpen={openCart} onMobileOpen={openCategoryDrawer} onAccountOpen={() => navigate(customerAccountEntryPath(authenticated))} accountDetail={authenticated ? session.user.fullName || "Hesabım" : "Giriş yap"} cartTriggerRef={cartTriggerRef} mobileMenuOpen={mobileMenuOpen} cartOpen={cartOpen} />
       {runtime.warnings.length > 0 && <div className="integration-session-warning" role="status">Bazı ikincil mağaza veya oturum verileri geçici olarak alınamadı; erişilebilen gerçek katalog gösteriliyor.</div>}
       {comparisonVisible && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => setComparisonIds(new Set())} onAdd={addToCart} />}
       {content}
@@ -1729,11 +1739,20 @@ function IntegrationState({ phase, error, onRetry }) {
 export function IntegratedApp() {
   const [runtimeRoute, setRuntimeRoute] = useState(parseRoute);
   const [assistantConversationState, setAssistantConversationState] = useState(createAssistantConversationState);
+  const [profileCompletionNotice, setProfileCompletionNotice] = useState(null);
   useEffect(() => {
     const handleRouteChange = () => setRuntimeRoute(parseRoute());
     window.addEventListener("hashchange", handleRouteChange);
     return () => window.removeEventListener("hashchange", handleRouteChange);
   }, []);
+  useEffect(() => {
+    if (!profileCompletionNotice) return undefined;
+    const timer = window.setTimeout(
+      () => setProfileCompletionNotice(null),
+      PROFILE_COMPLETION_NOTICE_TIMEOUT_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [profileCompletionNotice]);
   const isPublicStoreRoute = runtimeRoute.type === "public-store";
   const catalogOptionalRoute = [
     "auth",
@@ -1756,5 +1775,5 @@ export function IntegratedApp() {
   if (resource.phase !== "ready") {
     return <IntegrationState phase={resource.phase} error={resource.error} onRetry={resource.retry} />;
   }
-  return <CommerceProRuntimeApp runtime={resource.runtime} assistantConversationState={assistantConversationState} onAssistantConversationStateChange={setAssistantConversationState} />;
+  return <CommerceProRuntimeApp runtime={resource.runtime} assistantConversationState={assistantConversationState} onAssistantConversationStateChange={setAssistantConversationState} sharedProfileCompletionNotice={profileCompletionNotice} onProfileCompletionNoticeChange={setProfileCompletionNotice} />;
 }

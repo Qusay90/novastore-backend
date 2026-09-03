@@ -4,6 +4,7 @@ import test from "node:test";
 
 import { createCustomerAccountAdapter } from "../src/adapters/customerAccountAdapter.js";
 import {
+  customerAccountEntryPath,
   getCustomerProfileCompletion,
   NORMAL_LOGIN_DESTINATION,
   PROFILE_COMPLETION_NOTICE_TIMEOUT_MS,
@@ -58,6 +59,15 @@ test("R6 login return intent accepts only explicit internal Customer routes", ()
   }
 });
 
+test("R6 account header sends guests through normal login and keeps authenticated account access", async () => {
+  assert.equal(customerAccountEntryPath(false), "/giris");
+  assert.equal(customerAccountEntryPath(true), "/hesabim");
+
+  const app = await read("../src/IntegratedApp.jsx");
+  assert.match(app, /onAccountOpen=\{\(\) => navigate\(customerAccountEntryPath\(authenticated\)\)\}/u);
+  assert.doesNotMatch(app, /onAccountOpen=\{\(\) => navigate\("\/hesabim"\)\}/u);
+});
+
 test("R6 profile completion is derived deterministically from editable authoritative fields", () => {
   assert.deepEqual(
     getCustomerProfileCompletion({ fullName: "Nova Müşteri", phone: "05551234567" }),
@@ -109,8 +119,13 @@ test("R6 normal login lands home and guidance stays non-blocking with NovaBot co
   assert.doesNotMatch(app, /safeDecodeReturn/u);
   assert.match(app, /runtime\.customer\.getProfile\(\)/u);
   assert.match(app, /destination === NORMAL_LOGIN_DESTINATION && profileCompletion && !profileCompletion\.complete/u);
+  assert.match(app, /sharedProfileCompletionNotice=\{profileCompletionNotice\}/u);
+  assert.match(app, /onProfileCompletionNoticeChange=\{setProfileCompletionNotice\}/u);
+  assert.match(app, /if \(!profileCompletionNotice\) return undefined;[\s\S]+PROFILE_COMPLETION_NOTICE_TIMEOUT_MS/u);
   assert.match(app, /navigate\("\/hesabim\?focus=profile"\)/u);
   assert.match(app, /profileCompletionNotice && !assistantOpen/u);
+  assert.match(app, /<div className="profile-completion-notice" role="status" aria-live="polite">/u);
+  assert.doesNotMatch(app, /<aside className="profile-completion-notice" role="status"/u);
   assert.match(app, /profileFocusRequested[\s\S]+if \(!profileFocusRequested\)/u);
   assert.match(pages, /querySelector\('input\[name="fullName"\]'\)\?\.focus/u);
   assert.match(assistant, /onOpenChange\?\.\(open\)/u);
