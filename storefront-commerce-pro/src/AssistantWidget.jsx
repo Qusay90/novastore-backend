@@ -17,6 +17,7 @@ import {
   scopeAssistantConversationState,
   updateScopedAssistantConversationState,
 } from "./integration/assistantConversationState.js";
+import { getAssistantModePresentation } from "./integration/assistantModePresentation.js";
 
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -98,6 +99,7 @@ export function AssistantWidget({
   const capabilityModes = capabilityState.value?.modes || [];
   const selectedServerMode = capabilityModes.find((option) => option.id === mode) || null;
   const selectedServerModeId = selectedServerMode?.id || null;
+  const modePresentation = getAssistantModePresentation(capabilityState, selectedServerMode);
 
   useEffect(() => {
     rawSetConversation((current) => (
@@ -282,12 +284,12 @@ export function AssistantWidget({
     {open && <section id="novabot-dialog" className="assistant-window" role="dialog" aria-labelledby="novabot-dialog-title">
       <header><span><i><img className="novabot-artwork" src={novabotArtwork} alt="" /></i><span><strong id="novabot-dialog-title">NovaBot</strong><small>{phase === "submitting" ? "Yanıt hazırlanıyor…" : "Canlı katalog asistanı"}</small></span></span><button type="button" aria-label="NovaBot penceresini kapat" onClick={() => { setOpen(false); window.requestAnimationFrame(() => fabRef.current?.focus()); }}><X /></button></header>
       <div className="assistant-mode">
-        {capabilityState.phase === "ready" && capabilityModes.length > 0
-          ? <label><CheckCircle weight="fill" /><span>Sohbet modu</span><select aria-label="NovaBot sohbet modu" value={selectedServerMode?.id || capabilityState.value.defaultModeId || ""} disabled={!capabilityState.value.modeSelectionAvailable || phase === "submitting"} onChange={(event) => {
+        {modePresentation.kind === "selector"
+          ? <label><CheckCircle weight="fill" /><span>Sohbet modu</span><select aria-label="NovaBot sohbet modu" aria-describedby="novabot-mode-description" value={selectedServerMode?.id || capabilityState.value.defaultModeId || ""} disabled={phase === "submitting"} onChange={(event) => {
             const nextMode = capabilityModes.find((option) => option.id === event.target.value);
             if (nextMode) setConversation((current) => ({ ...current, mode: nextMode.id }));
-          }}>{capabilityModes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
-          : <span title={capabilityState.phase === "error" ? "Mod bilgisi alınamadı; temel sohbet kullanılacak." : undefined}><CheckCircle weight="fill" />{capabilityState.phase === "loading" ? "Modlar yükleniyor…" : "Temel sohbet"}</span>}
+          }}>{capabilityModes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select><span id="novabot-mode-description" className="sr-only" role="status">Seçili mod: {selectedServerMode?.label || modePresentation.label}. {selectedServerMode?.description || ""}</span></label>
+          : <div className="assistant-mode__status" role="status" aria-label={`NovaBot sohbet modu: ${modePresentation.label}. ${modePresentation.detail}`}><CheckCircle weight="fill" /><span><strong>{modePresentation.label}</strong>{modePresentation.detail && <small>{modePresentation.detail}</small>}</span></div>}
         <a href="#/destek"><Headphones /> Destek ekibi</a>
       </div>
       <div className="assistant-thread" ref={threadRef} aria-live="polite">
