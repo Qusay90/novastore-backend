@@ -1,4 +1,5 @@
 const asArray = (value) => Array.isArray(value) ? value : [];
+const MODE_ID_PATTERN = /^[a-z][a-z0-9_-]{1,31}$/;
 
 const cleanText = (value, maxLength = 2000) => String(value || "")
   .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, " ")
@@ -16,6 +17,36 @@ export const normalizeAssistantHistory = (history) => asArray(history)
   })
   .filter(Boolean)
   .slice(-10);
+
+export const normalizeAssistantCapability = (payload) => {
+  const seen = new Set();
+  const modes = asArray(payload?.modes).map((item) => {
+    const id = cleanText(item?.id, 32);
+    const label = cleanText(item?.label, 80);
+    const description = cleanText(item?.description, 240);
+    if (!MODE_ID_PATTERN.test(id) || !label || !description || seen.has(id)) return null;
+    seen.add(id);
+    return Object.freeze({ id, label, description });
+  }).filter(Boolean);
+  const requestedDefault = cleanText(payload?.defaultModeId, 32);
+  const defaultModeId = modes.some((mode) => mode.id === requestedDefault)
+    ? requestedDefault
+    : modes[0]?.id || null;
+
+  return Object.freeze({
+    contractVersion: cleanText(payload?.contractVersion, 80),
+    available: payload?.available === true && modes.length > 0,
+    provider: Object.freeze({
+      configured: payload?.provider?.configured === true,
+      ready: payload?.provider?.ready === true,
+    }),
+    advancedModesAvailable: payload?.advancedModesAvailable === true,
+    modeSelectionAvailable: payload?.modeSelectionAvailable === true && modes.length > 1,
+    defaultModeId,
+    modes: Object.freeze(modes),
+    unavailableReason: cleanText(payload?.unavailableReason, 80) || null,
+  });
+};
 
 const normalizePendingAction = (value, getProduct) => {
   const type = String(value?.type || "").trim();
@@ -64,7 +95,7 @@ export const normalizeAssistantResponse = (payload, getProduct) => {
     || "NovaBot şu anda yanıt oluşturamadı. Lütfen yeniden dene.";
   return Object.freeze({
     reply,
-    mode: cleanText(payload?.mode, 32) || "friendly",
+    mode: cleanText(payload?.modeId || payload?.mode, 32) || "friendly",
     modeLabel: cleanText(payload?.modeLabel, 80) || "NovaBot",
     suggestions: Object.freeze([...new Set(asArray(payload?.suggestions)
       .map((item) => cleanText(item, 80))
@@ -85,16 +116,32 @@ export function createAssistantAdapter({ http, getProduct } = {}) {
     throw new TypeError("NovaBot adapterı doğrulanmış ürün çözücüsü gerektirir.");
   }
 
-  const chat = async ({ message, history = [], mode = "friendly" }, options = {}) => {
+  const getCapability = async (options = {}) => {
+    const payload = await http.request("/api/assistant/capability", {
+      method: "GET",
+      signal: options.signal,
+    });
+    return normalizeAssistantCapability(payload);
+  };
+
+  const chat = async ({ message, history = [], modeId, mode }, options = {}) => {
     const normalizedMessage = cleanText(message, 2000);
     if (!normalizedMessage) throw new TypeError("NovaBot mesajı boş olamaz.");
+    const requestedModeId = modeId === undefined ? mode : modeId;
+    const body = {
+      message: normalizedMessage,
+      history: normalizeAssistantHistory(history),
+    };
+    if (requestedModeId !== undefined && requestedModeId !== null) {
+      const normalizedModeId = cleanText(requestedModeId, 32);
+      if (normalizedModeId !== requestedModeId || !MODE_ID_PATTERN.test(normalizedModeId)) {
+        throw new TypeError("NovaBot modeId değeri geçersizdir.");
+      }
+      body.modeId = normalizedModeId;
+    }
     const payload = await http.request("/api/assistant/chat", {
       method: "POST",
-      body: {
-        message: normalizedMessage,
-        history: normalizeAssistantHistory(history),
-        context: { selectedMode: cleanText(mode, 32) || "friendly" },
-      },
+      body,
       signal: options.signal,
     });
     return normalizeAssistantResponse(payload, getProduct);
@@ -112,11 +159,12 @@ export function createAssistantAdapter({ http, getProduct } = {}) {
     });
   };
 
-  return Object.freeze({ chat, escalate });
+  return Object.freeze({ chat, escalate, getCapability });
 }
 
 export const assistantAdapterTestUtils = Object.freeze({
   cleanText,
+  normalizeAssistantCapability,
   normalizeComparison,
   normalizePendingAction,
   normalizeProducts,

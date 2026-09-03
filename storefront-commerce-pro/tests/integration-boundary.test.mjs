@@ -839,14 +839,16 @@ test("customer HTTP yöntem, rota, sorgu ve müşteri token sınırlarını birl
   });
 
   await http.request("/api/users/login", { method: "POST", body: { email: "a@b.test", password: "secret" } });
+  await http.request("/api/assistant/capability");
   await http.request("/api/addresses");
   await http.request("/api/reviews/product/202");
   await http.request("/api/assistant/chat", { method: "POST", body: { message: "Gömlek öner" } });
   assert.equal(requests[0].options.headers.Authorization, undefined, "public auth isteği müşteri tokenı taşımamalı");
-  assert.equal(requests[1].options.headers.Authorization, "Bearer customer-token");
-  assert.equal(requests[1].options.credentials, "same-origin");
-  assert.equal(requests[2].options.headers.Authorization, "Bearer customer-token", "opsiyonel yorum uygunluğu mevcut müşteri tokenını kullanmalı");
-  assert.equal(requests[3].options.headers.Authorization, "Bearer customer-token", "opsiyonel NovaBot isteği mevcut müşteri tokenını kullanmalı");
+  assert.equal(requests[1].options.headers.Authorization, undefined, "NovaBot capability provider sırrı veya müşteri tokenı gerektirmemeli");
+  assert.equal(requests[2].options.headers.Authorization, "Bearer customer-token");
+  assert.equal(requests[2].options.credentials, "same-origin");
+  assert.equal(requests[3].options.headers.Authorization, "Bearer customer-token", "opsiyonel yorum uygunluğu mevcut müşteri tokenını kullanmalı");
+  assert.equal(requests[4].options.headers.Authorization, "Bearer customer-token", "opsiyonel NovaBot isteği mevcut müşteri tokenını kullanmalı");
   assert.equal(storage.getItem("nova_admin_token"), "admin-remains");
 });
 
@@ -859,8 +861,22 @@ test("NovaBot adapterı yalnız canlı katalog ürünlerini ve onaylı eylemleri
   const http = {
     request: async (path, options = {}) => {
       calls.push({ path, options });
+      if (path === "/api/assistant/capability") return {
+        contractVersion: "novabot-modes-v1",
+        available: true,
+        provider: { configured: true, ready: true },
+        advancedModesAvailable: true,
+        modeSelectionAvailable: true,
+        defaultModeId: "friendly",
+        modes: [
+          { id: "friendly", label: "Samimi Mod", description: "Sıcak ve anlaşılır." },
+          { id: "technical", label: "Teknik Uzman Modu", description: "Teknik ayrıntılara odaklanır." },
+          { id: "../admin", label: "Geçersiz", description: "Sızmamalı." },
+        ],
+      };
       if (path === "/api/assistant/chat") return {
         reply: "Gömlek canlı katalogda stokta.",
+        modeId: "technical",
         cards: [
           { productId: 202, name: "Sunucudan değiştirilemez ad" },
           { productId: 999, name: "Katalog dışı ürün" },
@@ -877,8 +893,12 @@ test("NovaBot adapterı yalnız canlı katalog ürünlerini ve onaylı eylemleri
     http,
     getProduct: (id) => products.get(Number(id)) || null,
   });
+  const capability = await adapter.getCapability();
+  assert.deepEqual(capability.modes.map((mode) => mode.id), ["friendly", "technical"]);
+  assert.equal(capability.provider.ready, true);
   const response = await adapter.chat({
     message: "\u0000 Gömlek öner ",
+    modeId: "technical",
     history: Array.from({ length: 12 }, (_, index) => ({
       role: index % 2 ? "assistant" : "user",
       message: `Mesaj ${index + 1}`,
@@ -890,6 +910,8 @@ test("NovaBot adapterı yalnız canlı katalog ürünlerini ve onaylı eylemleri
   assert.deepEqual(response.pendingAction, { type: "add_to_cart", productId: 202, quantity: 4 });
   const chatCall = calls.find((call) => call.path === "/api/assistant/chat");
   assert.equal(chatCall.options.body.message, "Gömlek öner");
+  assert.equal(chatCall.options.body.modeId, "technical");
+  assert.equal("context" in chatCall.options.body, false, "Customer Web yalnız kanonik modeId göndermeli");
   assert.equal(chatCall.options.body.history.length, 10);
   assert.equal(chatCall.options.body.history[0].message, "Mesaj 3");
   await adapter.escalate("Müşteri teslimat tarihi hakkında canlı destek istedi.");

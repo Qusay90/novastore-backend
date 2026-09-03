@@ -5,77 +5,14 @@ const {
     getCheaperProductsTool,
     searchProductsTool
 } = require('./assistantToolRegistry');
-
-const NOVABOT_MODES = Object.freeze({
-    professional: {
-        label: 'Profesyonel Mod',
-        aliases: ['profesyonel', 'resmi', 'musteri hizmetleri'],
-        intro: 'Net ve resmi şekilde yardımcı olayım.'
-    },
-    friendly: {
-        label: 'Samimi Mod',
-        aliases: ['samimi', 'sicak', 'normal'],
-        intro: 'Sıcak ve anlaşılır şekilde yardımcı olayım.'
-    },
-    buddy: {
-        label: 'Kanka Modu',
-        aliases: ['kanka', 'arkadas', 'rahat'],
-        intro: 'Kanka, mantıklı seçenekleri toparlayayım.'
-    },
-    funny: {
-        label: 'Komik Mod',
-        aliases: ['komik', 'eglenceli', 'esprili'],
-        intro: 'Hafif esprili ama bilgi tarafını boşlamadan yardımcı olayım.'
-    },
-    witty: {
-        label: 'Alayci Ama Saygili Mod',
-        aliases: ['alayci', 'sivri', 'takil'],
-        intro: 'Biraz takılırım ama saygıyı bozmadan net konuşurum.'
-    },
-    quick: {
-        label: 'Hızlı Mod',
-        aliases: ['hizli', 'kisa', 'net'],
-        intro: 'Kısa ve net cevap vereyim.'
-    },
-    detailed: {
-        label: 'Detaycı Mod',
-        aliases: ['detayci', 'detayli', 'uzun anlat'],
-        intro: 'Detaylarıyla karşılaştırıp anlatayım.'
-    },
-    technical: {
-        label: 'Teknik Uzman Modu',
-        aliases: ['teknik', 'uzman', 'performans'],
-        intro: 'Teknik kriterlere odaklanayım.'
-    },
-    sales: {
-        label: 'Satış Danışmanı Modu',
-        aliases: ['satis', 'danisman', 'ihtiyac'],
-        intro: 'İhtiyaç, bütçe ve kullanım amacına göre yönlendireyim.'
-    }
-});
-
-const listModeCards = () => Object.entries(NOVABOT_MODES).map(([id, mode]) => ({
-    id,
-    title: mode.label,
-    description: mode.intro
-}));
-
-const normalizeMode = (mode) => {
-    const requested = normalizeSearchText(mode);
-    if (NOVABOT_MODES[requested]) return requested;
-    return Object.entries(NOVABOT_MODES).find(([, item]) => item.aliases.some((alias) => requested.includes(normalizeSearchText(alias))))?.[0] || 'friendly';
-};
-
-const detectRequestedMode = (message) => {
-    const text = normalizeSearchText(message);
-    return Object.entries(NOVABOT_MODES).find(([, mode]) => mode.aliases.some((alias) => text.includes(normalizeSearchText(alias))))?.[0] || null;
-};
-
-const resolveActiveMode = (message, context = {}) => {
-    const requestedMode = detectRequestedMode(message);
-    if (requestedMode) return requestedMode;
-    return normalizeMode(context.selectedMode || context.mode || 'friendly');
-};
+const {
+    assertNovabotModeAvailable,
+    resolveNovabotCapability
+} = require('./novabotCapabilityService');
+const {
+    NOVABOT_MODE_REGISTRY,
+    getNovabotMode
+} = require('./novabotModeRegistry');
 
 const LIVE_SUPPORT_PATTERN = /canli destek|canli destege|canli destegi|gercek kisi|musteri temsilcisi|insan destegi|temsilciye bagla|destek ekibine bagla/;
 const CART_PATTERN = /sepetimde ne var|sepetim|sepeti goster|sepetimi goster|sepetimi kontrol/;
@@ -133,39 +70,31 @@ const buildSocialFallbackReply = (message, mode) => {
     return 'İyiyim, teşekkür ederim. Sana ürün arama, sepet, sipariş, iade veya canlı destek konusunda yardımcı olabilirim.';
 };
 
-const handleAssistantChat = async ({ message, user, history = [], context = {} }) => {
+const handleAssistantChat = async ({
+    message,
+    user,
+    history = [],
+    modeId,
+    provider = null,
+    providerCapability = null
+}) => {
     const trimmedMessage = String(message || '').trim();
-    const activeMode = resolveActiveMode(trimmedMessage, context);
-
-    // If changing mode explicitly
-    const requestedMode = detectRequestedMode(trimmedMessage);
-    if (/modu degistir|mod degistir|mod sec|modu/.test(normalizeSearchText(trimmedMessage)) && requestedMode) {
-        const title = NOVABOT_MODES[requestedMode].label;
-        return {
-            mode: requestedMode,
-            modeLabel: title,
-            availableModes: listModeCards(),
-            intent: ASSISTANT_INTENTS.MODE_CHANGE,
-            confidence: 1.0,
-            reply: `${title} aktif. Bundan sonra bu tonda konuşacağım.`,
-            message: `${title} aktif. Bundan sonra bu tonda konuşacağım.`,
-            suggestions: ['Ucuz ürün bul', 'Ürün karşılaştır', 'İade/değişim'],
-            products: [],
-            cards: [],
-            comparison: null,
-            requiresConfirmation: false,
-            pendingAction: null,
-            allowEscalation: false,
-            escalated: false,
-            citations: []
-        };
-    }
+    const capability = providerCapability || resolveNovabotCapability();
+    const activeModeId = assertNovabotModeAvailable(modeId, capability);
+    const activeMode = getNovabotMode(activeModeId);
+    const availableModes = capability.modes.map((mode) => ({
+        id: mode.id,
+        label: mode.label,
+        title: mode.label,
+        description: mode.description
+    }));
 
     if (!trimmedMessage) {
         return {
-            mode: activeMode,
-            modeLabel: NOVABOT_MODES[activeMode]?.label || NOVABOT_MODES.friendly.label,
-            availableModes: listModeCards(),
+            modeId: activeModeId,
+            mode: activeModeId,
+            modeLabel: activeMode.label,
+            availableModes,
             intent: ASSISTANT_INTENTS.GENERAL_CHAT,
             confidence: 1.0,
             reply: 'Merhaba, ben NovaBot. Ürün bulabilir, sepet/sipariş/iade/kargo konularında yardımcı olabilirim.',
@@ -184,9 +113,10 @@ const handleAssistantChat = async ({ message, user, history = [], context = {} }
 
     if (LIVE_SUPPORT_PATTERN.test(normalizeSearchText(trimmedMessage))) {
         return {
-            mode: 'professional',
-            modeLabel: NOVABOT_MODES.professional.label,
-            availableModes: listModeCards(),
+            modeId: activeModeId,
+            mode: activeModeId,
+            modeLabel: activeMode.label,
+            availableModes,
             intent: ASSISTANT_INTENTS.LIVE_SUPPORT,
             confidence: 1.0,
             reply: 'Seni canlı desteğe aktarabilirim. Temsilciye geçmeden önce onaylaman yeterli; konuşma özetini destek ekibine ileteceğim.',
@@ -205,9 +135,10 @@ const handleAssistantChat = async ({ message, user, history = [], context = {} }
 
     if (CART_PATTERN.test(normalizeSearchText(trimmedMessage))) {
         return {
-            mode: activeMode,
-            modeLabel: NOVABOT_MODES[activeMode]?.label || NOVABOT_MODES.friendly.label,
-            availableModes: listModeCards(),
+            modeId: activeModeId,
+            mode: activeModeId,
+            modeLabel: activeMode.label,
+            availableModes,
             intent: ASSISTANT_INTENTS.SHOW_CART,
             confidence: 1.0,
             reply: 'Sepetin Android uygulamasında yerel olarak tutuluyor. Sepet sekmesini açarak ürünlerini, adetleri ve toplam tutarı görebilirsin.',
@@ -228,8 +159,9 @@ const handleAssistantChat = async ({ message, user, history = [], context = {} }
     const agentResult = await runAgentSession({
         userMessage: trimmedMessage,
         history,
-        mode: activeMode,
-        user
+        modeId: activeModeId,
+        user,
+        provider
     });
 
     let products = agentResult.products || [];
@@ -238,7 +170,7 @@ const handleAssistantChat = async ({ message, user, history = [], context = {} }
     }
     const hasToolFallbackProducts = products.length > 0 && !(agentResult.products || []).length;
     const socialFallbackReply = looksLikeProviderBusy(agentResult.text)
-        ? buildSocialFallbackReply(trimmedMessage, activeMode)
+        ? buildSocialFallbackReply(trimmedMessage, activeModeId)
         : null;
     const reply = hasToolFallbackProducts
         ? buildProductSearchReply(products)
@@ -252,9 +184,10 @@ const handleAssistantChat = async ({ message, user, history = [], context = {} }
     const cards = products.map(toProductCard);
 
     return {
-        mode: activeMode,
-        modeLabel: NOVABOT_MODES[activeMode]?.label || NOVABOT_MODES.friendly.label,
-        availableModes: listModeCards(),
+        modeId: activeModeId,
+        mode: activeModeId,
+        modeLabel: activeMode.label,
+        availableModes,
         intent: products.length ? ASSISTANT_INTENTS.PRODUCT_SEARCH : ASSISTANT_INTENTS.GENERAL_CHAT,
         confidence: 1.0,
         reply,
@@ -276,6 +209,6 @@ const handleAssistantChat = async ({ message, user, history = [], context = {} }
 
 module.exports = {
     ASSISTANT_INTENTS,
-    NOVABOT_MODES,
+    NOVABOT_MODES: NOVABOT_MODE_REGISTRY,
     handleAssistantChat
 };

@@ -22,6 +22,7 @@
     "test:seller-notification-authorization:integration": "node tests/notificationCorePostgresSmoke.js",
     "test:customer-refresh:unit": "node tests/customerRefreshContractSmoke.js",
     "test:customer-refresh:integration": "node tests/customerRefreshPostgresSmoke.js",
+    "test:novabot-modes": "node tests/novabotModeContractSmoke.js && node tests/novabotInputSecuritySmoke.js && node tests/novabotFallbackSmoke.js",
     "test:staging-runtime-safety": "node tests/stagingRuntimeSafetySmoke.js",
     "test:staging-access-gate": "node tests/stagingAccessGateHttpSmoke.js",
     "test:staging-release-readiness": "node tests/stagingReleaseContractSmoke.js && node tests/stagingVerificationHarnessSmoke.js",

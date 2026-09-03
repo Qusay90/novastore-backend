@@ -253,6 +253,11 @@ test("R2 hesap rotaları erişilebilir, NovaBot tek shell örneği ve exact owne
   assert.match(conversationState, /instanceId: createAssistantConversationInstanceId\(\)/);
   assert.match(conversationState, /state\?\.ownerKey !== ownerKey \|\| state\?\.instanceId !== instanceId/);
   assert.match(assistant, /scopeAssistantConversationState\(rawConversation, session\)/);
+  assert.match(assistant, /assistant\.getCapability\(\{ signal: controller\.signal \}\)/);
+  assert.match(assistant, /aria-label="NovaBot sohbet modu"/);
+  assert.match(assistant, /capabilityModes\.map\(\(option\) =>/);
+  assert.match(assistant, /assistant\.chat\(\{ message: text, history, modeId: selectedServerModeId \}\)/);
+  assert.doesNotMatch(assistant, /\[\s*\{\s*id:\s*"professional"/s, "Customer Web ayrı mod taksonomisi tanımlamamalı");
   assert.match(assistant, /updateScopedAssistantConversationState\(current, session, conversationInstanceId, update\)/);
   assert.match(assistant, /const phase = pendingChatId === null \? "idle" : "submitting"/);
   assert.match(assistant, /const actionPhase = pendingActionId === null \? "idle" : "submitting"/);

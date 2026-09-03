@@ -31,6 +31,7 @@ const RULES = Object.freeze([
   { methods: ["GET"], pattern: /^\/api\/questions\/product\/\d+$/, authenticated: "optional" },
   { methods: ["GET"], pattern: /^\/api\/questions\/user$/, authenticated: true },
   { methods: ["POST"], pattern: /^\/api\/questions\/ask$/, authenticated: true },
+  { methods: ["GET"], pattern: /^\/api\/assistant\/capability$/, authenticated: false },
   { methods: ["POST"], pattern: /^\/api\/assistant\/chat$/, authenticated: "optional" },
   { methods: ["POST"], pattern: /^\/api\/assistant\/escalate$/, authenticated: true },
   { methods: ["GET"], pattern: /^\/api\/payments\/capability$/, authenticated: false },

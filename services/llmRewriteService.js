@@ -1,4 +1,11 @@
-const { createAiProvider } = require('./aiProviderService');
+const { createAiProvider, getProviderResultMetadata } = require('./aiProviderService');
+const { NovaBotProviderUnavailableError } = require('./novabotCapabilityService');
+const {
+    DEFAULT_NOVABOT_MODE_ID,
+    buildNovabotSystemPrompt,
+    getNovabotMode,
+    requireNovabotModeId
+} = require('./novabotModeRegistry');
 const { getPolicyAnswer } = require('./policyService');
 const { getOrderSupportContext } = require('./orderSupportService');
 const {
@@ -11,51 +18,6 @@ const {
     resolveProductsByIds,
     searchProductsTool
 } = require('./assistantToolRegistry');
-
-const buildSystemPrompt = (mode) => {
-    let modeInstruction = "";
-    switch (mode) {
-        case 'professional':
-            modeInstruction = "Resmi, net, son derece kibar ve kurumsal bir müşteri hizmetleri temsilcisi gibi konuş.";
-            break;
-        case 'buddy':
-            modeInstruction = "Bir kanka, dost veya yakın arkadaş gibi konuş. Samimi, rahat ve içten ol ama saygıyı bozma.";
-            break;
-        case 'funny':
-            modeInstruction = "Esprili, enerjik, neşeli ve komik bir dille konuş.";
-            break;
-        case 'witty':
-            modeInstruction = "Alaycı ama saygılı, hafif iğneleyici ve zeki espriler yapan bir tarzda konuş. Asla hakaret etme.";
-            break;
-        case 'quick':
-            modeInstruction = "Çok kısa, net, direkt ve gereksiz uzatmadan cevaplar ver. Net bilgilere odaklan.";
-            break;
-        case 'detailed':
-            modeInstruction = "Detaylara önem ver. Avantaj, dezavantaj, fiyat/performans dengesi ve ürün detaylarını uzun uzadıya anlat.";
-            break;
-        case 'technical':
-            modeInstruction = "Teknik özelliklere, parametrelere ve mühendislik detaylarına odaklanarak konuş.";
-            break;
-        case 'sales':
-            modeInstruction = "Satış danışmanı gibi davran. Kullanıcı bütçesine ve ihtiyacına göre ikna edici öneriler yap.";
-            break;
-        case 'friendly':
-        default:
-            modeInstruction = "Sıcak, günlük, samimi ve son derece anlaşılır bir dille konuş. Emojiler kullanabilirsin.";
-            break;
-    }
-
-    return [
-        "Sen NovaStore e-ticaret uygulamasının yapay zeka alışveriş asistanı NovaBot'sun.",
-        "Görevin, kullanıcıların alışveriş deneyimini geliştirmek, ürün bulmalarına yardımcı olmak, sepet/sipariş/iade/kargo konularındaki sorularını yanıtlamaktır.",
-        "Kullanıcıyla sohbet et, tavsiyeler ver ve sorularını yanıtla.",
-        `Davranış modu talimatı: ${modeInstruction}`,
-        "Kullanıcı ürün ararsa search_products aracını kullan. Sepetini sorarsa get_cart aracını kullan. Canlı desteğe bağlanmak isterse tekrar sebep sormadan connect_to_live_support aracını kullan ve uygulamanın onay akışını başlat.",
-        "Sepete ekleme, sepetten çıkarma ve canlı destek gibi işlemler için mutlaka araç çağır; bu araçlar kullanıcıdan onay bekleyen pendingAction döndürür.",
-        "Yalnızca doğrulanmış canlı verileri ve ürün bilgilerini kullan. Fiyat, stok veya sipariş bilgisi uydurma.",
-        "Türkçe karakterleri ASCII benzerlerine çevirme; 'cikar' değil 'çıkar', 'goster' değil 'göster', 'urun' değil 'ürün' yaz. Doğal ve akıcı bir Türkçe kullan."
-    ].join(' ');
-};
 
 const executeTool = async (name, args, { user } = {}) => {
     switch (name) {
@@ -147,21 +109,37 @@ const executeTool = async (name, args, { user } = {}) => {
     }
 };
 
-const runAgentSession = async ({ userMessage, history = [], mode, user }) => {
-    const provider = createAiProvider();
-    const systemPrompt = buildSystemPrompt(mode);
-    const boundExecuteTool = (name, args) => executeTool(name, args, { user });
-
+const runAgentSession = async ({ userMessage, history = [], modeId, user, provider: injectedProvider = null }) => {
+    const canonicalModeId = requireNovabotModeId(modeId, { allowDefault: true });
+    const mode = getNovabotMode(canonicalModeId);
     try {
+        const provider = injectedProvider || createAiProvider();
+        const allowedToolNames = new Set(mode.allowedToolNames);
+        const boundExecuteTool = (name, args) => {
+            if (!allowedToolNames.has(name)) throw new Error('NovaBot aracı bu mod için kullanılamıyor.');
+            return executeTool(name, args, { user });
+        };
         const result = await provider.runAgent({
-            systemPrompt,
+            systemPrompt: buildNovabotSystemPrompt(canonicalModeId),
             userMessage,
             history,
-            executeTool: boundExecuteTool
+            executeTool: boundExecuteTool,
+            generationConfig: mode.generationConfig,
+            allowedToolNames: mode.allowedToolNames,
+            maxToolRounds: mode.maxToolRounds
         });
+        const providerMetadata = getProviderResultMetadata(result);
+        const supportsConversationModes = providerMetadata
+            ? providerMetadata.supportsConversationModes
+            : provider.supportsConversationModes === true;
+        if (canonicalModeId !== DEFAULT_NOVABOT_MODE_ID && !supportsConversationModes) {
+            throw new NovaBotProviderUnavailableError();
+        }
         return result;
     } catch (err) {
-        console.error("Agent execution error:", err);
+        if (err instanceof NovaBotProviderUnavailableError) throw err;
+        if (canonicalModeId !== DEFAULT_NOVABOT_MODE_ID) throw new NovaBotProviderUnavailableError();
+        console.error('NovaBot agent execution failed safely.', { code: err?.code || 'NOVABOT_AGENT_ERROR' });
         return {
             text: "Şu an NovaBot tarafında kısa bir yoğunluk var ama buradayım. Ürün arama, sepet, sipariş veya canlı destek için devam edebilirim.",
             products: [],

@@ -3159,6 +3159,7 @@
 }
 
 .assistant-mode span,
+.assistant-mode label,
 .assistant-mode a {
   display: inline-flex;
   align-items: center;
@@ -3169,6 +3170,32 @@
 
 .assistant-mode span {
   color: #117455;
+}
+
+.assistant-mode label {
+  min-width: 0;
+  color: #117455;
+}
+
+.assistant-mode label > span {
+  flex: 0 0 auto;
+}
+
+.assistant-mode select {
+  min-width: 0;
+  max-width: 150px;
+  height: 30px;
+  padding: 0 24px 0 8px;
+  border: 1px solid var(--line-dark);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--navy-900);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.assistant-mode select:disabled {
+  opacity: 0.75;
 }
 
 .assistant-mode a {

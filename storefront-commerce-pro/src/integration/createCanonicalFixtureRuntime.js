@@ -237,8 +237,25 @@ export function createCanonicalFixtureRuntime({ root = globalThis } = {}) {
   });
 
   const assistant = Object.freeze({
-    chat: async ({ message }) => Object.freeze({
+    getCapability: async () => Object.freeze({
+      contractVersion: "novabot-modes-v1",
+      available: true,
+      provider: Object.freeze({ configured: false, ready: false }),
+      advancedModesAvailable: false,
+      modeSelectionAvailable: false,
+      defaultModeId: "friendly",
+      modes: Object.freeze([Object.freeze({
+        id: "friendly",
+        label: "Samimi Mod",
+        description: "Sıcak, günlük ve anlaşılır bir dille yardımcı olur.",
+      })]),
+      unavailableReason: "ADVANCED_PROVIDER_NOT_SELECTED",
+    }),
+    chat: async ({ message, modeId }) => Object.freeze({
       reply: `Yerel NovaBot fixture yanıtı: ${String(message || "").trim()}`,
+      modeId: modeId || "friendly",
+      mode: modeId || "friendly",
+      modeLabel: "Samimi Mod",
       products: Object.freeze([]),
       suggestions: Object.freeze(["Kategorileri göster"]),
       pendingAction: null,

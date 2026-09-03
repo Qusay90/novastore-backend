@@ -8,6 +8,34 @@ const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 const DEFAULT_OLLAMA_MODEL = 'llama3.1';
 const FALLBACK_PROVIDER_NAMES = new Set(['mock', 'ollama', 'gemini', 'openai']);
 const AI_PROVIDER_TIMEOUT_MS = 15000;
+const PROVIDER_RESULT_METADATA = Symbol('novabotProviderResultMetadata');
+
+const attachProviderResultMetadata = (result, provider) => {
+    const safeResult = result && typeof result === 'object' ? { ...result } : {};
+    Object.defineProperty(safeResult, PROVIDER_RESULT_METADATA, {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: Object.freeze({
+            providerName: provider?.name || 'unknown',
+            supportsConversationModes: provider?.supportsConversationModes === true
+        })
+    });
+    return safeResult;
+};
+
+const getProviderResultMetadata = (result) => result?.[PROVIDER_RESULT_METADATA] || null;
+
+const normalizeGenerationConfig = (value = {}) => {
+    const temperature = Number(value.temperature);
+    const maxOutputTokens = Number(value.maxOutputTokens);
+    return Object.freeze({
+        temperature: Number.isFinite(temperature) && temperature >= 0 && temperature <= 1 ? temperature : 0.45,
+        maxOutputTokens: Number.isInteger(maxOutputTokens) && maxOutputTokens >= 128 && maxOutputTokens <= 2048
+            ? maxOutputTokens
+            : 640
+    });
+};
 
 const fetchProviderResponse = async (url, options = {}, {
     fetchImpl = globalThis.fetch,
@@ -407,6 +435,7 @@ const GEMINI_TOOLS = [
 class MockAssistantProvider {
     constructor() {
         this.name = 'mock';
+        this.supportsConversationModes = false;
     }
 
     async runAgent({ userMessage, executeTool }) {
@@ -416,7 +445,7 @@ class MockAssistantProvider {
             try {
                 return await executeTool(name, args);
             } catch (err) {
-                console.warn(`Mock provider tool fallback failed: tool=${name} error=${err.message || err}`);
+                console.warn(`Mock provider tool fallback failed: tool=${name} code=${err?.code || 'TOOL_ERROR'}`);
                 return null;
             }
         };
@@ -513,6 +542,7 @@ class OllamaProvider {
     constructor() {
         assertExternalSideEffectAllowed('external_ai');
         this.name = 'ollama';
+        this.supportsConversationModes = false;
         this.baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
         this.model = process.env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL;
     }
@@ -534,12 +564,21 @@ class GeminiProvider {
     constructor() {
         assertExternalSideEffectAllowed('external_ai');
         this.name = 'gemini';
+        this.supportsConversationModes = true;
         this.apiKey = process.env.GEMINI_API_KEY;
         this.model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
         this.baseUrl = process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta';
     }
 
-    async runAgent({ systemPrompt, userMessage, history = [], executeTool }) {
+    async runAgent({
+        systemPrompt,
+        userMessage,
+        history = [],
+        executeTool,
+        generationConfig = {},
+        allowedToolNames = [],
+        maxToolRounds = 5
+    }) {
         assertExternalSideEffectAllowed('external_ai');
         if (!this.apiKey) {
             throw new AiProviderFallbackError('Gemini API anahtarı bulunamadı.', {
@@ -560,7 +599,12 @@ class GeminiProvider {
         });
 
         let loopCount = 0;
-        const maxLoops = 5;
+        const maxLoops = Math.max(1, Math.min(5, Number.parseInt(maxToolRounds, 10) || 5));
+        const safeGenerationConfig = normalizeGenerationConfig(generationConfig);
+        const allowedTools = new Set(allowedToolNames);
+        const geminiTools = GEMINI_TOOLS.map((group) => ({
+            functionDeclarations: group.functionDeclarations.filter((tool) => allowedTools.has(tool.name))
+        })).filter((group) => group.functionDeclarations.length > 0);
 
         const accumulated = {
             products: [],
@@ -583,16 +627,20 @@ class GeminiProvider {
                         parts: [{ text: systemPrompt }]
                     },
                     contents,
-                    tools: GEMINI_TOOLS,
+                    tools: geminiTools,
                     generationConfig: {
-                        temperature: 0.45
+                        temperature: safeGenerationConfig.temperature,
+                        maxOutputTokens: safeGenerationConfig.maxOutputTokens
                     }
                 })
             });
 
             if (!response.ok) {
                 const errJson = await safeJson(response);
-                console.error("Gemini API Error:", errJson);
+                console.error('Gemini API request failed.', {
+                    statusCode: response.status,
+                    providerStatus: getPayloadStatus(errJson)
+                });
                 throw new AiProviderFallbackError('Gemini API yanıt veremedi.', {
                     provider: this.name,
                     statusCode: response.status,
@@ -621,7 +669,15 @@ class GeminiProvider {
 
             const functionResponses = [];
             for (const call of functionCalls) {
-                const { name, args } = call.functionCall;
+                const name = String(call?.functionCall?.name || '');
+                const args = call?.functionCall?.args;
+                if (!allowedTools.has(name) || typeof executeTool !== 'function') {
+                    console.warn('NovaBot provider tool execution blocked: provider=gemini code=TOOL_NOT_ALLOWED');
+                    functionResponses.push({
+                        response: { output: { error: 'Tool is not available.' } }
+                    });
+                    continue;
+                }
                 try {
                     const result = await executeTool(name, args);
                     
@@ -635,9 +691,9 @@ class GeminiProvider {
                         response: { output: result.output || result }
                     });
                 } catch (err) {
-                    console.error(`Error running Gemini tool ${name}:`, err);
+                    console.warn(`NovaBot provider tool execution failed: provider=gemini tool=${name} code=${err?.code || 'TOOL_ERROR'}`);
                     functionResponses.push({
-                        response: { output: { error: err.message } }
+                        response: { output: { error: 'Tool execution failed.' } }
                     });
                 }
             }
@@ -671,12 +727,21 @@ class OpenAIProvider {
     constructor() {
         assertExternalSideEffectAllowed('external_ai');
         this.name = 'openai';
+        this.supportsConversationModes = true;
         this.apiKey = process.env.OPENAI_API_KEY;
         this.model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
         this.baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
     }
 
-    async runAgent({ systemPrompt, userMessage, history = [], executeTool }) {
+    async runAgent({
+        systemPrompt,
+        userMessage,
+        history = [],
+        executeTool,
+        generationConfig = {},
+        allowedToolNames = [],
+        maxToolRounds = 5
+    }) {
         assertExternalSideEffectAllowed('external_ai');
         if (!this.apiKey) {
             throw new AiProviderFallbackError('OpenAI API anahtarı bulunamadı.', {
@@ -699,7 +764,10 @@ class OpenAIProvider {
         });
 
         let loopCount = 0;
-        const maxLoops = 5;
+        const maxLoops = Math.max(1, Math.min(5, Number.parseInt(maxToolRounds, 10) || 5));
+        const safeGenerationConfig = normalizeGenerationConfig(generationConfig);
+        const allowedTools = new Set(allowedToolNames);
+        const openAiTools = OPENAI_TOOLS.filter((tool) => allowedTools.has(tool.function.name));
 
         const accumulated = {
             products: [],
@@ -720,14 +788,18 @@ class OpenAIProvider {
                 body: JSON.stringify({
                     model: this.model,
                     messages: openAiMessages,
-                    tools: OPENAI_TOOLS,
-                    temperature: 0.45
+                    tools: openAiTools,
+                    temperature: safeGenerationConfig.temperature,
+                    max_tokens: safeGenerationConfig.maxOutputTokens
                 })
             });
 
             if (!response.ok) {
                 const errJson = await safeJson(response);
-                console.error("OpenAI API Error:", errJson);
+                console.error('OpenAI API request failed.', {
+                    statusCode: response.status,
+                    providerStatus: getPayloadStatus(errJson)
+                });
                 throw new AiProviderFallbackError('OpenAI API yanıt veremedi.', {
                     provider: this.name,
                     statusCode: response.status,
@@ -751,7 +823,17 @@ class OpenAIProvider {
             }
 
             for (const toolCall of message.tool_calls) {
-                const name = toolCall.function.name;
+                const name = String(toolCall?.function?.name || '');
+                if (!allowedTools.has(name) || typeof executeTool !== 'function') {
+                    console.warn('NovaBot provider tool execution blocked: provider=openai code=TOOL_NOT_ALLOWED');
+                    openAiMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        name,
+                        content: JSON.stringify({ error: 'Tool is not available.' })
+                    });
+                    continue;
+                }
                 const args = parseToolArguments(toolCall.function.arguments, {
                     provider: this.name,
                     toolName: name
@@ -772,12 +854,12 @@ class OpenAIProvider {
                         content: JSON.stringify(result.output || result)
                     });
                 } catch (err) {
-                    console.error(`Error running OpenAI tool ${name}:`, err);
+                    console.warn(`NovaBot provider tool execution failed: provider=openai tool=${name} code=${err?.code || 'TOOL_ERROR'}`);
                     openAiMessages.push({
                         role: 'tool',
                         tool_call_id: toolCall.id,
                         name: name,
-                        content: JSON.stringify({ error: err.message })
+                        content: JSON.stringify({ error: 'Tool execution failed.' })
                     });
                 }
             }
@@ -815,6 +897,7 @@ class FallbackAiProvider {
         if (!this.providers.length) {
             this.providers = [new MockAssistantProvider()];
         }
+        this.supportsConversationModes = this.providers.some((provider) => provider.supportsConversationModes === true);
     }
 
     async runAgent(args) {
@@ -826,7 +909,7 @@ class FallbackAiProvider {
                 if (provider.name !== this.name) {
                     console.warn(`AI provider fallback active: ${this.name} -> ${provider.name}`);
                 }
-                return result;
+                return attachProviderResultMetadata(result, provider);
             } catch (err) {
                 if (err instanceof ExternalSideEffectBlockedError) throw err;
                 lastError = err;
@@ -843,8 +926,11 @@ class FallbackAiProvider {
             }
         }
 
-        console.warn('AI provider fallback exhausted:', lastError?.message || lastError);
-        return buildProviderUnavailableResult(this.name);
+        console.warn('AI provider fallback exhausted.', { code: lastError?.code || 'AI_PROVIDER_UNAVAILABLE' });
+        return attachProviderResultMetadata(buildProviderUnavailableResult(this.name), {
+            name: this.name,
+            supportsConversationModes: false
+        });
     }
 }
 
@@ -859,5 +945,6 @@ module.exports = {
     OpenAIProvider,
     fetchProviderResponse,
     createAiProvider,
+    getProviderResultMetadata,
     parseToolArguments
 };

@@ -25,6 +25,7 @@ const money = new Intl.NumberFormat("tr-TR", {
 });
 
 const HIDDEN_ROUTES = new Set(["payment-result", "auth", "password", "order-success"]);
+const INITIAL_CAPABILITY_STATE = Object.freeze({ phase: "loading", value: null });
 
 const isAuthenticated = (session) => (
   session?.status === "authenticated" || session?.status === "unverified"
@@ -74,6 +75,7 @@ export function AssistantWidget({
     updateScopedAssistantConversationState(current, session, conversationInstanceId, update)
   ));
   const { mode, error, messages, pendingChatId, pendingActionId } = conversation;
+  const [capabilityState, setCapabilityState] = useState(INITIAL_CAPABILITY_STATE);
   const phase = pendingChatId === null ? "idle" : "submitting";
   const actionPhase = pendingActionId === null ? "idle" : "submitting";
   const inputRef = useRef(null);
@@ -92,12 +94,48 @@ export function AssistantWidget({
     actionOperationRef.current = pendingActionId;
   }
   const authenticated = isAuthenticated(session);
+  const capabilityModes = capabilityState.value?.modes || [];
+  const selectedServerMode = capabilityModes.find((option) => option.id === mode) || null;
+  const selectedServerModeId = selectedServerMode?.id || null;
 
   useEffect(() => {
     rawSetConversation((current) => (
       current?.ownerKey === conversation.ownerKey && current?.instanceId ? current : conversation
     ));
   }, [conversation, rawSetConversation]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    setCapabilityState(INITIAL_CAPABILITY_STATE);
+    const capabilityRequest = typeof assistant?.getCapability === "function"
+      ? assistant.getCapability({ signal: controller.signal })
+      : Promise.reject(new Error("NovaBot capability contract is unavailable."));
+    capabilityRequest.then((capability) => {
+      if (!active) return;
+      setCapabilityState({ phase: "ready", value: capability });
+      const availableIds = new Set(capability.modes.map((option) => option.id));
+      rawSetConversation((current) => updateScopedAssistantConversationState(
+        current,
+        session,
+        conversationInstanceId,
+        (scoped) => {
+          if (availableIds.has(scoped.mode)) return scoped;
+          const nextMode = availableIds.has(capability.defaultModeId)
+            ? capability.defaultModeId
+            : capability.modes[0]?.id;
+          return nextMode ? { ...scoped, mode: nextMode } : scoped;
+        },
+      ));
+    }).catch((requestError) => {
+      if (!active || requestError?.name === "AbortError") return;
+      setCapabilityState({ phase: "error", value: null });
+    });
+    return () => {
+      active = false;
+      controller.abort("assistant-capability-owner-change");
+    };
+  }, [assistant, conversationInstanceId, rawSetConversation, session]);
 
   useEffect(() => {
     if (!open) return;
@@ -142,12 +180,15 @@ export function AssistantWidget({
     });
     setInput("");
     try {
-      const response = await assistant.chat({ message: text, history, mode });
+      const response = await assistant.chat({ message: text, history, modeId: selectedServerModeId });
       setConversation((current) => {
         if (current.pendingChatId !== operationId) return current;
+        const responseMode = capabilityModes.some((option) => option.id === response.mode)
+          ? response.mode
+          : current.mode;
         return {
           ...current,
-          mode: response.mode || current.mode,
+          mode: responseMode,
           messages: [...current.messages, {
             id: current.nextId,
             role: "assistant",
@@ -235,7 +276,15 @@ export function AssistantWidget({
   return <div className={`assistant-widget is-${route.type}${open ? " is-open" : ""}${raised ? " has-comparison" : ""}`}>
     {open && <section id="novabot-dialog" className="assistant-window" role="dialog" aria-labelledby="novabot-dialog-title">
       <header><span><i><img className="novabot-artwork" src={novabotArtwork} alt="" /></i><span><strong id="novabot-dialog-title">NovaBot</strong><small>{phase === "submitting" ? "Yanıt hazırlanıyor…" : "Canlı katalog asistanı"}</small></span></span><button type="button" aria-label="NovaBot penceresini kapat" onClick={() => { setOpen(false); window.requestAnimationFrame(() => fabRef.current?.focus()); }}><X /></button></header>
-      <div className="assistant-mode"><span><CheckCircle weight="fill" /> {mode === "friendly" ? "Samimi mod" : mode}</span><a href="#/destek"><Headphones /> Destek ekibi</a></div>
+      <div className="assistant-mode">
+        {capabilityState.phase === "ready" && capabilityModes.length > 0
+          ? <label><CheckCircle weight="fill" /><span>Sohbet modu</span><select aria-label="NovaBot sohbet modu" value={selectedServerMode?.id || capabilityState.value.defaultModeId || ""} disabled={!capabilityState.value.modeSelectionAvailable || phase === "submitting"} onChange={(event) => {
+            const nextMode = capabilityModes.find((option) => option.id === event.target.value);
+            if (nextMode) setConversation((current) => ({ ...current, mode: nextMode.id }));
+          }}>{capabilityModes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
+          : <span title={capabilityState.phase === "error" ? "Mod bilgisi alınamadı; temel sohbet kullanılacak." : undefined}><CheckCircle weight="fill" />{capabilityState.phase === "loading" ? "Modlar yükleniyor…" : "Temel sohbet"}</span>}
+        <a href="#/destek"><Headphones /> Destek ekibi</a>
+      </div>
       <div className="assistant-thread" ref={threadRef} aria-live="polite">
         {messages.map((message) => <article key={message.id} className={`assistant-message is-${message.role}`}><div className="assistant-message__icon">{message.role === "user" ? <User /> : <Bot />}</div><div className="assistant-message__body"><p>{message.text}</p><AssistantResponseExtras messageId={message.id} response={message.response} authenticated={authenticated} favorites={favorites} onFavorite={onFavorite} onAdd={onAdd} getProductImage={getProductImage} onConfirm={confirm} actionPhase={actionPhase} />{message.response?.suggestions?.length > 0 && <div className="assistant-suggestions">{message.response.suggestions.map((suggestion) => <button key={suggestion} type="button" disabled={phase === "submitting"} onClick={() => send(suggestion)}>{suggestion}</button>)}</div>}</div></article>)}
         {phase === "submitting" && <div className="assistant-typing" role="status"><span /><span /><span /><b>NovaBot düşünüyor</b></div>}

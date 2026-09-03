@@ -13,7 +13,12 @@ const cleanup = () => {
 
 setInterval(cleanup, 60 * 1000).unref();
 
-const simpleRateLimit = ({ windowMs = 60 * 1000, max = 120 } = {}) => (req, res, next) => {
+const simpleRateLimit = ({
+    windowMs = 60 * 1000,
+    max = 120,
+    code = 'RATE_LIMITED',
+    message = 'Çok fazla istek gönderildi. Lütfen kısa süre sonra tekrar deneyin.'
+} = {}) => (req, res, next) => {
     const ip = req.ip || req.connection.remoteAddress || 'unknown';
     const key = `${ip}:${req.path}`;
     const now = Date.now();
@@ -26,7 +31,9 @@ const simpleRateLimit = ({ windowMs = 60 * 1000, max = 120 } = {}) => (req, res,
 
     existing.count += 1;
     if (existing.count > max) {
-        return res.status(429).json({ error: 'Cok fazla istek gonderildi. Lutfen kisa sure sonra tekrar deneyin.' });
+        const retryAfterSeconds = Math.max(1, Math.ceil((existing.expiresAt - now) / 1000));
+        res.setHeader?.('Retry-After', String(retryAfterSeconds));
+        return res.status(429).json({ code, error: message });
     }
 
     next();

@@ -134,8 +134,8 @@ const splitList = (value) => String(value || '')
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
 
-const getAiProviderFallbacks = (primaryProvider) => {
-    const configuredFallbacks = splitList(process.env.AI_PROVIDER_FALLBACKS);
+const getAiProviderFallbacks = (primaryProvider, env = process.env) => {
+    const configuredFallbacks = splitList(env.AI_PROVIDER_FALLBACKS);
     if (configuredFallbacks.length) {
         return configuredFallbacks.filter((provider) => provider !== primaryProvider);
     }
@@ -144,12 +144,12 @@ const getAiProviderFallbacks = (primaryProvider) => {
     return ['mock'];
 };
 
-const getAiProviderConfig = () => {
-    const primaryProvider = String(process.env.AI_PROVIDER || 'mock').trim().toLowerCase() || 'mock';
+const getAiProviderConfig = (env = process.env) => {
+    const primaryProvider = String(env.AI_PROVIDER || 'mock').trim().toLowerCase() || 'mock';
     return {
         primaryProvider,
-        fallbackEnabled: parseBoolean(process.env.AI_PROVIDER_FALLBACK_ENABLED, true),
-        fallbackProviders: getAiProviderFallbacks(primaryProvider)
+        fallbackEnabled: parseBoolean(env.AI_PROVIDER_FALLBACK_ENABLED, true),
+        fallbackProviders: getAiProviderFallbacks(primaryProvider, env)
     };
 };
 

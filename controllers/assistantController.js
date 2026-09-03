@@ -8,11 +8,20 @@ const {
 } = require('../config/stagingRuntimePolicy');
 
 const { getAiProviderConfig } = require('../config/appConfig');
+const {
+    NovaBotProviderUnavailableError,
+    resolveNovabotCapability
+} = require('../services/novabotCapabilityService');
+const {
+    DEFAULT_NOVABOT_MODE_ID,
+    NovaBotModeError,
+    requireNovabotModeId
+} = require('../services/novabotModeRegistry');
 
 const ASSISTANT_MESSAGE_MAX_LENGTH = 2000;
 const ASSISTANT_HISTORY_MAX_ITEMS = 10;
 const ASSISTANT_HISTORY_MESSAGE_MAX_LENGTH = 2000;
-const ASSISTANT_BODY_KEYS = new Set(['message', 'history', 'context']);
+const ASSISTANT_BODY_KEYS = new Set(['message', 'history', 'modeId', 'context']);
 const ASSISTANT_HISTORY_KEYS = new Set(['role', 'message']);
 const ASSISTANT_CONTEXT_KEYS = new Set(['selectedMode', 'mode']);
 
@@ -28,6 +37,25 @@ class AssistantInputError extends Error {
 const cleanAssistantText = (value) => String(value)
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, ' ')
     .trim();
+
+const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+
+const normalizeModeId = (body, rawContext) => {
+    const candidates = [];
+    if (hasOwn(body, 'modeId')) candidates.push(body.modeId);
+    for (const key of ASSISTANT_CONTEXT_KEYS) {
+        if (hasOwn(rawContext, key)) candidates.push(rawContext[key]);
+    }
+    if (candidates.length === 0) {
+        return Object.freeze({ modeId: DEFAULT_NOVABOT_MODE_ID, modeSelectionRequested: false });
+    }
+
+    const canonical = candidates.map((candidate) => requireNovabotModeId(candidate));
+    if (canonical.some((modeId) => modeId !== canonical[0])) {
+        throw new AssistantInputError('NovaBot modeId alanları birbiriyle çelişiyor.');
+    }
+    return Object.freeze({ modeId: canonical[0], modeSelectionRequested: true });
+};
 
 const normalizeAssistantChatInput = (body) => {
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -65,26 +93,27 @@ const normalizeAssistantChatInput = (body) => {
         || Object.keys(rawContext).some((key) => !ASSISTANT_CONTEXT_KEYS.has(key))) {
         throw new AssistantInputError('NovaBot context alanı geçersizdir.');
     }
-    const context = {};
-    for (const key of Object.keys(rawContext)) {
-        if (typeof rawContext[key] !== 'string') throw new AssistantInputError('NovaBot modu metin olmalıdır.');
-        const mode = cleanAssistantText(rawContext[key]);
-        if (!mode || mode.length > 32) throw new AssistantInputError('NovaBot modu geçersizdir.');
-        context[key] = mode;
-    }
+    const { modeId, modeSelectionRequested } = normalizeModeId(body, rawContext);
     return Object.freeze({
         message,
         history: Object.freeze(history),
-        context: Object.freeze(context)
+        modeId,
+        modeSelectionRequested
     });
 };
 
 const normalizeAssistantResponse = (response = {}) => {
     const reply = String(response.reply || response.message || response.text || '').trim();
+    const modeId = String(response.modeId || response.mode || DEFAULT_NOVABOT_MODE_ID).trim();
     return {
-        ...response,
         reply,
         message: String(response.message || reply).trim(),
+        modeId,
+        mode: modeId,
+        modeLabel: String(response.modeLabel || '').trim(),
+        availableModes: Array.isArray(response.availableModes) ? response.availableModes : [],
+        intent: response.intent || null,
+        confidence: Number.isFinite(Number(response.confidence)) ? Number(response.confidence) : null,
         suggestions: Array.isArray(response.suggestions) ? response.suggestions : [],
         products: Array.isArray(response.products) ? response.products : [],
         cards: Array.isArray(response.cards) ? response.cards : [],
@@ -97,16 +126,22 @@ const normalizeAssistantResponse = (response = {}) => {
     };
 };
 
+const capability = (_req, res) => res.status(200).json(resolveNovabotCapability());
+
 const chat = async (req, res) => {
     try {
-        const { message, history, context } = normalizeAssistantChatInput(req.body);
+        const { message, history, modeId } = normalizeAssistantChatInput(req.body);
         const user = await getUserFromRequestIfAny(req);
+        const providerCapability = resolveNovabotCapability();
 
-        const response = await handleAssistantChat({ message, user, history, context });
+        const response = await handleAssistantChat({ message, user, history, modeId, providerCapability });
         res.status(200).json(normalizeAssistantResponse(response));
     } catch (err) {
-        if (err instanceof AssistantInputError) {
+        if (err instanceof AssistantInputError || err instanceof NovaBotModeError) {
             return res.status(err.statusCode).json({ code: err.code, error: err.message });
+        }
+        if (err instanceof NovaBotProviderUnavailableError) {
+            return res.status(err.statusCode).json({ code: err.code, error: err.publicMessage });
         }
         if (err instanceof ExternalSideEffectBlockedError) {
             return res.status(err.statusCode).json({ code: err.code, error: err.publicMessage });
@@ -118,7 +153,10 @@ const chat = async (req, res) => {
             provider: aiProviderConfig.primaryProvider,
             fallbacks: aiProviderConfig.fallbackProviders
         });
-        res.status(500).json({ error: 'Yapay zeka asistanı şu an yanıt veremiyor.' });
+        res.status(500).json({
+            code: 'NOVABOT_CHAT_UNAVAILABLE',
+            error: 'Yapay zeka asistanı şu an yanıt veremiyor.'
+        });
     }
 };
 
@@ -170,6 +208,7 @@ const escalate = async (req, res) => {
 
 module.exports = {
     AssistantInputError,
+    capability,
     chat,
     escalate,
     normalizeAssistantChatInput,

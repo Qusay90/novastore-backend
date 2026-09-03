@@ -1,6 +1,6 @@
 # NovaStore Dış Servisler ve Entegrasyonlar
 
-Son doğrulama: 1 Eylül 2026
+Son doğrulama: 3 Eylül 2026
 
 Bu dosya NovaStore'un kullandığı, kullanıma hazır tuttuğu veya canlıya çıkmadan önce bağlaması gereken dış servislerin tek kaynak listesidir. Anahtar, parola, token ve bağlantı şifresi gibi gizli değerler bu dosyaya **asla yazılmaz**.
 
@@ -19,7 +19,7 @@ Bu dosya NovaStore'un kullandığı, kullanıma hazır tuttuğu veya canlıya ç
 | **Supabase (PostgreSQL)** | Aktif | Kullanıcı, ürün, sepet, sipariş, ödeme, bildirim, analitik ve diğer kalıcı verileri tutuyor. | `config/db.js`, `models/`, `DATABASE_URL`; mevcut bağlantı Supabase Session Pooler kullanıyor. | `DATABASE_URL`, `DB_SSL`; gerektiğinde `SUPABASE_USE_POOLER`, `SUPABASE_REGION`, `SUPABASE_POOLER_HOST`, `SUPABASE_PROJECT_REF`, `DB_*` |
 | **Cloudinary** | Aktif | Ürün ve yorum görsellerini/videolarını yükler, saklar, dönüştürür, önizleme üretir ve siler. Android tarafı Cloudinary görsel URL'lerini optimize eder. | `config/cloudinary.js`, `routes/productRoutes.js`, `routes/reviewRoutes.js`, `controllers/productController.js`, `app/.../ImageUrls.kt` | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` |
 | **Resend** | Aktif | Şifremi unuttum akışında parola sıfırlama e-postası gönderiyor. | `controllers/authController.js`, `config/appConfig.js`, `resend` npm paketi | `RESEND_API_KEY`, doğrulanmış gönderen alan adı ve tercihen `MAIL_FROM` |
-| **Google Gemini API** | Aktif | NovaBot'un doğal dil yanıtlarını ve araç çağrılarını üreten birincil yapay zekâ sağlayıcısı. | `services/aiProviderService.js`; mevcut yerel yapılandırmada `AI_PROVIDER=gemini` | `AI_PROVIDER=gemini`, `GEMINI_API_KEY`, isteğe bağlı `GEMINI_MODEL` ve `GEMINI_BASE_URL` |
+| **Google Gemini API** | Hazır / sunucu yapılandırması bekliyor | NovaBot'un doğal dil yanıtlarını ve araç çağrılarını üretebilen sunucu sağlayıcısıdır. | `services/aiProviderService.js`, `services/novabotCapabilityService.js`; bu kabul worktree'sinde provider değişkenleri ayarlı değildir ve capability ileri modları kapalı bildirir. | `AI_PROVIDER=gemini`, `GEMINI_API_KEY`; isteğe bağlı `GEMINI_MODEL`, `GEMINI_BASE_URL`, `AI_PROVIDER_FALLBACK_ENABLED`, `AI_PROVIDER_FALLBACKS` |
 | **Natro DNS** | Aktif | `novastore.tr` alan adının DNS kayıtlarını yönetiyor; alan adını Render yayınına bağlıyor. | Canlı NS kayıtları `ns1.natrohost.com` ve `ns2.natrohost.com`; `www` kaydı Render'a gidiyor. | Natro panelindeki A/CNAME/MX/TXT kayıtları; SSL ve e-posta doğrulama kayıtları |
 | **GitHub** | Aktif | Kaynak kodun uzak deposunu ve sürüm geçmişini tutuyor. | Git remote: `github.com/Qusay90/novastore-backend.git` | Depo erişimi, branch koruması; otomatik yayın isteniyorsa Render deploy bağlantısı |
 
@@ -46,7 +46,7 @@ NovaStore içindeki satıcı sipariş projeksiyonu, ledger ve settlement kayıtl
 
 | Servis | Durum | Ne işe yarıyor? | Not |
 |---|---|---|---|
-| **OpenAI API** | Hazır / seçili değil | Gemini yerine veya yedek olarak NovaBot yanıtları ve araç çağrıları üretebilir. | Kod ve yerel API anahtarı mevcut; fakat mevcut fallback listesi tanımlı olmadığından otomatik yedek olarak kullanılmıyor. Kullanmak için `AI_PROVIDER=openai` veya `AI_PROVIDER_FALLBACKS=openai,mock` gerekir. |
+| **OpenAI API** | Hazır / seçili ve yapılandırılmış değil | Gemini yerine veya mode-capable yedek olarak NovaBot yanıtları ve araç çağrılarını üretebilir. | Kod kaynağı vardır; bu kabul worktree'sinde anahtar veya fallback yapılandırması ayarlı değildir. Kullanmak için sunucu secret yöneticisinde `OPENAI_API_KEY` ve açık provider zinciri gerekir. |
 | **Ollama** | Hazır / yerel seçenek | NovaBot'u harici ücretli AI API'si olmadan yerel modelle çalıştırabilir. | `services/aiProviderService.js` içinde destek var. Ayrı bir Ollama sunucusu, `OLLAMA_BASE_URL` ve model gerekir; production için zorunlu değildir. |
 | **Mock AI** | Aktif güvenlik ağı | Canlı AI sağlayıcısı hata verdiğinde NovaBot'un tamamen çökmesini engelleyen deterministik yanıt sağlar. | Dış uygulama değildir; proje içi fallback'tir. Varsayılan fallback zincirinde kullanılır. |
 
@@ -86,7 +86,7 @@ Bunlar hesap/secret gerektiren ana backend uygulamaları değildir; web arayüz�
 
 1. `.env.example` dosyasında kodun kullandığı `RESEND_API_KEY` değişkeni bulunmuyor; yeni ortam kurulumunda unutulabilir.
 2. PayTR merchant onayı, gerçek secret'lar, HTTPS callback/success/fail URL'leri ve yetkili provider UAT kanıtı dışarıdan sağlanmadı; `PAYTR_LIVE_REQUESTS_ALLOWED=false` olarak kalmalıdır.
-3. OpenAI anahtarı mevcut olsa da `AI_PROVIDER_FALLBACKS` tanımlı olmadığı için Gemini arızasında OpenAI'ye değil doğrudan proje içi mock sağlayıcıya geçiliyor.
+3. NovaBot ileri modları için bu kabul worktree'sinde Gemini/OpenAI sağlayıcı yapılandırması yoktur; temel `friendly` sohbet deterministik fallback ile çalışır, diğer modlar capability tarafından kapalı bildirilir.
 4. Kargo ve fatura akışları production sağlayıcısına bağlı değil.
 5. Hosting sağlayıcısına ait gizli değişkenlerin yalnızca panelde tutulduğu doğrulanmalı; hiçbir secret Git'e eklenmemeli.
 

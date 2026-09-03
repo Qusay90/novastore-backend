@@ -1,5 +1,19 @@
 const assert = require('node:assert/strict');
 
+process.env.NODE_ENV = 'test';
+process.env.NOVASTORE_SAFE_LOCAL_BACKEND = 'true';
+process.env.NOVASTORE_ALLOW_REMOTE_DB = 'false';
+process.env.SKIP_SCHEMA_INIT = 'true';
+process.env.NOVASTORE_ALLOW_SCHEMA_INIT = 'false';
+process.env.DATABASE_URL = 'postgresql://novastore_test:novastore_test_only@127.0.0.1:55432/novastore_novabot_fallback_test';
+process.env.DB_HOST = '127.0.0.1';
+process.env.DB_PORT = '55432';
+process.env.DB_NAME = 'novastore_novabot_fallback_test';
+process.env.DB_USER = 'novastore_test';
+process.env.DB_PASSWORD = 'novastore_test_only';
+process.env.DB_SSL = 'false';
+process.env.JWT_SECRET = 'novabot-fallback-smoke-secret';
+
 const { handleAssistantChat } = require('../services/assistantOrchestrator');
 const { OpenAIProvider, parseToolArguments } = require('../services/aiProviderService');
 const { normalizeAssistantResponse } = require('../controllers/assistantController');
@@ -61,7 +75,7 @@ const runGemini429ToMockFallbackSmoke = async () => {
             const response = normalizeAssistantResponse(await handleAssistantChat({
                 message: 'nasılsın',
                 history: [],
-                context: { selectedMode: 'friendly' }
+                modeId: 'friendly'
             }));
 
             assert.equal(response.requiresConfirmation, false);
@@ -122,6 +136,7 @@ const runMalformedToolArgumentsSmoke = async () => {
                 systemPrompt: 'NovaBot smoke test',
                 userMessage: 'telefon öner',
                 history: [],
+                allowedToolNames: ['search_products'],
                 executeTool: async (_name, args) => {
                     seenArgs = args;
                     return {
@@ -138,9 +153,65 @@ const runMalformedToolArgumentsSmoke = async () => {
     });
 };
 
+const runUnlistedProviderToolBlockedSmoke = async () => {
+    await withEnv({
+        OPENAI_API_KEY: 'smoke-test-key'
+    }, async () => {
+        let fetchCount = 0;
+        let executeCount = 0;
+
+        await withFetch(async () => {
+            fetchCount += 1;
+            if (fetchCount === 1) {
+                return createJsonResponse({
+                    choices: [{
+                        message: {
+                            role: 'assistant',
+                            content: null,
+                            tool_calls: [{
+                                id: 'call_blocked_1',
+                                type: 'function',
+                                function: {
+                                    name: 'internal_admin_tool',
+                                    arguments: '{definitely-not-json}'
+                                }
+                            }]
+                        }
+                    }]
+                });
+            }
+
+            return createJsonResponse({
+                choices: [{
+                    message: {
+                        role: 'assistant',
+                        content: 'Güvenli araç sınırı korundu.'
+                    }
+                }]
+            });
+        }, async () => {
+            const provider = new OpenAIProvider();
+            const result = await provider.runAgent({
+                systemPrompt: 'NovaBot smoke test',
+                userMessage: 'yetkisiz araç çağır',
+                history: [],
+                allowedToolNames: ['search_products'],
+                executeTool: async () => {
+                    executeCount += 1;
+                    return { output: 'unexpected' };
+                }
+            });
+
+            assert.equal(executeCount, 0);
+            assert.match(result.text, /araç sınırı/i);
+        });
+    });
+};
+
 (async () => {
     await runGemini429ToMockFallbackSmoke();
     await runMalformedToolArgumentsSmoke();
+    await runUnlistedProviderToolBlockedSmoke();
     console.log('novabot fallback smoke passed');
 })().catch((err) => {
     console.error(err);
