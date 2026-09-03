@@ -585,13 +585,24 @@ public class NativeShellInstrumentedTest {
             );
             Thread.sleep(300);
             JSONObject before = evaluateJson(scenario,
-                "(() => {const app=document.querySelector('[data-testid=calibration-app]');return {" +
+                "(() => {const app=document.querySelector('[data-testid=calibration-app]');const mode=app?.querySelector('[data-testid=novabot-mode-control]')?.getBoundingClientRect();" +
+                    "const reset=app?.querySelector('[data-testid=novabot-conversation-reset]')?.getBoundingClientRect();" +
+                    "const header=app?.querySelector('.native-chat-card>header')?.getBoundingClientRect();const messages=app?.querySelector('.native-chat-card>.messages')?.getBoundingClientRect();const text=app?.innerText||'';return {" +
                     "cal:app?.dataset.calId||'',legacy:(app?.innerText||'').includes('Seni canlı destek sırasına aldım.')," +
-                    "button:!!app?.querySelector('.escalate')};})()"
+                    "button:!!app?.querySelector('.escalate'),mode:!!mode,modeInHeader:!!mode&&!!header&&mode.right<=header.right+1&&mode.bottom<=header.bottom+1," +
+                    "reset:!!reset,resetTarget:!!reset&&reset.width>=44&&reset.height>=44,resetInHeader:!!reset&&!!header&&reset.right<=header.right+1&&reset.bottom<=header.bottom+1," +
+                    "headerClear:!!header&&!!messages&&messages.top>=header.bottom-1,rawProvider:/ADVANCED_PROVIDER|GEMINI|API_KEY|billing/i.test(text)};})()"
             );
             assertEquals("CAL-12", before.getString("cal"));
             assertFalse(before.getBoolean("legacy"));
             assertTrue(before.getBoolean("button"));
+            assertTrue(before.getBoolean("mode"));
+            assertTrue(before.getBoolean("modeInHeader"));
+            assertTrue(before.getBoolean("reset"));
+            assertTrue(before.getBoolean("resetTarget"));
+            assertTrue(before.getBoolean("resetInHeader"));
+            assertTrue(before.getBoolean("headerClear"));
+            assertFalse(before.getBoolean("rawProvider"));
 
             evaluate(scenario, "document.querySelector('.escalate')?.click();true");
             Thread.sleep(200);

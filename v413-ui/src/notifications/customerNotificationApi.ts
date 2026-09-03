@@ -51,7 +51,7 @@ function suspendCustomerVerification() {
   }
 }
 
-type NativeApiResponse = Readonly<{ status: number; payload: unknown }>;
+type NativeApiResponse = Readonly<{ status: number; payload: unknown; retryAfterSeconds?: number }>;
 type NativeNotificationCapability = Readonly<{
   providerConfigured: boolean;
   notificationsEnabled: boolean;
@@ -80,6 +80,7 @@ const EXACT_RULES = new Map<string, ReadonlySet<string>>([
   ["/api/campaigns/coupons/active", new Set(["GET"])],
   ["/api/favorites", new Set(["GET"])],
   ["/api/store-follows", new Set(["GET"])],
+  ["/api/assistant/capability", new Set(["GET"])],
   ["/api/assistant/chat", new Set(["POST"])],
   ["/api/payments/capability", new Set(["GET"])],
   ["/api/payments/agreements/preview", new Set(["POST"])],
@@ -115,12 +116,19 @@ const REQUEST_TIMEOUT_MS = 10_000;
 export class CustomerNotificationApiError extends Error {
   readonly status: number;
   readonly code: string;
+  readonly retryAfterSeconds: number | null;
 
-  constructor(message: string, status = 0, code = "CUSTOMER_NOTIFICATION_REQUEST_FAILED") {
+  constructor(
+    message: string,
+    status = 0,
+    code = "CUSTOMER_NOTIFICATION_REQUEST_FAILED",
+    retryAfterSeconds: number | null = null,
+  ) {
     super(message);
     this.name = "CustomerNotificationApiError";
     this.status = status;
     this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -202,13 +210,20 @@ function customerToken(required = true) {
   return token;
 }
 
-function responseError(status: number, payload: unknown) {
+function responseError(status: number, payload: unknown, retryAfterSeconds: number | null = null) {
   const source = payload && typeof payload === "object" && !Array.isArray(payload)
     ? payload as Record<string, unknown>
     : {};
   const message = typeof source.error === "string" ? source.error : "Bildirim işlemi tamamlanamadı.";
   const code = typeof source.code === "string" ? source.code : `CUSTOMER_NOTIFICATION_HTTP_${status}`;
-  return new CustomerNotificationApiError(message, status, code);
+  return new CustomerNotificationApiError(message, status, code, retryAfterSeconds);
+}
+
+function normalizeRetryAfterSeconds(value: unknown) {
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= 86_400) return value;
+  if (typeof value !== "string" || !/^\d{1,5}$/u.test(value)) return null;
+  const seconds = Number(value);
+  return Number.isSafeInteger(seconds) && seconds >= 1 && seconds <= 86_400 ? seconds : null;
 }
 
 async function readResponse(response: Response) {
@@ -223,11 +238,12 @@ async function readResponse(response: Response) {
 }
 
 type NormalizedRequest = Readonly<{ path: string; method: string }>;
-type TransportResult = Readonly<{ status: number; payload: unknown }>;
+type TransportResult = Readonly<{ status: number; payload: unknown; retryAfterSeconds: number | null }>;
 
 async function transportCustomerApi(normalized: NormalizedRequest, body: Record<string, unknown> | undefined, token: string): Promise<TransportResult> {
   let status: number;
   let payload: unknown;
+  let retryAfterSeconds: number | null = null;
   if (Capacitor.isNativePlatform()) {
     try {
       const result = await NovaNotificationApi.request({
@@ -238,6 +254,7 @@ async function transportCustomerApi(normalized: NormalizedRequest, body: Record<
       });
       status = Number(result.status);
       payload = result.payload;
+      retryAfterSeconds = normalizeRetryAfterSeconds(result.retryAfterSeconds);
     } catch {
       throw new CustomerNotificationApiError("NovaStore bildirim sunucusuna bağlanılamadı.", 0, "CUSTOMER_NOTIFICATION_NETWORK_ERROR");
     }
@@ -265,11 +282,12 @@ async function transportCustomerApi(normalized: NormalizedRequest, body: Record<
     }
     status = response.status;
     payload = await readResponse(response);
+    retryAfterSeconds = normalizeRetryAfterSeconds(response.headers.get("retry-after"));
   }
   if (!Number.isSafeInteger(status) || status < 100 || status > 599) {
     throw new CustomerNotificationApiError("Bildirim API durum kodu geçersiz.", 0, "CUSTOMER_NOTIFICATION_RESPONSE_INVALID");
   }
-  return Object.freeze({ status, payload });
+  return Object.freeze({ status, payload, retryAfterSeconds });
 }
 
 function successful(result: TransportResult) {
@@ -301,7 +319,7 @@ function loginSession(value: Record<string, unknown>) {
 }
 
 async function rejectRefresh(result: TransportResult, expectedGeneration: number): Promise<never> {
-  const error = responseError(result.status, result.payload);
+  const error = responseError(result.status, result.payload, result.retryAfterSeconds);
   if ([400, 401, 403].includes(result.status)) {
     await clearCustomerSession(expectedGeneration);
   } else if (
@@ -412,7 +430,7 @@ async function authenticatedRequest(
     }
     return result.payload;
   }
-  if (result.status !== 401) throw responseError(result.status, result.payload);
+  if (result.status !== 401) throw responseError(result.status, result.payload, result.retryAfterSeconds);
 
   const current = currentCustomerSessionState();
   if (current.generation !== used.generation) {
@@ -420,14 +438,14 @@ async function authenticatedRequest(
       throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
     }
     if (retryCount < 1 && current.session) return authenticatedRequest(normalized, body, false, retryCount + 1, guard);
-    throw responseError(result.status, result.payload);
+    throw responseError(result.status, result.payload, result.retryAfterSeconds);
   }
   if (allowRefresh && retryCount === 0 && customerSessionCanRefresh(used.session)) {
     await refreshCustomerSession(used.generation);
     return authenticatedRequest(normalized, body, false, retryCount + 1, guard);
   }
   await clearCustomerSession(used.generation);
-  throw responseError(result.status, result.payload);
+  throw responseError(result.status, result.payload, result.retryAfterSeconds);
 }
 
 async function requestCustomerApiInternal(
@@ -439,6 +457,9 @@ async function requestCustomerApiInternal(
   guard?: CustomerSessionGuard,
 ) {
   await initializeCustomerSession();
+  if (guard && !sessionStateMatchesGuard(currentCustomerSessionState(), guard)) {
+    throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
+  }
   const normalized = requestRule(path, method);
   if (normalized.path === "/api/users/refresh") {
     throw new CustomerNotificationApiError("Yenileme işlemi yalnız oturum yöneticisi tarafından çağrılabilir.", 0, "CUSTOMER_REFRESH_DIRECT_CALL_FORBIDDEN");
@@ -451,12 +472,21 @@ async function requestCustomerApiInternal(
     return authenticatedRequest(normalized, body, allowRefresh, 0, operationGuard);
   }
   const result = await transportCustomerApi(normalized, body, "");
-  if (!successful(result)) throw responseError(result.status, result.payload);
+  if (guard && !sessionStateMatchesGuard(currentCustomerSessionState(), guard)) {
+    throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
+  }
+  if (!successful(result)) throw responseError(result.status, result.payload, result.retryAfterSeconds);
   return result.payload;
 }
 
-export async function requestCustomerApi(path: string, method = "GET", body?: Record<string, unknown>, authenticated = true) {
-  return requestCustomerApiInternal(path, method, body, authenticated, true);
+export async function requestCustomerApi(
+  path: string,
+  method = "GET",
+  body?: Record<string, unknown>,
+  authenticated = true,
+  guard?: CustomerSessionGuard,
+) {
+  return requestCustomerApiInternal(path, method, body, authenticated, true, guard);
 }
 
 const request = requestCustomerApi;
@@ -755,5 +785,6 @@ export const customerNotificationApiTestUtils = Object.freeze({
   loginSession,
   refreshResponse,
   requestRule,
+  normalizeRetryAfterSeconds,
   validUser,
 });

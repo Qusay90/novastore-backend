@@ -97,6 +97,7 @@ test("R11-R4 native Account and NovaBot transport allowlists stay exact", () => 
     ["/api/store-follows/nova-audio", "POST"],
     ["/api/store-follows/nova-audio", "DELETE"],
     [`/api/store-follows/${"a".repeat(160)}`, "GET"],
+    ["/api/assistant/capability", "GET"],
     ["/api/assistant/chat", "POST"],
   ]) expect(requestRule(path, method)).toEqual({ path, method });
 
@@ -114,6 +115,8 @@ test("R11-R4 native Account and NovaBot transport allowlists stay exact", () => 
     [`/api/store-follows/${"a".repeat(161)}`, "GET"],
     ["/api/store-follows/nova%2Faudio", "GET"],
     ["/api/assistant/chat?debug=1", "POST"],
+    ["/api/assistant/capability?debug=1", "GET"],
+    ["/api/assistant/capability", "POST"],
     ["/api/assistant/escalate", "POST"],
   ]) expect(() => requestRule(path, method)).toThrow();
 });
@@ -122,32 +125,34 @@ test("R11-R4 NovaBot request and response contracts reject fallback or unbounded
   const request = customerNovaBotApiTestUtils.normalizeRequest({
     message: " Siparişimi takip et ",
     history: [{ role: "assistant", message: "Nasıl yardımcı olabilirim?" }],
-    selectedMode: "friendly",
-  });
+    modeId: "friendly",
+  }, ["friendly"]);
   expect(request).toEqual({
     message: "Siparişimi takip et",
     history: [{ role: "assistant", message: "Nasıl yardımcı olabilirim?" }],
-    context: { selectedMode: "friendly" },
+    modeId: "friendly",
   });
   expect(customerNovaBotApiTestUtils.normalizeResponse({
-    reply: "Siparişlerim ekranını açabilirsin.", mode: "friendly", suggestions: ["Siparişlerime git"], products: [], cards: [],
-    availableModes: [{ id: "friendly", title: "Samimi Mod", description: "Sıcak ve anlaşılır şekilde yardımcı olayım." }],
-  })).toMatchObject({
+    reply: "Siparişlerim ekranını açabilirsin.", modeId: "friendly", mode: "friendly", suggestions: ["Siparişlerime git"], products: [], cards: [],
+    availableModes: [{ id: "friendly", label: "Samimi Mod", description: "Sıcak ve anlaşılır şekilde yardımcı olayım." }],
+  }, "friendly")).toMatchObject({
     reply: "Siparişlerim ekranını açabilirsin.",
+    modeId: "friendly",
     suggestions: ["Siparişlerime git"],
-    availableModes: [{ id: "friendly", title: "Samimi Mod" }],
+    availableModes: [{ id: "friendly", label: "Samimi Mod" }],
   });
   expect(() => customerNovaBotApiTestUtils.normalizeRequest({ message: "x".repeat(2001) })).toThrow();
+  expect(() => customerNovaBotApiTestUtils.normalizeRequest({ message: "Yanıt", modeId: "friendly" }, [])).toThrow();
   expect(() => customerNovaBotApiTestUtils.normalizeResponse({ suggestions: [] })).toThrow();
   expect(() => customerNovaBotApiTestUtils.normalizeResponse({
-    reply: "Yanıt", mode: "friendly",
-    availableModes: [{ id: "buddy", title: "Kanka Modu", description: "Kanka gibi yardımcı olayım." }],
+    reply: "Yanıt", modeId: "friendly", mode: "buddy",
   })).toThrow();
+  expect(() => customerNovaBotApiTestUtils.normalizeResponse({ reply: "Yanıt", modeId: "friendly" }, "technical")).toThrow();
   expect(() => customerNovaBotApiTestUtils.normalizeResponse({
     reply: "Yanıt",
     availableModes: [
-      { id: "friendly", title: "Samimi Mod", description: "Sıcak ve anlaşılır." },
-      { id: "friendly", title: "Sahte tekrar", description: "Tekrar." },
+      { id: "friendly", label: "Samimi Mod", description: "Sıcak ve anlaşılır." },
+      { id: "friendly", label: "Sahte tekrar", description: "Tekrar." },
     ],
   })).toThrow();
 });

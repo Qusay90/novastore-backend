@@ -51,6 +51,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
         "/api/campaigns/coupons/active",
         "/api/favorites",
         "/api/store-follows",
+        "/api/assistant/capability",
         "/api/payments/capability",
         "/api/payments/status",
         "/api/returns/mine",
@@ -90,6 +91,9 @@ public final class NovaNotificationApiPlugin extends Plugin {
         "/api/auth/forgot-password",
         "/api/auth/reset-password"
     );
+    private static final Set<String> UNAUTHENTICATED_GET = immutableSet(
+        "/api/assistant/capability"
+    );
     private static final Set<String> OPTIONAL_AUTHENTICATION_POST = immutableSet(
         "/api/assistant/chat"
     );
@@ -113,7 +117,8 @@ public final class NovaNotificationApiPlugin extends Plugin {
             call.reject("CUSTOMER_SESSION_INVALID");
             return;
         }
-        boolean authenticated = !("POST".equals(method) && (UNAUTHENTICATED_POST.contains(path) || optionalAuthentication));
+        boolean publicGet = "GET".equals(method) && UNAUTHENTICATED_GET.contains(path);
+        boolean authenticated = !(publicGet || ("POST".equals(method) && (UNAUTHENTICATED_POST.contains(path) || optionalAuthentication)));
         if (authenticated && token == null) {
             call.reject("CUSTOMER_SESSION_MISSING");
             return;
@@ -127,7 +132,8 @@ public final class NovaNotificationApiPlugin extends Plugin {
             call.reject("CUSTOMER_NOTIFICATION_BODY_FORBIDDEN");
             return;
         }
-        getBridge().execute(() -> execute(call, path, method, token, body));
+        String requestToken = publicGet ? null : token;
+        getBridge().execute(() -> execute(call, path, method, requestToken, body));
     }
 
     @PluginMethod
@@ -209,6 +215,8 @@ public final class NovaNotificationApiPlugin extends Plugin {
             JSObject result = new JSObject();
             result.put("status", status);
             result.put("payload", responseBody.isEmpty() ? new JSObject() : new JSONTokener(responseBody).nextValue());
+            Integer retryAfterSeconds = canonicalRetryAfterSeconds(connection.getHeaderField("Retry-After"));
+            if (retryAfterSeconds != null) result.put("retryAfterSeconds", retryAfterSeconds);
             call.resolve(result);
         } catch (IOException | JSONException | IllegalArgumentException failure) {
             call.reject("CUSTOMER_NOTIFICATION_REQUEST_FAILED");
@@ -312,6 +320,21 @@ public final class NovaNotificationApiPlugin extends Plugin {
 
     static boolean optionalAuthentication(String path, String method) {
         return "POST".equals(method) && OPTIONAL_AUTHENTICATION_POST.contains(path);
+    }
+
+    static boolean unauthenticated(String path, String method) {
+        return ("GET".equals(method) && UNAUTHENTICATED_GET.contains(path))
+            || ("POST".equals(method) && UNAUTHENTICATED_POST.contains(path));
+    }
+
+    static Integer canonicalRetryAfterSeconds(String value) {
+        if (value == null || !value.matches("^[1-9][0-9]{0,4}$")) return null;
+        try {
+            int seconds = Integer.parseInt(value);
+            return seconds <= 86_400 ? seconds : null;
+        } catch (NumberFormatException failure) {
+            return null;
+        }
     }
 
     static boolean validRefreshBody(JSObject body) {

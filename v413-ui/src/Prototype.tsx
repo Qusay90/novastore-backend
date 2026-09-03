@@ -64,7 +64,13 @@ import { hasAppOwnedBackEntry, nativeHistoryDepth } from "./native/nativeNavigat
 import { canonicalNativeRoute, canonicalNativeRouteOrSafeDefault } from "./native/routeContract";
 import { useCustomerAccountRuntime, type CustomerAddressInput, type CustomerOrder } from "./account";
 import { useCustomerStoreFollowRuntime } from "./account/useCustomerStoreFollowRuntime";
-import { sendCustomerNovaBotMessage } from "./assistant/customerNovaBotApi";
+import {
+  describeCustomerNovaBotFailure,
+  fetchCustomerNovaBotCapability,
+  resolveCustomerNovaBotModeId,
+  sendCustomerNovaBotMessage,
+  type CustomerNovaBotCapability,
+} from "./assistant/customerNovaBotApi";
 import {
   ensureNovaBotComposerVisible,
   GlobalNovaBotLauncher,
@@ -86,6 +92,8 @@ import {
 import { CheckoutLegalConsent } from "./checkout/CheckoutLegalConsent";
 import {
   CustomerNotificationApiError,
+  currentCustomerSessionGuard,
+  customerSessionMatchesGuard,
   normalizeCustomerNotificationTarget,
   resolveCustomerNotificationDestination,
   useCustomerNotificationRuntime,
@@ -3460,7 +3468,9 @@ function SupportSubpage({ go, view }: { go: Go; view: "faq" | "history" | "live"
 
 type ChatMessage = { id: number; from: "bot" | "user"; text: string; time: string; delivery?: "pending" | "sent" | "failed" };
 type NovaBotConnectionState = "unverified" | "checking" | "ready" | "error";
+type NovaBotCapabilityState = "loading" | "ready" | "error";
 const DEFAULT_NOVABOT_SUGGESTIONS = Object.freeze(["Siparişimi takip et", "İade ve değişim", "Ödeme sorunu"]);
+let runtimeNovaBotRetryUntil = 0;
 
 function createInitialNovaBotMessages(): ChatMessage[] {
   return [{ id: 1, from: "bot", text: "Merhaba! Sana nasıl yardımcı olabilirim?", time: "12:04 · İletildi", delivery: "sent" }];
@@ -3477,6 +3487,11 @@ function NovaBotScreen({ go }: { go: Go }) {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
   const [connectionState, setConnectionState] = useState<NovaBotConnectionState>("unverified");
+  const [capabilityState, setCapabilityState] = useState<NovaBotCapabilityState>("loading");
+  const [capability, setCapability] = useState<CustomerNovaBotCapability | null>(null);
+  const [selectedModeId, setSelectedModeId] = useState<string | null>(null);
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const [retryUntil, setRetryUntil] = useState(() => runtimeNovaBotRetryUntil > Date.now() ? runtimeNovaBotRetryUntil : 0);
   const [nativeSuggestions, setNativeSuggestions] = useState<readonly string[]>(DEFAULT_NOVABOT_SUGGESTIONS);
   const [messages, setMessages] = useState<ChatMessage[]>(createInitialNovaBotMessages);
   const conversationGeneration = useRef(0);
@@ -3488,6 +3503,42 @@ function NovaBotScreen({ go }: { go: Go }) {
     window.requestAnimationFrame(() => ensureNovaBotComposerVisible(composerRef.current));
     window.setTimeout(() => ensureNovaBotComposerVisible(composerRef.current), 280);
   }, []);
+
+  const refreshCapability = useCallback(async (operationGeneration: number) => {
+    setCapabilityState("loading");
+    try {
+      const nextCapability = await fetchCustomerNovaBotCapability();
+      if (operationGeneration !== conversationGeneration.current) return null;
+      setCapability(nextCapability);
+      setSelectedModeId((current) => resolveCustomerNovaBotModeId(nextCapability, current));
+      setModeMenuOpen(false);
+      setCapabilityState("ready");
+      return nextCapability;
+    } catch {
+      if (operationGeneration !== conversationGeneration.current) return null;
+      setCapability(null);
+      setSelectedModeId(null);
+      setModeMenuOpen(false);
+      setCapabilityState("error");
+      return null;
+    }
+  }, []);
+
+  const resetConversation = useCallback(() => {
+    const nextGeneration = ++conversationGeneration.current;
+    setMessage("");
+    setLiveRequested(false);
+    setAttachment(null);
+    setSending(false);
+    setSendError("");
+    setConnectionState("unverified");
+    setCapability(null);
+    setSelectedModeId(null);
+    setModeMenuOpen(false);
+    setNativeSuggestions(DEFAULT_NOVABOT_SUGGESTIONS);
+    setMessages(createInitialNovaBotMessages());
+    void refreshCapability(nextGeneration);
+  }, [refreshCapability]);
 
   useLayoutEffect(() => {
     const list = messagesRef.current;
@@ -3503,27 +3554,64 @@ function NovaBotScreen({ go }: { go: Go }) {
   }, [revealComposer]);
 
   useEffect(() => {
+    if (!NATIVE_SHELL) return;
+    const operationGeneration = conversationGeneration.current;
+    void refreshCapability(operationGeneration);
+    return () => { ++conversationGeneration.current; };
+  }, [refreshCapability]);
+
+  useEffect(() => {
+    const remaining = retryUntil - Date.now();
+    if (remaining <= 0) return;
+    const timeout = window.setTimeout(() => {
+      runtimeNovaBotRetryUntil = 0;
+      setRetryUntil(0);
+    }, remaining);
+    return () => window.clearTimeout(timeout);
+  }, [retryUntil]);
+
+  useEffect(() => {
+    if (!NATIVE_SHELL) return;
+    const handleAuthEpoch = () => {
+      previousSessionIdentity.current = "guest";
+      resetConversation();
+    };
+    const events = ["novastore:auth-required", "novastore:auth-unverified"];
+    events.forEach((eventName) => window.addEventListener(eventName, handleAuthEpoch));
+    return () => events.forEach((eventName) => window.removeEventListener(eventName, handleAuthEpoch));
+  }, [resetConversation]);
+
+  useEffect(() => {
     if (!NATIVE_SHELL || previousSessionIdentity.current === sessionIdentity) return;
     previousSessionIdentity.current = sessionIdentity;
-    ++conversationGeneration.current;
-    setMessage("");
-    setSending(false);
-    setSendError("");
-    setConnectionState("unverified");
-    setNativeSuggestions(DEFAULT_NOVABOT_SUGGESTIONS);
-    setMessages(createInitialNovaBotMessages());
-  }, [sessionIdentity]);
+    resetConversation();
+  }, [resetConversation, sessionIdentity]);
 
   if (NATIVE_SHELL) {
     const sendNativeMessage = async (text: string) => {
       const clean = text.trim();
       if (!clean || sending) return;
+      if (retryUntil > Date.now()) {
+        setMessage((current) => current.trim() ? current : clean);
+        setSendError("NovaBot mesaj sınırı için bekleme sürüyor. Mesajın korundu; süre dolunca yeniden dene.");
+        return;
+      }
+      const allowedModeIds = capability?.modes.map((mode) => mode.id) ?? [];
+      const requestedModeId = selectedModeId && allowedModeIds.includes(selectedModeId) ? selectedModeId : null;
+      if (!requestedModeId) {
+        setMessage((current) => current.trim() ? current : clean);
+        setSendError(capabilityState === "loading"
+          ? "Sohbet modu hazırlanıyor. Mesajın korundu; birkaç saniye sonra yeniden dene."
+          : "Sohbet modu doğrulanamadı. Mesajın korundu; mod bilgisini yenileyip yeniden dene.");
+        return;
+      }
       const history = messages
         .filter((item) => item.delivery !== "pending" && item.delivery !== "failed")
         .slice(-10)
         .map((item) => ({ role: item.from === "user" ? "user" as const : "assistant" as const, message: item.text }));
       const id = Date.now();
       const operationGeneration = conversationGeneration.current;
+      const operationSession = currentCustomerSessionGuard();
       setSendError("");
       setNativeSuggestions([]);
       setConnectionState("checking");
@@ -3531,22 +3619,28 @@ function NovaBotScreen({ go }: { go: Go }) {
       setMessage("");
       setMessages((current) => [...current, { id, from: "user", text: clean, time: "Şimdi · Gönderiliyor", delivery: "pending" }]);
       try {
-        const reply = await sendCustomerNovaBotMessage({ message: clean, history });
-        if (operationGeneration !== conversationGeneration.current) return;
+        const reply = await sendCustomerNovaBotMessage({ message: clean, history, modeId: requestedModeId }, allowedModeIds, operationSession);
+        if (operationGeneration !== conversationGeneration.current || !customerSessionMatchesGuard(operationSession)) return;
         setMessages((current) => [
           ...current.map((item) => item.id === id ? { ...item, time: "Şimdi · Gönderildi", delivery: "sent" as const } : item),
           { id: id + 1, from: "bot", text: reply.reply, time: "Şimdi · İletildi", delivery: "sent" },
         ]);
         setNativeSuggestions(reply.suggestions);
         setConnectionState("ready");
-      } catch {
-        if (operationGeneration !== conversationGeneration.current) return;
+      } catch (error) {
+        if (operationGeneration !== conversationGeneration.current || !customerSessionMatchesGuard(operationSession)) return;
+        const failure = describeCustomerNovaBotFailure(error);
         setMessages((current) => current.map((item) => item.id === id ? { ...item, time: "Şimdi · Gönderilemedi", delivery: "failed" as const } : item));
         setMessage((current) => current.trim() ? current : clean);
-        setSendError("Mesaj gönderilemedi. Mesajın giriş alanına geri getirildi; bağlantını kontrol edip yeniden dene.");
+        setSendError(failure.message);
+        if (failure.retryAfterSeconds) {
+          runtimeNovaBotRetryUntil = Math.max(runtimeNovaBotRetryUntil, Date.now() + failure.retryAfterSeconds * 1_000);
+          setRetryUntil(runtimeNovaBotRetryUntil);
+        }
         setConnectionState("error");
+        if (failure.refreshCapability) await refreshCapability(operationGeneration);
       } finally {
-        if (operationGeneration === conversationGeneration.current) setSending(false);
+        if (operationGeneration === conversationGeneration.current && customerSessionMatchesGuard(operationSession)) setSending(false);
       }
     };
     const connectionCopy = connectionState === "checking"
@@ -3556,13 +3650,19 @@ function NovaBotScreen({ go }: { go: Go }) {
         : connectionState === "error"
           ? "PC1 bağlantısı doğrulanamadı"
           : "Bağlantı ilk mesajda doğrulanır";
+    const selectedMode = capability?.modes.find((mode) => mode.id === selectedModeId) ?? null;
+    const modeSwitchingAvailable = capability?.modeSelectionAvailable === true && capability.modes.length > 1;
+    const modeRetryAvailable = capabilityState === "error" || (capabilityState === "ready" && !selectedMode);
+    const modeStaticLabel = capabilityState === "loading" ? "Hazırlanıyor" : selectedMode?.label ?? "Şu anda kullanılamıyor";
+    const rateLimited = retryUntil > Date.now();
     return <div className="root-layout novabot-layout">
       <div className="support-heading novabot-heading"><div><h1>Destek</h1></div><button type="button" onClick={() => go("CAL-11", "support", "history")}><ClockIcon /><span>Geçmiş</span></button></div>
       <section className={`chat-card native-chat-card${messages.length > 1 ? " active-conversation" : ""}`} aria-busy={sending || undefined}>
-        <header><span className="novabot-art"><img src={NOVABOT} alt="NovaBot resmi simgesi" /></span><div><h1>NovaBot</h1><p className={`novabot-connection ${connectionState}`} data-testid="novabot-connection-state" data-state={connectionState}><i /> {connectionCopy}</p></div></header>
+        <header><span className="novabot-art"><img src={NOVABOT} alt="NovaBot resmi simgesi" /></span><div className="novabot-header-copy"><h1>NovaBot</h1><p className={`novabot-connection ${connectionState}`} data-testid="novabot-connection-state" data-state={connectionState}><i /> {connectionCopy}</p><div className="novabot-mode-control" data-testid="novabot-mode-control" data-capability-state={capabilityState}>{modeSwitchingAvailable && selectedMode ? <button className="novabot-mode-trigger" type="button" aria-haspopup="listbox" aria-expanded={modeMenuOpen} onClick={() => setModeMenuOpen((open) => !open)}><MixerHorizontalIcon /><span><small>Sohbet Modu</small><b>{selectedMode.label}</b></span></button> : modeRetryAvailable ? <button className="novabot-mode-trigger retry" type="button" onClick={() => void refreshCapability(conversationGeneration.current)}><ReloadIcon /><span><small>Sohbet Modu</small><b>{capabilityState === "error" ? "Modları yenile" : "Tekrar dene"}</b></span></button> : <span className="novabot-mode-static" role="status"><MixerHorizontalIcon /><span><small>Sohbet Modu</small><b>{modeStaticLabel}</b></span></span>}</div></div><button className="novabot-conversation-reset" data-testid="novabot-conversation-reset" type="button" aria-label="Yeni sohbet başlat" title="Yeni sohbet" onClick={resetConversation}><ReloadIcon /></button></header>
+        {modeMenuOpen && modeSwitchingAvailable && capability && <div className="novabot-mode-menu" role="listbox" aria-label="NovaBot sohbet modları">{capability.modes.map((mode) => <button type="button" role="option" aria-selected={mode.id === selectedModeId} key={mode.id} onClick={() => { setSelectedModeId(mode.id); setModeMenuOpen(false); }}><span><b>{mode.label}</b><small>{mode.description}</small></span>{mode.id === selectedModeId && <CheckIcon />}</button>)}</div>}
         <div ref={messagesRef} className="messages" data-scroll-drag="ignore" aria-live="polite">{messages.map((item) => <div className={`message ${item.from}${item.delivery ? ` ${item.delivery}` : ""}`} key={item.id}>{item.from === "bot" && <span className="novabot-art small"><img src={NOVABOT} alt="" /></span>}<div><p>{item.text}</p><small>{item.time}</small></div></div>)}{sending && <div className="message bot novabot-pending" role="status"><span className="novabot-art small"><img src={NOVABOT} alt="" /></span><div><p>NovaBot yanıt hazırlıyor…</p></div></div>}{sendError && <div className="novabot-inline-error" data-testid="novabot-send-error" role="alert"><ReloadIcon /><p>{sendError}</p></div>}</div>
-        <div className="suggestion-row" aria-label="NovaBot önerileri">{nativeSuggestions.map((suggestion, index) => <button type="button" disabled={sending} onClick={() => void sendNativeMessage(suggestion)} key={`${suggestion}:${index}`}>{suggestion}</button>)}</div>
-        <form ref={composerRef} className="composer native-composer" onFocusCapture={revealComposer} onSubmit={(event) => { event.preventDefault(); void sendNativeMessage(message); }}><KeyboardInput aria-label="NovaBot mesajı" placeholder="Mesajını yaz..." value={message} maxLength={2000} disabled={sending} onChange={(event) => setMessage(event.target.value)} /><button type="submit" aria-label="Mesajı gönder" disabled={sending || !message.trim()}><PaperPlaneIcon /></button></form>
+        <div className="suggestion-row" aria-label="NovaBot önerileri">{nativeSuggestions.map((suggestion, index) => <button type="button" disabled={sending || rateLimited || !selectedMode} onClick={() => void sendNativeMessage(suggestion)} key={`${suggestion}:${index}`}>{suggestion}</button>)}</div>
+        <form ref={composerRef} className="composer native-composer" onFocusCapture={revealComposer} onSubmit={(event) => { event.preventDefault(); void sendNativeMessage(message); }}><KeyboardInput aria-label="NovaBot mesajı" placeholder="Mesajını yaz..." value={message} maxLength={2000} disabled={sending} onChange={(event) => setMessage(event.target.value)} /><button type="submit" aria-label="Mesajı gönder" disabled={sending || rateLimited || !selectedMode || !message.trim()}><PaperPlaneIcon /></button></form>
         <button className="escalate" type="button" onClick={() => go("CAL-11", "support", "live")}><PersonIcon /> Destek mesajlarına geç <ArrowRightIcon /></button>
         <p className="handoff-copy">Gerçek destek mesajların mevcut PC1 destek kanalında tutulur.</p>
       </section>
