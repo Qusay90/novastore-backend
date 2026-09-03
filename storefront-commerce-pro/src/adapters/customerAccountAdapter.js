@@ -343,11 +343,12 @@ export function createCustomerAccountAdapter({
 
   const saveSession = (payload) => {
     const token = asTrimmedString(payload?.token);
+    const sessionId = asTrimmedString(payload?.sessionId) || null;
     const user = normalizeCustomerUser(payload?.user);
     if (!token || !user) throw new Error("Giriş yanıtında doğrulanmış müşteri oturumu bulunamadı.");
     storage?.setItem?.(TOKEN_KEY, token);
     storage?.setItem?.(USER_KEY, JSON.stringify(user));
-    return Object.freeze({ status: "authenticated", user, warning: null });
+    return Object.freeze({ status: "authenticated", sessionId, user, warning: null });
   };
 
   const login = async ({ email, password }, options = {}) => {
@@ -371,6 +372,14 @@ export function createCustomerAccountAdapter({
       signal: options.signal,
     },
   );
+
+  const getProfile = async (options = {}) => {
+    const payload = await http.request("/api/users/me", { signal: options.signal });
+    const user = normalizeCustomerUser(payload?.user || payload);
+    if (!user) throw new Error("Profil yanıtı doğrulanamadı.");
+    storage?.setItem?.(USER_KEY, JSON.stringify(user));
+    return user;
+  };
 
   const forgotPassword = async (email, options = {}) => http.request("/api/auth/forgot-password", {
     method: "POST",
@@ -651,6 +660,7 @@ export function createCustomerAccountAdapter({
     register,
     forgotPassword,
     resetPassword,
+    getProfile,
     updateProfile,
     changePassword,
     logout,

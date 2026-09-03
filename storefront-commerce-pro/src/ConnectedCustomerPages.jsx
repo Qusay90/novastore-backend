@@ -40,6 +40,7 @@ import {
 } from "../../web-notifications/notificationClient.js";
 import turkeyLocations from "../../shared/turkiye-provinces-districts.v1.json";
 import { isCheckoutReviewBlocked, resolveCheckoutVisibleStep } from "./checkoutRouteGuard.js";
+import { NORMAL_LOGIN_DESTINATION, safeCustomerReturnPath } from "./customerAuthUx.js";
 
 const LOCAL_REVIEW_RUNTIME_ENABLED = __NOVASTORE_LOCAL_REVIEW_RUNTIME__;
 
@@ -73,12 +74,6 @@ const formatDate = (value, withTime = true) => {
 const errorMessage = (error, fallback = "İşlem tamamlanamadı.") => (
   error?.message || error?.payload?.error || fallback
 );
-
-const safeReturnPath = (value, fallback = "/hesabim") => {
-  const path = String(value || "").trim();
-  if (!path.startsWith("/") || path.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(path)) return fallback;
-  return path;
-};
 
 const safeTrackingUrl = (value) => {
   try {
@@ -170,7 +165,7 @@ export function CustomerAuthPage(props) {
   const {
     account,
     initialMode = "login",
-    returnPath = "/hesabim",
+    returnPath = NORMAL_LOGIN_DESTINATION,
     onAuthenticated,
   } = props;
   const [mode, setMode] = useState(initialMode === "register" ? "register" : "login");
@@ -206,7 +201,7 @@ export function CustomerAuthPage(props) {
         setMessage("Hesabın oluşturuldu. Şimdi güvenle giriş yapabilirsin.");
       } else {
         const session = await account.login({ email, password });
-        await onAuthenticated(session, safeReturnPath(returnPath));
+        await onAuthenticated(session, safeCustomerReturnPath(returnPath));
       }
     } catch (requestError) {
       setError(errorMessage(requestError, mode === "register" ? "Kayıt tamamlanamadı." : "Giriş tamamlanamadı."));
@@ -341,9 +336,17 @@ function CustomerOrderCard({ order, productById, getProductImage }) {
   return <article className="order-card connected-order-card"><div className="order-card__head"><span><strong>Sipariş No: {order.id}</strong><small>{formatDate(order.createdAt)}</small></span><span className={`status-pill is-${order.tone}`}>{order.status}</span><b>{money.format(order.total)}</b></div><div className="order-card__body"><div>{images.map((image) => image.src ? <img key={image.key} src={image.src} alt={image.name} /> : <span key={image.key} className="order-image-placeholder"><Package /></span>)}<span>{order.items.length} ürün</span></div><a href={`#/hesabim/siparisler/${order.id}`}>Sipariş detayları <CaretRight /></a></div>{order.statusNote && <p className="order-status-note">{order.statusNote}</p>}</article>;
 }
 
-function ProfileForm({ user, account, onUpdated, onNotice }) {
+function ProfileForm({ user, account, onUpdated, onNotice, focusOnMount = false }) {
   const [phase, setPhase] = useState("idle");
   const [error, setError] = useState("");
+  const formRef = useRef(null);
+  useEffect(() => {
+    if (!focusOnMount) return;
+    window.requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      formRef.current?.querySelector('input[name="fullName"]')?.focus({ preventScroll: true });
+    });
+  }, [focusOnMount]);
   const submit = async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -362,10 +365,10 @@ function ProfileForm({ user, account, onUpdated, onNotice }) {
       setPhase("idle");
     }
   };
-  return <form className="profile-editor connected-form" onSubmit={submit}><div className="profile-editor__head"><span><User /><strong>Profil bilgileri</strong><small>Ödeme ve teslimat iletişiminde kullanılacak temel bilgiler.</small></span></div>{error && <div className="form-message is-error" role="alert"><WarningCircle />{error}</div>}<div className="profile-editor__fields"><label>Ad soyad<input name="fullName" defaultValue={user.fullName} minLength="2" required /></label><label>E-posta<input value={user.email} readOnly aria-describedby="email-note" /><small id="email-note">E-posta bu ekrandan değiştirilemez.</small></label><label>Telefon<input name="phone" defaultValue={user.phone || ""} inputMode="numeric" autoComplete="tel" minLength="11" maxLength="11" pattern="05[0-9]{9}" placeholder="05xxxxxxxxx" /><small>11 haneli Türkiye cep telefonu: 05xxxxxxxxx</small></label></div><button className="primary-button" type="submit" disabled={phase === "submitting"}>{phase === "submitting" ? "Kaydediliyor…" : "Bilgilerimi kaydet"}</button></form>;
+  return <form ref={formRef} id="profil-bilgileri" className="profile-editor connected-form" onSubmit={submit}><div className="profile-editor__head"><span><User /><strong>Profil bilgileri</strong><small>Ödeme ve teslimat iletişiminde kullanılacak temel bilgiler.</small></span></div>{error && <div className="form-message is-error" role="alert"><WarningCircle />{error}</div>}<div className="profile-editor__fields"><label>Ad soyad<input name="fullName" defaultValue={user.fullName} minLength="2" required /></label><label>E-posta<input value={user.email} readOnly aria-describedby="email-note" /><small id="email-note">E-posta bu ekrandan değiştirilemez.</small></label><label>Telefon<input name="phone" defaultValue={user.phone || ""} inputMode="numeric" autoComplete="tel" minLength="11" maxLength="11" pattern="05[0-9]{9}" placeholder="05xxxxxxxxx" /><small>11 haneli Türkiye cep telefonu: 05xxxxxxxxx</small></label></div><button className="primary-button" type="submit" disabled={phase === "submitting"}>{phase === "submitting" ? "Kaydediliyor…" : "Bilgilerimi kaydet"}</button></form>;
 }
 
-function AccountOverview({ session, account, favoriteCount, onSessionUpdated, onNotice, productById, getProductImage }) {
+function AccountOverview({ session, account, favoriteCount, onSessionUpdated, onNotice, productById, getProductImage, focusProfile }) {
   const resource = useAsyncResource((options) => account.loadDashboard(session, options), [account, session]);
   if (resource.phase !== "ready") return <InlineState phase={resource.phase} error={resource.error} onRetry={resource.reload} />;
   const dashboard = resource.data;
@@ -374,7 +377,7 @@ function AccountOverview({ session, account, favoriteCount, onSessionUpdated, on
     <div className="commerce-heading"><div><span className="section-kicker">Hoş geldin</span><h1>{session.user.fullName ? `${session.user.fullName.split(/\s+/)[0]}, hesabın hazır.` : "Hesabın hazır."}</h1><p>Siparişlerini, adreslerini ve favorilerini tek yerden yönet.</p></div></div>
     {dashboard.warnings.length > 0 && <div className="form-message is-warning" role="status"><WarningCircle />Bazı hesap bölümleri şu anda alınamadı; erişilebilen bilgiler gösteriliyor.</div>}
     <div className="account-stats"><a href="#/hesabim/siparisler"><Receipt /><span><strong>{currentOrders.length}</strong><small>Aktif sipariş</small></span></a><a href="#/favoriler"><Heart /><span><strong>{favoriteCount}</strong><small>Favori ürün</small></span></a><a href="#/hesabim/adresler"><MapPin /><span><strong>{dashboard.addresses.length}</strong><small>Kayıtlı adres</small></span></a><a href="#/hesabim/kuponlar"><Ticket /><span><strong>{dashboard.coupons.length}</strong><small>Aktif kupon</small></span></a></div>
-    <ProfileForm user={session.user} account={account} onUpdated={onSessionUpdated} onNotice={onNotice} />
+    <ProfileForm user={session.user} account={account} onUpdated={onSessionUpdated} onNotice={onNotice} focusOnMount={focusProfile} />
     <h2>Son siparişlerin</h2>
     {dashboard.orders.length ? <div className="order-list">{dashboard.orders.slice(0, 3).map((order) => <CustomerOrderCard key={order.id} order={order} productById={productById} getProductImage={getProductImage} />)}</div> : <div className="connected-empty is-compact"><ShoppingBag /><h3>Henüz siparişin yok</h3><p>Katalogdaki ürünleri keşfederek ilk siparişini oluşturabilirsin.</p><a className="primary-button" href="#/">Alışverişe başla</a></div>}
   </>;
@@ -794,11 +797,12 @@ export function CustomerAccountPage(props) {
     onSessionUpdated,
     onLogout,
     onNotice,
+    focusProfile = false,
   } = props;
   const productById = useMemo(() => new Map(products.map((product) => [Number(product.id), product])), [products]);
   const activeSection = section === "order-detail" ? "orders" : section;
   let content;
-  if (section === "overview") content = <AccountOverview session={session} account={account} favoriteCount={favoriteCount} onSessionUpdated={onSessionUpdated} onNotice={onNotice} productById={productById} getProductImage={getProductImage} />;
+  if (section === "overview") content = <AccountOverview session={session} account={account} favoriteCount={favoriteCount} onSessionUpdated={onSessionUpdated} onNotice={onNotice} productById={productById} getProductImage={getProductImage} focusProfile={focusProfile} />;
   else if (section === "orders" || section === "order-detail") content = <OrdersSection session={session} account={account} orderId={orderId} productById={productById} getProductImage={getProductImage} onNotice={onNotice} />;
   else if (section === "addresses") content = <AddressesSection account={account} user={session.user} onNotice={onNotice} />;
   else if (section === "coupons") content = <CouponsSection account={account} onNotice={onNotice} />;

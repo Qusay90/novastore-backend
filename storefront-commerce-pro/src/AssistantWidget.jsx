@@ -61,6 +61,7 @@ export function AssistantWidget({
   onRemove,
   getProductImage,
   raised = false,
+  onOpenChange = null,
   conversationState = null,
   onConversationStateChange = null,
 }) {
@@ -153,6 +154,10 @@ export function AssistantWidget({
   useEffect(() => {
     if (disabled || HIDDEN_ROUTES.has(route.type)) setOpen(false);
   }, [disabled, route.type]);
+
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [onOpenChange, open]);
 
   useEffect(() => {
     if (!open || !threadRef.current) return;

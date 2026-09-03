@@ -104,20 +104,22 @@ export function createCanonicalFixtureRuntime({ root = globalThis } = {}) {
   let supportMessages = [];
   let pendingPurchase = [];
 
+  const incompleteFixtureProfile = new URLSearchParams(root.location?.search || "").get("profile") === "incomplete";
   const fixtureUser = (email = "fixture@novastore.test") => Object.freeze({
     id: 9001,
     fullName: "Test Müşteri",
     email,
-    phone: "05555555555",
+    phone: incompleteFixtureProfile ? null : "05555555555",
   });
 
   const customer = Object.freeze({
     login: async ({ email, password }) => {
       if (!String(email || "").trim() || !String(password || "")) throw new Error("Fixture giriş bilgileri eksik.");
-      session = Object.freeze({ status: "authenticated", user: fixtureUser(), warning: null });
+      session = Object.freeze({ status: "authenticated", sessionId: "fixture-session-1", user: fixtureUser(), warning: null });
       return session;
     },
     register: async ({ fullName, email }) => ({ id: 9001, fullName, email }),
+    getProfile: async () => session.user,
     forgotPassword: async () => ({ message: "Yerel fixture sıfırlama isteğini kabul etti." }),
     resetPassword: async () => ({ ok: true }),
     logout: () => { session = Object.freeze({ status: "guest", user: null, warning: null }); },

@@ -85,6 +85,13 @@ import { CustomerProductCard } from "./CustomerProductCard.jsx";
 import { normalizePublicStoreSlug } from "./adapters/publicStoreAdapter.js";
 import { reconcileFinalizedCart } from "./adapters/checkoutAdapter.js";
 import {
+  getCustomerProfileCompletion,
+  NORMAL_LOGIN_DESTINATION,
+  PROFILE_COMPLETION_NOTICE_TIMEOUT_MS,
+  safeCustomerReturnPath,
+  SELLER_RECRUITMENT_URL,
+} from "./customerAuthUx.js";
+import {
   FavoritesPage as CanonicalFavoritesPage,
   HomePage as CanonicalHomePage,
   LoadingPage as CanonicalLoadingPage,
@@ -302,12 +309,6 @@ function navigate(path, { replace = false } = {}) {
   else window.location.hash = next;
 }
 
-function safeDecodeReturn(value, fallback = "/hesabim") {
-  const path = String(value || "").trim();
-  if (!path.startsWith("/") || path.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(path)) return fallback;
-  return path;
-}
-
 function documentRouteRaw() {
   const pathname = window.location.pathname || "/";
   const search = window.location.search || "";
@@ -404,9 +405,15 @@ function useRoute() {
 
   useEffect(() => {
     const onHash = () => {
-      setRoute(parseRoute());
+      const nextRoute = parseRoute();
+      setRoute(nextRoute);
       window.scrollTo({ top: 0, behavior: motionBehavior() });
-      window.requestAnimationFrame(() => window.requestAnimationFrame(() => focusMainContent()));
+      const profileFocusRequested = nextRoute.type === "account"
+        && nextRoute.section === "overview"
+        && nextRoute.query.get("focus") === "profile";
+      if (!profileFocusRequested) {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => focusMainContent()));
+      }
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -494,13 +501,17 @@ function SearchBox({ onSearch }) {
   );
 }
 
-function HeaderAction({ icon: Icon, label, detail, badge, onClick, buttonRef, expanded, controls }) {
+function HeaderAction({ icon: Icon, label, detail, badge, onClick, buttonRef, expanded, controls, className }) {
   return (
-    <button ref={buttonRef} className="header-action" type="button" onClick={onClick} aria-label={`${label}: ${detail}`} aria-haspopup={controls ? "dialog" : undefined} aria-expanded={controls ? expanded : undefined} aria-controls={controls}>
+    <button ref={buttonRef} className={cx("header-action", className)} type="button" onClick={onClick} aria-label={`${label}: ${detail}`} aria-haspopup={controls ? "dialog" : undefined} aria-expanded={controls ? expanded : undefined} aria-controls={controls}>
       <span className="header-action__icon"><Icon size={22} />{badge > 0 && <b>{badge}</b>}</span>
       <span><small>{label}</small><strong>{detail}</strong></span>
     </button>
   );
+}
+
+function HeaderLink({ icon: Icon, label, detail, href, className }) {
+  return <a className={cx("header-action", "header-action-link", className)} href={href} aria-label={`${label}: ${detail}`}><span className="header-action__icon"><Icon size={22} /></span><span><small>{label}</small><strong>{detail}</strong></span></a>;
 }
 
 function MegaMenu({ root, onRootChange, onClose }) {
@@ -669,7 +680,8 @@ function Header({ cartCount, favoriteCount, notificationUnreadCount, onCartOpen,
           <HeaderAction icon={Bell} label="Bildirimler" detail={notificationUnreadCount ? `${notificationUnreadCount} okunmamış` : "Güncellemelerim"} badge={notificationUnreadCount} onClick={() => navigate("/hesabim/bildirimler")} />
           <HeaderAction icon={User} label="Hesabım" detail={accountDetail} onClick={onAccountOpen} />
           <HeaderAction icon={Heart} label="Listem" detail="Favorilerim" badge={favoriteCount} onClick={() => navigate("/favoriler")} />
-          <HeaderAction icon={ShoppingCart} label="Sepetim" detail={cartCount ? `${cartCount} ürün` : "0 ürün"} badge={cartCount} onClick={onCartOpen} buttonRef={cartTriggerRef} expanded={cartOpen} controls="cart-drawer" />
+          <HeaderAction className="cart-header-action" icon={ShoppingCart} label="Sepetim" detail={cartCount ? `${cartCount} ürün` : "0 ürün"} badge={cartCount} onClick={onCartOpen} buttonRef={cartTriggerRef} expanded={cartOpen} controls="cart-drawer" />
+          <HeaderLink className="seller-recruitment-action" icon={Storefront} label="Ortağımız Ol" detail="NovaStore'da sat" href={SELLER_RECRUITMENT_URL} />
         </div>
       </div>
       <CategoryNavigation onMobileOpen={onMobileOpen} drawerOpen={mobileMenuOpen} />
@@ -735,6 +747,7 @@ function MobileCategoryDrawer({ open, onClose, returnFocusRef }) {
               );
             })}
           </div>
+          {!current && <a className="mobile-seller-recruitment" href={SELLER_RECRUITMENT_URL}><Storefront /><span><strong>Ortağımız Ol</strong><small>NovaStore’da satış yap ve müşterilere ulaş</small></span><CaretRight /></a>}
         </div>
         <div className="drawer-footer"><ShieldCheck /><span><strong>NovaStore güvencesi</strong><small>Güvenli ödeme ve hesap destekli işlemler</small></span></div>
       </div>
@@ -787,6 +800,11 @@ function BenefitStrip() {
     [Headphones, "Nova desteği", "Mevcut destek kanalına erişim"],
   ];
   return <div className="benefit-strip">{benefits.map(([Icon, title, copy]) => <div key={title}><Icon /><span><strong>{title}</strong><small>{copy}</small></span></div>)}</div>;
+}
+
+function ProfileCompletionNotice({ missingFields, onDismiss, onOpen }) {
+  const missingCopy = missingFields.length ? `${missingFields.join(" ve ")} bilgini tamamla.` : "Profil bilgilerini tamamla.";
+  return <aside className="profile-completion-notice" role="status" aria-live="polite"><button className="profile-completion-notice__body" type="button" onClick={onOpen} aria-label="Eksik hesap bilgilerini tamamla"><span className="profile-completion-notice__icon"><User /></span><span><small>Hesap hatırlatması</small><strong>Hesap bilgilerini tamamla</strong><p>{missingCopy} Teslimat ve hesap işlemlerini daha rahat yönet.</p><b>Bilgilerimi tamamla <CaretRight /></b></span></button><button className="profile-completion-notice__close" type="button" onClick={onDismiss} aria-label="Hesap bilgileri hatırlatmasını kapat"><X /></button></aside>;
 }
 
 function HomePage({ favorites, onFavorite, onAdd }) {
@@ -1342,7 +1360,11 @@ export function CommerceProRuntimeApp({
   const [session, setSession] = useState(runtime.session);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [toast, setToast] = useState("");
+  const [profileCompletionNotice, setProfileCompletionNotice] = useState(null);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const toastTimer = useRef(null);
+  const profileCompletionTimer = useRef(null);
+  const profileNoticeSessionRef = useRef(null);
   const buyNowPendingRef = useRef(false);
   const [buyNowPending, setBuyNowPending] = useState(false);
   const categoryDrawerTriggerRef = useRef(null);
@@ -1361,6 +1383,23 @@ export function CommerceProRuntimeApp({
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(""), 2600);
   }
+
+  const dismissProfileCompletionNotice = useCallback(() => {
+    window.clearTimeout(profileCompletionTimer.current);
+    setProfileCompletionNotice(null);
+  }, []);
+
+  const showProfileCompletionNotice = useCallback((activeSession, completion) => {
+    const sessionKey = String(activeSession?.sessionId || `customer:${activeSession?.user?.id || "unknown"}`);
+    if (profileNoticeSessionRef.current === sessionKey) return;
+    profileNoticeSessionRef.current = sessionKey;
+    window.clearTimeout(profileCompletionTimer.current);
+    setProfileCompletionNotice(completion);
+    profileCompletionTimer.current = window.setTimeout(
+      () => setProfileCompletionNotice(null),
+      PROFILE_COMPLETION_NOTICE_TIMEOUT_MS,
+    );
+  }, []);
 
   function replaceCart(next, { persist = true } = {}) {
     const normalized = next.map((item) => ({
@@ -1502,13 +1541,18 @@ export function CommerceProRuntimeApp({
   useEffect(() => {
     const handleAuthRequired = () => {
       setSession(Object.freeze({ status: "guest", user: null, warning: null }));
+      profileNoticeSessionRef.current = null;
+      dismissProfileCompletionNotice();
       notify("Oturumunun süresi doldu. Devam etmek için yeniden giriş yap.");
     };
     window.addEventListener("novastore:auth-required", handleAuthRequired);
     return () => window.removeEventListener("novastore:auth-required", handleAuthRequired);
-  }, []);
+  }, [dismissProfileCompletionNotice]);
 
-  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+  useEffect(() => () => {
+    window.clearTimeout(toastTimer.current);
+    window.clearTimeout(profileCompletionTimer.current);
+  }, []);
 
   const authenticated = session?.status === "authenticated" || session?.status === "unverified";
   const refreshNotificationUnreadCount = useCallback(async () => {
@@ -1542,7 +1586,17 @@ export function CommerceProRuntimeApp({
   const comparisonVisible = comparisonIds.size > 0 && COMPARISON_TRAY_ROUTE_TYPES.has(route.type);
   const comparisonContext = { available: true, ids: comparisonIds, toggle: toggleComparison };
   const handleAuthenticated = async (nextSession, returnPath) => {
-    setSession(nextSession);
+    let authoritativeSession = nextSession;
+    let profileCompletion = null;
+    try {
+      const authoritativeProfile = await runtime.customer.getProfile();
+      authoritativeSession = Object.freeze({ ...nextSession, status: "authenticated", user: authoritativeProfile, warning: null });
+      profileCompletion = getCustomerProfileCompletion(authoritativeProfile);
+    } catch (error) {
+      if (error?.status === 401) throw error;
+      authoritativeSession = Object.freeze({ ...nextSession, status: "unverified", warning: error });
+    }
+    setSession(authoritativeSession);
     try {
       const refreshed = await runtime.refreshCustomerState({ cartItems: cartRef.current });
       replaceCart(refreshed.cartItems, { persist: false });
@@ -1552,11 +1606,19 @@ export function CommerceProRuntimeApp({
     } catch {
       notify("Hesabın açıldı; sepet veya favori eşitlemesi geçici olarak tamamlanamadı.");
     }
-    navigate(returnPath);
+    const destination = safeCustomerReturnPath(returnPath, NORMAL_LOGIN_DESTINATION);
+    navigate(destination);
+    if (destination === NORMAL_LOGIN_DESTINATION && profileCompletion && !profileCompletion.complete) {
+      showProfileCompletionNotice(authoritativeSession, profileCompletion);
+    } else {
+      dismissProfileCompletionNotice();
+    }
   };
   const authReturn = (path) => <CustomerAuthPage account={runtime.customer} returnPath={path} onAuthenticated={handleAuthenticated} {...localReviewSurfaceProps} />;
   const handleSessionUpdated = (user) => setSession((current) => Object.freeze({ ...current, status: "authenticated", user, warning: null }));
   const handleLogout = async () => {
+    dismissProfileCompletionNotice();
+    profileNoticeSessionRef.current = null;
     const result = await runtime.customer.logout();
     if (!result.serverRevocationVerified) window.alert?.(result.warning);
     window.location.hash = "#/";
@@ -1595,10 +1657,10 @@ export function CommerceProRuntimeApp({
   else if (route.type === "cart-page") content = <CartPage items={cartItems} onQuantity={updateCartQuantity} onRemove={removeFromCart} onCheckout={handoffToCheckout} />;
   else if (route.type === "auth") content = authenticated
     ? <CustomerAccountPage session={session} account={runtime.customer} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} {...localReviewSessionProps} />
-    : <CustomerAuthPage account={runtime.customer} initialMode={route.mode} returnPath={safeDecodeReturn(route.query.get("return"), "/hesabim")} onAuthenticated={handleAuthenticated} {...localReviewSurfaceProps} />;
+    : <CustomerAuthPage account={runtime.customer} initialMode={route.mode} returnPath={safeCustomerReturnPath(route.query.get("return"), NORMAL_LOGIN_DESTINATION)} onAuthenticated={handleAuthenticated} {...localReviewSurfaceProps} />;
   else if (route.type === "password") content = <CustomerPasswordPage account={runtime.customer} mode={route.mode} token={route.query.get("token") || ""} {...localReviewSurfaceProps} />;
   else if (route.type === "account") content = authenticated
-    ? <CustomerAccountPage session={session} account={runtime.customer} section={route.section} orderId={route.orderId} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} {...localReviewSessionProps} />
+    ? <CustomerAccountPage session={session} account={runtime.customer} section={route.section} orderId={route.orderId} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} focusProfile={route.query.get("focus") === "profile"} {...localReviewSessionProps} />
     : authReturn(route.section === "order-detail"
       ? `/hesabim/siparisler/${route.orderId}`
       : `/hesabim${route.section === "orders" ? "/siparisler" : route.section === "addresses" ? "/adresler" : route.section === "coupons" ? "/kuponlar" : route.section === "notifications" ? "/bildirimler" : route.section === "questions" ? "/sorularim" : route.section === "reviews" ? "/degerlendirmelerim" : route.section === "followed-stores" ? "/takip-ettigim-magazalar" : route.section === "security" ? "/guvenlik" : ""}`);
@@ -1632,7 +1694,8 @@ export function CommerceProRuntimeApp({
       <MobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={categoryDrawerTriggerRef} />
       <CartDrawer open={cartOpen} items={cartItems} onClose={closeCart} onRemove={removeFromCart} onQuantity={updateCartQuantity} returnFocusRef={cartTriggerRef} />
       <MobileBottomNav route={route} cartCount={cartCount} favoriteCount={favorites.size} />
-      <AssistantWidget key={assistantConversationOwnerKey(session)} disabled={runtime.readOnlyPreview === true} route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonVisible} conversationState={activeAssistantConversationState} onConversationStateChange={updateAssistantConversationState} />
+      {route.type === "home" && profileCompletionNotice && !assistantOpen && <ProfileCompletionNotice missingFields={profileCompletionNotice.missingFields} onDismiss={dismissProfileCompletionNotice} onOpen={() => { dismissProfileCompletionNotice(); navigate("/hesabim?focus=profile"); }} />}
+      <AssistantWidget key={assistantConversationOwnerKey(session)} disabled={runtime.readOnlyPreview === true} route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonVisible} onOpenChange={setAssistantOpen} conversationState={activeAssistantConversationState} onConversationStateChange={updateAssistantConversationState} />
       <div className={cx("toast", toast && "is-visible")} role="status" aria-live="polite"><CheckCircle weight="fill" /><span>{toast}</span></div>
     </RuntimeComparisonContext.Provider>
   );
