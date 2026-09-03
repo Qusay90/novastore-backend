@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Bot,
+  CaretDown,
   ChatCircleText,
   CheckCircle,
   Headphones,
@@ -18,6 +19,10 @@ import {
   updateScopedAssistantConversationState,
 } from "./integration/assistantConversationState.js";
 import { getAssistantModePresentation } from "./integration/assistantModePresentation.js";
+import {
+  getAssistantViewportMetrics,
+  nextModeOptionIndex,
+} from "./integration/assistantResponsive.js";
 
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -78,11 +83,18 @@ export function AssistantWidget({
   ));
   const { mode, error, messages, pendingChatId, pendingActionId } = conversation;
   const [capabilityState, setCapabilityState] = useState(INITIAL_CAPABILITY_STATE);
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const [activeModeIndex, setActiveModeIndex] = useState(0);
   const phase = pendingChatId === null ? "idle" : "submitting";
   const actionPhase = pendingActionId === null ? "idle" : "submitting";
+  const widgetRef = useRef(null);
+  const dialogRef = useRef(null);
   const inputRef = useRef(null);
   const fabRef = useRef(null);
   const threadRef = useRef(null);
+  const modeMenuRef = useRef(null);
+  const modeTriggerRef = useRef(null);
+  const modeOptionRefs = useRef([]);
   const chatOperationRef = useRef(pendingChatId);
   const actionOperationRef = useRef(pendingActionId);
   const renderedPendingChatIdRef = useRef(pendingChatId);
@@ -142,20 +154,70 @@ export function AssistantWidget({
 
   useEffect(() => {
     if (!open) return;
-    window.requestAnimationFrame(() => inputRef.current?.focus());
+    window.requestAnimationFrame(() => {
+      const finePointer = window.matchMedia?.("(hover: hover) and (pointer: fine)").matches === true;
+      if (finePointer) inputRef.current?.focus({ preventScroll: true });
+      else dialogRef.current?.focus({ preventScroll: true });
+    });
     const closeOnEscape = (event) => {
       if (event.key !== "Escape") return;
+      if (modeMenuOpen) {
+        event.preventDefault();
+        setModeMenuOpen(false);
+        window.requestAnimationFrame(() => modeTriggerRef.current?.focus());
+        return;
+      }
       if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
       setOpen(false);
       window.requestAnimationFrame(() => fabRef.current?.focus());
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [modeMenuOpen, open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const visualViewport = window.visualViewport;
+    const syncViewport = () => {
+      const metrics = getAssistantViewportMetrics(visualViewport, window.innerHeight);
+      widgetRef.current?.style.setProperty("--assistant-visual-viewport-height", `${metrics.height}px`);
+      widgetRef.current?.style.setProperty("--assistant-visual-viewport-top", `${metrics.top}px`);
+    };
+    syncViewport();
+    visualViewport?.addEventListener("resize", syncViewport);
+    visualViewport?.addEventListener("scroll", syncViewport);
+    window.addEventListener("resize", syncViewport);
+    return () => {
+      visualViewport?.removeEventListener("resize", syncViewport);
+      visualViewport?.removeEventListener("scroll", syncViewport);
+      window.removeEventListener("resize", syncViewport);
+    };
   }, [open]);
 
   useEffect(() => {
-    if (disabled || HIDDEN_ROUTES.has(route.type)) setOpen(false);
+    if (!modeMenuOpen) return undefined;
+    const closeOnOutsidePointer = (event) => {
+      if (!modeMenuRef.current?.contains(event.target)) setModeMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [modeMenuOpen]);
+
+  useEffect(() => {
+    if (!modeMenuOpen) return;
+    window.requestAnimationFrame(() => modeOptionRefs.current[activeModeIndex]?.focus());
+  }, [activeModeIndex, modeMenuOpen]);
+
+  useEffect(() => {
+    if (disabled || HIDDEN_ROUTES.has(route.type)) {
+      setOpen(false);
+      setModeMenuOpen(false);
+    }
   }, [disabled, route.type]);
+
+  useEffect(() => {
+    if (modePresentation.kind !== "selector" || phase === "submitting") setModeMenuOpen(false);
+  }, [modePresentation.kind, phase]);
 
   useEffect(() => {
     onOpenChange?.(open);
@@ -280,15 +342,66 @@ export function AssistantWidget({
     send(input);
   };
 
-  return <div className={`assistant-widget is-${route.type}${open ? " is-open" : ""}${raised ? " has-comparison" : ""}`}>
-    {open && <section id="novabot-dialog" className="assistant-window" role="dialog" aria-labelledby="novabot-dialog-title">
-      <header><span><i><img className="novabot-artwork" src={novabotArtwork} alt="" /></i><span><strong id="novabot-dialog-title">NovaBot</strong><small>{phase === "submitting" ? "Yanıt hazırlanıyor…" : "Canlı katalog asistanı"}</small></span></span><button type="button" aria-label="NovaBot penceresini kapat" onClick={() => { setOpen(false); window.requestAnimationFrame(() => fabRef.current?.focus()); }}><X /></button></header>
+  const selectedModeIndex = Math.max(0, capabilityModes.findIndex((option) => option.id === selectedServerModeId));
+  const focusModeOption = (index) => {
+    const boundedIndex = Math.min(capabilityModes.length - 1, Math.max(0, index));
+    setActiveModeIndex(boundedIndex);
+    window.requestAnimationFrame(() => modeOptionRefs.current[boundedIndex]?.focus());
+  };
+  const openModeMenu = () => {
+    setActiveModeIndex(selectedModeIndex);
+    setModeMenuOpen(true);
+  };
+  const selectMode = (index) => {
+    const nextMode = capabilityModes[index];
+    if (!nextMode) return;
+    setConversation((current) => ({ ...current, mode: nextMode.id }));
+    setModeMenuOpen(false);
+    window.requestAnimationFrame(() => modeTriggerRef.current?.focus());
+  };
+  const handleModeTriggerKeyDown = (event) => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const nextIndex = nextModeOptionIndex(selectedModeIndex, capabilityModes.length, event.key);
+    if (nextIndex === null) return;
+    setModeMenuOpen(true);
+    focusModeOption(nextIndex);
+  };
+  const handleModeOptionKeyDown = (event, index) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      event.stopPropagation();
+      selectMode(index);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setModeMenuOpen(false);
+      window.requestAnimationFrame(() => modeTriggerRef.current?.focus());
+      return;
+    }
+    if (event.key === "Tab") {
+      setModeMenuOpen(false);
+      return;
+    }
+    const nextIndex = nextModeOptionIndex(index, capabilityModes.length, event.key);
+    if (nextIndex === null) return;
+    event.preventDefault();
+    focusModeOption(nextIndex);
+  };
+  const closeWidget = () => {
+    setModeMenuOpen(false);
+    setOpen(false);
+    window.requestAnimationFrame(() => fabRef.current?.focus());
+  };
+
+  return <div ref={widgetRef} className={`assistant-widget is-${route.type}${open ? " is-open" : ""}${raised ? " has-comparison" : ""}`}>
+    {open && <section ref={dialogRef} id="novabot-dialog" className="assistant-window" role="dialog" aria-labelledby="novabot-dialog-title" tabIndex="-1">
+      <header><span><i><img className="novabot-artwork" src={novabotArtwork} alt="" /></i><span><strong id="novabot-dialog-title">NovaBot</strong><small>{phase === "submitting" ? "Yanıt hazırlanıyor…" : "Canlı katalog asistanı"}</small></span></span><button type="button" aria-label="NovaBot penceresini kapat" onClick={closeWidget}><X /></button></header>
       <div className="assistant-mode">
         {modePresentation.kind === "selector"
-          ? <label><CheckCircle weight="fill" /><span>Sohbet modu</span><select aria-label="NovaBot sohbet modu" aria-describedby="novabot-mode-description" value={selectedServerMode?.id || capabilityState.value.defaultModeId || ""} disabled={phase === "submitting"} onChange={(event) => {
-            const nextMode = capabilityModes.find((option) => option.id === event.target.value);
-            if (nextMode) setConversation((current) => ({ ...current, mode: nextMode.id }));
-          }}>{capabilityModes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select><span id="novabot-mode-description" className="sr-only" role="status">Seçili mod: {selectedServerMode?.label || modePresentation.label}. {selectedServerMode?.description || ""}</span></label>
+          ? <div ref={modeMenuRef} className="assistant-mode__picker"><CheckCircle weight="fill" /><span className="assistant-mode__label">Sohbet modu</span><button ref={modeTriggerRef} className="assistant-mode__trigger" type="button" aria-label={`NovaBot sohbet modu. Seçili: ${selectedServerMode?.label || modePresentation.label}`} aria-haspopup="listbox" aria-expanded={modeMenuOpen} aria-controls="novabot-mode-listbox" aria-describedby="novabot-mode-description" disabled={phase === "submitting"} onClick={() => modeMenuOpen ? setModeMenuOpen(false) : openModeMenu()} onKeyDown={handleModeTriggerKeyDown}><span>{selectedServerMode?.label || modePresentation.label}</span><CaretDown /></button>{modeMenuOpen && <div id="novabot-mode-listbox" className="assistant-mode__listbox" role="listbox" aria-label="NovaBot sohbet modları" aria-activedescendant={`novabot-mode-option-${activeModeIndex}`}>{capabilityModes.map((option, index) => <button ref={(element) => { modeOptionRefs.current[index] = element; }} id={`novabot-mode-option-${index}`} key={option.id} className={option.id === selectedServerModeId ? "is-selected" : ""} type="button" role="option" aria-selected={option.id === selectedServerModeId} tabIndex={index === activeModeIndex ? 0 : -1} onFocus={() => setActiveModeIndex(index)} onClick={() => selectMode(index)} onKeyDown={(event) => handleModeOptionKeyDown(event, index)}><span><strong>{option.label}</strong>{option.description && <small>{option.description}</small>}</span>{option.id === selectedServerModeId && <CheckCircle weight="fill" aria-hidden="true" />}</button>)}</div>}<span id="novabot-mode-description" className="sr-only" role="status" aria-live="polite">Seçili mod: {selectedServerMode?.label || modePresentation.label}. {selectedServerMode?.description || ""}</span></div>
           : <div className="assistant-mode__status" role="status" aria-label={`NovaBot sohbet modu: ${modePresentation.label}. ${modePresentation.detail}`}><CheckCircle weight="fill" /><span><strong>{modePresentation.label}</strong>{modePresentation.detail && <small>{modePresentation.detail}</small>}</span></div>}
         <a href="#/destek"><Headphones /> Destek ekibi</a>
       </div>
@@ -300,7 +413,7 @@ export function AssistantWidget({
       <form className="assistant-composer" onSubmit={submit}><label className="sr-only" htmlFor="assistant-message">NovaBot’a mesaj yaz</label><input ref={inputRef} id="assistant-message" value={input} maxLength="2000" autoComplete="off" placeholder="Ürün, fiyat veya destek hakkında sor…" onChange={(event) => setInput(event.target.value)} /><button type="submit" disabled={phase === "submitting" || !input.trim()} aria-label="Mesajı gönder"><PaperPlaneTilt weight="fill" /></button></form>
       <footer>NovaBot hata yapabilir; fiyat ve stok canlı katalogdan doğrulanır.</footer>
     </section>}
-    <button ref={fabRef} className="assistant-fab" type="button" aria-controls="novabot-dialog" aria-expanded={open} aria-haspopup="dialog" aria-label={open ? "NovaBot penceresini kapat" : "NovaBot alışveriş asistanını aç"} onClick={() => setOpen((value) => !value)}>{open ? <X /> : <img className="novabot-artwork" src={novabotArtwork} alt="" />}</button>
+    <button ref={fabRef} className="assistant-fab" type="button" aria-controls="novabot-dialog" aria-expanded={open} aria-haspopup="dialog" aria-label={open ? "NovaBot penceresini kapat" : "NovaBot alışveriş asistanını aç"} onClick={() => open ? closeWidget() : setOpen(true)}>{open ? <X /> : <img className="novabot-artwork" src={novabotArtwork} alt="" />}</button>
   </div>;
 }
 

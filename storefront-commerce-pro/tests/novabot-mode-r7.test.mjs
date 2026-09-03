@@ -106,7 +106,10 @@ test("R7 Customer Web mod kimliklerini tanımlamaz ve server contract seçenekle
   ]);
 
   assert.match(widgetSource, /modePresentation\.kind === "selector"/u);
-  assert.match(widgetSource, /capabilityModes\.map\(\(option\) =>/u);
+  assert.match(widgetSource, /capabilityModes\.map\(\(option, index\) =>/u);
+  assert.match(widgetSource, /role="listbox" aria-label="NovaBot sohbet modları"/u);
+  assert.match(widgetSource, /role="option" aria-selected=/u);
+  assert.doesNotMatch(widgetSource, /<select\b/u);
   assert.match(widgetSource, /assistant\.chat\(\{ message: text, history, modeId: selectedServerModeId \}\)/u);
   assert.match(widgetSource, /role="status" aria-label=\{`NovaBot sohbet modu:/u);
   assert.doesNotMatch(widgetSource, /const\s+CANONICAL_SERVER_MODES/u);

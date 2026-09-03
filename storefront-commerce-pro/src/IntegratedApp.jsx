@@ -594,9 +594,30 @@ function CategoryNavigation({ onMobileOpen, drawerOpen }) {
   const roots = getVisibleRoots();
   const [open, setOpen] = useState(false);
   const [activeRoot, setActiveRoot] = useState(roots[0]);
+  const [railState, setRailState] = useState({ overflow: false, canStart: false, canEnd: false });
   const closeTimer = useRef(null);
   const containerRef = useRef(null);
+  const railRef = useRef(null);
   const suppressFocusOpen = useRef(false);
+
+  const syncRailState = useCallback(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const maxScroll = Math.max(0, rail.scrollWidth - rail.clientWidth);
+    const next = {
+      overflow: maxScroll > 2,
+      canStart: rail.scrollLeft > 2,
+      canEnd: rail.scrollLeft < maxScroll - 2,
+    };
+    setRailState((current) => current.overflow === next.overflow && current.canStart === next.canStart && current.canEnd === next.canEnd ? current : next);
+  }, []);
+
+  const scrollCategoryRail = (direction) => {
+    const rail = railRef.current;
+    if (!rail) return;
+    rail.scrollBy({ left: direction * Math.max(180, rail.clientWidth * .62), behavior: motionBehavior() });
+    window.setTimeout(syncRailState, 280);
+  };
 
   function cancelClose() {
     window.clearTimeout(closeTimer.current);
@@ -631,37 +652,54 @@ function CategoryNavigation({ onMobileOpen, drawerOpen }) {
     };
   }, [open]);
 
+  useEffect(() => {
+    syncRailState();
+    const rail = railRef.current;
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(syncRailState) : null;
+    if (rail) observer?.observe(rail);
+    window.addEventListener("resize", syncRailState);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", syncRailState);
+    };
+  }, [roots.length, syncRailState]);
+
   return (
     <div className={cx("category-navigation", open && "is-mega-open")} ref={containerRef} onMouseEnter={cancelClose} onMouseLeave={scheduleClose}>
       <div className="shell category-navigation__row">
         <button className="all-categories-button" type="button" onClick={onMobileOpen} aria-haspopup="dialog" aria-expanded={drawerOpen} aria-controls="category-drawer">
           <List size={21} /> <span>Tüm Kategoriler</span>
         </button>
-        <nav aria-label="Ürün kategorileri">
-          <ul>
-            {roots.map((root) => (
-              <li key={root.id} className={cx(open && activeRoot.id === root.id && "is-active")}>
-                <a href={`#/kategori/${root.canonicalPath}`} onClick={() => setOpen(false)}>{root.name}</a>
-                <button
-                  type="button"
-                  aria-label={`${root.name} alt kategorilerini aç`}
-                  aria-expanded={open && activeRoot.id === root.id}
-                  aria-controls="mega-navigation"
-                  onMouseEnter={() => { cancelClose(); setActiveRoot(root); setOpen(true); }}
-                  onFocus={() => {
-                    if (suppressFocusOpen.current) return;
-                    setActiveRoot(root);
-                    setOpen(true);
-                  }}
-                  onClick={() => {
-                    setActiveRoot(root);
-                    setOpen((current) => activeRoot.id === root.id ? !current : true);
-                  }}
-                ><CaretDown size={13} /></button>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <div className={cx("category-rail", railState.overflow && "has-overflow", railState.canStart && "can-scroll-start", railState.canEnd && "can-scroll-end")}>
+          <button className="category-rail__control is-previous" type="button" aria-label="Önceki kategorileri göster" disabled={!railState.canStart} onClick={() => scrollCategoryRail(-1)}><CaretRight /></button>
+          <nav ref={railRef} aria-label="Ürün kategorileri" onScroll={syncRailState}>
+            <ul>
+              {roots.map((root) => (
+                <li key={root.id} className={cx(open && activeRoot.id === root.id && "is-active")}>
+                  <a href={`#/kategori/${root.canonicalPath}`} onFocus={(event) => event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" })} onClick={() => setOpen(false)}>{root.name}</a>
+                  <button
+                    type="button"
+                    aria-label={`${root.name} alt kategorilerini aç`}
+                    aria-expanded={open && activeRoot.id === root.id}
+                    aria-controls="mega-navigation"
+                    onMouseEnter={() => { cancelClose(); setActiveRoot(root); setOpen(true); }}
+                    onFocus={(event) => {
+                      event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
+                      if (suppressFocusOpen.current) return;
+                      setActiveRoot(root);
+                      setOpen(true);
+                    }}
+                    onClick={() => {
+                      setActiveRoot(root);
+                      setOpen((current) => activeRoot.id === root.id ? !current : true);
+                    }}
+                  ><CaretDown size={13} /></button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <button className="category-rail__control is-next" type="button" aria-label="Sonraki kategorileri göster" disabled={!railState.canEnd} onClick={() => scrollCategoryRail(1)}><CaretRight /></button>
+        </div>
         <a className="deals-link" href="#/koleksiyon/firsatlar" onClick={() => setOpen(false)}><BadgePercent /> Fırsatlar</a>
       </div>
       {open && <div className="shell mega-shell"><MegaMenu root={activeRoot} onRootChange={setActiveRoot} onClose={() => setOpen(false)} /></div>}
@@ -674,7 +712,7 @@ function Header({ cartCount, favoriteCount, notificationUnreadCount, onCartOpen,
     <header className="site-header">
       <TrustBar />
       <div className="shell main-header">
-        <button className="mobile-menu-trigger" type="button" onClick={onMobileOpen} aria-label="Kategorileri aç" aria-haspopup="dialog" aria-expanded={mobileMenuOpen} aria-controls="category-drawer"><List /></button>
+        <button className="mobile-menu-trigger" type="button" onClick={onMobileOpen} aria-label="Menüyü aç" aria-haspopup="dialog" aria-expanded={mobileMenuOpen} aria-controls="category-drawer"><List /></button>
         <Logo surface="dark" />
         <SearchBox onSearch={(term) => navigate(`/arama?q=${encodeURIComponent(term)}`)} />
         <div className="header-actions">
@@ -690,7 +728,7 @@ function Header({ cartCount, favoriteCount, notificationUnreadCount, onCartOpen,
   );
 }
 
-function MobileCategoryDrawer({ open, onClose, returnFocusRef }) {
+function MobileCategoryDrawer({ open, onClose, returnFocusRef, authenticated, cartCount, favoriteCount, notificationUnreadCount }) {
   const roots = getVisibleRoots();
   const [stack, setStack] = useState([]);
   const closeRef = useRef(null);
@@ -727,7 +765,7 @@ function MobileCategoryDrawer({ open, onClose, returnFocusRef }) {
 
   return createPortal(
     <div className="overlay-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeDrawer()}>
-      <div id="category-drawer" ref={dialogRef} className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Kategori menüsü" tabIndex="-1">
+      <div id="category-drawer" ref={dialogRef} className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Müşteri menüsü" tabIndex="-1">
         <div className="drawer-head">
           {current ? <button type="button" onClick={() => setStack((value) => value.slice(0, -1))}><ArrowLeft /> Geri</button> : <Logo surface="light" onClick={closeDrawer} />}
           <button ref={closeRef} className="icon-button" type="button" onClick={closeDrawer} aria-label="Menüyü kapat"><X /></button>
@@ -735,6 +773,13 @@ function MobileCategoryDrawer({ open, onClose, returnFocusRef }) {
         <div className="mobile-drawer__body">
           <span className="drawer-kicker">{current ? "Kategori" : "Tüm kategoriler"}</span>
           <h2>{current?.name || "Ne arıyorsun?"}</h2>
+          {!current && <nav className="mobile-customer-shortcuts" aria-label="Müşteri bağlantıları">
+            <a href="#/" onClick={closeDrawer}><House /><span>Ana Sayfa</span></a>
+            <a href="#/favoriler" onClick={closeDrawer}><Heart /><span>Favoriler</span>{favoriteCount > 0 && <b>{favoriteCount}</b>}</a>
+            <a href={`#${customerAccountEntryPath(authenticated)}`} onClick={closeDrawer}><User /><span>{authenticated ? "Hesabım" : "Giriş yap"}</span></a>
+            <a href="#/sepet" onClick={closeDrawer}><ShoppingCart /><span>Sepet</span>{cartCount > 0 && <b>{cartCount}</b>}</a>
+            {authenticated && <a href="#/hesabim/bildirimler" onClick={closeDrawer}><Bell /><span>Bildirimler</span>{notificationUnreadCount > 0 && <b>{notificationUnreadCount}</b>}</a>}
+          </nav>}
           {current && <a className="drawer-view-all" href={`#/kategori/${current.canonicalPath}`} onClick={closeDrawer}>Tüm {current.name} ürünlerini gör <CaretRight /></a>}
           <div className="mobile-category-list">
             {items.map((item) => {
@@ -1701,7 +1746,7 @@ export function CommerceProRuntimeApp({
       {comparisonVisible && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => setComparisonIds(new Set())} onAdd={addToCart} />}
       {content}
       <Footer businessIdentity={runtime.businessIdentity} />
-      <MobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={categoryDrawerTriggerRef} />
+      <MobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={categoryDrawerTriggerRef} authenticated={authenticated} cartCount={cartCount} favoriteCount={favorites.size} notificationUnreadCount={notificationUnreadCount} />
       <CartDrawer open={cartOpen} items={cartItems} onClose={closeCart} onRemove={removeFromCart} onQuantity={updateCartQuantity} returnFocusRef={cartTriggerRef} />
       <MobileBottomNav route={route} cartCount={cartCount} favoriteCount={favorites.size} />
       {route.type === "home" && profileCompletionNotice && !assistantOpen && <ProfileCompletionNotice missingFields={profileCompletionNotice.missingFields} onDismiss={dismissProfileCompletionNotice} onOpen={() => { dismissProfileCompletionNotice(); navigate("/hesabim?focus=profile"); }} />}
