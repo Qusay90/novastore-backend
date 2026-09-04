@@ -218,6 +218,51 @@ export function createSameOriginAdapter(http) {
         return actions.getCatalogProduct({ productId, signal });
       };
     }
+    if (hasCapability(capabilities, "catalogStructureRead")
+      && hasCapability(capabilities, "catalogStructureWrite")) {
+      const structureRequest = (path, method, body, signal) => http.request(path, {
+        method,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal,
+      });
+      actions.saveCategory = async ({ category = null, body, signal } = {}) => {
+        if (!category) return structureRequest("/api/admin/categories", "POST", body, signal);
+        const { parent_id: parentId, sort_order: sortOrder, ...metadata } = body;
+        await structureRequest(`/api/admin/categories/${encodeURIComponent(String(category.id))}`, "PATCH", metadata, signal);
+        if (parentId !== category.parentId || Number(sortOrder) !== Number(category.sortOrder)) {
+          await structureRequest(`/api/admin/categories/${encodeURIComponent(String(category.id))}/move`, "PATCH", {
+            parent_id: parentId,
+            sort_order: sortOrder,
+          }, signal);
+        }
+        return true;
+      };
+      actions.setCategoryArchived = ({ categoryId, archived, signal } = {}) => structureRequest(
+        `/api/admin/categories/${encodeURIComponent(String(categoryId))}/archive`, "PATCH", { archived }, signal,
+      );
+      actions.saveAttribute = ({ attribute = null, body, signal } = {}) => structureRequest(
+        attribute ? `/api/admin/attributes/${encodeURIComponent(String(attribute.id))}` : "/api/admin/attributes",
+        attribute ? "PATCH" : "POST", body, signal,
+      );
+      actions.setAttributeArchived = ({ attributeId, archived, signal } = {}) => structureRequest(
+        `/api/admin/attributes/${encodeURIComponent(String(attributeId))}/archive`, "PATCH", { archived }, signal,
+      );
+      actions.saveTemplate = ({ template = null, body, signal } = {}) => structureRequest(
+        template ? `/api/admin/attribute-templates/${encodeURIComponent(String(template.id))}` : "/api/admin/attribute-templates",
+        template ? "PATCH" : "POST", body, signal,
+      );
+      actions.saveCollection = ({ collection = null, body, signal } = {}) => structureRequest(
+        collection ? `/api/admin/collections/${encodeURIComponent(String(collection.id))}` : "/api/admin/collections",
+        collection ? "PATCH" : "POST", body, signal,
+      );
+      actions.setCollectionArchived = ({ collectionId, archived, signal } = {}) => structureRequest(
+        `/api/admin/collections/${encodeURIComponent(String(collectionId))}/archive`, "PATCH", { archived }, signal,
+      );
+      actions.saveMenu = ({ menu = null, body, signal } = {}) => structureRequest(
+        menu ? `/api/admin/menus/${encodeURIComponent(String(menu.id))}` : "/api/admin/menus",
+        menu ? "PATCH" : "POST", body, signal,
+      );
+    }
     if (hasCapability(capabilities, "orderCancelWrite")) {
       actions.cancelOrder = async (input = {}) => {
         const request = buildCancelOrderMutation(input);

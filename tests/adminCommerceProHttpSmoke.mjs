@@ -362,6 +362,14 @@ const catalogProductPayload = (overrides = {}) => ({
   ...overrides,
 });
 
+const writablePlatformStoreAuthority = Object.freeze({
+  storeId: 10,
+  storeName: "NovaStore",
+  storeSlug: "novastore-platform",
+  adminWritable: true,
+  reason: null,
+});
+
 const normalizedOrderPage = normalizeOrderSummaryPage({
   items: [orderPayload()],
   limit: 100,
@@ -452,6 +460,7 @@ assert.throws(() => normalizeNotificationSummaryPage({ items: [{ id: 5, is_read:
 const catalogPage = normalizeFirstPartyCatalogPage({
   catalogMode: "marketplace",
   mutationScope: "first_party",
+  platformStoreAuthority: writablePlatformStoreAuthority,
   items: [catalogProductPayload()],
   limit: 100,
   hasMore: true,
@@ -472,6 +481,7 @@ assert.equal("approvalAction" in catalogPage.items[0], false, "ürün özetine m
 const deletedCatalogProduct = normalizeFirstPartyCatalogPage({
   catalogMode: "marketplace",
   mutationScope: "first_party",
+  platformStoreAuthority: writablePlatformStoreAuthority,
   items: [catalogProductPayload({
     id: 13,
     name: "Arşiv Kayıt",
@@ -507,6 +517,7 @@ assert.deepEqual(
 const sellerCatalogProduct = normalizeFirstPartyCatalogPage({
   catalogMode: "marketplace",
   mutationScope: "first_party",
+  platformStoreAuthority: writablePlatformStoreAuthority,
   items: [catalogProductPayload({
     store_id: 73,
     store_name: "Lale Tasarım",
@@ -524,6 +535,7 @@ assert.equal(sellerCatalogProduct.adminEditable, false);
 const orphanCatalogProduct = normalizeFirstPartyCatalogPage({
   catalogMode: "marketplace",
   mutationScope: "first_party",
+  platformStoreAuthority: writablePlatformStoreAuthority,
   items: [catalogProductPayload({
     store_id: null,
     store_name: null,
@@ -537,11 +549,12 @@ const orphanCatalogProduct = normalizeFirstPartyCatalogPage({
 assert.equal(orphanCatalogProduct.storeId, null);
 assert.equal(orphanCatalogProduct.storeName, null);
 assert.equal(orphanCatalogProduct.adminEditable, false);
-assert.throws(() => normalizeFirstPartyCatalogPage({ catalogMode: "first_party", mutationScope: "first_party", items: [], limit: 100, hasMore: false }), /marketplace/);
-assert.throws(() => normalizeFirstPartyCatalogPage({ catalogMode: "marketplace", mutationScope: "first_party", items: [], limit: 100, hasMore: "false" }), /boolean/);
+assert.throws(() => normalizeFirstPartyCatalogPage({ catalogMode: "first_party", mutationScope: "first_party", platformStoreAuthority: writablePlatformStoreAuthority, items: [], limit: 100, hasMore: false }), /marketplace/);
+assert.throws(() => normalizeFirstPartyCatalogPage({ catalogMode: "marketplace", mutationScope: "first_party", platformStoreAuthority: writablePlatformStoreAuthority, items: [], limit: 100, hasMore: "false" }), /boolean/);
 assert.throws(() => normalizeFirstPartyCatalogPage({
   catalogMode: "marketplace",
   mutationScope: "first_party",
+  platformStoreAuthority: writablePlatformStoreAuthority,
   items: [{ id: 1 }],
   limit: 100,
   hasMore: false,
@@ -549,6 +562,7 @@ assert.throws(() => normalizeFirstPartyCatalogPage({
 assert.throws(() => normalizeFirstPartyCatalogPage({
   catalogMode: "marketplace",
   mutationScope: "first_party",
+  platformStoreAuthority: writablePlatformStoreAuthority,
   items: [catalogProductPayload({ publication_status: "seller_pending" })],
   limit: 100,
   hasMore: false,
@@ -556,6 +570,7 @@ assert.throws(() => normalizeFirstPartyCatalogPage({
 assert.throws(() => normalizeFirstPartyCatalogPage({
   catalogMode: "marketplace",
   mutationScope: "first_party",
+  platformStoreAuthority: writablePlatformStoreAuthority,
   items: [catalogProductPayload({
     publication_status: "archived",
     is_customer_visible: false,
@@ -685,6 +700,7 @@ const fixtureHttp = {
     if (path === "/api/admin/catalog/products/summary?limit=100") return {
       catalogMode: "marketplace",
       mutationScope: "first_party",
+      platformStoreAuthority: writablePlatformStoreAuthority,
       items: [catalogProductPayload({
         id: 1,
         name: "Ürün",

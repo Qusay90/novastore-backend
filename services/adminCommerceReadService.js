@@ -292,9 +292,49 @@ const createGetAdminProductSummaries = (database) => async (req, res) => {
             `,
             [PLATFORM_STORE.slug, limit + 1]
         );
+        const platformStoreResult = await database.query(
+            `
+                SELECT
+                    platform_store.id AS platform_store_id,
+                    platform_store.name AS platform_store_name,
+                    platform_store.slug AS platform_store_slug,
+                    COALESCE(seller_binding.current_binding_count, 0)::INT AS current_binding_count,
+                    (COALESCE(seller_binding.current_binding_count, 0) = 0) AS admin_writable
+                FROM stores platform_store
+                LEFT JOIN LATERAL (
+                    SELECT COUNT(*)::INT AS current_binding_count
+                    FROM seller_stores seller_store
+                    WHERE seller_store.legacy_store_id = platform_store.id
+                      AND seller_store.closed_at IS NULL
+                ) seller_binding ON TRUE
+                WHERE LOWER(platform_store.slug) = LOWER($1)
+                  AND platform_store.is_active = TRUE
+                  AND platform_store.deleted_at IS NULL
+                ORDER BY platform_store.id ASC
+                LIMIT 1
+            `,
+            [PLATFORM_STORE.slug]
+        );
+        const platformStore = platformStoreResult.rows[0] || null;
+        const platformStoreAuthority = platformStore
+            ? {
+                storeId: Number(platformStore.platform_store_id),
+                storeName: String(platformStore.platform_store_name),
+                storeSlug: String(platformStore.platform_store_slug),
+                adminWritable: platformStore.admin_writable === true,
+                reason: platformStore.admin_writable === true ? null : 'seller_bound'
+            }
+            : {
+                storeId: null,
+                storeName: null,
+                storeSlug: PLATFORM_STORE.slug,
+                adminWritable: false,
+                reason: 'unavailable'
+            };
         return res.status(200).json({
             catalogMode: 'marketplace',
             mutationScope: 'first_party',
+            platformStoreAuthority,
             ...toSummaryPage(result.rows, limit)
         });
     } catch (error) {

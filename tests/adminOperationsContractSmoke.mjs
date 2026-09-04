@@ -20,9 +20,17 @@ assert.throws(() => normalizeReviewPage({ reviews: [{
 }], count: 1 }), /geçersiz metin/);
 
 assert.equal(normalizeQuestions([{
-  id: 4, product_id: 2, product_name: "Ürün", user_name: "Müşteri",
+  id: 4, product_id: 2, product_name: "Ürün", store_id: 9,
+  store_name: "NovaStore Platform", store_slug: "novastore-platform", user_name: "Müşteri",
+  admin_answerable: true, seller_organization_name: null,
   question: "Stok var mı?", answer: null, revision: 1, created_at: timestamp, answered_at: null,
-}])[0].answer, null);
+}])[0].storeName, "NovaStore Platform");
+assert.equal(normalizeQuestions([{
+  id: 5, product_id: 2, product_name: "Ürün", store_id: 9,
+  store_name: "NovaStore Platform", store_slug: "novastore-platform", user_name: "Müşteri",
+  admin_answerable: false, seller_organization_name: "Nova Yaşam Demo Satıcısı",
+  question: "Stok var mı?", answer: null, revision: 1, created_at: timestamp, answered_at: null,
+}])[0].sellerOrganizationName, "Nova Yaşam Demo Satıcısı");
 assert.equal(normalizeCoupons({ items: [{
   id: 5, code: "LOCAL10", discount_type: "PERCENT", discount_value: 10,
   min_order_amount: 0, max_discount_amount: null, usage_limit: null, used_count: 0,
@@ -83,6 +91,8 @@ const actions = adapter.mutationActions({
   questionAnswerWrite: true,
   couponWrite: true,
   supportWrite: true,
+  catalogStructureRead: true,
+  catalogStructureWrite: true,
 });
 await actions.moderateReview({ reviewId: 1, expectedRevision: 1, status: "PUBLISHED" });
 await actions.answerQuestion({ questionId: 4, expectedRevision: 1, answer: "Evet." });
@@ -97,6 +107,11 @@ await actions.registerCatalogMedia({
   mediaUrl: "https://res.cloudinary.com/demo/image/upload/item.webp",
   mediaType: "image",
 });
+await actions.saveCategory({ body: { name: "Yeni kategori", slug: "yeni-kategori" } });
+await actions.saveAttribute({ body: { code: "renk", name: "Renk", data_type: "select" } });
+await actions.saveTemplate({ body: { name: "Temel şablon" } });
+await actions.saveCollection({ body: { name: "Yeni koleksiyon", slug: "yeni-koleksiyon", collection_type: "manual" } });
+await actions.saveMenu({ body: { code: "header", name: "Üst menü" } });
 
 const mutationRequests = requests.slice(5);
 assert.deepEqual(mutationRequests.map((entry) => [entry.options.method, entry.pathname]), [
@@ -109,6 +124,11 @@ assert.deepEqual(mutationRequests.map((entry) => [entry.options.method, entry.pa
   ["POST", "/api/messages/send"],
   ["POST", "/api/admin/catalog/products/2/media"],
   [undefined, "/api/admin/catalog/products/2"],
+  ["POST", "/api/admin/categories"],
+  ["POST", "/api/admin/attributes"],
+  ["POST", "/api/admin/attribute-templates"],
+  ["POST", "/api/admin/collections"],
+  ["POST", "/api/admin/menus"],
 ]);
 const deliveryActions = adapter.mutationActions({ manualShipmentWrite: true });
 assert.equal(typeof deliveryActions.createManualShipment, "function");

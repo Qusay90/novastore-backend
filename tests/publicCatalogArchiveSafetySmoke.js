@@ -291,8 +291,12 @@ const testFavorites = async () => {
 };
 
 const testPublicQuestions = async () => {
-    pool.query = async (sql, params = []) => {
+    const query = async (sql, params = []) => {
         const text = String(sql);
+
+        if (/^(BEGIN|COMMIT|ROLLBACK)$/i.test(text.trim())) {
+            return { rows: [], rowCount: 0 };
+        }
 
         if (/INSERT INTO product_questions/i.test(text)) {
             assert.match(text, /INSERT INTO product_questions[\s\S]*SELECT products\.id/i);
@@ -324,6 +328,8 @@ const testPublicQuestions = async () => {
 
         throw new Error(`Unhandled public question safety SQL: ${text}`);
     };
+    pool.query = query;
+    pool.connect = async () => ({ query, release() {} });
 
     const archivedAsk = await invoke(questionController.askQuestion, {
         body: { product_id: ARCHIVED_PRODUCT.id, question: 'Arsiv urune soru' },

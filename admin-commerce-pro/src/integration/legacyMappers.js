@@ -427,14 +427,42 @@ export function normalizeNotificationSummaryPage(payload) {
 }
 
 export function normalizeFirstPartyCatalogPage(payload) {
-  assertExactRecord(payload, ["catalogMode", "mutationScope", "items", "limit", "hasMore"], "Katalog özeti");
+  assertExactRecord(payload, ["catalogMode", "mutationScope", "platformStoreAuthority", "items", "limit", "hasMore"], "Katalog özeti");
   if (payload.catalogMode !== "marketplace") {
     throw new TypeError("catalog.catalogMode marketplace olmalıdır.");
   }
   if (payload.mutationScope !== "first_party") {
     throw new TypeError("catalog.mutationScope first_party olmalıdır.");
   }
-  return normalizeSummaryPage(payload, normalizeFirstPartyCatalogProduct, "catalog");
+  assertExactRecord(
+    payload.platformStoreAuthority,
+    ["storeId", "storeName", "storeSlug", "adminWritable", "reason"],
+    "Platform mağazası yazma yetkisi",
+  );
+  const authority = payload.platformStoreAuthority;
+  const storeId = toStrictNullablePositiveInteger(authority.storeId, "catalog.platformStoreAuthority.storeId");
+  const storeName = toStrictNullableText(authority.storeName, "catalog.platformStoreAuthority.storeName");
+  const storeSlug = toRequiredText(authority.storeSlug, "catalog.platformStoreAuthority.storeSlug");
+  const adminWritable = toBoolean(authority.adminWritable, "catalog.platformStoreAuthority.adminWritable");
+  if (![null, "seller_bound", "unavailable"].includes(authority.reason)) {
+    throw new TypeError("catalog.platformStoreAuthority.reason geçersiz.");
+  }
+  if (adminWritable !== (authority.reason === null)
+    || (authority.reason === "unavailable" && (storeId !== null || storeName !== null))
+    || (authority.reason !== "unavailable" && (storeId === null || storeName === null))) {
+    throw new TypeError("catalog.platformStoreAuthority durumu tutarsız.");
+  }
+  const page = normalizeSummaryPage(payload, normalizeFirstPartyCatalogProduct, "catalog");
+  return Object.freeze({
+    ...page,
+    platformStoreAuthority: Object.freeze({
+      storeId,
+      storeName,
+      storeSlug,
+      adminWritable,
+      reason: authority.reason,
+    }),
+  });
 }
 
 export function normalizeAdminSession(payload) {

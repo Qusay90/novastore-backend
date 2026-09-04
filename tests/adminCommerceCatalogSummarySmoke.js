@@ -100,6 +100,15 @@ const productRow = (id) => {
     const catalogHandler = createGetAdminProductSummaries({
         async query(sql, params) {
             catalogQueries.push({ sql, params });
+            if (/AS platform_store_id/i.test(sql)) {
+                return { rows: [{
+                    platform_store_id: 10,
+                    platform_store_name: 'NovaStore',
+                    platform_store_slug: 'novastore-platform',
+                    current_binding_count: 0,
+                    admin_writable: true
+                }] };
+            }
             return { rows: Array.from({ length: 101 }, (_, index) => productRow(200 - index)) };
         }
     });
@@ -109,10 +118,18 @@ const productRow = (id) => {
     assert.equal(catalogResponse.statusCode, 200);
     assert.equal(catalogResponse.payload.catalogMode, 'marketplace');
     assert.equal(catalogResponse.payload.mutationScope, 'first_party');
+    assert.deepEqual(catalogResponse.payload.platformStoreAuthority, {
+        storeId: 10,
+        storeName: 'NovaStore',
+        storeSlug: 'novastore-platform',
+        adminWritable: true,
+        reason: null
+    });
     assert.equal(catalogResponse.payload.limit, 100);
     assert.equal(catalogResponse.payload.items.length, 100);
     assert.equal(catalogResponse.payload.hasMore, true);
     assert.deepEqual(catalogQueries[0].params, ['novastore-platform', 101]);
+    assert.deepEqual(catalogQueries[1].params, ['novastore-platform']);
     assert.deepEqual(Object.keys(catalogResponse.payload.items[0]).sort(), [
         'admin_editable',
         'brand',
@@ -215,8 +232,17 @@ const productRow = (id) => {
 
     let guardedCatalogQueryCount = 0;
     const guardedCatalogHandler = createGetAdminProductSummaries({
-        async query() {
+        async query(sql) {
             guardedCatalogQueryCount += 1;
+            if (/AS platform_store_id/i.test(sql)) {
+                return { rows: [{
+                    platform_store_id: 10,
+                    platform_store_name: 'NovaStore',
+                    platform_store_slug: 'novastore-platform',
+                    current_binding_count: 0,
+                    admin_writable: true
+                }] };
+            }
             return { rows: [productRow(21)] };
         }
     });
@@ -298,7 +324,7 @@ const productRow = (id) => {
     assert.equal(validAdmin.statusCode, 200);
     assert.equal(validAdmin.headers['cache-control'], 'private, no-store, max-age=0');
     assert.equal(validAdmin.payload.items[0].id, 21);
-    assert.equal(guardedCatalogQueryCount, 1);
+    assert.equal(guardedCatalogQueryCount, 2);
     assert.deepEqual(currentAdminQueries[0].params, [17]);
 
     const routeSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'adminRoutes.js'), 'utf8');

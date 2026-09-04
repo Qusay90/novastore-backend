@@ -220,6 +220,15 @@ exports.getAllQuestionsAdmin = async (req, res) => {
             `SELECT pq.id, pq.product_id, pq.user_id, pq.question, pq.answer,
                     pq.revision, pq.answered_by, pq.created_at, pq.answered_at, pq.updated_at,
                      p.name as product_name, p.image_url as product_image,
+                     first_party_store.id as store_id,
+                     first_party_store.name as store_name,
+                     first_party_store.slug as store_slug,
+                     (COALESCE(seller_binding.current_binding_count, 0) = 0) AS admin_answerable,
+                     CASE
+                         WHEN COALESCE(seller_binding.current_binding_count, 0) = 1
+                         THEN seller_binding.seller_organization_name
+                         ELSE NULL
+                     END AS seller_organization_name,
                      COALESCE(u.full_name, u.name) as user_name
              FROM product_questions pq
              JOIN products p ON pq.product_id = p.id
@@ -228,6 +237,15 @@ exports.getAllQuestionsAdmin = async (req, res) => {
               AND LOWER(first_party_store.slug) = LOWER($1)
               AND first_party_store.is_active = TRUE
               AND first_party_store.deleted_at IS NULL
+             LEFT JOIN LATERAL (
+                 SELECT COUNT(*)::INT AS current_binding_count,
+                        MIN(seller_organization.display_name) AS seller_organization_name
+                 FROM seller_stores seller_store
+                 JOIN seller_organizations seller_organization
+                   ON seller_organization.id = seller_store.organization_id
+                 WHERE seller_store.legacy_store_id = first_party_store.id
+                   AND seller_store.closed_at IS NULL
+             ) seller_binding ON TRUE
              JOIN users u ON pq.user_id = u.id
              ORDER BY
                 CASE WHEN NULLIF(BTRIM(pq.answer), '') IS NULL THEN 0 ELSE 1 END ASC,
@@ -313,6 +331,12 @@ exports.answerQuestion = async (req, res) => {
               AND first_party_store.is_active = TRUE
               AND first_party_store.deleted_at IS NULL
              WHERE pq.id = $1
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM seller_stores current_seller_store
+                   WHERE current_seller_store.legacy_store_id = first_party_store.id
+                     AND current_seller_store.closed_at IS NULL
+               )
              FOR UPDATE OF pq`,
             [questionId, PLATFORM_STORE.slug]
         );

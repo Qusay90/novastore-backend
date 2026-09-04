@@ -1330,11 +1330,14 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
   const [suppressedMutationActions, setSuppressedMutationActions] = useState(null);
   const pendingMediaFocusRef = useRef(null);
   const writesSuppressed = suppressedMutationActions === mutationActions;
+  const platformStoreAuthority = catalogPage.platformStoreAuthority;
   const writeCapabilityEnabled = typeof mutationActions.getCatalogProduct === "function"
     && typeof mutationActions.createCatalogProduct === "function"
     && typeof mutationActions.updateCatalogProduct === "function"
     && typeof mutationActions.archiveCatalogProduct === "function";
-  const writesBlocked = !writeCapabilityEnabled || writesSuppressed || Boolean(error) || refreshing || sessionRefreshing;
+  const platformStoreWritable = platformStoreAuthority.adminWritable === true;
+  const productWriteEnabled = writeCapabilityEnabled && platformStoreWritable;
+  const writesBlocked = !productWriteEnabled || writesSuppressed || Boolean(error) || refreshing || sessionRefreshing;
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("tr-TR");
     return filterFirstPartyCatalogProducts(products, {
@@ -1486,6 +1489,10 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
   const archivedProduct = (product) => Boolean(product.deletedAt) || product.publicationStatus === "archived";
   const writeBoundaryMessage = !writeCapabilityEnabled
     ? "Bu oturum bütün ürün özetlerini salt okunur gösterir; platform ürünü yazma capability'si sunulmadı. Seller ürünleri capability'den bağımsız olarak salt okunurdur."
+    : platformStoreAuthority.reason === "unavailable"
+      ? "Yazılabilir bir NovaStore platform mağazası bulunamadı. Yeni ürün oluşturma ve mevcut kayıtlara yazma güvenli biçimde kapalıdır."
+      : platformStoreAuthority.reason === "seller_bound"
+        ? `${platformStoreAuthority.storeName} şu anda bir Seller organizasyonuna bağlıdır. Ürünleri Seller portalından yönetilir; Admin sahiplik sınırını aşarak oluşturma, düzenleme, medya veya arşivleme yapmaz.`
     : writesSuppressed
       ? "Sunucu yazmayı reddettiği için bu görünümdeki ürün aksiyonları oturum yeniden doğrulanana kadar kapatıldı."
       : error
@@ -1498,23 +1505,23 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
     <section className="workspace live-workspace" data-testid="live-catalog">
       <header className="workspace-heading operations-heading">
         <div>
-          <span className="eyebrow">Entegre backend · paylaşımlı katalog · {writeCapabilityEnabled ? "platform yazması capability kontrollü" : "salt okunur"}</span>
+          <span className="eyebrow">Entegre backend · paylaşımlı katalog · {productWriteEnabled ? "Admin mağazası yazmaya açık" : "sahiplik sınırıyla salt okunur"}</span>
           <h2 tabIndex="-1">Ürünler</h2>
           <p>En fazla son {catalogPage.limit} platform ve Seller ürün kaydı, sahiplik ve mağaza gerçeğiyle gösterilir.</p>
         </div>
         <div className="heading-actions live-catalog-heading-actions">
-          {writeCapabilityEnabled && <button className="primary-button" onClick={openCreate} disabled={writesBlocked || openingProductId !== null}><Icon name="package" />Yeni platform ürünü</button>}
+          {productWriteEnabled && <button className="primary-button" onClick={openCreate} disabled={writesBlocked || openingProductId !== null}><Icon name="package" />Yeni platform ürünü</button>}
           <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
         </div>
       </header>
 
       <ResourceWarning error={error} onRetry={onRefresh} />
       {operationNotice && <section className={`notice-card live-operation-notice ${operationNotice.tone === "warning" ? "warning-card" : "success-card"}`} role="status"><Icon name={operationNotice.tone === "warning" ? "warning" : "check"} /><div><strong>{operationNotice.tone === "warning" ? "Güncel veri gerekli" : "Ürün işlemi kaydedildi"}</strong><p>{operationNotice.message}</p></div></section>}
-      <section className="notice-card live-boundary-notice" role="note">
+      <section className={`notice-card live-boundary-notice ${platformStoreWritable ? "" : "warning-card"}`} role="note">
         <Icon name="shield" />
         <div>
-          <strong>Tek katalog gerçeği · sahiplik tabanlı yazma sınırı</strong>
-          <p>Platform ve Seller ürünleri aynı listede görünür. Yalnız adminEditable=true platform kaydı düzenlenebilir; Seller ürününde detay mutation, medya yazması ve arşivleme açılmaz. Dosya yükleme/silme, hard-delete ve arşivden geri yükleme bu turda yoktur.</p>
+          <strong>{platformStoreAuthority.reason === "seller_bound" ? `${platformStoreAuthority.storeName} · Seller yönetiminde` : platformStoreAuthority.reason === "unavailable" ? "Platform mağazası kullanılamıyor" : "Tek katalog gerçeği · sahiplik tabanlı yazma sınırı"}</strong>
+          <p>{platformStoreWritable ? "Platform ve Seller ürünleri aynı listede görünür. Yalnız adminEditable=true platform kaydı düzenlenebilir; Seller ürününde detay mutation, medya yazması ve arşivleme açılmaz. Dosya yükleme/silme, hard-delete ve arşivden geri yükleme bu turda yoktur." : writeBoundaryMessage}</p>
         </div>
       </section>
 
@@ -1593,7 +1600,7 @@ function Catalog({ catalogPage, error, refreshing, sessionRefreshing, onRefresh,
             <button className="secondary-button" onClick={resetFilters}>Filtreleri temizle</button>
           </div>
         )}
-        <footer className={`table-footer live-catalog-write-footer ${writesBlocked ? "is-blocked" : "is-ready"}`} role="note"><span><Icon name={writesBlocked ? "shield" : "check"} />{writeBoundaryMessage}</span><strong>{writeCapabilityEnabled ? "Platform CRUD · Seller salt okunur" : "Salt okunur"}</strong></footer>
+        <footer className={`table-footer live-catalog-write-footer ${writesBlocked ? "is-blocked" : "is-ready"}`} role="note"><span><Icon name={writesBlocked ? "shield" : "check"} />{writeBoundaryMessage}</span><strong>{productWriteEnabled ? "Admin mağazası CRUD · Seller salt okunur" : "Sahiplik nedeniyle salt okunur"}</strong></footer>
       </section>
       {operation?.kind === "create" && typeof mutationActions.createCatalogProduct === "function" && <CatalogProductFormDialog mode="create" action={mutationActions.createCatalogProduct} onClose={() => setOperation(null)} onComplete={handleComplete} onRequestError={handleMutationError} />}
       {operation?.kind === "edit" && typeof mutationActions.updateCatalogProduct === "function" && <CatalogProductFormDialog mode="edit" product={operation.product} action={mutationActions.updateCatalogProduct} onClose={() => setOperation(null)} onComplete={handleComplete} onRequestError={handleMutationError} />}
@@ -1647,10 +1654,110 @@ const filterStructureActivity = (items, activity) => items.filter((item) => {
   return activity === "active" ? active : !active;
 });
 
-function CatalogStructure({ structure, error, refreshing, onRefresh }) {
+const catalogStructureEntityLabels = Object.freeze({
+  categories: "kategori",
+  attributes: "özellik",
+  templates: "şablon",
+  collections: "koleksiyon",
+  menus: "menü",
+});
+
+const catalogStructureFormState = (view, item = null) => {
+  if (view === "categories") return {
+    name: item?.name || "", slug: item?.slug || "", parentId: item?.parentId || "", sortOrder: item?.sortOrder || 0,
+    active: item?.active !== false, customerVisible: item?.customerVisible !== false, showInMenu: item?.showInMenu !== false,
+    showOnHome: item?.showOnHome === true, hideWhenEmpty: item?.hideWhenEmpty !== false,
+  };
+  if (view === "attributes") return {
+    code: item?.code || "", name: item?.name || "", type: item?.type || "text", unit: item?.unit || "", sortOrder: item?.sortOrder || 0,
+    filterable: item?.filterable === true, required: item?.required === true, variantRelevant: item?.variantRelevant === true, active: item?.active !== false,
+  };
+  if (view === "templates") return {
+    name: item?.name || "", categoryId: item?.categoryId || "", sortOrder: item?.sortOrder || 0, active: item?.active !== false,
+  };
+  if (view === "collections") return {
+    name: item?.name || "", slug: item?.slug || "", type: item?.type || "manual", ruleCode: item?.ruleCode || "new_arrivals",
+    sortOrder: item?.sortOrder || 0, showOnHome: item?.showOnHome === true, active: item?.active !== false,
+  };
+  return { code: item?.code || "main", name: item?.name || "", active: item?.active !== false };
+};
+
+function CatalogStructureRecordDialog({ view, operation, structure, actions, onClose, onComplete }) {
+  const item = operation.item || null;
+  const archive = operation.kind === "archive";
+  const label = catalogStructureEntityLabels[view];
+  const [form, setForm] = useState(() => catalogStructureFormState(view, item));
+  const [busy, setBusy] = useState(false);
+  const [requestError, setRequestError] = useState(null);
+  const field = (name, value) => setForm((current) => ({ ...current, [name]: value }));
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setRequestError(null);
+    try {
+      if (archive) {
+        if (view === "categories") await actions.setCategoryArchived({ categoryId: item.id, archived: !item.deletedAt });
+        if (view === "attributes") await actions.setAttributeArchived({ attributeId: item.id, archived: item.active });
+        if (view === "collections") await actions.setCollectionArchived({ collectionId: item.id, archived: !item.deletedAt });
+      } else if (view === "categories") {
+        await actions.saveCategory({ category: item, body: {
+          name: form.name.trim(), slug: form.slug.trim() || null, parent_id: form.parentId ? Number(form.parentId) : null,
+          sort_order: Number(form.sortOrder) || 0, is_active: form.active, is_customer_visible: form.customerVisible,
+          show_in_menu: form.showInMenu, show_on_home: form.showOnHome, hide_when_empty: form.hideWhenEmpty,
+        } });
+      } else if (view === "attributes") {
+        await actions.saveAttribute({ attribute: item, body: {
+          code: form.code.trim(), name: form.name.trim(), type: form.type, unit: form.unit.trim() || null,
+          sort_order: Number(form.sortOrder) || 0, is_filterable: form.filterable, is_required: form.required,
+          is_variant_relevant: form.variantRelevant, is_active: form.active,
+        } });
+      } else if (view === "templates") {
+        await actions.saveTemplate({ template: item, body: {
+          name: form.name.trim(), category_id: Number(form.categoryId), sort_order: Number(form.sortOrder) || 0, is_active: form.active,
+        } });
+      } else if (view === "collections") {
+        await actions.saveCollection({ collection: item, body: {
+          name: form.name.trim(), slug: form.slug.trim(), collection_type: form.type,
+          rule_code: form.type === "dynamic" ? form.ruleCode : null, sort_order: Number(form.sortOrder) || 0,
+          show_on_home: form.showOnHome, is_active: form.active,
+        } });
+      } else {
+        await actions.saveMenu({ menu: item, body: { code: form.code, name: form.name.trim(), is_active: form.active } });
+      }
+      onComplete(`${item ? "Güncellenen" : "Oluşturulan"} ${label} kaydı sunucudan yeniden doğrulandı.`);
+    } catch (error) {
+      setRequestError(error);
+      setBusy(false);
+    }
+  };
+
+  if (archive) {
+    const restoring = (view === "categories" || view === "collections") && Boolean(item.deletedAt);
+    return <OperationDialog title={`${item.name} ${restoring ? "geri yüklensin mi?" : "arşivlensin mi?"}`} busy={busy} onClose={onClose} testId="catalog-structure-archive-dialog"><form className="modal-form live-operation-form" onSubmit={submit}><div className="confirmation-body"><Icon name="warning" /><p><strong>{restoring ? "Kayıt yeniden etkin yönetim alanına alınacak." : "Kayıt kalıcı olarak silinmeyecek."}</strong> {restoring ? "Görünürlük ayarlarını yayımlamadan önce yeniden kontrol edin." : "Bağlı ürün ve yapı ilişkileri korunur; müşteri yüzeyinden güvenli biçimde çekilir."}</p></div><OperationError error={requestError} /><footer><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Vazgeç</button><button type="submit" className={restoring ? "primary-button" : "danger-button"} disabled={busy}>{busy ? "Kaydediliyor…" : restoring ? "Geri yükle" : "Arşivle"}</button></footer></form></OperationDialog>;
+  }
+
+  return <OperationDialog title={`${item ? "Düzenle" : "Yeni"}: ${label}`} busy={busy} onClose={onClose} testId="catalog-structure-record-dialog" wide><form className="modal-form live-operation-form live-structure-form" onSubmit={submit}><OperationError error={requestError} />
+    {(view === "categories" || view === "collections" || view === "templates" || view === "menus") && <label><span>Ad</span><input data-autofocus value={form.name} onChange={(event) => field("name", event.target.value)} required maxLength="200" /></label>}
+    {(view === "categories" || view === "collections") && <label><span>Slug</span><input value={form.slug} onChange={(event) => field("slug", event.target.value)} maxLength="200" placeholder="otomatik-uretilebilir" /></label>}
+    {view === "categories" && <label><span>Üst kategori</span><select value={form.parentId} onChange={(event) => field("parentId", event.target.value)}><option value="">Kök kategori</option>{structure.categories.items.filter((entry) => entry.id !== item?.id && !entry.deletedAt).map((entry) => <option value={entry.id} key={entry.id}>{entry.path || entry.name}</option>)}</select></label>}
+    {view === "attributes" && <><label><span>Sistem kodu</span><input data-autofocus value={form.code} onChange={(event) => field("code", event.target.value)} required pattern="[a-z][a-z0-9_]{1,79}" maxLength="80" /></label><label><span>Özellik adı</span><input value={form.name} onChange={(event) => field("name", event.target.value)} required maxLength="200" /></label><label><span>Tür</span><select value={form.type} onChange={(event) => field("type", event.target.value)}>{Object.entries(attributeTypeLabels).map(([value, name]) => <option value={value} key={value}>{name}</option>)}</select></label><label><span>Birim</span><input value={form.unit} onChange={(event) => field("unit", event.target.value)} maxLength="80" placeholder="Örn. cm" /></label></>}
+    {view === "templates" && <label><span>Kategori</span><select data-autofocus value={form.categoryId} onChange={(event) => field("categoryId", event.target.value)} required><option value="">Kategori seçin</option>{structure.categories.items.filter((entry) => !entry.deletedAt).map((entry) => <option value={entry.id} key={entry.id}>{entry.path || entry.name}</option>)}</select></label>}
+    {view === "collections" && <><label><span>Koleksiyon türü</span><select value={form.type} onChange={(event) => field("type", event.target.value)}><option value="manual">Manuel</option><option value="dynamic">Dinamik</option></select></label>{form.type === "dynamic" && <label><span>Dinamik kural</span><select value={form.ruleCode} onChange={(event) => field("ruleCode", event.target.value)}>{Object.entries(collectionRuleLabels).map(([value, name]) => <option value={value} key={value}>{name}</option>)}</select></label>}</>}
+    {view === "menus" && <label><span>Menü konumu</span><select data-autofocus value={form.code} onChange={(event) => field("code", event.target.value)} disabled={Boolean(item)}><option value="main">Ana menü</option><option value="footer">Alt bilgi</option><option value="mobile">Mobil</option><option value="home">Ana sayfa</option></select></label>}
+    {view !== "menus" && <label><span>Sıra</span><input type="number" value={form.sortOrder} onChange={(event) => field("sortOrder", event.target.value)} /></label>}
+    <fieldset className="live-structure-switches"><legend>Yayın ve kullanım</legend><label className="check-row"><input type="checkbox" checked={form.active} onChange={(event) => field("active", event.target.checked)} /><span>Etkin</span></label>{view === "categories" && <><label className="check-row"><input type="checkbox" checked={form.customerVisible} onChange={(event) => field("customerVisible", event.target.checked)} /><span>Müşteriye görünür</span></label><label className="check-row"><input type="checkbox" checked={form.showInMenu} onChange={(event) => field("showInMenu", event.target.checked)} /><span>Menüde göster</span></label><label className="check-row"><input type="checkbox" checked={form.showOnHome} onChange={(event) => field("showOnHome", event.target.checked)} /><span>Ana sayfada göster</span></label><label className="check-row"><input type="checkbox" checked={form.hideWhenEmpty} onChange={(event) => field("hideWhenEmpty", event.target.checked)} /><span>Boşken gizle</span></label></>}{view === "attributes" && <><label className="check-row"><input type="checkbox" checked={form.filterable} onChange={(event) => field("filterable", event.target.checked)} /><span>Filtrelenebilir</span></label><label className="check-row"><input type="checkbox" checked={form.required} onChange={(event) => field("required", event.target.checked)} /><span>Zorunlu</span></label><label className="check-row"><input type="checkbox" checked={form.variantRelevant} onChange={(event) => field("variantRelevant", event.target.checked)} /><span>Varyantla ilgili</span></label></>}{view === "collections" && <label className="check-row"><input type="checkbox" checked={form.showOnHome} onChange={(event) => field("showOnHome", event.target.checked)} /><span>Ana sayfada göster</span></label>}</fieldset>
+    <footer><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Vazgeç</button><button type="submit" className="primary-button" disabled={busy}>{busy ? "Kaydediliyor…" : item ? "Değişiklikleri kaydet" : `${label[0].toLocaleUpperCase("tr-TR")}${label.slice(1)} oluştur`}</button></footer>
+  </form></OperationDialog>;
+}
+
+function CatalogStructure({ structure, error, refreshing, onRefresh, mutationActions }) {
   const [view, setView] = useState("categories");
   const [query, setQuery] = useState("");
   const [activity, setActivity] = useState("all");
+  const [operation, setOperation] = useState(null);
+  const [operationNotice, setOperationNotice] = useState(null);
+  const writeEnabled = typeof mutationActions.saveCategory === "function";
   const sourceByView = {
     categories: structure.categories,
     attributes: structure.attributeDefinitions,
@@ -1681,6 +1788,13 @@ function CatalogStructure({ structure, error, refreshing, onRefresh }) {
     setActivity("all");
   };
 
+  const completeOperation = (message) => {
+    setOperation(null);
+    setOperationNotice(message);
+    onRefresh();
+  };
+  const operationCell = (item) => <td>{writeEnabled ? <span className="live-operation-buttons"><button type="button" className="secondary-button small" onClick={() => setOperation({ kind: "edit", item })}>Düzenle</button>{["categories", "attributes", "collections"].includes(view) && <button type="button" className="danger-button small" onClick={() => setOperation({ kind: "archive", item })}>{item.deletedAt || item.active === false ? "Geri yükle" : "Arşivle"}</button>}</span> : <span className="live-archived-lock"><Icon name="shield" />Salt okunur</span>}</td>;
+
   const empty = (
     <div className="state-panel">
       <Icon name="search" />
@@ -1694,14 +1808,14 @@ function CatalogStructure({ structure, error, refreshing, onRefresh }) {
   if (view === "categories") {
     table = filtered.length ? (
       <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Kategori yapı özeti tablosu">
-        <table className="data-table live-structure-table"><caption className="sr-only">Salt okunur kategori yapı özetleri</caption>
-          <thead><tr><th scope="col">Kategori</th><th scope="col">Hiyerarşi</th><th scope="col">NovaStore ürünü</th><th scope="col">Şablon</th><th scope="col">Yayın yüzeyleri</th><th scope="col">Durum</th></tr></thead>
+        <table className="data-table live-structure-table"><caption className="sr-only">Kategori yapı kayıtları ve yönetim işlemleri</caption>
+          <thead><tr><th scope="col">Kategori</th><th scope="col">Hiyerarşi</th><th scope="col">NovaStore ürünü</th><th scope="col">Şablon</th><th scope="col">Yayın yüzeyleri</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
           <tbody>{filtered.map((item) => <tr key={item.id}>
             <td><span className="live-customer-cell"><strong>{item.name}</strong><small>#{item.id} · {item.slug || "slug bekliyor"}</small></span></td>
             <td><span className="live-customer-cell"><strong>{item.path || "Yol bekliyor"}</strong><small>Derinlik {item.depth ?? "?"} · üst #{item.parentId || "kök"} · {item.childCount} alt kategori</small></span></td>
             <td>{item.firstPartyProductCount}</td><td>{item.attributeTemplateCount}</td>
             <td><span className="live-flag-list"><small>Vitrin {item.customerVisible ? "açık" : "kapalı"}</small><small>Menü {item.showInMenu ? "açık" : "kapalı"}</small><small>Ana sayfa {item.showOnHome ? "açık" : "kapalı"}</small></span></td>
-            <td><span className={`status ${isCatalogStructureItemActive(item) ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.deletedAt ? "Arşivli" : item.active ? "Etkin" : "Pasif"}</span></td>
+            <td><span className={`status ${isCatalogStructureItemActive(item) ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.deletedAt ? "Arşivli" : item.active ? "Etkin" : "Pasif"}</span></td>{operationCell(item)}
           </tr>)}</tbody>
         </table>
       </div>
@@ -1709,13 +1823,13 @@ function CatalogStructure({ structure, error, refreshing, onRefresh }) {
   } else if (view === "attributes") {
     table = filtered.length ? (
       <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Özellik tanımı özeti tablosu">
-        <table className="data-table live-structure-table"><caption className="sr-only">Salt okunur özellik tanımı özetleri</caption>
-          <thead><tr><th scope="col">Özellik</th><th scope="col">Tür</th><th scope="col">Seçenek</th><th scope="col">Şablon</th><th scope="col">NovaStore değeri</th><th scope="col">Davranış</th><th scope="col">Durum</th></tr></thead>
+        <table className="data-table live-structure-table"><caption className="sr-only">Özellik tanımı kayıtları ve yönetim işlemleri</caption>
+          <thead><tr><th scope="col">Özellik</th><th scope="col">Tür</th><th scope="col">Seçenek</th><th scope="col">Şablon</th><th scope="col">NovaStore değeri</th><th scope="col">Davranış</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
           <tbody>{filtered.map((item) => <tr key={item.id}>
             <td><span className="live-customer-cell"><strong>{item.name}</strong><small>#{item.id} · {item.code}</small></span></td>
             <td>{attributeTypeLabels[item.type]}{item.unit && <small>{item.unit}</small>}</td><td>{item.optionCount}</td><td>{item.templateCount}</td><td>{item.firstPartyValueCount}</td>
             <td><span className="live-flag-list"><small>{item.filterable ? "Filtrelenir" : "Filtrelenmez"}</small><small>{item.required ? "Zorunlu" : "İsteğe bağlı"}</small><small>{item.variantRelevant ? "Varyantla ilgili" : "Varyant dışı"}</small></span></td>
-            <td><span className={`status ${item.active ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.active ? "Etkin" : "Pasif"}</span></td>
+            <td><span className={`status ${item.active ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.active ? "Etkin" : "Pasif"}</span></td>{operationCell(item)}
           </tr>)}</tbody>
         </table>
       </div>
@@ -1723,13 +1837,13 @@ function CatalogStructure({ structure, error, refreshing, onRefresh }) {
   } else if (view === "templates") {
     table = filtered.length ? (
       <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Özellik şablonu özeti tablosu">
-        <table className="data-table live-structure-table"><caption className="sr-only">Salt okunur özellik şablonu özetleri</caption>
-          <thead><tr><th scope="col">Şablon</th><th scope="col">Kategori</th><th scope="col">Özellik</th><th scope="col">Zorunlu</th><th scope="col">Filtrelenebilir</th><th scope="col">Durum</th></tr></thead>
+        <table className="data-table live-structure-table"><caption className="sr-only">Özellik şablonu kayıtları ve yönetim işlemleri</caption>
+          <thead><tr><th scope="col">Şablon</th><th scope="col">Kategori</th><th scope="col">Özellik</th><th scope="col">Zorunlu</th><th scope="col">Filtrelenebilir</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
           <tbody>{filtered.map((item) => <tr key={item.id}>
             <td><span className="live-customer-cell"><strong>{item.name}</strong><small>#{item.id}</small></span></td>
             <td><span className="live-customer-cell"><strong>{item.categoryName}</strong><small>#{item.categoryId} · {item.categoryPath || "Yol bekliyor"}</small></span></td>
             <td>{item.attributeCount}</td><td>{item.requiredCount}</td><td>{item.filterableCount}</td>
-            <td><span className={`status ${item.active ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.active ? "Etkin" : "Pasif"}</span></td>
+            <td><span className={`status ${item.active ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.active ? "Etkin" : "Pasif"}</span></td>{operationCell(item)}
           </tr>)}</tbody>
         </table>
       </div>
@@ -1737,12 +1851,12 @@ function CatalogStructure({ structure, error, refreshing, onRefresh }) {
   } else if (view === "collections") {
     table = filtered.length ? (
       <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Koleksiyon özeti tablosu">
-        <table className="data-table live-structure-table"><caption className="sr-only">Salt okunur koleksiyon özetleri</caption>
-          <thead><tr><th scope="col">Koleksiyon</th><th scope="col">Tür</th><th scope="col">Kural</th><th scope="col">Manuel NovaStore ürünü</th><th scope="col">Ana sayfa</th><th scope="col">Durum</th></tr></thead>
+        <table className="data-table live-structure-table"><caption className="sr-only">Koleksiyon kayıtları ve yönetim işlemleri</caption>
+          <thead><tr><th scope="col">Koleksiyon</th><th scope="col">Tür</th><th scope="col">Kural</th><th scope="col">Manuel NovaStore ürünü</th><th scope="col">Ana sayfa</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
           <tbody>{filtered.map((item) => <tr key={item.id}>
             <td><span className="live-customer-cell"><strong>{item.name}</strong><small>#{item.id} · {item.slug}</small></span></td>
             <td>{item.type === "manual" ? "Manuel" : "Dinamik"}</td><td>{item.ruleCode ? collectionRuleLabels[item.ruleCode] : `${item.ruleCount} kural`}</td><td>{item.type === "manual" ? item.firstPartyManualProductCount : "Kural tabanlı"}</td><td>{item.showOnHome ? "Gösteriliyor" : "Gizli"}</td>
-            <td><span className={`status ${isCatalogStructureItemActive(item) ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.deletedAt ? "Arşivli" : item.active ? "Etkin" : "Pasif"}</span></td>
+            <td><span className={`status ${isCatalogStructureItemActive(item) ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.deletedAt ? "Arşivli" : item.active ? "Etkin" : "Pasif"}</span></td>{operationCell(item)}
           </tr>)}</tbody>
         </table>
       </div>
@@ -1751,9 +1865,9 @@ function CatalogStructure({ structure, error, refreshing, onRefresh }) {
     table = filtered.length || filteredMenuItems.length ? (
       <div className="live-structure-menu-stack">
         <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Menü özeti tablosu">
-          <table className="data-table live-structure-table"><caption className="sr-only">Salt okunur menü özetleri</caption>
-            <thead><tr><th scope="col">Menü</th><th scope="col">Toplam öğe</th><th scope="col">Etkin öğe</th><th scope="col">Kök öğe</th><th scope="col">Durum</th></tr></thead>
-            <tbody>{filtered.map((item) => <tr key={item.id}><td><span className="live-customer-cell"><strong>{item.name}</strong><small>#{item.id} · {item.code}</small></span></td><td>{item.itemCount}</td><td>{item.activeItemCount}</td><td>{item.rootItemCount}</td><td><span className={`status ${item.active ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.active ? "Etkin" : "Pasif"}</span></td></tr>)}</tbody>
+          <table className="data-table live-structure-table"><caption className="sr-only">Menü kayıtları ve yönetim işlemleri</caption>
+            <thead><tr><th scope="col">Menü</th><th scope="col">Toplam öğe</th><th scope="col">Etkin öğe</th><th scope="col">Kök öğe</th><th scope="col">Durum</th><th scope="col">İşlem</th></tr></thead>
+            <tbody>{filtered.map((item) => <tr key={item.id}><td><span className="live-customer-cell"><strong>{item.name}</strong><small>#{item.id} · {item.code}</small></span></td><td>{item.itemCount}</td><td>{item.activeItemCount}</td><td>{item.rootItemCount}</td><td><span className={`status ${item.active ? "status-yayında" : "status-yayından-kaldırıldı"}`}>{item.active ? "Etkin" : "Pasif"}</span></td>{operationCell(item)}</tr>)}</tbody>
           </table>
         </div>
         <div className="table-scroll table-scroll-hint" tabIndex="0" role="region" aria-label="Menü öğesi özeti tablosu">
@@ -1769,11 +1883,12 @@ function CatalogStructure({ structure, error, refreshing, onRefresh }) {
   return (
     <section className="workspace live-workspace" data-testid="live-catalog-structure">
       <header className="workspace-heading operations-heading">
-        <div><span className="eyebrow">Entegre backend · ortak yapı · salt okunur</span><h2 tabIndex="-1">Katalog yapısı</h2><p>Kategori, özellik, şablon, koleksiyon ve menü kayıtları aynı bounded yönetim sözleşmesinden okunur.</p></div>
-        <button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button>
+        <div><span className="eyebrow">Entegre backend · ortak yapı · {writeEnabled ? "kontrollü yönetim" : "salt okunur"}</span><h2 tabIndex="-1">Katalog yapısı</h2><p>Kategori, özellik, şablon, koleksiyon ve menü kayıtları aynı bounded yönetim sözleşmesinden okunur.</p></div>
+        <div className="heading-actions">{writeEnabled && <button className="primary-button" onClick={() => setOperation({ kind: "create", item: null })}><Icon name="plus" />Yeni {catalogStructureEntityLabels[view]}</button>}<button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />{refreshing ? "Yenileniyor" : "Yenile"}</button></div>
       </header>
       <ResourceWarning error={error} onRetry={onRefresh} />
-      <section className="notice-card live-boundary-notice" role="note"><Icon name="shield" /><div><strong>Satıcı portalı veya ürün izin kuyruğu değildir</strong><p>Bu ekran platform ve Seller ürünlerinin paylaştığı ortak katalog yapısını okur. Seller sahipliği, teklif, risk puanı, onay aksiyonu, medya URL'si veya yazma isteği taşımaz; menülerin iç URL değerleri de DTO'ya alınmaz.</p></div></section>
+      {operationNotice && <section className="notice-card live-operation-notice success-card" role="status"><Icon name="check" /><div><strong>Katalog kaydı güncellendi</strong><p>{operationNotice}</p></div></section>}
+      <section className="notice-card live-boundary-notice" role="note"><Icon name="shield" /><div><strong>{writeEnabled ? "Platform kataloğu · yetkili ve geri alınabilir işlemler" : "Satıcı portalı veya ürün izin kuyruğu değildir"}</strong><p>{writeEnabled ? "Bu oturumda platform kategori, özellik, şablon, koleksiyon ve menü kayıtları yönetilebilir. Silme yerine arşivleme kullanılır; Seller ürün sahipliği ve teklif yönetimi bu ekrana taşınmaz." : "Bu ekran platform ve Seller ürünlerinin paylaştığı ortak katalog yapısını okur. Seller sahipliği, teklif, risk puanı, onay aksiyonu, medya URL'si veya yazma isteği taşımaz; menülerin iç URL değerleri de DTO'ya alınmaz."}</p></div></section>
       <section className="table-card live-structure-card">
         <nav className="ledger-tabs live-structure-tabs" aria-label="Katalog yapı bölümleri">
           {catalogStructureTabs.map(([id, label]) => <button type="button" key={id} className={view === id ? "active" : ""} aria-current={view === id ? "page" : undefined} onClick={() => setView(id)}>{label} <b>{counts[id]}</b></button>)}
@@ -1785,6 +1900,7 @@ function CatalogStructure({ structure, error, refreshing, onRefresh }) {
         </div>
         {table}
       </section>
+      {operation && writeEnabled && <CatalogStructureRecordDialog view={view} operation={operation} structure={structure} actions={mutationActions} onClose={() => setOperation(null)} onComplete={completeOperation} />}
     </section>
   );
 }
@@ -2142,12 +2258,15 @@ function QuestionAnswerDialog({ question, action, onClose, onComplete }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const submit = async (event) => { event.preventDefault(); setBusy(true); setError(null); try { await action({ questionId: question.id, expectedRevision: question.revision, answer }); onComplete(); } catch (requestError) { setError(requestError); } finally { setBusy(false); } };
-  return <OperationDialog title={`Soru #${question.id} yanıtı`} busy={busy} onClose={onClose} testId="question-answer-dialog"><form className="connected-form" onSubmit={submit}>{error && <OperationError error={error} id="question-answer-error" />}<section className="notice-card"><Icon name="help" /><div><strong>{question.productName}</strong><p>{question.question}</p></div></section><label className="field field-wide"><span>Yayınlanacak yanıt</span><textarea value={answer} onChange={(event) => setAnswer(event.target.value)} minLength="1" maxLength="2000" required rows="6" /></label><button className="primary-button" disabled={busy || !answer.trim()}>Yanıtla ve yayınla</button></form></OperationDialog>;
+  return <OperationDialog title="Ürün sorusunu yanıtla" eyebrow={`${question.storeName} · Soru #${question.id}`} busy={busy} onClose={onClose} testId="question-answer-dialog" wide><form className="modal-form live-operation-form question-answer-form" onSubmit={submit} aria-describedby="question-publication-note"><OperationError error={error} id="question-answer-error" /><section className="question-context-card"><div className="question-context-icon"><Icon name="help" /></div><div className="question-context-copy"><span className="question-context-kicker">{question.storeName} · {question.userName}</span><h3>{question.productName}</h3><blockquote>{question.question}</blockquote><small>{dateTime(question.createdAt)} · Mağaza #{question.storeId}</small></div></section><label className="field field-wide"><span>Herkese açık mağaza yanıtı</span><textarea data-autofocus value={answer} onChange={(event) => setAnswer(event.target.value)} minLength="1" maxLength="2000" required rows="6" placeholder="Müşterinin sorusunu açık, doğru ve yardımcı bir dille yanıtlayın." aria-describedby="question-answer-count question-publication-note" /></label><div className="question-composer-meta"><span id="question-publication-note">Yanıt ürün sayfasında yayımlanır ve müşteriye bildirilir.</span><strong id="question-answer-count">{answer.length}/2000</strong></div><footer><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Vazgeç</button><button className="primary-button" disabled={busy || !answer.trim()}>{busy ? "Yayımlanıyor…" : question.answer ? "Yanıtı güncelle" : "Yanıtla ve yayınla"}</button></footer></form></OperationDialog>;
 }
 
 function QuestionsWorkspace({ items, error, refreshing, onRefresh, action }) {
   const [operation, setOperation] = useState(null);
-  return <section className="workspace live-workspace" data-testid="live-questions"><header className="workspace-heading operations-heading"><div><span className="eyebrow">Ürün soru ve cevap operasyonu</span><h2 tabIndex="-1">Müşteri soruları</h2><p>Yanıtsız sorular storefront'a yayımlanmaz.</p></div><button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />Yenile</button></header><ResourceWarning error={error} onRetry={onRefresh} /><div className="table-card"><div className="table-scroll" tabIndex="0" role="region" aria-label="Müşteri soruları"><table className="data-table"><thead><tr><th>Ürün</th><th>Müşteri</th><th>Soru</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td>{item.productName}</td><td>{item.userName}</td><td>{item.question}</td><td>{item.answer ? "Yanıtlandı" : "Bekliyor"}</td><td>{action ? <button className="primary-button small" onClick={() => setOperation(item)}>{item.answer ? "Yanıtı güncelle" : "Yanıtla"}</button> : "Salt okunur"}</td></tr>)}{items.length === 0 && <tr><td colSpan="5">Soru kaydı yok.</td></tr>}</tbody></table></div></div>{operation && action && <QuestionAnswerDialog question={operation} action={action} onClose={() => setOperation(null)} onComplete={() => { setOperation(null); onRefresh(); }} />}</section>;
+  const adminPending = items.filter((item) => item.adminAnswerable && !item.answer).length;
+  const sellerOwned = items.filter((item) => !item.adminAnswerable).length;
+  const answered = items.filter((item) => item.answer).length;
+  return <section className="workspace live-workspace" data-testid="live-questions"><header className="workspace-heading operations-heading"><div><span className="eyebrow">Mağaza sahipliği doğrulanmış ürün soruları</span><h2 tabIndex="-1">Müşteri soruları</h2><p>Admin yalnız Admin yönetimindeki mağaza sorularını yanıtlar. Seller mağazalarının soruları burada denetlenebilir, ancak yanıt yetkisi ilgili Seller organizasyonunda kalır.</p></div><button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />Yenile</button></header><ResourceWarning error={error} onRetry={onRefresh} /><section className="question-summary-strip" aria-label="Soru operasyon özeti"><div><span>Admin yanıtı bekleyen</span><strong>{adminPending}</strong></div><div><span>Seller sorusu</span><strong>{sellerOwned}</strong></div><div><span>Yanıtlanan</span><strong>{answered}</strong></div><div><span>Toplam</span><strong>{items.length}</strong></div></section><div className="table-card"><div className="table-scroll" tabIndex="0" role="region" aria-label="Müşteri soruları"><table className="data-table question-operations-table"><thead><tr><th>Mağaza / ürün</th><th>Müşteri</th><th>Soru</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><span className="live-customer-cell"><strong>{item.productName}</strong><small>{item.storeName} · Soru #{item.id}</small><small>{item.adminAnswerable ? "Admin yönetiminde" : `${item.sellerOrganizationName || "Seller organizasyonu"} yönetiminde`}</small></span></td><td>{item.userName}</td><td><p className="question-cell-copy">{item.question}</p><small>{dateTime(item.createdAt)}</small></td><td><span className={`status ${item.answer ? "status-yayında" : "status-ödeme-bekliyor"}`}>{item.answer ? "Yanıtlandı" : "Yanıt bekliyor"}</span></td><td>{action && item.adminAnswerable ? <button className={item.answer ? "secondary-button small" : "primary-button small"} onClick={() => setOperation(item)}>{item.answer ? "Yanıtı güncelle" : "Yanıtla"}</button> : <span className="live-archived-lock"><Icon name="shield" />{item.adminAnswerable ? "Salt okunur" : "Seller yanıtlar"}</span>}</td></tr>)}{items.length === 0 && <tr><td colSpan="5">Henüz müşteri sorusu yok.</td></tr>}</tbody></table></div></div>{operation && action && operation.adminAnswerable && <QuestionAnswerDialog question={operation} action={action} onClose={() => setOperation(null)} onComplete={() => { setOperation(null); onRefresh(); }} />}</section>;
 }
 
 const toLocalInput = (value) => value instanceof Date ? new Date(value.getTime() - value.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
@@ -2168,18 +2287,57 @@ function CouponsWorkspace({ items, error, refreshing, onRefresh, actions }) {
 }
 
 function SupportDialog({ thread, loadHistory, actions, onClose, onComplete }) {
-  const [messages, setMessages] = useState([]); const [phase, setPhase] = useState("loading"); const [reply, setReply] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState(null);
-  const refresh = useCallback(async () => { setPhase("loading"); try { setMessages(await loadHistory(thread.customerId)); setPhase("ready"); } catch (requestError) { setError(requestError); setPhase("error"); } }, [loadHistory, thread.customerId]);
+  const [messages, setMessages] = useState([]); const [phase, setPhase] = useState("loading"); const [reply, setReply] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState(null); const [status, setStatus] = useState(thread.status);
+  const refresh = useCallback(async () => { setPhase("loading"); setError(null); try { setMessages(await loadHistory(thread.customerId)); setPhase("ready"); } catch (requestError) { setError(requestError); setPhase("error"); } }, [loadHistory, thread.customerId]);
   useEffect(() => { refresh(); }, [refresh]);
   const mutate = async (callback) => { setBusy(true); setError(null); try { await callback(); await refresh(); onComplete(); return true; } catch (requestError) { setError(requestError); return false; } finally { setBusy(false); } };
-  const send = async (event) => { event.preventDefault(); if (await mutate(() => actions.sendSupportReply({ customerId: thread.customerId, message: reply }))) setReply(""); };
+  const send = async (event) => { event.preventDefault(); if (await mutate(() => actions.sendSupportReply({ customerId: thread.customerId, message: reply }))) { setReply(""); setStatus("TAKEN_OVER"); } };
   const mutateAndClose = async (callback) => { if (await mutate(callback)) onClose(); };
-  return <OperationDialog title={`${thread.name} · destek görüşmesi`} busy={busy} onClose={onClose} testId="support-thread-dialog" wide>{error && <OperationError error={error} id="support-thread-error" />}<section className="notice-card"><Icon name="shield" /><div><strong>{thread.status}</strong><p>Thread #{thread.threadId} · {thread.email}</p></div></section>{phase === "loading" ? <p role="status">Görüşme yükleniyor…</p> : <div className="support-thread-messages">{messages.map((message) => <article className="notice-card" key={message.id}><div><strong>{message.senderId === thread.customerId ? thread.name : "Admin"}</strong><p>{message.message}</p><small>{dateTime(message.createdAt)}</small></div></article>)}</div>}<div className="heading-actions">{thread.status !== "TAKEN_OVER" && actions.takeoverSupport && <button className="secondary-button" onClick={() => mutateAndClose(() => actions.takeoverSupport({ threadId: thread.threadId }))}>Görüşmeyi devral</button>}{thread.status !== "CLOSED" && actions.setSupportStatus && <button className="danger-button" onClick={() => mutateAndClose(() => actions.setSupportStatus({ threadId: thread.threadId, status: "CLOSED" }))}>Görüşmeyi kapat</button>}</div>{actions.sendSupportReply && thread.status !== "CLOSED" && <form className="connected-form" onSubmit={send}><label className="field field-wide"><span>Yanıt</span><textarea value={reply} onChange={(event) => setReply(event.target.value)} required maxLength="2000" rows="4" /></label><button className="primary-button" disabled={busy || !reply.trim()}>Yanıt gönder</button></form>}</OperationDialog>;
+  return <OperationDialog title={`${thread.name} · destek görüşmesi`} busy={busy} onClose={onClose} testId="support-thread-dialog" wide>
+    <div className="support-dialog-shell">
+      {error && <OperationError error={error} id="support-thread-error" />}
+      <header className="support-thread-header">
+        <div className="support-thread-avatar" aria-hidden="true"><Icon name="user" /></div>
+        <div className="support-thread-identity"><span className="eyebrow">Müşteri destek görüşmesi</span><strong>{thread.name}</strong><p>{thread.email} · Thread #{thread.threadId}</p></div>
+        <span className={`status-pill ${String(status).toLowerCase()}`}>{status === "TAKEN_OVER" ? "Admin devraldı" : status === "CLOSED" ? "Kapalı" : "Açık"}</span>
+      </header>
+      {phase === "loading" && <div className="support-thread-loading" role="status"><Icon name="refresh" /><span>Görüşme yükleniyor…</span></div>}
+      {phase === "error" && <div className="support-thread-empty"><strong>Görüşme yüklenemedi.</strong><p>Bağlantıyı kontrol edip yeniden deneyin.</p><button className="secondary-button small" onClick={refresh}>Yeniden dene</button></div>}
+      {phase === "ready" && <div className="support-message-list" role="log" aria-label={`${thread.name} destek mesajları`}>
+        {messages.map((message) => {
+          const fromCustomer = message.senderId === thread.customerId;
+          return <article className={`support-message ${fromCustomer ? "is-customer" : "is-admin"}`} key={message.id}>
+            <div className="support-message-meta"><strong>{fromCustomer ? thread.name : "NovaStore Destek"}</strong><time dateTime={message.createdAt}>{dateTime(message.createdAt)}</time></div>
+            <p>{message.message}</p>
+          </article>;
+        })}
+        {messages.length === 0 && <div className="support-thread-empty"><Icon name="help" /><strong>Henüz mesaj yok.</strong><p>Müşteri ilk mesajı gönderdiğinde görüşme burada görünecek.</p></div>}
+      </div>}
+      <div className="support-thread-actions">
+        {status !== "TAKEN_OVER" && status !== "CLOSED" && actions.takeoverSupport && <button className="secondary-button" onClick={() => mutateAndClose(() => actions.takeoverSupport({ threadId: thread.threadId }))} disabled={busy}><Icon name="shield" />Görüşmeyi devral</button>}
+        {status !== "CLOSED" && actions.setSupportStatus && <button className="danger-button" onClick={() => mutateAndClose(() => actions.setSupportStatus({ threadId: thread.threadId, status: "CLOSED" }))} disabled={busy}>Görüşmeyi kapat</button>}
+      </div>
+      {actions.sendSupportReply && status !== "CLOSED" ? <form className="modal-form live-operation-form support-composer" onSubmit={send}>
+        <label className="field field-wide"><span>Müşteriye yanıtınız</span><textarea value={reply} onChange={(event) => setReply(event.target.value)} required maxLength="2000" rows="4" placeholder="Açık, yardımcı ve sonraki adımı belirten bir yanıt yazın." /></label>
+        <div className="support-composer-meta"><p>Yanıt, bu ortak görüşme kimliğine kaydedilir ve müşterinin aynı konuşmasında görünür.</p><span>{reply.length} / 2000</span></div>
+        <footer className="modal-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Vazgeç</button><button className="primary-button" disabled={busy || !reply.trim()}>{busy ? "Gönderiliyor…" : "Yanıtı gönder"}</button></footer>
+      </form> : status !== "CLOSED" && <section className="operation-boundary"><Icon name="shield" /><div><strong>Yanıt yetkisi bu oturumda kapalı</strong><p>Görüşme salt okunur gösteriliyor. Destek yazma yetkisi etkin bir Admin oturumu gerekir.</p></div></section>}
+    </div>
+  </OperationDialog>;
 }
 
 function SupportWorkspace({ items, error, refreshing, onRefresh, loadHistory, actions }) {
   const [selected, setSelected] = useState(null);
-  return <section className="workspace live-workspace" data-testid="live-support"><header className="workspace-heading operations-heading"><div><span className="eyebrow">Müşteri · NovaBot · Admin ortak thread</span><h2 tabIndex="-1">Destek gelen kutusu</h2><p>Devir, yönetici sahipliği ve yanıtlar ortak thread kimliğinde izlenir.</p></div><button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />Yenile</button></header><ResourceWarning error={error} onRetry={onRefresh} /><div className="table-card"><div className="table-scroll" tabIndex="0" role="region" aria-label="Destek görüşmeleri"><table className="data-table"><thead><tr><th>Müşteri</th><th>Kaynak</th><th>Durum</th><th>Son mesaj</th><th>İşlem</th></tr></thead><tbody>{items.map((thread) => <tr key={thread.threadId}><td><strong>{thread.name}</strong><small> {thread.email}</small></td><td>{thread.source}</td><td>{thread.status}</td><td>{thread.lastMessageAt ? dateTime(thread.lastMessageAt) : "Mesaj yok"}</td><td><button className="primary-button small" onClick={() => setSelected(thread)}>Görüşmeyi aç</button></td></tr>)}{items.length === 0 && <tr><td colSpan="5">Destek görüşmesi yok.</td></tr>}</tbody></table></div></div>{selected && <SupportDialog thread={selected} loadHistory={loadHistory} actions={actions} onClose={() => setSelected(null)} onComplete={onRefresh} />}</section>;
+  const openCount = items.filter((thread) => thread.status === "OPEN").length;
+  const takenOverCount = items.filter((thread) => thread.status === "TAKEN_OVER").length;
+  const closedCount = items.filter((thread) => thread.status === "CLOSED").length;
+  return <section className="workspace live-workspace" data-testid="live-support">
+    <header className="workspace-heading operations-heading"><div><span className="eyebrow">Müşteri · NovaBot · Admin ortak görüşmesi</span><h2 tabIndex="-1">Destek gelen kutusu</h2><p>Müşteri mesajlarını tek görüşmede takip edin, devralın ve yanıtlayın.</p></div><button className="secondary-button" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" />Yenile</button></header>
+    <div className="support-summary-strip" aria-label="Destek görüşmesi özeti"><div><strong>{openCount}</strong><span>Yanıt bekliyor</span></div><div><strong>{takenOverCount}</strong><span>Admin devraldı</span></div><div><strong>{closedCount}</strong><span>Kapalı</span></div></div>
+    <ResourceWarning error={error} onRetry={onRefresh} />
+    <div className="table-card"><div className="table-scroll" tabIndex="0" role="region" aria-label="Destek görüşmeleri"><table className="data-table support-operations-table"><thead><tr><th>Müşteri</th><th>Kaynak</th><th>Durum</th><th>Son mesaj</th><th>İşlem</th></tr></thead><tbody>{items.map((thread) => <tr key={thread.threadId}><td><div className="question-cell-copy"><strong>{thread.name}</strong><small>{thread.email}</small></div></td><td>{thread.source}</td><td><span className={`status-pill ${String(thread.status).toLowerCase()}`}>{thread.status === "TAKEN_OVER" ? "Admin devraldı" : thread.status === "CLOSED" ? "Kapalı" : "Açık"}</span></td><td>{thread.lastMessageAt ? dateTime(thread.lastMessageAt) : "Mesaj yok"}</td><td><button className="primary-button small" onClick={() => setSelected(thread)}>Görüşmeyi aç</button></td></tr>)}{items.length === 0 && <tr><td colSpan="5"><div className="table-empty-state"><strong>Destek görüşmesi yok.</strong><p>Yeni müşteri görüşmeleri burada listelenecek.</p></div></td></tr>}</tbody></table></div></div>
+    {selected && <SupportDialog thread={selected} loadHistory={loadHistory} actions={actions} onClose={() => setSelected(null)} onComplete={onRefresh} />}
+  </section>;
 }
 
 const railItems = [
@@ -2527,7 +2685,7 @@ export function IntegratedApp() {
     pageContent = !catalogStructureEnabled
       ? <StatePanel phase="forbidden" error={catalogStructureUnavailableError} onRetry={catalogStructureResource.reload} />
       : catalogStructureLoaded
-        ? <CatalogStructure structure={catalogStructureResource.data} error={catalogStructureResource.error} refreshing={catalogStructureResource.refreshing} onRefresh={catalogStructureResource.reload} />
+        ? <CatalogStructure structure={catalogStructureResource.data} error={catalogStructureResource.error} refreshing={catalogStructureResource.refreshing} onRefresh={catalogStructureResource.reload} mutationActions={mutationActions} />
         : <StatePanel phase={catalogStructureResource.phase} error={catalogStructureResource.error} onRetry={catalogStructureResource.reload} />;
   } else if (page === "sellerApplications") {
     pageContent = !storesEnabled

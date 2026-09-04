@@ -345,6 +345,45 @@ const testReviewTenantDenied = async () => {
     assert.equal(mutations, 0);
 };
 
+const testQuestionAdminOwnershipProjection = async () => {
+    pool.query = async (sql, params = []) => {
+        const text = String(sql);
+        assert.match(text, /LEFT JOIN LATERAL[\s\S]*seller_stores seller_store/i);
+        assert.match(text, /admin_answerable/i);
+        assert.equal(params.length, 1);
+        return {
+            rows: [{
+                id: 501,
+                product_id: 101,
+                user_id: 41,
+                question: 'Stok var mı?',
+                answer: null,
+                revision: 1,
+                answered_by: null,
+                created_at: new Date('2026-08-13T08:00:00.000Z'),
+                answered_at: null,
+                updated_at: null,
+                product_name: 'Ürün',
+                product_image: null,
+                store_id: 10,
+                store_name: 'NovaStore Platform',
+                store_slug: 'novastore-platform',
+                admin_answerable: false,
+                seller_organization_name: 'Nova Yaşam Demo Satıcısı',
+                user_name: 'Müşteri'
+            }]
+        };
+    };
+
+    const result = await invoke(questionController.getAllQuestionsAdmin, {
+        currentAdmin: { id: 9, role: 'admin' },
+        headers: {}
+    });
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body[0].admin_answerable, false);
+    assert.equal(result.body[0].seller_organization_name, 'Nova Yaşam Demo Satıcısı');
+};
+
 const testQuestionAnswerAudit = async () => {
     const calls = [];
     pool.connect = async () => transactionClient(async (sql, params = []) => {
@@ -353,6 +392,7 @@ const testQuestionAnswerAudit = async () => {
         if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(text)) return { rows: [] };
         if (/FROM product_questions pq[\s\S]*FOR UPDATE OF pq/i.test(text)) {
             assert.match(text, /first_party_store\.slug/i);
+            assert.match(text, /NOT EXISTS[\s\S]*seller_stores current_seller_store/i);
             return {
                 rows: [{
                     id: 501,
@@ -408,6 +448,30 @@ const testQuestionAnswerAudit = async () => {
     assert.equal(result.body.question.answered_by, 9);
     assert.equal(calls.filter((call) => call.text === 'COMMIT').length, 1);
     assert.equal(calls.some((call) => /INSERT INTO notification_outbox_events/i.test(call.text)), true);
+};
+
+const testSellerOwnedQuestionAnswerDenied = async () => {
+    let mutations = 0;
+    pool.connect = async () => transactionClient(async (sql) => {
+        const text = String(sql).trim();
+        if (['BEGIN', 'ROLLBACK'].includes(text)) return { rows: [] };
+        if (/FROM product_questions pq[\s\S]*FOR UPDATE OF pq/i.test(text)) {
+            assert.match(text, /NOT EXISTS[\s\S]*seller_stores current_seller_store/i);
+            return { rows: [] };
+        }
+        if (/^(?:UPDATE|INSERT|DELETE)\b/i.test(text)) mutations += 1;
+        throw new Error(`Unexpected seller-owned question query: ${text}`);
+    });
+
+    const result = await invoke(questionController.answerQuestion, {
+        currentAdmin: { id: 9, role: 'admin' },
+        params: { id: '777' },
+        body: { answer: 'Bu yanıt Seller tarafından verilmelidir.', expected_revision: 1 },
+        headers: {}
+    });
+    assert.equal(result.statusCode, 404);
+    assert.equal(result.body.code, 'QUESTION_NOT_FOUND');
+    assert.equal(mutations, 0);
 };
 
 const testQuestionValidationAndConflict = async () => {
@@ -472,7 +536,9 @@ const testQuestionValidationAndConflict = async () => {
     await testSellerWritesFailClosed();
     await testReviewModerationAudit();
     await testReviewTenantDenied();
+    await testQuestionAdminOwnershipProjection();
     await testQuestionAnswerAudit();
+    await testSellerOwnedQuestionAnswerDenied();
     await testQuestionValidationAndConflict();
     console.log('reviewQuestionOperationsSmoke: OK');
 })().catch((error) => {
