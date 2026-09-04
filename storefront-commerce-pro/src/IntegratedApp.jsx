@@ -31,6 +31,7 @@ import {
   Plus,
   Question,
   ShieldCheck,
+  SignIn,
   ShoppingBag,
   ShoppingCart,
   SlidersHorizontal,
@@ -502,9 +503,9 @@ function SearchBox({ onSearch }) {
   );
 }
 
-function HeaderAction({ icon: Icon, label, detail, badge, onClick, buttonRef, expanded, controls, className }) {
+function HeaderAction({ icon: Icon, label, detail, badge, onClick, buttonRef, expanded, controls, className, accessibleName }) {
   return (
-    <button ref={buttonRef} className={cx("header-action", className)} type="button" onClick={onClick} aria-label={`${label}: ${detail}`} aria-haspopup={controls ? "dialog" : undefined} aria-expanded={controls ? expanded : undefined} aria-controls={controls}>
+    <button ref={buttonRef} className={cx("header-action", className)} type="button" onClick={onClick} aria-label={accessibleName || `${label}: ${detail}`} aria-haspopup={controls ? "dialog" : undefined} aria-expanded={controls ? expanded : undefined} aria-controls={controls}>
       <span className="header-action__icon"><Icon size={22} />{badge > 0 && <b>{badge}</b>}</span>
       <span><small>{label}</small><strong>{detail}</strong></span>
     </button>
@@ -707,7 +708,8 @@ function CategoryNavigation({ onMobileOpen, drawerOpen }) {
   );
 }
 
-function Header({ cartCount, favoriteCount, notificationUnreadCount, onCartOpen, onMobileOpen, onAccountOpen, accountDetail, cartTriggerRef, mobileMenuOpen, cartOpen }) {
+function Header({ authenticated, cartCount, favoriteCount, notificationUnreadCount, onCartOpen, onMobileOpen, onAccountOpen, accountDetail, cartTriggerRef, mobileMenuOpen, cartOpen }) {
+  const AccountIcon = authenticated ? User : SignIn;
   return (
     <header className="site-header">
       <TrustBar />
@@ -717,7 +719,7 @@ function Header({ cartCount, favoriteCount, notificationUnreadCount, onCartOpen,
         <SearchBox onSearch={(term) => navigate(`/arama?q=${encodeURIComponent(term)}`)} />
         <div className="header-actions">
           <HeaderAction icon={Bell} label="Bildirimler" detail={notificationUnreadCount ? `${notificationUnreadCount} okunmamış` : "Güncellemelerim"} badge={notificationUnreadCount} onClick={() => navigate("/hesabim/bildirimler")} />
-          <HeaderAction icon={User} label="Hesabım" detail={accountDetail} onClick={onAccountOpen} />
+          <HeaderAction className={!authenticated && "is-login-entry"} icon={AccountIcon} label={authenticated ? "Hesabım" : "Hesap"} detail={accountDetail} accessibleName={authenticated ? `Hesabım: ${accountDetail}` : "Giriş yap"} onClick={onAccountOpen} />
           <HeaderAction icon={Heart} label="Listem" detail="Favorilerim" badge={favoriteCount} onClick={() => navigate("/favoriler")} />
           <HeaderAction className="cart-header-action" icon={ShoppingCart} label="Sepetim" detail={cartCount ? `${cartCount} ürün` : "0 ürün"} badge={cartCount} onClick={onCartOpen} buttonRef={cartTriggerRef} expanded={cartOpen} controls="cart-drawer" />
           <HeaderLink className="seller-recruitment-action" icon={Storefront} label="Ortağımız Ol" detail="NovaStore'da sat" href={SELLER_RECRUITMENT_URL} />
@@ -730,6 +732,7 @@ function Header({ cartCount, favoriteCount, notificationUnreadCount, onCartOpen,
 
 function MobileCategoryDrawer({ open, onClose, returnFocusRef, authenticated, cartCount, favoriteCount, notificationUnreadCount }) {
   const roots = getVisibleRoots();
+  const AccountIcon = authenticated ? User : SignIn;
   const [stack, setStack] = useState([]);
   const closeRef = useRef(null);
   const dialogRef = useRef(null);
@@ -776,7 +779,7 @@ function MobileCategoryDrawer({ open, onClose, returnFocusRef, authenticated, ca
           {!current && <nav className="mobile-customer-shortcuts" aria-label="Müşteri bağlantıları">
             <a href="#/" onClick={closeDrawer}><House /><span>Ana Sayfa</span></a>
             <a href="#/favoriler" onClick={closeDrawer}><Heart /><span>Favoriler</span>{favoriteCount > 0 && <b>{favoriteCount}</b>}</a>
-            <a href={`#${customerAccountEntryPath(authenticated)}`} onClick={closeDrawer}><User /><span>{authenticated ? "Hesabım" : "Giriş yap"}</span></a>
+            <a className={cx(!authenticated && "is-login-entry")} href={`#${customerAccountEntryPath(authenticated)}`} onClick={closeDrawer}><AccountIcon /><span>{authenticated ? "Hesabım" : "Giriş yap"}</span></a>
             <a href="#/sepet" onClick={closeDrawer}><ShoppingCart /><span>Sepet</span>{cartCount > 0 && <b>{cartCount}</b>}</a>
             {authenticated && <a href="#/hesabim/bildirimler" onClick={closeDrawer}><Bell /><span>Bildirimler</span>{notificationUnreadCount > 0 && <b>{notificationUnreadCount}</b>}</a>}
           </nav>}
@@ -1741,7 +1744,7 @@ export function CommerceProRuntimeApp({
   return (
     <RuntimeComparisonContext.Provider value={comparisonContext}>
       <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); focusMainContent({ preventScroll: false }); }}>Ana içeriğe geç</a>
-      <Header cartCount={cartCount} favoriteCount={favorites.size} notificationUnreadCount={notificationUnreadCount} onCartOpen={openCart} onMobileOpen={openCategoryDrawer} onAccountOpen={() => navigate(customerAccountEntryPath(authenticated))} accountDetail={authenticated ? session.user.fullName || "Hesabım" : "Giriş yap"} cartTriggerRef={cartTriggerRef} mobileMenuOpen={mobileMenuOpen} cartOpen={cartOpen} />
+      <Header authenticated={authenticated} cartCount={cartCount} favoriteCount={favorites.size} notificationUnreadCount={notificationUnreadCount} onCartOpen={openCart} onMobileOpen={openCategoryDrawer} onAccountOpen={() => navigate(customerAccountEntryPath(authenticated))} accountDetail={authenticated ? session.user.fullName || "Hesabım" : "Giriş yap"} cartTriggerRef={cartTriggerRef} mobileMenuOpen={mobileMenuOpen} cartOpen={cartOpen} />
       {runtime.warnings.length > 0 && <div className="integration-session-warning" role="status">Bazı ikincil mağaza veya oturum verileri geçici olarak alınamadı; erişilebilen gerçek katalog gösteriliyor.</div>}
       {comparisonVisible && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => setComparisonIds(new Set())} onAdd={addToCart} />}
       {content}

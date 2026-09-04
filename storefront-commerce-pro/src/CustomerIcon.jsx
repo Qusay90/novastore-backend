@@ -27,6 +27,7 @@ import {
   List as LucideList,
   LifeBuoy as LucideLifeBuoy,
   LockKeyhole,
+  LogIn,
   LogOut,
   Mail,
   MapPin as LucideMapPin,
@@ -136,6 +137,7 @@ export const Clock = adapt(LucideClock);
 export const Copy = adapt(LucideCopy);
 export const Key = adapt(LucideKey);
 export const LockKey = adapt(LockKeyhole);
+export const SignIn = adapt(LogIn);
 export const PaperPlaneTilt = adapt(Send);
 export const PencilSimple = adapt(Pencil);
 export const SignOut = adapt(LogOut);
@@ -146,7 +148,7 @@ export const Users = adapt(LucideUsers);
 export const CUSTOMER_ICON_SEMANTICS = Object.freeze({
   navigation: Object.freeze({ back: ArrowLeft, forward: CaretRight, expand: CaretDown, home: House }),
   commerce: Object.freeze({ cart: ShoppingCart, bag: ShoppingBag, compare: ArrowsLeftRight, discount: BadgePercent }),
-  account: Object.freeze({ profile: User, signOut: SignOut, security: ShieldCheck, notification: Bell }),
+  account: Object.freeze({ profile: User, signIn: SignIn, signOut: SignOut, security: ShieldCheck, notification: Bell }),
   service: Object.freeze({ help: LifeBuoy, support: Headphones, delivery: Truck, return: ArrowsClockwise }),
   feedback: Object.freeze({ success: CheckCircle, warning: WarningCircle, close: X, favorite: Heart }),
 });

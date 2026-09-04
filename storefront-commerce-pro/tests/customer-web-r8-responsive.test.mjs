@@ -39,8 +39,9 @@ test("R8 Customer Web uses server modes in one styled accessible listbox", async
 test("R8 responsive CSS removes the 620px favorites collision and constrains checkout surfaces", async () => {
   const css = await fs.readFile(new URL("../src/integrated.css", import.meta.url), "utf8");
   assert.match(css, /\.favorites-page \.product-card\.customer-product-card\s*\{[\s\S]*?display: flex;[\s\S]*?flex-direction: column;/u);
-  assert.match(css, /\.favorites-page \.customer-product-card \.product-card__media\s*\{[\s\S]*?height: auto;[\s\S]*?min-height: 0;[\s\S]*?aspect-ratio: 1\.28 \/ 1 !important;/u);
-  assert.match(css, /@media \(max-width: 480px\)\s*\{[\s\S]*?\.favorites-page \.product-grid\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/u);
+  assert.match(css, /\.favorites-page \.customer-product-card \.product-card__media\s*\{[\s\S]*?height: auto;[\s\S]*?min-height: 0;[\s\S]*?aspect-ratio: 1 \/ 1;/u);
+  assert.match(css, /\.favorites-page \.product-grid\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*?gap: 9px;/u);
+  assert.doesNotMatch(css, /@media \(max-width: 480px\)\s*\{[\s\S]*?\.favorites-page \.product-grid\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/u);
   assert.match(css, /--assistant-visual-viewport-height/u);
   assert.match(css, /\.assistant-widget\.is-open\s*\{[\s\S]*?--assistant-visual-viewport-top/u);
   assert.match(css, /\.assistant-mode__listbox\s*\{[\s\S]*?overflow-y: auto;/u);
