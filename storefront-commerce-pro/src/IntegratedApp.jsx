@@ -1297,6 +1297,7 @@ function ComparisonDialog({ open, products: selectedProducts, onClose, onRemove,
   useEffect(() => {
     if (!open) return;
     document.body.classList.add("is-locked");
+    document.body.classList.add("is-comparison-dialog-open");
     const restorePage = isolatePageFromModal();
     window.setTimeout(() => closeRef.current?.focus(), 20);
     const onKey = (event) => {
@@ -1306,6 +1307,7 @@ function ComparisonDialog({ open, products: selectedProducts, onClose, onRemove,
     document.addEventListener("keydown", onKey);
     return () => {
       document.body.classList.remove("is-locked");
+      document.body.classList.remove("is-comparison-dialog-open");
       document.removeEventListener("keydown", onKey);
       restorePage();
     };
@@ -1323,17 +1325,55 @@ function ComparisonDialog({ open, products: selectedProducts, onClose, onRemove,
   return createPortal(<div className="overlay-layer comparison-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeAndRestore()}><section ref={dialogRef} className="comparison-dialog" role="dialog" aria-modal="true" aria-labelledby="comparison-title" tabIndex="-1"><header><div><span className="section-kicker">Canlı katalog</span><h2 id="comparison-title">Ürünleri karşılaştır</h2><p>Fiyat, stok ve ürün bilgileri güncel NovaStore kataloğundan alınır.</p></div><button ref={closeRef} className="icon-button" type="button" onClick={closeAndRestore} aria-label="Karşılaştırmayı kapat"><X /></button></header><div className="comparison-scroll"><div className="comparison-table" style={{ "--comparison-columns": selectedProducts.length }} role="table" aria-label="Seçili ürünlerin karşılaştırması"><div className="comparison-product-row" role="row"><strong role="rowheader">Ürün</strong>{selectedProducts.map((product) => <article role="cell" key={product.id}><button type="button" onClick={() => onRemove(product.id)} aria-label={`${product.name} ürününü karşılaştırmadan çıkar`}><X /></button><a href={`#/urun/${product.slug}`} onClick={closeAndRestore}><img src={productImage(product)} alt="" /><span>{productEyebrow(product)}</span><b>{product.name}</b></a><button className="primary-button" type="button" disabled={product.stock <= 0} onClick={() => onAdd(product.id)}><ShoppingCart />{product.stock > 0 ? "Sepete ekle" : "Tükendi"}</button></article>)}</div>{rows.map(([label, render]) => <div className="comparison-fact-row" role="row" key={label}><strong role="rowheader">{label}</strong>{selectedProducts.map((product) => <span role="cell" key={product.id}>{render(product)}</span>)}</div>)}</div></div></section></div>, document.body);
 }
 
-function ComparisonTray({ ids, onToggle, onClear, onAdd }) {
+function ComparisonTray({ ids, onToggle, onClear, onAdd, onVisibilityChange }) {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const triggerRef = useRef(null);
+  const closeRef = useRef(null);
+  const launcherRef = useRef(null);
+  const previousSelectionCountRef = useRef(ids.size);
   const selectedProducts = [...ids].map((id) => products.find((product) => product.id === id)).filter(Boolean);
+  const closeTray = useCallback(() => {
+    setCollapsed(true);
+    onVisibilityChange(false);
+    window.requestAnimationFrame(() => launcherRef.current?.focus());
+  }, [onVisibilityChange]);
+  const openTray = useCallback(() => {
+    setCollapsed(false);
+    onVisibilityChange(true);
+    window.requestAnimationFrame(() => closeRef.current?.focus());
+  }, [onVisibilityChange]);
 
   useEffect(() => {
-    if (!selectedProducts.length) setOpen(false);
-  }, [selectedProducts.length]);
+    if (!selectedProducts.length) {
+      setOpen(false);
+      onVisibilityChange(false);
+      return;
+    }
+    const selectionChanged = previousSelectionCountRef.current !== selectedProducts.length;
+    previousSelectionCountRef.current = selectedProducts.length;
+    if (selectionChanged) {
+      setCollapsed(false);
+      onVisibilityChange(true);
+      return;
+    }
+    onVisibilityChange(!collapsed);
+  }, [collapsed, onVisibilityChange, selectedProducts.length]);
+
+  useEffect(() => () => onVisibilityChange(false), [onVisibilityChange]);
+
+  useEffect(() => {
+    if (collapsed || open) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") closeTray();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [closeTray, collapsed, open]);
 
   if (!selectedProducts.length) return null;
-  return <><aside className="comparison-tray" aria-label="Karşılaştırma listesi"><span><ArrowsLeftRight /><span><strong>Karşılaştır</strong><small>{selectedProducts.length}/3 ürün seçildi</small></span></span><div className="comparison-tray__products">{selectedProducts.map((product) => <span key={product.id}><img src={productImage(product)} alt="" /><button type="button" onClick={() => onToggle(product.id)} aria-label={`${product.name} ürününü karşılaştırmadan çıkar`}><X /></button></span>)}</div><button ref={triggerRef} className="comparison-open" type="button" disabled={selectedProducts.length < 2} onClick={() => setOpen(true)}>{selectedProducts.length < 2 ? "Bir ürün daha seç" : "Karşılaştır"}</button><button className="comparison-clear" type="button" onClick={onClear} aria-label="Karşılaştırma listesini temizle"><Trash /></button></aside><ComparisonDialog open={open} products={selectedProducts} onClose={() => setOpen(false)} onRemove={onToggle} onAdd={onAdd} returnFocusRef={triggerRef} /></>;
+  if (collapsed) return <button ref={launcherRef} className="comparison-launcher" type="button" onClick={openTray} aria-label={`Karşılaştırma listesini aç. ${selectedProducts.length} ürün seçildi`}><ArrowsLeftRight /><span><strong>Karşılaştırma</strong><small>{selectedProducts.length}/3 ürün</small></span></button>;
+  return <><aside className="comparison-tray" role="region" aria-labelledby="comparison-tray-title"><span><ArrowsLeftRight /><span><strong id="comparison-tray-title">Karşılaştır</strong><small aria-live="polite">{selectedProducts.length}/3 ürün seçildi</small></span></span><div className="comparison-tray__products">{selectedProducts.map((product) => <span key={product.id}><img src={productImage(product)} alt="" /><button type="button" onClick={() => onToggle(product.id)} aria-label={`${product.name} ürününü karşılaştırmadan çıkar`}><X /></button></span>)}</div><button ref={triggerRef} className="comparison-open" type="button" disabled={selectedProducts.length < 2} onClick={() => setOpen(true)}>{selectedProducts.length < 2 ? "Bir ürün daha seç" : "Karşılaştır"}</button><button className="comparison-clear" type="button" onClick={onClear} aria-label="Karşılaştırma listesini temizle"><Trash /></button><button ref={closeRef} className="comparison-tray__close" type="button" onClick={closeTray} aria-label="Karşılaştırma listesini kapat"><X /></button></aside><ComparisonDialog open={open} products={selectedProducts} onClose={() => setOpen(false)} onRemove={onToggle} onAdd={onAdd} returnFocusRef={triggerRef} /></>;
 }
 
 function CartDrawer({ open, items, onClose, onRemove, onQuantity, returnFocusRef }) {
@@ -1408,6 +1448,7 @@ export function CommerceProRuntimeApp({
   const [favorites, setFavorites] = useState(() => new Set(runtime.favorites.initialIds));
   const favoritesRef = useRef(favorites);
   const [comparisonIds, setComparisonIds] = useState(() => new Set());
+  const [comparisonSurfaceVisible, setComparisonSurfaceVisible] = useState(false);
   const [session, setSession] = useState(runtime.session);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [toast, setToast] = useState("");
@@ -1574,6 +1615,7 @@ export function CommerceProRuntimeApp({
       return false;
     } else next.add(productId);
     setComparisonIds(next);
+    if (!next.size) setComparisonSurfaceVisible(false);
     return true;
   }
 
@@ -1641,7 +1683,10 @@ export function CommerceProRuntimeApp({
     && String(session?.user?.email || "").endsWith("@local.invalid");
   const localReviewSurfaceProps = LOCAL_REVIEW_RUNTIME_ENABLED ? { reviewOnly: localReviewSurface } : {};
   const localReviewSessionProps = LOCAL_REVIEW_RUNTIME_ENABLED ? { reviewOnly: localReviewSession } : {};
-  const comparisonVisible = comparisonIds.size > 0 && COMPARISON_TRAY_ROUTE_TYPES.has(route.type);
+  const comparisonAvailable = comparisonIds.size > 0 && COMPARISON_TRAY_ROUTE_TYPES.has(route.type);
+  useEffect(() => {
+    if (!comparisonAvailable) setComparisonSurfaceVisible(false);
+  }, [comparisonAvailable]);
   const comparisonContext = { available: true, ids: comparisonIds, toggle: toggleComparison };
   const handleAuthenticated = async (nextSession, returnPath) => {
     let authoritativeSession = nextSession;
@@ -1746,14 +1791,14 @@ export function CommerceProRuntimeApp({
       <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); focusMainContent({ preventScroll: false }); }}>Ana içeriğe geç</a>
       <Header authenticated={authenticated} cartCount={cartCount} favoriteCount={favorites.size} notificationUnreadCount={notificationUnreadCount} onCartOpen={openCart} onMobileOpen={openCategoryDrawer} onAccountOpen={() => navigate(customerAccountEntryPath(authenticated))} accountDetail={authenticated ? session.user.fullName || "Hesabım" : "Giriş yap"} cartTriggerRef={cartTriggerRef} mobileMenuOpen={mobileMenuOpen} cartOpen={cartOpen} />
       {runtime.warnings.length > 0 && <div className="integration-session-warning" role="status">Bazı ikincil mağaza veya oturum verileri geçici olarak alınamadı; erişilebilen gerçek katalog gösteriliyor.</div>}
-      {comparisonVisible && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => setComparisonIds(new Set())} onAdd={addToCart} />}
+      {comparisonAvailable && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => { setComparisonIds(new Set()); setComparisonSurfaceVisible(false); }} onAdd={addToCart} onVisibilityChange={setComparisonSurfaceVisible} />}
       {content}
       <Footer businessIdentity={runtime.businessIdentity} />
       <MobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={categoryDrawerTriggerRef} authenticated={authenticated} cartCount={cartCount} favoriteCount={favorites.size} notificationUnreadCount={notificationUnreadCount} />
       <CartDrawer open={cartOpen} items={cartItems} onClose={closeCart} onRemove={removeFromCart} onQuantity={updateCartQuantity} returnFocusRef={cartTriggerRef} />
       <MobileBottomNav route={route} cartCount={cartCount} favoriteCount={favorites.size} />
       {route.type === "home" && profileCompletionNotice && !assistantOpen && <ProfileCompletionNotice missingFields={profileCompletionNotice.missingFields} onDismiss={dismissProfileCompletionNotice} onOpen={() => { dismissProfileCompletionNotice(); navigate("/hesabim?focus=profile"); }} />}
-      <AssistantWidget key={assistantConversationOwnerKey(session)} disabled={runtime.readOnlyPreview === true} route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonVisible} onOpenChange={setAssistantOpen} conversationState={activeAssistantConversationState} onConversationStateChange={updateAssistantConversationState} />
+      <AssistantWidget key={assistantConversationOwnerKey(session)} disabled={runtime.readOnlyPreview === true} route={route} assistant={runtime.assistant} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} onRemove={removeFromCart} getProductImage={productImage} raised={comparisonAvailable && comparisonSurfaceVisible} onOpenChange={setAssistantOpen} conversationState={activeAssistantConversationState} onConversationStateChange={updateAssistantConversationState} />
       <div className={cx("toast", toast && "is-visible")} role="status" aria-live="polite"><CheckCircle weight="fill" /><span>{toast}</span></div>
     </RuntimeComparisonContext.Provider>
   );

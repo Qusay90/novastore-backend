@@ -62,7 +62,6 @@
 - Axe serious/critical findings: 0.
 
 final result: passed
-
 # Main-6Y R2 Design QA
 
 Compared the accepted R1 storefront, the supplied owner favorite-motion recording, and the final real-Chrome R2 evidence board.
@@ -140,5 +139,51 @@ passed
 - Reduced motion: covered by the targeted contract test and the explicit `prefers-reduced-motion: reduce` rule; the active browser preference was not reduced motion.
 - Browser: Codex in-app browser against the pinned local official artifact.
 - Browser console warnings/errors: 0.
+
+final result: passed
+
+# PC1 Customer Web R8-R2 Design QA
+
+Date: 2026-09-04
+
+## Scope and source truth
+
+- Owner reference: `C:\Users\kusay\AppData\Local\Temp\codex-clipboard-51218880-787a-463c-ae1a-33e876d7ce85.png`
+- Runtime under test: `http://127.0.0.1:5000/#/favoriler`
+- Implementation: `storefront-commerce-pro/src/IntegratedApp.jsx` and `storefront-commerce-pro/src/integrated.css`
+- Evidence directory: `C:\Users\kusay\AppData\Local\Temp\novastore-customer-web-r8-r2-20260904`
+- Primary mobile viewport: 390 x 844 CSS pixels, DPR 1. The in-app browser reported a 375-pixel visual viewport because its vertical browser chrome/scrollbar consumes 15 pixels.
+- Tested state: Favorites with one, two, three, and attempted fourth comparison selections; expanded tray; collapsed launcher; comparison dialog; NovaBot present; bottom navigation present.
+
+## Reference-to-implementation comparison
+
+The owner reference and the final runtime screenshot were inspected together in the same visual comparison input. The reference establishes the accepted two-column Favorites card geometry, sticky header, NovaBot position, and bottom navigation. The final implementation preserves those surfaces and adds the missing comparison control as a deliberate fixed bottom sheet above the bottom navigation.
+
+### Fidelity surfaces
+
+1. Layout and spacing: the sheet is inset 10 pixels from both mobile edges, remains above the 68-pixel bottom navigation, uses a compact two-row control layout, and does not alter the product grid.
+2. Typography and copy: existing NovaStore type hierarchy is preserved. Selection count, `Karşılaştır`, remove, clear, close, and reopen labels are explicit and use correct Turkish characters.
+3. Color, icons, and imagery: the existing navy/orange token system, Lucide icons, and canonical product thumbnails are reused; no placeholder or custom-drawn asset was introduced.
+4. Responsiveness and behavior: all required widths from 320 through 768 pixels render a fixed, intersecting comparison surface with its primary action reachable. The 600 x 430 landscape and 768 x 430 compact-tablet checks also pass without compare/NovaBot or compare/navigation overlap.
+5. Accessibility: the sheet is a labelled region with a polite selection-count announcement. Primary, clear, and close controls are 44 pixels high; thumbnail removal targets are 24 x 24 pixels. Keyboard focus moves to close on open, remains inside the modal while tabbing, returns to the primary action after Escape, moves to the launcher when the tray collapses, and returns to close when reopened.
+
+## Interaction evidence
+
+- Baseline defect: at 320-620 pixels the mounted tray used `position: relative`, rendered above the scrolled card viewport, had zero viewport intersection, and still moved NovaBot.
+- Final breakpoint matrix: 20/20 required widths pass; zero unreachable regions, zero compare-induced horizontal overflow, zero NovaBot overlap, and zero bottom-navigation overlap.
+- Add/remove/re-add/clear: passed. A fourth selection attempt preserves the three-product maximum.
+- Dialog: two selected products render in the canonical comparison table with internal horizontal and vertical scrolling. Escape, close, and focus restoration pass.
+- Route parity: Home, Favorites, and Search each expose the same functional fixed comparison surface.
+- Console: no warning or error entries in the final browser session.
+- Screenshot evidence: `baseline-390-compare-selected.png`, `after-390-one-product-bottom-sheet.png`, `after-390-two-products-primary-visible.png`, `after-390-comparison-dialog.png`, `after-390-dialog-closed-novabot-safe.png`, `after-390-tray-closed-novabot-restored.png`, `after-700-narrow-desktop-side-tray.png`, and `after-1366-wide-desktop-side-tray.png`.
+
+## Finding history
+
+- Fixed, high: the mobile comparison root existed but was outside the visible viewport at every width through 620 pixels.
+- Fixed, medium: a collapsed or otherwise invisible comparison surface incorrectly reserved NovaBot space.
+- Fixed, accessibility: mobile thumbnail removal targets increased from 18 x 18 to the WCAG 2.2 minimum 24 x 24 CSS pixels.
+- Excluded baseline observation: the accepted wide desktop shell has a 14-pixel document overflow from the global header even with no comparison tray mounted; R8-R2 adds no overflow and does not modify that unrelated shell behavior.
+- Remaining in-scope high findings: 0.
+- Remaining in-scope medium findings: 0.
 
 final result: passed

@@ -59,10 +59,12 @@ test("runtime presentation owns the shared card, product media, review anchor, a
   assert.match(integratedApp, /available: true, ids: comparisonIds, toggle: toggleComparison/);
   assert.match(integratedApp, /const COMPARISON_TRAY_ROUTE_TYPES = new Set\(\[[\s\S]*?"home"[\s\S]*?"category"[\s\S]*?"search"[\s\S]*?"collection"[\s\S]*?"favorites"[\s\S]*?\]\)/);
   assert.doesNotMatch(integratedApp.slice(integratedApp.indexOf("const COMPARISON_TRAY_ROUTE_TYPES"), integratedApp.indexOf("function cx")), /"product(?:-id)?"/);
-  assert.match(integratedApp, /comparisonIds\.size > 0 && COMPARISON_TRAY_ROUTE_TYPES\.has\(route\.type\)/);
+  assert.match(integratedApp, /const comparisonAvailable = comparisonIds\.size > 0 && COMPARISON_TRAY_ROUTE_TYPES\.has\(route\.type\)/);
   assert.doesNotMatch(integratedApp, /comparisonIds\.size > 0 && !\[/);
   assert.doesNotMatch(integratedApp, /comparison-tray-reserve/);
-  assert.ok(integratedApp.indexOf("{comparisonVisible && <ComparisonTray") < integratedApp.indexOf("{content}"));
+  assert.ok(integratedApp.indexOf("{comparisonAvailable && <ComparisonTray") < integratedApp.indexOf("{content}"));
+  assert.match(integratedApp, /onVisibilityChange=\{setComparisonSurfaceVisible\}/);
+  assert.match(integratedApp, /raised=\{comparisonAvailable && comparisonSurfaceVisible\}/);
   assert.match(integratedApp, /if \(buyNowPendingRef\.current\) return/);
   assert.match(integratedApp, /buyNowPendingRef\.current = true/);
   assert.match(integratedApp, /finally \{\s*buyNowPendingRef\.current = false/);
@@ -82,7 +84,8 @@ test("runtime presentation owns the shared card, product media, review anchor, a
   assert.match(integratedCss, /outline: 3px solid var\(--orange-600\)/);
   assert.match(integratedCss, /\.footer-bottom\s*\{\s*font-size: 11px/);
   assert.doesNotMatch(integratedCss, /comparison-tray-reserve/);
-  assert.match(integratedCss, /@media \(max-width: 620px\)[\s\S]*?\.comparison-tray\s*\{[\s\S]*?position: relative;[\s\S]*?bottom: auto;[\s\S]*?width: calc\(100% - 20px\);[\s\S]*?margin: 10px auto 0/);
+  assert.match(integratedCss, /@media \(max-width: 620px\)[\s\S]*?\.comparison-tray\s*\{[\s\S]*?position: fixed;[\s\S]*?bottom: calc\(78px \+ env\(safe-area-inset-bottom\)\);[\s\S]*?display: grid;[\s\S]*?grid-template-areas:/);
   assert.match(integratedCss, /\.comparison-clear\s*\{[\s\S]*?width: 44px;[\s\S]*?height: 44px;[\s\S]*?flex: 0 0 44px/);
   assert.doesNotMatch(integratedCss, /\.comparison-clear\s*\{\s*display: none/);
+  assert.match(integratedCss, /body\.is-comparison-dialog-open \.assistant-widget\s*\{[\s\S]*?visibility: hidden;[\s\S]*?pointer-events: none;/);
 });

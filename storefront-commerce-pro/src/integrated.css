@@ -3719,6 +3719,72 @@
   cursor: pointer;
 }
 
+.comparison-tray__close {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  flex: 0 0 38px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 7px;
+  background: transparent;
+  color: #d9e3ea;
+  cursor: pointer;
+}
+
+.comparison-tray__close svg {
+  width: 15px;
+  height: 15px;
+}
+
+.comparison-launcher {
+  position: fixed;
+  z-index: 114;
+  left: 22px;
+  bottom: 22px;
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 13px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 13px;
+  background: var(--navy-950);
+  color: var(--white);
+  box-shadow: 0 18px 46px rgba(3, 29, 57, .26);
+  font: inherit;
+  cursor: pointer;
+}
+
+.comparison-launcher > svg {
+  width: 23px;
+  height: 23px;
+  color: #ffad62;
+}
+
+.comparison-launcher strong,
+.comparison-launcher small {
+  display: block;
+  text-align: left;
+}
+
+.comparison-launcher strong {
+  font-size: 11px;
+}
+
+.comparison-launcher small {
+  margin-top: 2px;
+  color: #b9c8d3;
+  font-size: 8px;
+}
+
+body.is-comparison-dialog-open .assistant-widget {
+  visibility: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+
 .assistant-mode__trigger > span {
   min-width: 0;
   overflow: hidden;
@@ -4860,28 +4926,38 @@ html[data-input-modality="pointer"] .check-option input:focus + span {
   }
 
   .assistant-widget.has-comparison {
-    bottom: calc(154px + env(safe-area-inset-bottom));
+    bottom: calc(248px + env(safe-area-inset-bottom));
   }
 
   .comparison-tray {
-    position: relative;
-    right: auto;
-    bottom: auto;
-    left: auto;
-    gap: 6px;
-    width: calc(100% - 20px);
+    position: fixed;
+    z-index: 150;
+    right: 10px;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    left: 10px;
+    display: grid;
+    grid-template-areas:
+      "summary close"
+      "products products"
+      "action clear";
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 8px;
+    width: auto;
     max-width: none;
-    min-height: 60px;
-    margin: 10px auto 0;
-    padding: 7px 8px 7px 11px;
+    min-height: 0;
+    margin: 0;
+    padding: 10px;
+    border-radius: 15px;
   }
 
   .comparison-tray > span {
-    display: none;
+    grid-area: summary;
+    min-width: 0;
   }
 
   .comparison-tray__products {
-    flex: 0 1 auto;
+    grid-area: products;
+    flex: none;
     min-width: 0;
     gap: 4px;
   }
@@ -4891,17 +4967,47 @@ html[data-input-modality="pointer"] .check-option input:focus + span {
     height: 34px;
   }
 
+  .comparison-tray__products button {
+    top: -7px;
+    right: -7px;
+    width: 24px;
+    height: 24px;
+  }
+
+  .comparison-tray__products button svg {
+    width: 11px;
+    height: 11px;
+  }
+
   .comparison-open {
-    flex: 1 1 92px;
+    grid-area: action;
+    width: 100%;
+    flex: none;
     min-width: 0;
     min-height: 44px;
     padding-inline: 8px;
   }
 
   .comparison-clear {
+    grid-area: clear;
     width: 44px;
     height: 44px;
     flex: 0 0 44px;
+  }
+
+  .comparison-tray__close {
+    grid-area: close;
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+  }
+
+  .comparison-launcher {
+    right: auto;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    left: 10px;
+    max-width: calc(100% - 90px);
+    min-height: 52px;
   }
 
   .comparison-overlay {
