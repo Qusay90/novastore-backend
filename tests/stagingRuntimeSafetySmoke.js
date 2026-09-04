@@ -535,10 +535,10 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         assert.equal(packageJson.scripts['staging:bootstrap'], 'node scripts/stagingBootstrapCli.js');
     });
 
-    await check('runtime', '42 migration manifest remains the exact 37-file combined registry', () => {
+    await check('runtime', '42 migration manifest remains the exact 38-file combined registry', () => {
         const manifest = JSON.parse(read('scripts/staging-migrations/manifest.json'));
-        assert.equal(manifest.length, 37);
-        assert.equal(new Set(manifest.map((item) => item.path)).size, 37);
+        assert.equal(manifest.length, 38);
+        assert.equal(new Set(manifest.map((item) => item.path)).size, manifest.length);
     });
 
     await check('runtime', '43 local and production behavior stays outside staging policy', () => {

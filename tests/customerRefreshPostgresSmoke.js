@@ -108,7 +108,8 @@ const captureConsoleOutput = () => {
     await adminClient.end();
 
     const registry = loadRegistry();
-    assert.equal(registry.length, 37);
+    assert.equal(registry.length, 38);
+    assert.equal(registry.at(-1).id, '20260904_01_seller_reputation_questions');
     const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));

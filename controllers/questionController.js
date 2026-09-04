@@ -58,6 +58,33 @@ const requestAuditMetadata = (req, values = {}) => {
     };
 };
 
+// Match the canonical public store projection, retaining unbound platform products.
+const buildQuestionStoreEligibilitySql = (platformSlugParameter) => `EXISTS (
+    SELECT 1
+    FROM stores canonical_store
+    LEFT JOIN LATERAL (
+        SELECT COUNT(*)::INT AS binding_count,
+               COUNT(*) FILTER (
+                   WHERE seller_store.status = 'active'
+                     AND seller_store.closed_at IS NULL
+                     AND COALESCE(profile.operational_status, 'open') = 'open'
+               )::INT AS public_binding_count
+        FROM seller_stores seller_store
+        LEFT JOIN seller_store_profiles profile
+          ON profile.organization_id = seller_store.organization_id
+         AND profile.store_id = seller_store.id
+        WHERE seller_store.legacy_store_id = canonical_store.id
+    ) question_store_binding ON TRUE
+    WHERE canonical_store.id = products.store_id
+      AND canonical_store.is_active = TRUE
+      AND canonical_store.deleted_at IS NULL
+      AND (
+          question_store_binding.public_binding_count = 1
+          OR (question_store_binding.binding_count = 0
+              AND LOWER(canonical_store.slug) = LOWER(${platformSlugParameter}))
+      )
+)`;
+
 // --- Musteri Islemleri ---
 
 // Yeni Soru Sor
@@ -83,13 +110,9 @@ exports.askQuestion = async (req, res) => {
             `INSERT INTO product_questions (product_id, user_id, question)
              SELECT products.id, $2, $3
              FROM products
-             JOIN stores first_party_store
-               ON first_party_store.id = products.store_id
-              AND LOWER(first_party_store.slug) = LOWER($4)
-              AND first_party_store.is_active = TRUE
-              AND first_party_store.deleted_at IS NULL
              WHERE products.id = $1
                AND ${buildPublicProductSqlPredicate('products')}
+               AND ${buildQuestionStoreEligibilitySql('$4')}
              RETURNING id, product_id, question, answer, revision, created_at, answered_at`,
             [productId, user_id, question, PLATFORM_STORE.slug]
         );
@@ -144,6 +167,7 @@ exports.getProductQuestions = async (req, res) => {
                 FROM products
                 WHERE products.id = $1
                   AND ${buildPublicProductSqlPredicate('products')}
+                  AND ${buildQuestionStoreEligibilitySql('$2')}
              )
              SELECT public_product.id AS public_product_id,
                     pq.id, pq.question, pq.answer, pq.created_at, pq.answered_at,
@@ -154,7 +178,7 @@ exports.getProductQuestions = async (req, res) => {
               AND NULLIF(BTRIM(pq.answer), '') IS NOT NULL
              LEFT JOIN users u ON pq.user_id = u.id
              ORDER BY pq.answered_at DESC, pq.id DESC`,
-            [productId]
+            [productId, PLATFORM_STORE.slug]
         );
 
         if (questions.rows.length === 0) {
@@ -223,7 +247,8 @@ exports.getAllQuestionsAdmin = async (req, res) => {
                      first_party_store.id as store_id,
                      first_party_store.name as store_name,
                      first_party_store.slug as store_slug,
-                     (COALESCE(seller_binding.current_binding_count, 0) = 0) AS admin_answerable,
+                     (LOWER(first_party_store.slug) = LOWER($1)
+                      AND COALESCE(seller_binding.current_binding_count, 0) = 0) AS admin_answerable,
                      CASE
                          WHEN COALESCE(seller_binding.current_binding_count, 0) = 1
                          THEN seller_binding.seller_organization_name
@@ -234,7 +259,6 @@ exports.getAllQuestionsAdmin = async (req, res) => {
              JOIN products p ON pq.product_id = p.id
              JOIN stores first_party_store
               ON first_party_store.id = p.store_id
-              AND LOWER(first_party_store.slug) = LOWER($1)
               AND first_party_store.is_active = TRUE
               AND first_party_store.deleted_at IS NULL
              LEFT JOIN LATERAL (
@@ -276,14 +300,12 @@ exports.getProductQuestionSummaryAdmin = async (req, res) => {
              JOIN products p ON pq.product_id = p.id
              JOIN stores first_party_store
               ON first_party_store.id = p.store_id
-              AND LOWER(first_party_store.slug) = LOWER($1)
               AND first_party_store.is_active = TRUE
               AND first_party_store.deleted_at IS NULL
              GROUP BY p.id, p.name, p.image_url
              ORDER BY
                 COUNT(pq.id) FILTER (WHERE NULLIF(BTRIM(pq.answer), '') IS NULL) DESC,
-                MAX(pq.created_at) DESC`,
-            [PLATFORM_STORE.slug]
+                MAX(pq.created_at) DESC`
         );
 
         res.status(200).json(result.rows);

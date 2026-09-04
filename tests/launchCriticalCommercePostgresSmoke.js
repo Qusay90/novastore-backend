@@ -139,12 +139,14 @@ let paymentControllerTestApi = null;
     await admin.query('CREATE SCHEMA public');
 
     const registry = loadRegistry();
-    assert.equal(registry.length, 37);
+    assert.equal(registry.length, 38);
+    assert.equal(registry.at(-1).id, '20260904_01_seller_reputation_questions');
     const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));
     assert.deepEqual(secondApply.applied, []);
-    const deliveryMigration = registry.at(-1);
+    const deliveryMigration = registry.find((entry) => entry.id === '20260902_01_seller_package_delivery_status');
+    assert(deliveryMigration, 'The package delivery migration must remain in the canonical registry.');
     assert.equal(deliveryMigration.id, '20260902_01_seller_package_delivery_status');
     const readDeliveryConstraintDefinitions = async () => (
         await admin.query(

@@ -15,7 +15,7 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
 
 (async () => {
     const registry = loadRegistry();
-    assert.equal(registry.length, 37);
+    assert.equal(registry.length, 38);
 
     const sellerMigrations = selectSellerMigrations({ registry });
     assert.deepEqual(
@@ -37,7 +37,8 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
             'migrations/20260821_01_seller_password_recovery.sql',
             'migrations/20260821_02_seller_applications.sql',
             'migrations/20260822_01_seller_application_terms_authority.sql',
-            'migrations/20260830_01_seller_application_user_binding.sql'
+            'migrations/20260830_01_seller_application_user_binding.sql',
+            'migrations/20260904_01_seller_reputation_questions.sql'
         ]
     );
 
@@ -63,8 +64,8 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
     };
     const applied = await applyLocalSellerMigrations({ database, registry, output: () => {} });
     assert.deepEqual(applied, localSellerMigrations.map((migration) => migration.id));
-    assert.equal(statements.filter((sql) => sql === 'BEGIN').length, 10);
-    assert.equal(statements.filter((sql) => sql === 'COMMIT').length, 10);
+    assert.equal(statements.filter((sql) => sql === 'BEGIN').length, 11);
+    assert.equal(statements.filter((sql) => sql === 'COMMIT').length, 11);
     assert.equal(statements.filter((sql) => sql === 'ROLLBACK').length, 0);
     assert.equal(released, true);
 
@@ -109,7 +110,7 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
     assert.equal(count(settings, /include\(":app"\)/g), 1);
     assert.equal(count(settings, /include\(":seller-app"\)/g), 1);
 
-    console.log('main6t combined integration smoke passed: migrations=36 seller=5 binding=1 main6u=4 main6y=1 launch=1 notification=2 legal-identity=1 listeners=1 routes=38');
+    console.log('combined integration smoke passed: migrations=38 seller=5 binding=1 main6u=4 reputation=1 listeners=1');
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;

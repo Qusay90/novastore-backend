@@ -20,12 +20,16 @@ const requireDatabase = (req) => {
     return database;
 };
 
-const createSellerBusinessController = ({ storeService, publicStoreService = defaultPublicStoreService, offerInventoryService, orderService, financeService, supportService } = {}) => {
+const createSellerBusinessController = ({ storeService, publicStoreService = defaultPublicStoreService, offerInventoryService, orderService, financeService, supportService, reputationService } = {}) => {
     if (!storeService || !publicStoreService || !offerInventoryService || !orderService || !financeService || !supportService) throw new TypeError('Seller business services are required.');
     const respond = (handler) => async (req, res) => {
         try { return res.status(200).json(await handler(req)); } catch (error) { return safeError(res, error); }
     };
+    const reputation = () => reputationService || require('../services/sellerReputationService');
     return Object.freeze({
+        listReputationInbox: respond((req) => reputation().listInbox(requireDatabase(req), req.sellerContext, req.query)),
+        readReputationItem: respond((req) => reputation().readItem(requireDatabase(req), req.sellerContext, req.params.itemId)),
+        reputationCommand: respond((req) => reputation().command(requireDatabase(req), req.sellerContext, req.params.itemId, { ...req.body, idempotency_key: req.headers['idempotency-key'] })),
         getStore: respond((req) => storeService.readStore(requireDatabase(req), req.sellerContext, req.params.storeId)),
         getStorePublicPreview: respond((req) => publicStoreService.loadSellerPublicPreview(requireDatabase(req), req.sellerContext, req.params.storeId)),
         updateStore: respond((req) => storeService.updateStore(requireDatabase(req), req.sellerContext, req.params.storeId, { ...req.body, revision: req.body?.revision, idempotency_key: req.headers['idempotency-key'], step_up_verified: req.sellerStepUpVerified === true })),

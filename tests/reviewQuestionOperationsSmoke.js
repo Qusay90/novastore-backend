@@ -216,7 +216,7 @@ const testControlCharacterRejection = async () => {
     assert.equal(question.body.code, 'QUESTION_TEXT_INVALID');
 };
 
-const testSellerWritesFailClosed = async () => {
+const testSellerReviewWritesFailClosed = async () => {
     let queryCount = 0;
     pool.query = async (sql) => {
         const text = String(sql);
@@ -230,10 +230,6 @@ const testSellerWritesFailClosed = async () => {
                     has_delivered_order: true
                 }]
             };
-        }
-        if (/INSERT INTO product_questions/i.test(text)) {
-            assert.match(text, /first_party_store\.slug/i);
-            return { rows: [] };
         }
         throw new Error(`Unexpected seller write query: ${text}`);
     };
@@ -249,29 +245,79 @@ const testSellerWritesFailClosed = async () => {
     });
     assert.equal(review.statusCode, 403);
     assert.equal(review.body.code, 'SELLER_REVIEW_HANDOFF_REQUIRED');
+    assert.equal(queryCount, 1);
+};
 
-    const questionTransaction = [];
-    pool.connect = async () => transactionClient(async (sql) => {
-        const text = String(sql).trim();
-        questionTransaction.push(text);
-        if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(text)) return { rows: [] };
-        if (/INSERT INTO product_questions/i.test(text)) {
-            queryCount += 1;
-            assert.match(text, /first_party_store\.slug/i);
-            return { rows: [] };
+const assertQuestionStoreEligibility = (sql) => {
+    assert.match(sql, /products\.publication_status = 'active'/i);
+    assert.match(sql, /products\.is_customer_visible = TRUE/i);
+    assert.match(sql, /products\.deleted_at IS NULL/i);
+    assert.match(sql, /canonical_store\.id = products\.store_id/i);
+    assert.match(sql, /canonical_store\.is_active = TRUE/i);
+    assert.match(sql, /canonical_store\.deleted_at IS NULL/i);
+    assert.match(sql, /seller_store\.legacy_store_id = canonical_store\.id/i);
+    assert.match(sql, /seller_store\.status = 'active'/i);
+    assert.match(sql, /seller_store\.closed_at IS NULL/i);
+    assert.match(sql, /profile\.organization_id = seller_store\.organization_id/i);
+    assert.match(sql, /profile\.store_id = seller_store\.id/i);
+    assert.match(sql, /COALESCE\(profile\.operational_status, 'open'\) = 'open'/i);
+    assert.match(sql, /question_store_binding\.public_binding_count = 1/i);
+    assert.match(sql, /OR \(question_store_binding\.binding_count = 0\s+AND LOWER\(canonical_store\.slug\)/i);
+};
+
+const testCustomerQuestionCanonicalEligibility = async () => {
+    for (const eligible of [true, false]) {
+        const calls = [];
+        pool.connect = async () => transactionClient(async (sql, params = []) => {
+            const text = String(sql).trim();
+            calls.push(text);
+            if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(text)) return { rows: [] };
+            if (/INSERT INTO product_questions/i.test(text)) {
+                assertQuestionStoreEligibility(text);
+                assert.deepEqual(params, [999, 41, 'Satıcı ürünü hakkında soru?', 'novastore-platform']);
+                return { rows: eligible ? [{ id: 502, product_id: 999, question: params[2], answer: null, revision: 1 }] : [] };
+            }
+            if (/INSERT INTO notification_outbox_events/i.test(text)) {
+                assert.equal(eligible, true);
+                assert.equal(params[2], 'QUESTION_CREATED');
+                assert.equal(params[3], 'product_question');
+                assert.equal(Number(params[4]), 502);
+                return { rows: [{ id: params[0], inserted: true, status: 'PENDING' }] };
+            }
+            throw new Error(`Unexpected customer question query: ${text}`);
+        });
+        const question = await invoke(questionController.askQuestion, {
+            user: { id: 41, role: 'customer', principal: 'customer' },
+            // Client identity/store fields cannot choose question ownership.
+            body: { product_id: 999, question: 'Satıcı ürünü hakkında soru?', user_id: 999, store_id: 999 }
+        });
+        assert.equal(question.statusCode, eligible ? 201 : 404);
+        if (eligible) {
+            assert.equal(question.body.question.id, 502);
+            assert.equal(question.body.question.status, 'pending');
+            assert.equal(calls.filter((sql) => /INSERT INTO notification_outbox_events/i.test(sql)).length, 1);
+            assert.equal(calls.at(-1), 'COMMIT');
+        } else {
+            assert.equal(question.body.code, 'PRODUCT_NOT_FOUND');
+            assert.equal(calls.length, 3);
+            assert.equal(calls.at(-1), 'ROLLBACK');
         }
-        throw new Error(`Unexpected seller question transaction query: ${text}`);
-    });
+    }
+};
 
-    const question = await invoke(questionController.askQuestion, {
-        user: { id: 41, role: 'customer', principal: 'customer' },
-        body: { product_id: 999, question: 'Satıcı ürünü hakkında soru?' }
-    });
-    assert.equal(question.statusCode, 404);
-    assert.equal(question.body.code, 'PRODUCT_NOT_FOUND');
-    assert.equal(queryCount, 2);
-    assert.deepEqual(questionTransaction, ['BEGIN', questionTransaction[1], 'ROLLBACK']);
-    assert.match(questionTransaction[1], /INSERT INTO product_questions/i);
+const testPublicQuestionStoreVisibility = async () => {
+    for (const eligible of [true, false]) {
+        pool.query = async (sql, params) => {
+            assertQuestionStoreEligibility(String(sql));
+            assert.deepEqual(params, [999, 'novastore-platform']);
+            assert.match(sql, /NULLIF\(BTRIM\(pq\.answer\), ''\) IS NOT NULL/i);
+            return { rows: eligible ? [{ public_product_id: 999, id: null }] : [] };
+        };
+        const result = await invoke(questionController.getProductQuestions, { params: { productId: '999' } });
+        assert.equal(result.statusCode, eligible ? 200 : 404);
+        if (eligible) assert.deepEqual(result.body, []);
+        else assert.equal(result.body.code, 'PRODUCT_NOT_FOUND');
+    }
 };
 
 const testReviewModerationAudit = async () => {
@@ -350,6 +396,8 @@ const testQuestionAdminOwnershipProjection = async () => {
         const text = String(sql);
         assert.match(text, /LEFT JOIN LATERAL[\s\S]*seller_stores seller_store/i);
         assert.match(text, /admin_answerable/i);
+        assert.match(text, /LOWER\(first_party_store\.slug\) = LOWER\(\$1\)\s+AND COALESCE\(seller_binding\.current_binding_count, 0\) = 0/i);
+        assert.doesNotMatch(text, /JOIN stores first_party_store[\s\S]*?AND LOWER\(first_party_store\.slug\)/i);
         assert.equal(params.length, 1);
         return {
             rows: [{
@@ -366,8 +414,8 @@ const testQuestionAdminOwnershipProjection = async () => {
                 product_name: 'Ürün',
                 product_image: null,
                 store_id: 10,
-                store_name: 'NovaStore Platform',
-                store_slug: 'novastore-platform',
+                store_name: 'Seller Mağazası',
+                store_slug: 'seller-magazasi',
                 admin_answerable: false,
                 seller_organization_name: 'Nova Yaşam Demo Satıcısı',
                 user_name: 'Müşteri'
@@ -381,7 +429,20 @@ const testQuestionAdminOwnershipProjection = async () => {
     });
     assert.equal(result.statusCode, 200);
     assert.equal(result.body[0].admin_answerable, false);
+    assert.equal(result.body[0].store_slug, 'seller-magazasi');
     assert.equal(result.body[0].seller_organization_name, 'Nova Yaşam Demo Satıcısı');
+};
+
+const testQuestionAdminProductSummary = async () => {
+    pool.query = async (sql, params = []) => {
+        assert.match(sql, /JOIN stores first_party_store/i);
+        assert.doesNotMatch(sql, /first_party_store\.slug/i);
+        assert.equal(params.length, 0);
+        return { rows: [{ product_id: 999, product_name: 'Seller ürünü', question_count: 1, pending_count: 1, answered_count: 0 }] };
+    };
+    const result = await invoke(questionController.getProductQuestionSummaryAdmin, { currentAdmin: { id: 9, role: 'admin' } });
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body[0].product_id, 999);
 };
 
 const testQuestionAnswerAudit = async () => {
@@ -533,10 +594,13 @@ const testQuestionValidationAndConflict = async () => {
     await testPublicProjection();
     await testDuplicateReviewRejection();
     await testControlCharacterRejection();
-    await testSellerWritesFailClosed();
+    await testSellerReviewWritesFailClosed();
+    await testCustomerQuestionCanonicalEligibility();
+    await testPublicQuestionStoreVisibility();
     await testReviewModerationAudit();
     await testReviewTenantDenied();
     await testQuestionAdminOwnershipProjection();
+    await testQuestionAdminProductSummary();
     await testQuestionAnswerAudit();
     await testSellerOwnedQuestionAnswerDenied();
     await testQuestionValidationAndConflict();

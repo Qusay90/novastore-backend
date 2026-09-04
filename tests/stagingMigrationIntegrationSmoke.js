@@ -31,6 +31,8 @@ const env = {
     DATABASE_URL: connectionString
 };
 const registry = loadRegistry();
+assert.equal(registry.length, 38);
+assert.equal(registry.at(-1).id, '20260904_01_seller_reputation_questions');
 const silent = () => {};
 const admin = new Client({ connectionString, application_name: 'p4d1a_integration_assertions' });
 
@@ -178,7 +180,8 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
     const applicantBindingMigrationIndex = registry.findIndex(
         (migration) => migration.id === '20260830_01_seller_application_user_binding'
     );
-    assert.equal(applicantBindingMigrationIndex, registry.length - 1);
+    assert(applicantBindingMigrationIndex >= 0 && applicantBindingMigrationIndex < registry.length - 1,
+        'The application binding migration must precede the R10 reputation migration.');
     const preApplicantBindingRegistry = registry.slice(0, applicantBindingMigrationIndex);
     const preApplicantBindingApply = await runApply({
         env,
@@ -203,7 +206,11 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
             ('92000000-0000-4000-8000-000000000002', repeat('e', 64), repeat('f', 64),
              'binding-ambiguous@example.test', 'Ambiguous binding probe', repeat('1', 64), repeat('2', 64))`
     );
-    const applicantBindingApply = await runApply({ env, registry, output: silent });
+    const applicantBindingApply = await runApply({
+        env,
+        registry: registry.slice(0, applicantBindingMigrationIndex + 1),
+        output: silent
+    });
     assert.deepEqual(applicantBindingApply.applied, ['20260830_01_seller_application_user_binding']);
     const applicantBindings = await admin.query(
         `SELECT id::TEXT, applicant_user_id
@@ -251,7 +258,8 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'seller_offers', 'seller_order_items', 'seller_order_transitions', 'seller_orders',
         'seller_organizations', 'seller_outbox_delivery_attempts', 'seller_outbox_events',
         'seller_password_recovery_challenges', 'seller_password_recovery_events',
-        'seller_permissions', 'seller_refresh_token_families', 'seller_refresh_tokens',
+        'seller_permissions', 'seller_public_legal_identities', 'seller_public_legal_identity_events',
+        'seller_refresh_token_families', 'seller_refresh_tokens',
         'seller_returns', 'seller_role_permissions', 'seller_roles', 'seller_sessions',
         'seller_settlements', 'seller_step_up_challenges', 'seller_store_profiles',
         'seller_stores', 'seller_support_conversations', 'seller_support_messages',

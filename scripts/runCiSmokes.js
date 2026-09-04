@@ -61,6 +61,7 @@ const smokeTests = [
     'tests/publicStoreProjectionSmoke.js',
     'tests/storeFollowSmoke.js',
     'tests/reviewQuestionOperationsSmoke.js',
+    'tests/sellerReputationQuestionsSmoke.js',
     'tests/supportNotificationOperationsSmoke.js',
     'tests/novabotModeContractSmoke.js',
     'tests/novabotInputSecuritySmoke.js',

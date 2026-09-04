@@ -473,6 +473,7 @@ if (localSellerApiEnabled) {
     const orderService = require('./services/sellerOrderFulfillmentService');
     const financeService = require('./services/sellerFinanceService');
     const supportService = require('./services/sellerSupportService');
+    const reputationService = require('./services/sellerReputationService');
     const { listMembersForStoreScope } = require('./services/sellerTeamReadService');
     const { createSellerPasswordRecoveryService } = require('./services/sellerPasswordRecoveryService');
     const { createSellerPasswordRecoveryDeliveryBoundary } = require('./services/sellerPasswordRecoveryDeliveryBoundary');
@@ -529,7 +530,8 @@ if (localSellerApiEnabled) {
         offerInventoryService,
         orderService,
         financeService,
-        supportService
+        supportService,
+        reputationService
     });
     const authController = createSellerAuthController({ loginService, tokenService });
     const passwordRecoveryController = createSellerPasswordRecoveryController({ service: passwordRecoveryService });

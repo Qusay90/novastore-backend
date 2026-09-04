@@ -2,13 +2,14 @@
 
 ## Durum ve normatif dil
 
-Bu dosyadaki `/api/seller/v1/**` yolları, aksi açıkça yazılmadıkça `PROPOSED_NOT_IMPLEMENTED` durumundadır. Repo incelemesinde uygulanmış seller namespace bulunmamıştır. Mevcut admin, customer, public veya legacy endpoint’ler seller endpoint’i yerine geçmez.
+Bu dosyadaki `/api/seller/v1/**` yolları, aksi açıkça yazılmadıkça `PROPOSED_NOT_IMPLEMENTED` durumundadır. R10 ürün sorusu REP-01/REP-02/REP-03 blokları uygulanmış ve yerel/disposable testlerden geçmiştir; her endpoint için aşağıdaki açık kapsam ve runtime notları esas alınır. Mevcut admin, customer, public veya legacy endpoint’ler seller endpoint’i yerine geçmez.
 
 Contract status enum:
 
 - `PROPOSED_NOT_IMPLEMENTED`: Bağlayıcı gelecek sözleşmesi; runtime’da yok.
 - `EXISTING_REUSABLE`: Kaynakta doğrulanmış iç primitive; seller authorization’ı olduğu anlamına gelmez.
 - `BLOCKED`: Eksik güvenlik, veri veya owner kararı nedeniyle uygulanamaz.
+- `IMPLEMENTED`: Açıkça belirtilen kapsamda kod, hedefli testler ve yerel/disposable UAT doğrulanmıştır; production deployment yapıldığı anlamına gelmez.
 
 ## Ortak envelope ve güvenlik
 
@@ -55,6 +56,7 @@ Her kayıtta status, method, route, domain, auth, permission, organization/store
 - `ORG-01 GET /api/seller/v1/context`: 024, 027, 055 ve 243 için post-auth context dependency.
 - `ORG-02 GET /api/seller/v1/organizations/current`: 027 ve 243 için organization/store detail dependency.
 - `OFFER-03 POST /api/seller/v1/offers`: 103–116 create flow dependency; aynı kanonik ekranlar existing-offer edit yolunda OFFER-02/OFFER-04 birincil bağını kullanabilir.
+- `REP-03 GET /api/seller/v1/reputation/items/{itemId}`: R10 ürün sorusu detay/refetch bağımlılığı; `254–255` ekranlarının list/command birincil bağını değiştirmez.
 
 Bunun dışındaki registry endpoint’leri matrixte birincil veya shared-primary olarak bulunur. Screen setlerinin birebir ters eşitliği aranmaz; primary coverage ve declared secondary dependency ayrı doğrulanır.
 
@@ -486,25 +488,49 @@ This subsection is a binding `PROPOSED_NOT_IMPLEMENTED` security contract. It de
 
 ## Reviews ve questions
 
+R10 REP aktivasyonu mevcut global Seller gate'ini kullanır: `SELLER_API_V1_ENABLED=true` **ve** `SELLER_API_V1_LOCAL_ONLY=true`; adlı loopback veritabanı ve `NOVASTORE_BIND_HOST=127.0.0.1` zorunludur. Bu global gate değiştirilmemiştir; ayrı sahte/local-only soru API'si oluşturulmamıştır. Kanonik backend kodu uygulanmıştır, production deployment `NOT_DONE`.
+
+Doğrulama: `npm run test:seller-reputation` → `PASS`, `67` reddedilen girdi senaryosu, `3` route ve migration kontrolleri; `npm run test:seller-reputation:integration` → `PASS`, `172` gerçek HTTP kontrolü. Yerel auth/Customer-Seller-Admin akışı, dört rollback enjeksiyonu, yetki kilidi çekişmesi, eşzamanlılık, imleç/imza/kapsam ve bildirim dedupe doğrulandı. Bağımsız review: `HIGH=0`, `MEDIUM=0`.
+
 ### REP-01 — Reviews/questions inbox
 
-- Status / method / route / domain: `PROPOSED_NOT_IMPLEMENTED` · `GET` · `/api/seller/v1/reputation/inbox` · `reviews_questions`
-- Auth / permission / scope: Seller session; `reputation.read`; own store/offer only.
-- Request / success: `{cursor?,limit?,type?,status?,offer_id?}` · `{items,next_cursor}`.
-- Stable errors / page-filter-sort: `PERMISSION_DENIED`, `RESOURCE_NOT_FOUND`, `INVALID_CURSOR` · limit 50; type/status filter; newest first.
-- Revision / idempotency / audit: Item revision · N/A · read sampled.
-- PII / offline-cache: customer identity minimum/maskeli · timestamped cache.
-- Phase / screens: `F12` · `252,254`.
+- Status / method / route / domain: `IMPLEMENTED` · `GET` · `/api/seller/v1/reputation/inbox` · `reviews_questions`.
+- R10 kapsamı: Yalnız `product_question`; review inbox ve report komutu bu dalgada uygulanmaz.
+- Auth / permission / scope: Seller audience ve güncel server session/membership; `reputation.read`; aktif organization, aktif/açık Seller mağazası ve güncel atanmış mağaza kapsamı. Soru sahipliği `product_questions → products.store_id → seller_stores.legacy_store_id` zincirinden çözülür.
+- Request / success: `{cursor?,limit?,type?,status?,offer_id?}` · ham Seller business JSON `{items,next_cursor}`. Bu REP runtime, yukarıdaki gelecek `data/meta` envelope önerisini uygulamaz.
+- Filter: `type` varsayılanı ve tek desteklenen değer `product_question`; `status` yoksa tümü, varsa `unanswered|answered`; `offer_id` pozitif Seller offer kimliğidir, product kimliği değildir. Offer filtresi mevcut organization/store/product bağı içinde çözülür; yetki vermez.
+- Pagination: Varsayılan limit `25`, üst sınır `50`; immutable kanonik soru kimliği `id DESC`. `next_cursor` son sayfada `null`. İmleç opaktır; version, scope/filter özeti ve son kimliği kapsayan base64url payload ile sunucunun ürettiği HMAC imzasını taşır. Organization, membership ve güncel store scope bağlamına bağlıdır; bozuk imza veya başka kapsam/filtre `400 INVALID_CURSOR`. İmza yetki vermez; her SQL sorgusu yeniden tenant filtrelidir.
+- DTO: `{item_id,type,product_id,product_name,store_id,store_name,question,answer,status,revision,created_at,answered_at,can_reply}`. `item_id` kanonik `product_questions.id`, `store_id` ise Seller mağaza kimliğidir; legacy `stores.id` değildir. Kimlik/revision alanları pozitif JSON sayılarıdır. `status=unanswered|answered`; boş yanıt/tarih `null`.
+- Stable errors / page-filter-sort: `403 PERMISSION_DENIED`, `404 RESOURCE_NOT_FOUND`, `400 INVALID_CURSOR`, `400 VALIDATION_FAILED`, `400 UNSUPPORTED_REPUTATION_TYPE`, geçici backend/yetki kilidi çekişmesinde `503 SELLER_BUSINESS_UNAVAILABLE`; ayrıca mevcut Seller auth/session hataları. Ham hata biçimi `{code,error}`; sayfalama/filtre/sıralama yukarıda tanımlıdır.
+- Revision / idempotency / audit: Kanonik item revision · salt okunur istek için idempotency key yok · yanıt audit davranışı REP-02'de tanımlıdır.
+- PII / offline-cache: Customer e-posta, telefon, adres, kimlik numarası veya auth/session bilgisi DTO'ya alınmaz. `can_reply` güncel izin ve soru durumundan hesaplanan sunum bilgisidir; mutasyon yetkisinin yerine geçmez. Yanıttan/yeniden bağlantıdan sonra server refetch gerekir.
+- Phase / screens: `F12` · ürün soruları `254`; review `252` desteklenmiş sayılmaz.
 
 ### REP-02 — Public reply/report command
 
-- Status / method / route / domain: `PROPOSED_NOT_IMPLEMENTED` · `POST` · `/api/seller/v1/reputation/items/{itemId}/commands` · `reviews_questions`
-- Auth / permission / scope: Seller session; `reputation.reply|report`; own store/offer item.
-- Request / success: `{command:"reply|report",body?,reason_code?,revision}` · `{item,status,revision}`.
-- Stable errors / page-filter-sort: `PERMISSION_DENIED`, `RESOURCE_NOT_FOUND`, `CONTENT_POLICY_VIOLATION`, `REVISION_CONFLICT` · N/A.
-- Revision / idempotency / audit: Item revision · `Idempotency-Key` zorunlu · `seller.reputation.reply_published|item_reported`.
-- PII / offline-cache: phone/email/address/payment/order detail/external link forbidden · offline mutation yasak.
-- Phase / screens: `F12` · `253,255`.
+- Status / method / route / domain: `IMPLEMENTED` · `POST` · `/api/seller/v1/reputation/items/{itemId}/commands` · `reviews_questions`.
+- Auth / permission / scope: REP-01 ile aynı canlı sahiplik zinciri; desteklenen `reply` için hem `reputation.read` hem `reputation.reply`. `report` uygulanmamıştır ve başarı döndürmez; `reputation.report` yoksa `403 PERMISSION_DENIED`, açıkça mevcutsa `400 UNSUPPORTED_COMMAND`. Bu dalga report yetkisi dağıtmaz.
+- Request / success: `{command:"reply",body:"...",revision:1}` · ham `{item,status:"answered",revision}`. `{itemId}` kanonik soru kimliğidir. Yanıt, REP-01 DTO'sunu kullanır.
+- Validation: Trim sonrası `1–2000` JavaScript UTF-16 karakter birimi; boş/aşırı uzun yanıt ve izin verilmeyen kontrol karakterleri `400 VALIDATION_FAILED`. Açık iletişim/URL/e-posta/telefon, ödeme aracı/IBAN, HTML işaretlemesi, adres belirteci ve sipariş referansı kalıpları `400 CONTENT_POLICY_VIOLATION`; bu deterministik sınırlı kalıp kontrolü tüm doğal dil PII'sini tespit ettiği iddiası taşımaz. Ayrıntılar [R10 handoff](PC1-SELLER-QUESTION-API-FINAL-HANDOFF.md).
+- Revision: Pozitif JSON integer body `revision` zorunlu; eksik `428 PRECONDITION_REQUIRED`, bozuk `400 VALIDATION_FAILED`, stale veya zaten yanıtlı soru `409 REVISION_CONFLICT`. Bu runtime body revision kullanır; yukarıdaki gelecek `If-Match` önerisini zorunlu kılmaz. `reply`, mevcut yanıtı düzenlemez.
+- Idempotency: `Idempotency-Key` zorunlu, `8–160` ASCII harf/rakam veya `._:-`; eksik `428 IDEMPOTENCY_KEY_REQUIRED`. Aynı key+aynı istek aynı sonucu döndürür ve yeni yanıt/audit/event üretmez; uyumsuz yeniden kullanım `409 IDEMPOTENCY_KEY_REUSED`. Retry sırasında da canlı auth, izin ve sahiplik kontrol edilir. Başka key ile zaten yanıtlı soruya tekrar cevap `409 REVISION_CONFLICT`.
+- Transaction / audit: Kanonik `product_questions` yanıtı, `answered_at`, `answered_by`, revision artışı; Seller audit, idempotency receipt ve mevcut `QUESTION_ANSWERED` outbox olayı tek transaction içinde. Audit yalnız güvenli kimlik/aksiyon metadata taşır; ayrı Seller yanıt deposu yoktur.
+- Stable errors / page-filter-sort: `403 PERMISSION_DENIED`, `404 RESOURCE_NOT_FOUND`, `400 VALIDATION_FAILED`, `400 CONTENT_POLICY_VIOLATION`, `400 UNSUPPORTED_COMMAND`, `428 PRECONDITION_REQUIRED`, `428 IDEMPOTENCY_KEY_REQUIRED`, `409 REVISION_CONFLICT`, `409 IDEMPOTENCY_KEY_REUSED`, geçici backend/yetki kilidi çekişmesinde `503 SELLER_BUSINESS_UNAVAILABLE`; mevcut auth/session hataları ayrıca geçerlidir. Ham hata biçimi `{code,error}` · page/filter/sort N/A. `503` sonrası kısa bekleme/refetch uygun olduğunda yapılır; aynı komut tekrarında aynı request/key korunur, belirsiz sonuç için yeni key üretilmez.
+- Revision / idempotency / audit: Yukarıdaki body revision ve zorunlu header key · `seller.reputation.reply_published`; tam transaction ve replay kuralları yukarıda tanımlıdır.
+- PII / offline-cache: Yalnız herkese açık ürün yanıtı; içerik koruması yukarıda tanımlıdır. Mutasyon offline kuyruğuna alınmaz; kesinleşmeyen ağ sonucu için aynı key ve aynı request ile retry yapılır.
+- Phase / screens: `F12` · ürün sorusu yanıtı `255`; review yanıtı `253` desteklenmiş sayılmaz.
+
+### REP-03 — Canonical product-question detail/refetch
+
+- Status / method / route / domain: `IMPLEMENTED` · `GET` · `/api/seller/v1/reputation/items/{itemId}` · `reviews_questions`.
+- Auth / permission / scope: REP-01 ile aynı canlı Seller session/membership/store sahipliği; `reputation.read`.
+- Request / success: Path `{itemId}` · `{item}`; `item`, REP-01 kanonik DTO'sudur.
+- Stable errors / page-filter-sort: Cross-tenant/missing/deleted/erişilemeyen kaynak `404 RESOURCE_NOT_FOUND`; izin yoksa `403 PERMISSION_DENIED`; geçici backend/yetki kilidi çekişmesinde `503 SELLER_BUSINESS_UNAVAILABLE`; mevcut auth/session hataları · page/filter/sort N/A.
+- Revision / idempotency / audit: Güncel kanonik item revision · salt okunur istek için idempotency key yok · yanıt audit davranışı REP-02'de tanımlıdır.
+- PII / offline-cache: REP-01 ile aynı Customer veri minimizasyonu; reply veya notification açılışından önce canlı refetch.
+- Phase / screens: `F12` · ürün sorusu `254–255` detay/refetch ikincil bağımlılığı.
+- Notification consumption: Mevcut target `{type:"product_question",destination:"NOTIFICATION_CENTER",questionId,productId,sellerStoreId}` değişmez. Notification çözümleyicisinin mevcut `offer.read` kontrolü REP erişimi sağlamaz; tüketici detail endpointine `questionId` ile gider, `reputation.read` ve güncel sahiplik yeniden doğrulanır. Başarısız refetch güvenli notification/inbox fallback ile sonuçlanır; payload içindeki product/store kimlikleri yetki değildir.
+- Tam Android/Stocky sözleşmesi: [PC1 Seller Question API Final Handoff](PC1-SELLER-QUESTION-API-FINAL-HANDOFF.md). R10 backend sözleşmesi `GO`; Android handoff `READY`; Stocky tüketimi `BACKEND_READY`. İstemci UI/deployment tamamlandı anlamına gelmez.
 
 ## Campaigns ve coupons
 

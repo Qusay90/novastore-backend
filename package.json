@@ -9,6 +9,8 @@
     "review:official-runtime": "node scripts/serveOfficialRuntimeReview.mjs",
     "test": "node scripts/runCiSmokes.js",
     "test:ci": "node scripts/runCiSmokes.js",
+    "test:seller-reputation": "node tests/sellerReputationQuestionsSmoke.js",
+    "test:seller-reputation:integration": "node tests/sellerReputationQuestionsPostgresSmoke.js --execute-disposable-db",
     "test:staging-migrations": "node tests/stagingMigrationFoundationSmoke.js",
     "test:staging-migrations:integration": "node tests/stagingMigrationIntegrationSmoke.js",
     "test:main6s-operations:integration": "node tests/main6sOperationsPostgresSmoke.js",

@@ -257,5 +257,12 @@
     "sha256": "283882f39fcc9e871aef308e8baaa1eeeba10bc9d246d0570667e33b90b1ea49",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260904_01_seller_reputation_questions",
+    "path": "migrations/20260904_01_seller_reputation_questions.sql",
+    "sha256": "958d1746e536266c86ec31466bea51d3b4a3ed6ea67d6a8b78113c4ad8eaf725",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

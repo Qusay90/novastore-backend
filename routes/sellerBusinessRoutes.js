@@ -7,7 +7,8 @@ const SELLER_BUSINESS_PATHS = Object.freeze([
     '/stores/:storeId', '/stores/:storeId/public-preview', '/offers', '/offers/:offerId', '/offers/:offerId/commands', '/inventory',
     '/inventory/adjustments', '/inventory/:inventoryItemId/threshold', '/orders', '/orders/:orderId',
     '/orders/:orderId/commands', '/returns', '/dashboard', '/finance/summary', '/finance/ledger',
-    '/finance/settlements', '/support/conversations', '/support/messages', '/support/conversations/:conversationId/rating'
+    '/finance/settlements', '/support/conversations', '/support/messages', '/support/conversations/:conversationId/rating',
+    '/reputation/inbox', '/reputation/items/:itemId', '/reputation/items/:itemId/commands'
 ]);
 
 const capabilityDisabled = (_req, res) => res.status(503).json({ code: 'CAPABILITY_DISABLED', error: 'CAPABILITY_DISABLED' });
@@ -26,6 +27,9 @@ const createSellerBusinessRouter = ({ enabled = false, auth, tenant, controller,
     const offerWrite = featureGate(features.offerWrite === true);
     const orderWrite = featureGate(features.orderWrite === true);
     const financeRead = featureGate(features.financeRead === true);
+    router.get('/reputation/inbox', ...base, tenant.requireSellerPermission('reputation.read'), controller.listReputationInbox);
+    router.get('/reputation/items/:itemId', ...base, tenant.requireSellerPermission('reputation.read'), controller.readReputationItem);
+    router.post('/reputation/items/:itemId/commands', ...base, tenant.requireSellerPermission('reputation.read'), commandPermission(tenant, { reply: 'reputation.reply', report: 'reputation.report' }), controller.reputationCommand);
     router.get('/stores/:storeId', ...base, tenant.requireSellerPermission('store.read'), controller.getStore);
     router.get('/stores/:storeId/public-preview', ...base, tenant.requireSellerPermission('store.read'), controller.getStorePublicPreview);
     router.patch('/stores/:storeId', ...base, tenant.requireSellerPermission('store.update'), controller.updateStore);
