@@ -187,3 +187,36 @@ The owner reference and the final runtime screenshot were inspected together in 
 - Remaining in-scope medium findings: 0.
 
 final result: passed
+
+# PC1 Customer Web R8-R3 Design QA
+
+Date: 2026-09-04
+
+## Scope and root cause
+
+- Accepted R8-R2 source was preserved; this correction changes only the desktop shell breakpoint and its focused regression test.
+- At an exact 1366 px browser viewport, the vertical scrollbar reduced `documentElement.clientWidth` to 1351 px while the compact header rule stopped at 1360 px layout width.
+- The base `.header-actions` intrinsic width was 669.03 px and ended at x=1365.03. The final Seller recruitment action therefore extended the document to 1365 px, producing the owner-reported 14 px page overflow.
+- The defect existed from 1361 through 1379 px layout width and ended naturally at 1380 px. The compact header breakpoint now covers that exact gap through 1379 px; no `overflow-x: hidden` masking was added.
+
+## Browser matrix
+
+- Desktop document overflow was 0 px at 981, 1024, 1100, 1200, 1280, 1366, 1440, 1536, 1600, and 1920 px.
+- Mobile/tablet document overflow was 0 px at 390, 430, 621, 768, 820, and 980 px.
+- At 980 px the compact menu, cart, and all four drawer shortcuts were visible and reachable. At 981 px the compact menu was absent and all five desktop header actions were visible and entirely inside the viewport. No responsive navigation dead zone remains.
+- At 1366 px the corrected header actions end at x=1323, leaving the normal shell gutter inside the 1351 px client width. At 1440 px and above the accepted wide header layout resumes unchanged.
+
+## Preserved behavior
+
+- Category navigation retains fixed `Tüm Kategoriler` and `Fırsatlar` edge actions and a dedicated `overflow-x: auto` rail with non-wrapping, max-content items; it does not cause document overflow.
+- Compare closed, collapsed launcher, open tray, and open dialog states all measured 0 px compare-induced document overflow. NovaBot placement and mobile bottom navigation remain unchanged.
+- The R8 Favorites card layout, R8-R2 Compare architecture, NovaBot modes, checkout, auth entry, and Seller recruitment behavior were not reopened.
+
+## Evidence
+
+- Exact 1366 px bottom-of-page screenshot: `C:\Users\kusay\AppData\Local\Temp\novastore-customer-web-r8-r3-20260904\r8-r3-bottom-1366.png`; client width 1351 px, scroll width 1351 px, horizontal scrollbar absent.
+- Exact 1920 px bottom-of-page screenshot: `C:\Users\kusay\AppData\Local\Temp\novastore-customer-web-r8-r3-20260904\r8-r3-bottom-1920.png`; client width 1905 px, scroll width 1905 px, horizontal scrollbar absent.
+- Remaining in-scope high findings: 0.
+- Remaining in-scope medium findings: 0.
+
+final result: passed

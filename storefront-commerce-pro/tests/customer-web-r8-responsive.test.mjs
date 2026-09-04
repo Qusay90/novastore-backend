@@ -64,6 +64,12 @@ test("R8 compact drawer preserves every canonical global navigation path", async
   assert.match(css, /\.mobile-customer-shortcuts a:focus-visible/u);
 });
 
+test("R8-R3 desktop shell keeps the compact header through the scrollbar overflow gap", async () => {
+  const css = await fs.readFile(new URL("../src/integrated.css", import.meta.url), "utf8");
+  assert.match(css, /@media \(min-width: 981px\) and \(max-width: 1379px\)\s*\{[\s\S]*?\.site-header \.main-header\s*\{[\s\S]*?grid-template-columns: 180px minmax\(240px, 1fr\) auto;[\s\S]*?\.main-header \.header-actions\s*\{[\s\S]*?gap: 8px;/u);
+  assert.doesNotMatch(css, /(?:^|\n)\s*(?:html|body|html\s*,\s*body|body\s*,\s*html)\s*\{[^}]*overflow-x:\s*hidden/iu);
+});
+
 test("R8 category navigation keeps edge actions fixed and every overflow item reachable", async () => {
   const app = await fs.readFile(new URL("../src/IntegratedApp.jsx", import.meta.url), "utf8");
   const css = await fs.readFile(new URL("../src/integrated.css", import.meta.url), "utf8");

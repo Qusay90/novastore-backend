@@ -681,7 +681,7 @@
   }
 }
 
-@media (min-width: 981px) and (max-width: 1360px) {
+@media (min-width: 981px) and (max-width: 1379px) {
   .site-header .main-header {
     grid-template-columns: 180px minmax(240px, 1fr) auto;
     gap: 14px;
