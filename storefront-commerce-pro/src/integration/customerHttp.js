@@ -1,6 +1,9 @@
 const CUSTOMER_TOKEN_KEY = "nova_user_token";
 
 const RULES = Object.freeze([
+  { methods: ["POST"], pattern: /^\/api\/returns$/, authenticated: true },
+  { methods: ["GET"], pattern: /^\/api\/returns\/mine$/, authenticated: true },
+  { methods: ["GET"], pattern: /^\/api\/returns\/[1-9][0-9]*$/, authenticated: true },
   { methods: ["POST"], pattern: /^\/api\/users\/(?:login|register)$/, authenticated: false },
   { methods: ["POST"], pattern: /^\/api\/users\/logout$/, authenticated: true },
   { methods: ["POST"], pattern: /^\/api\/auth\/(?:forgot-password|reset-password)$/, authenticated: false },
@@ -217,7 +220,7 @@ export function createCustomerHttp({
 
     const payload = await readPayload(response);
     if (!response.ok) {
-      if (token && response.status === 401) clearCustomerSession();
+      if (token && response.status === 401 && token === String(storage?.getItem?.(CUSTOMER_TOKEN_KEY) || "")) clearCustomerSession();
       throw new CustomerHttpError(
         payload.error || payload.message || "Müşteri işlemi tamamlanamadı.",
         {

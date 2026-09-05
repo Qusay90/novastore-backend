@@ -1,3 +1,5 @@
+import CustomerReturns from "./CustomerReturns.jsx";
+import { refundStatusLabel, returnDetailPath, returnErrorMessage } from "./adapters/customerReturnContract.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -297,6 +299,7 @@ const ACCOUNT_ITEMS = Object.freeze([
   [User, "Hesap özetim", "#/hesabim", "overview"],
   [MapPin, "Adreslerim", "#/hesabim/adresler", "addresses"],
   [Receipt, "Siparişlerim", "#/hesabim/siparisler", "orders"],
+  [Receipt, "İade Taleplerim", "#/hesabim/iadeler", "returns"],
   [Heart, "Favorilerim", "#/favoriler", "favorites"],
   [Question, "Sorulan Sorularım", "#/hesabim/sorularim", "questions"],
   [Star, "Değerlendirmelerim", "#/hesabim/degerlendirmelerim", "reviews"],
@@ -378,6 +381,7 @@ function AccountOverview({ session, account, favoriteCount, onSessionUpdated, on
     {dashboard.warnings.length > 0 && <div className="form-message is-warning" role="status"><WarningCircle />Bazı hesap bölümleri şu anda alınamadı; erişilebilen bilgiler gösteriliyor.</div>}
     <div className="account-stats"><a href="#/hesabim/siparisler"><Receipt /><span><strong>{currentOrders.length}</strong><small>Aktif sipariş</small></span></a><a href="#/favoriler"><Heart /><span><strong>{favoriteCount}</strong><small>Favori ürün</small></span></a><a href="#/hesabim/adresler"><MapPin /><span><strong>{dashboard.addresses.length}</strong><small>Kayıtlı adres</small></span></a><a href="#/hesabim/kuponlar"><Ticket /><span><strong>{dashboard.coupons.length}</strong><small>Aktif kupon</small></span></a></div>
     <ProfileForm user={session.user} account={account} onUpdated={onSessionUpdated} onNotice={onNotice} focusOnMount={focusProfile} />
+    <a className="return-history-entry" href="#/hesabim/iadeler"><Receipt /><span><strong>İade Taleplerim</strong><small>Geçmiş taleplerini ve güncel durumlarını görüntüle.</small></span><CaretRight /></a>
     <h2>Son siparişlerin</h2>
     {dashboard.orders.length ? <div className="order-list">{dashboard.orders.slice(0, 3).map((order) => <CustomerOrderCard key={order.id} order={order} productById={productById} getProductImage={getProductImage} />)}</div> : <div className="connected-empty is-compact"><ShoppingBag /><h3>Henüz siparişin yok</h3><p>Katalogdaki ürünleri keşfederek ilk siparişini oluşturabilirsin.</p><a className="primary-button" href="#/">Alışverişe başla</a></div>}
   </>;
@@ -391,7 +395,12 @@ function OrdersSection({ session, account, orderId, productById, getProductImage
   const [returnOpen, setReturnOpen] = useState(false);
   const [returnPhase, setReturnPhase] = useState("idle");
   const [returnError, setReturnError] = useState("");
-  if (resource.phase !== "ready") return <InlineState phase={resource.phase} error={resource.error} onRetry={resource.reload} />;
+  const [createdReturn, setCreatedReturn] = useState(null);
+  const returnBusy = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const confirmation = createdReturn && <div className="return-create-confirmation form-message" role="status">İade talebin {createdReturn.reused ? "zaten kayıtlı" : "alındı"}. <a href={returnDetailPath(createdReturn.return.id)}>Talep #{createdReturn.return.id} detayını aç</a>. Bilgileri yenileme hatası bu kaydı değiştirmez.</div>;
+  if (resource.phase !== "ready") return <>{confirmation}<InlineState phase={resource.phase} error={resource.error} onRetry={resource.reload} /></>;
   const orders = resource.data;
   const selected = orderId ? orders.find((order) => String(order.id) === String(orderId)) : null;
 
@@ -412,21 +421,26 @@ function OrdersSection({ session, account, orderId, productById, getProductImage
 
   const createReturn = async (event, order) => {
     event.preventDefault();
+    if (returnBusy.current || createdReturn) return;
+    returnBusy.current = true;
     const form = new FormData(event.currentTarget);
     setReturnPhase("submitting");
     setReturnError("");
     try {
-      await account.createReturnRequest(order, {
+      const result = await account.createReturnRequest(order, {
         reasonCode: form.get("reasonCode"),
         note: form.get("note"),
       });
+      if (!mounted.current) return;
+      setCreatedReturn(result);
       setReturnOpen(false);
-      onNotice("İade talebin alındı. Durumu sipariş detayından takip edebilirsin.");
+      onNotice(`İade talebin kayıtlı: #${result.return.id}.`);
       resource.reload();
     } catch (requestError) {
-      setReturnError(errorMessage(requestError, "İade talebi oluşturulamadı."));
+      if (mounted.current) setReturnError(returnErrorMessage(requestError));
     } finally {
-      setReturnPhase("idle");
+      returnBusy.current = false;
+      if (mounted.current) setReturnPhase("idle");
     }
   };
 
@@ -438,12 +452,13 @@ function OrdersSection({ session, account, orderId, productById, getProductImage
       <div className="commerce-heading"><div><span className="section-kicker">Sipariş detayı</span><h1>Sipariş #{selected.id}</h1><p>{formatDate(selected.createdAt)}</p></div><span className={`status-pill is-${selected.tone}`}>{selected.status}</span></div>
       {selected.statusNote && <div className="form-message is-warning"><WarningCircle />{selected.statusNote}</div>}
       {cancelError && <div className="form-message is-error" role="alert"><WarningCircle />{cancelError}</div>}
+      {confirmation}
       {returnError && <div className="form-message is-error" role="alert"><WarningCircle />{returnError}</div>}
       <div className="order-detail-products">{selected.items.length ? selected.items.map((item, index) => { const image = orderImage(item, productById, getProductImage); return <div key={`${item.id || item.name}-${index}`}>{image ? <img src={image} alt={item.name} /> : <span className="order-detail-placeholder"><Package /></span>}<span><strong>{item.name}</strong><small>{item.quantity} adet</small></span><b>{money.format(item.price * item.quantity)}</b></div>; }) : <div className="order-items-unavailable"><Package /><span><strong>Ürün özeti alınamadı</strong><small>Sipariş toplamı ve durumu korunuyor.</small></span></div>}</div>
       <div className="order-detail-grid"><div><MapPin /><span><strong>Teslimat adresi</strong><p>{selected.address || "Adres özeti bu sipariş kaydında bulunmuyor."}</p></span></div><div><CreditCard /><span><strong>Ödeme</strong><p>{selected.paymentStatus ? paymentStatusLabel(selected.paymentStatus) : selected.paymentMethod || "Ödeme durumu sipariş kaydında gösterilecek."}</p></span></div>{selected.trackingNo || trackingUrl ? <div><Truck /><span><strong>Kargo takibi</strong><p>{selected.trackingNo ? `Takip no: ${selected.trackingNo}` : "Takip bağlantısı hazır."}{selected.etaDate ? ` · Tahmini teslimat ${formatDate(selected.etaDate, false)}` : ""}</p>{trackingUrl && <a href={trackingUrl} target="_blank" rel="noopener noreferrer">Taşıyıcı sayfasını aç <CaretRight /></a>}</span></div> : null}</div>
-      {selected.returnStatus && <section className="order-return-status" role="status" aria-live="polite"><Receipt /><span><strong>İade durumu: {selected.returnStatusLabel}</strong><small>Talep #{selected.returnId}{selected.returnDecisionNote ? ` · ${selected.returnDecisionNote}` : ""}</small>{selected.returnStatus === "APPROVED" && <small>Onay kaydedildi; para iadesi sağlayıcı işlemi tamamlandığında ayrıca güncellenecek.</small>}</span></section>}
-      {selected.returnable && !returnOpen && <div className="order-return-zone"><span><strong>İade talebi</strong><small>İade uygunluğu ve süre sunucu tarafından doğrulanır. Talep açmak para iadesinin tamamlandığı anlamına gelmez.</small></span><button type="button" onClick={() => { setReturnError(""); setReturnOpen(true); }}>İade talebi oluştur</button></div>}
-      {selected.returnable && returnOpen && <form className="order-return-form connected-form" onSubmit={(event) => createReturn(event, selected)}><div><strong>İade nedenini seç</strong><small>Talebin yalnız bu sipariş için oluşturulur.</small></div><label>Neden<select name="reasonCode" defaultValue="CHANGED_MIND" required>{RETURN_REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Açıklama <span>(isteğe bağlı)</span><textarea name="note" maxLength="1000" rows="4" placeholder="İncelemeye yardımcı olacak kısa bir açıklama ekleyebilirsin." /></label><div className="form-actions"><button type="button" onClick={() => { setReturnOpen(false); setReturnError(""); }} disabled={returnPhase === "submitting"}>Vazgeç</button><button className="primary-button" type="submit" disabled={returnPhase === "submitting"}>{returnPhase === "submitting" ? "Gönderiliyor…" : "Talebi gönder"}</button></div></form>}
+      {selected.returnStatus && <section className="order-return-status" role="status" aria-live="polite"><Receipt /><span><strong>İade durumu: {selected.returnStatusLabel}</strong><small>Talep #{selected.returnId}{selected.returnDecisionNote ? ` · ${selected.returnDecisionNote}` : ""}</small><small>Geri Ödeme Durumu: {refundStatusLabel(selected.refundStatus)}</small>{selected.returnId && <a href={returnDetailPath(selected.returnId)}>Talep detayını aç</a>}</span></section>}
+      {selected.returnable && !createdReturn && !returnOpen && <div className="order-return-zone"><span><strong>İade talebi</strong><small>İade uygunluğu ve süre sunucu tarafından doğrulanır. Talep açmak para iadesinin tamamlandığı anlamına gelmez.</small></span><button type="button" onClick={() => { setReturnError(""); setReturnOpen(true); }}>İade talebi oluştur</button></div>}
+      {selected.returnable && !createdReturn && returnOpen && <form className="order-return-form connected-form" onSubmit={(event) => createReturn(event, selected)}><div><strong>İade nedenini seç</strong><small>Talebin yalnız bu sipariş için oluşturulur.</small></div><label>Neden<select name="reasonCode" defaultValue="CHANGED_MIND" required>{RETURN_REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Açıklama <span>(isteğe bağlı)</span><textarea name="note" maxLength="1000" rows="4" placeholder="İncelemeye yardımcı olacak kısa bir açıklama ekleyebilirsin." /></label><div className="form-actions"><button type="button" onClick={() => { setReturnOpen(false); setReturnError(""); }} disabled={returnPhase === "submitting"}>Vazgeç</button><button className="primary-button" type="submit" disabled={returnPhase === "submitting"}>{returnPhase === "submitting" ? "Gönderiliyor…" : "Talebi gönder"}</button></div></form>}
       {selected.cancellable && <div className="order-danger-zone"><span><strong>Sipariş iptali</strong><small>İptal ve olası iade koşulları güncel sipariş durumuna göre sunucu tarafından doğrulanır.</small></span><button type="button" disabled={cancelPhase === "submitting"} onClick={() => cancel(selected)}>{cancelPhase === "submitting" ? "İşleniyor…" : "İptal talebi gönder"}</button></div>}
     </>;
   }
@@ -452,7 +467,7 @@ function OrdersSection({ session, account, orderId, productById, getProductImage
     ? [...orders].sort((left, right) => left.status.localeCompare(right.status, "tr"))
     : orders;
   return <>
-    <div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Siparişlerim</h1><p>{orders.length} sipariş bulundu.</p></div><select aria-label="Siparişleri sırala" value={sort} onChange={(event) => setSort(event.target.value)}><option value="date">Tarihe göre: yeni → eski</option><option value="status">Duruma göre</option></select></div>
+    <div className="commerce-heading"><div><span className="section-kicker">Hesabım</span><h1>Siparişlerim</h1><p>{orders.length} sipariş bulundu.</p><a href="#/hesabim/iadeler">İade Taleplerim</a></div><select aria-label="Siparişleri sırala" value={sort} onChange={(event) => setSort(event.target.value)}><option value="date">Tarihe göre: yeni → eski</option><option value="status">Duruma göre</option></select></div>
     {orders.length ? <div className="order-list">{displayed.map((order) => <CustomerOrderCard key={order.id} order={order} productById={productById} getProductImage={getProductImage} />)}</div> : <div className="connected-empty"><ShoppingBag /><h2>Henüz siparişin yok</h2><p>İlk siparişinden sonra tüm süreçleri bu ekrandan takip edebilirsin.</p><a className="primary-button" href="#/">Ürünleri keşfet</a></div>}
   </>;
 }
@@ -800,10 +815,11 @@ export function CustomerAccountPage(props) {
     focusProfile = false,
   } = props;
   const productById = useMemo(() => new Map(products.map((product) => [Number(product.id), product])), [products]);
-  const activeSection = section === "order-detail" ? "orders" : section;
+  const activeSection = section === "order-detail" ? "orders" : section === "return-detail" ? "returns" : section;
   let content;
   if (section === "overview") content = <AccountOverview session={session} account={account} favoriteCount={favoriteCount} onSessionUpdated={onSessionUpdated} onNotice={onNotice} productById={productById} getProductImage={getProductImage} focusProfile={focusProfile} />;
-  else if (section === "orders" || section === "order-detail") content = <OrdersSection session={session} account={account} orderId={orderId} productById={productById} getProductImage={getProductImage} onNotice={onNotice} />;
+  else if (section === "orders" || section === "order-detail") content = <OrdersSection key={`${session.user.id}:${orderId || "orders"}`} session={session} account={account} orderId={orderId} productById={productById} getProductImage={getProductImage} onNotice={onNotice} />;
+  else if (section === "returns" || section === "return-detail") content = <CustomerReturns key={`${session.user.id}:${props.returnId || "list"}`} account={account} session={session} returnId={props.returnId} />;
   else if (section === "addresses") content = <AddressesSection account={account} user={session.user} onNotice={onNotice} />;
   else if (section === "coupons") content = <CouponsSection account={account} onNotice={onNotice} />;
   else if (section === "questions") content = <QuestionsSection session={session} account={account} productById={productById} />;

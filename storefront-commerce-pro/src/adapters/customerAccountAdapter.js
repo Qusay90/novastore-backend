@@ -1,3 +1,4 @@
+import { RETURN_STATUS_LABELS, normalizeCustomerReturn } from "./customerReturnContract.js";
 import { resolveNotificationTarget } from "../../../web-notifications/notificationClient.js";
 
 const TOKEN_KEY = "nova_user_token";
@@ -105,13 +106,6 @@ const CANCELLABLE_STATUSES = new Set([
   "Hazırlanıyor",
 ]);
 
-const RETURN_STATUS_LABELS = Object.freeze({
-  REQUESTED: "Talep alındı",
-  IN_REVIEW: "İnceleniyor",
-  APPROVED: "Onaylandı · para iadesi bekleniyor",
-  REJECTED: "Reddedildi",
-  COMPLETED: "Tamamlandı",
-});
 
 export const normalizeCustomerOrder = (value) => {
   if (!value || typeof value !== "object") return null;
@@ -136,6 +130,7 @@ export const normalizeCustomerOrder = (value) => {
     ) || null,
     paymentMethod: asTrimmedString(value.payment_method || value.paymentMethod) || null,
     paymentStatus,
+    currency: /^[A-Z]{3}$/.test(value.currency || "") ? value.currency : null,
     refundStatus: asTrimmedString(value.refund_status || value.refundStatus) || null,
     trackingNo: asTrimmedString(value.tracking_no || value.trackingNo) || null,
     trackingUrl: asTrimmedString(value.tracking_url || value.trackingUrl) || null,
@@ -145,7 +140,7 @@ export const normalizeCustomerOrder = (value) => {
     returnStatus,
     returnStatusLabel: returnStatus ? (RETURN_STATUS_LABELS[returnStatus] || returnStatus) : null,
     returnDecisionNote: asTrimmedString(value.return_decision_note || value.returnDecisionNote) || null,
-    returnable: status === "Teslim Edildi" && paymentStatus === "PAID" && !returnId,
+    returnable: status === "Teslim Edildi" && paymentStatus === "PAID" && (!returnId || ["REJECTED", "COMPLETED"].includes(returnStatus)),
   });
 };
 
@@ -555,10 +550,42 @@ export function createCustomerAccountAdapter({
     });
   };
 
+  // Bind private return responses to the initiating account, including delayed errors.
+  const returnRequest = async (session, path, options = {}) => {
+    const userId = session ? requireUserId(session) : readStoredUserId(storage);
+    const token = storage?.getItem?.(TOKEN_KEY);
+    const changed = () => !token || !userId || token !== storage?.getItem?.(TOKEN_KEY) || userId !== readStoredUserId(storage);
+    const sessionError = () => Object.assign(new Error("Müşteri oturumu değişti."), { status: 401, code: "CUSTOMER_SESSION_CHANGED" });
+    if (changed()) throw sessionError();
+    try {
+      const result = await http.request(path, options);
+      if (changed()) throw sessionError();
+      return result;
+    } catch (error) {
+      if (changed()) throw sessionError();
+      throw error;
+    }
+  };
+
+  const listReturns = async (session, options = {}) => {
+    const payload = await returnRequest(session, "/api/returns/mine", options);
+    if (!Array.isArray(payload)) throw Object.assign(new Error("İade listesi doğrulanamadı."), { status: 400 });
+    const rows = payload.map((row) => normalizeCustomerReturn(row));
+    if (new Set(rows.map((row) => row.id)).size !== rows.length) throw Object.assign(new Error("İade listesi doğrulanamadı."), { status: 400 });
+    return Object.freeze(rows);
+  };
+
+  const getReturn = async (session, id, options = {}) => {
+    const returnId = toPositiveInteger(id);
+    if (!Number.isSafeInteger(returnId)) throw Object.assign(new Error("Geçersiz iade kimliği."), { status: 400 });
+    const payload = await returnRequest(session, `/api/returns/${returnId}`, options);
+    return normalizeCustomerReturn(payload, { detail: true, expectedId: returnId });
+  };
+
   const createReturnRequest = async (order, options = {}) => {
     const orderId = toPositiveInteger(order?.id ?? order);
-    if (!orderId) throw new Error("Geçersiz sipariş kimliği.");
-    return http.request("/api/returns", {
+    if (!Number.isSafeInteger(orderId)) throw new Error("Geçersiz sipariş kimliği.");
+    const payload = await returnRequest(null, "/api/returns", {
       method: "POST",
       body: {
         order_id: orderId,
@@ -567,6 +594,9 @@ export function createCustomerAccountAdapter({
       },
       signal: options.signal,
     });
+    const request = normalizeCustomerReturn(payload?.return);
+    if (request.orderId !== orderId || typeof payload.reused !== "boolean") throw new Error("İade yanıtı doğrulanamadı; yeniden göndermeden önce iade geçmişini kontrol edin.");
+    return Object.freeze({ reused: payload.reused, return: request });
   };
 
   const listCoupons = async (options = {}) => {
@@ -676,6 +706,8 @@ export function createCustomerAccountAdapter({
     unfollowStore,
     cancelOrder,
     createReturnRequest,
+    listReturns,
+    getReturn,
     listCoupons,
     listNotifications,
     getNotificationUnreadCount,

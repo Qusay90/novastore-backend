@@ -30,7 +30,7 @@ assert.match(storefrontIntegration, /product\.stock <= 0/);
 assert.match(storefrontIntegration, /Math\.min\(product\.stock/);
 assert.match(storefrontCatalogAdapter, /slug: safeProductSlug\(product\.slug, id\)/);
 assert.match(storefrontIntegration, /<ComparisonTray ids=\{comparisonIds\}/);
-assert.match(storefrontIntegration, /onClear=\{\(\) => setComparisonIds\(new Set\(\)\)\}/);
+assert.match(storefrontIntegration, /onClear=\{\(\) => \{\s*setComparisonIds\(new Set\(\)\);\s*setComparisonSurfaceVisible\(false\);\s*\}\}/);
 assert.match(storefrontArtifact, /production-candidate/);
 assert.match(storefrontArtifact, /IntegratedApp:createCommerceRuntime/);
 assert.doesNotMatch(storefrontArtifact, /main-integrated-fixture|createCanonicalFixtureRuntime/);

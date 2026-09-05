@@ -15,7 +15,7 @@ const cases = [
   ["shipment", 78, "#/hesabim/siparisler/78", "orders"],
   ["product", 72, "#/urun-id/72", "catalog"],
   ["product_question", 73, "#/hesabim/sorularim", "questions"],
-  ["return_request", 74, "#/hesabim/siparisler", "returns"],
+  ["return_request", 74, "#/hesabim/iadeler/74", "returns"],
   ["review", 75, "#/hesabim/degerlendirmelerim", "reviews"],
   ["store", 79, "#/hesabim/bildirimler", "sellerApplications"],
   ["support_thread", 76, "#/destek", "support"],

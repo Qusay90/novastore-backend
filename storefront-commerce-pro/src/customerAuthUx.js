@@ -9,6 +9,7 @@ export function customerAccountEntryPath(authenticated) {
 const CONTROL_OR_BACKSLASH = /[\\\u0000-\u001f\u007f]/;
 const TURKISH_MOBILE_PATTERN = /^05[0-9]{9}$/;
 const CUSTOMER_RETURN_PATHS = Object.freeze([
+  /^\/hesabim\/iadeler(?:\/[1-9][0-9]*)?$/,
   /^\/$/,
   /^\/urun\/[a-z0-9]+(?:-[a-z0-9]+)*$/,
   /^\/urun-id\/[1-9][0-9]*$/,

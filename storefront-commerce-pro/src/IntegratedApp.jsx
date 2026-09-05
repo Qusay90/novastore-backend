@@ -370,6 +370,11 @@ function parseRoute() {
   }
   if (pathname === "/favoriler") return { type: "favorites", query };
   if (pathname === "/sepet") return { type: "cart-page", query };
+  if (pathname === "/hesabim/iadeler") return { type: "account", section: "returns", query };
+  if (/^\/hesabim\/iadeler\/[1-9][0-9]*$/.test(pathname)) {
+    const returnId = Number(pathname.split("/").at(-1));
+    return Number.isSafeInteger(returnId) ? { type: "account", section: "return-detail", returnId, query } : { type: "not-found", query };
+  }
   if (pathname === "/hesabim") return { type: "account", section: "overview", query };
   if (pathname === "/hesabim/adresler") return { type: "account", section: "addresses", query };
   if (pathname === "/hesabim/kuponlar") return { type: "account", section: "coupons", query };
@@ -1759,12 +1764,12 @@ export function CommerceProRuntimeApp({
   else if (route.type === "favorites") content = <CanonicalFavoritesPage favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
   else if (route.type === "cart-page") content = <CartPage items={cartItems} onQuantity={updateCartQuantity} onRemove={removeFromCart} onCheckout={handoffToCheckout} />;
   else if (route.type === "auth") content = authenticated
-    ? <CustomerAccountPage session={session} account={runtime.customer} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} {...localReviewSessionProps} />
+    ? <CustomerAccountPage key={`${session.user.id}:${session.sessionId || "session"}`} session={session} account={runtime.customer} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} {...localReviewSessionProps} />
     : <CustomerAuthPage account={runtime.customer} initialMode={route.mode} returnPath={safeCustomerReturnPath(route.query.get("return"), NORMAL_LOGIN_DESTINATION)} onAuthenticated={handleAuthenticated} {...localReviewSurfaceProps} />;
   else if (route.type === "password") content = <CustomerPasswordPage account={runtime.customer} mode={route.mode} token={route.query.get("token") || ""} {...localReviewSurfaceProps} />;
   else if (route.type === "account") content = authenticated
-    ? <CustomerAccountPage session={session} account={runtime.customer} section={route.section} orderId={route.orderId} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} focusProfile={route.query.get("focus") === "profile"} {...localReviewSessionProps} />
-    : authReturn(route.section === "order-detail"
+    ? <CustomerAccountPage key={`${session.user.id}:${session.sessionId || "session"}`} session={session} account={runtime.customer} section={route.section} orderId={route.orderId} returnId={route.returnId} favoriteCount={favorites.size} products={getVisibleProducts()} getProductImage={productImage} onSessionUpdated={handleSessionUpdated} onLogout={handleLogout} onNotice={notify} focusProfile={route.query.get("focus") === "profile"} {...localReviewSessionProps} />
+    : authReturn(route.section === "return-detail" ? `/hesabim/iadeler/${route.returnId}` : route.section === "returns" ? "/hesabim/iadeler" : route.section === "order-detail"
       ? `/hesabim/siparisler/${route.orderId}`
       : `/hesabim${route.section === "orders" ? "/siparisler" : route.section === "addresses" ? "/adresler" : route.section === "coupons" ? "/kuponlar" : route.section === "notifications" ? "/bildirimler" : route.section === "questions" ? "/sorularim" : route.section === "reviews" ? "/degerlendirmelerim" : route.section === "followed-stores" ? "/takip-ettigim-magazalar" : route.section === "security" ? "/guvenlik" : ""}`);
   else if (route.type === "checkout") content = authenticated

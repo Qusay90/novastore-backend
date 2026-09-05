@@ -66,7 +66,7 @@ export const resolveNotificationTarget = (value, role) => {
   }
   if (surfaceRole === "customer") {
     if (["order", "payment", "shipment"].includes(target.entityType)) return `#/hesabim/siparisler/${target.entityId}`;
-    if (target.entityType === "return_request") return "#/hesabim/siparisler";
+    if (target.entityType === "return_request") return `#/hesabim/iadeler/${target.entityId}`;
     if (target.entityType === "product") return `#/urun-id/${target.entityId}`;
     if (target.entityType === "support_thread") return "#/destek";
     if (target.entityType === "product_question") return "#/hesabim/sorularim";
