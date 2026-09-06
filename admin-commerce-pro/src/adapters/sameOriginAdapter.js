@@ -22,6 +22,7 @@ import {
   normalizeFirstPartyCatalogPage,
   normalizeNotificationSummaryPage,
   normalizeOrderSummaryPage,
+  normalizeReturnDetail,
   normalizeReturnSummaryPage,
 } from "../integration/legacyMappers.js";
 import {
@@ -60,9 +61,15 @@ export function createSameOriginAdapter(http) {
     await http.request("/api/admin/orders/summary?limit=100", { signal }),
   );
 
-  const returns = async ({ signal } = {}) => normalizeReturnSummaryPage(
-    await http.request("/api/admin/returns/summary?limit=100", { signal }),
-  );
+  const returns = async ({ cursor = null, signal } = {}) => {
+    if (cursor !== null && (typeof cursor !== "string" || !cursor.trim())) {
+      throw new TypeError("İade sayfalama imleci boş olmayan bir metin olmalıdır.");
+    }
+    const suffix = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+    return normalizeReturnSummaryPage(
+      await http.request(`/api/admin/returns/summary?limit=100${suffix}`, { signal }),
+    );
+  };
 
   const notifications = async ({ signal } = {}) => normalizeNotificationSummaryPage(
     await http.request("/api/notifications?limit=50", { signal }),
@@ -140,6 +147,12 @@ export function createSameOriginAdapter(http) {
 
   const mutationActions = (capabilities) => {
     const actions = {};
+    if (hasCapability(capabilities, "returnsRead")) {
+      actions.loadReturnPage = returns;
+      actions.getReturn = async ({ returnId, signal } = {}) => normalizeReturnDetail(
+        await http.request(`/api/returns/${encodeURIComponent(String(returnId))}`, { signal }),
+      );
+    }
     if (hasCapability(capabilities, "firstPartyCatalogRead")
       && hasCapability(capabilities, "firstPartyCatalogWrite")) {
       actions.getCatalogProduct = async (input = {}) => {

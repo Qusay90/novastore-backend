@@ -22,6 +22,91 @@ const toSummaryPage = (rows, limit) => ({
     hasMore: rows.length > limit
 });
 
+const ADMIN_RETURN_CURSOR_VERSION = 1;
+const ADMIN_RETURN_CURSOR_CREATED_AT_MICROS_PATTERN = /^-?\d{1,18}$/;
+const ADMIN_RETURN_CURSOR_MAX_CREATED_AT_MICROS = 253402300799999999n;
+const ADMIN_RETURN_CURSOR_MAX_ID = 2147483647;
+const ADMIN_RETURN_STATUS_RANK_SQL = `CASE r.status
+    WHEN 'REQUESTED' THEN 0
+    WHEN 'IN_REVIEW' THEN 1
+    WHEN 'APPROVED' THEN 2
+    WHEN 'COMPLETED' THEN 3
+    ELSE 4
+END`;
+
+class AdminReturnCursorError extends Error {
+    constructor() {
+        super('İade sayfalama imleci geçersiz.');
+        this.name = 'AdminReturnCursorError';
+        this.code = 'ADMIN_RETURN_CURSOR_INVALID';
+    }
+}
+
+const parseAdminReturnCursor = (rawValue) => {
+    if (rawValue === undefined || rawValue === null || rawValue === '') return null;
+    if (typeof rawValue !== 'string' || rawValue.length > 512 || !/^[A-Za-z0-9_-]+$/.test(rawValue)) {
+        throw new AdminReturnCursorError();
+    }
+
+    try {
+        const decoded = Buffer.from(rawValue, 'base64url');
+        if (decoded.toString('base64url') !== rawValue) throw new AdminReturnCursorError();
+        const cursor = JSON.parse(decoded.toString('utf8'));
+        const createdAtMicrosValid = cursor?.createdAtMicros === null
+            || (typeof cursor?.createdAtMicros === 'string'
+                && ADMIN_RETURN_CURSOR_CREATED_AT_MICROS_PATTERN.test(cursor.createdAtMicros)
+                && BigInt(cursor.createdAtMicros) >= 0n
+                && BigInt(cursor.createdAtMicros) <= ADMIN_RETURN_CURSOR_MAX_CREATED_AT_MICROS);
+        if (
+            !cursor
+            || Array.isArray(cursor)
+            || cursor.v !== ADMIN_RETURN_CURSOR_VERSION
+            || !Number.isInteger(cursor.statusRank)
+            || cursor.statusRank < 0
+            || cursor.statusRank > 4
+            || !createdAtMicrosValid
+            || !Number.isSafeInteger(cursor.id)
+            || cursor.id < 1
+            || cursor.id > ADMIN_RETURN_CURSOR_MAX_ID
+        ) {
+            throw new AdminReturnCursorError();
+        }
+        return Object.freeze({
+            statusRank: cursor.statusRank,
+            createdAtMicros: cursor.createdAtMicros,
+            id: cursor.id
+        });
+    } catch (error) {
+        if (error instanceof AdminReturnCursorError) throw error;
+        throw new AdminReturnCursorError();
+    }
+};
+
+const encodeAdminReturnCursor = (row) => Buffer.from(JSON.stringify({
+    v: ADMIN_RETURN_CURSOR_VERSION,
+    statusRank: Number(row.return_status_rank),
+    createdAtMicros: row.return_cursor_created_at_micros || null,
+    id: Number(row.id)
+}), 'utf8').toString('base64url');
+
+const toAdminReturnSummaryPage = (rows, limit) => {
+    const pageRows = rows.slice(0, limit);
+    const items = pageRows.map(({
+        return_status_rank: _rank,
+        return_cursor_created_at_micros: _createdAtMicros,
+        ...row
+    }) => row);
+    const hasMore = rows.length > limit;
+    return {
+        items,
+        limit,
+        hasMore,
+        nextCursor: hasMore && pageRows.length > 0
+            ? encodeAdminReturnCursor(pageRows[pageRows.length - 1])
+            : null
+    };
+};
+
 const SELLER_ENTITY_STATUSES = new Set(['active', 'suspended', 'closed']);
 
 const positiveSafeIntegerOrNull = (value) => {
@@ -742,6 +827,33 @@ const createGetAdminReturnSummaries = (database) => async (req, res) => {
     const limit = parseOrderSummaryLimit(req.query?.limit);
 
     try {
+        const cursor = parseAdminReturnCursor(req.query?.cursor);
+        const cursorPredicate = cursor
+            ? `WHERE (
+                    ${ADMIN_RETURN_STATUS_RANK_SQL} > $1
+                    OR (
+                        ${ADMIN_RETURN_STATUS_RANK_SQL} = $1
+                        AND (
+                            ($2::bigint IS NULL AND r.created_at IS NULL AND r.id < $3)
+                            OR (
+                                $2::bigint IS NOT NULL
+                                AND (
+                                    r.created_at < TIMESTAMP 'epoch' + $2::bigint * INTERVAL '1 microsecond'
+                                    OR r.created_at IS NULL
+                                    OR (
+                                        r.created_at = TIMESTAMP 'epoch' + $2::bigint * INTERVAL '1 microsecond'
+                                        AND r.id < $3
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )`
+            : '';
+        const params = cursor
+            ? [cursor.statusRank, cursor.createdAtMicros, cursor.id, limit + 1]
+            : [limit + 1];
+        const limitPlaceholder = cursor ? '$4' : '$1';
         const result = await database.query(
             `
                 SELECT
@@ -759,26 +871,27 @@ const createGetAdminReturnSummaries = (database) => async (req, res) => {
                     o.refund_status,
                     o.payment_status,
                     o.currency,
-                    COALESCE(u.full_name, u.name, o.customer_name, 'Bilinmiyor') AS customer_name
+                    COALESCE(u.full_name, u.name, o.customer_name, 'Bilinmiyor') AS customer_name,
+                    ${ADMIN_RETURN_STATUS_RANK_SQL} AS return_status_rank,
+                    ROUND(EXTRACT(EPOCH FROM r.created_at) * 1000000)::BIGINT::TEXT
+                        AS return_cursor_created_at_micros
                 FROM returns r
                 JOIN orders o ON o.id = r.order_id
                 LEFT JOIN users u ON u.id = r.user_id
+                ${cursorPredicate}
                 ORDER BY
-                    CASE r.status
-                        WHEN 'REQUESTED' THEN 0
-                        WHEN 'IN_REVIEW' THEN 1
-                        WHEN 'APPROVED' THEN 2
-                        WHEN 'COMPLETED' THEN 3
-                        ELSE 4
-                    END,
+                    ${ADMIN_RETURN_STATUS_RANK_SQL},
                     r.created_at DESC NULLS LAST,
                     r.id DESC
-                LIMIT $1
+                LIMIT ${limitPlaceholder}
             `,
-            [limit + 1]
+            params
         );
-        return res.status(200).json(toSummaryPage(result.rows, limit));
+        return res.status(200).json(toAdminReturnSummaryPage(result.rows, limit));
     } catch (error) {
+        if (error instanceof AdminReturnCursorError) {
+            return res.status(400).json({ code: error.code, error: error.message });
+        }
         console.error('Admin iade özetleri hatası:', error.message);
         return res.status(500).json({ error: 'İade özetleri getirilemedi.' });
     }
@@ -817,7 +930,9 @@ module.exports = {
     createGetAdminStoreSummaries,
     getAdminCommerceCapabilities,
     getAdminSession,
+    parseAdminReturnCursor,
     parseOrderSummaryLimit,
+    toAdminReturnSummaryPage,
     parseAdminStoreId,
     toAdminStoreDetail,
     toAdminStoreSummary,

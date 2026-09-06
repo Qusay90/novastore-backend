@@ -250,6 +250,34 @@ export function normalizeReturnSummary(row) {
   });
 }
 
+const canonicalReturnStatuses = new Set([
+  "REQUESTED",
+  "IN_REVIEW",
+  "APPROVED",
+  "REJECTED",
+  "COMPLETED",
+]);
+
+export function normalizeReturnDetail(row) {
+  const requiredFields = [
+    "id", "order_id", "reason_code", "note", "status", "refund_amount", "revision",
+    "decision_note", "decided_at", "created_at", "updated_at", "order_status",
+    "payment_status", "refund_status",
+  ];
+  if (!row || typeof row !== "object" || Array.isArray(row)
+    || requiredFields.some((field) => !Object.prototype.hasOwnProperty.call(row, field))) {
+    throw new TypeError("İade detayı alan sözleşmesi geçersiz.");
+  }
+  const summary = normalizeReturnSummary(row);
+  if (!canonicalReturnStatuses.has(summary.status)) {
+    throw new TypeError("return.status desteklenen canonical durum olmalıdır.");
+  }
+  const note = row.note === null
+    ? null
+    : toStrictNullableBoundedText(row.note, "return.note", 1000);
+  return Object.freeze({ ...summary, note });
+}
+
 export function normalizeNotificationSummary(row) {
   if (!row || typeof row !== "object") throw new TypeError("Bildirim özeti nesne olmalıdır.");
   const rawId = toInteger(row.id, "notification.id");
@@ -412,7 +440,16 @@ export function normalizeOrderSummaryPage(payload) {
 }
 
 export function normalizeReturnSummaryPage(payload) {
-  return normalizeSummaryPage(payload, normalizeReturnSummary, "returns");
+  const page = normalizeSummaryPage(payload, normalizeReturnSummary, "returns");
+  const cursor = payload.nextCursor === undefined && payload.hasMore === false
+    ? null
+    : payload.nextCursor;
+  if ((cursor !== null && (typeof cursor !== "string" || !cursor.trim()))
+    || (page.hasMore && cursor === null)
+    || (!page.hasMore && cursor !== null)) {
+    throw new TypeError("returns.nextCursor sayfalama sözleşmesi geçersiz.");
+  }
+  return Object.freeze({ ...page, nextCursor: cursor });
 }
 
 export function normalizeNotificationSummaryPage(payload) {

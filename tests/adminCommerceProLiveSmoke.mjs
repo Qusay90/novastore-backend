@@ -135,7 +135,7 @@ assert.doesNotMatch(source, /Demo Operatör|demo-operasyon@example\.invalid|Demo
 assert.match(source, /live-returns/);
 assert.match(source, /live-notifications/);
 assert.match(source, /Taşıyıcı doğrulanmadı/);
-assert.match(source, /gerçek refund isteği gönderilmez/);
+assert.match(source, /gerçek geri ödeme isteği gönderilmez/);
 assert.match(source, /sağlayıcı\/para hareketi doğrulanmadı/);
 assert.match(source, /\/api\/orders\//);
 assert.match(source, /\/api\/shipments\//);

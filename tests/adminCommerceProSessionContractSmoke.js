@@ -315,6 +315,90 @@ const chainFor = (rows, queries) => [
     assert.doesNotMatch(returnProjection, /r\.\*|o\.\*|\bemail\b|\bphone\b|\baddress\b|\br\.note\b|\br\.user_id\b/i, 'iade özeti ham satır veya gereksiz PII seçmemeli');
     assert.match(returnQueries[0].sql, /ORDER BY[\s\S]+r\.created_at DESC NULLS LAST[\s\S]+r\.id DESC/);
 
+    const pagedReturnQueries = [];
+    const pagedReturnSummaryHandler = createGetAdminReturnSummaries({
+        async query(sql, params) {
+            pagedReturnQueries.push({ sql, params });
+            if (params.length === 1) {
+                return {
+                    rows: [
+                        {
+                            id: 101,
+                            order_id: 701,
+                            status: 'REQUESTED',
+                            created_at: '2026-09-06T10:00:00.123Z',
+                            return_status_rank: 0,
+                            return_cursor_created_at_micros: '1788688800123456'
+                        },
+                        {
+                            id: 100,
+                            order_id: 700,
+                            status: 'REQUESTED',
+                            created_at: '2026-09-06T09:00:00.000Z',
+                            return_status_rank: 0,
+                            return_cursor_created_at_micros: '1788685200000000'
+                        }
+                    ]
+                };
+            }
+            return {
+                rows: [{
+                    id: 100,
+                    order_id: 700,
+                    status: 'REQUESTED',
+                    created_at: '2026-09-06T09:00:00.000Z',
+                    return_status_rank: 0,
+                    return_cursor_created_at_micros: '1788685200000000'
+                }]
+            };
+        }
+    });
+    const firstReturnPage = createResponse();
+    await pagedReturnSummaryHandler({ query: { limit: '1' } }, firstReturnPage);
+    assert.equal(firstReturnPage.statusCode, 200);
+    assert.equal(firstReturnPage.payload.items.length, 1);
+    assert.equal(firstReturnPage.payload.items[0].id, 101);
+    assert.equal(firstReturnPage.payload.items[0].return_status_rank, undefined);
+    assert.equal(firstReturnPage.payload.items[0].return_cursor_created_at_micros, undefined);
+    assert.equal(firstReturnPage.payload.hasMore, true);
+    assert.equal(typeof firstReturnPage.payload.nextCursor, 'string');
+
+    const secondReturnPage = createResponse();
+    await pagedReturnSummaryHandler({
+        query: { limit: '1', cursor: firstReturnPage.payload.nextCursor }
+    }, secondReturnPage);
+    assert.equal(secondReturnPage.statusCode, 200);
+    assert.equal(secondReturnPage.payload.items[0].id, 100);
+    assert.equal(secondReturnPage.payload.hasMore, false);
+    assert.equal(secondReturnPage.payload.nextCursor, null);
+    assert.deepEqual(pagedReturnQueries[1].params, [0, '1788688800123456', 101, 2]);
+    assert.match(pagedReturnQueries[1].sql, /r\.created_at < TIMESTAMP 'epoch' \+ \$2::bigint \* INTERVAL '1 microsecond'/);
+    assert.match(pagedReturnQueries[1].sql, /r\.id < \$3/);
+
+    const invalidReturnCursor = createResponse();
+    await pagedReturnSummaryHandler({ query: { limit: '1', cursor: 'not+a+cursor' } }, invalidReturnCursor);
+    assert.equal(invalidReturnCursor.statusCode, 400);
+    assert.equal(invalidReturnCursor.payload.code, 'ADMIN_RETURN_CURSOR_INVALID');
+
+    const oversizedReturnCursor = createResponse();
+    await pagedReturnSummaryHandler({ query: { limit: '1', cursor: 'a'.repeat(513) } }, oversizedReturnCursor);
+    assert.equal(oversizedReturnCursor.statusCode, 400);
+    assert.equal(oversizedReturnCursor.payload.code, 'ADMIN_RETURN_CURSOR_INVALID');
+
+    const outOfRangeReturnCursor = createResponse();
+    const forgedReturnCursor = Buffer.from(JSON.stringify({
+        v: 1,
+        statusRank: 0,
+        createdAtMicros: '999999999999999999',
+        id: 2147483648
+    }), 'utf8').toString('base64url');
+    await pagedReturnSummaryHandler({
+        query: { limit: '1', cursor: forgedReturnCursor }
+    }, outOfRangeReturnCursor);
+    assert.equal(outOfRangeReturnCursor.statusCode, 400);
+    assert.equal(outOfRangeReturnCursor.payload.code, 'ADMIN_RETURN_CURSOR_INVALID');
+    assert.equal(pagedReturnQueries.length, 2, 'geçersiz cursor DB sorgusu üretmemeli');
+
     const notificationQueries = [];
     const notificationSummaryHandler = createGetAdminNotificationSummaries({
         async query(sql, params) {
