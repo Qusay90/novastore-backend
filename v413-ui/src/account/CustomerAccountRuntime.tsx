@@ -15,6 +15,7 @@ import {
   changeCustomerPassword,
   deleteCustomerAddress,
   getCurrentCustomer,
+  getCustomerReturn,
   getCustomerSecurityStatus,
   listCustomerAddresses,
   listCustomerCoupons,
@@ -50,6 +51,7 @@ import {
 } from "./customerAccountApi";
 
 export type CustomerAccountPhase = "loading" | "guest" | "authenticated" | "offline" | "error";
+export type CustomerReturnResourcePhase = "loading" | "ready" | "empty" | "error" | "offline" | "session-expired";
 
 type CustomerAccountRuntimeValue = Readonly<{
   phase: CustomerAccountPhase;
@@ -62,6 +64,12 @@ type CustomerAccountRuntimeValue = Readonly<{
   favoriteProductIds: readonly number[];
   orders: readonly CustomerOrder[];
   returns: readonly CustomerReturn[];
+  returnHistoryPhase: CustomerReturnResourcePhase;
+  returnHistoryError: string;
+  returnDetail: CustomerReturn | null;
+  returnDetailId: number | null;
+  returnDetailPhase: CustomerReturnResourcePhase;
+  returnDetailError: string;
   supportMessages: readonly CustomerSupportMessage[];
   securityStatus: CustomerSecurityStatus | null;
   errorMessage: string;
@@ -79,7 +87,10 @@ type CustomerAccountRuntimeValue = Readonly<{
   deleteAddress(id: number): Promise<void>;
   setDefaultAddress(id: number): Promise<void>;
   cancelOrder(id: number, expectedStatus: string): Promise<void>;
-  createReturn(orderId: number, reasonCode: string, note?: string): Promise<void>;
+  refreshReturns(): Promise<void>;
+  loadReturnDetail(returnId: number): Promise<CustomerReturn | null>;
+  clearReturnDetail(): void;
+  createReturn(orderId: number, reasonCode: string, note?: string): Promise<CustomerReturn>;
   refreshFollowedStores(): Promise<void>;
   unfollowStore(storeSlug: string): Promise<void>;
   refreshFavoriteProductIds(): Promise<void>;
@@ -101,6 +112,27 @@ function warningText(scope: string) {
   return `${scope} şu anda sunucudan alınamadı.`;
 }
 
+function returnResourcePhase(error: unknown): CustomerReturnResourcePhase {
+  if (offline(error)) return "offline";
+  if (error instanceof CustomerNotificationApiError && error.status === 401) return "session-expired";
+  return "error";
+}
+
+function returnResourceMessage(scope: "history" | "detail", error: unknown) {
+  const phase = returnResourcePhase(error);
+  if (phase === "offline") return scope === "history"
+    ? "İade taleplerin çevrimdışıyken doğrulanamadı. Bağlantı geldiğinde tekrar dene."
+    : "Talep ayrıntısı çevrimdışıyken doğrulanamadı. Bağlantı geldiğinde tekrar dene.";
+  if (phase === "session-expired") return "Oturumun sona erdi. İade bilgilerini görmek için yeniden giriş yap.";
+  return scope === "history"
+    ? "İade taleplerin sunucudan alınamadı. Bu durum boş geçmiş olarak kabul edilmedi."
+    : "Bu iade talebi bulunamadı veya artık bu hesap tarafından erişilemiyor.";
+}
+
+function upsertCustomerReturn(current: readonly CustomerReturn[], incoming: CustomerReturn) {
+  return Object.freeze([incoming, ...current.filter((item) => item.id !== incoming.id)]);
+}
+
 export function useCustomerAccountRuntime() {
   return useContext(CustomerAccountRuntimeContext);
 }
@@ -117,6 +149,12 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   const [favoriteProductIds, setFavoriteProductIds] = useState<readonly number[]>([]);
   const [orders, setOrders] = useState<readonly CustomerOrder[]>([]);
   const [returns, setReturns] = useState<readonly CustomerReturn[]>([]);
+  const [returnHistoryPhase, setReturnHistoryPhase] = useState<CustomerReturnResourcePhase>("loading");
+  const [returnHistoryError, setReturnHistoryError] = useState("");
+  const [returnDetail, setReturnDetail] = useState<CustomerReturn | null>(null);
+  const [returnDetailId, setReturnDetailId] = useState<number | null>(null);
+  const [returnDetailPhase, setReturnDetailPhase] = useState<CustomerReturnResourcePhase>("loading");
+  const [returnDetailError, setReturnDetailError] = useState("");
   const [supportMessages, setSupportMessages] = useState<readonly CustomerSupportMessage[]>([]);
   const [securityStatus, setSecurityStatus] = useState<CustomerSecurityStatus | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -128,6 +166,21 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   const favoriteLoadSequence = useRef(0);
   const favoriteMutationSequence = useRef(0);
   const communityMutationSequence = useRef(0);
+  const returnHistoryLoadSequence = useRef(0);
+  const returnDetailLoadSequence = useRef(0);
+  const returnCreateSequence = useRef(0);
+  const confirmedCreatedReturns = useRef(new Map<number, CustomerReturn>());
+
+  const mergeConfirmedCreatedReturns = useCallback((serverReturns: readonly CustomerReturn[]) => {
+    if (!confirmedCreatedReturns.current.size) return serverReturns;
+    const merged = [...serverReturns];
+    const serverIds = new Set(serverReturns.map((item) => item.id));
+    for (const [id, item] of confirmedCreatedReturns.current) {
+      if (serverIds.has(id)) confirmedCreatedReturns.current.delete(id);
+      else merged.unshift(item);
+    }
+    return Object.freeze(merged);
+  }, []);
 
   const clearPrivateState = useCallback(() => {
     setUser(null);
@@ -139,6 +192,12 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     setFavoriteProductIds([]);
     setOrders([]);
     setReturns([]);
+    setReturnHistoryPhase("session-expired");
+    setReturnHistoryError("Oturumun sona erdi. İade bilgilerini görmek için yeniden giriş yap.");
+    setReturnDetail(null);
+    setReturnDetailId(null);
+    setReturnDetailPhase("session-expired");
+    setReturnDetailError("Oturumun sona erdi. İade bilgilerini görmek için yeniden giriş yap.");
     setSupportMessages([]);
     setSecurityStatus(null);
     setDataWarnings([]);
@@ -148,9 +207,16 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     ++favoriteLoadSequence.current;
     ++favoriteMutationSequence.current;
     ++communityMutationSequence.current;
+    ++returnHistoryLoadSequence.current;
+    ++returnDetailLoadSequence.current;
+    ++returnCreateSequence.current;
+    confirmedCreatedReturns.current.clear();
   }, []);
 
   const loadPrivateData = useCallback(async (profile: CustomerProfile, currentSequence: number) => {
+    const currentReturnLoad = ++returnHistoryLoadSequence.current;
+    setReturnHistoryPhase("loading");
+    setReturnHistoryError("");
     const results = await Promise.allSettled([
       listCustomerAddresses(),
       listCustomerOrders(profile.id),
@@ -168,7 +234,19 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     const [addressResult, orderResult, returnResult, supportResult, securityResult, couponResult, questionResult, reviewResult, followedStoreResult, favoriteResult] = results;
     if (addressResult.status === "fulfilled") setAddresses(addressResult.value); else { setAddresses([]); warnings.push(warningText("Adresler")); }
     if (orderResult.status === "fulfilled") setOrders(orderResult.value); else { setOrders([]); warnings.push(warningText("Siparişler")); }
-    if (returnResult.status === "fulfilled") setReturns(returnResult.value); else { setReturns([]); warnings.push(warningText("İadeler")); }
+    if (returnHistoryLoadSequence.current === currentReturnLoad) {
+      if (returnResult.status === "fulfilled") {
+        const nextReturns = mergeConfirmedCreatedReturns(returnResult.value);
+        setReturns(nextReturns);
+        setReturnHistoryPhase(nextReturns.length ? "ready" : "empty");
+        setReturnHistoryError("");
+      } else {
+        setReturns([]);
+        setReturnHistoryPhase(returnResourcePhase(returnResult.reason));
+        setReturnHistoryError(returnResourceMessage("history", returnResult.reason));
+        warnings.push(warningText("İadeler"));
+      }
+    }
     if (supportResult.status === "fulfilled") setSupportMessages(supportResult.value); else { setSupportMessages([]); warnings.push(warningText("Destek geçmişi")); }
     if (securityResult.status === "fulfilled") setSecurityStatus(securityResult.value); else { setSecurityStatus(null); warnings.push(warningText("Güvenlik durumu")); }
     if (couponResult.status === "fulfilled") setCoupons(couponResult.value); else { setCoupons([]); warnings.push(warningText("Kuponlar")); }
@@ -177,7 +255,7 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     if (followedStoreResult.status === "fulfilled") setFollowedStores(followedStoreResult.value); else { setFollowedStores([]); warnings.push(warningText("Takip edilen mağazalar")); }
     if (favoriteResult.status === "fulfilled") setFavoriteProductIds(favoriteResult.value); else { setFavoriteProductIds([]); warnings.push(warningText("Favoriler")); }
     setDataWarnings(Object.freeze(warnings));
-  }, []);
+  }, [mergeConfirmedCreatedReturns]);
 
   const establishVerifiedSession = useCallback(async () => {
     const currentSequence = ++sequence.current;
@@ -330,15 +408,92 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     setBusy(true); try { await makeDefaultCustomerAddress(id); await refreshAddresses(); } finally { setBusy(false); }
   }, [refreshAddresses]);
 
+  const refreshReturns = useCallback(async () => {
+    if (!user) {
+      setReturns([]);
+      setReturnHistoryPhase("session-expired");
+      setReturnHistoryError("Oturumun sona erdi. İade bilgilerini görmek için yeniden giriş yap.");
+      return;
+    }
+    const guard = currentCustomerSessionGuard();
+    const currentLoad = ++returnHistoryLoadSequence.current;
+    setReturnHistoryPhase("loading");
+    setReturnHistoryError("");
+    try {
+      const nextReturns = await listCustomerReturns();
+      if (!customerSessionMatchesGuard(guard) || returnHistoryLoadSequence.current !== currentLoad) return;
+      const mergedReturns = mergeConfirmedCreatedReturns(nextReturns);
+      setReturns(mergedReturns);
+      setReturnHistoryPhase(mergedReturns.length ? "ready" : "empty");
+      setDataWarnings((current) => Object.freeze(current.filter((warning) => warning !== warningText("İadeler"))));
+    } catch (error) {
+      if (!customerSessionMatchesGuard(guard) || returnHistoryLoadSequence.current !== currentLoad) return;
+      const nextPhase = returnResourcePhase(error);
+      if (nextPhase === "session-expired") setReturns([]);
+      setReturnHistoryPhase(nextPhase);
+      setReturnHistoryError(returnResourceMessage("history", error));
+      setDataWarnings((current) => current.includes(warningText("İadeler"))
+        ? current
+        : Object.freeze([...current, warningText("İadeler")]));
+      throw error;
+    }
+  }, [mergeConfirmedCreatedReturns, user]);
+
+  const clearReturnDetail = useCallback(() => {
+    ++returnDetailLoadSequence.current;
+    setReturnDetail(null);
+    setReturnDetailId(null);
+    setReturnDetailPhase(user ? "loading" : "session-expired");
+    setReturnDetailError("");
+  }, [user]);
+
+  const loadReturnDetail = useCallback(async (returnId: number) => {
+    if (!user) {
+      setReturnDetail(null);
+      setReturnDetailId(null);
+      setReturnDetailPhase("session-expired");
+      setReturnDetailError("Oturumun sona erdi. İade bilgilerini görmek için yeniden giriş yap.");
+      return null;
+    }
+    const guard = currentCustomerSessionGuard();
+    const currentLoad = ++returnDetailLoadSequence.current;
+    setReturnDetail(null);
+    setReturnDetailId(returnId);
+    setReturnDetailPhase("loading");
+    setReturnDetailError("");
+    try {
+      const detail = await getCustomerReturn(returnId);
+      if (!customerSessionMatchesGuard(guard) || returnDetailLoadSequence.current !== currentLoad) return null;
+      setReturnDetail(detail);
+      setReturnDetailId(detail.id);
+      setReturnDetailPhase("ready");
+      setReturns((current) => upsertCustomerReturn(current, detail));
+      return detail;
+    } catch (error) {
+      if (!customerSessionMatchesGuard(guard) || returnDetailLoadSequence.current !== currentLoad) return null;
+      setReturnDetail(null);
+      setReturnDetailId(returnId);
+      setReturnDetailPhase(returnResourcePhase(error));
+      setReturnDetailError(returnResourceMessage("detail", error));
+      throw error;
+    }
+  }, [user]);
+
   const refreshOrdersAndReturns = useCallback(async () => {
     if (!user) return;
     const currentSequence = sequence.current;
+    const currentReturnLoad = ++returnHistoryLoadSequence.current;
     const customerId = user.id;
     const [nextOrders, nextReturns] = await Promise.all([listCustomerOrders(customerId), listCustomerReturns()]);
     if (sequence.current !== currentSequence) return;
     setOrders(nextOrders);
-    setReturns(nextReturns);
-  }, [user]);
+    if (returnHistoryLoadSequence.current === currentReturnLoad) {
+      const mergedReturns = mergeConfirmedCreatedReturns(nextReturns);
+      setReturns(mergedReturns);
+      setReturnHistoryPhase(mergedReturns.length ? "ready" : "empty");
+      setReturnHistoryError("");
+    }
+  }, [mergeConfirmedCreatedReturns, user]);
   const cancelOrder = useCallback(async (id: number, expectedStatus: string) => {
     const currentSequence = sequence.current;
     setBusy(true);
@@ -354,14 +509,56 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
     } finally { setBusy(false); }
   }, [refreshOrdersAndReturns]);
   const createReturn = useCallback(async (orderId: number, reasonCode: string, note = "") => {
-    const currentSequence = sequence.current;
+    if (!user) throw new CustomerNotificationApiError("Müşteri oturumu gerekli.", 401, "CUSTOMER_SESSION_MISSING");
+    const guard = currentCustomerSessionGuard();
+    const currentOperation = ++returnCreateSequence.current;
     setBusy(true);
     try {
-      await createCustomerReturn(orderId, reasonCode, note);
-      if (sequence.current !== currentSequence) return;
-      await refreshOrdersAndReturns();
-    } finally { setBusy(false); }
-  }, [refreshOrdersAndReturns]);
+      const created = await createCustomerReturn(orderId, reasonCode, note);
+      if (!customerSessionMatchesGuard(guard) || returnCreateSequence.current !== currentOperation) {
+        throw new CustomerNotificationApiError("Müşteri oturumu değişti. Güncel hesaptaki iadeleri yeniden aç.", 409, "CUSTOMER_SESSION_CHANGED");
+      }
+      const currentReturnLoad = ++returnHistoryLoadSequence.current;
+      confirmedCreatedReturns.current.set(created.return.id, created.return);
+      setReturns((current) => upsertCustomerReturn(current, created.return));
+      setReturnHistoryPhase("ready");
+      setReturnHistoryError("");
+
+      void (async () => {
+        const [orderResult, returnResult] = await Promise.allSettled([
+          listCustomerOrders(user.id),
+          listCustomerReturns(),
+        ] as const);
+        if (
+          !customerSessionMatchesGuard(guard) ||
+          returnCreateSequence.current !== currentOperation ||
+          returnHistoryLoadSequence.current !== currentReturnLoad
+        ) return;
+        if (orderResult.status === "fulfilled") setOrders(orderResult.value);
+        if (returnResult.status === "fulfilled") {
+          const mergedReturns = mergeConfirmedCreatedReturns(returnResult.value);
+          setReturns(mergedReturns);
+          setReturnHistoryPhase(mergedReturns.length ? "ready" : "empty");
+          setReturnHistoryError("");
+          setDataWarnings((current) => Object.freeze(current.filter((warning) => warning !== warningText("İadeler"))));
+        } else {
+          setReturnHistoryPhase(returnResourcePhase(returnResult.reason));
+          setReturnHistoryError("Talebiniz oluşturuldu; geçmiş yenilenemedi. Güvenle tekrar deneyebilirsin.");
+          setDataWarnings((current) => current.includes(warningText("İadeler"))
+            ? current
+            : Object.freeze([...current, warningText("İadeler")]));
+        }
+        if (orderResult.status === "rejected") {
+          setDataWarnings((current) => current.includes(warningText("Siparişler"))
+            ? current
+            : Object.freeze([...current, warningText("Siparişler")]));
+        }
+      })();
+      return created.return;
+    } finally {
+      if (customerSessionMatchesGuard(guard) && returnCreateSequence.current === currentOperation) setBusy(false);
+    }
+  }, [mergeConfirmedCreatedReturns, user]);
 
   const refreshFollowedStores = useCallback(async () => {
     if (!user) return;
@@ -482,12 +679,20 @@ export default function CustomerAccountRuntime({ children }: PropsWithChildren) 
   }, [clearPrivateState, refresh]);
 
   const value = useMemo<CustomerAccountRuntimeValue>(() => Object.freeze({
-    phase, user, addresses, coupons, questions, reviews, followedStores, favoriteProductIds, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy,
+    phase, user, addresses, coupons, questions, reviews, followedStores, favoriteProductIds, orders, returns,
+    returnHistoryPhase, returnHistoryError, returnDetail, returnDetailId, returnDetailPhase, returnDetailError,
+    supportMessages, securityStatus, errorMessage, dataWarnings, busy,
     refresh, login, register, requestPasswordRecovery: recover, logout, updateProfile, changePassword,
-    createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder, createReturn, refreshSupport,
+    createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder,
+    refreshReturns, loadReturnDetail, clearReturnDetail, createReturn, refreshSupport,
     refreshFollowedStores, unfollowStore, refreshFavoriteProductIds, setFavoriteProduct, submitProductQuestion, submitProductReview,
     sendSupportMessage: sendSupport,
-  }), [phase, user, addresses, coupons, questions, reviews, followedStores, favoriteProductIds, orders, returns, supportMessages, securityStatus, errorMessage, dataWarnings, busy, refresh, login, register, recover, logout, updateProfile, changePassword, createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder, createReturn, refreshFollowedStores, unfollowStore, refreshFavoriteProductIds, setFavoriteProduct, submitProductQuestion, submitProductReview, refreshSupport, sendSupport]);
+  }), [phase, user, addresses, coupons, questions, reviews, followedStores, favoriteProductIds, orders, returns,
+    returnHistoryPhase, returnHistoryError, returnDetail, returnDetailId, returnDetailPhase, returnDetailError,
+    supportMessages, securityStatus, errorMessage, dataWarnings, busy, refresh, login, register, recover, logout,
+    updateProfile, changePassword, createAddress, updateAddress, deleteAddress, setDefaultAddress, cancelOrder,
+    refreshReturns, loadReturnDetail, clearReturnDetail, createReturn, refreshFollowedStores, unfollowStore,
+    refreshFavoriteProductIds, setFavoriteProduct, submitProductQuestion, submitProductReview, refreshSupport, sendSupport]);
 
   return <CustomerAccountRuntimeContext.Provider value={value}>{children}</CustomerAccountRuntimeContext.Provider>;
 }

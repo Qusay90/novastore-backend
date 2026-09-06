@@ -72,6 +72,7 @@ export type CustomerNotificationDestination = Readonly<{
   tab: "home" | "account" | "support";
   view: "" | "notifications" | "returns" | "questions" | "reviews" | "history";
   productId?: string;
+  returnId?: string;
 }>;
 
 const eventTypes = new Set<string>(CUSTOMER_NOTIFICATION_EVENT_TYPES);
@@ -271,8 +272,8 @@ export function resolveCustomerNotificationDestination(target: CustomerNotificat
   if (target.entityType === "product" && target.entityId) {
     return Object.freeze({ cal: "CAL-06", tab: "home", view: "", productId: String(target.entityId) });
   }
-  if (target.entityType === "return_request") {
-    return Object.freeze({ cal: "CAL-10", tab: "account", view: "returns" });
+  if (target.entityType === "return_request" && target.entityId) {
+    return Object.freeze({ cal: "CAL-10", tab: "account", view: "returns", returnId: String(target.entityId) });
   }
   if (target.entityType === "product_question") {
     return Object.freeze({ cal: "CAL-10", tab: "account", view: "questions" });

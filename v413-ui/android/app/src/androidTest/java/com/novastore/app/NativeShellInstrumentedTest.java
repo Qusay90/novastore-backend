@@ -305,6 +305,44 @@ public class NativeShellInstrumentedTest {
     }
 
     @Test
+    public void returnTrackingRouteKeepsOneExactIdAndRejectsAmbiguousContext() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            evaluate(scenario,
+                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-10&tab=account&view=returns&returnId=801&shell=native');" +
+                    "dispatchEvent(new PopStateEvent('popstate'));true"
+            );
+            JSONObject detail = waitForRoute(scenario, "CAL-10", "returns", 0);
+            assertEquals("?cal=CAL-10&tab=account&view=returns&returnId=801&shell=native", detail.getString("search"));
+            assertEquals("true", evaluate(scenario,
+                "document.querySelector('[data-testid=app-topbar] h1')?.textContent?.trim()==='Talep detayı'"
+            ));
+            assertEquals("1", evaluate(scenario,
+                "document.querySelectorAll('[data-testid=account-guest]').length"
+            ));
+
+            evaluate(scenario,
+                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-10&tab=account&view=returns&returnAction=new&shell=native');" +
+                    "dispatchEvent(new PopStateEvent('popstate'));true"
+            );
+            JSONObject create = waitForRoute(scenario, "CAL-10", "returns", 0);
+            assertEquals("?cal=CAL-10&tab=account&view=returns&returnAction=new&shell=native", create.getString("search"));
+            assertEquals("true", evaluate(scenario,
+                "document.querySelector('[data-testid=app-topbar] h1')?.textContent?.trim()==='Yeni İade Talebi'"
+            ));
+
+            evaluate(scenario,
+                "history.replaceState({novastoreDepth:0},'','/?cal=CAL-10&tab=account&view=returns&returnId=801&returnAction=new&shell=native');" +
+                    "dispatchEvent(new PopStateEvent('popstate'));true"
+            );
+            Thread.sleep(300);
+            JSONObject rejected = routeAndDepth(scenario);
+            assertEquals("CAL-02", rejected.getString("cal"));
+            assertEquals("root", rejected.getString("view"));
+            assertEquals("?cal=CAL-02&tab=home&shell=native", rejected.getString("search"));
+        }
+    }
+
+    @Test
     public void armedNativePullRefreshSurvivesWebViewTouchCancellation() throws Exception {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             evaluate(scenario,

@@ -55,17 +55,36 @@ export type CustomerOrder = Readonly<{
   returnDecisionNote: string | null;
 }>;
 
+export const CUSTOMER_RETURN_STATUSES = Object.freeze([
+  "REQUESTED", "IN_REVIEW", "APPROVED", "REJECTED", "COMPLETED",
+] as const);
+export type CustomerReturnStatus = typeof CUSTOMER_RETURN_STATUSES[number] | "UNKNOWN";
+
+export const CUSTOMER_REFUND_STATUSES = Object.freeze([
+  "NONE", "REQUESTED", "IN_REVIEW", "APPROVED", "PENDING", "COMPLETED", "FAILED", "REJECTED",
+] as const);
+export type CustomerRefundStatus = typeof CUSTOMER_REFUND_STATUSES[number] | "UNKNOWN";
+
 export type CustomerReturn = Readonly<{
   id: number;
   orderId: number;
   reasonCode: string;
   note: string | null;
-  status: string;
+  status: CustomerReturnStatus;
   refundAmount: number | null;
   revision: number;
   decisionNote: string | null;
+  decidedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  orderStatus: string | null;
+  paymentStatus: string | null;
+  refundStatus: CustomerRefundStatus | null;
+}>;
+
+export type CustomerReturnCreation = Readonly<{
+  reused: boolean;
+  return: CustomerReturn;
 }>;
 
 export type CustomerSupportMessage = Readonly<{
@@ -142,6 +161,8 @@ export type CustomerFavoriteMutation = Readonly<{
 
 const text = (value: unknown) => String(value ?? "").trim();
 const CUSTOMER_RETURN_REASON_CODES = new Set(["DAMAGED", "WRONG_ITEM", "NOT_AS_DESCRIBED", "CHANGED_MIND", "OTHER"]);
+const CUSTOMER_RETURN_STATUS_SET = new Set<string>(CUSTOMER_RETURN_STATUSES);
+const CUSTOMER_REFUND_STATUS_SET = new Set<string>(CUSTOMER_REFUND_STATUSES);
 const CUSTOMER_REVIEW_STATUSES = new Set<CustomerReviewStatus>(["PENDING", "PUBLISHED", "HIDDEN"]);
 const COUPON_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,63}$/u;
 const STORE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
@@ -467,9 +488,9 @@ export function normalizeCustomerReturn(value: unknown): CustomerReturn | null {
   const id = positiveInteger(source?.id);
   const orderId = positiveInteger(source?.order_id ?? source?.orderId);
   const reasonCode = text(source?.reason_code ?? source?.reasonCode);
-  const status = text(source?.status);
+  const rawStatus = text(source?.status).toUpperCase();
   const revision = positiveInteger(source?.revision);
-  if (!source || !id || !orderId || !reasonCode || !status || !revision) return null;
+  if (!source || !id || !orderId || !reasonCode || !rawStatus || !revision) return null;
   const refundAmount = source.refund_amount === null || source.refund_amount === undefined
     ? null
     : Number(source.refund_amount);
@@ -479,12 +500,22 @@ export function normalizeCustomerReturn(value: unknown): CustomerReturn | null {
     orderId,
     reasonCode,
     note: text(source.note) || null,
-    status,
+    status: CUSTOMER_RETURN_STATUS_SET.has(rawStatus) ? rawStatus as CustomerReturnStatus : "UNKNOWN",
     refundAmount,
     revision,
     decisionNote: text(source.decision_note ?? source.decisionNote) || null,
+    decidedAt: text(source.decided_at ?? source.decidedAt) || null,
     createdAt: text(source.created_at ?? source.createdAt) || null,
     updatedAt: text(source.updated_at ?? source.updatedAt) || null,
+    orderStatus: text(source.order_status ?? source.orderStatus) || null,
+    paymentStatus: text(source.payment_status ?? source.paymentStatus) || null,
+    refundStatus: (() => {
+      const rawRefundStatus = text(source.refund_status ?? source.refundStatus).toUpperCase();
+      if (!rawRefundStatus) return null;
+      return CUSTOMER_REFUND_STATUS_SET.has(rawRefundStatus)
+        ? rawRefundStatus as CustomerRefundStatus
+        : "UNKNOWN";
+    })(),
   });
 }
 
@@ -765,7 +796,20 @@ export async function cancelCustomerOrder(id: number, expectedStatus: string, re
 export async function listCustomerReturns() {
   const payload = await requestCustomerApi("/api/returns/mine");
   if (!Array.isArray(payload)) throw new CustomerNotificationApiError("İade listesi doğrulanamadı.", 0, "CUSTOMER_RETURN_RESPONSE_INVALID");
-  return Object.freeze(payload.map(normalizeCustomerReturn).filter((item): item is CustomerReturn => Boolean(item)));
+  const items = payload.map(normalizeCustomerReturn);
+  if (items.some((item) => !item)) {
+    throw new CustomerNotificationApiError("İade listesi doğrulanamadı.", 0, "CUSTOMER_RETURN_RESPONSE_INVALID");
+  }
+  return Object.freeze(items as CustomerReturn[]);
+}
+
+export async function getCustomerReturn(returnId: number) {
+  const id = requireId(returnId, "İade talebi");
+  const result = normalizeCustomerReturn(await requestCustomerApi(`/api/returns/${id}`));
+  if (!result || result.id !== id) {
+    throw new CustomerNotificationApiError("İade talebi ayrıntısı doğrulanamadı.", 0, "CUSTOMER_RETURN_RESPONSE_INVALID");
+  }
+  return result;
 }
 
 export async function createCustomerReturn(orderId: number, reasonCode: string, note = "") {
@@ -784,7 +828,7 @@ export async function createCustomerReturn(orderId: number, reasonCode: string, 
   if (!result || result.orderId !== safeOrderId) {
     throw new CustomerNotificationApiError("İade talebi yanıtı doğrulanamadı.", 0, "CUSTOMER_RETURN_RESPONSE_INVALID");
   }
-  return result;
+  return Object.freeze({ reused: payload?.reused === true, return: result }) satisfies CustomerReturnCreation;
 }
 
 export async function listCustomerSupportMessages(customerId: number) {

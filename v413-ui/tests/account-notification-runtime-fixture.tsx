@@ -64,6 +64,8 @@ function RuntimeProbe() {
   const [passwordMutationResult, setPasswordMutationResult] = React.useState("idle");
   const [questionMutationResult, setQuestionMutationResult] = React.useState("idle");
   const [reviewMutationResult, setReviewMutationResult] = React.useState("idle");
+  const [returnMutationResult, setReturnMutationResult] = React.useState("idle");
+  const [orderMutationResult, setOrderMutationResult] = React.useState("idle");
   if (!account || !notifications) return null;
 
   const login = (customer: "a" | "b") => {
@@ -94,6 +96,18 @@ function RuntimeProbe() {
       <span data-testid="customer-id">{account.user?.id ?? "guest"}</span>
       <span data-testid="address-count">{account.addresses.length}</span>
       <span data-testid="order-count">{account.orders.length}</span>
+      <span data-testid="order-status">{account.orders[0]?.status ?? "none"}</span>
+      <span data-testid="return-count">{account.returns.length}</span>
+      <span data-testid="return-ids">{account.returns.map((item) => item.id).join(",")}</span>
+      <span data-testid="return-history-phase">{account.returnHistoryPhase}</span>
+      <span data-testid="return-history-error">{account.returnHistoryError}</span>
+      <span data-testid="return-detail-phase">{account.returnDetailPhase}</span>
+      <span data-testid="return-detail-id">{account.returnDetail?.id ?? "none"}</span>
+      <span data-testid="return-detail-status">{account.returnDetail?.status ?? "none"}</span>
+      <span data-testid="return-detail-order-status">{account.returnDetail?.orderStatus ?? "none"}</span>
+      <span data-testid="return-detail-payment-status">{account.returnDetail?.paymentStatus ?? "none"}</span>
+      <span data-testid="return-detail-refund-status">{account.returnDetail?.refundStatus ?? "none"}</span>
+      <span data-testid="return-detail-error">{account.returnDetailError}</span>
       <span data-testid="support-count">{account.supportMessages.length}</span>
       <span data-testid="coupon-count">{account.coupons.length}</span>
       <span data-testid="question-count">{account.questions.length}</span>
@@ -125,6 +139,16 @@ function RuntimeProbe() {
       <button type="button" onClick={() => runAction(setQuestionMutationResult, () => account.submitProductQuestion(71, "x"))}>Geçersiz ürün sorusu gönder</button>
       <button type="button" onClick={() => runAction(setReviewMutationResult, () => account.submitProductReview(71, 5, "Ürün beklentimi karşıladı."))}>Ürün değerlendirmesi gönder</button>
       <button type="button" onClick={() => runAction(setReviewMutationResult, () => account.submitProductReview(71, 6, "Geçersiz puan."))}>Geçersiz ürün değerlendirmesi gönder</button>
+      <button type="button" onClick={() => runAction(setReturnMutationResult, account.refreshReturns)}>İadeleri yenile</button>
+      <button type="button" onClick={() => runAction(setOrderMutationResult, () => account.cancelOrder(501, "Hazırlanıyor"))}>Sipariş 501 iptal et</button>
+      <button type="button" onClick={() => {
+        setReturnMutationResult("pending");
+        void account.loadReturnDetail(801).then((item) => setReturnMutationResult(item ? `detail:${item.id}` : "detail:none")).catch((error) => setReturnMutationResult(actionFailure(error)));
+      }}>İade 801 ayrıntısını yükle</button>
+      <button type="button" onClick={() => {
+        setReturnMutationResult("pending");
+        void account.createReturn(501, "DAMAGED", "Kutu hasarlı geldi.").then((item) => setReturnMutationResult(`created:${item.id}`)).catch((error) => setReturnMutationResult(actionFailure(error)));
+      }}>İade talebi oluştur</button>
       <span data-testid="login-a-result">{loginAResult}</span>
       <span data-testid="login-b-result">{loginBResult}</span>
       <span data-testid="follow-probe-mounted">{String(followProbeMounted)}</span>
@@ -133,6 +157,8 @@ function RuntimeProbe() {
       <span data-testid="password-mutation-result">{passwordMutationResult}</span>
       <span data-testid="question-mutation-result">{questionMutationResult}</span>
       <span data-testid="review-mutation-result">{reviewMutationResult}</span>
+      <span data-testid="return-mutation-result">{returnMutationResult}</span>
+      <span data-testid="order-mutation-result">{orderMutationResult}</span>
       {followProbeMounted && <StoreFollowProbe account={account} storeSlug={followStoreSlug} enabled={followProbeEnabled} />}
     </main>
   );

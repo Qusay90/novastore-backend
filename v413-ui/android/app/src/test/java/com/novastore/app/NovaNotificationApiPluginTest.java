@@ -67,6 +67,9 @@ public final class NovaNotificationApiPluginTest {
         assertFalse(NovaNotificationApiPlugin.allowed("/api/notifications/0/read", "PATCH"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/orders/user/0", "GET"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/orders/0/cancel", "POST"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/returns/0", "GET"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/returns/7", "POST"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/returns/7?customerId=18", "GET"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/messages/history/7", "POST"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/users/refresh", "GET"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/assistant/chat", "GET"));

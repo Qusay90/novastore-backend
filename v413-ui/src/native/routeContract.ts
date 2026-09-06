@@ -43,6 +43,7 @@ const canonicalNativeRouteKeys = new Set<string>(
 
 const STORE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PRODUCT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const RETURN_ID_PATTERN = /^[1-9]\d{0,14}$/;
 
 function safeNativeRoute() {
   return new URLSearchParams({ cal: "CAL-02", tab: "home", shell: "native" });
@@ -66,6 +67,9 @@ export function canonicalNativeRoute(search: URLSearchParams) {
   const rawStoreSlug = search.get("storeSlug");
   const rawProductId = search.get("productId");
   const rawMode = search.get("mode");
+  const returnIds = search.getAll("returnId");
+  const returnActions = search.getAll("returnAction");
+  const isReturnRoute = cal === "CAL-10" && tab === "account" && view === "returns";
   if (rawStoreSlug !== null) {
     const storeSlug = rawStoreSlug.trim().toLocaleLowerCase("en-US");
     if ((!isStoreRoute && !isProductRoute) || storeSlug.length > 160 || !STORE_SLUG_PATTERN.test(storeSlug)) {
@@ -84,6 +88,20 @@ export function canonicalNativeRoute(search: URLSearchParams) {
     }
     if (rawMode === "preview" && !result.has("storeSlug")) return null;
     result.set("mode", rawMode);
+  }
+  if (returnIds.length || returnActions.length) {
+    if (!isReturnRoute || returnIds.length > 1 || returnActions.length > 1 || (returnIds.length && returnActions.length)) {
+      return null;
+    }
+    if (returnIds.length) {
+      const returnId = returnIds[0].trim();
+      if (!RETURN_ID_PATTERN.test(returnId) || !Number.isSafeInteger(Number(returnId))) return null;
+      result.set("returnId", returnId);
+    }
+    if (returnActions.length) {
+      if (returnActions[0] !== "new") return null;
+      result.set("returnAction", "new");
+    }
   }
   result.set("shell", "native");
   return result;

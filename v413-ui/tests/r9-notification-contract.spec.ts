@@ -84,7 +84,7 @@ test("typed targets route only to the bounded customer surfaces", () => {
     [{ entityType: "payment", entityId: 2 }, { cal: "CAL-09", view: "" }],
     [{ entityType: "shipment", entityId: 3 }, { cal: "CAL-09", view: "" }],
     [{ entityType: "product", entityId: 4 }, { cal: "CAL-06", view: "", productId: "4" }],
-    [{ entityType: "return_request", entityId: 5 }, { cal: "CAL-10", view: "returns" }],
+    [{ entityType: "return_request", entityId: 5 }, { cal: "CAL-10", view: "returns", returnId: "5" }],
     [{ entityType: "product_question", entityId: 6 }, { cal: "CAL-10", view: "questions" }],
     [{ entityType: "review", entityId: 7 }, { cal: "CAL-10", view: "reviews" }],
     [{ entityType: "support_thread", entityId: 8 }, { cal: "CAL-11", view: "history" }],

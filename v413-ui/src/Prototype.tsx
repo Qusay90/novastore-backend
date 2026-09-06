@@ -115,6 +115,8 @@ type RouteContext = {
   storeSlug?: string;
   productId?: string;
   mode?: CustomerStorePresentationMode;
+  returnId?: string;
+  returnAction?: "new";
 };
 type Route = { cal: CalId; tab: TabId; view: ViewId } & RouteContext;
 type RefreshSource = "pull" | "reselect";
@@ -339,9 +341,13 @@ function routeFromCanonicalNativeParams(params: URLSearchParams): Route {
   const storeSlug = params.get("storeSlug");
   const productId = params.get("productId");
   const mode = params.get("mode");
+  const returnId = params.get("returnId");
+  const returnAction = params.get("returnAction");
   if (storeSlug) route.storeSlug = storeSlug;
   if (productId) route.productId = productId;
   if (mode === "customer" || mode === "preview") route.mode = mode;
+  if (returnId) route.returnId = returnId;
+  if (returnAction === "new") route.returnAction = returnAction;
   return route;
 }
 
@@ -385,6 +391,14 @@ function readRoute(): Route {
   }
   if (contextRoute && (mode === "customer" || mode === "preview") && (mode !== "preview" || route.storeSlug)) {
     route.mode = mode;
+  }
+  const returnIds = params.getAll("returnId");
+  const returnActions = params.getAll("returnAction");
+  const returnRoute = cal === "CAL-10" && tab === "account" && view === "returns";
+  if (returnRoute && returnIds.length === 1 && returnActions.length === 0 && /^[1-9]\d{0,14}$/.test(returnIds[0]) && Number.isSafeInteger(Number(returnIds[0]))) {
+    route.returnId = returnIds[0];
+  } else if (returnRoute && returnActions.length === 1 && returnIds.length === 0 && returnActions[0] === "new") {
+    route.returnAction = "new";
   }
   return route;
 }
@@ -532,7 +546,8 @@ export default function Prototype() {
     const nextRoute: Route = { cal: next, tab, view, ...context };
     if (
       route.cal === nextRoute.cal && route.tab === nextRoute.tab && route.view === nextRoute.view &&
-      route.storeSlug === nextRoute.storeSlug && route.productId === nextRoute.productId && route.mode === nextRoute.mode
+      route.storeSlug === nextRoute.storeSlug && route.productId === nextRoute.productId && route.mode === nextRoute.mode &&
+      route.returnId === nextRoute.returnId && route.returnAction === nextRoute.returnAction
     ) {
       setNavigationRevision((current) => current + 1);
       setContentRevision((current) => current + 1);
@@ -546,7 +561,7 @@ export default function Prototype() {
       url.searchParams.set("cal", next);
       url.searchParams.set("tab", tab);
       if (view) url.searchParams.set("view", view); else url.searchParams.delete("view");
-      for (const key of ["storeSlug", "productId", "mode"] as const) {
+      for (const key of ["storeSlug", "productId", "mode", "returnId", "returnAction"] as const) {
         const value = nextRoute[key];
         if (value) url.searchParams.set(key, value); else url.searchParams.delete(key);
       }
@@ -575,7 +590,7 @@ export default function Prototype() {
     && !keyboard.visible
     && !["CAL-01", "CAL-08", "CAL-12"].includes(route.cal);
   const hasFixedAppHeader = route.cal !== "CAL-06";
-  const routeIdentity = `${route.cal}:${route.tab}:${route.view || "root"}:${route.storeSlug || "local"}:${route.productId || "none"}:${route.mode || "customer"}`;
+  const routeIdentity = `${route.cal}:${route.tab}:${route.view || "root"}:${route.storeSlug || "local"}:${route.productId || "none"}:${route.mode || "customer"}:${route.returnId || route.returnAction || "history"}`;
   const scrollSurfaceIdentity = route.cal === "CAL-08" ? `${route.cal}:${route.tab}` : routeIdentity;
   const scrollSurfaceKey = `${scrollSurfaceIdentity}:${contentRevision}:${refreshRequest.id}`;
   const cartCount = cartLines.reduce((total, line) => total + line.quantity, 0);
@@ -976,7 +991,10 @@ function openCustomerNotificationTarget(go: Go, selectProduct: (id: string) => v
   const destination = resolveCustomerNotificationDestination(target);
   if (destination.productId) selectProduct(destination.productId);
   selectOrder(target?.entityType === "order" ? target.entityId! : null);
-  go(destination.cal, destination.tab, destination.view, destination.productId ? { productId: destination.productId } : {});
+  go(destination.cal, destination.tab, destination.view, {
+    ...(destination.productId ? { productId: destination.productId } : {}),
+    ...(destination.returnId ? { returnId: destination.returnId } : {}),
+  });
 }
 
 function RouteTopbar({ route, go, query, setQuery, setSearchPanelOpen }: { route: Route; go: Go; query: string; setQuery: (value: string) => void; setSearchPanelOpen: (open: boolean) => void }) {
@@ -1005,7 +1023,7 @@ function RouteTopbar({ route, go, query, setQuery, setSearchPanelOpen }: { route
     return <TopActions title={title} back={() => route.view ? goBackOr(() => go("CAL-09", "account")) : go("CAL-10", "account")} overflow={!route.view} onOverflow={() => go("CAL-09", "account", "tracking")} />;
   }
   if (route.cal === "CAL-10") {
-    if (route.view === "returns") return <TopActions title="İade ve Değişim" back={() => goBackOr(() => go("CAL-10", "account"))} plainEnd />;
+    if (route.view === "returns") return <TopActions title={route.returnId ? "Talep detayı" : route.returnAction === "new" ? "Yeni İade Talebi" : "İade Taleplerim"} back={() => goBackOr(() => go("CAL-10", "account"))} plainEnd />;
     if (route.view === "faq" || route.view === "history") return <TopActions title={route.view === "faq" ? "Sıkça Sorulan Sorular" : "Geçmiş İşlemler"} back={() => goBackOr(() => go("CAL-10", "account"))} plainEnd />;
     if (route.view === "addresses") return <TopActions title="Adreslerim" back={() => goBackOr(() => go("CAL-10", "account"))} plainEnd />;
     if (route.view === "notifications") return <TopActions title="Bildirimler" back={() => goBackOr(() => go("CAL-10", "account"))} plainEnd />;
@@ -1034,7 +1052,7 @@ function Screen({ route, go, searchQuery, setSearchQuery, searchPanelOpen, setSe
     case "CAL-07": return <CartScreen go={go} />;
     case "CAL-08": return <CheckoutScreen go={go} view={route.view} />;
     case "CAL-09": return <OrderDetailScreen go={go} view={route.view} />;
-    case "CAL-10": return <AccountScreen go={go} view={route.view} />;
+    case "CAL-10": return <AccountScreen go={go} route={route} />;
     case "CAL-11": return <SupportHubScreen go={go} view={route.view} />;
     case "CAL-12": return <NovaBotScreen go={go} />;
   }
@@ -2839,8 +2857,8 @@ function OrderDetailScreen({ go, view }: { go: Go; view: ViewId }) {
     if (selected) {
       const cancellable = CUSTOMER_CANCELLABLE_ORDER_STATUSES.has(selected.status) && !selected.isPendingPayment && !selected.isPaymentFailed;
       const returnProjection = customerReturnProjectionState(selected);
-      const activeReturn = returnProjection === "active";
-      const returnEligible = selected.status === "Teslim Edildi" && selected.paymentStatus === "PAID" && Boolean(selected.deliveredAt) && (returnProjection === "none" || returnProjection === "terminal");
+      const hasReturn = Boolean(selected.returnId);
+      const returnEligible = selected.status === "Teslim Edildi" && selected.paymentStatus === "PAID" && Boolean(selected.deliveredAt) && returnProjection === "none";
       const cancel = async () => {
         setOrderActionError("");
         setOrderActionNotice("");
@@ -2867,7 +2885,10 @@ function OrderDetailScreen({ go, view }: { go: Go; view: ViewId }) {
         <div className="order-actions">
           {cancellable && cancelConfirmId !== selected.id && <button className="secondary" type="button" onClick={() => { setOrderActionError(""); setCancelConfirmId(selected.id); }}>Siparişi İptal Et</button>}
           {cancellable && cancelConfirmId === selected.id && <section className="account-empty-authoritative" role="alertdialog" aria-label="Sipariş iptal onayı"><h2>İptal talebini onaylıyor musun?</h2><p>Son uygunluk ve iade durumu PC1 sunucusu tarafından belirlenecek.</p><div><button className="secondary" type="button" disabled={accountRuntime.busy} onClick={() => setCancelConfirmId(null)}>Vazgeç</button><button className="primary orange" type="button" disabled={accountRuntime.busy} onClick={() => void cancel()}>{accountRuntime.busy ? "İşleniyor…" : "İptali Onayla"}</button></div></section>}
-          {(returnEligible || activeReturn) && <button className="primary navy" type="button" onClick={() => { selectOrder(selected.id); go("CAL-10", "account", "returns"); }}>{activeReturn ? "İade Talebini Gör" : "İade Talebi Oluştur"}</button>}
+          {(returnEligible || hasReturn) && <button className="primary navy" type="button" onClick={() => {
+            selectOrder(selected.id);
+            go("CAL-10", "account", "returns", hasReturn ? { returnId: String(selected.returnId) } : { returnAction: "new" });
+          }}>{hasReturn ? "İade Talebini Gör" : "İade Talebi Oluştur"}</button>}
           <button className="secondary" type="button" onClick={() => { setOrderActionError(""); accountRuntime.refresh().catch((error) => setOrderActionError(error instanceof Error ? error.message : "Sipariş yenilenemedi.")); }}>Sunucudan Yenile</button>
         </div>
           {returnProjection === "unknown" && <p className="account-logout-error" role="alert">İade kaydı tutarsız görünüyor. Yeni talep açılmadan önce sunucudan yenile.</p>}
@@ -2895,7 +2916,8 @@ function InfoRow({ icon, title, copy, action, onAction }: { icon: ReactNode; tit
   return <div className="info-row"><i>{icon}</i><span><b>{title}</b><small>{copy}</small></span>{action ? <button onClick={onAction}>{action} <ArrowRightIcon /></button> : <CaretRightIcon />}</div>;
 }
 
-function AccountScreen({ go, view }: { go: Go; view: ViewId }) {
+function AccountScreen({ go, route }: { go: Go; route: Route }) {
+  const view = route.view;
   const notificationRuntime = useCustomerNotificationRuntime();
   const accountRuntime = useCustomerAccountRuntime();
   const { selectOrder } = useCommerce();
@@ -2920,13 +2942,14 @@ function AccountScreen({ go, view }: { go: Go; view: ViewId }) {
       </section>
     </div>;
   }
-  if (view === "returns") return <ReturnsScreen go={go} />;
+  if (view === "returns") return <ReturnsScreen go={go} returnId={route.returnId} returnAction={route.returnAction} />;
   if (view === "faq" || view === "history") return <AccountUtilityScreen go={go} view={view} />;
   if (view === "addresses") return <AddressBookScreen go={go} />;
   if (view === "notifications") return <NotificationCenterScreen go={go} />;
   if (["profile", "payments", "coupons", "reviews", "questions", "followed-stores", "security", "settings"].includes(view)) return <AccountFeatureScreen go={go} view={view as "profile" | "payments" | "coupons" | "reviews" | "questions" | "followed-stores" | "security" | "settings"} />;
   const tiles: Array<[string, ReactNode, ViewId]> = NATIVE_SHELL ? [
     ["Adreslerim", <MapPinIcon data-icon="location-pin" weight="regular" />, "addresses"],
+    ["İade Taleplerim", <ReloadIcon />, "returns"],
     ["Kuponlarım", <CubeIcon />, "coupons"],
     ["Değerlendirmelerim", <StarFilledIcon />, "reviews"],
     ["Sorularım", <QuestionMarkCircledIcon />, "questions"],
@@ -3317,7 +3340,36 @@ function NotificationCenterScreen({ go }: { go: Go }) {
   );
 }
 
-function ReturnsScreen({ go }: { go: Go }) {
+const CUSTOMER_RETURN_STATUS_COPY = Object.freeze({
+  REQUESTED: "Talep alındı",
+  IN_REVIEW: "Talep inceleniyor",
+  APPROVED: "İade talebi onaylandı",
+  REJECTED: "İade talebi reddedildi",
+  COMPLETED: "İade işlemi tamamlandı",
+  UNKNOWN: "Durum bilgisi güncelleniyor",
+} as const);
+
+const CUSTOMER_REFUND_STATUS_COPY = Object.freeze({
+  NONE: "Geri ödeme başlatılmadı",
+  REQUESTED: "Geri ödeme talebi alındı",
+  IN_REVIEW: "Geri ödeme inceleniyor",
+  APPROVED: "Geri ödeme onaylandı; aktarım henüz tamamlanmadı",
+  PENDING: "Geri ödeme sağlayıcı işlemi bekliyor",
+  COMPLETED: "Geri ödeme tamamlandı",
+  FAILED: "Geri ödeme tamamlanamadı",
+  REJECTED: "Geri ödeme reddedildi",
+  UNKNOWN: "Geri ödeme durumu güncelleniyor",
+} as const);
+
+const CUSTOMER_RETURN_REASON_COPY = Object.freeze({
+  DAMAGED: "Ürün hasarlı",
+  WRONG_ITEM: "Yanlış ürün geldi",
+  NOT_AS_DESCRIBED: "Ürün açıklamayla uyuşmuyor",
+  CHANGED_MIND: "Satın almaktan vazgeçtim",
+  OTHER: "Diğer",
+} as const);
+
+function ReturnsScreen({ go, returnId, returnAction }: { go: Go; returnId?: string; returnAction?: "new" }) {
   const [reason, setReason] = useState("Beden / renk değişimi");
   const [created, setCreated] = useState(false);
   const accountRuntime = useCustomerAccountRuntime();
@@ -3326,13 +3378,24 @@ function ReturnsScreen({ go }: { go: Go }) {
   const [returnNote, setReturnNote] = useState("");
   const [returnError, setReturnError] = useState("");
   const [returnNotice, setReturnNotice] = useState("");
+  const [createdReturnId, setCreatedReturnId] = useState<number | null>(null);
+  const numericReturnId = returnId && /^[1-9]\d{0,14}$/.test(returnId) && Number.isSafeInteger(Number(returnId))
+    ? Number(returnId)
+    : null;
+
+  useEffect(() => {
+    if (!NATIVE_SHELL || !numericReturnId || accountRuntime?.phase !== "authenticated") return;
+    void accountRuntime.loadReturnDetail(numericReturnId).catch(() => { /* authoritative detail state renders the failure */ });
+    return () => accountRuntime.clearReturnDetail();
+  }, [numericReturnId, accountRuntime?.phase, accountRuntime?.loadReturnDetail, accountRuntime?.clearReturnDetail]);
+
   if (NATIVE_SHELL) {
     if (accountRuntime?.phase !== "authenticated") {
-      return <div className="root-layout returns-layout" data-testid="returns-view"><section className="account-empty-authoritative"><LockClosedIcon /><h1>İadeler için giriş yap</h1><p>İade talepleri yalnız doğrulanmış müşteri hesabında gösterilir.</p><button className="primary navy" type="button" onClick={() => go("CAL-01", "account", "login")}>Giriş Yap</button></section></div>;
+      return <div className="root-layout returns-layout" data-testid="returns-session-expired"><section className="account-empty-authoritative"><LockClosedIcon /><h1>Oturum doğrulaması gerekli</h1><p>İade talepleri yalnız doğrulanmış müşteri hesabında gösterilir. Oturumun sona erdiyse yeniden giriş yap.</p><button className="primary navy" type="button" onClick={() => go("CAL-01", "account", "login")}>Giriş Yap</button></section></div>;
     }
     const eligibleOrders = accountRuntime.orders.filter((order) => {
       const returnProjection = customerReturnProjectionState(order);
-      return order.status === "Teslim Edildi" && order.paymentStatus === "PAID" && Boolean(order.deliveredAt) && (returnProjection === "none" || returnProjection === "terminal");
+      return order.status === "Teslim Edildi" && order.paymentStatus === "PAID" && Boolean(order.deliveredAt) && returnProjection === "none";
     });
     const selectedOrder = eligibleOrders.find((order) => order.id === selectedOrderId) ?? eligibleOrders[0] ?? null;
     const reasonOptions = [
@@ -3347,23 +3410,72 @@ function ReturnsScreen({ go }: { go: Go }) {
       setReturnError("");
       setReturnNotice("");
       try {
-        await accountRuntime.createReturn(selectedOrder.id, reasonCode, returnNote);
+        const result = await accountRuntime.createReturn(selectedOrder.id, reasonCode, returnNote);
         setReturnNote("");
-        setReturnNotice("İade talebin PC1 sunucusunda oluşturuldu.");
+        setCreatedReturnId(result.id);
+        setReturnNotice("Talebiniz oluşturuldu. Talep kimliği güvenle saklandı.");
       } catch (error) {
         setReturnError(error instanceof Error ? error.message : "İade talebi oluşturulamadı. Güncel uygunluğu yeniden kontrol et.");
       }
     };
+
+    if (numericReturnId) {
+      const detail = accountRuntime.returnDetailId === numericReturnId ? accountRuntime.returnDetail : null;
+      const phase = accountRuntime.returnDetailPhase;
+      if (phase === "loading") return <div className="root-layout returns-layout" data-testid="return-detail-loading" aria-busy="true"><section className="return-resource-state"><ReloadIcon /><h1>Talep ayrıntısı yükleniyor</h1><p>İade #{numericReturnId} doğrudan PC1 sunucusundan yeniden doğrulanıyor.</p></section></div>;
+      if (phase === "session-expired") return <div className="root-layout returns-layout" data-testid="return-detail-session-expired"><section className="return-resource-state" role="alert"><LockClosedIcon /><h1>Oturumun sona erdi</h1><p>{accountRuntime.returnDetailError}</p><button className="primary navy" type="button" onClick={() => go("CAL-01", "account", "login")}>Yeniden Giriş Yap</button></section></div>;
+      if (phase === "offline" || phase === "error" || !detail) return <div className="root-layout returns-layout" data-testid={`return-detail-${phase === "offline" ? "offline" : "unavailable"}`}><section className="return-resource-state" role="alert"><ReloadIcon /><h1>{phase === "offline" ? "Bağlantı bekleniyor" : "Talep ayrıntısı kullanılamıyor"}</h1><p>{accountRuntime.returnDetailError || "Bu talep bulunamadı veya artık bu hesap tarafından erişilemiyor."}</p><div><button className="secondary" type="button" onClick={() => go("CAL-10", "account", "returns")}>İade Taleplerime Dön</button><button className="primary navy" type="button" onClick={() => void accountRuntime.loadReturnDetail(numericReturnId).catch(() => {})}>Tekrar Dene</button></div></section></div>;
+      const refundCopy = detail.refundStatus
+        ? CUSTOMER_REFUND_STATUS_COPY[detail.refundStatus]
+        : "Geri ödeme durumu henüz sunucu ayrıntısında paylaşılmadı";
+      const refundComplete = detail.refundStatus === "COMPLETED";
+      return <div className="root-layout returns-layout" data-testid="return-detail" data-return-id={detail.id}>
+        <section className="returns-hero"><ReloadIcon /><div><h1>Talep detayı</h1><p>Bu bilgiler iade #{detail.id} için PC1 sunucusundan yeniden doğrulandı.</p></div></section>
+        <section className="return-detail-card" aria-label={`İade talebi ${detail.id}`}>
+          <header><div><small>Talep kimliği</small><h2>İade #{detail.id}</h2></div><span data-status={detail.status}>{CUSTOMER_RETURN_STATUS_COPY[detail.status]}</span></header>
+          <dl>
+            <div><dt>Sipariş</dt><dd>#{detail.orderId}</dd></div>
+            <div><dt>Talep tarihi</dt><dd>{formatAccountDate(detail.createdAt)}</dd></div>
+            <div><dt>Neden</dt><dd>{CUSTOMER_RETURN_REASON_COPY[detail.reasonCode as keyof typeof CUSTOMER_RETURN_REASON_COPY] || "Diğer"}</dd></div>
+            <div><dt>Müşteri notu</dt><dd>{detail.note || "Not eklenmedi"}</dd></div>
+            <div><dt>İade durumu</dt><dd>{CUSTOMER_RETURN_STATUS_COPY[detail.status]}</dd></div>
+            <div><dt>Karar notu</dt><dd>{detail.decisionNote || "Karar notu henüz paylaşılmadı"}</dd></div>
+            <div><dt>Talep edilen geri ödeme</dt><dd>{detail.refundAmount === null ? "Tutar paylaşılmadı" : formatMoney(detail.refundAmount)}</dd></div>
+            <div><dt>Sipariş durumu</dt><dd>{detail.orderStatus || "Bilgi paylaşılmadı"}</dd></div>
+            <div><dt>Ödeme durumu</dt><dd>{detail.paymentStatus || "Bilgi paylaşılmadı"}</dd></div>
+          </dl>
+        </section>
+        <section className={`return-refund-truth${refundComplete ? " complete" : ""}`} data-testid="return-refund-truth" data-refund-status={detail.refundStatus || "UNAVAILABLE"} data-refund-complete={refundComplete ? "true" : "false"} role="status">
+          {refundComplete ? <CheckIcon /> : <ClockIcon />}
+          <div><h2>Geri ödeme durumu</h2><p>{refundCopy}</p>{detail.status === "APPROVED" && !refundComplete && <small>İade onayı, paranın hesaba geçtiği anlamına gelmez.</small>}</div>
+        </section>
+        <button className="secondary return-history-link" type="button" onClick={() => go("CAL-10", "account", "returns")}>Tüm İade Taleplerim</button>
+      </div>;
+    }
+
+    if (returnAction !== "new") {
+      const historyPhase = accountRuntime.returnHistoryPhase;
+      return <div className="root-layout returns-layout" data-testid="return-history" data-history-state={historyPhase}>
+        <section className="returns-hero"><ReloadIcon /><div><h1>İade Taleplerim</h1><p>Tüm taleplerin son doğrulanmış durumuyla burada kalıcı olarak görünür.</p></div></section>
+        <button className="primary navy return-new-request" type="button" onClick={() => go("CAL-10", "account", "returns", { returnAction: "new" })}>Yeni İade Talebi</button>
+        {historyPhase === "loading" && <section className="return-resource-state" data-testid="return-history-loading" aria-busy="true"><ReloadIcon /><h2>İade talepleri yükleniyor</h2><p>Güncel geçmiş PC1 sunucusundan alınıyor.</p></section>}
+        {historyPhase === "empty" && <section className="return-resource-state" data-testid="return-history-empty"><CubeIcon /><h2>İade talebiniz bulunmuyor</h2><p>Bu hesapla oluşturduğun talepler burada görünecek.</p></section>}
+        {(historyPhase === "offline" || historyPhase === "error") && <section className="return-resource-state" data-testid={`return-history-${historyPhase}`} role="alert"><ReloadIcon /><h2>{historyPhase === "offline" ? "Bağlantı bekleniyor" : "İade talepleri yüklenemedi"}</h2><p>{accountRuntime.returnHistoryError}</p><button className="secondary" type="button" onClick={() => void accountRuntime.refreshReturns().catch(() => {})}>Tekrar Dene</button></section>}
+        {historyPhase === "session-expired" && <section className="return-resource-state" data-testid="return-history-session-expired" role="alert"><LockClosedIcon /><h2>Oturumun sona erdi</h2><p>{accountRuntime.returnHistoryError}</p><button className="primary navy" type="button" onClick={() => go("CAL-01", "account", "login")}>Yeniden Giriş Yap</button></section>}
+        {historyPhase === "ready" && <section className="return-history-list" aria-label="İade talepleri">{accountRuntime.returns.map((item) => <button type="button" className="return-order" data-return-status={item.status} key={item.id} onClick={() => go("CAL-10", "account", "returns", { returnId: String(item.id) })}><CubeIcon /><div><small>Sipariş #{item.orderId} · {formatAccountDate(item.createdAt)}</small><h3>İade #{item.id}</h3><p>{CUSTOMER_RETURN_STATUS_COPY[item.status]}</p></div><CaretRightIcon /></button>)}</section>}
+        <button className="text-action return-support" type="button" onClick={() => go("CAL-11", "support", "live")}>Destek Al</button>
+      </div>;
+    }
+
     return <div className="root-layout returns-layout" data-testid="returns-view">
-      <section className="returns-hero"><ReloadIcon /><div><h1>İade ve değişim</h1><p>Uygunluk, süre ve talep durumu PC1 sunucusu tarafından belirlenir.</p></div></section>
-      {accountRuntime.returns.length > 0 && <section className="return-reasons" aria-label="Mevcut iade talepleri"><h2>Mevcut talepler</h2>{accountRuntime.returns.map((item) => <article className="return-order" key={item.id}><CubeIcon /><div><small>Sipariş #{item.orderId}</small><h3>İade #{item.id}</h3><p>{item.status}{item.decisionNote ? ` · ${item.decisionNote}` : ""}</p></div></article>)}</section>}
-      {selectedOrder ? <>
+      <section className="returns-hero"><ReloadIcon /><div><h1>Yeni İade Talebi</h1><p>Yeni talep oluşturma, mevcut taleplerin geçmişinden ayrı tutulur.</p></div></section>
+      {createdReturnId ? <section className="return-created-state" data-testid="return-created-success"><CheckIcon /><h2>Talebiniz oluşturuldu</h2><p>{returnNotice} Geçmiş yenilenemese bile aynı talebi tekrar oluşturma.</p><button className="primary navy" type="button" onClick={() => go("CAL-10", "account", "returns", { returnId: String(createdReturnId) })}>İade Talebini Gör</button><button className="secondary" type="button" onClick={() => void accountRuntime.refreshReturns().catch(() => {})}>Geçmişi Yeniden Dene</button></section> : selectedOrder ? <>
         <section className="return-reasons" aria-label="İade edilecek sipariş"><h2>Uygun sipariş</h2>{eligibleOrders.map((order) => <button type="button" className={selectedOrder.id === order.id ? "active" : ""} aria-pressed={selectedOrder.id === order.id} onClick={() => selectOrder(order.id)} key={order.id}><span>{selectedOrder.id === order.id && <CheckIcon />}</span>Sipariş #{order.id} · {formatMoney(order.total)}</button>)}</section>
         <section className="return-reasons"><h2>İade nedeni</h2>{reasonOptions.map(([code, label]) => <button type="button" className={reasonCode === code ? "active" : ""} aria-pressed={reasonCode === code} onClick={() => setReasonCode(code)} key={code}><span>{reasonCode === code && <CheckIcon />}</span>{label}</button>)}</section>
         <label className="return-reasons"><h2>Ek açıklama (isteğe bağlı)</h2><KeyboardTextarea aria-label="İade açıklaması" maxLength={1000} value={returnNote} onChange={(event) => setReturnNote(event.target.value)} placeholder="Talebinle ilgili ek bilgiyi yaz" /><small>{returnNote.length}/1000</small></label>
         <button className="primary navy return-cta" type="button" disabled={accountRuntime.busy} onClick={() => void submitReturn()}>{accountRuntime.busy ? "Gönderiliyor…" : "İade Talebi Oluştur"}</button>
       </> : <section className="account-empty-authoritative"><CubeIcon /><h1>İadeye uygun sipariş yok</h1><p>Yalnız ödemesi tamamlanmış ve teslim edilmiş siparişler için talep oluşturulabilir. Nihai uygunluğu sunucu doğrular.</p><button className="primary navy" type="button" onClick={() => go("CAL-09", "account")}>Siparişlerime Git</button></section>}
-      {returnNotice && <p role="status" className="return-status"><CheckIcon /> {returnNotice}</p>}
+      {returnNotice && !createdReturnId && <p role="status" className="return-status"><CheckIcon /> {returnNotice}</p>}
       {returnError && <p role="alert" className="account-logout-error">{returnError}</p>}
       <button className="text-action return-support" type="button" onClick={() => go("CAL-11", "support", "live")}>Destek Al</button>
     </div>;

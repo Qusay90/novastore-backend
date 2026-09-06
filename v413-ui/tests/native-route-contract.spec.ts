@@ -122,6 +122,26 @@ test("public store and PDP route context is typed, bounded, and preview fails cl
   }
 });
 
+test("return history keeps one bounded exact detail or one explicit create context", () => {
+  expect(canonicalNativeRoute(new URLSearchParams(
+    "cal=CAL-10&tab=account&view=returns&returnId=801",
+  ))?.toString()).toBe("cal=CAL-10&tab=account&view=returns&returnId=801&shell=native");
+  expect(canonicalNativeRoute(new URLSearchParams(
+    "cal=CAL-10&tab=account&view=returns&returnAction=new",
+  ))?.toString()).toBe("cal=CAL-10&tab=account&view=returns&returnAction=new&shell=native");
+
+  for (const query of [
+    "cal=CAL-10&tab=account&view=returns&returnId=0",
+    "cal=CAL-10&tab=account&view=returns&returnId=-1",
+    "cal=CAL-10&tab=account&view=returns&returnId=1.5",
+    "cal=CAL-10&tab=account&view=returns&returnId=01",
+    "cal=CAL-10&tab=account&view=returns&returnId=1&returnId=2",
+    "cal=CAL-10&tab=account&view=returns&returnId=1&returnAction=new",
+    "cal=CAL-10&tab=account&view=returns&returnAction=edit",
+    "cal=CAL-02&tab=home&returnId=1",
+  ]) expect(canonicalNativeRoute(new URLSearchParams(query)), query).toBeNull();
+});
+
 test("deep links are origin and path constrained for cold and warm launch", () => {
   expect(nativeRouteFromAppUrl("https://novastore.tr/app/customer?cal=CAL-04&tab=home&view=store"))
     .not.toBeNull();
