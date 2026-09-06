@@ -29,8 +29,20 @@ assert.match(storefrontIntegration, /runtime\.cart\.handoffToCheckout\(next\)/);
 assert.match(storefrontIntegration, /product\.stock <= 0/);
 assert.match(storefrontIntegration, /Math\.min\(product\.stock/);
 assert.match(storefrontCatalogAdapter, /slug: safeProductSlug\(product\.slug, id\)/);
-assert.match(storefrontIntegration, /<ComparisonTray ids=\{comparisonIds\}/);
-assert.match(storefrontIntegration, /onClear=\{\(\) => setComparisonIds\(new Set\(\)\)\}/);
+const comparisonTraySource = storefrontIntegration.slice(
+  storefrontIntegration.indexOf("function ComparisonTray"),
+  storefrontIntegration.indexOf("function CartDrawer"),
+);
+const comparisonMountStart = storefrontIntegration.indexOf("{comparisonAvailable && <ComparisonTray");
+assert.ok(comparisonMountStart >= 0, "Comparison tray mount contract is missing.");
+const comparisonMountSource = storefrontIntegration.slice(
+  comparisonMountStart,
+  storefrontIntegration.indexOf("\n", comparisonMountStart),
+);
+assert.match(comparisonTraySource, /className="comparison-clear"[\s\S]*?onClick=\{onClear\}[\s\S]*?aria-label="Karşılaştırma listesini temizle"/);
+assert.match(comparisonMountSource, /<ComparisonTray ids=\{comparisonIds\}/);
+assert.match(comparisonMountSource, /onClear=\{\(\) => \{\s*setComparisonIds\(new Set\(\)\);\s*setComparisonSurfaceVisible\(false\);\s*\}\}/);
+assert.match(storefrontIntegration, /const comparisonAvailable = comparisonIds\.size > 0 && COMPARISON_TRAY_ROUTE_TYPES\.has\(route\.type\)/);
 assert.match(storefrontArtifact, /production-candidate/);
 assert.match(storefrontArtifact, /IntegratedApp:createCommerceRuntime/);
 assert.doesNotMatch(storefrontArtifact, /main-integrated-fixture|createCanonicalFixtureRuntime/);

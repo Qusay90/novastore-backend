@@ -380,6 +380,7 @@ const assertRawByteArtifactMatrix = () => {
             }
         );
         assertCleanCheckout(checkoutRoot, 'post-install');
+        executeBuffer(process.execPath, [path.join(checkoutRoot, 'tests', 'commerceProNavigationOriginSmoke.js'), repositoryRoot], checkoutRoot);
 
         const build1 = buildRawByteArtifact(checkoutRoot, 'build1');
         const build2 = buildRawByteArtifact(checkoutRoot, 'build2');
@@ -612,6 +613,7 @@ const productionClosure = Object.freeze([
         content: fs.readFileSync(sourcePath, 'utf8')
     }))
 ]);
+
 assert.doesNotThrow(
     () => assertProductionArtifactHygiene(productionClosure),
     'the clean generated HTML and exact served runtime script closure must pass hygiene'
@@ -673,10 +675,8 @@ console.log('AGREEMENT_PREVIEW_ROUTE_ALLOW_PROBE=PASS');
 assert(!html.includes('\r'), 'artifact must use LF line endings');
 assert(html.endsWith('\n'), 'artifact must end with one newline');
 
-const externalOrigins = [...html.matchAll(/https?:\/\/[^"'`\s<>\)]+/g)]
-    .map((match) => match[0])
-    .filter((origin) => !origin.startsWith('http://www.w3.org/'));
-assert.deepEqual([...new Set(externalOrigins)], [], 'artifact must not contain unexpected external origins');
+// The complete external-origin assertion runs in assertRawByteArtifactMatrix using
+// the installed parser and this outer checkout, including navigation misuse probes.
 
 const referencedPaths = new Set();
 const shellHtml = html

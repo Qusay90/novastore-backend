@@ -59,6 +59,24 @@ test("R6 login return intent accepts only explicit internal Customer routes", ()
   }
 });
 
+test("Customer return parsing normalizes routes without a network origin", () => {
+  for (const [input, expected] of [
+    ["/hesabim/../sepet", "/sepet"],
+    ["/hesabim/%2e%2e/favoriler", "/favoriler"],
+    ["/./destek", "/destek"],
+    ["/odeme/sonuc?paymentRef=a+b&orderId=41", "/odeme/sonuc?paymentRef=a+b&orderId=41"],
+    ["https://customer.novastore.invalid/sepet", "/"],
+    ["customer-return:/sepet", "/"],
+    ["//attacker.invalid/sepet", "/"],
+    ["///attacker.invalid/sepet", "/"],
+    ["/%2f%2fattacker.invalid/sepet", "/"],
+    ["/destek\\@attacker.invalid", "/"],
+    ["/odeme/sonuc?paymentRef=", "/"],
+    ["/odeme/sonuc?orderId=41&next=/sepet", "/"],
+    ["/odeme/sonuc?paymentRef=%00", "/"],
+  ]) assert.equal(safeCustomerReturnPath(input), expected, input);
+});
+
 test("R6 account header sends guests through normal login and keeps authenticated account access", async () => {
   assert.equal(customerAccountEntryPath(false), "/giris");
   assert.equal(customerAccountEntryPath(true), "/hesabim");

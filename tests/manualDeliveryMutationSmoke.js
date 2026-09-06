@@ -464,8 +464,32 @@ const run = async (state, options = {}) => {
         );
         assert.match(migrationSource, /COMMIT;\s*$/u);
         const registry = loadRegistry();
-        assert.equal(registry.at(-1).id, '20260902_01_seller_package_delivery_status');
-        assert.equal(registry.at(-1).path, 'migrations/20260902_01_seller_package_delivery_status.sql');
+        const deliveryMigrationId = '20260902_01_seller_package_delivery_status';
+        const deliveryMigrationPath = 'migrations/20260902_01_seller_package_delivery_status.sql';
+        const packageFoundationMigrationId = '20260806_02_seller_wave3_business_verticals';
+        const deliveryMigrationIndex = registry.findIndex(({ id }) => id === deliveryMigrationId);
+        const packageFoundationMigrationIndex = registry.findIndex(({ id }) => id === packageFoundationMigrationId);
+        assert.notEqual(deliveryMigrationIndex, -1, 'The package delivery migration must remain in the registry.');
+        assert.equal(
+            registry.filter(({ id }) => id === deliveryMigrationId).length,
+            1,
+            'The package delivery migration id must be unique.'
+        );
+        assert.equal(
+            registry.filter(({ path: migrationRegistryPath }) => migrationRegistryPath === deliveryMigrationPath).length,
+            1,
+            'The package delivery migration path must be unique.'
+        );
+        assert.equal(registry[deliveryMigrationIndex].path, deliveryMigrationPath);
+        assert.notEqual(
+            packageFoundationMigrationIndex,
+            -1,
+            'The seller fulfillment package foundation migration must remain in the registry.'
+        );
+        assert(
+            deliveryMigrationIndex > packageFoundationMigrationIndex,
+            'The package delivery migration must run after the seller fulfillment package foundation.'
+        );
 
         console.log('manual delivery mutation smoke passed');
     } finally {
