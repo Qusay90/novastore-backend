@@ -10,6 +10,7 @@
     "test": "node scripts/runCiSmokes.js",
     "test:ci": "node scripts/runCiSmokes.js",
     "test:admin-order-delivery:integration": "node tests/adminOrderDeliveryPostgresSmoke.js --execute-disposable-db",
+    "test:canonical-commerce:integration": "node tests/canonicalCommercePostgresSmoke.js --execute-disposable-db",
     "test:seller-reputation": "node tests/sellerReputationQuestionsSmoke.js",
     "test:seller-reputation:integration": "node tests/sellerReputationQuestionsPostgresSmoke.js --execute-disposable-db",
     "test:staging-migrations": "node tests/stagingMigrationFoundationSmoke.js",

@@ -45,6 +45,9 @@ const normalizeCartItems = (cartItems) => {
 
     const canonicalByProduct = new Map();
     for (const [index, item] of cartItems.entries()) {
+        if (['variant_id', 'variantId', 'offer_id', 'offerId', 'options', 'selectedOptions'].some((field) => item?.[field] !== undefined && item[field] !== null)) {
+            throw Object.assign(new Error('Satýn alýnabilir varyant seçimi henüz desteklenmiyor.'), { code: 'PURCHASABLE_VARIANT_UNSUPPORTED', statusCode: 400 });
+        }
         const productId = readCartProductId(item, index);
         const quantity = Number(item.quantity || 1);
 
@@ -88,7 +91,7 @@ const loadProductsForCart = async (cartItems, client = pool) => {
     const ids = [...new Set(normalized.map((item) => item.id))];
 
     const result = await client.query(
-        `SELECT id, name, price, old_price, stock, image_url, store_id
+        `SELECT id, name, price, old_price, stock, image_url, store_id, sku
          FROM products
          WHERE id = ANY($1::int[])
            AND ${buildPublicProductSqlPredicate('products')}`,
@@ -202,6 +205,7 @@ const calculatePricing = async ({ cartItems, couponCode = null, client = pool, l
         return {
             id: Number(product.id),
             name: product.name,
+            sku: product.sku || null,
             quantity: cartItem.quantity,
             price: unitPrice,
             old_price: product.old_price !== null ? Number(product.old_price) : null,

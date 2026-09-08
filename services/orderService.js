@@ -59,9 +59,10 @@ const reserveStock = async (client, pricedItems) => {
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $2
                AND stock >= $1
+               AND price = $3
                AND ${buildPublicProductSqlPredicate('products')}
              RETURNING id, stock`,
-            [item.quantity, item.id]
+            [item.quantity, item.id, item.price]
         );
 
         if (updateResult.rows.length === 0) {

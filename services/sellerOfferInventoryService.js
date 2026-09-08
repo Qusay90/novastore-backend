@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const commerce = require('./sellerCanonicalCommerceService');
 const { writeAuditAndOutbox } = require('./sellerAuditOutboxService');
 
 class SellerOfferInventoryError extends Error {
@@ -55,6 +56,15 @@ const atomic = async (database, input) => {
     try {
         await client.query('BEGIN');
         began = true;
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`seller-commerce:${input.organizationId}:${input.outbox.idempotencyKey}`]);
+        const replay = await receipt(client, input.organizationId, input.outbox.idempotencyKey, input.requestFingerprint);
+        if (replay) {
+            await client.query('COMMIT');
+            const mutationResult = input.outbox.aggregateType === 'seller_offer'
+                ? { reused: true, offer: replay }
+                : { reused: true, inventory: input.outbox.aggregateType === 'inventory_batch' ? replay.items : replay };
+            return { mutationResult };
+        }
         const mutationResult = await input.mutation(client);
         const events = await writeAuditAndOutbox(client, input);
         await client.query('COMMIT');
@@ -96,36 +106,37 @@ const loadOffer = async (queryable, context, offerId, lock = '') => {
                 variant.id AS variant_id, variant.seller_sku, variant.price_minor, variant.currency, variant.revision AS variant_revision,
                 inventory.id AS inventory_id, inventory.quantity, inventory.low_stock_threshold, inventory.revision AS inventory_revision
            FROM seller_offers offer
-           JOIN seller_offer_variants variant ON variant.organization_id = offer.organization_id AND variant.offer_id = offer.id
-           JOIN seller_inventory_items inventory ON inventory.organization_id = variant.organization_id AND inventory.variant_id = variant.id
+           JOIN seller_offer_variants variant ON variant.organization_id = offer.organization_id AND variant.offer_id = offer.id AND variant.store_id = offer.store_id
+           JOIN seller_inventory_items inventory ON inventory.organization_id = variant.organization_id AND inventory.variant_id = variant.id AND inventory.store_id = offer.store_id
           WHERE offer.organization_id = $1 AND offer.id = $2 AND offer.store_id = ANY($3::bigint[]) ${lock}`,
         [safeContext.organizationId, integer(offerId, 'RESOURCE_NOT_FOUND'), safeContext.storeIds]
     );
     if (!result.rows?.[0]) fail('RESOURCE_NOT_FOUND', 404);
-    return safeOffer(result.rows[0]);
+    return commerce.projectOffer(queryable, safeContext, safeOffer(result.rows[0]), Boolean(lock));
 };
 
 const validateCreate = (input) => {
     if (!input || typeof input !== 'object' || Array.isArray(input)) fail('VALIDATION_FAILED', 400);
-    const allowed = new Set(['product_id', 'seller_sku', 'price_minor', 'currency', 'initial_quantity', 'idempotency_key']);
+    const allowed = new Set(['product_id', 'seller_sku', 'price_minor', 'currency', 'initial_quantity', 'commerce_revision', 'idempotency_key']);
     if (Object.keys(input).some((field) => !allowed.has(field))) fail('VALIDATION_FAILED', 400);
-    return Object.freeze({ productId: integer(input.product_id), sellerSku: text(input.seller_sku, 96), priceMinor: integer(input.price_minor, 'VALIDATION_FAILED', 0), currency: currency(input.currency), initialQuantity: integer(input.initial_quantity ?? 0, 'VALIDATION_FAILED', 0), idempotencyKey: key(input.idempotency_key) });
+    return Object.freeze({ commerceRevision: integer(input.commerce_revision, 'COMMERCE_PRECONDITION_REQUIRED'), productId: integer(input.product_id), sellerSku: text(input.seller_sku, 96), priceMinor: integer(input.price_minor, 'VALIDATION_FAILED', 0), currency: currency(input.currency), initialQuantity: integer(input.initial_quantity ?? 0, 'VALIDATION_FAILED', 0), idempotencyKey: key(input.idempotency_key) });
 };
 
 const createOffer = async (database, context, input) => {
     const safeContext = requireContext(context);
     const data = validateCreate(input);
     const storeId = activeStoreId(safeContext);
+    if (data.currency !== 'TRY') fail('UNSUPPORTED_COMMERCE_CURRENCY', 400);
     const requestFingerprint = fingerprint({ storeId, ...data });
     const replay = await receipt(database, safeContext.organizationId, data.idempotencyKey, requestFingerprint);
     if (replay) return Object.freeze({ reused: true, offer: replay });
     const result = await atomic(database, {
-        organizationId: safeContext.organizationId,
+        organizationId: safeContext.organizationId, requestFingerprint,
         audit: { storeId, actorUserId: safeContext.userId, actorMembershipId: safeContext.membershipId, sessionId: safeContext.sessionId, eventType: 'seller.offer.created', targetType: 'seller_offer', targetId: 'pending', resultCode: 'success', metadata: { action: 'create', target_class: 'seller_offer' } },
         outbox: { storeId, aggregateType: 'seller_offer', aggregateId: `create:${data.idempotencyKey}`, eventType: 'seller.offer.created', aggregateRevision: 1, idempotencyKey: data.idempotencyKey, payload: { action: 'create', target_class: 'seller_offer' } },
         mutation: async (client) => {
-            const product = await client.query('SELECT id FROM products WHERE id = $1', [data.productId]);
-            if (!product.rows?.[0]) fail('RESOURCE_NOT_FOUND', 404);
+            const product = await commerce.loadProduct(client, safeContext, data.productId, storeId, true);
+            await commerce.writeProduct(client, product, data.commerceRevision, { priceMinor: data.priceMinor, quantity: data.initialQuantity });
             const offerInsert = await client.query(
                 "INSERT INTO seller_offers (organization_id, store_id, product_id) VALUES ($1, $2, $3) RETURNING id",
                 [safeContext.organizationId, storeId, data.productId]
@@ -156,19 +167,19 @@ const listOffers = async (database, context, query = {}) => {
         `SELECT offer.id AS offer_id, offer.product_id, offer.store_id, offer.status, offer.visibility, offer.revision,
                 variant.id AS variant_id, variant.seller_sku, variant.price_minor, variant.currency, variant.revision AS variant_revision,
                 inventory.id AS inventory_id, inventory.quantity, inventory.low_stock_threshold, inventory.revision AS inventory_revision
-           FROM seller_offers offer JOIN seller_offer_variants variant ON variant.organization_id = offer.organization_id AND variant.offer_id = offer.id
-           JOIN seller_inventory_items inventory ON inventory.organization_id = variant.organization_id AND inventory.variant_id = variant.id
+           FROM seller_offers offer JOIN seller_offer_variants variant ON variant.organization_id = offer.organization_id AND variant.offer_id = offer.id AND variant.store_id = offer.store_id
+           JOIN seller_inventory_items inventory ON inventory.organization_id = variant.organization_id AND inventory.variant_id = variant.id AND inventory.store_id = offer.store_id
           WHERE offer.organization_id = $1 AND offer.store_id = ANY($2::bigint[]) AND ($3::varchar IS NULL OR offer.status = $3)
           ORDER BY offer.id ASC LIMIT $4`,
         [safeContext.organizationId, safeContext.storeIds, status, limit]
     );
-    return Object.freeze((result.rows || []).map(safeOffer));
+    return Object.freeze(await Promise.all((result.rows || []).map((row) => commerce.projectOffer(database, safeContext, safeOffer(row)))));
 };
 
 const updateOffer = async (database, context, offerId, input) => {
     const safeContext = requireContext(context);
     if (!input || typeof input !== 'object' || Array.isArray(input)) fail('VALIDATION_FAILED', 400);
-    const allowed = new Set(['seller_sku', 'price_minor', 'visibility', 'revision', 'idempotency_key']);
+    const allowed = new Set(['seller_sku', 'price_minor', 'visibility', 'revision', 'commerce_revision', 'idempotency_key']);
     if (Object.keys(input).some((field) => !allowed.has(field))) fail('VALIDATION_FAILED', 400);
     const changes = {};
     if (Object.hasOwn(input, 'seller_sku')) changes.sellerSku = text(input.seller_sku, 96);
@@ -180,17 +191,22 @@ const updateOffer = async (database, context, offerId, input) => {
     if (!Object.keys(changes).length) fail('VALIDATION_FAILED', 400);
     const revision = integer(input.revision, 'PRECONDITION_REQUIRED');
     const idempotencyKey = key(input.idempotency_key);
-    const requestFingerprint = fingerprint({ offerId: integer(offerId), changes, revision });
-    await loadOffer(database, safeContext, offerId);
+    const commerceRevision = changes.priceMinor === undefined ? null : integer(input.commerce_revision, 'COMMERCE_PRECONDITION_REQUIRED');
+    const requestFingerprint = fingerprint({ offerId: integer(offerId), changes, revision, commerceRevision });
+    const preflight = await loadOffer(database, safeContext, offerId);
     const replay = await receipt(database, safeContext.organizationId, idempotencyKey, requestFingerprint);
     if (replay) return Object.freeze({ reused: true, offer: replay });
     const result = await atomic(database, {
-        organizationId: safeContext.organizationId,
-        audit: { storeId: null, actorUserId: safeContext.userId, actorMembershipId: safeContext.membershipId, sessionId: safeContext.sessionId, eventType: 'seller.offer.updated', targetType: 'seller_offer', targetId: String(offerId), resultCode: 'success', metadata: { action: 'update', target_class: 'seller_offer' } },
-        outbox: { storeId: null, aggregateType: 'seller_offer', aggregateId: String(offerId), eventType: 'seller.offer.updated', aggregateRevision: revision + 1, idempotencyKey, payload: { action: 'update', target_class: 'seller_offer' } },
+        organizationId: safeContext.organizationId, requestFingerprint,
+        audit: { storeId: preflight.store_id, actorUserId: safeContext.userId, actorMembershipId: safeContext.membershipId, sessionId: safeContext.sessionId, eventType: 'seller.offer.updated', targetType: 'seller_offer', targetId: String(offerId), resultCode: 'success', metadata: { action: 'update', target_class: 'seller_offer' } },
+        outbox: { storeId: preflight.store_id, aggregateType: 'seller_offer', aggregateId: String(offerId), eventType: 'seller.offer.updated', aggregateRevision: revision + 1, idempotencyKey, payload: { action: 'update', target_class: 'seller_offer' } },
         mutation: async (client) => {
             const current = await loadOffer(client, safeContext, offerId, 'FOR UPDATE');
             if (current.revision !== revision) fail('REVISION_CONFLICT', 409);
+            if (changes.priceMinor !== undefined) {
+                const product = await commerce.loadProduct(client, safeContext, current.product_id, current.store_id, true);
+                await commerce.writeProduct(client, product, commerceRevision, { priceMinor: changes.priceMinor });
+            }
             const updated = await client.query('UPDATE seller_offers SET visibility = COALESCE($1, visibility), revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE organization_id = $2 AND id = $3 AND revision = $4 RETURNING id', [changes.visibility ?? null, safeContext.organizationId, Number(offerId), revision]);
             if (!updated.rows?.[0]) fail('REVISION_CONFLICT', 409);
             if (changes.sellerSku !== undefined || changes.priceMinor !== undefined) await client.query('UPDATE seller_offer_variants SET seller_sku = COALESCE($1, seller_sku), price_minor = COALESCE($2, price_minor), revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE organization_id = $3 AND id = $4', [changes.sellerSku ?? null, changes.priceMinor ?? null, safeContext.organizationId, current.variant.id]);
@@ -217,7 +233,7 @@ const offerCommand = async (database, context, offerId, input) => {
     if (!transitions[command].includes(preflight.status)) fail('INVALID_STATE_TRANSITION', 409);
     const next = command === 'publish' ? 'active' : command === 'unpublish' ? 'inactive' : 'archived';
     const result = await atomic(database, {
-        organizationId: safeContext.organizationId,
+        organizationId: safeContext.organizationId, requestFingerprint,
         audit: { storeId: preflight.store_id, actorUserId: safeContext.userId, actorMembershipId: safeContext.membershipId, sessionId: safeContext.sessionId, eventType: 'seller.offer.command_applied', targetType: 'seller_offer', targetId: String(offerId), resultCode: 'success', metadata: { action: command, target_class: 'seller_offer' } },
         outbox: { storeId: preflight.store_id, aggregateType: 'seller_offer', aggregateId: String(offerId), eventType: 'seller.offer.command_applied', aggregateRevision: revision + 1, idempotencyKey, payload: { action: command, target_class: 'seller_offer' } },
         mutation: async (client) => {
@@ -241,11 +257,15 @@ const readInventory = async (database, context, query = {}) => {
     const result = await database.query(
         `SELECT inventory.id, inventory.store_id, inventory.variant_id, inventory.quantity, inventory.low_stock_threshold, inventory.revision, variant.seller_sku, variant.price_minor, variant.currency
            FROM seller_inventory_items inventory JOIN seller_offer_variants variant ON variant.organization_id = inventory.organization_id AND variant.id = inventory.variant_id
-          WHERE inventory.organization_id = $1 AND inventory.store_id = ANY($2::bigint[]) AND ($3::boolean = FALSE OR inventory.quantity <= inventory.low_stock_threshold)
+          WHERE inventory.organization_id = $1 AND inventory.store_id = ANY($2::bigint[]) AND ($3::boolean IN (TRUE, FALSE))
           ORDER BY inventory.id ASC LIMIT $4`,
         [safeContext.organizationId, safeContext.storeIds, query.low_stock === true, limit]
     );
-    return Object.freeze((result.rows || []).map((row) => Object.freeze({ id: Number(row.id), store_id: Number(row.store_id), variant_id: Number(row.variant_id), seller_sku: String(row.seller_sku), price_minor: Number(row.price_minor), currency: String(row.currency), quantity: Number(row.quantity), low_stock_threshold: Number(row.low_stock_threshold), revision: Number(row.revision) })));
+    const projected = await Promise.all((result.rows || []).map(async (row) => {
+        const product = await commerce.productForInventory(database, safeContext, Number(row.id));
+        return Object.freeze({ id: Number(row.id), store_id: Number(row.store_id), variant_id: Number(row.variant_id), seller_sku: String(row.seller_sku), price_minor: Math.round(Number(product.price) * 100), currency: 'TRY', quantity: Number(product.stock), low_stock_threshold: Number(row.low_stock_threshold), revision: Number(row.revision), commerce_revision: Number(product.revision) });
+    }));
+    return Object.freeze(projected.filter((row) => query.low_stock !== true || row.quantity <= row.low_stock_threshold));
 };
 
 const adjustInventory = async (database, context, input) => {
@@ -253,10 +273,10 @@ const adjustInventory = async (database, context, input) => {
     if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some((field) => !['items', 'idempotency_key'].includes(field))) fail('VALIDATION_FAILED', 400);
     if (!Array.isArray(input.items) || input.items.length < 1 || input.items.length > 50) fail('VALIDATION_FAILED', 400);
     const items = input.items.map((item) => {
-        if (!item || typeof item !== 'object' || Array.isArray(item) || Object.keys(item).some((field) => !['inventory_item_id', 'delta', 'reason_code', 'revision'].includes(field))) fail('VALIDATION_FAILED', 400);
+        if (!item || typeof item !== 'object' || Array.isArray(item) || Object.keys(item).some((field) => !['inventory_item_id', 'delta', 'reason_code', 'revision', 'commerce_revision'].includes(field))) fail('VALIDATION_FAILED', 400);
         const delta = integer(item.delta, 'VALIDATION_FAILED', -2147483648);
         if (delta === 0) fail('VALIDATION_FAILED', 400);
-        return Object.freeze({ inventoryItemId: integer(item.inventory_item_id), delta, reasonCode: text(item.reason_code, 64), revision: integer(item.revision, 'PRECONDITION_REQUIRED') });
+        return Object.freeze({ inventoryItemId: integer(item.inventory_item_id), commerceRevision: integer(item.commerce_revision, 'COMMERCE_PRECONDITION_REQUIRED'), delta, reasonCode: text(item.reason_code, 64), revision: integer(item.revision, 'PRECONDITION_REQUIRED') });
     }).sort((left, right) => left.inventoryItemId - right.inventoryItemId);
     if (new Set(items.map((item) => item.inventoryItemId)).size !== items.length) fail('VALIDATION_FAILED', 400);
     const idempotencyKey = key(input.idempotency_key);
@@ -267,9 +287,9 @@ const adjustInventory = async (database, context, input) => {
     );
     if ((scopedItems.rows || []).length !== items.length) fail('RESOURCE_NOT_FOUND', 404);
     const replay = await receipt(database, safeContext.organizationId, idempotencyKey, requestFingerprint);
-    if (replay) return Object.freeze({ reused: true, inventory: replay });
+    if (replay) return Object.freeze({ reused: true, inventory: replay.items || replay });
     const result = await atomic(database, {
-        organizationId: safeContext.organizationId,
+        organizationId: safeContext.organizationId, requestFingerprint,
         audit: { storeId: null, actorUserId: safeContext.userId, actorMembershipId: safeContext.membershipId, sessionId: safeContext.sessionId, eventType: 'seller.inventory.adjusted', targetType: 'inventory_batch', targetId: idempotencyKey, resultCode: 'success', metadata: { action: 'adjust', target_class: 'inventory_batch' } },
         outbox: { storeId: null, aggregateType: 'inventory_batch', aggregateId: idempotencyKey, eventType: 'seller.inventory.adjusted', aggregateRevision: 1, idempotencyKey, payload: { action: 'adjust', target_class: 'inventory_batch' } },
         mutation: async (client) => {
@@ -279,12 +299,14 @@ const adjustInventory = async (database, context, input) => {
                 const current = loaded.rows?.[0];
                 if (!current) fail('RESOURCE_NOT_FOUND', 404);
                 if (Number(current.revision) !== item.revision) fail('REVISION_CONFLICT', 409);
-                const nextQuantity = Number(current.quantity) + item.delta;
+                const product = await commerce.productForInventory(client, safeContext, item.inventoryItemId, true);
+                const nextQuantity = Number(product.stock) + item.delta;
                 if (nextQuantity < 0) fail('NEGATIVE_STOCK_FORBIDDEN', 409);
+                const canonical = await commerce.writeProduct(client, product, item.commerceRevision, { quantity: nextQuantity });
                 const updated = await client.query('UPDATE seller_inventory_items SET quantity = $1, revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE organization_id = $2 AND id = $3 AND revision = $4 RETURNING revision', [nextQuantity, safeContext.organizationId, item.inventoryItemId, item.revision]);
                 if (!updated.rows?.[0]) fail('REVISION_CONFLICT', 409);
-                await client.query('INSERT INTO seller_inventory_movements (organization_id, store_id, inventory_item_id, delta, quantity_before, quantity_after, reason_code) VALUES ($1, $2, $3, $4, $5, $6, $7)', [safeContext.organizationId, Number(current.store_id), item.inventoryItemId, item.delta, Number(current.quantity), nextQuantity, item.reasonCode]);
-                changed.push(Object.freeze({ id: item.inventoryItemId, quantity: nextQuantity, revision: Number(updated.rows[0].revision) }));
+                await client.query('INSERT INTO seller_inventory_movements (organization_id, store_id, inventory_item_id, delta, quantity_before, quantity_after, reason_code) VALUES ($1, $2, $3, $4, $5, $6, $7)', [safeContext.organizationId, Number(current.store_id), item.inventoryItemId, item.delta, Number(product.stock), nextQuantity, item.reasonCode]);
+                changed.push(Object.freeze({ id: item.inventoryItemId, quantity: nextQuantity, revision: Number(updated.rows[0].revision), commerce_revision: Number(canonical.revision) }));
             }
             await saveReceipt(client, safeContext.organizationId, idempotencyKey, requestFingerprint, 'inventory_batch', idempotencyKey, { items: changed });
             return Object.freeze({ reused: false, inventory: Object.freeze(changed) });
@@ -306,9 +328,9 @@ const updateThreshold = async (database, context, inventoryItemId, input) => {
     );
     if (!scopedItem.rows?.[0]) fail('RESOURCE_NOT_FOUND', 404);
     const replay = await receipt(database, safeContext.organizationId, idempotencyKey, requestFingerprint);
-    if (replay) return Object.freeze({ reused: true, inventory: replay });
+    if (replay) return Object.freeze({ reused: true, inventory: replay.items || replay });
     const result = await atomic(database, {
-        organizationId: safeContext.organizationId,
+        organizationId: safeContext.organizationId, requestFingerprint,
         audit: { storeId: null, actorUserId: safeContext.userId, actorMembershipId: safeContext.membershipId, sessionId: safeContext.sessionId, eventType: 'seller.inventory.threshold_changed', targetType: 'inventory_item', targetId: String(inventoryItemId), resultCode: 'success', metadata: { action: 'threshold', target_class: 'inventory_item' } },
         outbox: { storeId: null, aggregateType: 'inventory_item', aggregateId: String(inventoryItemId), eventType: 'seller.inventory.threshold_changed', aggregateRevision: revision + 1, idempotencyKey, payload: { action: 'threshold', target_class: 'inventory_item' } },
         mutation: async (client) => {
@@ -317,7 +339,8 @@ const updateThreshold = async (database, context, inventoryItemId, input) => {
             if (Number(loaded.rows[0].revision) !== revision) fail('REVISION_CONFLICT', 409);
             const updated = await client.query('UPDATE seller_inventory_items SET low_stock_threshold = $1, revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE organization_id = $2 AND id = $3 AND revision = $4 RETURNING id, quantity, low_stock_threshold, revision', [threshold, safeContext.organizationId, integer(inventoryItemId), revision]);
             if (!updated.rows?.[0]) fail('REVISION_CONFLICT', 409);
-            const inventory = Object.freeze({ id: Number(updated.rows[0].id), quantity: Number(updated.rows[0].quantity), low_stock_threshold: Number(updated.rows[0].low_stock_threshold), revision: Number(updated.rows[0].revision) });
+            const product = await commerce.productForInventory(client, safeContext, integer(inventoryItemId));
+            const inventory = Object.freeze({ id: Number(updated.rows[0].id), commerce_revision: Number(product.revision), quantity: Number(product.stock), low_stock_threshold: Number(updated.rows[0].low_stock_threshold), revision: Number(updated.rows[0].revision) });
             await saveReceipt(client, safeContext.organizationId, idempotencyKey, requestFingerprint, 'inventory_item', inventoryItemId, inventory);
             return Object.freeze({ reused: false, inventory });
         }

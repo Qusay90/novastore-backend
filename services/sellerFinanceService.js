@@ -90,7 +90,12 @@ const dashboard = async (database, rawContext, query = {}) => {
     const [finance, orders, inventory] = await Promise.all([
         financeSummary(database, safeContext, query),
         database.query('SELECT status, COUNT(*)::integer AS count FROM seller_orders WHERE organization_id = $1 AND store_id = ANY($2::bigint[]) GROUP BY status', [safeContext.organizationId, safeContext.storeIds]),
-        database.query('SELECT COUNT(*)::integer AS low_stock_count FROM seller_inventory_items WHERE organization_id = $1 AND store_id = ANY($2::bigint[]) AND quantity <= low_stock_threshold', [safeContext.organizationId, safeContext.storeIds])
+        database.query(`SELECT COUNT(*)::integer AS low_stock_count FROM seller_inventory_items inventory
+            JOIN seller_offer_variants variant ON variant.organization_id = inventory.organization_id AND variant.id = inventory.variant_id AND variant.store_id = inventory.store_id
+            JOIN seller_offers offer ON offer.organization_id = variant.organization_id AND offer.id = variant.offer_id AND offer.store_id = variant.store_id
+            JOIN seller_stores store ON store.organization_id = offer.organization_id AND store.id = offer.store_id AND store.status = 'active' AND store.closed_at IS NULL
+            JOIN products product ON product.id = offer.product_id AND product.store_id = store.legacy_store_id AND product.deleted_at IS NULL
+            WHERE inventory.organization_id = $1 AND inventory.store_id = ANY($2::bigint[]) AND product.stock <= inventory.low_stock_threshold`, [safeContext.organizationId, safeContext.storeIds])
     ]);
     return Object.freeze({ finance, orders_by_status: Object.freeze((orders.rows || []).map((row) => Object.freeze({ status: String(row.status), count: Number(row.count) }))), low_stock_count: Number(inventory.rows?.[0]?.low_stock_count || 0) });
 };
