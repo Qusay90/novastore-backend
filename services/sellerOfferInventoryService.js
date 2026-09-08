@@ -101,12 +101,17 @@ const safeOffer = (row) => Object.freeze({
 });
 const loadOffer = async (queryable, context, offerId, lock = '') => {
     const safeContext = requireContext(context);
+    if (lock) {
+        const owner = (await queryable.query('SELECT product_id, store_id FROM seller_offers WHERE id=$1 AND organization_id=$2 AND store_id=ANY($3::bigint[])', [offerId,safeContext.organizationId,safeContext.storeIds])).rows[0];
+        if (!owner) fail('RESOURCE_NOT_FOUND',404);
+        await commerce.loadProduct(queryable,safeContext,owner.product_id,Number(owner.store_id),true);
+    }
     const result = await queryable.query(
         `SELECT offer.id AS offer_id, offer.product_id, offer.store_id, offer.status, offer.visibility, offer.revision,
                 variant.id AS variant_id, variant.seller_sku, variant.price_minor, variant.currency, variant.revision AS variant_revision,
                 inventory.id AS inventory_id, inventory.quantity, inventory.low_stock_threshold, inventory.revision AS inventory_revision
            FROM seller_offers offer
-           JOIN seller_offer_variants variant ON variant.organization_id = offer.organization_id AND variant.offer_id = offer.id AND variant.store_id = offer.store_id
+           JOIN seller_offer_variants variant ON variant.organization_id = offer.organization_id AND variant.offer_id = offer.id AND variant.store_id = offer.store_id AND variant.product_id IS NULL
            JOIN seller_inventory_items inventory ON inventory.organization_id = variant.organization_id AND inventory.variant_id = variant.id AND inventory.store_id = offer.store_id
           WHERE offer.organization_id = $1 AND offer.id = $2 AND offer.store_id = ANY($3::bigint[]) ${lock}`,
         [safeContext.organizationId, integer(offerId, 'RESOURCE_NOT_FOUND'), safeContext.storeIds]
@@ -167,7 +172,7 @@ const listOffers = async (database, context, query = {}) => {
         `SELECT offer.id AS offer_id, offer.product_id, offer.store_id, offer.status, offer.visibility, offer.revision,
                 variant.id AS variant_id, variant.seller_sku, variant.price_minor, variant.currency, variant.revision AS variant_revision,
                 inventory.id AS inventory_id, inventory.quantity, inventory.low_stock_threshold, inventory.revision AS inventory_revision
-           FROM seller_offers offer JOIN seller_offer_variants variant ON variant.organization_id = offer.organization_id AND variant.offer_id = offer.id AND variant.store_id = offer.store_id
+           FROM seller_offers offer JOIN seller_offer_variants variant ON variant.organization_id = offer.organization_id AND variant.offer_id = offer.id AND variant.store_id = offer.store_id AND variant.product_id IS NULL
            JOIN seller_inventory_items inventory ON inventory.organization_id = variant.organization_id AND inventory.variant_id = variant.id AND inventory.store_id = offer.store_id
           WHERE offer.organization_id = $1 AND offer.store_id = ANY($2::bigint[]) AND ($3::varchar IS NULL OR offer.status = $3)
           ORDER BY offer.id ASC LIMIT $4`,
@@ -203,6 +208,7 @@ const updateOffer = async (database, context, offerId, input) => {
         mutation: async (client) => {
             const current = await loadOffer(client, safeContext, offerId, 'FOR UPDATE');
             if (current.revision !== revision) fail('REVISION_CONFLICT', 409);
+            if(current.variant_selection_required) fail('VARIANT_MODE_REQUIRES_VARIANT_WRITE');
             if (changes.priceMinor !== undefined) {
                 const product = await commerce.loadProduct(client, safeContext, current.product_id, current.store_id, true);
                 await commerce.writeProduct(client, product, commerceRevision, { priceMinor: changes.priceMinor });
@@ -210,6 +216,7 @@ const updateOffer = async (database, context, offerId, input) => {
             const updated = await client.query('UPDATE seller_offers SET visibility = COALESCE($1, visibility), revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE organization_id = $2 AND id = $3 AND revision = $4 RETURNING id', [changes.visibility ?? null, safeContext.organizationId, Number(offerId), revision]);
             if (!updated.rows?.[0]) fail('REVISION_CONFLICT', 409);
             if (changes.sellerSku !== undefined || changes.priceMinor !== undefined) await client.query('UPDATE seller_offer_variants SET seller_sku = COALESCE($1, seller_sku), price_minor = COALESCE($2, price_minor), revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE organization_id = $3 AND id = $4', [changes.sellerSku ?? null, changes.priceMinor ?? null, safeContext.organizationId, current.variant.id]);
+            if (current.variant_selection_required) await require('./purchasableVariantService').aggregate(client,current.product_id);
             const offer = await loadOffer(client, safeContext, offerId);
             await saveReceipt(client, safeContext.organizationId, idempotencyKey, requestFingerprint, 'seller_offer', offerId, offer);
             return Object.freeze({ reused: false, offer });
@@ -241,6 +248,7 @@ const offerCommand = async (database, context, offerId, input) => {
             if (current.revision !== revision) fail('REVISION_CONFLICT', 409);
             if (!transitions[command].includes(current.status)) fail('INVALID_STATE_TRANSITION', 409);
             await client.query("UPDATE seller_offers SET status = $1::varchar, archived_at = CASE WHEN $1::varchar = 'archived' THEN CURRENT_TIMESTAMP ELSE archived_at END, revision = revision + 1, updated_at = CURRENT_TIMESTAMP WHERE organization_id = $2 AND id = $3", [next, safeContext.organizationId, Number(offerId)]);
+            if (current.variant_selection_required) await require('./purchasableVariantService').aggregate(client,current.product_id);
             const offer = await loadOffer(client, safeContext, offerId);
             await saveReceipt(client, safeContext.organizationId, idempotencyKey, requestFingerprint, 'seller_offer', offerId, offer);
             return Object.freeze({ reused: false, offer });
@@ -263,9 +271,10 @@ const readInventory = async (database, context, query = {}) => {
     );
     const projected = await Promise.all((result.rows || []).map(async (row) => {
         const product = await commerce.productForInventory(database, safeContext, Number(row.id));
+        if (product.variant_selection_required) return null;
         return Object.freeze({ id: Number(row.id), store_id: Number(row.store_id), variant_id: Number(row.variant_id), seller_sku: String(row.seller_sku), price_minor: Math.round(Number(product.price) * 100), currency: 'TRY', quantity: Number(product.stock), low_stock_threshold: Number(row.low_stock_threshold), revision: Number(row.revision), commerce_revision: Number(product.revision) });
     }));
-    return Object.freeze(projected.filter((row) => query.low_stock !== true || row.quantity <= row.low_stock_threshold));
+    return Object.freeze(projected.filter((row) => row && (query.low_stock !== true || row.quantity <= row.low_stock_threshold)));
 };
 
 const adjustInventory = async (database, context, input) => {
@@ -295,11 +304,12 @@ const adjustInventory = async (database, context, input) => {
         mutation: async (client) => {
             const changed = [];
             for (const item of items) {
+                const product = await commerce.productForInventory(client, safeContext, item.inventoryItemId, true);
+                if (product.variant_selection_required) fail('VARIANT_MODE_REQUIRES_VARIANT_WRITE');
                 const loaded = await client.query('SELECT id, store_id, quantity, revision FROM seller_inventory_items WHERE organization_id = $1 AND id = $2 AND store_id = ANY($3::bigint[]) FOR UPDATE', [safeContext.organizationId, item.inventoryItemId, safeContext.storeIds]);
                 const current = loaded.rows?.[0];
                 if (!current) fail('RESOURCE_NOT_FOUND', 404);
                 if (Number(current.revision) !== item.revision) fail('REVISION_CONFLICT', 409);
-                const product = await commerce.productForInventory(client, safeContext, item.inventoryItemId, true);
                 const nextQuantity = Number(product.stock) + item.delta;
                 if (nextQuantity < 0) fail('NEGATIVE_STOCK_FORBIDDEN', 409);
                 const canonical = await commerce.writeProduct(client, product, item.commerceRevision, { quantity: nextQuantity });

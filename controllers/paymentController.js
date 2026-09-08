@@ -821,6 +821,7 @@ const buildCheckoutAgreementContext = ({
     },
     items: pricing.items.map((item) => ({
         productId: Number(item.id),
+        ...(item.variant_id ? {variantId:Number(item.variant_id),variantSelections:item.variant_selections,sku:item.sku}:{}),
         name: item.name,
         quantity: Number(item.quantity),
         unitPrice: Number(item.price),
@@ -847,7 +848,7 @@ const buildCheckoutAgreementContext = ({
         legalIdentity: seller.legalIdentity,
         currency: seller.currency,
         grossMinor: Number(seller.grossMinor),
-        productIds: (seller.items || []).map((item) => Number(item.productId))
+        productIds: [...new Set((seller.items || []).map((item) => Number(item.productId)))]
     }))
 });
 

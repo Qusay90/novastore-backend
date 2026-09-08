@@ -6,7 +6,7 @@ const fail = (code, statusCode = 409) => { throw Object.assign(new Error(code), 
 // A Seller store ID is not a public products.store_id. Resolve the accepted
 // binding on the server and lock the actual purchasable row before any write.
 const loadProduct = async (db, context, productId, storeId, lock = false) => {
-    const result = await db.query(`SELECT product.id, product.price, product.stock, product.revision
+    const result = await db.query(`SELECT product.id, product.price, product.stock, product.revision, product.variant_selection_required
         FROM products product
         JOIN seller_stores seller_store ON seller_store.legacy_store_id = product.store_id
         JOIN stores public_store ON public_store.id = product.store_id
@@ -23,8 +23,8 @@ const loadProduct = async (db, context, productId, storeId, lock = false) => {
 const projectOffer = async (db, context, offer, lock = false) => {
     const product = await loadProduct(db, context, offer.product_id, offer.store_id, lock);
     const variants = await db.query('SELECT id FROM seller_offer_variants WHERE organization_id = $1 AND offer_id = $2', [context.organizationId, offer.id]);
-    if (variants.rows.length !== 1) fail('PURCHASABLE_VARIANT_WAVE_REQUIRED');
-    return Object.freeze({ ...offer, commerce_revision: Number(product.revision),
+    if (!product.variant_selection_required && variants.rows.length !== 1) fail('PURCHASABLE_VARIANT_WAVE_REQUIRED');
+    return Object.freeze({ ...offer, variant_selection_required: product.variant_selection_required === true, commerce_revision: Number(product.revision),
         variant: Object.freeze({ ...offer.variant, price_minor: Math.round(Number(product.price) * 100), currency: 'TRY' }),
         inventory: Object.freeze({ ...offer.inventory, quantity: Number(product.stock), commerce_revision: Number(product.revision) }) });
 };
@@ -40,10 +40,11 @@ const productForInventory = async (db, context, inventoryId, lock = false) => {
     if (!result.rows[0]) fail('RESOURCE_NOT_FOUND', 404);
     const offer = result.rows[0];
     const projected = await projectOffer(db, context, { id: Number(offer.id), product_id: Number(offer.product_id), store_id: Number(offer.store_id), variant: {}, inventory: {} }, lock);
-    return { id: Number(offer.product_id), stock: projected.inventory.quantity, revision: projected.commerce_revision, price: projected.variant.price_minor / 100 };
+    return { variant_selection_required: projected.variant_selection_required, id: Number(offer.product_id), stock: projected.inventory.quantity, revision: projected.commerce_revision, price: projected.variant.price_minor / 100 };
 };
 
 const writeProduct = async (db, product, expectedRevision, { priceMinor, quantity } = {}) => {
+    if (product.variant_selection_required) fail('VARIANT_MODE_REQUIRES_VARIANT_WRITE');
     if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1) fail('COMMERCE_PRECONDITION_REQUIRED', 400);
     if (Number(product.revision) !== expectedRevision) fail('COMMERCE_REVISION_CONFLICT');
     if (priceMinor !== undefined && (!Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 9999999999)) fail('VALIDATION_FAILED', 400);

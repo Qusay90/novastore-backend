@@ -264,5 +264,12 @@
     "sha256": "958d1746e536266c86ec31466bea51d3b4a3ed6ea67d6a8b78113c4ad8eaf725",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260908_01_purchasable_variants",
+    "path": "migrations/20260908_01_purchasable_variants.sql",
+    "sha256": "6b3c2d9921d622503e8ec6ff2e9c974cee9f19839b7e904424e496a98aceeaca",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

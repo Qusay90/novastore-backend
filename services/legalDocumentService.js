@@ -95,6 +95,11 @@ const normalizeCheckoutAgreementContext = (input) => {
     };
     const normalizedItems = items.map((item) => ({
         productId: Number(item.productId),
+        ...(item.variantId !== undefined ? {
+            variantId: Number(item.variantId),
+            variantSelections: (Array.isArray(item.variantSelections) ? item.variantSelections : []).map(selection => ({group:cleanText(selection.group,96),value:cleanText(selection.value,96)})),
+            sku: cleanText(item.sku,96)
+        } : {}),
         name: cleanText(item.name, 300),
         quantity: Number(item.quantity),
         unitPrice: cleanMoney(item.unitPrice),
@@ -144,6 +149,9 @@ const normalizeCheckoutAgreementContext = (input) => {
             !Number.isSafeInteger(item.productId)
             || item.productId <= 0
             || !item.name
+            || (item.variantId !== undefined && (!Number.isSafeInteger(item.variantId) || item.variantId <= 0 || item.variantId > 2147483647 || !item.sku
+                || item.variantSelections.length < 1 || item.variantSelections.length > 8
+                || item.variantSelections.some(selection => !selection.group || !selection.value)))
             || !Number.isSafeInteger(item.quantity)
             || item.quantity <= 0
             || item.unitPrice === null
@@ -187,16 +195,17 @@ const normalizeCheckoutAgreementContext = (input) => {
     if (!allocationInvalid) {
         const itemIds = normalizedItems.map((item) => item.productId);
         const itemIdSet = new Set(itemIds);
-        const itemLineMinorByProductId = new Map(
-            normalizedItems.map((item) => [item.productId, moneyToMinor(item.lineTotal)])
-        );
+        const itemLineMinorByProductId = new Map();
+        for (const item of normalizedItems) {
+            itemLineMinorByProductId.set(item.productId, (itemLineMinorByProductId.get(item.productId) || 0) + moneyToMinor(item.lineTotal));
+        }
         const allocations = [
             ...(normalizedPlatformAllocation ? [normalizedPlatformAllocation] : []),
             ...normalizedSellers
         ];
         const allocatedProductIds = new Set();
         let allocatedGrossMinor = 0;
-        if (itemIdSet.size !== itemIds.length) allocationInvalid = true;
+        if (new Set(normalizedItems.map(item => `${item.productId}:${item.variantId || ''}`)).size !== normalizedItems.length) allocationInvalid = true;
         for (const allocation of allocations) {
             let expectedGrossMinor = 0;
             const allocationIdSet = new Set(allocation.productIds);
@@ -303,7 +312,7 @@ const formatMoney = (value, currency) => `${Number(value).toFixed(2)} ${currency
 
 const renderCheckoutContext = (context) => {
     const itemLines = context.items.map((item) => (
-        `- ${item.name} (Ürün #${item.productId}) | ${item.quantity} adet | Birim ${formatMoney(item.unitPrice, context.totals.currency)} | Satır ${formatMoney(item.lineTotal, context.totals.currency)}`
+        `- ${item.name} (Ürün #${item.productId})${item.variantId ? ` | Varyant #${item.variantId} | SKU ${item.sku} | ${item.variantSelections.map(selection => `${selection.group}: ${selection.value}`).join(', ')}` : ''} | ${item.quantity} adet | Birim ${formatMoney(item.unitPrice, context.totals.currency)} | Satır ${formatMoney(item.lineTotal, context.totals.currency)}`
     ));
     const salesPartyLines = [
         ...(context.platformAllocation

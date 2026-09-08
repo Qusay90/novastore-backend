@@ -50,7 +50,7 @@ const selectLocalSellerMigrations = (options = {}) => {
     ) {
         throw new Error('Combined migration registry is missing the Main-6T Seller session-membership binding migration.');
     }
-    const main6uMigrations = [...MAIN6U_MIGRATIONS, R10_REPUTATION_MIGRATION].map((expected) => {
+    const main6uMigrations = [...MAIN6U_MIGRATIONS, R10_REPUTATION_MIGRATION, {id:'20260908_01_purchasable_variants',path:'migrations/20260908_01_purchasable_variants.sql'}].map((expected) => {
         const migration = registry.find((entry) => entry.id === expected.id);
         if (
             !migration || migration.path !== expected.path ||

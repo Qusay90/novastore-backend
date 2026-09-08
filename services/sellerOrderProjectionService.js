@@ -107,7 +107,7 @@ const buildCheckoutSalesPartyProjection = async (client, pricedItems) => {
     const productIds = pricedItems.map((item) => Number(item.id));
     if (
         productIds.some((productId) => !Number.isSafeInteger(productId) || productId <= 0)
-        || new Set(productIds).size !== productIds.length
+        || new Set(pricedItems.map(item => `${item.id}:${item.variant_id || ''}`)).size !== pricedItems.length
     ) {
         throwProjectionUnavailable(null, 'PRICED_PRODUCT_IDS_INVALID');
     }
@@ -227,6 +227,7 @@ const buildCheckoutSalesPartyProjection = async (client, pricedItems) => {
             return;
         }
         const candidates = sellerRows.filter((row) => (
+            (!item.variant_id || Number(row.variant_id) === Number(item.variant_id)) &&
             row.seller_store_status === 'active'
             && row.seller_store_closed_at === null
             && row.seller_organization_status === 'active'
@@ -286,7 +287,7 @@ const buildCheckoutSalesPartyProjection = async (client, pricedItems) => {
 
     const sellerProjection = Object.freeze([...groups.values()].map((group) => Object.freeze({
         ...group,
-        productIds: Object.freeze(group.items.map((item) => item.productId)),
+        productIds: Object.freeze([...new Set(group.items.map((item) => item.productId))]),
         items: Object.freeze(group.items.map((item) => Object.freeze(item)))
     })));
     const platformAllocation = platform

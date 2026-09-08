@@ -33,6 +33,10 @@ const createSellerBusinessRouter = ({ enabled = false, auth, tenant, controller,
     router.get('/stores/:storeId', ...base, tenant.requireSellerPermission('store.read'), controller.getStore);
     router.get('/stores/:storeId/public-preview', ...base, tenant.requireSellerPermission('store.read'), controller.getStorePublicPreview);
     router.patch('/stores/:storeId', ...base, tenant.requireSellerPermission('store.update'), controller.updateStore);
+    const variantController = require('../controllers/sellerVariantController');
+    router.get('/offers/:offerId/variants', ...base, tenant.requireSellerPermission('offer.read'), variantController.list);
+    router.post('/offers/:offerId/variants', ...base, offerWrite, tenant.requireSellerPermission('offer.create'), tenant.requireSellerPermission('offer.publish'), tenant.requireSellerPermission('inventory.adjust'), variantController.create);
+    router.patch('/offers/:offerId/variants/:variantId', ...base, offerWrite, tenant.requireSellerPermission('offer.update'), tenant.requireSellerPermission('offer.publish'), tenant.requireSellerPermission('inventory.adjust'), variantController.update);
     router.get('/offers', ...base, tenant.requireSellerPermission('offer.read'), controller.listOffers);
     router.get('/offers/:offerId', ...base, tenant.requireSellerPermission('offer.read'), controller.getOffer);
     router.post('/offers', ...base, offerWrite, tenant.requireSellerPermission('offer.create'), controller.createOffer);

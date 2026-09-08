@@ -191,7 +191,7 @@ const loadFirstPartyProduct = async (client, id, storeId) => {
         `SELECT id, name, description, price, old_price, stock, sku, normalized_sku,
                 brand, product_type, vat_rate, vat_rate_source, weight_grams, desi,
                 category, categories,
-                publication_status, is_customer_visible, deleted_at, revision
+                publication_status, is_customer_visible, deleted_at, revision, variant_selection_required
          FROM products
          WHERE id = $1 AND store_id = $2`,
         [id, storeId]
@@ -424,6 +424,7 @@ const updateAdminCatalogProduct = async (database, rawId, { actor, body, request
         applyMutation: async (client, { targetScope }) => {
             const { store, product: current } = targetScope;
             if (isArchivedProduct(current)) throw alreadyArchived();
+            if(current.variant_selection_required && ['price','stock'].some(k=>Object.hasOwn(payload.changes,k))) throw new AdminCatalogMutationError('Varyant fiyat ve stoku ayrı yönetilmelidir.',{code:'VARIANT_MODE_REQUIRES_VARIANT_WRITE',statusCode:409});
             if (!hasMaterialProductChange(current, payload.changes)) {
                 throw new AdminCatalogMutationError('Ürün güncellemesi gerçek bir değişiklik içermiyor.', {
                     code: 'ADMIN_CATALOG_PRODUCT_UPDATE_NOOP',
@@ -554,6 +555,7 @@ const archiveAdminCatalogProduct = async (database, rawId, { actor, body, reques
         applyMutation: async (client, { targetScope }) => {
             const { store, product: current } = targetScope;
             if (isArchivedProduct(current)) throw alreadyArchived();
+            if(current.variant_selection_required && ['price','stock'].some(k=>Object.hasOwn(payload.changes,k))) throw new AdminCatalogMutationError('Varyant fiyat ve stoku ayrı yönetilmelidir.',{code:'VARIANT_MODE_REQUIRES_VARIANT_WRITE',statusCode:409});
             const categoryLinks = await getProductCategoryLinks(client, id);
             const archiveResult = await client.query(
                 `UPDATE products

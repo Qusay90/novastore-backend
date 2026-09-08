@@ -995,6 +995,10 @@ const getProductById = async (req, res) => {
         product.primaryCategoryId = categoryLinks.find((item) => item.isPrimary)?.categoryId || null;
         product.attributes = await getProductAttributeValues(pool, id, { publicOnly: !isAdmin });
 
+        if(product.variant_selection_required) {
+            product.variants=await require('../services/purchasableVariantService').publicVariants(pool,id);
+            product.is_purchasable=product.variants.some(v=>v.purchasable);
+        }
         res.status(200).json(product);
     } catch (err) {
         if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);

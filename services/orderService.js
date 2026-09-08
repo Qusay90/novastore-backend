@@ -51,7 +51,8 @@ const appendOrderEvent = async (client, orderId, eventType, message, payload = n
 
 const reserveStock = async (client, pricedItems) => {
     const changedProductIds = [];
-    for (const item of pricedItems) {
+    for (const item of [...pricedItems].sort((a,b)=>a.id-b.id || (a.variant_id||0)-(b.variant_id||0))) {
+        if(item.variant_id){ await require('./purchasableVariantService').stock(client,item,-1); continue; }
         const updateResult = await client.query(
             `UPDATE products
              SET stock = stock - $1,
@@ -60,6 +61,7 @@ const reserveStock = async (client, pricedItems) => {
              WHERE id = $2
                AND stock >= $1
                AND price = $3
+               AND variant_selection_required = FALSE
                AND ${buildPublicProductSqlPredicate('products')}
              RETURNING id, stock`,
             [item.quantity, item.id, item.price]
@@ -85,6 +87,7 @@ const restockItems = async (client, items) => {
         const quantity = Number(item.quantity || 0);
 
         if (!Number.isInteger(productId) || quantity <= 0) continue;
+        if(item.variant_id){ await require('./purchasableVariantService').stock(client,{...item,id:productId,quantity},1); continue; }
 
         await client.query(
             `UPDATE products
@@ -119,6 +122,7 @@ const releaseStockReservation = async ({ client = pool, payment, items, reasonCo
     }
 
     const normalizedItems = parsedItems.map((item) => ({
+        variant_id: item?.variant_id ?? null,
         productId: Number(item?.id ?? item?.product_id ?? item?.productId),
         quantity: Number(item?.quantity)
     }));
@@ -131,7 +135,8 @@ const releaseStockReservation = async ({ client = pool, payment, items, reasonCo
     }
 
     const changedProductIds = [];
-    for (const item of normalizedItems) {
+    for (const item of [...normalizedItems].sort((a,b)=>a.productId-b.productId || (a.variant_id||0)-(b.variant_id||0))) {
+        if(item.variant_id){ await require('./purchasableVariantService').stock(client,{id:item.productId,variant_id:item.variant_id,quantity:item.quantity},1); continue; }
         const result = await client.query(
             `UPDATE products
              SET stock = stock + $1,
