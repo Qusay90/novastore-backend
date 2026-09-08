@@ -1,4 +1,6 @@
 const pool = require('../config/db');
+const { createGetAdminOrderDetail } = require('../services/adminOrderDetailService');
+const getAdminOrderDetail = createGetAdminOrderDetail(pool);
 const { ORDER_STATUS } = require('../constants/orderStatus');
 const {
     ADMIN_COMMERCE_CAPABILITIES,
@@ -656,6 +658,7 @@ const getBehaviorAnalytics = async (req, res) => {
 };
 
 module.exports = {
+    getAdminOrderDetail,
     ADMIN_COMMERCE_CAPABILITIES,
     getAdminCatalogStructureSummary,
     getAdminNotificationSummaries,

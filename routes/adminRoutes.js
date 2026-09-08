@@ -4,6 +4,7 @@ const {
     getAdminCatalogStructureSummary,
     getAdminNotificationSummaries,
     getAdminOrderSummaries,
+    getAdminOrderDetail,
     getAdminProductSummaries,
     getAdminReturnSummaries,
     getAdminStoreDetail,
@@ -44,6 +45,7 @@ const integratedAdminProductWrite = [
 router.get('/session', ...integratedAdminRead, getAdminSession);
 router.get('/notifications/summary', ...integratedAdminRead, getAdminNotificationSummaries);
 router.get('/orders/summary', ...integratedAdminRead, getAdminOrderSummaries);
+router.get('/orders/:id', ...integratedAdminRead, getAdminOrderDetail);
 router.get('/catalog/products/summary', ...integratedAdminRead, getAdminProductSummaries);
 router.get('/catalog/products/:id', ...integratedAdminRead, getAdminCatalogProduct);
 router.get('/catalog/products/:id/media', ...integratedAdminRead, getAdminCatalogProductMedia);

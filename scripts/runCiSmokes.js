@@ -44,6 +44,7 @@ const smokeTests = [
     'tests/commerceProCutoverArtifactSmoke.js',
     'tests/commerceProCutoverRouteSmoke.js',
     'tests/adminCommerceProResponseHeadersSmoke.js',
+    'tests/adminOrderDeliveryContractSmoke.mjs',
     'tests/adminCommerceCapabilityRouteSmoke.js',
     'tests/legacyAdminProductWriteRetirementSmoke.js',
     'tests/adminSessionAuthSmoke.js',

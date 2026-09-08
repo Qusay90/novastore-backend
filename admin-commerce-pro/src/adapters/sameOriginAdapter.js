@@ -1,4 +1,5 @@
 import { hasCapability, resolveCapabilities } from "../integration/capabilities.js";
+import { normalizeAdminOrderDetail } from "../integration/orderDetail.js";
 import { normalizeCatalogStructureSummary } from "../integration/catalogStructureRead.js";
 import {
   normalizeAdminStoreDetail,
@@ -362,6 +363,10 @@ export function createSameOriginAdapter(http) {
     catalog, catalogStructure, session, dashboard, notifications, notificationUnreadCount,
     markNotificationRead, markAllNotificationsRead, webPush,
     orders, returns, stores, storeDetail, reviews, questions, coupons,
+    orderDetail: async ({ orderId, signal } = {}) => {
+      if (!Number.isSafeInteger(Number(orderId)) || Number(orderId) < 1) throw new TypeError("Geçerli sipariş kimliği gerekli.");
+      return normalizeAdminOrderDetail(await http.request(`/api/admin/orders/${Number(orderId)}`, { signal }), orderId);
+    },
     supportThreads, supportHistory, mutationActions,
   });
 }

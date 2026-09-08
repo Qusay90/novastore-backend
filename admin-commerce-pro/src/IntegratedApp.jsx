@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import OrderDeliveryDetail from "./OrderDeliveryDetail.jsx";
 import productCardFraming from "../../shared/productCardFraming.js";
 import { createSameOriginAdapter } from "./adapters/sameOriginAdapter.js";
 import { hasCapability } from "./integration/capabilities.js";
@@ -345,7 +346,7 @@ function OrderPaymentSummary({ order, compact }) {
   );
 }
 
-function OrdersTable({ orders, compact = false, mutationActions = {}, onOpenOperation }) {
+function OrdersTable({ orders, compact = false, mutationActions = {}, onOpenOperation, onOpenDetail }) {
   const cancelEnabled = typeof mutationActions.cancelOrder === "function";
   const shipmentEnabled = typeof mutationActions.createManualShipment === "function";
   const deliveryEnabled = typeof mutationActions.confirmManualDelivery === "function";
@@ -371,7 +372,7 @@ function OrdersTable({ orders, compact = false, mutationActions = {}, onOpenOper
         <tbody>
           {orders.map((order) => (
             <tr key={order.id}>
-              <td><strong>{order.id}</strong></td>
+              <td>{!compact && onOpenDetail ? <button className="secondary-button" onClick={() => onOpenDetail(order.rawId)} aria-label={`${order.id} sipariş detayını aç`}>{order.id} · Detay</button> : <strong>{order.id}</strong>}</td>
               <td>
                 <span className="live-customer-cell">
                   <strong>{order.customerName}</strong>
@@ -697,8 +698,9 @@ function ManualDeliveryDialog({ operation, action, onClose, onConflict, onUnavai
   );
 }
 
-function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities, mutationActions, paymentProvider, notificationTarget = null }) {
+function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities, mutationActions, paymentProvider, loadOrderDetail, notificationTarget = null }) {
   const orders = orderPage.items;
+  const [detailOrderId, setDetailOrderId] = useState(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Tümü");
   const [operation, setOperation] = useState(null);
@@ -802,7 +804,7 @@ function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities,
           </label>
           <span className="live-result-count">{filtered.length} / {orders.length} kayıt{orderPage.hasMore ? " · daha eski kayıtlar bu turda gösterilmiyor" : ""}</span>
         </div>
-        {filtered.length > 0 ? <OrdersTable orders={filtered} mutationActions={visibleMutationActions} onOpenOperation={openOperation} /> : (
+        {filtered.length > 0 ? <OrdersTable orders={filtered} mutationActions={visibleMutationActions} onOpenOperation={openOperation} onOpenDetail={setDetailOrderId} /> : (
           <div className="state-panel">
             <Icon name="search" />
             <h3>Eşleşen sipariş yok</h3>
@@ -811,6 +813,7 @@ function Orders({ orderPage, error, refreshing, onRefresh, onReloadCapabilities,
           </div>
         )}
       </section>
+      {detailOrderId !== null && <OrderDeliveryDetail key={detailOrderId} orderId={detailOrderId} loadDetail={loadOrderDetail} Dialog={OperationDialog} onClose={() => setDetailOrderId(null)} />}
       {operation?.kind === "cancel" && typeof visibleMutationActions.cancelOrder === "function" && <CancelOrderDialog operation={operation} action={visibleMutationActions.cancelOrder} onClose={closeOperation} onConflict={handleConflict} onUnavailable={handleUnavailable} onComplete={handleComplete} />}
       {operation?.kind === "shipment" && typeof visibleMutationActions.createManualShipment === "function" && <ManualShipmentDialog operation={operation} action={visibleMutationActions.createManualShipment} onClose={closeOperation} onConflict={handleConflict} onUnavailable={handleUnavailable} onComplete={handleComplete} />}
       {operation?.kind === "delivery" && typeof visibleMutationActions.confirmManualDelivery === "function" && <ManualDeliveryDialog operation={operation} action={visibleMutationActions.confirmManualDelivery} onClose={closeOperation} onConflict={handleConflict} onUnavailable={handleUnavailable} onComplete={handleComplete} />}
@@ -2811,7 +2814,7 @@ export function IntegratedApp() {
     pageContent = !ordersEnabled
       ? <StatePanel phase="forbidden" error={ordersUnavailableError} onRetry={ordersResource.reload} />
       : ordersLoaded
-        ? <Orders orderPage={ordersResource.data} error={ordersResource.error} refreshing={ordersResource.refreshing} onRefresh={ordersResource.reload} onReloadCapabilities={sessionResource.reload} mutationActions={mutationActions} paymentProvider={sessionResource.data?.paymentProvider} notificationTarget={notificationTarget} />
+        ? <Orders orderPage={ordersResource.data} error={ordersResource.error} refreshing={ordersResource.refreshing} onRefresh={ordersResource.reload} onReloadCapabilities={sessionResource.reload} mutationActions={mutationActions} paymentProvider={sessionResource.data?.paymentProvider} loadOrderDetail={adapter.orderDetail} notificationTarget={notificationTarget} />
         : <StatePanel phase={ordersResource.phase} error={ordersResource.error} onRetry={ordersResource.reload} />;
   } else if (page === "returns") {
     pageContent = !returnsEnabled

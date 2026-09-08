@@ -998,3 +998,10 @@
 @media (prefers-reduced-motion: reduce) {
   .catalog-card-framing__preview img { transition: none !important; }
 }
+
+/* Exact-order recipient data stays in this bounded, non-link text surface. */
+.live-delivery-detail { min-width: 0; max-width: 100%; }
+.live-delivery-detail dl { display: grid; grid-template-columns: minmax(90px, 130px) minmax(0, 1fr); gap: 12px 18px; }
+.live-delivery-detail dt { font-weight: 700; }
+.live-delivery-detail dd { margin: 0; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.live-delivery-detail p { overflow-wrap: anywhere; }
