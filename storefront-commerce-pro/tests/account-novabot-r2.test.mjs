@@ -274,7 +274,7 @@ test("R2 hesap rotaları erişilebilir, NovaBot tek shell örneği ve exact owne
   assert.match(assistant, /cihazındaki sepetten çıkarıldı ancak hesap sepeti güncellenemedi/);
   assert.match(assistant, /pendingChatId: null, error: requestMessage/);
   assert.match(assistant, /pendingActionId: null, error: requestMessage/);
-  assert.match(integrated, /async function removeFromCart\(productId\)[\s\S]*?if \(next\.length === current\.length\) return false;[\s\S]*?return replaceCart\(next\);/);
+  assert.match(integrated, /async function removeFromCart\(productId, variantId = null\)[\s\S]*?cartLineKey\(item\) !== cartLineKey\(productId, variantId\)[\s\S]*?if \(next\.length === current\.length\) return false;[\s\S]*?return replaceCart\(next\);/);
   assert.match(integrated, /return \{ appliedLocally: true, persisted: false \}/);
   assert.match(integrated, /if \(mutationResult !== true\) return mutationResult/);
   assert.match(fixture, /listQuestions: async \(\) => questions\.map/);

@@ -1,5 +1,6 @@
 import { RETURN_STATUS_LABELS, normalizeCustomerReturn } from "./customerReturnContract.js";
 import { resolveNotificationTarget } from "../../../web-notifications/notificationClient.js";
+import { cartLineKey, normalizeVariantId, normalizeVariantSelections } from "./variantContract.js";
 
 const TOKEN_KEY = "nova_user_token";
 const USER_KEY = "nova_user_info";
@@ -80,12 +81,19 @@ export const normalizeOrderItem = (value) => {
   const price = Number(value.price || 0);
   const name = asTrimmedString(value.name);
   if (!name || !Number.isFinite(price) || price < 0) return null;
+  const variantId = normalizeVariantId(value.variant_id ?? value.variantId);
   return Object.freeze({
     id,
     name,
     quantity,
     price,
     image: safeMediaUrl(value.image || value.imageUrl || value.image_url),
+    ...(variantId ? {
+      variantId,
+      variantSelections: normalizeVariantSelections(value.variant_selections ?? value.variantSelections),
+      sku: asTrimmedString(value.sku),
+      cartKey: cartLineKey(id, variantId),
+    } : {}),
   });
 };
 

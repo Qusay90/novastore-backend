@@ -133,7 +133,7 @@ const MEGA_DISCOVERY_TERMS = {
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
   currency: "TRY",
-  maximumFractionDigits: 0,
+  maximumFractionDigits: 2,
 });
 
 const MOCK_ORDERS = Object.freeze([
@@ -852,10 +852,10 @@ function ProductListing({ category, initialItems, title, favorites, onFavorite, 
   );
 }
 
-function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyNow, buyNowPending = false }) {
+function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyNow, buyNowPending = false, purchaseOptions = null }) {
   const category = getCategoryById(product.categoryId);
   const [quantity, setQuantity] = useState(1);
-  const maxQuantity = Math.max(1, Math.min(9, Number(product.stock) || 1));
+  const maxQuantity = Math.max(1, Math.min(product.variantSelectionRequired ? 20 : 9, Number(product.stock) || 1));
   const runtimeMedia = useMemo(() => {
     const media = Array.isArray(product.media)
       ? product.media.filter((item) => item?.url && ["image", "video"].includes(item.type))
@@ -884,7 +884,8 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyN
     { id: "delivery", label: "Teslimat & iade" },
   ];
   const related = stockFirst(getProductsForCategory(category.id).filter((item) => item.id !== product.id)).slice(0, 4);
-  const soldOut = product.stock <= 0;
+  const needsSelection = product.variantSelectionRequired && !product.selectedVariantId;
+  const soldOut = product.purchaseUnavailable === true || product.stock <= 0;
 
   function moveTabFocus(event, currentIndex) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -905,7 +906,7 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyN
     <main id="main-content" className="page product-page">
       <div className="shell"><Breadcrumbs category={category} productName={product.name} />
         <div className="product-detail-grid">
-          <section className="product-gallery runtime-product-gallery" aria-label="Ürün görseli"><span className="product-badge">{soldOut ? "Tükendi" : product.badge}</span><CustomerFavoriteButton productId={product.id} productName={product.name} favorite={favorite} onFavorite={onFavorite} /><button ref={mediaTriggerRef} className="runtime-product-media-stage" type="button" onClick={() => setMediaOpen(true)} aria-label={`${product.name} medyasını büyüt`}>
+          <section className="product-gallery runtime-product-gallery" aria-label="Ürün görseli"><span className="product-badge">{needsSelection ? "Seçenek seç" : soldOut ? "Tükendi" : product.badge}</span><CustomerFavoriteButton productId={product.id} productName={product.name} favorite={favorite} onFavorite={onFavorite} /><button ref={mediaTriggerRef} className="runtime-product-media-stage" type="button" onClick={() => setMediaOpen(true)} aria-label={`${product.name} medyasını büyüt`}>
               {activeMedia?.type === "video"
                 ? <video src={activeMedia.url} muted playsInline preload="metadata" />
                 : <img src={activeMedia?.url || productImage(product)} alt={product.name} />}
@@ -915,12 +916,13 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyN
           <section className="product-summary">
             <span className="product-brand">{product.brand}</span><h1>{product.name}</h1>
             <div className="detail-rating"><span><Star weight="fill" /> {product.rating.toFixed(1)}</span><button type="button" onClick={() => document.getElementById("community-reviews")?.scrollIntoView({ behavior: "smooth", block: "start" })}>{product.reviews} değerlendirme</button><small>Ürün kodu: {product.id}</small></div>
-            <div className="detail-price"><strong>{money.format(product.price)}</strong>{product.oldPrice && <del>{money.format(product.oldPrice)}</del>}</div>
+            <div className="detail-price"><strong>{product.pricePending ? "Seçenek seç" : money.format(product.price)}</strong>{product.oldPrice && <del>{money.format(product.oldPrice)}</del>}</div>
             <p className="installment">Teslimat, indirim ve ödeme seçenekleri <strong>ödeme adımında</strong> doğrulanır.</p>
-            {colorOptions.length > 0 && <div className="variant-group"><div><strong>Renk</strong><span>{colorOptions[0]}</span></div><button className="color-swatch is-active" type="button" aria-label={colorOptions[0]} aria-pressed="true"><i /></button></div>}
-            {storageOptions.length > 0 && <div className="variant-group"><div><strong>Kapasite</strong><span>Stokta</span></div><div className="storage-options">{storageOptions.map((storage) => <button key={storage} className={selectedStorage === storage ? "is-active" : ""} type="button" aria-pressed={selectedStorage === storage} onClick={() => setSelectedStorage(storage)}>{storage}</button>)}</div></div>}
-            <div className="purchase-row"><div className="quantity-control"><button type="button" disabled={soldOut || quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" disabled={soldOut || quantity >= maxQuantity} onClick={() => setQuantity((value) => Math.min(maxQuantity, value + 1))} aria-label="Adedi artır"><Plus /></button></div><button className="buy-now-button" type="button" disabled={soldOut || buyNowPending || typeof onBuyNow !== "function"} onClick={() => onBuyNow?.(product.id, quantity)}><CreditCard /> {buyNowPending ? "Hazırlanıyor" : "Hemen Al"}</button><button className="primary-button" type="button" disabled={soldOut} onClick={() => onAdd(product.id, quantity)}><ShoppingCart /> {soldOut ? "Tükendi" : "Sepete ekle"}</button></div>
-            <div className="stock-line">{soldOut ? <><X /> Stokta yok</> : <><CheckCircle weight="fill" /> Stokta · {product.stock} adet</>}</div>
+            {purchaseOptions}
+            {!product.variantSelectionRequired && colorOptions.length > 0 && <div className="variant-group"><div><strong>Renk</strong><span>{colorOptions[0]}</span></div><button className="color-swatch is-active" type="button" aria-label={colorOptions[0]} aria-pressed="true"><i /></button></div>}
+            {!product.variantSelectionRequired && storageOptions.length > 0 && <div className="variant-group"><div><strong>Kapasite</strong><span>Stokta</span></div><div className="storage-options">{storageOptions.map((storage) => <button key={storage} className={selectedStorage === storage ? "is-active" : ""} type="button" aria-pressed={selectedStorage === storage} onClick={() => setSelectedStorage(storage)}>{storage}</button>)}</div></div>}
+            <div className="purchase-row"><div className="quantity-control"><button type="button" disabled={soldOut || quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" disabled={soldOut || quantity >= maxQuantity} onClick={() => setQuantity((value) => Math.min(maxQuantity, value + 1))} aria-label="Adedi artır"><Plus /></button></div><button className="buy-now-button" type="button" disabled={soldOut || buyNowPending || typeof onBuyNow !== "function"} onClick={() => onBuyNow?.(product.id, quantity)}><CreditCard /> {buyNowPending ? "Hazırlanıyor" : "Hemen Al"}</button><button className="primary-button" type="button" disabled={soldOut} onClick={() => onAdd(product.id, quantity)}><ShoppingCart /> {needsSelection ? "Seçenek seç" : soldOut ? "Tükendi" : "Sepete ekle"}</button></div>
+            <div className="stock-line" role="status">{product.purchaseMessage ? product.purchaseMessage : soldOut ? <><X /> Stokta yok</> : <><CheckCircle weight="fill" /> Stokta · {product.stock} adet</>}</div>
             <div className="detail-benefits"><div><Truck /><span><strong>Teslimat seçenekleri</strong><small>Ödeme adımında hesaplanır</small></span></div><div><ArrowsClockwise /><span><strong>İade koşulları</strong><small>Onaylı politikadan görüntülenir</small></span></div><div><ShieldCheck /><span><strong>Güvenli ödeme</strong><small>Sağlayıcı ekranında tamamlanır</small></span></div></div>
           </section>
         </div>
@@ -930,7 +932,7 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyN
         </section>
         {related.length > 0 && <section className="section"><div className="section-heading"><div><span className="section-kicker">Benzer ürünler</span><h2>Bunları da sevebilirsin</h2></div></div><ProductGrid items={related} favorites={favorites} onFavorite={onFavorite} onAdd={onAdd} /></section>}
       </div>
-      <div className="mobile-purchase-bar"><div><small>Toplam</small><strong>{money.format(product.price * quantity)}</strong></div><button type="button" disabled={soldOut || buyNowPending || typeof onBuyNow !== "function"} onClick={() => onBuyNow?.(product.id, quantity)}><CreditCard />{soldOut ? "Tükendi" : buyNowPending ? "Hazırlanıyor" : "Hemen Al"}</button></div>
+      <div className="mobile-purchase-bar"><div><small>Toplam</small><strong>{product.pricePending ? "Seçenek seç" : money.format(product.price * quantity)}</strong></div><button type="button" disabled={soldOut || buyNowPending || typeof onBuyNow !== "function"} onClick={() => onBuyNow?.(product.id, quantity)}><CreditCard />{needsSelection ? "Seçenek seç" : soldOut ? "Tükendi" : buyNowPending ? "Hazırlanıyor" : "Hemen Al"}</button></div>
     </main>
   );
 }

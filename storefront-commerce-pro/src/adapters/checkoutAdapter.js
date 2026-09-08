@@ -1,3 +1,5 @@
+import { cartIdentity, cartLineKey, normalizeVariantSelections, toPurchaseCartItems } from "./variantContract.js";
+
 const asString = (value) => String(value ?? "").trim();
 
 const readUserId = (storage) => {
@@ -21,31 +23,21 @@ const safeJsonRead = (storage, key, fallback = null) => {
   }
 };
 
-export const toCheckoutCartItems = (items) => (Array.isArray(items) ? items : [])
-  .map((entry) => {
-    const product = entry?.product || entry;
-    const id = Number(product?.id ?? entry?.productId ?? entry?.product_id);
-    const quantity = Math.max(1, Number.parseInt(entry?.quantity || 1, 10) || 1);
-    if (!Number.isInteger(id) || id <= 0) return null;
-    return {
-      id,
-      productId: id,
-      quantity,
-      name: asString(product?.name),
-      image: asString(product?.imageUrl || product?.image || product?.image_url),
-    };
-  })
-  .filter(Boolean);
+export const toCheckoutCartItems = toPurchaseCartItems;
 
 export const reconcileFinalizedCart = (cartItems, purchasedItems) => {
   const purchasedByProduct = new Map();
   toCheckoutCartItems(purchasedItems).forEach((item) => {
-    purchasedByProduct.set(item.productId, (purchasedByProduct.get(item.productId) || 0) + item.quantity);
+    const key = cartLineKey(item);
+    purchasedByProduct.set(key, (purchasedByProduct.get(key) || 0) + item.quantity);
   });
   return Object.freeze((Array.isArray(cartItems) ? cartItems : []).map((item) => {
-    const productId = Number(item?.productId ?? item?.product_id ?? item?.id);
+    const { productId } = cartIdentity(item);
     const currentQuantity = Math.max(1, Number.parseInt(item?.quantity || 1, 10) || 1);
-    const remainingQuantity = currentQuantity - (purchasedByProduct.get(productId) || 0);
+    const key = cartLineKey(item);
+    const purchasedQuantity = Math.min(currentQuantity, purchasedByProduct.get(key) || 0);
+    purchasedByProduct.set(key, Math.max(0, (purchasedByProduct.get(key) || 0) - purchasedQuantity));
+    const remainingQuantity = currentQuantity - purchasedQuantity;
     if (!Number.isInteger(productId) || productId <= 0 || remainingQuantity <= 0) return null;
     return Object.freeze({ ...item, productId, quantity: remainingQuantity });
   }).filter(Boolean));
@@ -72,11 +64,23 @@ const normalizeTotals = (value = {}) => {
   });
 };
 
+const normalizeQuoteItem = (item) => {
+  const identity = cartIdentity(item);
+  return Object.freeze({
+    ...item,
+    ...(identity.variantId ? {
+      variantId: identity.variantId,
+      variantSelections: normalizeVariantSelections(item.variant_selections),
+      cartKey: cartLineKey(identity),
+    } : {}),
+  });
+};
+
 export const normalizeQuote = (payload = {}) => Object.freeze({
   totals: normalizeTotals(payload.totals),
   campaigns: Object.freeze({ ...(payload.campaigns || {}) }),
   coupon: Object.freeze({ ...(payload.coupon || {}) }),
-  items: Object.freeze(Array.isArray(payload.items) ? payload.items : []),
+  items: Object.freeze(Array.isArray(payload.items) ? payload.items.map(normalizeQuoteItem) : []),
 });
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
@@ -306,7 +310,8 @@ export function createCheckoutAdapter({
       return Object.freeze([]);
     }
     const purchasedItems = Object.freeze(toCheckoutCartItems(pending.items).map((item) => Object.freeze({
-      productId: item.id,
+      productId: item.product_id,
+      ...(item.variant_id ? { variantId: item.variant_id } : {}),
       quantity: item.quantity,
     })));
     storage?.removeItem?.(pendingKey);

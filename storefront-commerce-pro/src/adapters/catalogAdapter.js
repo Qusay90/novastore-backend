@@ -1,4 +1,5 @@
 import productCardFraming from "../../../shared/productCardFraming.js";
+import { normalizePurchasableVariants } from "./variantContract.js";
 
 const { normalizeCardFraming } = productCardFraming;
 
@@ -212,6 +213,7 @@ const normalizeProducts = (payload, categories, collectionDetails) => {
   });
 
   return asArray(payload).map((product, index) => {
+    if (product.variant_selection_required !== undefined && typeof product.variant_selection_required !== "boolean") return null;
     const id = Number(product.id);
     if (!Number.isInteger(id) || id <= 0) return null;
     const name = String(product.name || "").trim();
@@ -268,6 +270,9 @@ const normalizeProducts = (payload, categories, collectionDetails) => {
       rating: Math.min(5, Math.max(0, finiteNumber(product.average_rating ?? product.rating, 0))),
       reviews: nonNegativeInteger(product.review_count ?? product.reviews),
       stock,
+      variantSelectionRequired: product.variant_selection_required === true,
+      variantContractLoaded: typeof product.variant_selection_required === "boolean",
+      variants: normalizePurchasableVariants(product.variants),
       fastDelivery: false,
       deliveryLabel: null,
       color: product.color || attributeValueByCode(attributes, ["renk", "color"]) || null,
@@ -378,7 +383,7 @@ export function createCatalogAdapter(http) {
       catalog.categories,
       catalog.collectionDetails || [],
     )[0];
-    if (!detail) throw new Error("Public ürün detayı geçerli bir ürüne dönüştürülemedi.");
+    if (!detail || detail.id !== id) throw new Error("Public ürün detayı geçerli bir ürüne dönüştürülemedi.");
     const summary = catalog.products.find((product) => Number(product.id) === id);
     return Object.freeze({
       ...(summary || {}),

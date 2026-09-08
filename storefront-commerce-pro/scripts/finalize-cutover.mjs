@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import navigationContract from "./production-navigation-contract.cjs";
 import {
   mkdir,
   mkdtemp,
@@ -201,11 +202,7 @@ function assertProductionClosureHygiene(sources) {
       }
     }
 
-    const origins = [...content.matchAll(/https?:\/\/[^"'`\s<>\)]+/g)].map((match) => match[0]);
-    const unexpectedOrigins = origins.filter((origin) => !origin.startsWith("http://www.w3.org/"));
-    if (unexpectedOrigins.length > 0) {
-      throw new Error(`Production artifact closure ${sourceLabel} beklenmeyen external origin içeriyor: ${[...new Set(unexpectedOrigins)].join(", ")}`);
-    }
+    navigationContract.assertProductionOrigins(content, { generatedHtml: sourceLabel === "generated HTML" });
   }
 }
 

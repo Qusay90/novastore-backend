@@ -72,7 +72,7 @@ export const RUNTIME_COMPARISON_STATE = 'const comparison = useContext(RuntimeCo
 export const CANONICAL_COMPARISON_TOGGLE = 'onClick={() => setCompared((value) => !value)}';
 export const RUNTIME_COMPARISON_TOGGLE = 'disabled={!comparison.available} onClick={() => comparison.toggle(product.id)}';
 export const CANONICAL_PRODUCT_DETAIL_SIGNATURE = 'function ProductDetail({ product, favorite, favorites, onFavorite, onAdd }) {';
-export const RUNTIME_PRODUCT_DETAIL_SIGNATURE = 'function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyNow, buyNowPending = false }) {';
+export const RUNTIME_PRODUCT_DETAIL_SIGNATURE = 'function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, onBuyNow, buyNowPending = false, purchaseOptions = null }) {';
 export const CANONICAL_PRODUCT_IMAGE_FUNCTION = 'function productImage(product) {\n  return IMAGE_MAP[product.imageKey] || phoneImage;\n}';
 export const RUNTIME_PRODUCT_IMAGE_FUNCTION = 'function productImage(product) {\n  return product?.imageUrl || IMAGE_MAP[product?.imageKey] || phoneImage;\n}';
 export const CANONICAL_PRODUCT_QUANTITY_STATE = 'const [quantity, setQuantity] = useState(1);';
@@ -225,7 +225,7 @@ export const createRuntimePresentation = (canonicalApp) => {
     runtimePresentation,
     CANONICAL_PRODUCT_QUANTITY_STATE,
     `${CANONICAL_PRODUCT_QUANTITY_STATE}
-  const maxQuantity = Math.max(1, Math.min(9, Number(product.stock) || 1));
+  const maxQuantity = Math.max(1, Math.min(product.variantSelectionRequired ? 20 : 9, Number(product.stock) || 1));
   const runtimeMedia = useMemo(() => {
     const media = Array.isArray(product.media)
       ? product.media.filter((item) => item?.url && ["image", "video"].includes(item.type))
@@ -300,6 +300,21 @@ export const createRuntimePresentation = (canonicalApp) => {
     '<div className="mobile-purchase-bar"><div><small>Toplam</small><strong>{money.format(product.price * quantity)}</strong></div><button type="button" disabled={soldOut || buyNowPending || typeof onBuyNow !== "function"} onClick={() => onBuyNow?.(product.id, quantity)}><CreditCard />{soldOut ? "Tükendi" : buyNowPending ? "Hazırlanıyor" : "Hemen Al"}</button></div>',
     "Canonical mobile purchase owner",
   );
+
+  runtimePresentation = replaceExactOnce(runtimePresentation, "maximumFractionDigits: 0", "maximumFractionDigits: 2", "Server price minor units");
+  // Extend only the generated runtime detail. Descriptive attributes never form purchase combinations.
+  const detailStart = runtimePresentation.indexOf(RUNTIME_PRODUCT_DETAIL_SIGNATURE);
+  const detailEnd = runtimePresentation.indexOf("\nfunction FavoritesPage(", detailStart);
+  let detail = runtimePresentation.slice(detailStart, detailEnd);
+  detail = replaceExactOnce(detail, 'const soldOut = product.stock <= 0;', 'const needsSelection = product.variantSelectionRequired && !product.selectedVariantId;\n  const soldOut = product.stock <= 0;', "Variant selection state");
+  detail = replaceExactOnce(detail, 'const soldOut = product.stock <= 0;', 'const soldOut = product.purchaseUnavailable === true || product.stock <= 0;', "Variant purchase eligibility");
+  detail = detail.replaceAll('soldOut ? "Tükendi" :', 'needsSelection ? "Seçenek seç" : soldOut ? "Tükendi" :');
+  detail = replaceExactOnce(detail, '{colorOptions.length > 0 &&', '{purchaseOptions}\n            {!product.variantSelectionRequired && colorOptions.length > 0 &&', "Canonical variant selector slot");
+  detail = replaceExactOnce(detail, '{storageOptions.length > 0 &&', '{!product.variantSelectionRequired && storageOptions.length > 0 &&', "Descriptive capacity isolation");
+  detail = detail.replaceAll('money.format(product.price)', 'product.pricePending ? "Seçenek seç" : money.format(product.price)');
+  detail = detail.replaceAll('money.format(product.price * quantity)', 'product.pricePending ? "Seçenek seç" : money.format(product.price * quantity)');
+  detail = replaceExactOnce(detail, RUNTIME_PRODUCT_STOCK_CLAIM, '<div className="stock-line" role="status">{product.purchaseMessage ? product.purchaseMessage : soldOut ? <><X /> Stokta yok</> : <><CheckCircle weight="fill" /> Stokta · {product.stock} adet</>}</div>', "Variant availability display");
+  runtimePresentation = runtimePresentation.slice(0, detailStart) + detail + runtimePresentation.slice(detailEnd);
 
   assertExactCount(runtimePresentation, CANONICAL_CATALOG_IMPORT, 0, "Runtime canonical catalog import");
   assertExactCount(runtimePresentation, RUNTIME_CATALOG_IMPORT, 1, "Runtime catalog import boundary");

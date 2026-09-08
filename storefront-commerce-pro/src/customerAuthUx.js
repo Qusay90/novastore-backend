@@ -42,12 +42,13 @@ export function safeCustomerReturnPath(value, fallback = NORMAL_LOGIN_DESTINATIO
 
   let parsed;
   try {
-    parsed = new URL(path, "https://customer.novastore.invalid");
+    // Parse internal route syntax without introducing a network origin.
+    parsed = new URL(path, "customer-return:/");
   } catch {
     return fallback;
   }
 
-  if (parsed.origin !== "https://customer.novastore.invalid") return fallback;
+  if (parsed.protocol !== "customer-return:" || parsed.host) return fallback;
   if (parsed.pathname === "/odeme/sonuc") {
     return safePaymentResultQuery(parsed.searchParams) ? `${parsed.pathname}${parsed.search}` : fallback;
   }

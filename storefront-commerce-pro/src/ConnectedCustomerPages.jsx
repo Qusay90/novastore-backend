@@ -43,6 +43,8 @@ import {
 import turkeyLocations from "../../shared/turkiye-provinces-districts.v1.json";
 import { isCheckoutReviewBlocked, resolveCheckoutVisibleStep } from "./checkoutRouteGuard.js";
 import { NORMAL_LOGIN_DESTINATION, safeCustomerReturnPath } from "./customerAuthUx.js";
+import { formatVariantSelections, variantErrorMessage } from "./adapters/variantContract.js";
+import { cartLineKey } from "./integration/runtimeCartIdentity.js";
 
 const LOCAL_REVIEW_RUNTIME_ENABLED = __NOVASTORE_LOCAL_REVIEW_RUNTIME__;
 
@@ -74,7 +76,7 @@ const formatDate = (value, withTime = true) => {
 };
 
 const errorMessage = (error, fallback = "İşlem tamamlanamadı.") => (
-  error?.message || error?.payload?.error || fallback
+  variantErrorMessage(error) || error?.message || error?.payload?.error || fallback
 );
 
 const safeTrackingUrl = (value) => {
@@ -332,7 +334,7 @@ function orderImage(item, productById, getProductImage) {
 
 function CustomerOrderCard({ order, productById, getProductImage }) {
   const images = order.items.slice(0, 4).map((item) => ({
-    key: `${item.id || item.name}-${item.quantity}`,
+    key: `${cartLineKey(item)}-${item.quantity}`,
     name: item.name,
     src: orderImage(item, productById, getProductImage),
   }));
@@ -454,7 +456,7 @@ function OrdersSection({ session, account, orderId, productById, getProductImage
       {cancelError && <div className="form-message is-error" role="alert"><WarningCircle />{cancelError}</div>}
       {confirmation}
       {returnError && <div className="form-message is-error" role="alert"><WarningCircle />{returnError}</div>}
-      <div className="order-detail-products">{selected.items.length ? selected.items.map((item, index) => { const image = orderImage(item, productById, getProductImage); return <div key={`${item.id || item.name}-${index}`}>{image ? <img src={image} alt={item.name} /> : <span className="order-detail-placeholder"><Package /></span>}<span><strong>{item.name}</strong><small>{item.quantity} adet</small></span><b>{money.format(item.price * item.quantity)}</b></div>; }) : <div className="order-items-unavailable"><Package /><span><strong>Ürün özeti alınamadı</strong><small>Sipariş toplamı ve durumu korunuyor.</small></span></div>}</div>
+      <div className="order-detail-products">{selected.items.length ? selected.items.map((item, index) => { const image = orderImage(item, productById, getProductImage); return <div key={`${item.id || item.name}-${index}`}>{image ? <img src={image} alt={item.name} /> : <span className="order-detail-placeholder"><Package /></span>}<span><strong>{item.name}</strong>{item.variantId && <small className="runtime-variant-label">{formatVariantSelections(item.variantSelections)} · {item.sku}</small>}<small>{item.quantity} adet</small></span><b>{money.format(item.price * item.quantity)}</b></div>; }) : <div className="order-items-unavailable"><Package /><span><strong>Ürün özeti alınamadı</strong><small>Sipariş toplamı ve durumu korunuyor.</small></span></div>}</div>
       <div className="order-detail-grid"><div><MapPin /><span><strong>Teslimat adresi</strong><p>{selected.address || "Adres özeti bu sipariş kaydında bulunmuyor."}</p></span></div><div><CreditCard /><span><strong>Ödeme</strong><p>{selected.paymentStatus ? paymentStatusLabel(selected.paymentStatus) : selected.paymentMethod || "Ödeme durumu sipariş kaydında gösterilecek."}</p></span></div>{selected.trackingNo || trackingUrl ? <div><Truck /><span><strong>Kargo takibi</strong><p>{selected.trackingNo ? `Takip no: ${selected.trackingNo}` : "Takip bağlantısı hazır."}{selected.etaDate ? ` · Tahmini teslimat ${formatDate(selected.etaDate, false)}` : ""}</p>{trackingUrl && <a href={trackingUrl} target="_blank" rel="noopener noreferrer">Taşıyıcı sayfasını aç <CaretRight /></a>}</span></div> : null}</div>
       {selected.returnStatus && <section className="order-return-status" role="status" aria-live="polite"><Receipt /><span><strong>İade durumu: {selected.returnStatusLabel}</strong><small>Talep #{selected.returnId}{selected.returnDecisionNote ? ` · ${selected.returnDecisionNote}` : ""}</small><small>Geri Ödeme Durumu: {refundStatusLabel(selected.refundStatus)}</small>{selected.returnId && <a href={returnDetailPath(selected.returnId)}>Talep detayını aç</a>}</span></section>}
       {selected.returnable && !createdReturn && !returnOpen && <div className="order-return-zone"><span><strong>İade talebi</strong><small>İade uygunluğu ve süre sunucu tarafından doğrulanır. Talep açmak para iadesinin tamamlandığı anlamına gelmez.</small></span><button type="button" onClick={() => { setReturnError(""); setReturnOpen(true); }}>İade talebi oluştur</button></div>}
@@ -899,16 +901,34 @@ export function CustomerCheckoutPage(props) {
   const [submitPhase, setSubmitPhase] = useState("idle");
   const [submitError, setSubmitError] = useState("");
   const localReviewOnly = LOCAL_REVIEW_RUNTIME_ENABLED ? Boolean(props.reviewOnly) : false;
-  const hasStockIssues = items.some(({ product, quantity }) => product.stock <= 0 || quantity > product.stock);
+  const hasStockIssues = items.some(({ product, quantity, variantId }) => variantId == null && !product.variantSelectionRequired && (product.stock <= 0 || quantity > product.stock));
+  const cartFingerprint = items.map((item) => `${cartLineKey(item)}:${item.quantity}`).sort().join("|");
+  const quoteContext = `${session.user.id}|${cartFingerprint}`;
+  const quoteContextRef = useRef(quoteContext);
+  const quoteGenerationRef = useRef(0);
+  if (quoteContextRef.current !== quoteContext) {
+    quoteContextRef.current = quoteContext;
+    quoteGenerationRef.current += 1;
+  }
+  useEffect(() => () => { quoteGenerationRef.current += 1; }, []);
 
   const loadQuote = useCallback(async (couponCode = null, signal = undefined) => {
+    const generation = ++quoteGenerationRef.current;
+    const context = quoteContextRef.current;
     setQuoteState((current) => ({ phase: "loading", data: current.data, error: null }));
+    setAcceptedAgreements(new Set());
+    setAgreementPreviewState({ phase: "idle", data: null, error: null });
     try {
       const next = await checkout.quote(items, couponCode, { signal });
+      if (signal?.aborted || generation !== quoteGenerationRef.current || context !== quoteContextRef.current) {
+        throw Object.assign(new Error("Fiyatlandırma isteği güncellendi."), { code: "CUSTOMER_ABORTED" });
+      }
       setQuoteState({ phase: "ready", data: next, error: null });
+      setAgreementPreviewRevision((value) => value + 1);
       return next;
     } catch (error) {
-      if (error?.code !== "CUSTOMER_ABORTED") setQuoteState({ phase: "error", data: null, error });
+      if (generation === quoteGenerationRef.current && context === quoteContextRef.current && error?.code !== "CUSTOMER_ABORTED") setQuoteState({ phase: "error", data: null, error });
+      if (generation !== quoteGenerationRef.current || context !== quoteContextRef.current) throw Object.assign(new Error("Fiyatlandırma isteği güncellendi."), { code: "CUSTOMER_ABORTED" });
       throw error;
     }
   }, [checkout, items]);
@@ -942,10 +962,6 @@ export function CustomerCheckoutPage(props) {
     .map((agreement) => `${agreement.slug}:${agreement.version || "pending"}:${agreement.status}`)
     .sort()
     .join("|");
-  const cartFingerprint = items
-    .map(({ product, quantity }) => `${product.id}:${quantity}`)
-    .sort()
-    .join("|");
   useEffect(() => {
     const definitionsReady = capabilityAgreements.length > 0 && capabilityAgreements.every((agreement) => (
       agreement.status === "published" && agreement.version
@@ -962,6 +978,8 @@ export function CustomerCheckoutPage(props) {
     }
 
     const controller = new AbortController();
+    const context = quoteContextRef.current;
+    const quoteGeneration = quoteGenerationRef.current;
     setAgreementPreviewState({ phase: "loading", data: null, error: null });
     setAcceptedAgreements(new Set());
     checkout.previewAgreements({
@@ -970,10 +988,11 @@ export function CustomerCheckoutPage(props) {
       items,
       couponCode: appliedCoupon,
     }, { signal: controller.signal }).then((data) => {
+      if (controller.signal.aborted || context !== quoteContextRef.current || quoteGeneration !== quoteGenerationRef.current) return;
       setQuoteState({ phase: "ready", data: data.quote, error: null });
       setAgreementPreviewState({ phase: "ready", data, error: null });
     }).catch((error) => {
-      if (error?.code !== "CUSTOMER_ABORTED") {
+      if (!controller.signal.aborted && context === quoteContextRef.current && quoteGeneration === quoteGenerationRef.current && error?.code !== "CUSTOMER_ABORTED") {
         setAgreementPreviewState({ phase: "error", data: null, error });
       }
     });
@@ -1006,7 +1025,7 @@ export function CustomerCheckoutPage(props) {
 
   useEffect(() => {
     if (!reviewBlocked) return;
-    setSubmitError("Sipariş kontrolüne geçmeden önce iki güncel sözleşmeyi de onaylamalısın.");
+    setSubmitError((current) => current || "Sipariş kontrolüne geçmeden önce iki güncel sözleşmeyi de onaylamalısın.");
     onStepChange("payment", { replace: true });
   }, [onStepChange, reviewBlocked]);
 
@@ -1032,7 +1051,7 @@ export function CustomerCheckoutPage(props) {
     const code = couponInput.trim().toLocaleUpperCase("tr-TR");
     if (!code) return;
     const cartFingerprint = items
-      .map(({ product, quantity }) => `${product.id}:${quantity}`)
+      .map((item) => `${cartLineKey(item)}:${item.quantity}`)
       .sort()
       .join("|");
     const intentKey = `${code}::${cartFingerprint}`;
@@ -1041,8 +1060,7 @@ export function CustomerCheckoutPage(props) {
     couponIntentKeyRef.current = intentKey;
     setCouponBusy(true);
     try {
-      const next = await checkout.quote(items, code);
-      setQuoteState({ phase: "ready", data: next, error: null });
+      const next = await loadQuote(code);
       if (next.coupon?.applied) {
         if (appliedCoupon !== code) {
           skipCouponEffectRef.current = true;
@@ -1058,11 +1076,12 @@ export function CustomerCheckoutPage(props) {
       }
     } catch (error) {
       if (couponIntentKeyRef.current === intentKey) couponIntentKeyRef.current = "";
-      setQuoteState({ phase: "error", data: null, error });
+      // loadQuote owns error state and discards superseded cart/session responses.
     } finally { couponRequestRef.current = false; setCouponBusy(false); }
   };
 
   const clearCoupon = () => {
+    quoteGenerationRef.current += 1;
     couponIntentKeyRef.current = "";
     setAppliedCoupon(null);
     setCouponInput("");
@@ -1092,6 +1111,13 @@ export function CustomerCheckoutPage(props) {
     } catch (error) {
       setSubmitError(errorMessage(error, "Güvenli ödeme başlatılamadı."));
       setSubmitPhase("idle");
+      if (/^VARIANT_|AGREEMENT|PRICE_CHANGED|STOCK_UNAVAILABLE/.test(error?.code || "")) {
+        setAcceptedAgreements(new Set());
+        setAgreementPreviewState({ phase: "idle", data: null, error: null });
+        setAgreementPreviewRevision((value) => value + 1);
+        onStepChange("payment");
+        loadQuote(appliedCoupon).catch(() => {});
+      }
     }
   };
 
@@ -1125,7 +1151,13 @@ export function CustomerCheckoutPage(props) {
       {visibleStep === "review" && <>
         <div className="checkout-panel__head"><div><Receipt /><span><strong>Siparişini Kontrol Et</strong><small>Ödeme sağlayıcısına geçmeden önce adres ve ürünleri doğrula.</small></span></div></div>
         {selectedAddress ? <div className="review-box"><span>Teslimat</span><strong>{selectedAddress.title}</strong><p>{selectedAddress.fullName} · {selectedAddress.addressLine}, {selectedAddress.district} / {selectedAddress.city}</p></div> : <div className="form-message is-error"><WarningCircle />Teslimat adresi seçilmedi.</div>}
-        <div className="review-products">{items.map(({ product, quantity }) => <div key={product.id}><img src={getProductImage(product)} alt="" /><span><strong>{product.name}</strong><small>{quantity} adet</small></span><b>{money.format(product.price * quantity)}</b></div>)}</div>
+        <div className="review-products">{quote.items.map((item) => {
+          const key = cartLineKey(item);
+          const product = items.find((line) => cartLineKey(line) === key)?.product || {};
+          return <div key={key} data-cart-line-key={key}><img src={getProductImage(product)} alt="" /><span><strong>{item.name || product.name}</strong>
+            {(item.variantId || item.variant_id) && <small className="runtime-variant-label">{formatVariantSelections(item.variantSelections || item.variant_selections)} · {item.sku}</small>}
+            <small>{item.quantity} adet</small></span><b>{money.format(item.lineTotal ?? item.line_total ?? item.price * item.quantity)}</b></div>;
+        })}</div>
         <div className="review-provider-state"><ShieldCheck /><span><strong>{capability?.ready ? capability.testMode ? "PayTR test ödemesi" : "PayTR güvenli ödeme" : "Ödeme aktivasyonu bekleniyor"}</strong><small>{capability?.message || "Sağlayıcı durumu doğrulanmadan ödeme başlatılmaz."}{capability?.ready && capability.testMode ? " Gerçek tahsilat yapılmaz." : ""}</small></span></div>
         {localReviewOnly && <div className="form-message is-warning" role="status"><ShieldCheck />Yerel incelemede gerçek ödeme, sipariş oluşturma ve sağlayıcı yönlendirmesi yapılmaz.</div>}
         <div className="checkout-navigation"><button type="button" onClick={() => onStepChange("payment")}><ArrowLeft /> Geri</button><button className="primary-button" type="button" disabled={localReviewOnly || submitPhase === "submitting" || quoteState.phase !== "ready" || !selectedAddress || !paymentReady} onClick={submitPayment}><ShieldCheck /> {localReviewOnly ? "Yerel incelemede ödeme kapalı" : !capability?.ready ? "Ödeme aktivasyonu bekleniyor" : !agreementsReady ? "Sözleşme onayı gerekli" : submitPhase === "submitting" ? "Güvenli ödeme hazırlanıyor…" : "PayTR güvenli ödeme ekranına geç"}</button></div>

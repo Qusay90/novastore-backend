@@ -68,13 +68,13 @@ test("runtime presentation owns the shared card, product media, review anchor, a
   assert.match(integratedApp, /if \(buyNowPendingRef\.current\) return/);
   assert.match(integratedApp, /buyNowPendingRef\.current = true/);
   assert.match(integratedApp, /finally \{\s*buyNowPendingRef\.current = false/);
-  assert.match(integratedApp, /runtime\.cart\.handoffToCheckout\(next\)/);
+  assert.match(integratedApp, /const added = await addToCart\(productId, quantity, variantId\);[\s\S]*?if \(added !== true \|\| principal !== cartMutationPrincipal\(\)\) return;[\s\S]*?runtime\.cart\.handoffToCheckout\(cartRef\.current\)/);
   assert.doesNotMatch(integratedApp, /document\.addEventListener\("click"/);
   assert.match(comparisonContext, /available: false/);
-  assert.match(cartAdapter, /const \{ enriched, normalized \} = persistLocal\(items\)/);
+  assert.match(cartAdapter, /const \{ enriched, simpleItems, hasVariants \} = persistLocal\(items\)/);
   assert.match(cartAdapter, /const stockIssue = requestedItems\.find/);
   assert.ok(
-    cartAdapter.indexOf("const { enriched, normalized } = persistLocal(items);")
+    cartAdapter.indexOf("const { enriched, simpleItems, hasVariants } = persistLocal(items);")
       < cartAdapter.indexOf("const stockIssue = requestedItems.find"),
     "checkout handoff must preserve the local cart before stock validation can reject",
   );

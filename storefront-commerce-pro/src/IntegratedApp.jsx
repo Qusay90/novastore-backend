@@ -85,6 +85,11 @@ import { PublicStorePage } from "./PublicStorePage.jsx";
 import { CustomerProductCard } from "./CustomerProductCard.jsx";
 import { normalizePublicStoreSlug } from "./adapters/publicStoreAdapter.js";
 import { reconcileFinalizedCart } from "./adapters/checkoutAdapter.js";
+import { assertProductVariant, getProductVariant } from "./adapters/variantContract.js";
+import { cartLineKey } from "./integration/runtimeCartIdentity.js";
+import { VariantSelection } from "./integration/VariantSelection.jsx";
+import { useCartProducts } from "./integration/useCartProducts.js";
+import "./integration/variant-selection.css";
 import {
   customerAccountEntryPath,
   getCustomerProfileCompletion,
@@ -176,7 +181,7 @@ const MEGA_DISCOVERY_TERMS = {
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
   currency: "TRY",
-  maximumFractionDigits: 0,
+  maximumFractionDigits: 2,
 });
 
 const HELP_TOPICS = [
@@ -220,6 +225,10 @@ function normalizeRuntimeProductId(value) {
   if (Number.isInteger(value) && value > 0) return value;
   const text = String(value ?? "").trim();
   return /^[A-Z0-9][A-Z0-9_-]{0,63}$/i.test(text) ? text : null;
+}
+
+function cartMutationPrincipal() {
+  return `${window.localStorage.getItem("nova_user_info") || ""}:${window.localStorage.getItem("nova_user_token") || ""}`;
 }
 
 function isolatePageFromModal() {
@@ -1127,11 +1136,14 @@ function ProductDetail({ product, favorite, favorites, onFavorite, onAdd, sessio
 
 function ProductRoute({ summary, loadProduct, favorite, favorites, onFavorite, onAdd, onBuyNow, buyNowPending, session, community }) {
   const [state, setState] = useState({ product: summary, phase: "loading" });
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
     setState({ product: summary, phase: "loading" });
+    setSelectedVariantId(null);
     loadProduct(summary.id, { signal: controller.signal }).then((product) => {
       if (active) setState({ product, phase: "ready" });
     }).catch((error) => {
@@ -1143,10 +1155,24 @@ function ProductRoute({ summary, loadProduct, favorite, favorites, onFavorite, o
       active = false;
       controller.abort("product-route-change");
     };
-  }, [loadProduct, summary]);
+  }, [loadProduct, summary, attempt]);
+
+  const selected = getProductVariant(state.product, selectedVariantId);
+  const displayProduct = useMemo(() => state.product.variantSelectionRequired ? {
+    ...state.product, selectedVariantId, price: selected?.price ?? 0, oldPrice: null,
+    stock: selected?.availableStock ?? 0, pricePending: !selected,
+    purchaseUnavailable: state.phase !== "ready" || !selected?.purchasable,
+    purchaseMessage: state.phase !== "ready" ? "Seçenek bilgileri doğrulanıyor." : !selected ? "Satın almak için bir seçenek seç." : "",
+  } : { ...state.product, purchaseUnavailable: state.phase !== "ready",
+    purchaseMessage: state.phase === "loading" ? "Ürün bilgileri doğrulanıyor." : state.phase === "error" ? "Ürün bilgileri doğrulanamadı." : "" },
+  [state, selected, selectedVariantId]);
 
   return <>
-    <CanonicalProductDetail key={state.product.id} product={state.product} favorite={favorite} favorites={favorites} onFavorite={onFavorite} onAdd={onAdd} onBuyNow={onBuyNow} buyNowPending={buyNowPending} />
+    <CanonicalProductDetail key={state.product.id} product={displayProduct} favorite={favorite} favorites={favorites} onFavorite={onFavorite}
+      onAdd={(id, quantity) => onAdd(id, quantity, id === state.product.id ? selectedVariantId : undefined)}
+      onBuyNow={(id, quantity) => onBuyNow(id, quantity, selectedVariantId)} buyNowPending={buyNowPending}
+      purchaseOptions={state.phase === "error" ? <div role="alert"><p>Ürün bilgileri doğrulanamadı.</p><button type="button" onClick={() => setAttempt((value) => value + 1)}>Yeniden dene</button></div>
+        : state.phase === "ready" ? <VariantSelection product={state.product} selectedId={selectedVariantId} onSelect={setSelectedVariantId} /> : null} />
     <PdpStoreAttribution product={state.product} />
     <div className="shell integration-community-shell"><ProductCommunity productId={state.product.id} productName={state.product.name} session={session} community={community} sectionId="community-reviews" /></div>
   </>;
@@ -1207,9 +1233,10 @@ function FavoritesPage({ favorites, onFavorite, onAdd, onAddAll }) {
 }
 
 function CartPage({ items, onQuantity, onRemove, onCheckout }) {
+  const pricePending = items.some((item) => item.product.pricePending);
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const total = subtotal;
-  const stockIssueItems = items.filter(({ product, quantity }) => product.stock <= 0 || quantity > product.stock);
+  const stockIssueItems = items.filter(({ product, quantity, variantError }) => variantError || product.stock <= 0 || quantity > product.stock);
   const hasStockIssue = stockIssueItems.length > 0;
   return (
     <main id="main-content" className="page commerce-page">
@@ -1218,25 +1245,26 @@ function CartPage({ items, onQuantity, onRemove, onCheckout }) {
         {items.length ? (
           <div className="cart-page-grid">
             <section className="cart-page-lines" aria-label="Sepetteki ürünler">
-              {items.map(({ product, quantity }) => (
-                <article className="cart-page-line" key={product.id}>
+              {items.map(({ product, quantity, variantId, cartKey, variantError }) => (
+                <article className="cart-page-line" key={cartKey} data-cart-line-key={cartKey}>
                   <img src={productImage(product)} alt={product.name} />
                   <div className="cart-page-line__copy">
                     <span>{productEyebrow(product)}</span>
                     <h2><a href={`#/urun/${product.slug}`}>{product.name}</a></h2>
-                    {product.stock <= 0
+                    {product.variantLabel && <span className="runtime-variant-label">{product.variantLabel} · {product.sku}</span>}
+                    {variantError ? <small className="cart-stock-status is-unavailable" role="status">{variantError} <a href={`#/urun/${product.slug}`}>Seçeneği incele</a></small> : product.stock <= 0
                       ? <small className="cart-stock-status is-unavailable"><WarningCircle weight="fill" /> Bu ürün şu anda stokta değil</small>
                       : quantity > product.stock
                         ? <small className="cart-stock-status is-unavailable"><WarningCircle weight="fill" /> Yalnız {product.stock} adet stokta; miktarı azalt</small>
                         : product.deliveryLabel ? <small><CheckCircle weight="fill" /> {product.deliveryLabel}</small> : null}
-                    <button type="button" onClick={() => onRemove(product.id)}><Trash /> Kaldır</button>
+                    <button type="button" onClick={() => onRemove(product.id, variantId)}><Trash /> Kaldır</button>
                   </div>
                   <div className="cart-page-line__end">
-                    <strong>{money.format(product.price * quantity)}</strong>
+                    <strong>{product.pricePending ? "Doğrulanıyor" : money.format(product.price * quantity)}</strong>
                     <div className="quantity-control">
-                      <button type="button" onClick={() => onQuantity(product.id, quantity - 1)} aria-label={`${product.name} adedini azalt`}><Minus /></button>
+                      <button type="button" onClick={() => onQuantity(product.id, quantity - 1, variantId)} aria-label={`${product.name} adedini azalt`}><Minus /></button>
                       <span>{quantity}</span>
-                      <button type="button" disabled={product.stock <= 0 || quantity >= product.stock} onClick={() => onQuantity(product.id, quantity + 1)} aria-label={`${product.name} adedini artır`}><Plus /></button>
+                      <button type="button" disabled={Boolean(variantError) || product.stock <= 0 || quantity >= Math.min(20, product.stock)} onClick={() => onQuantity(product.id, quantity + 1, variantId)} aria-label={`${product.name} adedini artır`}><Plus /></button>
                     </div>
                   </div>
                 </article>
@@ -1245,9 +1273,9 @@ function CartPage({ items, onQuantity, onRemove, onCheckout }) {
             <aside className="order-summary">
               <h2>Sipariş Özeti</h2>
               <dl>
-                <div><dt>Ara toplam</dt><dd>{money.format(subtotal)}</dd></div>
+                <div><dt>Ara toplam</dt><dd>{pricePending ? "Doğrulanıyor" : money.format(subtotal)}</dd></div>
                 <div><dt>Kargo ve indirimler</dt><dd>Ödeme adımında</dd></div>
-                <div className="order-total"><dt>Ürün toplamı</dt><dd>{money.format(total)}</dd></div>
+                <div className="order-total"><dt>Ürün toplamı</dt><dd>{pricePending ? "Doğrulanıyor" : money.format(total)}</dd></div>
               </dl>
               {hasStockIssue && <div className="cart-stock-warning" role="alert"><WarningCircle weight="fill" /><span><strong>Stok kontrolü gerekli</strong><small>{stockIssueItems.length} üründe sepet miktarı güncel stokla uyuşmuyor. Miktarı azalt veya ürünü kaldır.</small></span></div>}
               <p className="summary-security">Kupon, teslimat ve ödeme seçenekleri güvenli ödeme sayfasında doğrulanır.</p>
@@ -1382,6 +1410,7 @@ function ComparisonTray({ ids, onToggle, onClear, onAdd, onVisibilityChange }) {
 }
 
 function CartDrawer({ open, items, onClose, onRemove, onQuantity, returnFocusRef }) {
+  const pricePending = items.some((item) => item.product.pricePending);
   const closeRef = useRef(null);
   const dialogRef = useRef(null);
   const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
@@ -1406,8 +1435,8 @@ function CartDrawer({ open, items, onClose, onRemove, onQuantity, returnFocusRef
     <div className="overlay-layer cart-drawer-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeDrawer()}>
       <div id="cart-drawer" ref={dialogRef} className="cart-drawer" role="dialog" aria-modal="true" aria-label="Sepetim" tabIndex="-1">
         <div className="drawer-head"><div><h2>Sepetim</h2><span>{items.reduce((sum, item) => sum + item.quantity, 0)} ürün</span></div><button ref={closeRef} className="icon-button" type="button" onClick={closeDrawer} aria-label="Sepeti kapat"><X /></button></div>
-        <div className="cart-drawer__body">{items.length ? items.map(({ product, quantity }) => <article className="cart-line" key={product.id}><a href={`#/urun/${product.slug}`} onClick={closeDrawer}><img src={productImage(product)} alt="" /></a><div><a className="cart-line__product-link" href={`#/urun/${product.slug}`} onClick={closeDrawer}><strong>{product.name}</strong></a><span>{product.color ? `${product.color} · ` : ""}{quantity} adet</span><div className="cart-line__actions"><div className="quantity-control" aria-label={`${product.name} adedi`}><button type="button" disabled={quantity <= 1} onClick={() => onQuantity(product.id, quantity - 1)} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" disabled={quantity >= product.stock} onClick={() => onQuantity(product.id, quantity + 1)} aria-label="Adedi artır"><Plus /></button></div><b>{money.format(product.price * quantity)}</b></div></div><button type="button" onClick={() => onRemove(product.id)} aria-label={`${product.name} ürününü sepetten çıkar`}><Trash /></button></article>) : <div className="cart-empty"><ShoppingBag /><h3>Sepetin henüz boş</h3><p>İhtiyacına uygun ürünleri kategorilerden keşfedebilirsin.</p><button className="primary-button" type="button" onClick={() => { closeDrawer(); navigate(defaultCategoryPath() ? `/kategori/${defaultCategoryPath()}` : "/"); }}>Alışverişe başla</button></div>}</div>
-        {items.length > 0 && <div className="cart-drawer__footer"><div><span>Ürün toplamı</span><strong>{money.format(total)}</strong></div><button className="primary-button" type="button" onClick={() => { closeDrawer(); navigate("/sepet"); }}>Sepete git <CaretRight /></button><small><ShieldCheck /> Ödeme bilgileriniz güvenle korunur</small></div>}
+        <div className="cart-drawer__body">{items.length ? items.map(({ product, quantity, variantId, cartKey, variantError }) => <article className="cart-line" key={cartKey} data-cart-line-key={cartKey}><a href={`#/urun/${product.slug}`} onClick={closeDrawer}><img src={productImage(product)} alt="" /></a><div><a className="cart-line__product-link" href={`#/urun/${product.slug}`} onClick={closeDrawer}><strong>{product.name}</strong></a><span className="runtime-variant-label">{product.variantLabel || product.color ? `${product.variantLabel || product.color} · ` : ""}{quantity} adet</span>{variantError && <small role="status">{variantError}</small>}<div className="cart-line__actions"><div className="quantity-control" aria-label={`${product.name} adedi`}><button type="button" disabled={quantity <= 1} onClick={() => onQuantity(product.id, quantity - 1, variantId)} aria-label="Adedi azalt"><Minus /></button><span>{quantity}</span><button type="button" disabled={Boolean(variantError) || quantity >= Math.min(20, product.stock)} onClick={() => onQuantity(product.id, quantity + 1, variantId)} aria-label="Adedi artır"><Plus /></button></div><b>{product.pricePending ? "Doğrulanıyor" : money.format(product.price * quantity)}</b></div></div><button type="button" onClick={() => onRemove(product.id, variantId)} aria-label={`${product.name} ürününü sepetten çıkar`}><Trash /></button></article>) : <div className="cart-empty"><ShoppingBag /><h3>Sepetin henüz boş</h3><p>İhtiyacına uygun ürünleri kategorilerden keşfedebilirsin.</p><button className="primary-button" type="button" onClick={() => { closeDrawer(); navigate(defaultCategoryPath() ? `/kategori/${defaultCategoryPath()}` : "/"); }}>Alışverişe başla</button></div>}</div>
+        {items.length > 0 && <div className="cart-drawer__footer"><div><span>Ürün toplamı</span><strong>{pricePending ? "Doğrulanıyor" : money.format(total)}</strong></div><button className="primary-button" type="button" onClick={() => { closeDrawer(); navigate("/sepet"); }}>Sepete git <CaretRight /></button><small><ShieldCheck /> Ödeme bilgileriniz güvenle korunur</small></div>}
       </div>
     </div>, document.body
   );
@@ -1508,7 +1537,8 @@ export function CommerceProRuntimeApp({
   function replaceCart(next, { persist = true } = {}) {
     const normalized = next.map((item) => ({
       productId: normalizeRuntimeProductId(item.productId),
-      quantity: Math.max(1, Math.min(999, Number(item.quantity || 1))),
+      ...(item.variantId != null ? { variantId: item.variantId } : {}),
+      quantity: Math.max(1, Math.min(20, Number(item.quantity || 1))),
     })).filter((item) => item.productId !== null);
     cartRef.current = normalized;
     setCart(normalized);
@@ -1540,24 +1570,40 @@ export function CommerceProRuntimeApp({
     }
   }
 
-  async function addToCart(productId, quantity = 1) {
-    const product = products.find((item) => item.id === productId);
+  async function addToCart(productId, quantity = 1, variantId = null) {
+    const principal = cartMutationPrincipal();
+    let product;
+    try {
+      product = await runtime.catalog.loadProduct(productId);
+      if (principal !== cartMutationPrincipal()) return false;
+      if (product.variantSelectionRequired && variantId == null) {
+        navigate(`/urun/${product.slug}`);
+        notify("Sepete eklemek için bir seçenek seç.");
+        return false;
+      }
+      assertProductVariant(product, variantId);
+    } catch (error) { notify(error.message || "Ürün seçeneği doğrulanamadı."); return false; }
+    const variant = getProductVariant(product, variantId);
+    if (variant) product = { ...product, price: variant.price, stock: variant.availableStock };
     if (!product || product.stock <= 0) { notify("Bu ürün şu anda stokta değil"); return false; }
     const current = cartRef.current;
-    const existing = current.find((item) => item.productId === productId);
+    const key = cartLineKey(productId, variantId);
+    const existing = current.find((item) => cartLineKey(item) === key);
     const requestedQuantity = Math.max(1, Number(quantity) || 1);
     const currentQuantity = existing?.quantity || 0;
-    const nextQuantity = Math.min(product.stock, currentQuantity + requestedQuantity);
+    const cartCapacity = 50 - current.reduce((sum, item) => sum + item.quantity, 0);
+    const nextQuantity = Math.min(20, product.stock, currentQuantity + Math.min(requestedQuantity, cartCapacity));
     if (nextQuantity === currentQuantity) {
       notify(`${product.name} için sepetindeki adet mevcut stoğa ulaştı.`);
       return false;
     }
     const next = existing
-      ? current.map((item) => item.productId === productId
+      ? current.map((item) => cartLineKey(item) === key
         ? { ...item, quantity: nextQuantity }
         : item)
-      : [...current, { productId, quantity: nextQuantity }];
+      : [...current, { productId, ...(variantId != null ? { variantId } : {}), quantity: nextQuantity }];
     const mutationResult = await replaceCart(next);
+    if (principal !== cartMutationPrincipal()) return false;
     if (mutationResult !== true) return mutationResult;
     notify(nextQuantity - currentQuantity < requestedQuantity
       ? `${product.name} mevcut stok sınırına göre sepete eklendi.`
@@ -1565,47 +1611,38 @@ export function CommerceProRuntimeApp({
     return true;
   }
 
-  async function buyNow(productId, quantity = 1) {
+  async function buyNow(productId, quantity = 1, variantId = null) {
     if (buyNowPendingRef.current) return;
-    const product = products.find((item) => item.id === productId);
-    if (!product || product.stock <= 0) {
-      notify("Bu ürün şu anda stokta değil");
-      return;
-    }
-    const requestedQuantity = Math.min(product.stock, Math.max(1, Number(quantity) || 1));
-    const current = cartRef.current;
-    const existing = current.find((item) => item.productId === productId);
-    const nextQuantity = Math.min(product.stock, (existing?.quantity || 0) + requestedQuantity);
-    const next = existing
-      ? current.map((item) => item.productId === productId ? { ...item, quantity: nextQuantity } : item)
-      : [...current, { productId, quantity: nextQuantity }];
+    const principal = cartMutationPrincipal();
     buyNowPendingRef.current = true;
     setBuyNowPending(true);
-    replaceCart(next, { persist: false });
     try {
-      await runtime.cart.handoffToCheckout(next);
-    } catch {
-      notify("Güvenli ödeme özeti hazırlanamadı. Ürün sepetinde korunuyor; lütfen yeniden dene.");
+      const added = await addToCart(productId, quantity, variantId);
+      if (added !== true || principal !== cartMutationPrincipal()) return;
+      await runtime.cart.handoffToCheckout(cartRef.current);
+    } catch (error) {
+      notify(error.message || "Güvenli ödeme özeti hazırlanamadı. Ürün sepetinde korunuyor; lütfen yeniden dene.");
     } finally {
       buyNowPendingRef.current = false;
       setBuyNowPending(false);
     }
   }
 
-  function updateCartQuantity(productId, quantity) {
-    const product = products.find((item) => item.id === productId);
+  function updateCartQuantity(productId, quantity, variantId = null) {
+    const key = cartLineKey(productId, variantId);
+    const product = cartItems.find((item) => cartLineKey(item) === key)?.product;
     const current = cartRef.current;
     const next = quantity <= 0
-      ? current.filter((item) => item.productId !== productId)
-      : current.map((item) => item.productId === productId
-        ? { ...item, quantity: Math.min(Math.max(1, Number(product?.stock || 1)), quantity) }
+      ? current.filter((item) => cartLineKey(item) !== key)
+      : current.map((item) => cartLineKey(item) === key
+        ? { ...item, quantity: Math.min(20, 50 - current.filter((other) => cartLineKey(other) !== key).reduce((sum, other) => sum + other.quantity, 0), Math.max(1, Number(product?.stock || 1)), quantity) }
         : item);
     replaceCart(next);
   }
 
-  async function removeFromCart(productId) {
+  async function removeFromCart(productId, variantId = null) {
     const current = cartRef.current;
-    const next = current.filter((item) => item.productId !== productId);
+    const next = current.filter((item) => cartLineKey(item) !== cartLineKey(productId, variantId));
     if (next.length === current.length) return false;
     return replaceCart(next);
   }
@@ -1627,15 +1664,12 @@ export function CommerceProRuntimeApp({
   async function handoffToCheckout() {
     try {
       await runtime.cart.handoffToCheckout(cartRef.current);
-    } catch {
-      notify("Güvenli ödeme özeti hazırlanamadı. Lütfen yeniden dene.");
+    } catch (error) {
+      notify(error.message || "Güvenli ödeme özeti hazırlanamadı. Lütfen yeniden dene.");
     }
   }
 
-  const cartItems = useMemo(
-    () => cart.map((item) => ({ ...item, product: products.find((product) => product.id === item.productId) })).filter((item) => item.product),
-    [cart],
-  );
+  const cartItems = useCartProducts(cart, products, runtime.catalog.loadProduct, `${route.type}:${cartOpen}`);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
