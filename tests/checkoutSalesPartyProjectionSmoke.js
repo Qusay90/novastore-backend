@@ -355,6 +355,19 @@ const expectUnsupportedFulfillment = (projection, expectedPartyCount) => assert.
         }
     });
 
+    const variantItems = [1101,1102].map((variant_id,index)=>({...pricedItem(401,10+index),variant_id}));
+    const variantSales = await buildCheckoutSalesPartyProjection(queryClient([sellerRow(401),sellerRow(401,{variant_id:1102})]),variantItems);
+    assert.deepEqual(variantSales.sellerProjection[0].items.map(item=>item.variantId),[1101,1102]);
+    assert.deepEqual(variantSales.sellerProjection[0].productIds,[401]);
+    const variantContext = toCheckoutContext(variantItems,variantSales);
+    variantContext.items.forEach((item,index)=>Object.assign(item,{variantId:1101+index,sku:`R19-${index}`,variantSelections:[{group:'Size',value:index?'L':'M'}]}));
+    const normalizedVariants=normalizeCheckoutAgreementContext(variantContext);
+    assert.deepEqual(normalizedVariants.items.map(item=>item.variantId),[1101,1102]);
+    assert.match(renderCheckoutContext(normalizedVariants),/Size: L/);
+    expectAgreementInvalid({...variantContext,items:[variantContext.items[0],{...variantContext.items[1],variantId:1101}]});
+    const renamed=structuredClone(variantContext);renamed.items[0].variantSelections[0].value='XL';
+    assert.notEqual(JSON.stringify(normalizeCheckoutAgreementContext(renamed)),JSON.stringify(normalizedVariants));
+
     console.log('checkout sales-party projection smoke passed: platform=explicit mixed=complete unknown/closed/ambiguous=blocked allocation=exact');
 })().catch((error) => {
     console.error(error);

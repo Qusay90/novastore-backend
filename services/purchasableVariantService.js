@@ -4,7 +4,7 @@ const {loadProduct}=require('./sellerCanonicalCommerceService');
 const {writeAuditAndOutbox}=require('./sellerAuditOutboxService');
 const {syncCategoryStatsForProducts}=require('./categoryStatsService');
 const fail=(code,statusCode=409)=>{throw Object.assign(new Error(code),{code,statusCode});};
-const id=(value)=>{if(!/^[1-9]\d{0,9}$/.test(String(value))||Number(value)>2147483647)fail('VARIANT_ID_INVALID',400);return Number(value);};
+const id=(value)=>{if(!['number','string'].includes(typeof value)||!/^[1-9]\d{0,9}$/.test(String(value))||Number(value)>2147483647)fail('VARIANT_ID_INVALID',400);return Number(value);};
 const int=(value,max=2147483647)=>{if(!Number.isSafeInteger(value)||value<0||value>max)fail('VARIANT_INPUT_INVALID',400);return value;};
 const label=(value)=>{if(typeof value!=='string'||!value.trim()||value.length>96||/[\u0000-\u001f]/u.test(value))fail('VARIANT_INPUT_INVALID',400);return value.trim();};
 const selections=(input)=>{
@@ -108,4 +108,5 @@ const mutate=async(database,context,offerId,variantId,input)=>{
         await client.query('COMMIT');return {reused:false,variant:response};
     }catch(error){await client.query('ROLLBACK').catch(()=>{});if(error.code==='23505')fail('VARIANT_UNIQUE_CONFLICT');throw error;}finally{client.release();}
 };
-module.exports={id,publicVariants,resolve,stock,aggregate,mutate,projection};
+const ownedVariants=async(db,offerId,productId)=>(await db.query(`${variantSql} WHERE v.offer_id=$1 AND v.product_id=$2 AND v.deleted_at IS NULL ORDER BY v.id`,[offerId,productId])).rows;
+module.exports={id,ownedVariants,publicVariants,resolve,stock,aggregate,mutate,projection};

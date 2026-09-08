@@ -139,8 +139,8 @@ let paymentControllerTestApi = null;
     await admin.query('CREATE SCHEMA public');
 
     const registry = loadRegistry();
-    assert.equal(registry.length, 38);
-    assert.equal(registry.at(-1).id, '20260904_01_seller_reputation_questions');
+    assert.equal(registry.length, 39);
+    assert.equal(registry.at(-1).id, '20260908_01_purchasable_variants');
     const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
     assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));

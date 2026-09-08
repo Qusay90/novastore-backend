@@ -1,3 +1,5 @@
+> R19 supersedes the backend gap below. See `PC1-A14-CURRENT-VARIANT-MODEL-INVENTORY.md` and the separate Customer Web / Android R19 handoffs. The following R18 text is historical, not current backend capability. Consumer UI/device gates remain separate.
+
 # A14 — dedicated purchasable variant implementation required
 
 Status: **DEDICATED_WAVE_REQUIRED**. R18 does not close A14, Android C03/C15 or a

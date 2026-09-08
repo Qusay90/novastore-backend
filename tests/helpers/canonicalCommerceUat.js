@@ -112,7 +112,7 @@ module.exports = async ({ pool, sensitive, originalConsole }) => {
         ok(await priceWrite(15000,'r18-post-order-price'));
         await pool.query("UPDATE products SET name='R18 later name',sku='R18-LATER',normalized_sku='R18-LATER',revision=revision+1 WHERE id=$1",[a.productId]);
         assert.equal(JSON.stringify((await pool.query('SELECT items FROM orders WHERE id=$1',[successful.id])).rows[0].items),snapshot);
-        for(const value of [1,'foreign','',{},-1]) await assert.rejects(calculatePricing({cartItems:[{id:a.productId,quantity:1,variant_id:value}],client:pool}), e=>e.code==='PURCHASABLE_VARIANT_UNSUPPORTED');
+        for(const value of [1,'foreign','',{},-1]) await assert.rejects(calculatePricing({cartItems:[{id:a.productId,quantity:1,variant_id:value}],client:pool}), e=>e.code===(value===1?'VARIANT_NOT_ALLOWED':'VARIANT_ID_INVALID'));
         ok(await req(`/api/seller/v1/offers/${a.offerId}`,{method:'PATCH',key:'owner-selector',body:{price_minor:1,revision:zero.revision,commerce_revision:zero.commerce_revision,store_id:b.storeIds[0]}}),400);
         const audits=(await pool.query("SELECT store_id,actor_user_id,actor_membership_id,result_code FROM seller_audit_events WHERE event_type='seller.offer.updated' AND target_id=$1",[String(a.offerId)])).rows;
         assert(audits.length>=3 && audits.every(r=>Number(r.store_id)===a.storeIds[0]&&Number(r.actor_user_id)===a.userId&&Number(r.actor_membership_id)===a.membershipId&&r.result_code==='success'));

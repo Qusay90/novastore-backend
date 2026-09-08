@@ -33,6 +33,8 @@ const getQuote = async (req, res) => {
             items: pricing.items
         });
     } catch (err) {
+        const variantCodes = new Set(['VARIANT_REQUIRED','VARIANT_NOT_ALLOWED','VARIANT_ID_INVALID','VARIANT_NOT_PURCHASABLE','VARIANT_STOCK_UNAVAILABLE']);
+        if (variantCodes.has(err.code)) return res.status(err.statusCode || 409).json({code:err.code,error:err.code});
         res.status(400).json({ error: err.message || 'Kampanya hesaplanamadi.' });
     }
 };
