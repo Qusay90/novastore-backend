@@ -535,9 +535,10 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         assert.equal(packageJson.scripts['staging:bootstrap'], 'node scripts/stagingBootstrapCli.js');
     });
 
-    await check('runtime', '42 migration manifest remains the exact 39-file combined registry', () => {
+    await check('runtime', '42 migration manifest remains the exact 40-file combined registry', () => {
         const manifest = JSON.parse(read('scripts/staging-migrations/manifest.json'));
-        assert.equal(manifest.length, 39);
+        assert.equal(manifest.length, 40);
+        assert.equal(manifest.at(-1).id, '20260915_01_stocky_system_commerce');
         assert.equal(new Set(manifest.map((item) => item.path)).size, manifest.length);
     });
 
