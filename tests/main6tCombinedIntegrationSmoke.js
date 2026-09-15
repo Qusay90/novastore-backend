@@ -15,7 +15,7 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
 
 (async () => {
     const registry = loadRegistry();
-    assert.equal(registry.length, 39);
+    assert.equal(registry.length, 40);
 
     const sellerMigrations = selectSellerMigrations({ registry });
     assert.deepEqual(
@@ -39,7 +39,8 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
             'migrations/20260822_01_seller_application_terms_authority.sql',
             'migrations/20260830_01_seller_application_user_binding.sql',
             'migrations/20260904_01_seller_reputation_questions.sql',
-            'migrations/20260908_01_purchasable_variants.sql'
+            'migrations/20260908_01_purchasable_variants.sql',
+            'migrations/20260915_01_stocky_system_commerce.sql'
         ]
     );
 
@@ -65,8 +66,8 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
     };
     const applied = await applyLocalSellerMigrations({ database, registry, output: () => {} });
     assert.deepEqual(applied, localSellerMigrations.map((migration) => migration.id));
-    assert.equal(statements.filter((sql) => sql === 'BEGIN').length, 12);
-    assert.equal(statements.filter((sql) => sql === 'COMMIT').length, 12);
+    assert.equal(statements.filter((sql) => sql === 'BEGIN').length, localSellerMigrations.length);
+    assert.equal(statements.filter((sql) => sql === 'COMMIT').length, localSellerMigrations.length);
     assert.equal(statements.filter((sql) => sql === 'ROLLBACK').length, 0);
     assert.equal(released, true);
 
@@ -98,9 +99,11 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
     assert.equal(count(server, /createSellerAuthRouter\(\{/g), 1);
     assert.equal(count(server, /createSellerContextRouter\(\{/g), 1);
     assert.equal(count(server, /createSellerBusinessRouter\(\{/g), 1);
-    assert.match(server, /SELLER_API_V1_ENABLED[\s\S]*SELLER_API_V1_LOCAL_ONLY/);
-    assert.match(server, /Seller API local mode requires a named loopback database/);
-    assert.match(server, /Seller API local mode requires NOVASTORE_BIND_HOST=127\.0\.0\.1/);
+    assert.match(server, /resolveSellerApiActivationPolicy\(\{/);
+    assert.match(server, /app\.use\('\/api\/seller\/v1', sellerApiRouter\)/);
+    assert.match(server, /await assertRuntimeDatabaseIdentity\(\{ database: pool, target: startupSafety\.target \}\)/);
+    assert.ok(server.indexOf('await assertRuntimeDatabaseIdentity') < server.indexOf('configureSellerRoutes();'));
+    assert.ok(server.indexOf('configureSellerRoutes();') < server.indexOf('server.listen('));
 
     const coreIndex = server.indexOf('await createCoreSchema();');
     const sellerIndex = server.indexOf('await applyLocalSellerMigrations();');
@@ -111,7 +114,7 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
     assert.equal(count(settings, /include\(":app"\)/g), 1);
     assert.equal(count(settings, /include\(":seller-app"\)/g), 1);
 
-    console.log('combined integration smoke passed: migrations=39 seller=5 binding=1 main6u=4 reputation=1 variants=1 listeners=1');
+    console.log('combined integration smoke passed: migrations=40 seller=5 binding=1 main6u=4 reputation=1 variants=1 stocky=1 listeners=1');
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;

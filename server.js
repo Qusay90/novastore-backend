@@ -33,6 +33,17 @@ const {
 } = require('./middlewares/stagingAccessGate');
 const { assertExternalSideEffectAllowed } = require('./config/stagingRuntimePolicy');
 const pool = require('./config/db');
+const {
+    resolveStockySystemCommerceRuntime
+} = require('./services/stockySystemConnectorService');
+const {
+    startStockyOrderDeliveryWorker,
+    stopStockyOrderDeliveryWorker
+} = require('./services/stockyOrderDeliveryWorkerService');
+const {
+    startNotificationWorker,
+    stopNotificationWorker
+} = require('./services/notificationWorkerService');
 const { getAllowedOrigins } = require('./config/appConfig');
 const { getTrustedProxyHops } = require('./config/proxyTrustConfig');
 const { getPublicCategoryBySlug } = require('./services/categoryService');
@@ -443,14 +454,24 @@ const merchantRoutes = require('./routes/merchantRoutes');
 app.use('/api/merchant', merchantRoutes);
 app.use('/merchant', merchantRoutes);
 
-const localSellerApiEnabled = String(process.env.SELLER_API_V1_ENABLED || '').toLowerCase() === 'true' &&
-    String(process.env.SELLER_API_V1_LOCAL_ONLY || '').toLowerCase() === 'true';
-const localSellerFeature = (name) => localSellerApiEnabled &&
+const { resolveSellerApiActivationPolicy } = require('./config/sellerApiActivationPolicy');
+const { assertRuntimeDatabaseIdentity } = require('./services/runtimeDatabaseIdentityService');
+const { createSellerTransportSecurityMiddleware } = require('./middlewares/sellerTransportSecurity');
+const configuredBindHost = String(process.env.NOVASTORE_BIND_HOST || '').trim();
+const sellerApiActivation = resolveSellerApiActivationPolicy({
+    environment: process.env,
+    startupSafety,
+    bindHost: configuredBindHost,
+    trustedProxyHops
+});
+const sellerApiRouter = express.Router();
+app.use('/api/seller/v1', sellerApiRouter);
+const sellerFeature = (name) => sellerApiActivation.enabled &&
     String(process.env[name] || '').toLowerCase() === 'true';
 
-if (localSellerApiEnabled) {
-    if (!startupSafety.safeLocalDatabase) throw new Error('Seller API local mode requires a named loopback database.');
-
+let sellerRoutesConfigured = false;
+const configureSellerRoutes = () => {
+    if (!sellerApiActivation.enabled || sellerRoutesConfigured) return;
     const { createSellerContextRouter } = require('./routes/sellerContextRoutes');
     const { createSellerAuthRouter } = require('./routes/sellerAuthRoutes');
     const { createSellerPasswordRecoveryRouter } = require('./routes/sellerPasswordRecoveryRoutes');
@@ -481,7 +502,8 @@ if (localSellerApiEnabled) {
     const { getSellerApplicationTermsAuthority } = require('./config/sellerApplicationTerms');
 
     app.locals.sellerDatabase = pool;
-    const sellerE2eTraceEnabled = localSellerFeature('SELLER_E2E_TRACE_ENABLED') &&
+    const sellerE2eTraceEnabled = sellerApiActivation.mode === 'local' &&
+        sellerFeature('SELLER_E2E_TRACE_ENABLED') &&
         String(process.env.NODE_ENV || '').toLowerCase() === 'development' &&
         String(process.env.NOVASTORE_SAFE_LOCAL_BACKEND || '').toLowerCase() === 'true' &&
         String(process.env.NOVASTORE_ALLOW_REMOTE_DB || '').toLowerCase() !== 'true';
@@ -492,7 +514,7 @@ if (localSellerApiEnabled) {
             : '15m'
     });
     const auth = createSellerAuthMiddleware({ verifyAccessToken: tokenService.verify });
-    const syntheticRecoveryEnabled = localSellerFeature('SELLER_PASSWORD_RECOVERY_SYNTHETIC_DELIVERY') &&
+    const syntheticRecoveryEnabled = sellerFeature('SELLER_PASSWORD_RECOVERY_SYNTHETIC_DELIVERY') &&
         ['test', 'development'].includes(String(process.env.NODE_ENV || '').toLowerCase()) &&
         String(process.env.NOVASTORE_SAFE_LOCAL_BACKEND || '').toLowerCase() === 'true' &&
         String(process.env.NOVASTORE_ALLOW_REMOTE_DB || '').toLowerCase() !== 'true';
@@ -540,7 +562,7 @@ if (localSellerApiEnabled) {
     app.locals.sellerPasswordRecoverySyntheticDelivery = recoveryDelivery;
 
     if (sellerE2eTraceEnabled) {
-        app.use('/api/seller/v1', (req, res, next) => {
+        sellerApiRouter.use((req, res, next) => {
             res.once('finish', () => {
                 console.log(`SELLER_E2E_HTTP ${req.method} ${req.path} ${res.statusCode}`);
             });
@@ -548,28 +570,33 @@ if (localSellerApiEnabled) {
         });
     }
 
-    app.use('/api/seller/v1', createSellerAuthRouter({ auth, controller: authController }));
-    app.use('/api/seller/v1', createSellerPasswordRecoveryRouter({ controller: passwordRecoveryController }));
-    app.use('/api/seller/v1', createSellerApplicationRouter({
+    sellerApiRouter.use(createSellerTransportSecurityMiddleware({
+        required: sellerApiActivation.requiresSecureTransport,
+        trustedIngressCidrs: sellerApiActivation.trustedIngressCidrs
+    }));
+    sellerApiRouter.use(createSellerAuthRouter({ auth, controller: authController }));
+    sellerApiRouter.use(createSellerPasswordRecoveryRouter({ controller: passwordRecoveryController }));
+    sellerApiRouter.use(createSellerApplicationRouter({
         controller: applicationController,
         applicantAuth,
         auth,
         tenant
     }));
-    app.use('/api/seller/v1', createSellerContextRouter({ enabled: true, auth, tenant, controller: contextController }));
-    app.use('/api/seller/v1', createSellerNotificationRouter({ enabled: true, auth, tenant }));
-    app.use('/api/seller/v1', createSellerBusinessRouter({
+    sellerApiRouter.use(createSellerContextRouter({ enabled: true, auth, tenant, controller: contextController }));
+    sellerApiRouter.use(createSellerNotificationRouter({ enabled: true, auth, tenant }));
+    sellerApiRouter.use(createSellerBusinessRouter({
         enabled: true,
         auth,
         tenant,
         controller: businessController,
         features: Object.freeze({
-            offerWrite: localSellerFeature('SELLER_OFFER_WRITE_ENABLED'),
-            orderWrite: localSellerFeature('SELLER_ORDER_WRITE_ENABLED'),
-            financeRead: localSellerFeature('SELLER_FINANCE_READ_ENABLED')
+            offerWrite: sellerFeature('SELLER_OFFER_WRITE_ENABLED'),
+            orderWrite: sellerFeature('SELLER_ORDER_WRITE_ENABLED'),
+            financeRead: sellerFeature('SELLER_FINANCE_READ_ENABLED')
         })
     }));
-}
+    sellerRoutesConfigured = true;
+};
 
 app.use((err, req, res, next) => {
     if (err && err.code === 'STAGING_EXTERNAL_SIDE_EFFECT_DISABLED') {
@@ -594,7 +621,7 @@ app.use((err, req, res, next) => {
     return res.status(statusCode).json({ error: message, requestId: req.requestId });
 });
 
-const prepareDatabase = async (startupSafety) => {
+const prepareDatabase = async (startupSafety, stockyCommerceRuntime) => {
     if (!startupSafety.shouldVerifyDbConnection) {
         console.log('Veritabani baglantisi ve schema init SKIP_SCHEMA_INIT=true ile atlandi.');
         return;
@@ -623,22 +650,36 @@ const prepareDatabase = async (startupSafety) => {
     await createNotificationsTable();
     await createCommerceSchema();
     await createAnalyticsSchema();
-    if (localSellerApiEnabled) await applyLocalSellerMigrations();
+    if (sellerApiActivation.enabled || stockyCommerceRuntime.enabled) {
+        await applyLocalSellerMigrations();
+    }
     await applyLocalMain6sOperationMigrations();
 };
 
 const start = async () => {
-    const configuredBindHost = String(process.env.NOVASTORE_BIND_HOST || '').trim();
     try {
-        if (localSellerApiEnabled && configuredBindHost !== '127.0.0.1') {
-            throw new Error('Seller API local mode requires NOVASTORE_BIND_HOST=127.0.0.1.');
-        }
+        const stockyCommerceRuntime = resolveStockySystemCommerceRuntime({
+            environment: process.env,
+            startupSafety
+        });
         console.log(`Veritabani hedefi: ${startupSafety.target.label}`);
-        await prepareDatabase(startupSafety);
+        await prepareDatabase(startupSafety, stockyCommerceRuntime);
+        if ((sellerApiActivation.requiresConnectedDatabaseIdentity || stockyCommerceRuntime.enabled)
+            && !startupSafety.shouldVerifyDbConnection) {
+            throw new Error('RUNTIME_DATABASE_IDENTITY_REQUIRED');
+        }
+        if (sellerApiActivation.requiresConnectedDatabaseIdentity || stockyCommerceRuntime.enabled) {
+            await assertRuntimeDatabaseIdentity({ database: pool, target: startupSafety.target });
+        }
+        configureSellerRoutes();
         if (!startupSafety.localPreviewMode) await socketRevocationService.start();
         if (startupSafety.shouldVerifyDbConnection) {
-            const { startNotificationWorker } = require('./services/notificationWorkerService');
             startNotificationWorker({ database: pool, getIo: () => io });
+            startStockyOrderDeliveryWorker({
+                database: pool,
+                runtime: stockyCommerceRuntime,
+                environment: process.env
+            });
         }
     } catch (err) {
         console.error('Veritabani hazirlama hatasi:', pool.formatError(err));
@@ -654,5 +695,32 @@ const start = async () => {
         console.log('Socket.io hazir!');
     });
 };
+
+let shutdownPromise = null;
+const shutdown = () => {
+    if (shutdownPromise) return shutdownPromise;
+    shutdownPromise = (async () => {
+        stopStockyOrderDeliveryWorker();
+        stopNotificationWorker();
+        await socketRevocationService.stop();
+        await new Promise((resolve) => {
+            if (!server.listening) return resolve();
+            return server.close(resolve);
+        });
+        await pool.end?.();
+    })();
+    return shutdownPromise;
+};
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.once(signal, () => {
+        shutdown()
+            .then(() => { process.exitCode = 0; })
+            .catch((error) => {
+                console.error('Sunucu kapatma hatasi:', pool.formatError(error));
+                process.exitCode = 1;
+            });
+    });
+}
 
 start();

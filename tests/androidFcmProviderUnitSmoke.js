@@ -233,7 +233,9 @@ const response = (status, value) => ({
     assert.match(sellerRoutes, /sellerAudienceAuthenticate,[\s\S]*requireLiveSellerSession,[\s\S]*resolveServerTenantContext/u);
     const serverSource = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
     assert.match(serverSource, /app\.use\('\/api\/notifications', notificationRoutes\)/u);
-    assert.match(serverSource, /app\.use\('\/api\/seller\/v1', createSellerNotificationRouter/u);
+    assert.match(serverSource, /app\.use\('\/api\/seller\/v1', sellerApiRouter\)/u);
+    assert.match(serverSource, /sellerApiRouter\.use\(createSellerNotificationRouter\(\{ enabled: true, auth, tenant \}\)\)/u);
+    assert.match(serverSource, /await assertRuntimeDatabaseIdentity\([\s\S]*?configureSellerRoutes\(\)/u);
 
     console.log('Android FCM provider unit smoke passed: strict endpoint contract, HTTP v1 auth, safe typed payload, failure classes, guarded routes');
 })().catch((error) => {

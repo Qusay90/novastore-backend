@@ -6,6 +6,7 @@ const {
 const MAIN6T_SESSION_BINDING_ID = '20260820_01_main6t_seller_session_membership_binding';
 const MAIN6T_SESSION_BINDING_PATH = 'migrations/20260820_01_main6t_seller_session_membership_binding.sql';
 const R10_REPUTATION_MIGRATION = Object.freeze({ id: '20260904_01_seller_reputation_questions', path: 'migrations/20260904_01_seller_reputation_questions.sql' });
+const R21_STOCKY_SYSTEM_COMMERCE_MIGRATION = Object.freeze({ id: '20260915_01_stocky_system_commerce', path: 'migrations/20260915_01_stocky_system_commerce.sql' });
 const MAIN6U_MIGRATIONS = Object.freeze([
     Object.freeze({ id: '20260821_01_seller_password_recovery', path: 'migrations/20260821_01_seller_password_recovery.sql' }),
     Object.freeze({ id: '20260821_02_seller_applications', path: 'migrations/20260821_02_seller_applications.sql' }),
@@ -50,7 +51,12 @@ const selectLocalSellerMigrations = (options = {}) => {
     ) {
         throw new Error('Combined migration registry is missing the Main-6T Seller session-membership binding migration.');
     }
-    const main6uMigrations = [...MAIN6U_MIGRATIONS, R10_REPUTATION_MIGRATION, {id:'20260908_01_purchasable_variants',path:'migrations/20260908_01_purchasable_variants.sql'}].map((expected) => {
+    const main6uMigrations = [
+        ...MAIN6U_MIGRATIONS,
+        R10_REPUTATION_MIGRATION,
+        { id: '20260908_01_purchasable_variants', path: 'migrations/20260908_01_purchasable_variants.sql' },
+        R21_STOCKY_SYSTEM_COMMERCE_MIGRATION
+    ].map((expected) => {
         const migration = registry.find((entry) => entry.id === expected.id);
         if (
             !migration || migration.path !== expected.path ||
@@ -93,6 +99,7 @@ const applyLocalSellerMigrations = async ({
 
 module.exports = {
     R10_REPUTATION_MIGRATION,
+    R21_STOCKY_SYSTEM_COMMERCE_MIGRATION,
     MAIN6U_MIGRATIONS,
     applyLocalSellerMigrations,
     selectLocalSellerMigrations,

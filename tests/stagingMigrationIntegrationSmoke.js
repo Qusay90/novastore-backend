@@ -31,8 +31,9 @@ const env = {
     DATABASE_URL: connectionString
 };
 const registry = loadRegistry();
-assert.equal(registry.length, 39);
-assert.equal(registry.at(-1).id, '20260908_01_purchasable_variants');
+assert.equal(registry.length, 40);
+assert.equal(registry.at(-2).id, '20260908_01_purchasable_variants');
+assert.equal(registry.at(-1).id, '20260915_01_stocky_system_commerce');
 const silent = () => {};
 const admin = new Client({ connectionString, application_name: 'p4d1a_integration_assertions' });
 

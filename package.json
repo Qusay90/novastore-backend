@@ -9,6 +9,7 @@
     "review:official-runtime": "node scripts/serveOfficialRuntimeReview.mjs",
     "test": "node scripts/runCiSmokes.js",
     "test:ci": "node scripts/runCiSmokes.js",
+    "test:stocky-system:integration": "node tests/stockySystemCommercePostgresSmoke.js --execute-disposable-db",
     "test:admin-order-delivery:integration": "node tests/adminOrderDeliveryPostgresSmoke.js --execute-disposable-db",
     "test:purchasable-variants:integration": "node tests/purchasableVariantPostgresSmoke.js --execute-disposable-db",
     "test:canonical-commerce:integration": "node tests/canonicalCommercePostgresSmoke.js --execute-disposable-db",

@@ -488,7 +488,14 @@ This subsection is a binding `PROPOSED_NOT_IMPLEMENTED` security contract. It de
 
 ## Reviews ve questions
 
-R10 REP aktivasyonu mevcut global Seller gate'ini kullanır: `SELLER_API_V1_ENABLED=true` **ve** `SELLER_API_V1_LOCAL_ONLY=true`; adlı loopback veritabanı ve `NOVASTORE_BIND_HOST=127.0.0.1` zorunludur. Bu global gate değiştirilmemiştir; ayrı sahte/local-only soru API'si oluşturulmamıştır. Kanonik backend kodu uygulanmıştır, production deployment `NOT_DONE`.
+R10 REP rotaları ortak Seller aktivasyon sözleşmesini kullanır. Seller V1 varsayılan olarak kapalıdır ve `SELLER_API_V1_ENABLED=true` tek başına rota açmaz.
+
+- Yerel geliştirme/test: `SELLER_API_V1_LOCAL_ONLY=true`, adlandırılmış loopback veritabanı, uzak DB izni kapalı ve `NOVASTORE_BIND_HOST=127.0.0.1` zorunludur. Eski yerel harness uyumluluğu için activation mode yalnız bu kesin yerel birleşimde verilmezse `local` kabul edilir.
+- Tek kullanımlık yerel UAT: `SELLER_API_V1_ACTIVATION_MODE=uat`, `NODE_ENV=test` ve aynı loopback sınırlarını kullanır.
+- Uzak UAT: `SELLER_API_V1_ACTIVATION_MODE=uat`, `NODE_ENV=production`, `NOVASTORE_DEPLOY_ENV=staging`, açık HTTPS Seller origin'i, tam uzak DB host/ad/TLS attestation'ı, bağımsız güvenlik sırları ve dar ingress IP/CIDR listesi ister.
+- Production: `SELLER_API_V1_ACTIVATION_MODE=production`, `NODE_ENV=production`, `NOVASTORE_DEPLOY_ENV=production`, `SELLER_API_V1_LOCAL_ONLY=false`, açık HTTPS Seller origin'i, dar trusted-ingress listesi, güvenli proxy topolojisi, bağımsız Seller/JWT sırları ve attested TLS veritabanı zorunludur. Bağlanılan PostgreSQL'in gerçek `current_database()` ve sunucu portu yapılandırılan hedefle eşleşmeden Seller router doldurulmaz ve dinleyici açılmaz. Doğrudan TLS yoksa yalnız listedeki ingress peer'in tek `X-Forwarded-Proto: https` bildirimi kabul edilir.
+
+Bu sözleşme üretimi etkinleştirmez ve deployment yapmaz; yalnız açıkça yapılandırılmış ilerideki aktivasyonun fail-closed koşullarını tanımlar. Kanonik backend kodu uygulanmıştır, production deployment `NOT_DONE`.
 
 Doğrulama: `npm run test:seller-reputation` → `PASS`, `67` reddedilen girdi senaryosu, `3` route ve migration kontrolleri; `npm run test:seller-reputation:integration` → `PASS`, `172` gerçek HTTP kontrolü. Yerel auth/Customer-Seller-Admin akışı, dört rollback enjeksiyonu, yetki kilidi çekişmesi, eşzamanlılık, imleç/imza/kapsam ve bildirim dedupe doğrulandı. Bağımsız review: `HIGH=0`, `MEDIUM=0`.
 

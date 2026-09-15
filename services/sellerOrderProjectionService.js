@@ -4,6 +4,9 @@ const { appendOrderEvent } = require('./orderService');
 const {
     assertApprovedSellerPublicLegalIdentity
 } = require('./sellerPublicLegalIdentityService');
+const { resolveStartupSafety } = require('../config/startupSafety');
+const { resolveStockySystemCommerceRuntime } = require('./stockySystemConnectorService');
+const { enqueueStockyOrderCreated } = require('./stockyOrderDeliveryService');
 
 const PLATFORM_STORE_SLUG = 'novastore-platform';
 
@@ -304,10 +307,22 @@ const buildSellerOrderProjection = async (client, pricedItems) => (
     await buildCheckoutSalesPartyProjection(client, pricedItems)
 ).sellerProjection;
 
-const materializeSellerOrderProjection = async (client, canonicalOrderId, projection) => {
+const resolveStockyRuntime = (options = {}) => {
+    if (options.stockyRuntime) return options.stockyRuntime;
+    if (String(process.env.NOVASTORE_STOCKY_SYSTEM_COMMERCE_ENABLED || '').trim().toLowerCase() !== 'true') {
+        return Object.freeze({ enabled: false });
+    }
+    return resolveStockySystemCommerceRuntime({
+        environment: process.env,
+        startupSafety: resolveStartupSafety(process.env)
+    });
+};
+
+const materializeSellerOrderProjection = async (client, canonicalOrderId, projection, options = {}) => {
     if (!Array.isArray(projection) || projection.length === 0) {
         return Object.freeze({ sellerOrderIds: Object.freeze([]) });
     }
+    const stockyRuntime = resolveStockyRuntime(options);
     const sellerOrderIds = [];
     for (const allocation of projection) {
         const insert = await client.query(
@@ -315,7 +330,7 @@ const materializeSellerOrderProjection = async (client, canonicalOrderId, projec
                 (organization_id, store_id, canonical_order_id, status, currency, gross_minor)
              VALUES ($1, $2, $3, 'new', $4, $5)
              ON CONFLICT (canonical_order_id, store_id) DO NOTHING
-             RETURNING id`,
+             RETURNING id, revision`,
             [
                 allocation.organizationId,
                 allocation.storeId,
@@ -325,9 +340,13 @@ const materializeSellerOrderProjection = async (client, canonicalOrderId, projec
             ]
         );
         let sellerOrderId = Number(insert.rows?.[0]?.id);
+        // Old focused query fakes returned only the id. A real row always has the
+        // schema default revision, so preserve those tests without weakening the
+        // durable producer value.
+        let sellerOrderRevision = Number(insert.rows?.[0]?.revision ?? 1);
         if (!Number.isSafeInteger(sellerOrderId)) {
             const existing = await client.query(
-                `SELECT id
+                `SELECT id, revision
                  FROM seller_orders
                  WHERE canonical_order_id = $1
                    AND organization_id = $2
@@ -335,8 +354,9 @@ const materializeSellerOrderProjection = async (client, canonicalOrderId, projec
                 [canonicalOrderId, allocation.organizationId, allocation.storeId]
             );
             sellerOrderId = Number(existing.rows?.[0]?.id);
+            sellerOrderRevision = Number(existing.rows?.[0]?.revision ?? 1);
         }
-        if (!Number.isSafeInteger(sellerOrderId)) {
+        if (!Number.isSafeInteger(sellerOrderId) || !Number.isSafeInteger(sellerOrderRevision)) {
             throw new SellerOrderProjectionError('SELLER_ORDER_PROJECTION_WRITE_FAILED');
         }
         sellerOrderIds.push(sellerOrderId);
@@ -372,6 +392,14 @@ const materializeSellerOrderProjection = async (client, canonicalOrderId, projec
              )`,
             [allocation.organizationId, allocation.storeId, sellerOrderId]
         );
+        await enqueueStockyOrderCreated(client, {
+            canonicalOrderId,
+            sellerOrderId,
+            sellerOrderRevision,
+            organizationId: allocation.organizationId,
+            storeId: allocation.storeId,
+            allocation
+        }, { runtime: stockyRuntime });
     }
     await appendOrderEvent(
         client,

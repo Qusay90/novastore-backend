@@ -271,5 +271,12 @@
     "sha256": "6b3c2d9921d622503e8ec6ff2e9c974cee9f19839b7e904424e496a98aceeaca",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260915_01_stocky_system_commerce",
+    "path": "migrations/20260915_01_stocky_system_commerce.sql",
+    "sha256": "2ae067b604708630c994f489ae10c33813e41fca63143de3c0e67045c8636dca",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]
