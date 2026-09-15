@@ -39,7 +39,7 @@ test("checkout totals remain server-coherent and cart quantity is capped at 20",
     total: 999,
   })).toBeNull();
   expect(() => customerCheckoutApiTestUtils.canonicalCartItems([{ id: 7, quantity: 21 }])).toThrow(/Sepet ürünü geçersiz/u);
-  expect(customerCheckoutApiTestUtils.canonicalCartItems([{ id: 7, quantity: 9 }, { id: 7, quantity: 11 }])).toEqual([{ id: 7, quantity: 20 }]);
+  expect(customerCheckoutApiTestUtils.canonicalCartItems([{ id: 7, quantity: 9 }, { id: 7, quantity: 11 }])).toEqual([{ product_id: 7, quantity: 20 }]);
   expect(() => customerCheckoutApiTestUtils.canonicalCartItems([{ id: 7, quantity: 12 }, { id: 7, quantity: 9 }])).toThrow(/en fazla 20 adet/u);
   expect(() => customerCheckoutApiTestUtils.canonicalCartItems(
     Array.from({ length: 21 }, (_, index) => ({ id: index + 1, quantity: 1 })),
@@ -61,7 +61,7 @@ test("checkout consent preserves canonical snapshot, versions and accepted flags
     ],
     quote: {
       totals: { subtotal: 100, discount: 0, shipping: 0, total: 100, currency: "TRY" },
-      items: [{ id: 7, name: "Ürün", quantity: 1, price: 100, lineTotal: 100, image: null }],
+      items: [{ id: 7, variantId: null, variantSelections: [], sku: null, name: "Ürün", quantity: 1, price: 100, lineTotal: 100, image: null }],
       couponApplied: false,
       couponCode: null,
     },

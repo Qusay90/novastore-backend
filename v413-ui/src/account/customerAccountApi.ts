@@ -2,6 +2,8 @@ import {
   CustomerNotificationApiError,
   requestCustomerApi,
 } from "../notifications/customerNotificationApi";
+import { canonicalVariantId, type CustomerVariantSelection } from "../adapters/canonicalVariant";
+import { normalizeCanonicalVariantSelections } from "../adapters/customerProductContract";
 
 export type CustomerProfile = Readonly<{
   id: number;
@@ -26,6 +28,9 @@ export type CustomerAddressInput = Readonly<Omit<CustomerAddress, "id">>;
 
 export type CustomerOrderItem = Readonly<{
   id: number | null;
+  variantId: number | null;
+  variantSelections: readonly CustomerVariantSelection[];
+  sku: string | null;
   name: string;
   quantity: number;
   price: number;
@@ -444,8 +449,34 @@ function normalizeOrderItem(value: unknown): CustomerOrderItem | null {
   const name = text(source.name);
   const price = Number(source.price ?? 0);
   if (!name || !Number.isFinite(price) || price < 0) return null;
+  const id = positiveInteger(source.id ?? source.productId ?? source.product_id);
+  const hasSnakeVariantId = source.variant_id !== null && source.variant_id !== undefined;
+  const hasCamelVariantId = source.variantId !== null && source.variantId !== undefined;
+  const snakeVariantId = hasSnakeVariantId ? canonicalVariantId(source.variant_id) : null;
+  const camelVariantId = hasCamelVariantId ? canonicalVariantId(source.variantId) : null;
+  if (
+    (hasSnakeVariantId && !snakeVariantId)
+    || (hasCamelVariantId && !camelVariantId)
+    || (snakeVariantId && camelVariantId && snakeVariantId !== camelVariantId)
+  ) return null;
+  const variantId = snakeVariantId ?? camelVariantId;
+  if (variantId && !id) return null;
+  let variantSelections: readonly CustomerVariantSelection[] = Object.freeze([]);
+  let sku: string | null = null;
+  if (variantId) {
+    try {
+      variantSelections = normalizeCanonicalVariantSelections(source.variant_selections ?? source.variantSelections);
+    } catch {
+      return null;
+    }
+    sku = text(source.sku) || null;
+    if (!sku) return null;
+  }
   return Object.freeze({
-    id: positiveInteger(source.id ?? source.productId ?? source.product_id),
+    id,
+    variantId,
+    variantSelections,
+    sku,
     name,
     quantity: Math.max(1, Number.parseInt(text(source.quantity || 1), 10) || 1),
     price,

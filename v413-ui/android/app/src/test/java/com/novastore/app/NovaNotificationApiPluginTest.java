@@ -31,6 +31,7 @@ public final class NovaNotificationApiPluginTest {
         assertTrue(NovaNotificationApiPlugin.allowed("/api/reviews/user/7", "GET"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/messages/history/7", "GET"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/products/7", "GET"));
+        assertTrue(NovaNotificationApiPlugin.unauthenticated("/api/products/7", "GET"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/users/me", "GET"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/users/me", "PATCH"));
         assertTrue(NovaNotificationApiPlugin.allowed("/api/users/register", "POST"));
@@ -87,6 +88,9 @@ public final class NovaNotificationApiPluginTest {
         assertFalse(NovaNotificationApiPlugin.allowed("/api/favorites/0", "POST"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/favorites/71?debug=1", "POST"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/favorites/71", "GET"));
+        assertFalse(NovaNotificationApiPlugin.unauthenticated("/api/products/0", "GET"));
+        assertFalse(NovaNotificationApiPlugin.unauthenticated("/api/products/7?debug=1", "GET"));
+        assertFalse(NovaNotificationApiPlugin.unauthenticated("/api/products/7", "POST"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/questions/ask", "GET"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/reviews", "GET"));
         assertFalse(NovaNotificationApiPlugin.allowed("/api/campaigns/coupons/active", "POST"));

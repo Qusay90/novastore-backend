@@ -117,7 +117,9 @@ public final class NovaNotificationApiPlugin extends Plugin {
             call.reject("CUSTOMER_SESSION_INVALID");
             return;
         }
-        boolean publicGet = "GET".equals(method) && UNAUTHENTICATED_GET.contains(path);
+        boolean publicGet = "GET".equals(method) && (
+            UNAUTHENTICATED_GET.contains(path) || PUBLIC_PRODUCT.matcher(path).matches()
+        );
         boolean authenticated = !(publicGet || ("POST".equals(method) && (UNAUTHENTICATED_POST.contains(path) || optionalAuthentication)));
         if (authenticated && token == null) {
             call.reject("CUSTOMER_SESSION_MISSING");
@@ -323,7 +325,9 @@ public final class NovaNotificationApiPlugin extends Plugin {
     }
 
     static boolean unauthenticated(String path, String method) {
-        return ("GET".equals(method) && UNAUTHENTICATED_GET.contains(path))
+        return ("GET".equals(method) && (
+            UNAUTHENTICATED_GET.contains(path) || PUBLIC_PRODUCT.matcher(path).matches()
+        ))
             || ("POST".equals(method) && UNAUTHENTICATED_POST.contains(path));
     }
 

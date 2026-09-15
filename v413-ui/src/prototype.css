@@ -1654,3 +1654,15 @@ body:has(.capture-mode) .device-screen:has(.capture-mode) > :is(.sheet-overlay, 
   .saved-address > div:last-child { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; }
   .payment-add-form > div:not(.saved-payment-card) { grid-template-columns: 1fr; }
 }
+/* Canonical combinations use the accepted PDP's navy controls and text scale. */
+.canonical-variants { margin: 18px 0; }
+.canonical-variants h2 { font-size: 14px; margin: 0 0 10px; }
+.canonical-variants [role="radiogroup"] { display: grid; gap: 8px; }
+.canonical-variants button { position: relative; display: grid; gap: 4px; min-height: 48px; padding: 12px 40px 12px 12px; border: 1px solid #dce0e8; border-radius: 12px; background: white; color: var(--nova-navy); text-align: left; font: inherit; }
+.canonical-variants button span { font-weight: 600; overflow-wrap: anywhere; }
+.canonical-variants button small, .canonical-variants p { font-size: 12px; line-height: 1.5; }
+.canonical-variants button.selected { border-color: var(--nova-navy); background: #f1f3f7; }
+.canonical-variants button > svg { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; }
+.canonical-variants button:disabled { color: #656b77; background: #f4f4f5; cursor: not-allowed; }
+.canonical-variants button:focus-visible { outline: 2px solid var(--nova-navy); outline-offset: 2px; }
+.cart-variant-label, .order-variant-label { overflow-wrap: anywhere; }

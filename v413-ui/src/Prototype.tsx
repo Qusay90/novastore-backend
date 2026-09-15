@@ -54,12 +54,15 @@ import { BottomSheet, Carousel, KeyboardInput, KeyboardTextarea, MobileScroll, u
 import {
   DEFAULT_PUBLIC_STORE_SLUG,
   loadCanonicalPublicStore,
+  loadCanonicalProductDetail,
   orderedCustomerCardMedia,
   orderedCustomerOriginalMediaUrls,
   type CustomerCardFraming,
   type CustomerPublicStoreProjection,
   type CustomerStorePresentationMode,
+  type CustomerCanonicalProductDetail,
 } from "./adapters";
+import { deviceCartKey, readDeviceCart, saveDeviceCart, readDeviceVariantSelection, saveDeviceVariantSelection, type DeviceCartLine } from "./checkout/deviceCart";
 import { hasAppOwnedBackEntry, nativeHistoryDepth } from "./native/nativeNavigation";
 import { canonicalNativeRoute, canonicalNativeRouteOrSafeDefault } from "./native/routeContract";
 import { useCustomerAccountRuntime, type CustomerAddressInput, type CustomerOrder } from "./account";
@@ -169,6 +172,7 @@ type Product = {
   cardMedia?: readonly ProductCardAsset[];
   isPurchasable?: boolean;
   isPublicProjection?: boolean;
+  canonicalDetail?: CustomerCanonicalProductDetail;
 };
 
 type SavedAddress = {
@@ -216,11 +220,7 @@ type ProductQuestion = {
 
 type NotificationPreference = "orders" | "campaigns" | "questions";
 
-type CartLine = {
-  id: string;
-  productId: string;
-  quantity: number;
-};
+type CartLine = DeviceCartLine;
 
 type CatalogFilters = {
   brands: string[];
@@ -238,14 +238,24 @@ const MAX_CART_QUANTITY_PER_PRODUCT = 20;
 const MAX_CART_TOTAL_QUANTITY = 50;
 type CartMutationResult = Readonly<{
   addedQuantity: number;
-  reason: "added" | "per-product-limit" | "distinct-limit" | "total-limit";
+  reason: "added" | "per-product-limit" | "distinct-limit" | "total-limit" | "selection-required" | "unavailable" | "busy";
 }>;
 
 function cartMutationMessage(result: CartMutationResult) {
   if (result.reason === "per-product-limit") return "Bu üründen sepete en fazla 20 adet ekleyebilirsin.";
   if (result.reason === "distinct-limit") return "Sepette en fazla 20 farklı ürün olabilir.";
   if (result.reason === "total-limit") return "Sepette toplam en fazla 50 ürün olabilir.";
+  if (result.reason === "selection-required") return "Ürün seçeneğini belirlemelisin.";
+  if (result.reason === "unavailable") return "Bu seçenek için yeterli stok yok. Ürün seçeneklerini yenile.";
+  if (result.reason === "busy") return "Sepet güncelleniyor.";
   return "";
+}
+
+function productRequestMessage(error: unknown): string {
+  if (!navigator.onLine) return "İnternet bağlantısı yok. Bağlantını kontrol edip yeniden dene.";
+  if (error instanceof CustomerNotificationApiError && error.status === 404) return "Ürün artık mevcut değil.";
+  if (error instanceof CustomerNotificationApiError && error.status === 401) return "Oturumun sona erdi. Yeniden giriş yap.";
+  return "Ürünün güncel fiyatı, stoku ve seçenekleri doğrulanamadı. Yeniden dene.";
 }
 
 type CommerceState = {
@@ -267,7 +277,7 @@ type CommerceState = {
   catalogFilters: CatalogFilters;
   catalogSort: CatalogSortKey;
   toggleFavorite: (id: string) => Promise<boolean>;
-  addToCart: (productId: string, quantity?: number) => CartMutationResult;
+  addToCart: (productId: string, quantity?: number, variantId?: number) => Promise<CartMutationResult>;
   changeCartQuantity: (lineId: string, delta: number) => void;
   removeCartLine: (lineId: string) => void;
   clearCart: () => void;
@@ -408,10 +418,17 @@ export default function Prototype() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const [route, setRoute] = useState<Route>(readRoute);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => new Set());
-  const [cartLines, setCartLines] = useState<CartLine[]>(() => NATIVE_SHELL ? [] : [
+  const [cartLines, setCartLines] = useState<CartLine[]>(() => NATIVE_SHELL ? readDeviceCart() : [
     { id: "headphones", productId: "pulse-anc", quantity: 1 },
     { id: "coffee", productId: "barista-pro", quantity: 2 },
   ]);
+  const cartLinesRef = useRef(cartLines);
+  const cartMutationLock = useRef(false);
+  const commitCart = (lines: CartLine[]) => {
+    cartLinesRef.current = lines;
+    setCartLines(lines);
+    if (NATIVE_SHELL) saveDeviceCart(lines);
+  };
   const [appliedCoupon, setAppliedCoupon] = useState(() => NATIVE_SHELL ? "" : "NOVAYAZ");
   const [selectedProductId, setSelectedProductId] = useState("pulse-anc");
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
@@ -641,53 +658,66 @@ export default function Prototype() {
         favoriteMutationLock.current = false;
       }
     },
-    addToCart: (productId, quantity = 1) => {
-      const requestedQuantity = Math.max(1, Math.floor(quantity));
-      const currentTotal = cartLines.reduce((total, line) => total + line.quantity, 0);
-      const existing = cartLines.find((line) => line.productId === productId);
-      if (existing) {
-        if (existing.quantity >= MAX_CART_QUANTITY_PER_PRODUCT) {
-          return Object.freeze({ addedQuantity: 0, reason: "per-product-limit" });
+    addToCart: async (productId, quantity = 1, variantId) => {
+      if (cartMutationLock.current) return { addedQuantity: 0, reason: "busy" };
+      cartMutationLock.current = true;
+      try {
+        let product = publicProducts[productId];
+        let availableStock = product?.stock ?? MAX_CART_QUANTITY_PER_PRODUCT;
+        let selectedVariant;
+        if (NATIVE_SHELL) {
+          const canonical = await loadCanonicalProductDetail(productId);
+          product = productFromCanonicalDetail(canonical, product);
+          registerPublicProducts([product]);
+          if (canonical.variantSelectionRequired && variantId === undefined) return { addedQuantity: 0, reason: "selection-required" };
+          selectedVariant = variantId === undefined ? undefined : canonical.variants?.find((variant) => variant.id === variantId);
+          if (!canonical.isPurchasable || (variantId !== undefined && (!canonical.variantSelectionRequired || !selectedVariant?.purchasable))) {
+            return { addedQuantity: 0, reason: "unavailable" };
+          }
+          availableStock = selectedVariant?.availableStock ?? canonical.stock;
         }
-        if (currentTotal >= MAX_CART_TOTAL_QUANTITY) {
-          return Object.freeze({ addedQuantity: 0, reason: "total-limit" });
-        }
-        const nextQuantity = Math.min(
-          MAX_CART_QUANTITY_PER_PRODUCT,
-          existing.quantity + requestedQuantity,
-          existing.quantity + Math.max(0, MAX_CART_TOTAL_QUANTITY - currentTotal),
-        );
-        setCartLines(cartLines.map((line) => line.id === existing.id ? { ...line, quantity: nextQuantity } : line));
-        return Object.freeze({ addedQuantity: nextQuantity - existing.quantity, reason: "added" });
-      }
-      if (cartLines.length >= MAX_CART_DISTINCT_PRODUCTS) {
-        return Object.freeze({ addedQuantity: 0, reason: "distinct-limit" });
-      }
-      if (currentTotal >= MAX_CART_TOTAL_QUANTITY) {
-        return Object.freeze({ addedQuantity: 0, reason: "total-limit" });
-      }
-      const nextQuantity = Math.min(
-        MAX_CART_QUANTITY_PER_PRODUCT,
-        requestedQuantity,
-        Math.max(0, MAX_CART_TOTAL_QUANTITY - currentTotal),
-      );
-      setCartLines([...cartLines, { id: `product-${productId}`, productId, quantity: nextQuantity }]);
-      return Object.freeze({ addedQuantity: nextQuantity, reason: "added" });
+        const current = cartLinesRef.current;
+        const currentTotal = current.reduce((total, line) => total + line.quantity, 0);
+        const key = deviceCartKey(productId, variantId);
+        const existing = current.find((line) => line.productId === productId && line.variantId === variantId);
+        const existingQuantity = existing?.quantity ?? 0;
+        if (existingQuantity >= availableStock) return { addedQuantity: 0, reason: "unavailable" };
+        if (existingQuantity >= MAX_CART_QUANTITY_PER_PRODUCT) return { addedQuantity: 0, reason: "per-product-limit" };
+        if (!existing && current.length >= MAX_CART_DISTINCT_PRODUCTS) return { addedQuantity: 0, reason: "distinct-limit" };
+        if (currentTotal >= MAX_CART_TOTAL_QUANTITY) return { addedQuantity: 0, reason: "total-limit" };
+        const requestedQuantity = Number.isSafeInteger(quantity) && quantity > 0 ? quantity : 1;
+        if (NATIVE_SHELL && requestedQuantity > availableStock - existingQuantity) return { addedQuantity: 0, reason: "unavailable" };
+        const addedQuantity = Math.min(requestedQuantity, availableStock - existingQuantity, MAX_CART_QUANTITY_PER_PRODUCT - existingQuantity, MAX_CART_TOTAL_QUANTITY - currentTotal);
+        if (addedQuantity < 1) return { addedQuantity: 0, reason: "unavailable" };
+        const amount = selectedVariant?.price ?? product?.amount ?? 0;
+        const next: CartLine = {
+          id: existing?.id ?? key, productId, quantity: existingQuantity + addedQuantity,
+          ...(variantId === undefined ? {} : { variantId, variantSelections: selectedVariant!.selections }),
+          ...(NATIVE_SHELL && product ? { snapshot: {
+            id: productId, name: product.name, store: product.store, image: product.image,
+            amount, price: formatCatalogPrice(amount), stock: availableStock, isPublicProjection: true as const,
+          } } : {}),
+        };
+        commitCart(existing ? current.map((line) => line.id === existing.id ? next : line) : [...current, next]);
+        return { addedQuantity, reason: "added" };
+      } finally { cartMutationLock.current = false; }
     },
-    changeCartQuantity: (lineId, delta) => setCartLines((current) => {
+    changeCartQuantity: (lineId, delta) => {
+      const current = cartLinesRef.current;
       const currentTotal = current.reduce((total, line) => total + line.quantity, 0);
-      return current.flatMap((line) => {
+      commitCart(current.flatMap((line) => {
         if (line.id !== lineId) return [line];
         const requestedQuantity = line.quantity + delta;
         if (requestedQuantity <= 0) return [];
+        const stock = NATIVE_SHELL ? line.snapshot?.stock ?? 0 : MAX_CART_QUANTITY_PER_PRODUCT;
         const nextQuantity = delta > 0
-          ? Math.min(MAX_CART_QUANTITY_PER_PRODUCT, requestedQuantity, line.quantity + Math.max(0, MAX_CART_TOTAL_QUANTITY - currentTotal))
+          ? Math.max(line.quantity, Math.min(stock, MAX_CART_QUANTITY_PER_PRODUCT, requestedQuantity, line.quantity + Math.max(0, MAX_CART_TOTAL_QUANTITY - currentTotal)))
           : requestedQuantity;
         return [{ ...line, quantity: nextQuantity }];
-      });
-    }),
-    removeCartLine: (lineId) => setCartLines((current) => current.filter((line) => line.id !== lineId)),
-    clearCart: () => setCartLines([]),
+      }));
+    },
+    removeCartLine: (lineId) => commitCart(cartLinesRef.current.filter((line) => line.id !== lineId)),
+    clearCart: () => commitCart([]),
     applyCartCoupon: (code) => setAppliedCoupon(code.trim().toLocaleUpperCase("tr-TR")),
     selectProduct: setSelectedProductId,
     selectOrder: setSelectedOrderId,
@@ -1584,6 +1614,38 @@ function productCardPriceFit(formattedPrice: string): ProductCardPriceFit {
   return "regular";
 }
 
+function productFromCanonicalDetail(source: CustomerCanonicalProductDetail, cached?: Product): Product {
+  const originals = source.media.map((item) => item.url);
+  const image = originals[0] ?? source.imageUrl ?? LOGO;
+  const sameStore = cached?.storeSlug === source.store?.slug;
+  return {
+    ...(sameStore ? cached : {}),
+    id: String(source.id), name: source.name, store: source.store?.name ?? "Satıcı bilgisi ödeme adımında doğrulanır",
+    storeSlug: source.store?.slug, image, images: originals.length ? originals : [image],
+    price: formatCatalogPrice(source.price), amount: source.price,
+    old: source.oldPrice === null ? undefined : formatCatalogPrice(source.oldPrice),
+    oldAmount: source.oldPrice ?? undefined, stock: source.stock,
+    badge: undefined, rating: source.averageRating, reviewCount: source.reviewCount,
+    isPurchasable: source.isPurchasable, isPublicProjection: true, canonicalDetail: source,
+  };
+}
+
+function canonicalFeatureValue(value: unknown, depth = 0): string {
+  if (depth > 4) return "";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (typeof value === "boolean") return value ? "Evet" : "Hayır";
+  if (Array.isArray(value)) return value.slice(0, 50).map((entry) => canonicalFeatureValue(entry, depth + 1)).filter(Boolean).join(", ");
+  if (value && typeof value === "object") {
+    const source = value as Record<string, unknown>;
+    if (typeof source.label === "string") return source.label;
+    if (typeof source.min === "number" && typeof source.max === "number"
+      && Number.isFinite(source.min) && Number.isFinite(source.max) && source.min <= source.max) {
+      return `${source.min}–${source.max}`;
+    }
+  }
+  return "";
+}
+
 function productsFromPublicProjection(projection: CustomerPublicStoreProjection): Product[] {
   return projection.products.map((source) => {
     const originals = orderedCustomerOriginalMediaUrls(source);
@@ -1958,6 +2020,7 @@ function ProductCard({ id, name, store, price, old, image, images, badge, rating
   const { favoriteIds, toggleFavorite, addToCart, selectProduct } = useCommerce();
   const favorite = favoriteIds.has(id);
   const [added, setAdded] = useState(false);
+  const [cartBusy, setCartBusy] = useState(false);
   const [cartAnnouncement, setCartAnnouncement] = useState("");
   const [activeImage, setActiveImage] = useState(0);
   const [favoriteMotion, setFavoriteMotion] = useState<"add" | "remove" | null>(null);
@@ -1981,9 +2044,16 @@ function ProductCard({ id, name, store, price, old, image, images, badge, rating
     if (favoriteTimer.current !== null) window.clearTimeout(favoriteTimer.current);
   }, []);
   useEffect(() => setActiveImage(0), [id]);
-  const handleAdd = () => {
-    if (added || readOnlyPreview || !isPurchasable) return;
-    const result = addToCart(id);
+  const handleAdd = async () => {
+    if (added || cartBusy || readOnlyPreview || !isPurchasable) return;
+    setCartBusy(true);
+    try {
+    const result = await addToCart(id);
+    if (result.reason === "selection-required") {
+      selectProduct(id);
+      onClick();
+      return;
+    }
     if (result.addedQuantity < 1) {
       setCartAnnouncement(cartMutationMessage(result));
       if (announcementTimer.current !== null) window.clearTimeout(announcementTimer.current);
@@ -1996,6 +2066,9 @@ function ProductCard({ id, name, store, price, old, image, images, badge, rating
     if (announcementTimer.current !== null) window.clearTimeout(announcementTimer.current);
     resetTimer.current = window.setTimeout(() => setAdded(false), 950);
     announcementTimer.current = window.setTimeout(() => setCartAnnouncement(""), 2_000);
+    } catch (error) {
+      setCartAnnouncement(productRequestMessage(error));
+    } finally { setCartBusy(false); }
   };
   const handleFavorite = async () => {
     if (readOnlyPreview || favoriteBusy) return;
@@ -2074,7 +2147,7 @@ function ProductCard({ id, name, store, price, old, image, images, badge, rating
         </IconButton>
         {favoriteError && <p className="product-favorite-error" role="alert">{favoriteError}</p>}
       </div>
-      <div className="product-copy"><span className="cart-cutout-shadow" aria-hidden="true"><i /></span>{!isPublicProjection && <span className="bestseller"><img src={`${A}/extracts/bestseller-flame-source.png`} alt="" />Çok Satan</span>}<small>{store}</small><button type="button" className="product-title-action" onClick={openProduct}>{name}</button>{hasPublishedRating ? <div className="rating"><span className="rating-stars"><StarFilledIcon /></span><b>{ratingCopy}</b><span>({displayReviewCount})</span></div> : isPublicProjection ? <div className="rating rating-empty"><span>Henüz değerlendirme yok</span></div> : null}<hr /><div className="price" data-price-fit={priceFit} data-old-price-fit={oldPriceFit}><strong>{price}</strong>{old && <del>{old}</del>}</div><button type="button" className={`add-cart${added ? " feedback" : ""}`} data-state={added ? "confirmed" : "idle"} aria-label={readOnlyPreview ? `${name} sepete ekle · önizlemede kapalı` : added ? `${name} sepete eklendi` : !isPurchasable ? `${name} şu anda satın alınamaz` : `${name} sepete ekle`} aria-pressed={added} disabled={readOnlyPreview || !isPurchasable || added} aria-disabled={readOnlyPreview || !isPurchasable || added} onClick={handleAdd}><span className="add-cart-visual"><span className="cart-idle-glyph"><ShoppingCartSimpleIcon className="cart-resting-icon" weight="regular" /><PlusIcon className="cart-state-mark" /></span><CheckIcon className="cart-confirm-check" /></span></button><span className="visually-hidden" role="status" aria-live="polite">{cartAnnouncement}</span></div>
+      <div className="product-copy"><span className="cart-cutout-shadow" aria-hidden="true"><i /></span>{!isPublicProjection && <span className="bestseller"><img src={`${A}/extracts/bestseller-flame-source.png`} alt="" />Çok Satan</span>}<small>{store}</small><button type="button" className="product-title-action" onClick={openProduct}>{name}</button>{hasPublishedRating ? <div className="rating"><span className="rating-stars"><StarFilledIcon /></span><b>{ratingCopy}</b><span>({displayReviewCount})</span></div> : isPublicProjection ? <div className="rating rating-empty"><span>Henüz değerlendirme yok</span></div> : null}<hr /><div className="price" data-price-fit={priceFit} data-old-price-fit={oldPriceFit}><strong>{price}</strong>{old && <del>{old}</del>}</div><button type="button" className={`add-cart${added ? " feedback" : ""}`} data-state={added ? "confirmed" : "idle"} aria-label={readOnlyPreview ? `${name} sepete ekle · önizlemede kapalı` : added ? `${name} sepete eklendi` : !isPurchasable ? `${name} şu anda satın alınamaz` : `${name} sepete ekle`} aria-pressed={added} disabled={readOnlyPreview || !isPurchasable || added || cartBusy} aria-disabled={readOnlyPreview || !isPurchasable || added || cartBusy} onClick={handleAdd}><span className="add-cart-visual"><span className="cart-idle-glyph"><ShoppingCartSimpleIcon className="cart-resting-icon" weight="regular" /><PlusIcon className="cart-state-mark" /></span><CheckIcon className="cart-confirm-check" /></span></button><span className="visually-hidden" role="status" aria-live="polite">{cartAnnouncement}</span></div>
     </article>
   );
 }
@@ -2151,42 +2224,66 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   const accountRuntime = useCustomerAccountRuntime();
   const { favoriteIds, toggleFavorite, addToCart, cartLines, cartCount, selectedProductId, selectProduct, publicProducts, publicCatalogPhase, reloadPublicCatalog, registerPublicProducts, productReviews, productQuestions, publishReview, submitProductQuestion } = useCommerce();
   const readOnlyPreview = route.mode === "preview";
-  const routedProduct = route.productId ? publicProducts[route.productId] : undefined;
-  const catalogProduct = routedProduct || publicProducts[selectedProductId] || products.find((product) => product.id === selectedProductId) || products[0];
-  const [remoteLoadState, setRemoteLoadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const requestedProductId = route.productId ?? selectedProductId;
+  const [loadedProduct, setLoadedProduct] = useState<Product | null>(null);
+  const routedProduct = publicProducts[requestedProductId];
+  const catalogProduct = (loadedProduct?.id === requestedProductId ? loadedProduct : null)
+    || routedProduct || products.find((product) => product.id === selectedProductId) || products[0];
+  const [remoteLoadState, setRemoteLoadState] = useState<"idle" | "loading" | "ready" | "error" | "offline" | "unavailable" | "session-expired">("idle");
   const [remoteLoadRevision, setRemoteLoadRevision] = useState(0);
+  const [variantSelection, setVariantSelection] = useState(() => ({ productId: requestedProductId, variantId: NATIVE_SHELL ? readDeviceVariantSelection(requestedProductId) : undefined }));
+  const canonical = catalogProduct.canonicalDetail;
+  const variantRequired = NATIVE_SHELL && canonical?.variantSelectionRequired === true;
+  const selectedVariantId = variantSelection.productId === requestedProductId ? variantSelection.variantId : undefined;
+  const selectedVariant = variantRequired ? canonical?.variants?.find((variant) => variant.id === selectedVariantId) : undefined;
+  const selectedAvailability = variantRequired ? selectedVariant?.availableStock ?? 0 : catalogProduct.stock;
+  const purchasable = catalogProduct.isPurchasable !== false && (!variantRequired || selectedVariant?.purchasable === true);
+  const [purchaseBusy, setPurchaseBusy] = useState(false);
+  const [purchaseError, setPurchaseError] = useState("");
 
   useEffect(() => {
-    if (!route.storeSlug || !route.productId || publicProducts[route.productId]) {
-      setRemoteLoadState("idle");
-      return;
-    }
+    setVariantSelection({ productId: requestedProductId, variantId: NATIVE_SHELL ? readDeviceVariantSelection(requestedProductId) : undefined });
+  }, [requestedProductId]);
+  useEffect(() => {
     let active = true;
-    setRemoteLoadState("loading");
-    loadCanonicalPublicStore(route.storeSlug)
-      .then((projection) => {
+    if (NATIVE_SHELL) {
+      setRemoteLoadState("loading");
+      setLoadedProduct(null);
+      loadCanonicalProductDetail(requestedProductId)
+        .then((value) => {
+          if (!active) return;
+          const product = productFromCanonicalDetail(value, publicProducts[requestedProductId]);
+          setLoadedProduct(product);
+          registerPublicProducts([product]);
+          setRemoteLoadState("ready");
+        })
+        .catch((error) => {
+          if (!active) return;
+          const status = error instanceof CustomerNotificationApiError ? error.status : 0;
+          setRemoteLoadState(!navigator.onLine ? "offline" : status === 401 ? "session-expired" : status === 404 || status === 410 ? "unavailable" : "error");
+        });
+    } else if (route.storeSlug && route.productId && !publicProducts[route.productId]) {
+      setRemoteLoadState("loading");
+      loadCanonicalPublicStore(route.storeSlug).then((projection) => {
         if (!active) return;
         const incoming = productsFromPublicProjection(projection);
-        const target = incoming.find((product) => product.id === route.productId);
-        if (!target) throw new Error("PUBLIC_PRODUCT_NOT_FOUND");
+        if (!incoming.some((product) => product.id === route.productId)) throw new Error("PUBLIC_PRODUCT_NOT_FOUND");
         registerPublicProducts(incoming);
-        selectProduct(target.id);
         setRemoteLoadState("ready");
-      })
-      .catch(() => {
-        if (active) setRemoteLoadState("error");
-      });
+      }).catch(() => { if (active) setRemoteLoadState("error"); });
+    } else setRemoteLoadState("idle");
     return () => { active = false; };
-  }, [publicProducts, registerPublicProducts, remoteLoadRevision, route.productId, route.storeSlug, selectProduct]);
-
+    // Catalog refreshes must not replace this exact in-flight product request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedProductId, registerPublicProducts, remoteLoadRevision, route.productId, route.storeSlug]);
   const detail = useMemo(() => ({
     ...productDetailData,
     id: catalogProduct.id,
-    category: catalogProduct.isPublicProjection ? "Ürün" : productDetailData.category,
+    category: canonical?.category ?? (catalogProduct.isPublicProjection ? "Ürün" : productDetailData.category),
     name: catalogProduct.name,
-    price: catalogProduct.price,
-    oldPrice: catalogProduct.old,
-    discount: catalogProduct.badge ?? "",
+    price: selectedVariant ? formatCatalogPrice(selectedVariant.price) : catalogProduct.price,
+    oldPrice: variantRequired ? undefined : catalogProduct.old,
+    discount: variantRequired ? "" : catalogProduct.badge ?? "",
     rating: (catalogProduct.isPublicProjection ? catalogProduct.rating ?? 0 : catalogProduct.rating ?? 4.8).toLocaleString("tr-TR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
     reviewCount: catalogProduct.isPublicProjection ? catalogProduct.reviewCount ?? 0 : catalogProduct.reviewCount ?? productDetailData.reviewCount,
     gallery: catalogProduct.images ?? [catalogProduct.image],
@@ -2198,20 +2295,23 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
         ? catalogProduct.isPublicProjection ? "" : productDetailData.seller.score
         : (catalogProduct.storeRating * 2).toLocaleString("tr-TR", { maximumFractionDigits: 1 }),
     },
-    stock: catalogProduct.stock === undefined
+    stock: variantRequired && !selectedVariant ? "Stok bilgisi için seçenek belirle" : selectedAvailability === undefined
       ? productDetailData.stock
-      : catalogProduct.stock > 0 ? `Stokta · ${catalogProduct.stock} ürün` : "Stokta yok",
-    description: catalogProduct.isPublicProjection
+      : selectedAvailability > 0 ? `Stokta · ${selectedAvailability} ürün` : "Stokta yok",
+    description: canonical ? canonical.description || "Bu ürün için açıklama paylaşılmamış." : catalogProduct.isPublicProjection
       ? "Bu ürünün güncel fiyat, stok ve medya bilgileri satıcının public mağaza kaydından gösteriliyor."
       : productDetailData.description,
-    specs: catalogProduct.isPublicProjection
+    specs: canonical ? canonical.attributes.flatMap((attribute) => {
+      const value = canonicalFeatureValue(attribute.value);
+      return value ? [[attribute.name, `${value}${attribute.unit ? ` ${attribute.unit}` : ""}`]] : [];
+    }) : catalogProduct.isPublicProjection
       ? [["Ürün kodu", catalogProduct.id], ["Stok", String(catalogProduct.stock ?? 0)]]
       : productDetailData.specs,
     policies: catalogProduct.isPublicProjection
       ? [["Teslimat", catalogProduct.shippingSummary || "Adres ve hazırlık süresine göre hesaplanır"], ["İade", catalogProduct.returnSummary || "Koşullar ödeme öncesinde gösterilir"]]
       : productDetailData.policies,
     campaign: catalogProduct.isPublicProjection ? "" : productDetailData.campaign,
-  }), [catalogProduct]);
+  }), [catalogProduct, selectedVariant, selectedAvailability, variantRequired]);
   const [color, setColor] = useState("Kırık Beyaz");
   const [qty, setQty] = useState(1);
   const [gallery, setGallery] = useState(0);
@@ -2239,10 +2339,10 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
   const favorite = favoriteIds.has(detail.id);
   const canonicalProductId = Number(detail.id);
   const hasCanonicalProductId = Number.isSafeInteger(canonicalProductId) && canonicalProductId > 0;
-  const existingCartQuantity = cartLines.find((line) => line.productId === detail.id)?.quantity ?? 0;
-  const stockCapacity = catalogProduct.stock === undefined
+  const existingCartQuantity = cartLines.find((line) => line.productId === detail.id && line.variantId === selectedVariantId)?.quantity ?? 0;
+  const stockCapacity = selectedAvailability === undefined
     ? MAX_CART_QUANTITY_PER_PRODUCT
-    : Math.max(0, catalogProduct.stock - existingCartQuantity);
+    : Math.max(0, selectedAvailability - existingCartQuantity);
   const distinctCapacity = existingCartQuantity > 0 || cartLines.length < MAX_CART_DISTINCT_PRODUCTS
     ? MAX_CART_QUANTITY_PER_PRODUCT
     : 0;
@@ -2314,20 +2414,27 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
     if (maxAddQuantity > 0) setQty((current) => Math.min(current, maxAddQuantity));
   }, [maxAddQuantity]);
 
-  const handleAdd = () => {
-    if (readOnlyPreview || catalogProduct.isPurchasable === false || maxAddQuantity < 1) return;
-    const result = addToCart(detail.id, qty);
-    if (result.addedQuantity < 1) return;
-    setAdded(true);
-    if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
-    resetTimer.current = window.setTimeout(() => setAdded(false), 950);
+  const purchase = async (buyNow: boolean) => {
+    if (readOnlyPreview || !purchasable || purchaseBusy || maxAddQuantity < 1) return;
+    setPurchaseBusy(true);
+    setPurchaseError("");
+    try {
+      const result = await addToCart(detail.id, qty, selectedVariant?.id);
+      if (result.addedQuantity < 1) {
+        setPurchaseError(cartMutationMessage(result));
+        setRemoteLoadRevision((value) => value + 1);
+        return;
+      }
+      if (buyNow) { go("CAL-08", "cart"); return; }
+      setAdded(true);
+      if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
+      resetTimer.current = window.setTimeout(() => setAdded(false), 950);
+    } catch (error) {
+      setPurchaseError(productRequestMessage(error));
+    } finally { setPurchaseBusy(false); }
   };
-  const handleBuyNow = () => {
-    if (readOnlyPreview || catalogProduct.isPurchasable === false || maxAddQuantity < 1) return;
-    const result = addToCart(detail.id, qty);
-    if (result.addedQuantity < 1) return;
-    go("CAL-08", "cart");
-  };
+  const handleAdd = () => void purchase(false);
+  const handleBuyNow = () => void purchase(true);
   const requireNativeProductAction = () => {
     if (accountRuntime?.phase !== "authenticated") {
       go("CAL-01", "account", "login");
@@ -2438,18 +2545,13 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
     setCommunityScope("review");
     setReviewOpen((current) => !current);
   };
-  if (route.storeSlug && route.productId && !publicProducts[route.productId] && remoteLoadState === "loading") {
-    return <div className="pdp-contract-load-state" data-testid="public-product-loading" role="status"><ReloadIcon /><h1>Ürün yükleniyor</h1><p>Güncel public ürün bilgileri hazırlanıyor.</p></div>;
+  const requiresRemote = NATIVE_SHELL || Boolean(route.storeSlug && route.productId && !publicProducts[route.productId]);
+  if (requiresRemote && ["error", "offline", "unavailable", "session-expired"].includes(remoteLoadState)) {
+    return <div className="pdp-contract-load-state error" data-testid="public-product-error" data-state={remoteLoadState} role="alert"><StorefrontIcon /><h1>{remoteLoadState === "offline" ? "İnternet bağlantısı yok" : remoteLoadState === "session-expired" ? "Oturumun sona erdi" : remoteLoadState === "unavailable" ? "Ürün artık mevcut değil" : "Ürün şu anda yüklenemedi"}</h1><p>Ürün seçenekleri doğrulanamadı.</p><button type="button" className="primary navy" onClick={() => remoteLoadState === "session-expired" ? go("CAL-01", "account", "login") : setRemoteLoadRevision((value) => value + 1)}>{remoteLoadState === "session-expired" ? "Giriş Yap" : "Yeniden Dene"}</button><button type="button" className="secondary" onClick={() => go("CAL-02", "home")}>Ürünlere Dön</button></div>;
   }
-  if (route.storeSlug && route.productId && !publicProducts[route.productId] && remoteLoadState === "error") {
-    return <div className="pdp-contract-load-state error" data-testid="public-product-error" role="alert"><StorefrontIcon /><h1>Ürün şu anda yüklenemedi</h1><p>Güvenli bağlantıyı yeniden deneyebilirsin.</p><button type="button" className="primary navy" onClick={() => setRemoteLoadRevision((value) => value + 1)}>Yeniden Dene</button></div>;
+  if (requiresRemote && (remoteLoadState !== "ready" || (NATIVE_SHELL && loadedProduct?.id !== requestedProductId))) {
+    return <div className="pdp-contract-load-state" data-testid="public-product-loading" role="status"><ReloadIcon /><h1>Ürün yükleniyor</h1><p>Güncel ürün bilgileri hazırlanıyor.</p></div>;
   }
-  if (NATIVE_SHELL && !catalogProduct.isPublicProjection) {
-    return publicCatalogPhase === "error"
-      ? <div className="pdp-contract-load-state error" role="alert"><StorefrontIcon /><h1>Ürün yüklenemedi</h1><p>Public mağaza kataloğu doğrulanamadı.</p><button type="button" className="primary navy" onClick={reloadPublicCatalog}>Yeniden Dene</button></div>
-      : <div className="pdp-contract-load-state" role="status"><ReloadIcon /><h1>Ürün yükleniyor</h1><p>Güncel public ürün bilgileri hazırlanıyor.</p></div>;
-  }
-
   return (
     <>
       <header className="pdp-topbar" data-testid="app-topbar">
@@ -2486,6 +2588,13 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
                 {hasPublishedReviews ? <div className="rating large"><StarFilledIcon /><b>{detail.rating}</b><i /><button type="button" onClick={() => reviewSection.current?.scrollIntoView({ behavior: "smooth", block: "center" })}>{displayedReviewCount} değerlendirme</button></div> : <p className="rating-empty">Henüz yayınlanmış değerlendirme yok</p>}
                 <div className="price large"><strong>{detail.price}</strong>{detail.oldPrice && <del>{detail.oldPrice}</del>}{detail.discount && <span>{detail.discount}</span>}</div>
                 {!catalogProduct.isPublicProjection && <div className="variant"><h2>Renk</h2><div>{[{ label: "Kırık Beyaz", className: "cream" }, { label: "Gece Mavisi", className: "navy" }].map((item) => <button type="button" aria-label={item.label} aria-pressed={color === item.label} className={`${item.className}${color === item.label ? " active" : ""}`} onClick={() => setColor(item.label)} key={item.label}><i /><span>{item.label}</span></button>)}</div><small className="variant-selection">Seçim: {color} · {color === "Kırık Beyaz" ? "NS-PA-IV" : "NS-PA-NV"}</small></div>}
+                {variantRequired && <section className="canonical-variants" data-testid="canonical-variant-selector" aria-labelledby="canonical-variant-heading"><h2 id="canonical-variant-heading">Ürün seçenekleri</h2><div role="radiogroup" aria-label="Ürün seçenekleri">{canonical!.variants!.map((variant) => <button type="button" role="radio" aria-checked={selectedVariantId === variant.id} disabled={!variant.purchasable || variant.availableStock < 1 || purchaseBusy} data-testid={`canonical-variant-${variant.id}`} className={selectedVariantId === variant.id ? "selected" : ""} onClick={() => {
+                  setVariantSelection({ productId: requestedProductId, variantId: variant.id });
+                  saveDeviceVariantSelection(requestedProductId, variant.id);
+                  setQty(1);
+                  setPurchaseError("");
+                }} key={variant.id}><span>{variant.selections.map((selection) => `${selection.group}: ${selection.value}`).join(" · ")}</span><small>{formatCatalogPrice(variant.price)} · {variant.purchasable && variant.availableStock > 0 ? `${variant.availableStock} adet stok` : "Stokta yok"}</small>{selectedVariantId === variant.id && <CheckIcon aria-label="Seçildi" />}</button>)}</div><p role="status" aria-live="polite">{!canonical!.variants!.length ? "Bu ürün için kullanılabilir seçenek yok." : selectedVariant && selectedVariant.purchasable ? `Seçim: ${selectedVariant.selections.map(({ group, value }) => `${group}: ${value}`).join(" · ")}` : selectedVariantId !== undefined ? "Seçtiğin seçenek artık kullanılamıyor. Güncel seçeneklerden seçim yap." : "Sepete eklemek için bir seçenek belirle."}</p></section>}
+                {purchaseError && <p className="pdp-community-error" data-testid="pdp-purchase-error" role="alert">{purchaseError}</p>}
                 <section className="pdp-seller-panel" aria-labelledby="pdp-seller-title"><h2 id="pdp-seller-title"><StorefrontIcon weight="duotone" /> Satıcı Bilgisi</h2><div className="pdp-seller-identity"><img src={catalogProduct.storeLogoUrl ?? LOGO} alt="" /><div><strong>{detail.seller.name} {!catalogProduct.isPublicProjection && <SealCheckIcon weight="fill" aria-label="Doğrulanmış satıcı" />}</strong><span>{catalogProduct.isPublicProjection ? "Public mağaza kaydı" : "Güvenilir satıcı · Hızlı gönderici"}</span></div>{detail.seller.score ? <b>{detail.seller.score}</b> : <b>—</b>}</div><div className="pdp-seller-actions"><button type="button" onClick={() => go("CAL-04", "home", "store", { storeSlug: catalogProduct.storeSlug ?? route.storeSlug, mode: route.mode })}>Mağazaya Git</button><button type="button" disabled={readOnlyPreview || communityBusy} onClick={openSellerQuestion}>Satıcıya Sor</button></div></section>
                 <div className="pdp-stock"><CheckCircleIcon weight="fill" /><div><strong>{detail.stock}</strong>{detail.seller.invoice && <span>{detail.seller.invoice}</span>}</div></div>
                 {detail.campaign && <p className="campaign-note"><b>Kampanya</b>{detail.campaign}</p>}
@@ -2514,9 +2623,9 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
         </main>
       </MobileScroll>
       <footer className={`pdp-footer${readOnlyPreview ? " preview-readonly-footer" : ""}`} data-testid="pdp-sticky-footer">
-        {readOnlyPreview ? <p data-testid="pdp-preview-read-only-bar"><LockClosedIcon /> Salt okunur satıcı önizlemesi</p> : <><div className="quantity"><button aria-label="Adedi azalt" disabled={catalogProduct.isPurchasable === false || maxAddQuantity < 1} onClick={() => setQty(Math.max(1, qty - 1))}><MinusIcon /></button><b>{qty}</b><button aria-label="Adedi artır" disabled={catalogProduct.isPurchasable === false || maxAddQuantity < 1 || qty >= maxAddQuantity} onClick={() => setQty(Math.min(maxAddQuantity, qty + 1))}><PlusIcon /></button></div>
-        <button className={`pdp-add-to-cart${added ? " feedback" : ""}`} aria-label={added ? "Sepete eklendi" : catalogProduct.isPurchasable === false ? "Ürün şu anda satın alınamaz" : maxAddQuantity < 1 ? "Sepet veya stok sınırına ulaşıldı" : "Sepete Ekle"} aria-pressed={added} disabled={added || catalogProduct.isPurchasable === false || maxAddQuantity < 1} onClick={handleAdd}>{added ? <CheckIcon className="pdp-confirm-check" /> : <ShoppingCartSimpleIcon weight="bold" />}<span>Sepete Ekle</span></button>
-        <button className="pdp-buy-now" disabled={catalogProduct.isPurchasable === false || maxAddQuantity < 1} onClick={handleBuyNow}>Hemen Al</button></>}
+        {readOnlyPreview ? <p data-testid="pdp-preview-read-only-bar"><LockClosedIcon /> Salt okunur satıcı önizlemesi</p> : <><div className="quantity"><button aria-label="Adedi azalt" disabled={!purchasable || purchaseBusy || maxAddQuantity < 1} onClick={() => setQty(Math.max(1, qty - 1))}><MinusIcon /></button><b>{qty}</b><button aria-label="Adedi artır" disabled={!purchasable || purchaseBusy || maxAddQuantity < 1 || qty >= maxAddQuantity} onClick={() => setQty(Math.min(maxAddQuantity, qty + 1))}><PlusIcon /></button></div>
+        <button className={`pdp-add-to-cart${added ? " feedback" : ""}`} aria-label={added ? "Sepete eklendi" : !purchasable || purchaseBusy ? "Ürün şu anda satın alınamaz" : maxAddQuantity < 1 ? "Sepet veya stok sınırına ulaşıldı" : "Sepete Ekle"} aria-pressed={added} disabled={added || !purchasable || purchaseBusy || maxAddQuantity < 1} onClick={handleAdd}>{added ? <CheckIcon className="pdp-confirm-check" /> : <ShoppingCartSimpleIcon weight="bold" />}<span>Sepete Ekle</span></button>
+        <button className="pdp-buy-now" disabled={!purchasable || purchaseBusy || maxAddQuantity < 1} onClick={handleBuyNow}>Hemen Al</button></>}
       </footer>
       {viewerOpen && <section className="pdp-image-viewer" role="dialog" aria-modal="true" aria-label={`${detail.name} görsel görüntüleyici`} data-viewer-zoomed={viewerZoomed}>
         <header><button type="button" aria-label="Görsel görüntüleyiciyi kapat" onClick={() => setViewerOpen(false)}><Cross1Icon /></button><b>{gallery + 1} / {detail.gallery.length}</b><span>1×–4× yakınlaştır</span></header>
@@ -2544,8 +2653,11 @@ function RecommendationCard({ product, go }: { product: (typeof products)[number
     selectProduct(product.id);
     go("CAL-06", "home");
   };
-  const add = () => {
-    const result = addToCart(product.id);
+  const add = async () => {
+    let result: CartMutationResult;
+    try { result = await addToCart(product.id); }
+    catch { open(); return; }
+    if (result.reason === "selection-required") { open(); return; }
     if (result.addedQuantity < 1) return;
     setAdded(true);
     if (timer.current !== null) window.clearTimeout(timer.current);
@@ -2563,17 +2675,17 @@ function CartScreen({ go }: { go: Go }) {
   const { cartLines, cartCount, appliedCoupon, applyCartCoupon, changeCartQuantity, removeCartLine, publicProducts } = useCommerce();
   const [coupon, setCoupon] = useState(appliedCoupon);
   const items = cartLines.flatMap((line) => {
-    const product = publicProducts[line.productId] ?? (!NATIVE_SHELL ? products.find((candidate) => candidate.id === line.productId) : undefined);
+    const product = line.snapshot ?? publicProducts[line.productId] ?? (!NATIVE_SHELL ? products.find((candidate) => candidate.id === line.productId) : undefined);
     return product ? [{ ...line, product }] : [];
   });
   const subtotal = items.reduce((total, item) => total + productAmount(item.product) * item.quantity, 0);
-  const discount = appliedCoupon ? Math.min(1500, Math.round(subtotal * .15)) : 0;
+  const discount = !NATIVE_SHELL && appliedCoupon ? Math.min(1500, Math.round(subtotal * .15)) : 0;
   const total = subtotal - discount;
   const couponApplied = !NATIVE_SHELL && Boolean(appliedCoupon) && coupon.trim().toLocaleUpperCase("tr-TR") === appliedCoupon;
   return (
     <div className="root-layout cart-layout">
       <div className="cart-grid">
-        <section className="cart-main"><div className="cart-title"><h1>Sepetim</h1><div className="cart-title-actions"><span>{cartCount} ürün</span></div></div>{items.map((item) => <article className="cart-item" data-testid={`cart-item-${item.id}`} data-product-id={item.product.id} key={item.id}><img src={item.product.image} alt={item.product.name} /><div><small>{item.product.store}</small><h2>{item.product.name}</h2><p>{NATIVE_SHELL ? `${item.product.stock ?? 0} adet stok` : "Krem · Stokta"}</p><strong>{item.product.price}</strong></div><div className="cart-item-actions"><IconButton label={`${item.product.name} Sil`} onClick={() => removeCartLine(item.id)}><TrashIcon /></IconButton><div className="quantity"><button aria-label={`${item.product.name} adedini azalt`} onClick={() => changeCartQuantity(item.id, -1)}><MinusIcon /></button><b>{item.quantity}</b><button aria-label={`${item.product.name} adedini artır`} disabled={item.quantity >= MAX_CART_QUANTITY_PER_PRODUCT || cartCount >= MAX_CART_TOTAL_QUANTITY} onClick={() => changeCartQuantity(item.id, 1)}><PlusIcon /></button></div></div></article>)}{items.length === 0 ? <div className="empty-state" role="status"><BackpackIcon /><h2>Sepetin boş</h2><button className="primary navy" onClick={() => go("CAL-02", "home")}>Alışverişe Dön</button></div> : <div className="delivery-note"><CubeIcon /><span><strong>Teslimat ödeme adımında netleşir</strong>Ücret ve tarih, adres ile satıcının hazırlık süresine göre hesaplanır.</span></div>}</section>
+        <section className="cart-main"><div className="cart-title"><h1>Sepetim</h1><div className="cart-title-actions"><span>{cartCount} ürün</span></div></div>{items.map((item) => <article className="cart-item" data-testid={`cart-item-${item.id}`} data-product-id={item.product.id} data-variant-id={item.variantId} key={item.id}><img src={item.product.image} alt={item.product.name} /><div><small>{item.product.store}</small><h2>{item.product.name}</h2><p className="cart-variant-label">{item.variantSelections?.map(({ group, value }) => `${group}: ${value}`).join(" · ")}</p><p>{NATIVE_SHELL ? `Son görülen stok: ${item.product.stock ?? 0}` : "Krem · Stokta"}</p><strong>{item.product.price}</strong></div><div className="cart-item-actions"><IconButton label={`${item.product.name}${item.variantSelections?.length ? ` · ${item.variantSelections.map(({ group, value }) => `${group}: ${value}`).join(" · ")}` : ""} Sil`} onClick={() => removeCartLine(item.id)}><TrashIcon /></IconButton><div className="quantity"><button aria-label={`${item.product.name}${item.variantSelections?.length ? ` · ${item.variantSelections.map(({ group, value }) => `${group}: ${value}`).join(" · ")}` : ""} adedini azalt`} onClick={() => changeCartQuantity(item.id, -1)}><MinusIcon /></button><b>{item.quantity}</b><button aria-label={`${item.product.name}${item.variantSelections?.length ? ` · ${item.variantSelections.map(({ group, value }) => `${group}: ${value}`).join(" · ")}` : ""} adedini artır`} disabled={item.quantity >= MAX_CART_QUANTITY_PER_PRODUCT || cartCount >= MAX_CART_TOTAL_QUANTITY || (NATIVE_SHELL && item.quantity >= (item.product.stock ?? 0))} onClick={() => changeCartQuantity(item.id, 1)}><PlusIcon /></button></div></div></article>)}{items.length === 0 ? <div className="empty-state" role="status"><BackpackIcon /><h2>Sepetin boş</h2><button className="primary navy" onClick={() => go("CAL-02", "home")}>Alışverişe Dön</button></div> : <div className="delivery-note"><CubeIcon /><span><strong>Teslimat ödeme adımında netleşir</strong>Ücret ve tarih, adres ile satıcının hazırlık süresine göre hesaplanır.</span></div>}</section>
         <aside className="order-summary"><h2>Sipariş Özeti</h2><label>Kupon kodu<div><KeyboardInput value={coupon} onChange={(e) => setCoupon(e.target.value)} /><button onClick={() => applyCartCoupon(coupon)}>Uygula</button></div></label>{couponApplied && <p className="coupon-success" role="status"><CheckIcon /> {appliedCoupon} indirimi uygulandı</p>}{NATIVE_SHELL && appliedCoupon && <p className="coupon-success" role="status">{appliedCoupon} ödeme adımında sunucuda doğrulanacak.</p>}<SummaryRows subtotal={subtotal} discount={discount} total={total} /><button className="primary navy" disabled={!items.length} onClick={() => go("CAL-08", "cart")}>{NATIVE_SHELL ? "Sunucuda Doğrula" : `${formatMoney(total)} · Ödemeye Geç`} <ArrowRightIcon /></button><small className="secure-copy"><LockClosedIcon /> {NATIVE_SHELL ? "Fiyat, stok ve kupon ödeme adımında doğrulanır" : "Güvenli ödeme"}</small></aside>
       </div>
     </div>
@@ -2648,27 +2760,44 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
   const [selectedAddressId, setSelectedAddressId] = useState(defaultAddress?.id ?? "");
   const [capability, setCapability] = useState<CustomerPaymentCapability | null>(null);
   const [preview, setPreview] = useState<CustomerCheckoutPreview | null>(null);
+  const [previewContext, setPreviewContext] = useState("");
+  const [checkoutConflict, setCheckoutConflict] = useState("");
   const [previewPhase, setPreviewPhase] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [acceptedSlugs, setAcceptedSlugs] = useState<ReadonlySet<string>>(() => new Set());
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentGate, setPaymentGate] = useState("");
   const [paymentResponse, setPaymentResponse] = useState<CustomerPaymentResponse | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<CustomerPaymentStatus | null>(null);
-  const [confirmedOrderId, setConfirmedOrderId] = useState<number | null>(null);
+  const [confirmedOrder, setConfirmedOrder] = useState<Readonly<{ id: number; customerId: number }> | null>(null);
   const [reloadRevision, setReloadRevision] = useState(0);
   const idempotencyKey = useRef("");
   const selectedAddress = addresses.find((address) => address.id === selectedAddressId);
   const checkoutItems = useMemo(() => cartLines.flatMap((line) => {
-    const product = publicProducts[line.productId];
+    const product = line.snapshot ?? publicProducts[line.productId];
     return product ? [{ ...line, product }] : [];
   }), [cartLines, publicProducts]);
   const requestItems = useMemo(() => checkoutItems.flatMap((item) => {
     const id = Number(item.product.id);
     return Number.isSafeInteger(id) && id > 0
-      ? [{ id, quantity: item.quantity, name: item.product.name, image: item.product.image }]
+      ? [{ id, quantity: item.quantity, ...(item.variantId === undefined ? {} : { variantId: item.variantId }) }]
       : [];
   }), [checkoutItems]);
-  const requestKey = requestItems.map((item) => `${item.id}:${item.quantity}`).join("|");
+  const requestKey = requestItems.map((item) => `${item.id}:${item.variantId ?? "simple"}:${item.quantity}`).join("|");
+  // Account refresh recreates address objects. Compare their delivery values so
+  // an unchanged address preserves the payment, while an edit invalidates it.
+  const selectedAddressTruth = JSON.stringify(selectedAddress ? [selectedAddress.id, selectedAddress.recipient, selectedAddress.line, selectedAddress.city, selectedAddress.postalCode, selectedAddress.phone ?? "", selectedAddress.district ?? ""] : null);
+  const checkoutContext = JSON.stringify([accountRuntime?.user?.id ?? "guest", selectedAddressId, selectedAddressTruth, appliedCoupon, requestKey]);
+  const currentCheckoutContext = useRef(checkoutContext);
+  const initializeLock = useRef(false);
+  const statusLock = useRef(false);
+  const paymentIdentity = paymentResponse ? `${paymentResponse.orderId}:${paymentResponse.paymentRef}` : "";
+  const currentPaymentIdentity = useRef(paymentIdentity);
+  currentPaymentIdentity.current = paymentIdentity;
+  currentCheckoutContext.current = checkoutContext;
+  useEffect(() => {
+    currentCheckoutContext.current = checkoutContext;
+    return () => { currentCheckoutContext.current = ""; };
+  }, [checkoutContext]);
 
   useEffect(() => {
     if (defaultAddress && !addresses.some((address) => address.id === selectedAddressId)) {
@@ -2690,7 +2819,10 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
       return;
     }
     let active = true;
+    const startedContext = checkoutContext;
     setPreviewPhase("loading");
+    setPreview(null);
+    setPreviewContext("");
     setPaymentGate("");
     setPaymentResponse(null);
     setPaymentStatus(null);
@@ -2703,10 +2835,11 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
         couponCode: appliedCoupon || null,
       }),
     ]).then(([nextCapability, nextPreview]) => {
-      if (!active) return;
+      if (!active || currentCheckoutContext.current !== startedContext) return;
       idempotencyKey.current = createCheckoutIdempotencyKey();
       setCapability(nextCapability);
       setPreview(nextPreview);
+      setPreviewContext(startedContext);
       setPreviewPhase("ready");
       if (appliedCoupon && !nextPreview.quote.couponApplied) {
         setPaymentGate("Kupon sunucu tarafından uygulanmadı. Güncel toplam kuponsuz olarak gösteriliyor.");
@@ -2719,7 +2852,7 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
       void getCustomerPaymentCapability().then((value) => { if (active) setCapability(value); }).catch(() => undefined);
     });
     return () => { active = false; };
-  }, [accountRuntime?.phase, appliedCoupon, cartLines.length, checkoutItems.length, reloadRevision, requestItems, requestKey, selectedAddress]);
+  }, [accountRuntime?.phase, appliedCoupon, cartLines.length, checkoutItems.length, checkoutContext, reloadRevision, requestItems, requestKey, selectedAddressTruth]);
 
   if (accountRuntime?.phase !== "authenticated") {
     return <div className="detail-layout checkout-layout"><section className="checkout-success checkout-blocked"><LockClosedIcon /><h1>Ödeme için giriş yap</h1><p>Adres ve sipariş sahipliği gerçek PC1 müşteri oturumuyla doğrulanmalıdır.</p><button className="primary navy" onClick={() => go("CAL-01", "account", "login")}>Giriş Yap</button></section></div>;
@@ -2727,16 +2860,16 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
   if (addresses.length === 0) {
     return <div className="detail-layout checkout-layout"><section className="checkout-success checkout-blocked"><MapPinIcon /><h1>Teslimat adresi ekle</h1><p>Ödeme adımında örnek adres kullanılmaz. Gerçek hesabına bir adres eklemelisin.</p><button className="primary navy" onClick={() => go("CAL-10", "account", "addresses")}>Adres Ekle</button></section></div>;
   }
+  if (confirmedOrder && confirmedOrder.customerId === accountRuntime.user?.id) {
+    return <div className="detail-layout checkout-layout"><section className="checkout-success" role="status"><CheckIcon /><h1>Ödemen doğrulandı</h1><p>Sipariş #{confirmedOrder.id} PC1 sunucu durumu üzerinden kesinleşti.</p><button className="primary navy" onClick={() => { go("CAL-09", "account"); void accountRuntime.refresh(); }}>Siparişi Gör</button></section></div>;
+  }
+
   if (checkoutItems.length === 0 || checkoutItems.length !== cartLines.length || requestItems.length !== checkoutItems.length) {
     return <div className="detail-layout checkout-layout"><section className="checkout-success checkout-blocked"><ShoppingCartSimpleIcon /><h1>Sepeti yeniden doğrula</h1><p>Yalnız PC1 ürün kimliği doğrulanan sepet kalemleri ödeme adımına geçebilir.</p><button className="primary navy" onClick={() => go("CAL-07", "cart")}>Sepete Dön</button></section></div>;
   }
-  if (confirmedOrderId) {
-    return <div className="detail-layout checkout-layout"><section className="checkout-success" role="status"><CheckIcon /><h1>Ödemen doğrulandı</h1><p>Sipariş #{confirmedOrderId} PC1 sunucu durumu üzerinden kesinleşti.</p><button className="primary navy" onClick={() => go("CAL-09", "account")}>Siparişi Gör</button></section></div>;
-  }
-
   const allAccepted = Boolean(preview?.documents.length) && preview!.documents.every((document) => acceptedSlugs.has(document.slug));
   const couponRejected = Boolean(appliedCoupon) && preview?.quote.couponApplied !== true;
-  const canInitialize = previewPhase === "ready" && capability?.ready === true && allAccepted && !couponRejected && !paymentResponse;
+  const canInitialize = previewPhase === "ready" && previewContext === checkoutContext && capability?.ready === true && allAccepted && !couponRejected && !paymentResponse;
   const total = preview?.quote.totals.total ?? 0;
 
   const updateLegalConsent = (slug: string, accepted: boolean) => {
@@ -2749,7 +2882,10 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
   };
 
   const initialize = async () => {
-    if (!preview || !canInitialize) return;
+    if (!preview || !canInitialize || initializeLock.current) return;
+    initializeLock.current = true;
+    const startedContext = checkoutContext;
+    const startedSession = currentCustomerSessionGuard();
     setPaymentBusy(true);
     setPaymentGate("");
     try {
@@ -2761,35 +2897,51 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
         acceptedSlugs: [...acceptedSlugs],
         idempotencyKey: idempotencyKey.current,
       });
+      if (currentCheckoutContext.current !== startedContext || !customerSessionMatchesGuard(startedSession)) return;
       setPaymentResponse(response);
       setPaymentGate(response.message);
       await openCustomerPaymentSurface(response);
     } catch (error) {
+      if (currentCheckoutContext.current !== startedContext || !customerSessionMatchesGuard(startedSession)) return;
       setPaymentGate(error instanceof Error ? error.message : "Güvenli ödeme başlatılamadı.");
-      if (error instanceof CustomerNotificationApiError && error.code === "CHECKOUT_AGREEMENT_SNAPSHOT_STALE") {
+      if (error instanceof CustomerNotificationApiError && ["CHECKOUT_AGREEMENT_SNAPSHOT_STALE", "VARIANT_PRICE_CHANGED", "VARIANT_STOCK_UNAVAILABLE", "VARIANT_NOT_PURCHASABLE", "VARIANT_REQUIRED", "VARIANT_ID_INVALID", "VARIANT_NOT_ALLOWED"].includes(error.code)) {
+        setAcceptedSlugs(new Set());
+        setPreview(null);
+        setPreviewContext("");
+        setCheckoutConflict("Ürün fiyatı, stoku veya seçenekleri değişti. Güncel özeti kontrol edip sözleşmeleri yeniden onayla; kullanılamayan ürünü sepetinden kaldır.");
         setReloadRevision((value) => value + 1);
       }
     } finally {
+      initializeLock.current = false;
       setPaymentBusy(false);
     }
   };
 
   const verifyStatus = async () => {
-    if (!paymentResponse) return;
+    if (!paymentResponse || statusLock.current) return;
+    statusLock.current = true;
+    const startedContext = checkoutContext;
+    const startedPayment = paymentIdentity;
+    const startedSession = currentCustomerSessionGuard();
+    const stillCurrent = () => currentCheckoutContext.current === startedContext && currentPaymentIdentity.current === startedPayment && customerSessionMatchesGuard(startedSession);
     setPaymentBusy(true);
     setPaymentGate("");
     try {
       const status = await getCustomerPaymentStatus(paymentResponse.paymentRef, paymentResponse.orderId);
+      if (!stillCurrent()) return;
       setPaymentStatus(status);
       setPaymentGate(status.message);
       if (status.paymentStatus.toUpperCase() === "PAID" && status.providerFinalized && status.commerceFinalized && !status.reconciliationRequired) {
+        // Commit this exact, server-finalized purchase in the same JS turn as
+        // the identity check. Account history refresh belongs to navigation.
+        setConfirmedOrder({ id: status.orderId, customerId: accountRuntime.user!.id });
         clearCart();
-        await accountRuntime.refresh();
-        setConfirmedOrderId(status.orderId);
       }
     } catch (error) {
+      if (!stillCurrent()) return;
       setPaymentGate(error instanceof Error ? error.message : "Ödeme durumu doğrulanamadı.");
     } finally {
+      statusLock.current = false;
       setPaymentBusy(false);
     }
   };
@@ -2797,6 +2949,7 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
   return (
     <div className="detail-layout checkout-layout" data-testid="native-authoritative-checkout">
       <div className="checkout-heading"><h1>Ödeme</h1></div>
+      {checkoutConflict && <p className="checkout-payment-gate" data-testid="checkout-variant-conflict" role="alert">{checkoutConflict}</p>}
       <div className="checkout-steps"><span className="done"><CheckIcon /> Sepet</span><i /><span className="done"><CheckIcon /> Teslimat</span><i /><span className="active">3</span><b>Ödeme</b></div>
       <div className="checkout-grid">
         <section className="checkout-main">
@@ -2813,7 +2966,7 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
           {preview && <CheckoutLegalConsent documents={preview.documents} acceptedSlugs={acceptedSlugs} onConsentChange={updateLegalConsent} />}
         </section>
         <aside className="checkout-summary">
-          <section className="checkout-summary-card"><h2>Sipariş Özeti</h2><p className="muted">{cartCount} ürün · sunucu doğrulamalı</p>{preview ? <><div className="summary-products">{preview.quote.items.map((item) => <div className="summary-product" data-product-id={item.id} key={item.id}><span>{item.name}<br /><b>{item.quantity} × {formatMoney(item.price)}</b></span></div>)}</div><SummaryRows subtotal={preview.quote.totals.subtotal} discount={preview.quote.totals.discount} shipping={preview.quote.totals.shipping} total={preview.quote.totals.total} /></> : <p className="checkout-provider-state">Güncel toplam bekleniyor.</p>}</section>
+          <section className="checkout-summary-card"><h2>Sipariş Özeti</h2><p className="muted">{cartCount} ürün · sunucu doğrulamalı</p>{preview ? <><div className="summary-products">{preview.quote.items.map((item) => <div className="summary-product" data-product-id={item.id} data-variant-id={item.variantId ?? undefined} key={`${item.id}:${item.variantId ?? "simple"}`}><span>{item.name}<br />{item.variantSelections?.length ? <small>{item.variantSelections.map(({ group, value }) => `${group}: ${value}`).join(" · ")}<br /></small> : null}<b>{item.quantity} × {formatMoney(item.price)}</b></span></div>)}</div><SummaryRows subtotal={preview.quote.totals.subtotal} discount={preview.quote.totals.discount} shipping={preview.quote.totals.shipping} total={preview.quote.totals.total} /></> : <p className="checkout-provider-state">Güncel toplam bekleniyor.</p>}</section>
           {!paymentResponse ? <button className="primary navy" disabled={!canInitialize || paymentBusy} onClick={() => void initialize()}>{paymentBusy ? "Hazırlanıyor…" : capability?.ready === false ? "Ödeme henüz etkin değil" : preview ? `${formatMoney(total)} · PayTR’a Geç` : "Sunucu özeti bekleniyor"} <ArrowRightIcon /></button> : <button className="primary navy" disabled={paymentBusy} onClick={() => void verifyStatus()}>{paymentBusy ? "Doğrulanıyor…" : "Ödeme Durumunu Kontrol Et"} <ReloadIcon /></button>}
           {paymentGate && <p className="checkout-payment-gate" role="alert">{paymentGate}</p>}
           {paymentStatus?.reconciliationRequired && <p className="checkout-payment-gate" role="alert">Ödeme sağlayıcı sonucu ile sipariş durumu uzlaştırma bekliyor; başarı gösterilmedi.</p>}
@@ -2878,7 +3031,7 @@ function OrderDetailScreen({ go, view }: { go: Go; view: ViewId }) {
       return <div className="root-layout order-layout" data-testid="real-order-detail" data-order-id={selected.id}>
         <article className="order-card">
           <header><div><h1>Sipariş #{selected.id}</h1><p>{orderDate(selected)}</p></div><span><CubeIcon /> {selected.displayStatus}</span></header>
-          {selected.items.length ? <div className="real-order-items">{selected.items.map((item, index) => <div className="order-product" key={`${item.id ?? "item"}-${index}`}>{item.image ? <img src={item.image} alt={item.name} /> : <CubeIcon />}<div><h2>{item.name}</h2><p>Adet: {item.quantity}</p><strong>{formatMoney(item.price * item.quantity)}</strong></div></div>)}</div> : <p className="account-feature-intro">Sipariş kalemleri sunucu yanıtında bulunmuyor.</p>}
+          {selected.items.length ? <div className="real-order-items">{selected.items.map((item, index) => <div className="order-product" key={`${item.id ?? "item"}-${index}`}>{item.image ? <img src={item.image} alt={item.name} /> : <CubeIcon />}<div><h2>{item.name}</h2>{item.variantId && <p className="order-variant-label" data-testid="order-variant-snapshot" data-variant-id={item.variantId}>{item.variantSelections.map(({ group, value }) => `${group}: ${value}`).join(" · ")}{item.sku ? ` · ${item.sku}` : ""}</p>}<p>Adet: {item.quantity}</p><strong>{formatMoney(item.price * item.quantity)}</strong>{item.id && <button type="button" className="secondary" onClick={() => { selectProduct(String(item.id)); go("CAL-06", "home", "", { productId: String(item.id) }); }}>Ürüne Git</button>}</div></div>)}</div> : <p className="account-feature-intro">Sipariş kalemleri sunucu yanıtında bulunmuyor.</p>}
           {selected.statusNote && <p className="account-feature-intro" role="status">{selected.statusNote}</p>}
           <div className="order-total"><p><span>Ödeme durumu</span><b>{selected.paymentStatus || "Bilgi yok"}</b></p><p><span>Ödeme yöntemi</span><b>{selected.paymentMethod || "Bilgi yok"}</b></p>{selected.refundStatus && selected.refundStatus !== "NONE" && <p><span>Geri ödeme durumu</span><b>{selected.refundStatus}</b></p>}{selected.returnStatus && <p><span>İade durumu</span><b>{selected.returnStatus}</b></p>}<hr /><p><strong>Toplam</strong><strong>{formatMoney(selected.total)}</strong></p></div>
         </article>

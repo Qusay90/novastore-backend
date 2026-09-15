@@ -3,9 +3,16 @@ import {
   openApprovedPaymentUrl,
   requestCustomerApi,
 } from "../notifications/customerNotificationApi";
+import {
+  canonicalCartLineKey,
+  canonicalVariantId,
+  type CustomerVariantSelection,
+} from "../adapters/canonicalVariant";
+import { normalizeCanonicalVariantSelections } from "../adapters/customerProductContract";
 
 export type CustomerCheckoutCartItem = Readonly<{
   id: number;
+  variantId?: number | null;
   quantity: number;
   name?: string;
   image?: string;
@@ -34,6 +41,9 @@ export type CustomerCheckoutAgreement = Readonly<{
 
 export type CustomerCheckoutQuoteItem = Readonly<{
   id: number;
+  variantId: number | null;
+  variantSelections: readonly CustomerVariantSelection[];
+  sku: string | null;
   name: string;
   quantity: number;
   price: number;
@@ -85,13 +95,13 @@ export type CustomerPaymentStatus = Readonly<{
   nextAction: string | null;
 }>;
 
-type CheckoutRequest = Readonly<{
+export type CustomerCheckoutRequest = Readonly<{
   addressId: number;
   cartItems: readonly CustomerCheckoutCartItem[];
   couponCode?: string | null;
 }>;
 
-type CustomerPaymentInitializeInput = CheckoutRequest & Readonly<{
+export type CustomerPaymentInitializeInput = CustomerCheckoutRequest & Readonly<{
   preview: CustomerCheckoutPreview;
   acceptedSlugs: readonly string[];
   idempotencyKey: string;
@@ -167,38 +177,54 @@ function normalizePaymentAction(value: unknown) {
   }
 }
 
-function canonicalCartItems(items: readonly CustomerCheckoutCartItem[]) {
+export type CustomerPurchaseCartItem = Readonly<{
+  product_id: number;
+  variant_id?: number;
+  quantity: number;
+}>;
+
+export function canonicalCartItems(items: readonly CustomerCheckoutCartItem[]): readonly CustomerPurchaseCartItem[] {
   if (!Array.isArray(items) || items.length === 0) throw checkoutError("Sepet boş olamaz.", "CHECKOUT_CART_EMPTY");
-  const byProductId = new Map<number, { id: number; quantity: number; name?: string; image?: string }>();
+  const byIdentity = new Map<string, CustomerPurchaseCartItem>();
   for (const item of items) {
     const id = positiveId(item.id);
+    const suppliedVariantId = item.variantId;
+    const variantId = suppliedVariantId === null || suppliedVariantId === undefined
+      ? null
+      : canonicalVariantId(suppliedVariantId);
     const quantity = Number(item.quantity);
-    if (!id || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY_PER_ITEM) {
+    if (
+      !id
+      || (suppliedVariantId !== null && suppliedVariantId !== undefined && !variantId)
+      || !Number.isSafeInteger(quantity)
+      || quantity < 1
+      || quantity > MAX_QUANTITY_PER_ITEM
+    ) {
       throw checkoutError("Sepet ürünü geçersiz.", "CHECKOUT_CART_ITEM_INVALID");
     }
-    const existing = byProductId.get(id);
+    const key = canonicalCartLineKey(id, variantId);
+    const existing = byIdentity.get(key);
     const nextQuantity = (existing?.quantity ?? 0) + quantity;
     if (nextQuantity > MAX_QUANTITY_PER_ITEM) {
       throw checkoutError("Bir ürün için en fazla 20 adet seçebilirsin.", "CHECKOUT_CART_ITEM_LIMIT");
     }
-    byProductId.set(id, {
-      id,
+    byIdentity.set(key, Object.freeze({
+      product_id: id,
+      ...(variantId ? { variant_id: variantId } : {}),
       quantity: nextQuantity,
-      ...(text(item.name ?? existing?.name) ? { name: text(item.name ?? existing?.name) } : {}),
-      ...(text(item.image ?? existing?.image) ? { image: text(item.image ?? existing?.image) } : {}),
-    });
+    }));
   }
-  if (byProductId.size > MAX_DISTINCT_CART_ITEMS) {
+  if (byIdentity.size > MAX_DISTINCT_CART_ITEMS) {
     throw checkoutError("Sepette en fazla 20 farklı ürün olabilir.", "CHECKOUT_CART_DISTINCT_LIMIT");
   }
-  const canonical = [...byProductId.values()];
+  const canonical = [...byIdentity.values()];
   if (canonical.reduce((total, item) => total + item.quantity, 0) > MAX_TOTAL_CART_QUANTITY) {
     throw checkoutError("Sepette toplam en fazla 50 ürün olabilir.", "CHECKOUT_CART_TOTAL_LIMIT");
   }
   return Object.freeze(canonical);
 }
 
-function requestBody(input: CheckoutRequest) {
+export function createCustomerCheckoutRequestBody(input: CustomerCheckoutRequest) {
   const addressId = positiveId(input.addressId);
   if (!addressId) throw checkoutError("Geçerli teslimat adresi seçilmelidir.", "CHECKOUT_ADDRESS_INVALID");
   return {
@@ -206,6 +232,72 @@ function requestBody(input: CheckoutRequest) {
     cartItems: canonicalCartItems(input.cartItems),
     couponCode: text(input.couponCode) || null,
   };
+}
+
+export function normalizeCustomerCheckoutQuoteItem(value: unknown): CustomerCheckoutQuoteItem | null {
+  const item = objectValue(value);
+  const id = positiveId(item?.id);
+  const rawSnakeVariantId = item?.variant_id;
+  const rawCamelVariantId = item?.variantId;
+  const hasSnakeVariantId = rawSnakeVariantId !== null && rawSnakeVariantId !== undefined;
+  const hasCamelVariantId = rawCamelVariantId !== null && rawCamelVariantId !== undefined;
+  const snakeVariantId = hasSnakeVariantId ? canonicalVariantId(rawSnakeVariantId) : null;
+  const camelVariantId = hasCamelVariantId ? canonicalVariantId(rawCamelVariantId) : null;
+  if (
+    (hasSnakeVariantId && !snakeVariantId)
+    || (hasCamelVariantId && !camelVariantId)
+    || (snakeVariantId && camelVariantId && snakeVariantId !== camelVariantId)
+  ) return null;
+  const variantId = snakeVariantId ?? camelVariantId;
+  const quantity = Number(item?.quantity);
+  const price = money(item?.price);
+  const lineTotal = money(item?.line_total ?? item?.lineTotal);
+  const name = text(item?.name);
+  let variantSelections: readonly CustomerVariantSelection[] = Object.freeze([]);
+  if (variantId) {
+    try {
+      variantSelections = normalizeCanonicalVariantSelections(item?.variant_selections ?? item?.variantSelections);
+    } catch {
+      return null;
+    }
+  }
+  const sku = text(item?.sku) || null;
+  if (
+    !id
+    || !Number.isSafeInteger(quantity)
+    || quantity < 1
+    || quantity > MAX_QUANTITY_PER_ITEM
+    || price === null
+    || lineTotal === null
+    || Math.abs(price * quantity - lineTotal) > 0.011
+    || !name
+    || (variantId !== null && !sku)
+  ) return null;
+  return Object.freeze({
+    id,
+    variantId,
+    variantSelections,
+    sku,
+    name,
+    quantity,
+    price,
+    lineTotal,
+    image: text(item?.image) || null,
+  });
+}
+
+export function quoteMatchesCanonicalCartItems(
+  quoteItems: readonly CustomerCheckoutQuoteItem[],
+  requestedItems: readonly CustomerPurchaseCartItem[],
+): boolean {
+  if (quoteItems.length !== requestedItems.length) return false;
+  const requestedByIdentity = new Map(requestedItems.map((item) => [
+    canonicalCartLineKey(item.product_id, item.variant_id ?? null),
+    item.quantity,
+  ]));
+  return quoteItems.every((item) => (
+    requestedByIdentity.get(canonicalCartLineKey(item.id, item.variantId)) === item.quantity
+  ));
 }
 
 export async function getCustomerPaymentCapability(): Promise<CustomerPaymentCapability> {
@@ -231,20 +323,23 @@ export async function getCustomerPaymentCapability(): Promise<CustomerPaymentCap
   });
 }
 
-export async function previewCustomerCheckout(input: CheckoutRequest): Promise<CustomerCheckoutPreview> {
+export async function previewCustomerCheckout(input: CustomerCheckoutRequest): Promise<CustomerCheckoutPreview> {
+  const canonicalRequest = createCustomerCheckoutRequestBody(input);
   const source = objectValue(await requestCustomerApi(
     "/api/payments/agreements/preview",
     "POST",
-    requestBody(input),
+    canonicalRequest,
   ));
   const schemaVersion = text(source?.schemaVersion);
   const snapshotSha256 = text(source?.snapshotSha256).toLowerCase();
   const quoteSource = objectValue(source?.quote);
   const totals = normalizeTotals(quoteSource?.totals);
-  if (!source || schemaVersion !== "checkout-agreements-v2" || !SHA256.test(snapshotSha256) || !quoteSource || !totals) {
+  const rawDocuments = Array.isArray(source?.documents) ? source.documents : null;
+  const rawQuoteItems = Array.isArray(quoteSource?.items) ? quoteSource.items : null;
+  if (!source || schemaVersion !== "checkout-agreements-v2" || !SHA256.test(snapshotSha256) || !quoteSource || !totals || !rawDocuments || !rawQuoteItems) {
     throw checkoutError("Sunucu sipariş özeti doğrulanamadı.", "CHECKOUT_PREVIEW_RESPONSE_INVALID");
   }
-  const documents = Array.isArray(source.documents) ? source.documents.map((value) => {
+  const documents = rawDocuments.map((value) => {
     const document = objectValue(value);
     const slug = text(document?.slug);
     const path = text(document?.path);
@@ -254,43 +349,26 @@ export async function previewCustomerCheckout(input: CheckoutRequest): Promise<C
     const contentSha256 = text(document?.contentSha256).toLowerCase();
     if (!slug || !path.startsWith("/") || !title || !version || !documentText || !SHA256.test(contentSha256)) return null;
     return Object.freeze({ slug, path, title, version, text: documentText, contentSha256 });
-  }).filter((value): value is CustomerCheckoutAgreement => Boolean(value)) : [];
+  }).filter((value): value is CustomerCheckoutAgreement => Boolean(value));
   const documentSlugs = new Set(documents.map((document) => document.slug));
   if (
     documents.length !== REQUIRED_AGREEMENT_SLUGS.length
-    || documents.length !== (source.documents as unknown[]).length
+    || documents.length !== rawDocuments.length
     || documentSlugs.size !== REQUIRED_AGREEMENT_SLUGS.length
     || REQUIRED_AGREEMENT_SLUGS.some((slug) => !documentSlugs.has(slug))
   ) {
     throw checkoutError("Sipariş sözleşmeleri doğrulanamadı.", "CHECKOUT_AGREEMENT_RESPONSE_INVALID");
   }
-  const items = Array.isArray(quoteSource.items) ? quoteSource.items.map((value) => {
-    const item = objectValue(value);
-    const id = positiveId(item?.id);
-    const quantity = Number(item?.quantity);
-    const price = money(item?.price);
-    const lineTotal = money(item?.line_total ?? item?.lineTotal);
-    const name = text(item?.name);
-    if (
-      !id
-      || !Number.isSafeInteger(quantity)
-      || quantity < 1
-      || quantity > MAX_QUANTITY_PER_ITEM
-      || price === null
-      || lineTotal === null
-      || Math.abs(price * quantity - lineTotal) > 0.011
-      || !name
-    ) return null;
-    return Object.freeze({ id, name, quantity, price, lineTotal, image: text(item?.image) || null });
-  }).filter((value): value is CustomerCheckoutQuoteItem => Boolean(value)) : [];
-  const itemIds = new Set(items.map((item) => item.id));
+  const items = rawQuoteItems.map(normalizeCustomerCheckoutQuoteItem).filter((value): value is CustomerCheckoutQuoteItem => Boolean(value));
+  const itemIdentities = new Set(items.map((item) => canonicalCartLineKey(item.id, item.variantId)));
   const totalQuantity = items.reduce((total, item) => total + item.quantity, 0);
   const quotedSubtotal = items.reduce((total, item) => total + item.lineTotal, 0);
   if (
     items.length < 1
-    || items.length !== (quoteSource.items as unknown[]).length
+    || items.length !== rawQuoteItems.length
     || items.length > MAX_DISTINCT_CART_ITEMS
-    || itemIds.size !== items.length
+    || itemIdentities.size !== items.length
+    || !quoteMatchesCanonicalCartItems(items, canonicalRequest.cartItems)
     || totalQuantity > MAX_TOTAL_CART_QUANTITY
     || Math.abs(quotedSubtotal - totals.subtotal) > 0.011
   ) {
@@ -320,7 +398,7 @@ function createCustomerPaymentInitializeBody(input: CustomerPaymentInitializeInp
     throw checkoutError("Ödeme tekrar güvenliği oluşturulamadı.", "CHECKOUT_IDEMPOTENCY_INVALID");
   }
   return {
-    ...requestBody(input),
+    ...createCustomerCheckoutRequestBody(input),
     paymentMethod: "card",
     idempotency_key: idempotencyKey,
     agreementSnapshotSha256: input.preview.snapshotSha256,
@@ -402,7 +480,10 @@ export function createCheckoutIdempotencyKey() {
 
 export const customerCheckoutApiTestUtils = Object.freeze({
   canonicalCartItems,
+  requestBody: createCustomerCheckoutRequestBody,
   createCustomerPaymentInitializeBody,
   normalizePaymentAction,
+  normalizeCustomerCheckoutQuoteItem,
+  quoteMatchesCanonicalCartItems,
   normalizeTotals,
 });
