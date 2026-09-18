@@ -4,6 +4,10 @@ const { buildPublicProductSqlPredicate } = require('../constants/productVisibili
 const { PLATFORM_STORE } = require('../services/categoryV2BackfillService');
 const { EVENT } = require('../services/notificationEventCatalog');
 const { enqueueNotificationEvent } = require('../services/notificationOutboxService');
+const { buildPublicStoreEligibilitySql } = require('../services/publicCommerceEligibilityService');
+const {
+    PublicReadError, parsePage, decodeCursor, cursorColumns, afterCursorSql, pageRows, setPageHeaders
+} = require('../services/publicReadPaginationService');
 
 const MIN_QUESTION_LENGTH = 5;
 const MAX_QUESTION_LENGTH = 1000;
@@ -58,32 +62,7 @@ const requestAuditMetadata = (req, values = {}) => {
     };
 };
 
-// Match the canonical public store projection, retaining unbound platform products.
-const buildQuestionStoreEligibilitySql = (platformSlugParameter) => `EXISTS (
-    SELECT 1
-    FROM stores canonical_store
-    LEFT JOIN LATERAL (
-        SELECT COUNT(*)::INT AS binding_count,
-               COUNT(*) FILTER (
-                   WHERE seller_store.status = 'active'
-                     AND seller_store.closed_at IS NULL
-                     AND COALESCE(profile.operational_status, 'open') = 'open'
-               )::INT AS public_binding_count
-        FROM seller_stores seller_store
-        LEFT JOIN seller_store_profiles profile
-          ON profile.organization_id = seller_store.organization_id
-         AND profile.store_id = seller_store.id
-        WHERE seller_store.legacy_store_id = canonical_store.id
-    ) question_store_binding ON TRUE
-    WHERE canonical_store.id = products.store_id
-      AND canonical_store.is_active = TRUE
-      AND canonical_store.deleted_at IS NULL
-      AND (
-          question_store_binding.public_binding_count = 1
-          OR (question_store_binding.binding_count = 0
-              AND LOWER(canonical_store.slug) = LOWER(${platformSlugParameter}))
-      )
-)`;
+const buildQuestionStoreEligibilitySql = () => buildPublicStoreEligibilitySql('products.store_id');
 
 // --- Musteri Islemleri ---
 
@@ -112,9 +91,9 @@ exports.askQuestion = async (req, res) => {
              FROM products
              WHERE products.id = $1
                AND ${buildPublicProductSqlPredicate('products')}
-               AND ${buildQuestionStoreEligibilitySql('$4')}
+               AND ${buildQuestionStoreEligibilitySql()}
              RETURNING id, product_id, question, answer, revision, created_at, answered_at`,
-            [productId, user_id, question, PLATFORM_STORE.slug]
+            [productId, user_id, question]
         );
 
         if (newQuestion.rows.length === 0) {
@@ -160,35 +139,42 @@ exports.getProductQuestions = async (req, res) => {
             'Geçersiz ürün kimliği.',
             'QUESTION_PRODUCT_ID_INVALID'
         );
-
+        const options = parsePage(req.query || {});
+        const scope = ['questions', productId];
+        const params = [productId];
+        const after = afterCursorSql(decodeCursor(options.cursor, scope), params,
+            { id: 'pq.id', time: 'pq.answered_at' });
+        const limit = `$${params.push(options.limit + 1)}`;
         const questions = await pool.query(
             `WITH public_product AS (
                 SELECT products.id
                 FROM products
                 WHERE products.id = $1
                   AND ${buildPublicProductSqlPredicate('products')}
-                  AND ${buildQuestionStoreEligibilitySql('$2')}
+                  AND ${buildQuestionStoreEligibilitySql()}
              )
              SELECT public_product.id AS public_product_id,
-                    pq.id, pq.question, pq.answer, pq.created_at, pq.answered_at,
+                    pq.id, pq.question, pq.answer, pq.created_at, pq.answered_at, pq.page_rank, pq.page_micros,
                     COALESCE(u.full_name, u.name) as user_name
              FROM public_product
-             LEFT JOIN product_questions pq
-               ON pq.product_id = public_product.id
-              AND NULLIF(BTRIM(pq.answer), '') IS NOT NULL
+             LEFT JOIN LATERAL (
+                SELECT pq.id, pq.question, pq.answer, pq.created_at, pq.answered_at, pq.user_id,
+                    ${cursorColumns('pq.answered_at')}
+                FROM product_questions pq WHERE pq.product_id = public_product.id
+                    AND NULLIF(BTRIM(pq.answer), '') IS NOT NULL ${after}
+                ORDER BY pq.answered_at DESC NULLS LAST, pq.id DESC LIMIT ${limit}
+             ) pq ON TRUE
              LEFT JOIN users u ON pq.user_id = u.id
-             ORDER BY pq.answered_at DESC, pq.id DESC`,
-            [productId, PLATFORM_STORE.slug]
+             ORDER BY pq.answered_at DESC NULLS LAST, pq.id DESC`,
+            params
         );
 
         if (questions.rows.length === 0) {
             return res.status(404).json({ error: 'Ürün bulunamadı.', code: 'PRODUCT_NOT_FOUND' });
         }
 
-        res.status(200).json(
-            questions.rows
-                .filter((questionRow) => questionRow.id !== null)
-                .map((questionRow) => ({
+        const page = pageRows(questions.rows.filter((row) => row.id !== null), options.limit, scope);
+        page.items = page.items.map((questionRow) => ({
                     id: Number(questionRow.id),
                     question: questionRow.question,
                     answer: questionRow.answer,
@@ -197,13 +183,14 @@ exports.getProductQuestions = async (req, res) => {
                     answered_at: questionRow.answered_at,
                     status: 'answered',
                     is_answered: true
-                }))
-        );
+                }));
+        setPageHeaders(res, page);
+        res.status(200).json(options.envelope ? page : page.items);
     } catch (error) {
-        if (error instanceof QuestionOperationError) {
+        if (error instanceof QuestionOperationError || error instanceof PublicReadError) {
             return res.status(error.statusCode).json({ error: error.message, code: error.code });
         }
-        console.error('Soruları getirme hatası:', error);
+        console.error('Soruları getirme hatası.');
         res.status(500).json({ error: 'Sunucu hatası' });
     }
 };

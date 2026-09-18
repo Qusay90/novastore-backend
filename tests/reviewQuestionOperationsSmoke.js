@@ -252,17 +252,19 @@ const assertQuestionStoreEligibility = (sql) => {
     assert.match(sql, /products\.publication_status = 'active'/i);
     assert.match(sql, /products\.is_customer_visible = TRUE/i);
     assert.match(sql, /products\.deleted_at IS NULL/i);
-    assert.match(sql, /canonical_store\.id = products\.store_id/i);
-    assert.match(sql, /canonical_store\.is_active = TRUE/i);
-    assert.match(sql, /canonical_store\.deleted_at IS NULL/i);
-    assert.match(sql, /seller_store\.legacy_store_id = canonical_store\.id/i);
+    assert.match(sql, /public_store\.platform_store_id = products\.store_id/i);
+    assert.match(sql, /platform_store\.is_active = TRUE/i);
+    assert.match(sql, /platform_store\.deleted_at IS NULL/i);
+    assert.match(sql, /seller_store\.legacy_store_id = platform_store\.id/i);
     assert.match(sql, /seller_store\.status = 'active'/i);
     assert.match(sql, /seller_store\.closed_at IS NULL/i);
     assert.match(sql, /profile\.organization_id = seller_store\.organization_id/i);
     assert.match(sql, /profile\.store_id = seller_store\.id/i);
     assert.match(sql, /COALESCE\(profile\.operational_status, 'open'\) = 'open'/i);
-    assert.match(sql, /question_store_binding\.public_binding_count = 1/i);
-    assert.match(sql, /OR \(question_store_binding\.binding_count = 0\s+AND LOWER\(canonical_store\.slug\)/i);
+    assert.match(sql, /organization\.status = 'active'/i);
+    assert.match(sql, /organization\.closed_at IS NULL/i);
+    assert.match(sql, /binding\.public_binding_count = 1/i);
+    assert.match(sql, /OR \(binding\.binding_count = 0\s+AND LOWER\(platform_store\.slug\)/i);
 };
 
 const testCustomerQuestionCanonicalEligibility = async () => {
@@ -274,7 +276,7 @@ const testCustomerQuestionCanonicalEligibility = async () => {
             if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(text)) return { rows: [] };
             if (/INSERT INTO product_questions/i.test(text)) {
                 assertQuestionStoreEligibility(text);
-                assert.deepEqual(params, [999, 41, 'Satıcı ürünü hakkında soru?', 'novastore-platform']);
+                assert.deepEqual(params, [999, 41, 'Satıcı ürünü hakkında soru?']);
                 return { rows: eligible ? [{ id: 502, product_id: 999, question: params[2], answer: null, revision: 1 }] : [] };
             }
             if (/INSERT INTO notification_outbox_events/i.test(text)) {
@@ -309,7 +311,8 @@ const testPublicQuestionStoreVisibility = async () => {
     for (const eligible of [true, false]) {
         pool.query = async (sql, params) => {
             assertQuestionStoreEligibility(String(sql));
-            assert.deepEqual(params, [999, 'novastore-platform']);
+            assert.deepEqual(params, [999, 21]);
+            assert.match(sql, /LIMIT \$2/);
             assert.match(sql, /NULLIF\(BTRIM\(pq\.answer\), ''\) IS NOT NULL/i);
             return { rows: eligible ? [{ public_product_id: 999, id: null }] : [] };
         };

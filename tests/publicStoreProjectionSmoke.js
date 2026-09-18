@@ -101,13 +101,18 @@ const runServiceMatrix = async () => {
         && !/AS follower_count/u.test(call.source)
     ));
     assert.equal(productQueries.length, 2);
-    productQueries.forEach((call) => {
-        assert.deepEqual(call.params, [101], 'ürün projeksiyonu yalnız server-resolved platform store kimliğiyle sorgulanmalı');
+    productQueries.filter((call) => /FROM products product/u.test(call.source)).forEach((call) => {
+        assert.deepEqual(call.params, [101, 21], 'server-resolved store and bounded sentinel');
         assert.match(call.source, /product\.store_id = \$1/u);
         assert.match(call.source, /product\.publication_status = 'active'/u);
         assert.match(call.source, /product\.is_customer_visible = TRUE/u);
         assert.match(call.source, /product\.deleted_at IS NULL/u);
+        assert.match(call.source, /LIMIT \$2/u);
     });
+    const mediaQuery = productQueries.find((call) => /FROM product_media media/u.test(call.source));
+    assert.deepEqual(mediaQuery.params, [[501, 502]], 'only the current page may load media');
+    assert.match(mediaQuery.source, /LIMIT 20/u);
+    assert.deepEqual(publicProjection.pagination, { limit: 20, hasMore: false, nextCursor: null });
     const metricsQuery = publicDatabase.calls.find((call) => /AS follower_count/u.test(call.source));
     assert.deepEqual(metricsQuery.params, [101, 'Teslim Edildi', 'PAID']);
     assert.match(metricsQuery.source, /customer_order\.status = \$2/u);

@@ -127,7 +127,14 @@ const runServiceMatrix = async () => {
         await setStoreFollow('nova-teknoloji', 7, false, { queryable: database }),
         { store_slug: 'nova-teknoloji', following: false, follower_count: 0 }
     );
-    assert.equal(database.calls.every((call) => !call.source.includes('seller_organizations')), true);
+    const identityCalls = database.calls.filter((call) => /SELECT public_store\.platform_store_id/u.test(call.source));
+    assert.ok(identityCalls.length > 0, 'follow identity must use the shared public store projection');
+    for (const call of identityCalls) {
+        assert.match(call.source, /organization\.status = 'active'/u);
+        assert.match(call.source, /organization\.closed_at IS NULL/u);
+        assert.doesNotMatch(call.source.slice(0, call.source.indexOf('FROM')), /organization_id|owner_user_id|SELECT \*/u,
+            'organization eligibility must not expose private organization fields');
+    }
     assert.equal(database.calls.some((call) => call.params.includes(41)), true, 'mağaza kimliği yalnız server çözümünden gelmeli');
     await assert.rejects(() => getStoreFollowState('../admin', 7, { queryable: database }), /STORE_NOT_FOUND/u);
     await assert.rejects(() => getStoreFollowState('nova-teknoloji', 0, { queryable: database }), /RESOURCE_NOT_FOUND/u);

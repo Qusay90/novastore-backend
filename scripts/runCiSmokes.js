@@ -63,6 +63,7 @@ const smokeTests = [
     'storefront-commerce-pro/tests/integration-boundary.test.mjs',
     'tests/sellerApplicationSummaryPrivacySmoke.mjs',
     'tests/publicStoreProjectionSmoke.js',
+    'tests/publicMarketplaceContractSmoke.js',
     'tests/storeFollowSmoke.js',
     'tests/reviewQuestionOperationsSmoke.js',
     'tests/sellerReputationQuestionsSmoke.js',

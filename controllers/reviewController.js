@@ -7,6 +7,11 @@ const { reviewUpload, uploadReviewMediaFiles, cleanupCloudinaryAssets } = requir
 const { PLATFORM_STORE } = require('../services/categoryV2BackfillService');
 const { EVENT } = require('../services/notificationEventCatalog');
 const { enqueueNotificationEvent } = require('../services/notificationOutboxService');
+const { buildPublicStoreEligibilitySql } = require('../services/publicCommerceEligibilityService');
+const { customerMediaUrl } = require('../services/publicStoreProjectionService');
+const {
+    PublicReadError, parsePage, decodeCursor, cursorColumns, afterCursorSql, pageRows, metadata, setPageHeaders
+} = require('../services/publicReadPaginationService');
 
 const MAX_REVIEW_MEDIA_COUNT = 4;
 const MAX_REVIEW_COMMENT_LENGTH = 2000;
@@ -225,13 +230,17 @@ const buildReviewMediaPayload = (files) => {
         .filter(Boolean);
 };
 
-const loadReviewMediaMap = async (reviewIds) => {
+const loadReviewMediaMap = async (reviewIds, { publicOnly = false } = {}) => {
     if (!Array.isArray(reviewIds) || reviewIds.length === 0) {
         return new Map();
     }
 
     const mediaResult = await pool.query(
-        `SELECT id, review_id, media_url, media_type, sort_order
+        publicOnly ? `SELECT media.* FROM UNNEST($1::INTEGER[]) selected(id)
+         CROSS JOIN LATERAL (
+            SELECT id, review_id, media_url, media_type, sort_order FROM review_media
+            WHERE review_id = selected.id ORDER BY sort_order ASC, id ASC LIMIT 4
+         ) media` : `SELECT id, review_id, media_url, media_type, sort_order
          FROM review_media
          WHERE review_id = ANY($1::int[])
          ORDER BY sort_order ASC, id ASC`,
@@ -240,10 +249,14 @@ const loadReviewMediaMap = async (reviewIds) => {
 
     const mediaMap = new Map();
     mediaResult.rows.forEach((row) => {
+        const url = publicOnly ? customerMediaUrl(row.media_url, process.env, ['image', 'video']) : row.media_url;
+        if (publicOnly && (!url || !['image', 'video'].includes(row.media_type))) return;
         if (!mediaMap.has(row.review_id)) {
             mediaMap.set(row.review_id, []);
         }
-        mediaMap.get(row.review_id).push(row);
+        mediaMap.get(row.review_id).push(publicOnly ? {
+            id: Number(row.id), media_url: url, media_type: row.media_type, sort_order: Number(row.sort_order)
+        } : row);
     });
 
     return mediaMap;
@@ -491,31 +504,42 @@ const getProductReviews = async (req, res) => {
         }
 
         const authUser = await getUserFromRequestIfAny(req);
-
+        const options = parsePage(req.query || {});
+        const scope = ['reviews', productId];
+        const params = [productId];
+        const after = afterCursorSql(decodeCursor(options.cursor, scope), params, { id: 'r.id', time: 'r.created_at' });
+        const limit = `$${params.push(options.limit + 1)}`;
         const reviewResult = await pool.query(
             `SELECT products.id AS public_product_id,
-                    r.id, r.rating, r.comment, r.created_at,
+                    r.id, r.rating, r.comment, r.created_at, r.page_rank, r.page_micros,
                     COALESCE(u.full_name, u.name) AS full_name,
-                    AVG(r.rating) OVER () AS average,
-                    COUNT(r.id) OVER () AS total
+                    summary.average, summary.total
              FROM products
-             LEFT JOIN reviews r
-               ON r.product_id = products.id
-              AND r.status = 'PUBLISHED'
+             CROSS JOIN LATERAL (
+                SELECT AVG(r.rating) AS average, COUNT(*)::INTEGER AS total FROM reviews r
+                WHERE r.product_id = products.id AND r.status = 'PUBLISHED'
+             ) summary
+             LEFT JOIN LATERAL (
+                SELECT r.id, r.rating, r.comment, r.created_at, r.user_id, ${cursorColumns('r.created_at')}
+                FROM reviews r WHERE r.product_id = products.id AND r.status = 'PUBLISHED' ${after}
+                ORDER BY r.created_at DESC NULLS LAST, r.id DESC LIMIT ${limit}
+             ) r ON TRUE
              LEFT JOIN users u ON r.user_id = u.id
              WHERE products.id = $1
                AND ${buildPublicProductSqlPredicate('products')}
-             ORDER BY r.created_at DESC`,
-            [productId]
+               AND ${buildPublicStoreEligibilitySql('products.store_id')}
+             ORDER BY r.created_at DESC NULLS LAST, r.id DESC`,
+            params
         );
 
         if (reviewResult.rows.length === 0) {
             return res.status(404).json({ error: 'Ürün bulunamadı.', code: 'PRODUCT_NOT_FOUND' });
         }
 
-        const reviewRows = reviewResult.rows.filter((review) => review.id !== null);
+        const page = pageRows(reviewResult.rows.filter((review) => review.id !== null), options.limit, scope);
+        const reviewRows = page.items;
 
-        const mediaMap = await loadReviewMediaMap(reviewRows.map((review) => review.id));
+        const mediaMap = await loadReviewMediaMap(reviewRows.map((review) => review.id), { publicOnly: true });
 
         const reviewPermission = await getReviewPermission(authUser ? authUser.id : null, productId);
         if (reviewPermission.code === 'PRODUCT_NOT_FOUND') {
@@ -524,19 +548,23 @@ const getProductReviews = async (req, res) => {
 
         const aggregateRow = reviewResult.rows[0];
 
+        setPageHeaders(res, page);
         res.status(200).json({
-            reviews: reviewRows.map(({ public_product_id: _productId, average: _average, total: _total, ...review }) => ({
-                ...review,
+            reviews: reviewRows.map((review) => ({
+                id: Number(review.id), rating: Number(review.rating), comment: review.comment,
+                created_at: review.created_at,
                 full_name: maskFullName(review.full_name),
                 media: mediaMap.get(review.id) || []
             })),
             average: aggregateRow.average ? parseFloat(aggregateRow.average).toFixed(1) : 0,
             totalReviews: parseInt(aggregateRow.total, 10) || 0,
-            reviewPermission
+            reviewPermission,
+            pagination: metadata(page)
         });
     } catch (err) {
+        if (err instanceof PublicReadError) return res.status(err.statusCode).json({ error: err.message, code: err.code });
         if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
-        console.error('Yorumları getirme hatası:', err.message);
+        console.error('Yorumları getirme hatası.');
         res.status(500).json({ error: 'Yorumlar getirilemedi.' });
     }
 };

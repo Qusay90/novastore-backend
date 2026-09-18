@@ -12,8 +12,7 @@ const {
     hasAttributePayload,
     validateProductAttributes,
     syncProductAttributeValues,
-    getProductAttributeValues,
-    buildPublicAttributeFilterSql
+    getProductAttributeValues
 } = require('../services/productAttributeService');
 const {
     getPublicCategoryBySlug,
@@ -21,6 +20,8 @@ const {
 } = require('../services/categoryService');
 const { normalizeLegacyCategoryName } = require('../services/categoryV2BackfillService');
 const { cardFramingFromStorage } = require('../shared/productCardFraming');
+const { listPublicProducts, validateMarketplaceQuery } = require('../services/publicMarketplaceReadService');
+const { setPageHeaders } = require('../services/publicReadPaginationService');
 const DEFAULT_PRODUCT_CATEGORY = 'Kategorisiz';
 const BACKGROUND_REMOVAL_TRANSFORMATION = [
     { effect: 'background_removal' },
@@ -731,44 +732,15 @@ const resolvePublicProductCategorySelection = async (query = {}) => {
 const getAllProducts = async (req, res) => {
     try {
         const isAdmin = (await getUserFromRequestIfAny(req))?.role === 'admin';
-        const selectedCategory = isAdmin ? null : await resolvePublicProductCategorySelection(req.query || {});
-        let visibilityWhere = isAdmin
-            ? ''
-            : `WHERE p.publication_status = 'active'
-                 AND p.is_customer_visible = TRUE
-                 AND p.deleted_at IS NULL`;
-        const productQueryParams = [];
-        if (selectedCategory !== null) {
-            productQueryParams.push(selectedCategory.categoryId, selectedCategory.includeDescendants);
-            visibilityWhere += `
-                AND EXISTS (
-                    WITH RECURSIVE selected_categories AS (
-                        SELECT id
-                        FROM categories
-                        WHERE id = $1
-                          AND is_active = TRUE
-                          AND is_customer_visible = TRUE
-                          AND deleted_at IS NULL
-                        UNION ALL
-                        SELECT child.id
-                        FROM categories child
-                        JOIN selected_categories parent ON child.parent_id = parent.id
-                        WHERE $2::BOOLEAN = TRUE
-                          AND child.is_active = TRUE
-                          AND child.is_customer_visible = TRUE
-                          AND child.deleted_at IS NULL
-                    )
-                    SELECT 1
-                    FROM product_categories product_category
-                    JOIN selected_categories selected
-                      ON selected.id = product_category.category_id
-                    WHERE product_category.product_id = p.id
-                )`;
+        if (!isAdmin || req.query?.pagination !== undefined) {
+            const options = validateMarketplaceQuery(req.query || {});
+            const category = await resolvePublicProductCategorySelection(req.query || {});
+            const page = await listPublicProducts(pool, req.query || {}, category);
+            setPageHeaders(res, page);
+            return res.status(200).json(options.envelope ? page : page.items);
         }
-        if (!isAdmin) {
-            const filtered = buildPublicAttributeFilterSql(req.query || {}, productQueryParams);
-            visibilityWhere += filtered.sql;
-        }
+        // Retain the authenticated legacy Admin inventory DTO. Public consumers
+        // always return through the bounded allowlist service above.
         const [productsResult, mediaResult, categoryLinksResult] = await Promise.all([
             pool.query(`
                 SELECT p.*,
@@ -786,10 +758,9 @@ const getAllProducts = async (req, res) => {
                       AND seller_store.status = 'active'
                       AND seller_store.closed_at IS NULL
                 LEFT JOIN reviews r ON p.id = r.product_id AND r.status = 'PUBLISHED'
-                ${visibilityWhere}
                 GROUP BY p.id, canonical_store.slug, seller_store.display_name
-                ORDER BY ${isAdmin ? '' : 'CASE WHEN p.stock > 0 THEN 0 ELSE 1 END,'} p.created_at DESC
-            `, productQueryParams),
+                ORDER BY p.created_at DESC
+            `),
             pool.query(`
                 SELECT id, product_id, media_url, media_type, is_main, sort_order,
                        card_focal_x, card_focal_y, card_zoom, created_at
@@ -831,7 +802,10 @@ const getAllProducts = async (req, res) => {
     } catch (err) {
         if (err.publicMessage && [401, 503].includes(err.statusCode)) return sendAuthError(res, err);
         if (!err.statusCode || err.statusCode >= 500) {
-            console.error('Ürün listeleme hatası:', err.message);
+            console.error('Ürün listeleme hatası.');
+            return res.status(500).json({
+                error: 'Ürünler getirilirken sunucu hatası oluştu.', code: 'PUBLIC_PRODUCTS_UNAVAILABLE'
+            });
         }
         res.status(err.statusCode || 500).json({
             error: err.statusCode ? err.message : 'Ürünler getirilirken sunucu hatası oluştu.',
