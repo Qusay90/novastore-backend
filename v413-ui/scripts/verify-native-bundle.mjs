@@ -100,10 +100,15 @@ const index = readFileSync(resolve(webRoot, "index.html"), "utf8");
 if (!index.includes("connect-src 'none'") || !index.includes("frame-src 'none'")) {
   throw new Error("Native Content-Security-Policy is not fail-closed.");
 }
-if (index.includes("__NOVASTORE_NATIVE_IMAGE_ORIGIN__")) {
-  throw new Error("Native image-origin placeholder reached the built bundle.");
+if (/__NOVASTORE_NATIVE_(?:IMAGE|MEDIA)_ORIGIN__/.test(index)) {
+  throw new Error("Native asset-origin placeholder reached the built bundle.");
 }
 const profilePolicy = profileOrigins[profileReceipt.profile];
+const expectedMediaSources = "'self' https://novastore.tr https://www.novastore.tr https://res.cloudinary.com"
+  + (profilePolicy.required ? ` ${profilePolicy.required}` : "");
+if (index.match(/(?:^|;)\s*media-src\s+([^;]+)/)?.[1].trim() !== expectedMediaSources) {
+  throw new Error("Native public-media policy does not match the approved profile origins.");
+}
 if (profilePolicy.required && !index.includes(profilePolicy.required)) {
   throw new Error(`Native ${profileReceipt.profile} image origin is missing.`);
 }

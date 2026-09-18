@@ -1,0 +1,21 @@
+import { expect, test } from "@playwright/test";
+import { normalizeMarketplacePage, normalizePublicCategoryTree, normalizePublicQuestions, normalizePublicReviews } from "../src/adapters/publicDiscoveryClient";
+import { normalizePublicStoreProjection } from "../src/adapters/publicStoreContract";
+const origin = "http://127.0.0.1:5000";
+const get = async (path: string) => { const response = await fetch(origin + path); expect(response.status).toBe(200); return response.json(); };
+test("actual R27 marketplace/category/store/reputation pages normalize with exact client contracts", async () => {
+  const fixture = await get("/__r26/fixture");
+  const assets = {apiOrigin:origin,allowCleartextAssets:true};
+  const rows:any[]=[]; let cursor:string|null=null; let pages=0;
+  do { const page=normalizeMarketplacePage(await get("/api/products?pagination=cursor&limit=20&q=R26%20Ortak"+(cursor?"&cursor="+cursor:"")),assets); rows.push(...page.items);cursor=page.nextCursor;pages++; } while(cursor && pages<10);
+  expect(rows).toHaveLength(105);expect(new Set(rows.map(r=>r.id)).size).toBe(105);expect(pages).toBe(6);
+  expect(new Set(rows.map(r=>r.store.slug))).toEqual(new Set([fixture.storeA,fixture.storeB]));
+  const tree=normalizePublicCategoryTree(await get("/api/public/categories?format=tree"),assets);
+  expect(tree.find(r=>r.id===fixture.rootCategory)?.children[0].children[0].id).toBe(fixture.nestedCategory);
+  const store=normalizePublicStoreProjection(await get("/api/public/stores/"+fixture.storeB+"?limit=20"),fixture.storeB,origin,true);
+  expect(store.products).toHaveLength(20);expect(store.store.productCount).toBeGreaterThan(20);expect(store.pagination?.hasMore).toBe(true);
+  const questions=normalizePublicQuestions(await get("/api/questions/product/"+fixture.reputationProductId+"?pagination=cursor&limit=20"));
+  expect(questions.items).toHaveLength(20);expect(questions.hasMore).toBe(true);
+  const reviews=normalizePublicReviews(await get("/api/reviews/product/"+fixture.reputationProductId+"?pagination=cursor&limit=20"),assets);
+  expect(reviews.items).toHaveLength(20);expect(reviews.summary.total).toBe(27);expect(reviews.hasMore).toBe(true);
+});

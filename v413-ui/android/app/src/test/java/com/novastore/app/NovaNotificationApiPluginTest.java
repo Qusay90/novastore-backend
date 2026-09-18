@@ -11,6 +11,18 @@ import org.junit.Test;
 
 public final class NovaNotificationApiPluginTest {
     @Test
+    public void publicDiscoveryQueriesAreReadOnlyBoundedAndCannotSelectPrivateAuthority() {
+        for (String path : new String[] {"/api/products?pagination=cursor&limit=20&q=%C3%87%C4%B1%C4%9F+%25_!&cursor=opaque_A", "/api/public/categories?format=tree", "/api/public/stores/store-b?limit=20&cursor=opaque_A", "/api/questions/product/21?pagination=cursor&limit=20", "/api/reviews/product/21?pagination=cursor&limit=20", "/api/products?categoryId=17&includeDescendants=true"}) {
+            assertEquals(path, NovaNotificationApiPlugin.canonicalPath(path));
+            assertTrue(NovaNotificationApiPlugin.allowed(path, "GET"));
+            assertTrue(NovaNotificationApiPlugin.unauthenticated(path, "GET"));
+            assertFalse(NovaNotificationApiPlugin.allowed(path, "POST"));
+        }
+        for (String path : new String[] {"/api/products?limit=101", "/api/products?limit=20&limit=30", "/api/products?userId=7", "/api/products?storeId=8", "/api/products?q=%00", "/api/products?cursor=https%3A%2F%2Fevil.test", "/api/%70roducts?limit=20", "/api/public/stores/store%2Fb", "/api/questions/user?pagination=cursor", "/api/public/categories?format=flat&customerId=1"}) {
+            assertNull(path, NovaNotificationApiPlugin.canonicalPath(path));
+        }
+    }
+    @Test
     public void canonicalPathsAndMethodsAreBounded() {
         assertEquals("/api/notifications?limit=50&cursor=abc_123", NovaNotificationApiPlugin.canonicalPath("/api/notifications?limit=50&cursor=abc_123"));
         assertEquals("PATCH", NovaNotificationApiPlugin.canonicalMethod(" patch "));

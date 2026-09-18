@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { publicReadKind, validPublicReadQuery } from "../adapters/publicReadQuery";
 import {
   clearStoredCustomerSession,
   currentCustomerSession,
@@ -51,7 +52,7 @@ function suspendCustomerVerification() {
   }
 }
 
-type NativeApiResponse = Readonly<{ status: number; payload: unknown; retryAfterSeconds?: number }>;
+type NativeApiResponse = Readonly<{ status: number; payload: unknown; retryAfterSeconds?: number; apiOrigin?: string; allowCleartextAssets?: boolean }>;
 type NativeNotificationCapability = Readonly<{
   providerConfigured: boolean;
   notificationsEnabled: boolean;
@@ -162,11 +163,14 @@ function requestRule(path: string, method: string) {
       || CUSTOMER_REVIEW_LIST_PATTERN.test(parsed.pathname)
       || CUSTOMER_SUPPORT_HISTORY_PATTERN.test(parsed.pathname)
       || PUBLIC_PRODUCT_PATTERN.test(parsed.pathname)
+      || publicReadKind(parsed.pathname) !== null
     ));
   if (!allowed) {
     throw new CustomerNotificationApiError("Bildirim API işlemi allowlist dışında.", 0, "CUSTOMER_NOTIFICATION_PATH_FORBIDDEN");
   }
-  if (parsed.pathname === "/api/notifications") {
+  if (publicReadKind(parsed.pathname)) {
+    if (!validPublicReadQuery(parsed)) throw new CustomerNotificationApiError("Public sorgu geçersiz.", 0, "PUBLIC_QUERY_INVALID");
+  } else if (parsed.pathname === "/api/notifications") {
     const seenKeys = new Set<string>();
     for (const key of parsed.searchParams.keys()) {
       if (!ALLOWED_QUERY_KEYS.has(key) || seenKeys.has(key)) {
@@ -238,12 +242,14 @@ async function readResponse(response: Response) {
 }
 
 type NormalizedRequest = Readonly<{ path: string; method: string }>;
-type TransportResult = Readonly<{ status: number; payload: unknown; retryAfterSeconds: number | null }>;
+type TransportResult = Readonly<{ status: number; payload: unknown; retryAfterSeconds: number | null; apiOrigin?: string; allowCleartextAssets?: boolean }>;
 
 async function transportCustomerApi(normalized: NormalizedRequest, body: Record<string, unknown> | undefined, token: string): Promise<TransportResult> {
   let status: number;
   let payload: unknown;
   let retryAfterSeconds: number | null = null;
+  let apiOrigin: string | undefined;
+  let allowCleartextAssets = false;
   if (Capacitor.isNativePlatform()) {
     try {
       const result = await NovaNotificationApi.request({
@@ -254,6 +260,8 @@ async function transportCustomerApi(normalized: NormalizedRequest, body: Record<
       });
       status = Number(result.status);
       payload = result.payload;
+      apiOrigin = result.apiOrigin;
+      allowCleartextAssets = result.allowCleartextAssets === true;
       retryAfterSeconds = normalizeRetryAfterSeconds(result.retryAfterSeconds);
     } catch {
       throw new CustomerNotificationApiError("NovaStore bildirim sunucusuna bağlanılamadı.", 0, "CUSTOMER_NOTIFICATION_NETWORK_ERROR");
@@ -265,7 +273,7 @@ async function transportCustomerApi(normalized: NormalizedRequest, body: Record<
     try {
       response = await fetch(normalized.path, {
         method: normalized.method,
-        credentials: "same-origin",
+        credentials: publicReadKind(normalized.path.split("?")[0]) ? "omit" : "same-origin",
         redirect: "error",
         headers: {
           accept: "application/json",
@@ -282,12 +290,22 @@ async function transportCustomerApi(normalized: NormalizedRequest, body: Record<
     }
     status = response.status;
     payload = await readResponse(response);
+    apiOrigin = typeof window === "undefined" ? undefined : window.location.origin;
+    allowCleartextAssets = typeof window !== "undefined" && ["127.0.0.1", "localhost", "[::1]"].includes(window.location.hostname) && window.location.protocol === "http:";
     retryAfterSeconds = normalizeRetryAfterSeconds(response.headers.get("retry-after"));
   }
   if (!Number.isSafeInteger(status) || status < 100 || status > 599) {
     throw new CustomerNotificationApiError("Bildirim API durum kodu geçersiz.", 0, "CUSTOMER_NOTIFICATION_RESPONSE_INVALID");
   }
-  return Object.freeze({ status, payload, retryAfterSeconds });
+  return Object.freeze({ status, payload, retryAfterSeconds, apiOrigin, allowCleartextAssets });
+}
+
+export async function requestPublicDiscovery(path: string) {
+  const normalized = requestRule(path, "GET");
+  if (!publicReadKind(normalized.path.split("?")[0])) throw new CustomerNotificationApiError("Public yol geçersiz.", 0, "PUBLIC_PATH_INVALID");
+  const result = await transportCustomerApi(normalized, undefined, "");
+  if (!successful(result)) throw responseError(result.status, result.payload, result.retryAfterSeconds);
+  return result;
 }
 
 function successful(result: TransportResult) {

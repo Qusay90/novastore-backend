@@ -16,6 +16,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -118,7 +119,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
             return;
         }
         boolean publicGet = "GET".equals(method) && (
-            UNAUTHENTICATED_GET.contains(path) || PUBLIC_PRODUCT.matcher(path).matches()
+            UNAUTHENTICATED_GET.contains(path) || PUBLIC_PRODUCT.matcher(path).matches() || publicReadPath(path.split("\\?", 2)[0])
         );
         boolean authenticated = !(publicGet || ("POST".equals(method) && (UNAUTHENTICATED_POST.contains(path) || optionalAuthentication)));
         if (authenticated && token == null) {
@@ -217,6 +218,8 @@ public final class NovaNotificationApiPlugin extends Plugin {
             JSObject result = new JSObject();
             result.put("status", status);
             result.put("payload", responseBody.isEmpty() ? new JSObject() : new JSONTokener(responseBody).nextValue());
+            result.put("apiOrigin", NovaPublicStorePlugin.apiOrigin(validatedApiBase()));
+            result.put("allowCleartextAssets", BuildConfig.DEBUG || BuildConfig.NOVASTORE_LOCAL_UAT);
             Integer retryAfterSeconds = canonicalRetryAfterSeconds(connection.getHeaderField("Retry-After"));
             if (retryAfterSeconds != null) result.put("retryAfterSeconds", retryAfterSeconds);
             call.resolve(result);
@@ -245,14 +248,62 @@ public final class NovaNotificationApiPlugin extends Plugin {
         return SUPPORTED_METHODS.contains(method) ? method : null;
     }
 
+    static boolean publicReadPath(String path) {
+        return "/api/products".equals(path) || "/api/public/categories".equals(path)
+            || path.matches("^/api/(questions|reviews)/product/[1-9][0-9]*$")
+            || path.matches("^/api/public/stores/(?=[a-z0-9-]{1,160}$)[a-z0-9]+(?:-[a-z0-9]+)*$");
+    }
+
+    static boolean validPublicQuery(String path, String query) {
+        if (query == null) return true;
+        Set<String> seen = new HashSet<>();
+        boolean marketplace = "/api/products".equals(path);
+        boolean categories = "/api/public/categories".equals(path);
+        try {
+            for (String item : query.split("&", -1)) {
+                String[] pair = item.split("=", 2);
+                if (pair.length != 2 || !pair[0].matches("^[A-Za-z]+$") || !seen.add(pair[0])) return false;
+                String key = pair[0];
+                String value = URLDecoder.decode(pair[1], StandardCharsets.UTF_8.name());
+                if (value.chars().anyMatch(character -> character < 0x20 || character == 0x7f)) return false;
+                if (categories) {
+                    if (!"format".equals(key) || !"tree".equals(value)) return false;
+                } else if ("limit".equals(key)) {
+                    if (!value.matches("^[1-9][0-9]{0,2}$") || Integer.parseInt(value) > 100) return false;
+                } else if ("cursor".equals(key)) {
+                    if (!SAFE_CURSOR.matcher(value).matches()) return false;
+                } else if ("pagination".equals(key)) {
+                    if (!"cursor".equals(value)) return false;
+                } else if (marketplace && "q".equals(key)) {
+                    if (value.length() > 120) return false;
+                } else if (marketplace && "categoryId".equals(key)) {
+                    if (!value.matches("^[1-9][0-9]{0,9}$") || Long.parseLong(value) > 2147483647L) return false;
+                } else if (marketplace && "categorySlug".equals(key)) {
+                    if (value.isEmpty() || value.length() > 255) return false;
+                } else if (marketplace && "includeDescendants".equals(key)) {
+                    if (!"true".equals(value) && !"false".equals(value)) return false;
+                } else if (marketplace && "attributes".equals(key)) {
+                    if (value.length() > 4096 || !value.startsWith("{") || !value.endsWith("}")) return false;
+                } else return false;
+            }
+            return true;
+        } catch (IllegalArgumentException | java.io.UnsupportedEncodingException failure) {
+            return false;
+        }
+    }
+
     static String canonicalPath(String value) {
-        if (value == null || value.length() < 1 || value.length() > 2048 || !value.startsWith("/") || value.startsWith("//")) return null;
-        if (value.indexOf('\\') >= 0 || value.indexOf('#') >= 0 || value.indexOf('%') >= 0 || value.chars().anyMatch(character -> character < 0x20 || character == 0x7f)) return null;
+        if (value == null || value.length() < 1 || !value.startsWith("/") || value.startsWith("//")) return null;
+        String rawPath = value.split("\\?", 2)[0];
+        boolean publicRead = publicReadPath(rawPath);
+        if (value.length() > (publicRead ? 32768 : 2048) || rawPath.indexOf('%') >= 0 || (!publicRead && value.indexOf('%') >= 0)) return null;
+        if (value.indexOf('\\') >= 0 || value.indexOf('#') >= 0 || value.chars().anyMatch(character -> character < 0x20 || character == 0x7f)) return null;
         try {
             URI parsed = URI.create("https://novastore.invalid" + value);
             if (!"novastore.invalid".equals(parsed.getHost()) || parsed.getRawUserInfo() != null || parsed.getRawFragment() != null) return null;
             if (!parsed.normalize().equals(parsed)) return null;
             String path = parsed.getPath();
+            if (publicRead) return validPublicQuery(path, parsed.getRawQuery()) ? path + (parsed.getRawQuery() == null ? "" : "?" + parsed.getRawQuery()) : null;
             if ("/api/notifications".equals(path)) {
                 String query = parsed.getRawQuery();
                 if (query == null || query.isEmpty()) return path;
@@ -305,6 +356,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
                 || CUSTOMER_SUPPORT_HISTORY.matcher(path).matches()
                 || CUSTOMER_STORE_FOLLOW.matcher(path).matches()
                 || PUBLIC_PRODUCT.matcher(path).matches()
+                || publicReadPath(path)
         )) return true;
         if ("POST".equals(method) && EXACT_POST.contains(path)) return true;
         if ("POST".equals(method) && CUSTOMER_ORDER_CANCEL.matcher(path).matches()) return true;
@@ -326,7 +378,7 @@ public final class NovaNotificationApiPlugin extends Plugin {
 
     static boolean unauthenticated(String path, String method) {
         return ("GET".equals(method) && (
-            UNAUTHENTICATED_GET.contains(path) || PUBLIC_PRODUCT.matcher(path).matches()
+            UNAUTHENTICATED_GET.contains(path) || PUBLIC_PRODUCT.matcher(path).matches() || publicReadPath(path.split("\\?", 2)[0])
         ))
             || ("POST".equals(method) && UNAUTHENTICATED_POST.contains(path));
     }

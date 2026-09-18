@@ -1666,3 +1666,16 @@ body:has(.capture-mode) .device-screen:has(.capture-mode) > :is(.sheet-overlay, 
 .canonical-variants button:disabled { color: #656b77; background: #f4f4f5; cursor: not-allowed; }
 .canonical-variants button:focus-visible { outline: 2px solid var(--nova-navy); outline-offset: 2px; }
 .cart-variant-label, .order-variant-label { overflow-wrap: anywhere; }
+.public-read-state { padding: 22px 12px; text-align: center; color: var(--nova-deep); }
+.public-read-state p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.public-page-controls { display: flex; justify-content: center; padding: 18px 0 26px; }
+.public-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; color: var(--nova-deep); font-size: 13px; }
+.public-page-heading button { min-width: 44px; min-height: 44px; border: 1px solid #d7e1eb; border-radius: 12px; background: white; color: inherit; }
+.public-category-branch { min-width: 0; }
+.public-category-children { padding-left: 12px; border-left: 2px solid #e7edf3; }
+.public-category-branch .subcategory-card { width: 100%; min-height: 90px; overflow-wrap: anywhere; }
+.public-category-branch .subcategory-card > svg { width: 42px; height: 42px; margin: 12px; }
+.public-review-media { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.review-preview time, .answer-block time { display: block; margin-top: 6px; font-size: 11px; color: var(--nova-muted); }
+.public-review-media img, .public-review-media video { width: 96px; height: 96px; object-fit: contain; border-radius: 8px; }
+[data-testid="public-questions"] p, [data-testid="public-reviews"] .review-preview { white-space: pre-wrap; overflow-wrap: anywhere; }

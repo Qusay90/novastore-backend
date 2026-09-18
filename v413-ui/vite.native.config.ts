@@ -87,10 +87,14 @@ export default defineConfig(({ mode }) => {
       enforce: "pre",
       transformIndexHtml(html) {
         const placeholder = "__NOVASTORE_NATIVE_IMAGE_ORIGIN__";
+        const mediaPlaceholder = "__NOVASTORE_NATIVE_MEDIA_ORIGIN__";
+        if (html.split(mediaPlaceholder).length !== 2) {
+          throw new Error("Native media-origin placeholder must occur exactly once.");
+        }
         if (html.split(placeholder).length !== 2) {
           throw new Error("Native image-origin placeholder must occur exactly once.");
         }
-        return html.replace(
+        return html.replace(mediaPlaceholder, profile.imageOrigin ? ` ${profile.imageOrigin}` : "").replace(
           placeholder,
           profile.imageOrigin ? ` ${profile.imageOrigin}` : "",
         );

@@ -52,7 +52,6 @@ import { Amex as AmexLogo, Mastercard as MastercardLogo, Visa as VisaLogo } from
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 import { BottomSheet, Carousel, KeyboardInput, KeyboardTextarea, MobileScroll, useKeyboard } from "./mobile";
 import {
-  DEFAULT_PUBLIC_STORE_SLUG,
   loadCanonicalPublicStore,
   loadCanonicalProductDetail,
   orderedCustomerCardMedia,
@@ -105,6 +104,10 @@ import {
   type CustomerNotificationTarget,
 } from "./notifications";
 import "./prototype.css";
+import { loadMarketplacePage, loadPublicCategoryTree, loadPublicQuestionPage, loadPublicReviewPage, loadPublicStorePage,
+  marketplacePath, type MarketplaceFilters, type MarketplaceProduct, type PublicCategory } from "./adapters/publicDiscoveryClient";
+import { usePublicPage } from "./adapters/usePublicPage";
+import { publicFailure, type PublicFailure } from "./adapters/publicPageRepository";
 
 declare const __NOVASTORE_NATIVE__: boolean;
 const NATIVE_SHELL = typeof __NOVASTORE_NATIVE__ !== "undefined" && __NOVASTORE_NATIVE__;
@@ -125,7 +128,7 @@ type Route = { cal: CalId; tab: TabId; view: ViewId } & RouteContext;
 type RefreshSource = "pull" | "reselect";
 type RefreshRequest = { id: number; source: RefreshSource };
 type RefreshPhase = "idle" | "pulling" | "armed" | "refreshing" | "complete";
-type CatalogSelection = { category: string; subcategory: string };
+type CatalogSelection = { category: string; subcategory: string; categoryId?: number; categorySlug?: string };
 
 const A = "/calibration-assets";
 const LOGO = `${A}/official/app_icon_foreground.png`;
@@ -299,6 +302,7 @@ type CommerceState = {
   markAllNotificationsRead: () => void;
   toggleNotificationPreference: (preference: NotificationPreference) => void;
   selectCatalog: (category: string, subcategory?: string) => void;
+  selectPublicCategory: (category: PublicCategory | null) => void;
   applyCatalogFilters: (filters: Omit<CatalogFilters, "applied">) => void;
   setCatalogSort: (sort: CatalogSortKey) => void;
 };
@@ -433,8 +437,7 @@ export default function Prototype() {
   const [selectedProductId, setSelectedProductId] = useState("pulse-anc");
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [publicProducts, setPublicProducts] = useState<Record<string, Product>>({});
-  const [publicCatalogPhase, setPublicCatalogPhase] = useState<"idle" | "loading" | "ready" | "error">(() => NATIVE_SHELL ? "loading" : "idle");
-  const [publicCatalogRevision, setPublicCatalogRevision] = useState(0);
+  const publicCatalogPhase = "idle" as const; // Calibration-only compatibility; native traversals own their own state.
   const [addresses, setAddresses] = useState<SavedAddress[]>(() => NATIVE_SHELL ? [] : [
     { id: "home", label: "Ev", recipient: "Kullanıcı Adı", line: "Atakum Mah. Cumhuriyet Cad. No: 58 D: 12", city: "Samsun / Atakum", postalCode: "55200", isDefault: true },
   ]);
@@ -538,25 +541,6 @@ export default function Prototype() {
       return changed ? next : current;
     });
   }, []);
-
-  useEffect(() => {
-    if (!NATIVE_SHELL) return;
-    let active = true;
-    setPublicCatalogPhase("loading");
-    loadCanonicalPublicStore(DEFAULT_PUBLIC_STORE_SLUG)
-      .then((projection) => {
-        if (!active) return;
-        const incoming = productsFromPublicProjection(projection);
-        setPublicProducts(Object.fromEntries(incoming.map((product) => [product.id, product])));
-        setPublicCatalogPhase("ready");
-      })
-      .catch(() => {
-        if (!active) return;
-        setPublicProducts({});
-        setPublicCatalogPhase("error");
-      });
-    return () => { active = false; };
-  }, [publicCatalogRevision]);
 
   const go = (next: CalId, tab = initialTab[next], view: ViewId = "", context: RouteContext = {}) => {
     keyboard.hide();
@@ -722,7 +706,7 @@ export default function Prototype() {
     selectProduct: setSelectedProductId,
     selectOrder: setSelectedOrderId,
     registerPublicProducts,
-    reloadPublicCatalog: () => setPublicCatalogRevision((current) => current + 1),
+    reloadPublicCatalog: () => setContentRevision((current) => current + 1),
     addAddress: (address) => setAddresses((current) => [...current, { ...address, id: `address-${Date.now()}`, isDefault: current.length === 0 }]),
     updateAddress: (id, address) => setAddresses((current) => current.map((item) => item.id === id ? { ...item, ...address } : item)),
     removeAddress: (id) => setAddresses((current) => {
@@ -747,6 +731,9 @@ export default function Prototype() {
     markAllNotificationsRead: () => setReadNotificationIds(new Set(["order", "campaign", "question", "welcome"])),
     toggleNotificationPreference: (preference) => setNotificationPreferences((current) => ({ ...current, [preference]: !current[preference] })),
     selectCatalog: (category, subcategory = category) => setCatalogSelection({ category, subcategory }),
+    selectPublicCategory: (category) => setCatalogSelection(category
+      ? { category: category.name, subcategory: category.name, categoryId: category.id, categorySlug: category.slug }
+      : { category: "Tüm Ürünler", subcategory: "" }),
     applyCatalogFilters: (filters) => setCatalogFilters({ ...filters, applied: true }),
     setCatalogSort,
   }), [accountRuntime, favoriteIds, cartCount, cartLines, appliedCoupon, selectedProductId, selectedOrderId, publicProducts, publicCatalogPhase, addresses, paymentMethods, productReviews, productQuestions, readNotificationIds, notificationPreferences, catalogSelection, catalogFilters, catalogSort, registerPublicProducts]);
@@ -1118,7 +1105,7 @@ function SearchTopbar({ query, setQuery, onBack, onActivate }: { query: string; 
   return (
     <header className="search-topbar" data-testid="app-topbar">
       <IconButton label="Aramayı kapat" onClick={onBack}><img className="repo-icon" src={`${A}/official/nav/ic_customer_caret_left.svg`} alt="" /></IconButton>
-      <label className="search-field" onPointerDown={onActivate}><MagnifyingGlassIcon /><KeyboardInput autoFocus aria-label="Ürün ara" placeholder="Ürün, kategori veya marka ara" value={query} onFocus={onActivate} onClick={onActivate} onChange={(event) => setQuery(event.target.value)} /></label>
+      <label className="search-field" onPointerDown={onActivate}><MagnifyingGlassIcon /><KeyboardInput autoFocus maxLength={120} aria-label="Ürün ara" placeholder="Ürün, kategori veya marka ara" value={query} onFocus={onActivate} onClick={onActivate} onChange={(event) => setQuery(event.target.value)} /></label>
       {query ? <IconButton label="Aramayı temizle" onClick={() => { setQuery(""); onActivate(); }}><Cross1Icon /></IconButton> : <span aria-hidden="true" />}
     </header>
   );
@@ -1469,7 +1456,117 @@ function CategoryIcon({ id }: { id: CategoryId }) {
   return <BasketIcon weight="regular" />;
 }
 
+function PublicReadState({ phase, retry }: { phase: "loading" | PublicFailure | "empty"; retry?: () => void }) {
+  const copy = phase === "loading" ? "Yükleniyor…" : phase === "empty" ? "Henüz gösterilecek içerik yok."
+    : phase === "offline" ? "İnternet bağlantısı yok. Bağlantını kontrol edip yeniden dene."
+      : phase === "unavailable" ? "Bu içerik şu anda kullanılamıyor." : "İçerik yüklenemedi. Yeniden deneyebilirsin.";
+  return <div className="public-read-state" data-public-phase={phase} role={phase === "loading" || phase === "empty" ? "status" : "alert"}><p>{copy}</p>{retry && phase !== "loading" && <button type="button" className="secondary" onClick={retry}>Yeniden Dene</button>}</div>;
+}
+
+function PublicPageControls({ page, label = "Daha fazla göster" }: { page: { appending: boolean; appendError: PublicFailure | null; hasMore: boolean; loadMore: () => Promise<void> }; label?: string }) {
+  return <div className="public-page-controls">{page.appendError && <PublicReadState phase={page.appendError} retry={() => void page.loadMore()} />}{page.hasMore && !page.appendError && <button type="button" className="secondary" disabled={page.appending} onClick={() => void page.loadMore()}>{page.appending ? "Yükleniyor…" : label}</button>}</div>;
+}
+
+function productFromMarketplace(source: MarketplaceProduct): Product {
+  const originals = orderedCustomerOriginalMediaUrls(source);
+  const image = originals[0] ?? source.imageUrl ?? LOGO;
+  return { id: source.id, name: source.name, store: source.store.name, storeSlug: source.store.slug,
+    image, images: originals.length ? originals : [image], cardMedia: orderedCustomerCardMedia(source),
+    price: formatCatalogPrice(source.price), amount: source.price, stock: source.stock,
+    old: source.oldPrice === null ? undefined : formatCatalogPrice(source.oldPrice), oldAmount: source.oldPrice ?? undefined,
+    rating: source.averageRating, reviewCount: source.reviewCount, isPurchasable: source.isPurchasable, isPublicProjection: true };
+}
+
+function NativeMarketplaceScreen({ go, filters = {}, title = "Tüm ürünler", home = false, search = false }: { go: Go; filters?: MarketplaceFilters; title?: string; home?: boolean; search?: boolean }) {
+  const { registerPublicProducts, selectPublicCategory } = useCommerce();
+  const surface = useRef<HTMLDivElement>(null);
+  const resourceKey = marketplacePath(filters);
+  const page = usePublicPage(resourceKey, cursor => loadMarketplacePage(filters, cursor));
+  useLayoutEffect(() => {
+    if (page.phase !== "loading") return;
+    const scroll = surface.current?.closest<HTMLElement>(".mobile-scroll");
+    if (scroll) scroll.scrollTop = 0;
+  }, [resourceKey, page.phase]);
+  const rows = useMemo(() => page.items.map(productFromMarketplace), [page.items]);
+  useEffect(() => { if (rows.length) registerPublicProducts(rows); }, [rows, registerPublicProducts]);
+  return <div ref={surface} className={`root-layout ${home ? "home-layout" : "plp-layout"}`} data-testid="marketplace-discovery">
+    {home && <section className="home-hero"><img src={`${A}/extracts/home-hero.png`} alt="Ev yaşam koleksiyonu" /><div className="carousel-dots"><i /><i /><i /></div></section>}
+    {home ? <SectionTitle title="Ürünleri keşfet" action="Tümünü Gör" onClick={() => { selectPublicCategory(null); go("CAL-04"); }} /> : <div className="page-heading"><h1>{title}</h1></div>}
+    <div className="public-page-heading"><span aria-live="polite">{rows.length} ürün gösteriliyor</span><button type="button" aria-label={search ? "Aramayı yenile" : "Ürünleri yenile"} onClick={() => void page.refresh()}><ReloadIcon /></button></div>
+    {page.phase !== "ready" ? <PublicReadState phase={page.phase} retry={() => void page.refresh()} /> : rows.length ? <div className={`product-grid ${home ? "home-products" : "plp-products"}`}>{rows.map((product, index) => <ProductCard key={product.id} {...product} testId={home ? `home-product-card-${index}` : `catalog-product-${index}`} onClick={() => openProductDetail(go, product)} />)}</div> : <PublicReadState phase="empty" />}
+    <PublicPageControls page={page} />
+  </div>;
+}
+
+function NativeCategoriesScreen({ go }: { go: Go }) {
+  const { selectPublicCategory } = useCommerce();
+  const [tree, setTree] = useState<readonly PublicCategory[]>([]);
+  const [phase, setPhase] = useState<"loading" | "ready" | PublicFailure>("loading");
+  const [revision, setRevision] = useState(0);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    setPhase("loading"); setTree([]);
+    loadPublicCategoryTree().then(value => { if (active) { setTree(value); setPhase("ready"); } })
+      .catch(error => { if (active) setPhase(publicFailure(error)); });
+    return () => { active = false; };
+  }, [revision]);
+  const selected = tree.find(category => category.id === selectedId) ?? tree[0];
+  const open = (category: PublicCategory) => { selectPublicCategory(category); go("CAL-04", "categories"); };
+  const tile = (category: PublicCategory): ReactNode => <div key={category.id} className="public-category-branch"><button className="subcategory-card" type="button" data-category-id={category.id} onClick={() => open(category)}>{category.imageUrl ? <img src={category.imageUrl} alt="" /> : <CubeIcon />}<span>{category.name}</span></button>{category.children.length > 0 && <div className="public-category-children">{category.children.map(tile)}</div>}</div>;
+  return <div className="root-layout categories-layout" data-testid="public-category-tree"><div className="public-page-heading"><h1>Kategoriler</h1><button type="button" aria-label="Kategorileri yenile" onClick={() => setRevision(value => value + 1)}><ReloadIcon /></button></div>
+    {phase !== "ready" ? <PublicReadState phase={phase} retry={() => setRevision(value => value + 1)} /> : !selected ? <PublicReadState phase="empty" /> : <div className="category-browser"><nav role="tablist" className="category-rail" aria-label="Ana kategoriler">{tree.map(category => <button type="button" role="tab" aria-selected={selected.id === category.id} className={selected.id === category.id ? "active" : ""} onClick={() => setSelectedId(category.id)} key={category.id}><CubeIcon /><span>{category.name}</span></button>)}</nav><section className="subcategory-panel"><div className="section-title"><h2>{selected.name}</h2><button type="button" onClick={() => open(selected)}>Tümünü Gör <ArrowRightIcon /></button></div><div className="subcategory-grid">{(selected.children.length ? selected.children : [selected]).map(tile)}</div></section></div>}
+  </div>;
+}
+
+function NativeFavoritesScreen({ go }: { go: Go }) {
+  const { favoriteIds, registerPublicProducts } = useCommerce();
+  const [rows, setRows] = useState<Product[]>([]);
+  const [phase, setPhase] = useState<"loading" | "ready" | PublicFailure>("loading");
+  const [revision, setRevision] = useState(0);
+  const key = [...favoriteIds].sort().join(",");
+  useEffect(() => {
+    let active = true;
+    setPhase("loading"); setRows([]);
+    const ids = key ? key.split(",") : [];
+    const hydrated: Product[] = [];
+    let index = 0;
+    const worker = async () => { while (index < ids.length) {
+      const id = ids[index++];
+      try { hydrated.push(productFromCanonicalDetail(await loadCanonicalProductDetail(id))); }
+      catch (error) { if (!(error instanceof CustomerNotificationApiError && error.status === 404)) throw error; }
+      if (!active) return;
+    } };
+    Promise.all(Array.from({ length: Math.min(ids.length, 4) }, worker)).then(() => {
+      if (active) { setRows(hydrated); registerPublicProducts(hydrated); setPhase("ready"); }
+    }).catch(error => { if (active) setPhase(publicFailure(error)); });
+    return () => { active = false; };
+  }, [key, revision, registerPublicProducts]);
+  return <div className="root-layout plp-layout" data-testid="public-favorites"><div className="page-heading"><h1>Favorilerim</h1></div>{phase !== "ready" ? <PublicReadState phase={phase} retry={() => setRevision(value => value + 1)} /> : rows.length ? <div className="product-grid plp-products">{rows.map(product => <ProductCard key={product.id} {...product} onClick={() => openProductDetail(go, product)} />)}</div> : <PublicReadState phase="empty" />}</div>;
+}
+
+function NativePublicQuestions({ productId }: { productId: string }) {
+  const page = usePublicPage(`questions:${productId}`, cursor => loadPublicQuestionPage(productId, cursor));
+  return <div data-testid="public-questions"><div className="public-page-heading"><span>Yanıtlanan sorular</span><button type="button" aria-label="Soruları yenile" onClick={() => void page.refresh()}><ReloadIcon /></button></div>{page.phase !== "ready" ? <PublicReadState phase={page.phase} retry={() => void page.refresh()} /> : !page.items.length ? <PublicReadState phase="empty" /> : <div className="question-thread-list">{page.items.map(question => <article className="question-thread" data-status="answered" key={question.id}><div className="question-block"><b>Soru · {question.userName}</b><p>{question.question}</p></div><div className="answer-block"><b>Satıcı yanıtı</b><p>{question.answer}</p><PublicContentDate value={question.answeredAt} /></div></article>)}</div>}<PublicPageControls page={page} label="Daha fazla soru göster" /></div>;
+}
+
+function PublicContentDate({ value }: { value: string | null }) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? <time dateTime={value}>{date.toLocaleDateString("tr-TR", { year: "numeric", month: "short", day: "numeric" })}</time> : null;
+}
+
+function NativePublicReviews({ productId }: { productId: string }) {
+  const page = usePublicPage(`reviews:${productId}`, cursor => loadPublicReviewPage(productId, cursor));
+  return <div data-testid="public-reviews"><div className="public-page-heading"><span data-testid="public-review-summary">{page.summary ? `${page.summary.average.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ★ · ${page.summary.total} değerlendirme` : "Değerlendirmeler yükleniyor"}</span><button type="button" aria-label="Değerlendirmeleri yenile" onClick={() => void page.refresh()}><ReloadIcon /></button></div>{page.phase !== "ready" ? <PublicReadState phase={page.phase} retry={() => void page.refresh()} /> : !page.items.length ? <PublicReadState phase="empty" /> : <div className="review-list">{page.items.map(review => <article className="review-preview" key={review.id}><span className="review-avatar" aria-hidden="true"><PersonIcon /></span><div><header><b>{review.fullName}</b><span>{review.rating} ★</span></header><span>{review.comment}</span><PublicContentDate value={review.createdAt} />{review.media.length > 0 && <div className="public-review-media">{review.media.map(media => media.type === "image" ? <img key={media.id} src={media.url} alt="Değerlendirme görseli" loading="lazy" /> : <video key={media.id} src={media.url} controls playsInline preload="none" aria-label="Değerlendirme videosu" />)}</div>}</div></article>)}</div>}<PublicPageControls page={page} label="Daha fazla değerlendirme göster" /></div>;
+}
+
 function HomeScreen({ go }: { go: Go }) {
+  if (NATIVE_SHELL) return <NativeMarketplaceScreen go={go} home />;
+  return <CalibrationHomeScreen go={go} />;
+}
+
+function CalibrationHomeScreen({ go }: { go: Go }) {
   const { selectCatalog, publicProducts, publicCatalogPhase, reloadPublicCatalog } = useCommerce();
   const runtimeProducts = NATIVE_SHELL ? Object.values(publicProducts) : products;
   return (
@@ -1497,7 +1594,7 @@ function SearchScreen({ go, query, setQuery, panelOpen, setPanelOpen }: { go: Go
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [history, setHistory] = useState(["kablosuz kulaklık", "kahve makinesi", "kabin boy valiz"]);
   const normalized = query.trim().toLocaleLowerCase("tr-TR");
-  const sourceProducts = NATIVE_SHELL ? Object.values(publicProducts) : products;
+  const sourceProducts = NATIVE_SHELL ? [] : products;
   const results = normalized ? sourceProducts.filter((product) => `${product.name} ${product.store}`.toLocaleLowerCase("tr-TR").includes(normalized)) : [];
   const choose = (value: string) => {
     setQuery(value);
@@ -1522,8 +1619,7 @@ function SearchScreen({ go, query, setQuery, panelOpen, setPanelOpen }: { go: Go
           <div className="search-suggestions"><h2>Önerilen aramalar</h2><div>{["Bluetooth kulaklık", "Akıllı saat", "Kahve makinesi", "Valiz"].map((item) => <button type="button" key={item} onClick={() => choose(item)}>{item}</button>)}</div></div>
         </section>}
       </div>
-      {NATIVE_SHELL && publicCatalogPhase === "loading" ? <CatalogAuthorityState phase="loading" />
-        : NATIVE_SHELL && publicCatalogPhase === "error" ? <CatalogAuthorityState phase="error" onRetry={reloadPublicCatalog} />
+      {NATIVE_SHELL ? <NativeMarketplaceScreen go={go} filters={{ q: query }} title={normalized ? "Arama sonuçları" : "Ürünleri keşfet"} search />
           : normalized ? (
         <section className="search-results">
           <div className="search-summary"><div><h1>Arama sonuçları</h1><p>“{query}” için {results.length} ürün</p></div><button type="button" onClick={() => go("CAL-05", "home")}>Filtrele <MixerHorizontalIcon /></button></div>
@@ -1539,6 +1635,11 @@ function SectionTitle({ title, action, onClick }: { title: string; action?: stri
 }
 
 function CategoriesScreen({ go }: { go: Go }) {
+  if (NATIVE_SHELL) return <NativeCategoriesScreen go={go} />;
+  return <CalibrationCategoriesScreen go={go} />;
+}
+
+function CalibrationCategoriesScreen({ go }: { go: Go }) {
   const { catalogSelection, selectCatalog, publicProducts, publicCatalogPhase, reloadPublicCatalog } = useCommerce();
   if (NATIVE_SHELL) {
     const publishedProducts = Object.values(publicProducts);
@@ -1775,6 +1876,14 @@ function formatMoney(value: number) {
 }
 
 function PlpScreen({ go, favoritesOnly = false }: { go: Go; favoritesOnly?: boolean }) {
+  const { catalogSelection } = useCommerce();
+  if (NATIVE_SHELL) return favoritesOnly ? <NativeFavoritesScreen go={go} /> : <NativeMarketplaceScreen go={go}
+    filters={catalogSelection.categoryId ? { categoryId: catalogSelection.categoryId, includeDescendants: true } : {}}
+    title={catalogSelection.categoryId ? catalogSelection.subcategory : "Tüm Ürünler"} />;
+  return <CalibrationPlpScreen go={go} favoritesOnly={favoritesOnly} />;
+}
+
+function CalibrationPlpScreen({ go, favoritesOnly = false }: { go: Go; favoritesOnly?: boolean }) {
   const keyboard = useKeyboard();
   const { favoriteIds, catalogSelection, catalogFilters, catalogSort, setCatalogSort, publicProducts, publicCatalogPhase, reloadPublicCatalog } = useCommerce();
   const [sortOpen, setSortOpen] = useState(false);
@@ -1825,13 +1934,18 @@ function StorefrontScreen({ go, route }: { go: Go; route: Route }) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [discountOnly, setDiscountOnly] = useState(false);
   const [highRatedOnly, setHighRatedOnly] = useState(false);
-  const [projection, setProjection] = useState<CustomerPublicStoreProjection | null>(null);
-  const [loadState, setLoadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [legacyProjection, setProjection] = useState<CustomerPublicStoreProjection | null>(null);
+  const [legacyLoadState, setLoadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [loadRevision, setLoadRevision] = useState(0);
   const mode = route.mode ?? "customer";
   const readOnlyPreview = mode === "preview";
   const liveStore = NATIVE_SHELL || readOnlyPreview || new URLSearchParams(window.location.search).get("publicStore") === "1";
-  const requestedSlug = route.storeSlug ?? DEFAULT_PUBLIC_STORE_SLUG;
+  const requestedSlug = route.storeSlug ?? "";
+  const storePage = usePublicPage(`store:${requestedSlug}:${loadRevision}`, cursor => loadPublicStorePage(requestedSlug, cursor), NATIVE_SHELL);
+  const projection = useMemo(() => NATIVE_SHELL
+    ? storePage.summary ? { store: storePage.summary, products: storePage.items } : null
+    : legacyProjection, [storePage.summary, storePage.items, legacyProjection]);
+  const loadState = NATIVE_SHELL ? storePage.phase : legacyLoadState;
   const serverFollowAuthority = NATIVE_SHELL && liveStore && !readOnlyPreview;
   const storeFollowRuntime = useCustomerStoreFollowRuntime({
     storeSlug: requestedSlug,
@@ -1845,6 +1959,7 @@ function StorefrontScreen({ go, route }: { go: Go; route: Route }) {
     : demoFollowing;
 
   useEffect(() => {
+    if (NATIVE_SHELL) return;
     if (!liveStore) {
       setProjection(null);
       setLoadState("idle");
@@ -1902,7 +2017,7 @@ function StorefrontScreen({ go, route }: { go: Go; route: Route }) {
   const storeProductCount = projection?.store.productCount ?? (liveStore ? 0 : storeProducts.length);
   const storeLogo = projection?.store.logoUrl ?? LOGO;
   const storeCover = projection?.store.bannerUrl ?? (liveStore ? LOGO : PRODUCT_HERO);
-  const storeSearchPrompt = projection
+  const storeSearchPrompt = NATIVE_SHELL ? "Yüklenen mağaza ürünlerinde ara" : projection
     ? `${storeName} içinde ara`
     : liveStore ? "Mağazada ara" : "Nova Audio mağazasında ara";
   const openProduct = (product: Product) => {
@@ -1995,7 +2110,8 @@ function StorefrontScreen({ go, route }: { go: Go; route: Route }) {
             <button type="button" className={highRatedOnly ? "selected" : ""} aria-pressed={highRatedOnly} onClick={() => setHighRatedOnly(!highRatedOnly)}>{highRatedOnly && <CheckIcon />} 4,8★ ve üzeri</button>
             <span aria-live="polite">{sortLabel}</span>
           </div>
-          {liveStore && loadState === "loading" ? <div className="store-load-state" data-testid="public-store-loading" role="status"><ReloadIcon /><h2>Mağaza yükleniyor</h2><p>Güncel public mağaza bilgileri hazırlanıyor.</p></div> : liveStore && loadState === "error" ? <div className="store-load-state error" data-testid="public-store-error" role="alert"><StorefrontIcon /><h2>Mağaza şu anda yüklenemedi</h2><p>Bağlantını kontrol edip güvenli biçimde yeniden deneyebilirsin.</p><button type="button" className="primary navy" onClick={() => setLoadRevision((value) => value + 1)}>Yeniden Dene</button></div> : visibleProducts.length ? <div className="product-grid plp-products store-products-grid">{visibleProducts.map((product, index) => <ProductCard key={product.id} {...product} readOnlyPreview={readOnlyPreview} testId={`store-product-${index}`} onClick={() => openProduct(product)} />)}</div> : <div className="store-empty"><MagnifyingGlassIcon /><h2>Bu seçimde ürün bulunamadı</h2><p>Aramayı veya filtreleri temizleyerek tüm mağaza ürünlerine dönebilirsin.</p><button type="button" className="primary navy" onClick={() => { setQuery(""); setDiscountOnly(false); setHighRatedOnly(false); setTab("products"); }}>Tüm ürünleri göster</button></div>}
+          {NATIVE_SHELL && storePage.phase !== "ready" ? <PublicReadState phase={storePage.phase} retry={() => void storePage.refresh()} /> : liveStore && loadState === "loading" ? <div className="store-load-state" data-testid="public-store-loading" role="status"><ReloadIcon /><h2>Mağaza yükleniyor</h2><p>Güncel public mağaza bilgileri hazırlanıyor.</p></div> : liveStore && loadState !== "ready" && loadState !== "idle" ? <div className="store-load-state error" data-testid="public-store-error" role="alert"><StorefrontIcon /><h2>Mağaza şu anda yüklenemedi</h2><p>Bağlantını kontrol edip güvenli biçimde yeniden deneyebilirsin.</p><button type="button" className="primary navy" onClick={() => setLoadRevision((value) => value + 1)}>Yeniden Dene</button></div> : visibleProducts.length ? <div className="product-grid plp-products store-products-grid">{visibleProducts.map((product, index) => <ProductCard key={product.id} {...product} readOnlyPreview={readOnlyPreview} testId={`store-product-${index}`} onClick={() => openProduct(product)} />)}</div> : <div className="store-empty"><MagnifyingGlassIcon /><h2>Bu seçimde ürün bulunamadı</h2><p>Aramayı veya filtreleri temizleyerek tüm mağaza ürünlerine dönebilirsin.</p><button type="button" className="primary navy" onClick={() => { setQuery(""); setDiscountOnly(false); setHighRatedOnly(false); setTab("products"); }}>Tüm ürünleri göster</button></div>}
+          {NATIVE_SHELL && <PublicPageControls page={storePage} label="Daha fazla mağaza ürünü göster" />}
         </section>}
       </div>
 
@@ -2611,12 +2727,12 @@ function ProductDetailScreen({ go, route }: { go: Go; route: Route }) {
             <section className="pdp-extra-sections">
               <article className="pdp-policy-card"><h2>Ürün ve satış bilgileri</h2>{detail.policies.map(([label, value]) => <div key={label}><b>{label}</b><span>{value}</span></div>)}</article>
               <article className="pdp-review-card" ref={reviewSection}>
-                <div className="pdp-review-summary"><div><h2>Değerlendirmeler</h2>{hasPublishedReviews ? <><strong>{detail.rating}<StarFilledIcon /></strong><span>{displayedReviewCount} doğrulanmış değerlendirme</span></> : <span>Henüz yayınlanmış değerlendirme yok</span>}</div><div className="pdp-review-actions">{displayedReviewCount > 0 && <button type="button" onClick={() => setReviewsExpanded(!reviewsExpanded)}>{reviewsExpanded ? "Kapat" : "Tümünü Gör"} <ArrowRightIcon /></button>}{canReview && <button type="button" className="secondary" disabled={communityBusy} onClick={openReview}>Değerlendir</button>}</div></div>
+                <div className="pdp-review-summary"><div><h2>Değerlendirmeler</h2>{!NATIVE_SHELL && hasPublishedReviews ? <><strong>{detail.rating}<StarFilledIcon /></strong><span>{displayedReviewCount} doğrulanmış değerlendirme</span></> : !NATIVE_SHELL && <span>Henüz yayınlanmış değerlendirme yok</span>}</div><div className="pdp-review-actions">{!NATIVE_SHELL && displayedReviewCount > 0 && <button type="button" onClick={() => setReviewsExpanded(!reviewsExpanded)}>{reviewsExpanded ? "Kapat" : "Tümünü Gör"} <ArrowRightIcon /></button>}{canReview && <button type="button" className="secondary" disabled={communityBusy} onClick={openReview}>Değerlendir</button>}</div></div>
                 {detail.id !== "pulse-anc" && <p className="review-eligibility-note">Bu ürünü satın aldıktan sonra değerlendirebilirsin.</p>}
-                <div className="review-list">{reviewsForProduct.slice(0, reviewsExpanded ? reviewsForProduct.length : 2).map((review) => <article className="review-preview" key={review.id}><span className="review-avatar" aria-hidden="true"><PersonIcon /></span><div><header><b>{review.authorMasked}</b>{review.verified && <em><CheckIcon /> Doğrulanmış alışveriş</em>}</header><span>{review.copy}</span></div></article>)}</div>
+                {NATIVE_SHELL ? <NativePublicReviews key={detail.id} productId={detail.id} /> : <div className="review-list">{reviewsForProduct.slice(0, reviewsExpanded ? reviewsForProduct.length : 2).map((review) => <article className="review-preview" key={review.id}><span className="review-avatar" aria-hidden="true"><PersonIcon /></span><div><header><b>{review.authorMasked}</b>{review.verified && <em><CheckIcon /> Doğrulanmış alışveriş</em>}</header><span>{review.copy}</span></div></article>)}</div>}
                 {reviewOpen && <form className="pdp-inline-form review-form" data-novabot-avoid="true" onSubmit={(event) => void submitReview(event)}><h3>Ürünü değerlendir</h3><div className="review-stars" aria-label="Puan seç">{[1, 2, 3, 4, 5].map((value) => <button type="button" key={value} aria-label={`${value} yıldız`} aria-pressed={reviewRating === value} onClick={() => setReviewRating(value)}><StarFilledIcon /></button>)}</div><KeyboardTextarea aria-label="Değerlendirmen" maxLength={2000} value={reviewDraft} onChange={(event) => setReviewDraft(event.target.value)} placeholder="Deneyimini paylaş (isteğe bağlı)" /><small>{reviewDraft.length}/2000</small><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setReviewOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={communityBusy || (!NATIVE_SHELL && !reviewDraft.trim())}>{communityBusy ? "Gönderiliyor…" : "Gönder"}</button></div></form>}{communityScope === "review" && communitySuccess && <p className="pdp-community-success" role="status"><CheckIcon /> {communitySuccess}</p>}{communityScope === "review" && communityError && <p className="pdp-community-error" role="alert">{communityError}</p>}
               </article>
-              <article className="pdp-question-card" ref={questionSection}><div className="pdp-question-summary"><div><h2>Ürün soruları</h2><p>{readOnlyPreview ? "Satıcı önizlemesinde soru gönderimi kapalıdır." : "Ürünle ilgili merak ettiğini satıcıya sor."}</p></div><button type="button" className="secondary" disabled={readOnlyPreview || communityBusy} onClick={() => questionOpen ? setQuestionOpen(false) : openSellerQuestion()}>Soru Sor</button></div>{questionOpen && !readOnlyPreview && <form className="pdp-inline-form" data-novabot-avoid="true" onSubmit={(event) => void submitQuestion(event)}><KeyboardTextarea aria-label="Ürün hakkında sorun" maxLength={1000} value={questionDraft} onChange={(event) => setQuestionDraft(event.target.value)} placeholder="Sorunu yaz" /><small>{questionDraft.length}/1000</small><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setQuestionOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={communityBusy || questionDraft.trim().length < (NATIVE_SHELL ? 5 : 1)}>{communityBusy ? "Gönderiliyor…" : "Satıcıya Gönder"}</button></div></form>}{communityScope === "question" && communitySuccess && <p className="pdp-community-success" role="status"><CheckIcon /> {communitySuccess}</p>}{communityScope === "question" && communityError && <p className="pdp-community-error" role="alert">{communityError}</p>}<div className="question-thread-list">{visibleQuestions.map((question) => <article className="question-thread" data-status={question.status} key={question.id}><div className="question-block"><b>Soru · {question.authorMasked}</b><p>{question.question}</p></div>{question.status === "answered" ? <div className="answer-block"><b>Satıcı yanıtı</b><p>{question.answer}</p></div> : <small role="status"><ClockIcon /> Satıcı yanıtı bekleniyor · yalnızca sen görebilirsin</small>}</article>)}</div></article>
+              <article className="pdp-question-card" ref={questionSection}><div className="pdp-question-summary"><div><h2>Ürün soruları</h2><p>{readOnlyPreview ? "Satıcı önizlemesinde soru gönderimi kapalıdır." : "Ürünle ilgili merak ettiğini satıcıya sor."}</p></div><button type="button" className="secondary" disabled={readOnlyPreview || communityBusy} onClick={() => questionOpen ? setQuestionOpen(false) : openSellerQuestion()}>Soru Sor</button></div>{questionOpen && !readOnlyPreview && <form className="pdp-inline-form" data-novabot-avoid="true" onSubmit={(event) => void submitQuestion(event)}><KeyboardTextarea aria-label="Ürün hakkında sorun" maxLength={1000} value={questionDraft} onChange={(event) => setQuestionDraft(event.target.value)} placeholder="Sorunu yaz" /><small>{questionDraft.length}/1000</small><div><button type="button" className="secondary" onClick={() => { keyboard.hide(); setQuestionOpen(false); }}>Vazgeç</button><button type="submit" className="primary navy" disabled={communityBusy || questionDraft.trim().length < (NATIVE_SHELL ? 5 : 1)}>{communityBusy ? "Gönderiliyor…" : "Satıcıya Gönder"}</button></div></form>}{communityScope === "question" && communitySuccess && <p className="pdp-community-success" role="status"><CheckIcon /> {communitySuccess}</p>}{communityScope === "question" && communityError && <p className="pdp-community-error" role="alert">{communityError}</p>}{NATIVE_SHELL ? <NativePublicQuestions key={detail.id} productId={detail.id} /> : <div className="question-thread-list">{visibleQuestions.map((question) => <article className="question-thread" data-status={question.status} key={question.id}><div className="question-block"><b>Soru · {question.authorMasked}</b><p>{question.question}</p></div>{question.status === "answered" ? <div className="answer-block"><b>Satıcı yanıtı</b><p>{question.answer}</p></div> : <small role="status"><ClockIcon /> Satıcı yanıtı bekleniyor · yalnızca sen görebilirsin</small>}</article>)}</div>}</article>
               <section className="recommendations"><div className="section-title"><h2>Benzer ürünler</h2><button type="button" onClick={() => go("CAL-04", "home", catalogProduct.isPublicProjection ? "store" : "", { storeSlug: catalogProduct.storeSlug, mode: route.mode })}>Tümünü Gör <ArrowRightIcon /></button></div><Carousel ariaLabel="Benzer ürünler" className="recommendation-carousel" contentClassName="recommendation-track">{recommendationProducts.slice(0, 5).map((product) => <ProductCard key={`recommend-${product.id}`} {...product} readOnlyPreview={readOnlyPreview} onClick={() => openRecommendation(product)} />)}</Carousel></section>
             </section>
           </div>

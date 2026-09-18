@@ -30,14 +30,21 @@ public final class NovaPublicStorePlugin extends Plugin {
             call.reject("INVALID_PUBLIC_STORE_SLUG");
             return;
         }
-        getBridge().execute(() -> loadPublicStore(call, slug));
+        String cursor = call.getString("cursor");
+        Integer limit = call.getInt("limit", 20);
+        if (limit == null || limit < 1 || limit > 100 || (cursor != null && !cursor.matches("^[A-Za-z0-9_-]{1,1024}$"))) {
+            call.reject("PUBLIC_QUERY_INVALID");
+            return;
+        }
+        String query = "?limit=" + limit + (cursor == null ? "" : "&cursor=" + cursor);
+        getBridge().execute(() -> loadPublicStore(call, slug, query));
     }
 
-    private void loadPublicStore(PluginCall call, String slug) {
+    private void loadPublicStore(PluginCall call, String slug, String query) {
         HttpURLConnection connection = null;
         try {
             URI base = validatedApiBase();
-            URL endpoint = base.resolve("api/public/stores/" + slug).toURL();
+            URL endpoint = base.resolve("api/public/stores/" + slug + query).toURL();
             connection = (HttpURLConnection) endpoint.openConnection();
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(8_000);

@@ -1,4 +1,4 @@
-export const DEFAULT_PUBLIC_STORE_SLUG = "main6v-nova-teknoloji";
+import { normalizePublicPagination, type PublicPagination } from "./publicPagination.ts";
 export const PUBLIC_STORE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export type CustomerStorePresentationMode = "customer" | "preview";
@@ -18,6 +18,7 @@ export type CustomerPublicProductMedia = Readonly<{
 }>;
 
 export type CustomerPublicProduct = Readonly<{
+  variantSelectionRequired?: boolean;
   id: string;
   slug: string;
   name: string;
@@ -48,6 +49,7 @@ export type CustomerPublicStore = Readonly<{
 }>;
 
 export type CustomerPublicStoreProjection = Readonly<{
+  pagination?: PublicPagination;
   store: CustomerPublicStore;
   products: readonly CustomerPublicProduct[];
 }>;
@@ -68,13 +70,14 @@ export class PublicStoreContractError extends Error {
   }
 }
 
-const ROOT_FIELDS = new Set(["store", "products"]);
+const ROOT_FIELDS = new Set(["store", "products", "pagination"]);
 const STORE_FIELDS = new Set([
   "slug", "name", "description", "logo_url", "banner_url", "status", "rating",
   "review_count", "follower_count", "total_units_sold", "product_count",
   "shipping_summary", "return_summary",
 ]);
 const PRODUCT_FIELDS = new Set([
+  "variant_selection_required",
   "id", "slug", "name", "price", "old_price", "stock", "is_purchasable",
   "image_url", "media", "average_rating", "review_count",
 ]);
@@ -130,7 +133,7 @@ function optionalBoolean(value: unknown, fallback = false): boolean {
   return value;
 }
 
-function optionalAssetUrl(value: unknown, assetOrigin?: string, allowCleartextAssetOrigin = false): string | null {
+export function optionalAssetUrl(value: unknown, assetOrigin?: string, allowCleartextAssetOrigin = false): string | null {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value !== "string") throw new PublicStoreContractError("PUBLIC_MEDIA_URL_INVALID");
   const candidate = value.trim();
@@ -217,7 +220,7 @@ function normalizeMedia(value: unknown, productId: string, assetOrigin?: string,
   });
 }
 
-function normalizeProduct(value: unknown, assetOrigin?: string, allowCleartextAssetOrigin = false): CustomerPublicProduct {
+export function normalizeProduct(value: unknown, assetOrigin?: string, allowCleartextAssetOrigin = false): CustomerPublicProduct {
   const source = objectValue(value, "PUBLIC_STORE_PRODUCT_INVALID");
   assertOnlyFields(source, PRODUCT_FIELDS);
   const numericId = finiteNumber(source.id, "PUBLIC_STORE_PRODUCT_ID_INVALID");
@@ -252,6 +255,7 @@ function normalizeProduct(value: unknown, assetOrigin?: string, allowCleartextAs
     media: Object.freeze(media),
     averageRating: Math.min(5, Math.max(0, rating)),
     reviewCount: nonNegativeInteger(source.review_count),
+    ...(source.variant_selection_required === undefined ? {} : { variantSelectionRequired: optionalBoolean(source.variant_selection_required) }),
   });
 }
 
@@ -297,7 +301,9 @@ export function normalizePublicStoreProjection(
     returnSummary: optionalString(sourceStore.return_summary, 1_000),
   });
   const products = root.products.map((item) => normalizeProduct(item, assetOrigin, allowCleartextAssetOrigin));
-  return Object.freeze({ store, products: Object.freeze(products) });
+  return Object.freeze({ store, products: Object.freeze(products),
+    ...(root.pagination === undefined ? {} : { pagination: normalizePublicPagination(root.pagination) }),
+  });
 }
 
 function orderedMedia(product: CustomerPublicProduct): CustomerPublicProductMedia[] {
