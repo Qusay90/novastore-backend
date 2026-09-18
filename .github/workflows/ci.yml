@@ -35,6 +35,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build integrated admin assets for smoke tests
+        run: |
+          npm --prefix admin-commerce-pro ci
+          npm --prefix admin-commerce-pro run build:live
+
       - name: Run curated smoke tests
         run: npm test
 

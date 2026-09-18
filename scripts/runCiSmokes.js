@@ -3,6 +3,8 @@ const path = require('path');
 
 const rootDir = path.join(__dirname, '..');
 const smokeTests = [
+    'tests/themePlatformAuthUnitSmoke.js',
+    'tests/themePlatformValidationSmoke.js',
     'tests/startupSafetySmoke.js',
     'tests/sellerApiActivationPolicySmoke.js',
     'tests/stockySystemCommerceContractSmoke.js',

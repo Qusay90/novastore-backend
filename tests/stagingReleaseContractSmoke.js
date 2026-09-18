@@ -254,14 +254,23 @@ const createFakeGitReader = ({
         assert.equal(FORBIDDEN_PROVIDER_CREDENTIAL_NAMES, FORBIDDEN_PROVIDER_CREDENTIAL_KEYS);
     });
 
-    await check(5, 'migration bytes/checksums 40/40 exact', () => {
+    await check(5, 'migration bytes/checksums 41/41 exact', () => {
         const registry = loadRegistry();
-        assert.equal(registry.length, 40);
+        assert.equal(registry.length, 41);
+        // Pre-commit foundation work can attest an immutable staged tree without
+        // creating an untested commit. Release/CI defaults still attest HEAD.
+        const migrationTree = process.env.NOVASTORE_TEST_MIGRATION_TREE || 'HEAD';
+        if (migrationTree !== 'HEAD') {
+            assert(/^[0-9a-f]{40}$/.test(migrationTree), 'Full immutable tree ID required.');
+            assert.equal(runGit(['cat-file', '-t', migrationTree]).trim(), 'tree');
+            const stagedManifest = JSON.parse(runGit(['show', `${migrationTree}:scripts/staging-migrations/manifest.json`]));
+            assert.deepEqual(stagedManifest, JSON.parse(fs.readFileSync(path.join(root, 'scripts/staging-migrations/manifest.json'), 'utf8')));
+        }
         for (const migration of registry) {
             const bytes = fs.readFileSync(migration.absolutePath);
             assert.equal(sha256(bytes), migration.sha256);
             assert.equal(bytes.includes(0x0d), false);
-            const blob = runGit(['show', `HEAD:${migration.path}`], { encoding: null });
+            const blob = runGit(['show', `${migrationTree}:${migration.path}`], { encoding: null });
             assert.equal(sha256(blob), migration.sha256);
         }
     });

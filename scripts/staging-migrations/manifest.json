@@ -278,5 +278,12 @@
     "sha256": "2ae067b604708630c994f489ae10c33813e41fca63143de3c0e67045c8636dca",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260918_01_theme_platform_foundation",
+    "path": "migrations/20260918_01_theme_platform_foundation.sql",
+    "sha256": "6fedd1843e41ba8aaf3eb597d3f75923b991778518ffe0863538d0c3b19ec679",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

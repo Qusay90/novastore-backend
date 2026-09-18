@@ -31,9 +31,9 @@ const env = {
     DATABASE_URL: connectionString
 };
 const registry = loadRegistry();
-assert.equal(registry.length, 40);
-assert.equal(registry.at(-2).id, '20260908_01_purchasable_variants');
-assert.equal(registry.at(-1).id, '20260915_01_stocky_system_commerce');
+assert.equal(registry.length, 41);
+assert.equal(registry.at(-2).id, '20260915_01_stocky_system_commerce');
+assert.equal(registry.at(-1).id, '20260918_01_theme_platform_foundation');
 const silent = () => {};
 const admin = new Client({ connectionString, application_name: 'p4d1a_integration_assertions' });
 
@@ -265,6 +265,12 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'seller_settlements', 'seller_step_up_challenges', 'seller_store_profiles',
         'seller_stores', 'seller_support_conversations', 'seller_support_messages',
         'seller_support_ratings', 'web_push_subscriptions',
+        'stocky_connector_connections', 'stocky_connector_event_results', 'stocky_connector_result_ack_attempts',
+        'themes', 'theme_versions', 'seller_theme_services', 'theme_assignments',
+        'theme_drafts', 'theme_draft_revisions', 'feature_catalog', 'plan_feature_defaults',
+        'seller_feature_entitlements', 'theme_assets', 'theme_previews', 'theme_publications',
+        'theme_deployments', 'theme_operations', 'theme_outbox', 'theme_inbox',
+        'theme_audit_events', 'theme_admin_roles', 'theme_seller_roles',
         'webhook_events', LEDGER_TABLE
     ].sort();
     const tables = await admin.query(

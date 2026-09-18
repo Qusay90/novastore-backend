@@ -15,7 +15,7 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
 
 (async () => {
     const registry = loadRegistry();
-    assert.equal(registry.length, 40);
+    assert.equal(registry.length, 41);
 
     const sellerMigrations = selectSellerMigrations({ registry });
     assert.deepEqual(
@@ -114,7 +114,7 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
     assert.equal(count(settings, /include\(":app"\)/g), 1);
     assert.equal(count(settings, /include\(":seller-app"\)/g), 1);
 
-    console.log('combined integration smoke passed: migrations=40 seller=5 binding=1 main6u=4 reputation=1 variants=1 stocky=1 listeners=1');
+    console.log('combined integration smoke passed: migrations=41 seller=5 binding=1 main6u=4 reputation=1 variants=1 stocky=1 listeners=1');
 })().catch((error) => {
     console.error(error);
     process.exitCode = 1;

@@ -39,10 +39,10 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 (async () => {
     assert.equal(validateManifest(manifest), true);
     const registry = loadRegistry();
-    assert.equal(registry.length, 40);
+    assert.equal(registry.length, 41);
     assert.equal(registry[0].id, '20260628_staging_schema_baseline');
-    assert.equal(registry.at(-2).id, '20260908_01_purchasable_variants');
-    assert.equal(registry.at(-1).id, '20260915_01_stocky_system_commerce');
+    assert.equal(registry.at(-2).id, '20260915_01_stocky_system_commerce');
+    assert.equal(registry.at(-1).id, '20260918_01_theme_platform_foundation');
     assert.deepEqual(
         registry.filter((entry) => entry.id.startsWith('20260712_')).map((entry) => entry.path),
         [
@@ -53,7 +53,7 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
     );
     assert.equal(new Set(registry.map((entry) => entry.id)).size, registry.length);
     assert.equal(new Set(registry.map((entry) => entry.path)).size, registry.length);
-    assert.equal(registry.filter((entry) => entry.transactionWrapper).length, 34);
+    assert.equal(registry.filter((entry) => entry.transactionWrapper).length, 35);
     assert.deepEqual(
         registry.filter((entry) => entry.id.includes('_seller_')).map((entry) => entry.path),
         [

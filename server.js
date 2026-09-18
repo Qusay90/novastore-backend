@@ -458,6 +458,10 @@ const { resolveSellerApiActivationPolicy } = require('./config/sellerApiActivati
 const { assertRuntimeDatabaseIdentity } = require('./services/runtimeDatabaseIdentityService');
 const { createSellerTransportSecurityMiddleware } = require('./middlewares/sellerTransportSecurity');
 const configuredBindHost = String(process.env.NOVASTORE_BIND_HOST || '').trim();
+// Additive, default-off foundation. This flag never runs migrations or publishes themes.
+const themePlatformEnabled = String(process.env.NOVASTORE_THEME_PLATFORM_ENABLED || '').toLowerCase() === 'true';
+const { createAdminThemeRouter, createSellerThemeRouter } = require('./routes/themePlatformRoutes');
+app.use('/api/admin/theme-platform', createAdminThemeRouter({ database: pool, enabled: themePlatformEnabled }));
 const sellerApiActivation = resolveSellerApiActivationPolicy({
     environment: process.env,
     startupSafety,
@@ -573,6 +577,9 @@ const configureSellerRoutes = () => {
     sellerApiRouter.use(createSellerTransportSecurityMiddleware({
         required: sellerApiActivation.requiresSecureTransport,
         trustedIngressCidrs: sellerApiActivation.trustedIngressCidrs
+    }));
+    sellerApiRouter.use('/theme-platform', createSellerThemeRouter({
+        database: pool, enabled: themePlatformEnabled, auth, tenant
     }));
     sellerApiRouter.use(createSellerAuthRouter({ auth, controller: authController }));
     sellerApiRouter.use(createSellerPasswordRecoveryRouter({ controller: passwordRecoveryController }));
