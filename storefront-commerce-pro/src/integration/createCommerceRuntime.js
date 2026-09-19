@@ -1,6 +1,6 @@
 import { createAuthAdapter } from "../adapters/authAdapter.js";
 import { createAssistantAdapter } from "../adapters/assistantAdapter.js";
-import { createCartAdapter } from "../adapters/cartAdapter.js";
+import { createCartV2Adapter } from "../adapters/cartV2Adapter.js";
 import { createBusinessIdentityAdapter } from "../adapters/businessIdentityAdapter.js";
 import { createCatalogAdapter } from "../adapters/catalogAdapter.js";
 import { createCheckoutAdapter } from "../adapters/checkoutAdapter.js";
@@ -91,7 +91,8 @@ export function createCommerceRuntime({
     const favoritesAdapter = readOnlyPreview ? null : createFavoritesAdapter({ root });
     const cartAdapter = readOnlyPreview
       ? null
-      : createCartAdapter({
+      : createCartV2Adapter({
+        http: customerHttp,
         root,
         storage,
         location,
@@ -102,13 +103,22 @@ export function createCommerceRuntime({
       getProduct: (id) => productById.get(Number(id)) || null,
     });
 
-    const [favoriteIds, cartItems, session] = readOnlyPreview
-      ? [READ_ONLY_PREVIEW_IDS, READ_ONLY_PREVIEW_ITEMS, READ_ONLY_PREVIEW_SESSION]
+    // Establish the customer principal before loading account data. Expired sessions
+    // must still reach the ordinary login page, without downgrading the account cart.
+    let session = readOnlyPreview ? READ_ONLY_PREVIEW_SESSION : await authAdapter.load({ signal });
+    const secondaryWarnings = [];
+    let [favoriteIds, cartItems] = readOnlyPreview
+      ? [READ_ONLY_PREVIEW_IDS, READ_ONLY_PREVIEW_ITEMS]
       : await Promise.all([
-        favoritesAdapter.load({ allowedProductIds }),
-        cartAdapter.load({ allowedProductIds }),
-        authAdapter.load({ signal }),
+        favoritesAdapter.load({ allowedProductIds }).catch((error) => { secondaryWarnings.push(error); return new Set(); }),
+        // This empty display placeholder is paired with a BLOCKED sync status. It is
+        // never persisted or treated as a successful empty server cart.
+        cartAdapter.load({ allowedProductIds }).catch(() => []),
       ]);
+    if (!readOnlyPreview && !storage?.getItem?.("nova_user_token")) {
+      if (session.status !== "guest") cartItems = await cartAdapter.load().catch(() => []);
+      session = Object.freeze({ status: "guest", user: null, warning: session.warning });
+    }
 
     const runtimeCatalog = Object.freeze({
       ...catalog,
@@ -136,13 +146,21 @@ export function createCommerceRuntime({
         cartItems: refreshedCart,
       });
     };
+    const requireVerifiedCart = (operation) => (...args) => {
+      if (!readOnlyPreview && cartAdapter.getSyncStatus().phase === "blocked") {
+        const error = new Error("Sepet eşitlemesi tamamlanmadan ödeme başlatılamaz.");
+        error.code = "CART_SYNC_BLOCKED";
+        return Promise.reject(error);
+      }
+      return operation(...args);
+    };
 
     return Object.freeze({
       catalog: runtimeCatalog,
       businessIdentity,
       legal: legalAdapter,
       session,
-      warnings: Object.freeze([...(catalog.warnings || []), session.warning].filter(Boolean)),
+      warnings: Object.freeze([...(catalog.warnings || []), session.warning, ...secondaryWarnings].filter(Boolean)),
       favorites: Object.freeze({
         initialIds: favoriteIds,
         set: readOnlyPreview ? previewMutationBlocked : favoritesAdapter.set,
@@ -152,12 +170,23 @@ export function createCommerceRuntime({
         persist: readOnlyPreview ? previewMutationBlocked : cartAdapter.persist,
         subscribe: readOnlyPreview ? (() => () => {}) : cartAdapter.subscribe,
         handoffToCheckout: readOnlyPreview ? previewMutationBlocked : cartAdapter.handoffToCheckout,
+        finalize: readOnlyPreview ? previewMutationBlocked : cartAdapter.finalize,
+        getMigration: readOnlyPreview ? (() => ({ unresolvedItems: [], localItems: [] })) : cartAdapter.getMigration,
+        resolveLegacy: readOnlyPreview ? previewMutationBlocked : cartAdapter.resolveLegacy,
+        subscribeMigration: readOnlyPreview ? (() => () => {}) : cartAdapter.subscribeMigration,
+        getSyncStatus: readOnlyPreview ? (() => ({ phase: "ready" })) : cartAdapter.getSyncStatus,
+        subscribeSync: readOnlyPreview ? (() => () => {}) : cartAdapter.subscribeSync,
+        retrySync: readOnlyPreview ? previewMutationBlocked : cartAdapter.load,
       }),
       auth: Object.freeze({
         openAccount: readOnlyPreview ? (() => undefined) : (() => authAdapter.openAccount(session)),
       }),
       customer: customerAccountAdapter,
-      checkout: checkoutAdapter,
+      checkout: Object.freeze({ ...checkoutAdapter,
+        quote: requireVerifiedCart(checkoutAdapter.quote),
+        previewAgreements: requireVerifiedCart(checkoutAdapter.previewAgreements),
+        initialize: requireVerifiedCart(checkoutAdapter.initialize),
+      }),
       community: productCommunityAdapter,
       publicStore: Object.freeze({
         load: (storeSlug, options = {}) => publicStoreAdapter.load(storeSlug, {

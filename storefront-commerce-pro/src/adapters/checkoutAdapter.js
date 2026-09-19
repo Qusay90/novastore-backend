@@ -298,7 +298,7 @@ export function createCheckoutAdapter({
     return http.request(`/api/payments/status?${params.toString()}`, { signal: options.signal });
   };
 
-  const consumeFinalizedCheckout = ({ paymentRef, orderId }) => {
+  const consumeFinalizedCheckout = ({ paymentRef, orderId, consume = true }) => {
     const pendingKey = scopedKey(storage, "novastore_pending_checkout_");
     const checkoutKey = scopedKey(storage, "novastore_checkout_");
     const pending = safeJsonRead(storage, pendingKey, null);
@@ -314,9 +314,11 @@ export function createCheckoutAdapter({
       ...(item.variant_id ? { variantId: item.variant_id } : {}),
       quantity: item.quantity,
     })));
-    storage?.removeItem?.(pendingKey);
-    storage?.removeItem?.(checkoutKey);
-    sessionStorage?.removeItem?.(`novastore.paytrCheckout.${asString(paymentRef)}`);
+    if (consume) {
+      storage?.removeItem?.(pendingKey);
+      storage?.removeItem?.(checkoutKey);
+      sessionStorage?.removeItem?.(`novastore.paytrCheckout.${asString(paymentRef)}`);
+    }
     return purchasedItems;
   };
 

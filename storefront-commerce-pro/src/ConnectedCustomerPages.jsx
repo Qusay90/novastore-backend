@@ -1179,11 +1179,13 @@ const paymentView = (result) => {
 export function CustomerPaymentResultPage({ checkout, paymentRef, orderId, onFinalized }) {
   const resource = useAsyncResource((options) => checkout.getPaymentStatus({ paymentRef, orderId }, options), [checkout, paymentRef, orderId]);
   const consumedRef = useRef("");
+  const [cartFinalizationError, setCartFinalizationError] = useState("");
+  const [cartFinalizationAttempt, setCartFinalizationAttempt] = useState(0);
   useEffect(() => {
     if (resource.phase !== "ready") return;
     const result = resource.data;
     const view = paymentView(result);
-    const shouldConsume = view.finalized || (
+    const shouldConsume = (view.finalized && result.paymentStatus === "PAID") || (
       result.providerFinalized === true
       && result.paymentStatus === "PAID"
       && ["WAIT_REFUND_REVIEW", "WAIT_RECONCILIATION"].includes(result.nextAction)
@@ -1194,14 +1196,21 @@ export function CustomerPaymentResultPage({ checkout, paymentRef, orderId, onFin
     const purchasedItems = checkout.consumeFinalizedCheckout({
       paymentRef: result.paymentRef,
       orderId: result.orderId,
+      consume: false,
     });
-    if (purchasedItems.length) onFinalized(purchasedItems);
-  }, [checkout, onFinalized, resource.phase, resource.data]);
+    setCartFinalizationError("");
+    Promise.resolve(onFinalized(purchasedItems, { orderId: result.orderId, paymentRef: result.paymentRef })).then(() => {
+      checkout.consumeFinalizedCheckout({ paymentRef: result.paymentRef, orderId: result.orderId });
+    }).catch((error) => {
+      consumedRef.current = "";
+      setCartFinalizationError(error.message || "Ödeme alındı; sepetin güncellenmesi doğrulanamadı. Yeniden dene.");
+    });
+  }, [checkout, onFinalized, resource.phase, resource.data, cartFinalizationAttempt]);
 
   if (resource.phase !== "ready") return <main id="main-content" className="page success-page"><div className="shell"><section className="success-card connected-payment-result"><InlineState phase={resource.phase} error={resource.error} onRetry={resource.reload} /></section></div></main>;
   const result = resource.data;
   const view = paymentView(result);
-  return <main id="main-content" className="page success-page"><div className="shell"><section className={`success-card connected-payment-result is-${view.tone}`}><div className="success-icon">{view.tone === "success" ? <Check /> : view.tone === "danger" ? <WarningCircle /> : <Clock />}</div><span className="section-kicker">Ödeme sonucu</span><h1>{view.title}</h1><p>{result.message || "Ödeme durumu güvenli şekilde kontrol edildi."}</p><div className="success-meta"><div><small>Sipariş no</small><strong>{result.orderId}</strong></div><div><small>Ödeme referansı</small><strong>{result.paymentRef}</strong></div><div><small>Durum</small><strong>{paymentStatusLabel(result.paymentStatus)}</strong></div></div><div className="success-actions">{view.action === "retry" && <a className="primary-button" href="#/odeme/teslimat">Ödemeyi yeniden dene</a>}{view.action === "refresh" && <button className="primary-button" type="button" onClick={resource.reload}>Durumu yenile</button>}<a href="#/hesabim/siparisler">Siparişlerime git <CaretRight /></a></div></section></div></main>;
+  return <main id="main-content" className="page success-page"><div className="shell"><section className={`success-card connected-payment-result is-${view.tone}`}><div className="success-icon">{view.tone === "success" ? <Check /> : view.tone === "danger" ? <WarningCircle /> : <Clock />}</div><span className="section-kicker">Ödeme sonucu</span><h1>{view.title}</h1><p>{result.message || "Ödeme durumu güvenli şekilde kontrol edildi."}</p><div className="success-meta"><div><small>Sipariş no</small><strong>{result.orderId}</strong></div><div><small>Ödeme referansı</small><strong>{result.paymentRef}</strong></div><div><small>Durum</small><strong>{paymentStatusLabel(result.paymentStatus)}</strong></div></div><div className="success-actions">{cartFinalizationError && <div role="alert"><p>{cartFinalizationError}</p><button type="button" onClick={() => setCartFinalizationAttempt((value) => value + 1)}>Sepeti yeniden eşitle</button></div>}{view.action === "retry" && <a className="primary-button" href="#/odeme/teslimat">Ödemeyi yeniden dene</a>}{view.action === "refresh" && <button className="primary-button" type="button" onClick={resource.reload}>Durumu yenile</button>}<a href="#/hesabim/siparisler">Siparişlerime git <CaretRight /></a></div></section></div></main>;
 }
 
 export function CustomerTrackingPage({ session, account, products = [], getProductImage }) {

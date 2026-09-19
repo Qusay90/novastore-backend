@@ -1,6 +1,8 @@
 const CUSTOMER_TOKEN_KEY = "nova_user_token";
 
 const RULES = Object.freeze([
+  { methods: ["GET", "PUT", "DELETE"], pattern: /^\/api\/shared-state\/(?:cart|checkout)$/, authenticated: true },
+  { methods: ["POST"], pattern: /^\/api\/shared-state\/cart\/finalize$/, authenticated: true },
   { methods: ["POST"], pattern: /^\/api\/returns$/, authenticated: true },
   { methods: ["GET"], pattern: /^\/api\/returns\/mine$/, authenticated: true },
   { methods: ["GET"], pattern: /^\/api\/returns\/[1-9][0-9]*$/, authenticated: true },
@@ -164,8 +166,13 @@ export function createCustomerHttp({
     body,
     signal,
     idempotencyKey = null,
+    cartCapability = false,
   } = {}) => {
     const normalized = normalizeCustomerApiRequest(input, method, origin);
+    const cartRequest = normalized.path.startsWith("/api/shared-state/");
+    if (cartRequest && cartCapability !== true) {
+      throw new CustomerHttpError("Sepet işlemi güncel istemci yeteneklerini gerektirir.", { code: "CART_CLIENT_UPGRADE_REQUIRED", status: 426 });
+    }
     const controller = new AbortController();
     const detachAbort = relayAbort(signal, controller);
     const timer = globalThis.setTimeout(() => controller.abort("timeout"), timeoutMs);
@@ -193,6 +200,7 @@ export function createCustomerHttp({
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...(idempotencyKey ? { "Idempotency-Key": String(idempotencyKey) } : {}),
+          ...(cartRequest ? { "X-Cart-Schema-Version": "2", "X-Cart-Variant-Line-Identity": "true", "X-Cart-CAS": "true" } : {}),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: controller.signal,

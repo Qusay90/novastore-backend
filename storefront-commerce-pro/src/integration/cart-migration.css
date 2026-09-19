@@ -1,0 +1,6 @@
+.cart-migration-notice { margin: 18px auto; padding: 18px; border: 1px solid #b57414; border-radius: 12px; background: #fff8e9; color: #55370b; }
+.cart-migration-notice p { margin: 8px 0; }
+.cart-migration-notice ul { margin: 0; padding: 0; list-style: none; }
+.cart-migration-notice li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 0; }
+.cart-migration-notice button, .cart-migration-notice a { color: #55370b; font: inherit; text-decoration: underline; }
+.cart-migration-notice button { border: 0; background: transparent; cursor: pointer; }

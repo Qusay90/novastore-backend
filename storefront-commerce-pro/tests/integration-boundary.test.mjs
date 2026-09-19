@@ -576,7 +576,7 @@ test("commerce runtime gerçek adapterları tek katalog, favori ve sepet durumun
   const runtime = await createCommerceRuntime({ root }).initialize();
   assert.equal(runtime.session.status, "guest");
   assert.deepEqual([...runtime.favorites.initialIds], [202]);
-  assert.deepEqual(runtime.cart.initialItems, [{ productId: 202, quantity: 1 }]);
+  assert.deepEqual(runtime.cart.initialItems, [{ productId: 202, variantId: null, quantity: 1 }]);
   assert.deepEqual(runtime.catalog.products.map((product) => product.id), [202, 101]);
   assert.equal(typeof runtime.catalog.loadProduct, "function");
   assert.equal(typeof runtime.catalog.loadCollection, "function");

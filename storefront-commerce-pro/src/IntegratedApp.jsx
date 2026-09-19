@@ -85,6 +85,9 @@ import { PublicStorePage } from "./PublicStorePage.jsx";
 import { CustomerProductCard } from "./CustomerProductCard.jsx";
 import { normalizePublicStoreSlug } from "./adapters/publicStoreAdapter.js";
 import { reconcileFinalizedCart } from "./adapters/checkoutAdapter.js";
+import { CartMigrationNotice } from "./integration/CartMigrationNotice.jsx";
+import { CartSyncNotice, CartPurchaseLimitNotice } from "./integration/CartSyncNotice.jsx";
+import { cartEditedQuantity, cartIncreaseQuantity } from "./integration/cartQuantityPolicy.js";
 import { assertProductVariant, getProductVariant } from "./adapters/variantContract.js";
 import { cartLineKey } from "./integration/runtimeCartIdentity.js";
 import { VariantSelection } from "./integration/VariantSelection.jsx";
@@ -1478,6 +1481,7 @@ export function CommerceProRuntimeApp({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart] = useState(() => [...runtime.cart.initialItems]);
+  const [cartSyncStatus, setCartSyncStatus] = useState(() => runtime.cart.getSyncStatus?.() || { phase: "ready" });
   const cartRef = useRef(cart);
   const [favorites, setFavorites] = useState(() => new Set(runtime.favorites.initialIds));
   const favoritesRef = useRef(favorites);
@@ -1500,7 +1504,10 @@ export function CommerceProRuntimeApp({
   const [buyNowPending, setBuyNowPending] = useState(false);
   const categoryDrawerTriggerRef = useRef(null);
   const cartTriggerRef = useRef(null);
-  const openCart = useCallback(() => setCartOpen(true), []);
+  const openCart = useCallback(() => {
+    if (runtime.cart.getSyncStatus?.().phase === "blocked") { navigate("/sepet"); return; }
+    setCartOpen(true);
+  }, [runtime]);
   const closeCart = useCallback(() => setCartOpen(false), []);
   const openCategoryDrawer = useCallback((event) => {
     categoryDrawerTriggerRef.current = event?.currentTarget || null;
@@ -1537,15 +1544,16 @@ export function CommerceProRuntimeApp({
   function replaceCart(next, { persist = true } = {}) {
     const normalized = next.map((item) => ({
       productId: normalizeRuntimeProductId(item.productId),
+      ...(Number.isSafeInteger(item.storeId) && item.storeId > 0 ? { storeId: item.storeId } : {}),
       ...(item.variantId != null ? { variantId: item.variantId } : {}),
-      quantity: Math.max(1, Math.min(20, Number(item.quantity || 1))),
+      quantity: Number(item.quantity),
     })).filter((item) => item.productId !== null);
     cartRef.current = normalized;
     setCart(normalized);
     if (persist) {
-      return runtime.cart.persist(normalized).then(() => true).catch(() => {
-        notify("Sepet sunucuya aktarılamadı; yerel değişikliğin korunuyor.");
-        return { appliedLocally: true, persisted: false };
+      return runtime.cart.persist(normalized).then(() => true).catch((error) => {
+        notify(error.message || "Sepet değişikliği sunucuda doğrulanamadı. Güncel sepeti kontrol et.");
+        return { appliedLocally: false, persisted: false };
       });
     }
     return Promise.resolve(true);
@@ -1591,10 +1599,10 @@ export function CommerceProRuntimeApp({
     const existing = current.find((item) => cartLineKey(item) === key);
     const requestedQuantity = Math.max(1, Number(quantity) || 1);
     const currentQuantity = existing?.quantity || 0;
-    const cartCapacity = 50 - current.reduce((sum, item) => sum + item.quantity, 0);
-    const nextQuantity = Math.min(20, product.stock, currentQuantity + Math.min(requestedQuantity, cartCapacity));
+    const nextQuantity = cartIncreaseQuantity({ currentQuantity, requestedQuantity, availableStock: product.stock,
+      totalQuantity: current.reduce((sum, item) => sum + item.quantity, 0) });
     if (nextQuantity === currentQuantity) {
-      notify(`${product.name} için sepetindeki adet mevcut stoğa ulaştı.`);
+      notify("Bu ekleme stok veya satın alma sınırını aşıyor. Mevcut sepetin korunuyor; önce adetleri azalt.");
       return false;
     }
     const next = existing
@@ -1632,10 +1640,16 @@ export function CommerceProRuntimeApp({
     const key = cartLineKey(productId, variantId);
     const product = cartItems.find((item) => cartLineKey(item) === key)?.product;
     const current = cartRef.current;
-    const next = quantity <= 0
+    const selected = current.find((item) => cartLineKey(item) === key);
+    if (!selected) return;
+    let desired;
+    try { desired = cartEditedQuantity({ currentQuantity: selected.quantity, requestedQuantity: Number(quantity),
+      totalQuantity: current.reduce((sum, item) => sum + item.quantity, 0), availableStock: Number(product?.stock || 0) }); }
+    catch (error) { notify(error.message); return; }
+    const next = desired <= 0
       ? current.filter((item) => cartLineKey(item) !== key)
       : current.map((item) => cartLineKey(item) === key
-        ? { ...item, quantity: Math.min(20, 50 - current.filter((other) => cartLineKey(other) !== key).reduce((sum, other) => sum + other.quantity, 0), Math.max(1, Number(product?.stock || 1)), quantity) }
+        ? { ...item, quantity: desired }
         : item);
     replaceCart(next);
   }
@@ -1676,6 +1690,10 @@ export function CommerceProRuntimeApp({
     const unsubscribe = runtime.cart.subscribe((next) => replaceCart(next, { persist: false }));
     return unsubscribe;
   }, [runtime]);
+  useEffect(() => runtime.cart.subscribeSync?.((next) => {
+    setCartSyncStatus(next);
+    if (next.phase === "blocked") setCartOpen(false);
+  }) || (() => {}), [runtime]);
 
   useEffect(() => {
     const handleAuthRequired = () => {
@@ -1766,11 +1784,17 @@ export function CommerceProRuntimeApp({
     window.location.hash = "#/";
     window.location.reload();
   };
-  const handlePaymentFinalized = useCallback((purchasedItems) => {
+  const handlePaymentFinalized = useCallback(async (purchasedItems, receipt) => {
+    if (runtime.cart.finalize) {
+      const next = await runtime.cart.finalize(purchasedItems, receipt);
+      cartRef.current = next;
+      setCart(next);
+      return;
+    }
     const next = reconcileFinalizedCart(cartRef.current, purchasedItems);
     cartRef.current = next;
     setCart(next);
-    runtime.cart.persist(next).catch(() => {});
+    await runtime.cart.persist(next);
   }, [runtime]);
   const handleCheckoutStepChange = useCallback((step, options) => {
     const segment = step === "delivery" ? "teslimat" : step === "payment" ? "odeme" : "onay";
@@ -1779,6 +1803,7 @@ export function CommerceProRuntimeApp({
 
   let content;
   if (loading) content = <CanonicalLoadingPage />;
+  else if (cartSyncStatus.phase === "blocked" && ["cart-page", "checkout"].includes(route.type)) content = <main id="main-content" className="page"><div className="shell"><h1>Sepetini yeniden eşitle</h1><p>Sepet boş olarak kabul edilmedi. Hesap kayıtların korunuyor; doğrulama tamamlanınca ürünlerin gösterilecek.</p></div></main>;
   else if (route.type === "home") content = <CanonicalHomePage favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
   else if (route.type === "public-store") content = <PublicStorePage slug={route.slug} previewMode={route.preview} loadStore={runtime.publicStore.load} followStore={runtime.publicStore.follow} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
   else if (route.type === "product" || route.type === "product-id") {
@@ -1831,7 +1856,10 @@ export function CommerceProRuntimeApp({
       <Header authenticated={authenticated} cartCount={cartCount} favoriteCount={favorites.size} notificationUnreadCount={notificationUnreadCount} onCartOpen={openCart} onMobileOpen={openCategoryDrawer} onAccountOpen={() => navigate(customerAccountEntryPath(authenticated))} accountDetail={authenticated ? session.user.fullName || "Hesabım" : "Giriş yap"} cartTriggerRef={cartTriggerRef} mobileMenuOpen={mobileMenuOpen} cartOpen={cartOpen} />
       {runtime.warnings.length > 0 && <div className="integration-session-warning" role="status">Bazı ikincil mağaza veya oturum verileri geçici olarak alınamadı; erişilebilen gerçek katalog gösteriliyor.</div>}
       {comparisonAvailable && <ComparisonTray ids={comparisonIds} onToggle={toggleComparison} onClear={() => { setComparisonIds(new Set()); setComparisonSurfaceVisible(false); }} onAdd={addToCart} onVisibilityChange={setComparisonSurfaceVisible} />}
+      <CartSyncNotice cart={runtime.cart} status={cartSyncStatus} authenticated={authenticated} onLogout={handleLogout} />
+      <CartPurchaseLimitNotice items={cart} />
       {content}
+      <CartMigrationNotice cart={runtime.cart} products={products} />
       <Footer businessIdentity={runtime.businessIdentity} />
       <MobileCategoryDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} returnFocusRef={categoryDrawerTriggerRef} authenticated={authenticated} cartCount={cartCount} favoriteCount={favorites.size} notificationUnreadCount={notificationUnreadCount} />
       <CartDrawer open={cartOpen} items={cartItems} onClose={closeCart} onRemove={removeFromCart} onQuantity={updateCartQuantity} returnFocusRef={cartTriggerRef} />
