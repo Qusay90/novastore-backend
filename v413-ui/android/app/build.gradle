@@ -57,6 +57,9 @@ android {
         }
         uat {
             initWith release
+            // Dedicated, opt-in B03 acceptance installation; never replaces the
+            // owner's actual application or alters the standard UAT identity.
+            if (project.findProperty('novaB03Isolated') == 'true') applicationIdSuffix '.b03cartuat'
             debuggable true
             versionNameSuffix "-uat"
             buildConfigField "String", "NOVASTORE_API_BASE_URL", '"http://127.0.0.1:5000/"'

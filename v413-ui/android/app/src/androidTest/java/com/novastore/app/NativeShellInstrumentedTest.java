@@ -163,15 +163,18 @@ public class NativeShellInstrumentedTest {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             JSONObject stores = evaluateJson(scenario,
                 "(() => {" +
-                    "const allowedLocal=new Set(['novastore.android.installationId','novastore.novabot.presentation.v1']);" +
+                    "const allowedLocal=new Set(['novastore.android.installationId','novastore.novabot.presentation.v1','novastore.customer.variant-selection.v1']);" +
+                    "const rawSelection=localStorage.getItem('novastore.customer.variant-selection.v1');let selectionValid=rawSelection===null;" +
+                    "try{const s=JSON.parse(rawSelection);if(s)selectionValid=Object.keys(s).sort().join(',')==='productId,variantId'&&typeof s.productId==='string'&&/^[1-9][0-9]*$/.test(s.productId)&&Number.isSafeInteger(s.variantId)&&s.variantId>0;}catch{}" +
                     "const localKeys=Object.keys(localStorage);" +
                     "const values=[...Object.entries(localStorage),...Object.entries(sessionStorage)].flat().join(' ');" +
                     "return {localUnexpected:localKeys.filter(key=>!allowedLocal.has(key)).length," +
-                    "local:localStorage.length,session:sessionStorage.length,cookie:document.cookie," +
+                    "local:localStorage.length,selectionValid,session:sessionStorage.length,cookie:document.cookie," +
                     "secret:/bearer|refresh[_-]?token|access[_-]?token|authorization/i.test(values)};" +
                 "})()"
             );
-            assertTrue(stores.getInt("local") <= 2);
+            assertTrue(stores.getInt("local") <= 3);
+            assertTrue(stores.getBoolean("selectionValid"));
             assertEquals(0, stores.getInt("localUnexpected"));
             assertEquals(0, stores.getInt("session"));
             assertEquals("", stores.getString("cookie"));

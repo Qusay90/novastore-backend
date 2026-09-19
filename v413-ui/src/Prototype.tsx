@@ -62,6 +62,9 @@ import {
   type CustomerCanonicalProductDetail,
 } from "./adapters";
 import { deviceCartKey, readDeviceCart, saveDeviceCart, readDeviceVariantSelection, saveDeviceVariantSelection, type DeviceCartLine } from "./checkout/deviceCart";
+import { useCartV2 } from './checkout/useCartV2';
+import type { CartV2Pending } from './checkout/cartV2Contract';
+import { saveCheckoutV2Snapshot } from './checkout/checkoutV2Snapshot';
 import { hasAppOwnedBackEntry, nativeHistoryDepth } from "./native/nativeNavigation";
 import { canonicalNativeRoute, canonicalNativeRouteOrSafeDefault } from "./native/routeContract";
 import { useCustomerAccountRuntime, type CustomerAddressInput, type CustomerOrder } from "./account";
@@ -284,6 +287,14 @@ type CommerceState = {
   changeCartQuantity: (lineId: string, delta: number) => void;
   removeCartLine: (lineId: string) => void;
   clearCart: () => void;
+  cartSyncBusy: boolean;
+  cartSyncReady: boolean;
+  cartSyncError: string;
+  cartRevision: number | null;
+  cartPending: readonly CartV2Pending[];
+  reloadCart: () => void;
+  resolveLegacyCart: (productId: number) => void;
+  finalizeCart: (orderId: number) => Promise<void>;
   applyCartCoupon: (code: string) => void;
   selectProduct: (id: string) => void;
   selectOrder: (id: number | null) => void;
@@ -422,15 +433,20 @@ export default function Prototype() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const [route, setRoute] = useState<Route>(readRoute);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => new Set());
-  const [cartLines, setCartLines] = useState<CartLine[]>(() => NATIVE_SHELL ? readDeviceCart() : [
+  const [deviceLines, setDeviceLines] = useState<CartLine[]>(() => NATIVE_SHELL ? readDeviceCart() : [
     { id: "headphones", productId: "pulse-anc", quantity: 1 },
     { id: "coffee", productId: "barista-pro", quantity: 2 },
   ]);
-  const cartLinesRef = useRef(cartLines);
+  const cartLinesRef = useRef(deviceLines);
   const cartMutationLock = useRef(false);
-  const commitCart = (lines: CartLine[]) => {
+  const commitCart = async (lines: CartLine[]) => {
+    if (NATIVE_SHELL && accountRuntime?.phase === 'authenticated') {
+      await syncedCart.replace(lines);
+      return;
+    }
+    if (NATIVE_SHELL && accountRuntime?.phase !== 'guest') throw new Error('Önce müşteri oturumunu doğrula.');
     cartLinesRef.current = lines;
-    setCartLines(lines);
+    setDeviceLines(lines);
     if (NATIVE_SHELL) saveDeviceCart(lines);
   };
   const [appliedCoupon, setAppliedCoupon] = useState(() => NATIVE_SHELL ? "" : "NOVAYAZ");
@@ -466,6 +482,10 @@ export default function Prototype() {
   const favoriteMutationLock = useRef(false);
   const notificationRuntime = useCustomerNotificationRuntime();
   const accountRuntime = useCustomerAccountRuntime();
+  const syncedCart = useCartV2(NATIVE_SHELL && accountRuntime?.phase === 'authenticated' ? accountRuntime.user?.id ?? null : null);
+  const cartLines = NATIVE_SHELL && accountRuntime?.phase !== 'guest'
+    ? syncedCart.state?.lines ?? [] : deviceLines;
+  cartLinesRef.current = cartLines;
   const capture = !NATIVE_SHELL && params.get("capture") === "1";
   const nativeShell = NATIVE_SHELL;
   const layout = NATIVE_SHELL ? "phone" : params.get("layout") === "tablet" ? "tablet" : "phone";
@@ -500,6 +520,10 @@ export default function Prototype() {
     keyboard.hide();
     setRefreshRequest((current) => ({ id: current.id + 1, source }));
   }, [keyboard]);
+
+  useEffect(() => {
+    if (NATIVE_SHELL && route.cal === 'CAL-07') void syncedCart.reload();
+  }, [route.cal, refreshRequest.id, syncedCart.reload]);
 
   useEffect(() => {
     if (!NATIVE_SHELL) return;
@@ -599,6 +623,14 @@ export default function Prototype() {
     favoriteIds,
     cartCount,
     cartLines,
+    cartSyncBusy: NATIVE_SHELL && syncedCart.busy,
+    cartSyncReady: !NATIVE_SHELL || accountRuntime?.phase === 'guest' || Boolean(syncedCart.state),
+    cartSyncError: NATIVE_SHELL ? syncedCart.error : '',
+    cartRevision: syncedCart.state?.revision ?? null,
+    cartPending: syncedCart.state?.pending ?? [],
+    reloadCart: () => { void syncedCart.reload(); },
+    resolveLegacyCart: (productId) => { void syncedCart.replace(cartLinesRef.current, [productId]).catch(() => undefined); },
+    finalizeCart: async (orderId) => { await syncedCart.finalize(orderId); },
     appliedCoupon,
     selectedProductId,
     selectedOrderId,
@@ -644,13 +676,16 @@ export default function Prototype() {
     },
     addToCart: async (productId, quantity = 1, variantId) => {
       if (cartMutationLock.current) return { addedQuantity: 0, reason: "busy" };
+      if (NATIVE_SHELL && accountRuntime?.phase === 'authenticated' && (syncedCart.busy || !syncedCart.state)) return { addedQuantity: 0, reason: 'busy' };
       cartMutationLock.current = true;
       try {
+        const startedSession = currentCustomerSessionGuard();
         let product = publicProducts[productId];
         let availableStock = product?.stock ?? MAX_CART_QUANTITY_PER_PRODUCT;
         let selectedVariant;
         if (NATIVE_SHELL) {
           const canonical = await loadCanonicalProductDetail(productId);
+          if (!customerSessionMatchesGuard(startedSession)) throw new Error('Müşteri oturumu değişti.');
           product = productFromCanonicalDetail(canonical, product);
           registerPublicProducts([product]);
           if (canonical.variantSelectionRequired && variantId === undefined) return { addedQuantity: 0, reason: "selection-required" };
@@ -676,20 +711,21 @@ export default function Prototype() {
         const amount = selectedVariant?.price ?? product?.amount ?? 0;
         const next: CartLine = {
           id: existing?.id ?? key, productId, quantity: existingQuantity + addedQuantity,
+          ...(existing?.storeId === undefined ? {} : { storeId: existing.storeId }),
           ...(variantId === undefined ? {} : { variantId, variantSelections: selectedVariant!.selections }),
           ...(NATIVE_SHELL && product ? { snapshot: {
             id: productId, name: product.name, store: product.store, image: product.image,
             amount, price: formatCatalogPrice(amount), stock: availableStock, isPublicProjection: true as const,
           } } : {}),
         };
-        commitCart(existing ? current.map((line) => line.id === existing.id ? next : line) : [...current, next]);
+        await commitCart(existing ? current.map((line) => line.id === existing.id ? next : line) : [...current, next]);
         return { addedQuantity, reason: "added" };
       } finally { cartMutationLock.current = false; }
     },
     changeCartQuantity: (lineId, delta) => {
       const current = cartLinesRef.current;
       const currentTotal = current.reduce((total, line) => total + line.quantity, 0);
-      commitCart(current.flatMap((line) => {
+      void commitCart(current.flatMap((line) => {
         if (line.id !== lineId) return [line];
         const requestedQuantity = line.quantity + delta;
         if (requestedQuantity <= 0) return [];
@@ -698,10 +734,10 @@ export default function Prototype() {
           ? Math.max(line.quantity, Math.min(stock, MAX_CART_QUANTITY_PER_PRODUCT, requestedQuantity, line.quantity + Math.max(0, MAX_CART_TOTAL_QUANTITY - currentTotal)))
           : requestedQuantity;
         return [{ ...line, quantity: nextQuantity }];
-      }));
+      })).catch(() => undefined);
     },
-    removeCartLine: (lineId) => commitCart(cartLinesRef.current.filter((line) => line.id !== lineId)),
-    clearCart: () => commitCart([]),
+    removeCartLine: (lineId) => { void commitCart(cartLinesRef.current.filter((line) => line.id !== lineId)).catch(() => undefined); },
+    clearCart: () => { void commitCart([]).catch(() => undefined); },
     applyCartCoupon: (code) => setAppliedCoupon(code.trim().toLocaleUpperCase("tr-TR")),
     selectProduct: setSelectedProductId,
     selectOrder: setSelectedOrderId,
@@ -736,7 +772,7 @@ export default function Prototype() {
       : { category: "Tüm Ürünler", subcategory: "" }),
     applyCatalogFilters: (filters) => setCatalogFilters({ ...filters, applied: true }),
     setCatalogSort,
-  }), [accountRuntime, favoriteIds, cartCount, cartLines, appliedCoupon, selectedProductId, selectedOrderId, publicProducts, publicCatalogPhase, addresses, paymentMethods, productReviews, productQuestions, readNotificationIds, notificationPreferences, catalogSelection, catalogFilters, catalogSort, registerPublicProducts]);
+  }), [accountRuntime, syncedCart.state, syncedCart.busy, syncedCart.error, syncedCart.reload, syncedCart.replace, syncedCart.finalize, favoriteIds, cartCount, cartLines, appliedCoupon, selectedProductId, selectedOrderId, publicProducts, publicCatalogPhase, addresses, paymentMethods, productReviews, productQuestions, readNotificationIds, notificationPreferences, catalogSelection, catalogFilters, catalogSort, registerPublicProducts]);
 
   return (
     <CommerceContext.Provider value={commerce}>
@@ -2788,7 +2824,8 @@ function RecommendationCard({ product, go }: { product: (typeof products)[number
 }
 
 function CartScreen({ go }: { go: Go }) {
-  const { cartLines, cartCount, appliedCoupon, applyCartCoupon, changeCartQuantity, removeCartLine, publicProducts } = useCommerce();
+  const cartAccount = useCustomerAccountRuntime();
+  const { cartLines, cartCount, appliedCoupon, applyCartCoupon, changeCartQuantity, removeCartLine, publicProducts, cartSyncBusy, cartSyncReady, cartSyncError, cartRevision, cartPending, reloadCart, resolveLegacyCart } = useCommerce();
   const [coupon, setCoupon] = useState(appliedCoupon);
   const items = cartLines.flatMap((line) => {
     const product = line.snapshot ?? publicProducts[line.productId] ?? (!NATIVE_SHELL ? products.find((candidate) => candidate.id === line.productId) : undefined);
@@ -2799,7 +2836,14 @@ function CartScreen({ go }: { go: Go }) {
   const total = subtotal - discount;
   const couponApplied = !NATIVE_SHELL && Boolean(appliedCoupon) && coupon.trim().toLocaleUpperCase("tr-TR") === appliedCoupon;
   return (
-    <div className="root-layout cart-layout">
+    <div className="root-layout cart-layout" data-cart-revision={cartRevision} aria-busy={cartSyncBusy}>
+      {NATIVE_SHELL && cartAccount?.phase === 'authenticated' && <div className="cart-sync-status">
+        <button type="button" className="secondary" disabled={cartSyncBusy} onClick={reloadCart}>Sepeti eşitle</button>
+        {cartSyncBusy && <p role="status">Sepetin eşitleniyor…</p>}
+        {cartSyncError && <p role="alert">{cartSyncError}</p>}
+        {!cartSyncReady && !cartSyncBusy && <p role="status">Sepet sunucuda doğrulanmadan değiştirilemez.</p>}
+        {cartPending.length > 0 && <section aria-label="Eski sepet seçeneklerini kontrol et"><h2>Ürün seçeneklerini yeniden seç</h2><p>Eski sepetindeki bu ürünlerin seçenekleri doğrulanamadı. Ürünü açıp istediğin seçeneği yeniden ekleyebilir veya eski kaydı kaldırabilirsin.</p>{cartPending.map((item) => <div key={item.productId}><span>Ürün #{item.productId} · {item.quantity} adet</span><button type="button" className="secondary" onClick={() => go('CAL-06', 'home', '', { productId: String(item.productId), mode: 'customer' })}>Ürünü aç</button><button type="button" className="secondary" disabled={cartSyncBusy} onClick={() => resolveLegacyCart(item.productId)}>Eski kaydı kaldır</button></div>)}</section>}
+      </div>}
       <div className="cart-grid">
         <section className="cart-main"><div className="cart-title"><h1>Sepetim</h1><div className="cart-title-actions"><span>{cartCount} ürün</span></div></div>{items.map((item) => <article className="cart-item" data-testid={`cart-item-${item.id}`} data-product-id={item.product.id} data-variant-id={item.variantId} key={item.id}><img src={item.product.image} alt={item.product.name} /><div><small>{item.product.store}</small><h2>{item.product.name}</h2><p className="cart-variant-label">{item.variantSelections?.map(({ group, value }) => `${group}: ${value}`).join(" · ")}</p><p>{NATIVE_SHELL ? `Son görülen stok: ${item.product.stock ?? 0}` : "Krem · Stokta"}</p><strong>{item.product.price}</strong></div><div className="cart-item-actions"><IconButton label={`${item.product.name}${item.variantSelections?.length ? ` · ${item.variantSelections.map(({ group, value }) => `${group}: ${value}`).join(" · ")}` : ""} Sil`} onClick={() => removeCartLine(item.id)}><TrashIcon /></IconButton><div className="quantity"><button aria-label={`${item.product.name}${item.variantSelections?.length ? ` · ${item.variantSelections.map(({ group, value }) => `${group}: ${value}`).join(" · ")}` : ""} adedini azalt`} onClick={() => changeCartQuantity(item.id, -1)}><MinusIcon /></button><b>{item.quantity}</b><button aria-label={`${item.product.name}${item.variantSelections?.length ? ` · ${item.variantSelections.map(({ group, value }) => `${group}: ${value}`).join(" · ")}` : ""} adedini artır`} disabled={item.quantity >= MAX_CART_QUANTITY_PER_PRODUCT || cartCount >= MAX_CART_TOTAL_QUANTITY || (NATIVE_SHELL && item.quantity >= (item.product.stock ?? 0))} onClick={() => changeCartQuantity(item.id, 1)}><PlusIcon /></button></div></div></article>)}{items.length === 0 ? <div className="empty-state" role="status"><BackpackIcon /><h2>Sepetin boş</h2><button className="primary navy" onClick={() => go("CAL-02", "home")}>Alışverişe Dön</button></div> : <div className="delivery-note"><CubeIcon /><span><strong>Teslimat ödeme adımında netleşir</strong>Ücret ve tarih, adres ile satıcının hazırlık süresine göre hesaplanır.</span></div>}</section>
         <aside className="order-summary"><h2>Sipariş Özeti</h2><label>Kupon kodu<div><KeyboardInput value={coupon} onChange={(e) => setCoupon(e.target.value)} /><button onClick={() => applyCartCoupon(coupon)}>Uygula</button></div></label>{couponApplied && <p className="coupon-success" role="status"><CheckIcon /> {appliedCoupon} indirimi uygulandı</p>}{NATIVE_SHELL && appliedCoupon && <p className="coupon-success" role="status">{appliedCoupon} ödeme adımında sunucuda doğrulanacak.</p>}<SummaryRows subtotal={subtotal} discount={discount} total={total} /><button className="primary navy" disabled={!items.length} onClick={() => go("CAL-08", "cart")}>{NATIVE_SHELL ? "Sunucuda Doğrula" : `${formatMoney(total)} · Ödemeye Geç`} <ArrowRightIcon /></button><small className="secure-copy"><LockClosedIcon /> {NATIVE_SHELL ? "Fiyat, stok ve kupon ödeme adımında doğrulanır" : "Güvenli ödeme"}</small></aside>
@@ -2871,7 +2915,7 @@ function CheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
 
 function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
   const accountRuntime = useCustomerAccountRuntime();
-  const { addresses, cartLines, cartCount, appliedCoupon, clearCart, publicProducts } = useCommerce();
+  const { addresses, cartLines, cartCount, appliedCoupon, finalizeCart, publicProducts, cartSyncReady, cartSyncBusy, cartPending } = useCommerce();
   const defaultAddress = addresses.find((address) => address.isDefault) ?? addresses[0];
   const [selectedAddressId, setSelectedAddressId] = useState(defaultAddress?.id ?? "");
   const [capability, setCapability] = useState<CustomerPaymentCapability | null>(null);
@@ -2885,6 +2929,7 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
   const [paymentResponse, setPaymentResponse] = useState<CustomerPaymentResponse | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<CustomerPaymentStatus | null>(null);
   const [confirmedOrder, setConfirmedOrder] = useState<Readonly<{ id: number; customerId: number }> | null>(null);
+  const [cartFinalizationError, setCartFinalizationError] = useState('');
   const [reloadRevision, setReloadRevision] = useState(0);
   const idempotencyKey = useRef("");
   const selectedAddress = addresses.find((address) => address.id === selectedAddressId);
@@ -2945,11 +2990,13 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
     setAcceptedSlugs(new Set());
     Promise.all([
       getCustomerPaymentCapability(),
-      previewCustomerCheckout({
+      saveCheckoutV2Snapshot({
         addressId: Number(selectedAddress.id),
         cartItems: requestItems,
         couponCode: appliedCoupon || null,
-      }),
+      }, () => active && currentCheckoutContext.current === startedContext).then(() => previewCustomerCheckout({
+        addressId: Number(selectedAddress.id), cartItems: requestItems, couponCode: appliedCoupon || null,
+      })),
     ]).then(([nextCapability, nextPreview]) => {
       if (!active || currentCheckoutContext.current !== startedContext) return;
       idempotencyKey.current = createCheckoutIdempotencyKey();
@@ -2977,7 +3024,11 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
     return <div className="detail-layout checkout-layout"><section className="checkout-success checkout-blocked"><MapPinIcon /><h1>Teslimat adresi ekle</h1><p>Ödeme adımında örnek adres kullanılmaz. Gerçek hesabına bir adres eklemelisin.</p><button className="primary navy" onClick={() => go("CAL-10", "account", "addresses")}>Adres Ekle</button></section></div>;
   }
   if (confirmedOrder && confirmedOrder.customerId === accountRuntime.user?.id) {
-    return <div className="detail-layout checkout-layout"><section className="checkout-success" role="status"><CheckIcon /><h1>Ödemen doğrulandı</h1><p>Sipariş #{confirmedOrder.id} PC1 sunucu durumu üzerinden kesinleşti.</p><button className="primary navy" onClick={() => { go("CAL-09", "account"); void accountRuntime.refresh(); }}>Siparişi Gör</button></section></div>;
+    return <div className="detail-layout checkout-layout"><section className="checkout-success" role="status"><CheckIcon /><h1>Ödemen doğrulandı</h1><p>Sipariş #{confirmedOrder.id} PC1 sunucu durumu üzerinden kesinleşti.</p>{cartFinalizationError && <><p role="alert">{cartFinalizationError}</p><button type="button" className="secondary" disabled={cartSyncBusy} onClick={() => { const guard = currentCustomerSessionGuard(); void finalizeCart(confirmedOrder.id).then(() => { if (customerSessionMatchesGuard(guard)) setCartFinalizationError(''); }).catch(() => undefined); }}>Sepeti yeniden eşitle</button></>}<button className="primary navy" onClick={() => { go("CAL-09", "account"); void accountRuntime.refresh(); }}>Siparişi Gör</button></section></div>;
+  }
+
+  if (!cartSyncReady || cartSyncBusy || cartPending.length > 0) {
+    return <div className="detail-layout checkout-layout"><section className="checkout-success checkout-blocked"><ShoppingCartSimpleIcon /><h1>Sepetini kontrol et</h1><p>{cartPending.length ? 'Eski sepetindeki ürünlerin seçeneklerini yeniden seç veya bu kayıtları açıkça kaldır.' : 'Sepet sunucuda eşitlenmeden ödeme başlatılamaz.'}</p><button className="primary navy" onClick={() => go('CAL-07', 'cart')}>Sepete Dön</button></section></div>;
   }
 
   if (checkoutItems.length === 0 || checkoutItems.length !== cartLines.length || requestItems.length !== checkoutItems.length) {
@@ -2985,7 +3036,7 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
   }
   const allAccepted = Boolean(preview?.documents.length) && preview!.documents.every((document) => acceptedSlugs.has(document.slug));
   const couponRejected = Boolean(appliedCoupon) && preview?.quote.couponApplied !== true;
-  const canInitialize = previewPhase === "ready" && previewContext === checkoutContext && capability?.ready === true && allAccepted && !couponRejected && !paymentResponse;
+  const canInitialize = cartSyncReady && !cartSyncBusy && cartPending.length === 0 && previewPhase === "ready" && previewContext === checkoutContext && capability?.ready === true && allAccepted && !couponRejected && !paymentResponse;
   const total = preview?.quote.totals.total ?? 0;
 
   const updateLegalConsent = (slug: string, accepted: boolean) => {
@@ -3048,10 +3099,12 @@ function NativeCheckoutScreen({ go, view }: { go: Go; view: ViewId }) {
       setPaymentStatus(status);
       setPaymentGate(status.message);
       if (status.paymentStatus.toUpperCase() === "PAID" && status.providerFinalized && status.commerceFinalized && !status.reconciliationRequired) {
-        // Commit this exact, server-finalized purchase in the same JS turn as
-        // the identity check. Account history refresh belongs to navigation.
+        // Payment truth is kept even if cart synchronization fails. The server
+        // uses an owned paid order and a durable receipt to subtract only its
+        // exact store/product/variant quantities once; retry never recharges.
         setConfirmedOrder({ id: status.orderId, customerId: accountRuntime.user!.id });
-        clearCart();
+        try { await finalizeCart(status.orderId); }
+        catch { if (customerSessionMatchesGuard(startedSession)) setCartFinalizationError('Ödemen doğrulandı; sepet eşitlemesi tamamlanamadı. Sipariş yeniden oluşturulmaz.'); }
       }
     } catch (error) {
       if (!stillCurrent()) return;

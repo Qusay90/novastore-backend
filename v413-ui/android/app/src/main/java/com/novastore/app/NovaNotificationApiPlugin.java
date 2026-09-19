@@ -193,6 +193,11 @@ public final class NovaNotificationApiPlugin extends Plugin {
             connection.setUseCaches(false);
             connection.setDoInput(true);
             connection.setRequestProperty("Accept", "application/json");
+            if (cartV2Path(path.split("\\?", 2)[0])) {
+                connection.setRequestProperty("X-Cart-Schema-Version", "2");
+                connection.setRequestProperty("X-Cart-Variant-Line-Identity", "true");
+                connection.setRequestProperty("X-Cart-CAS", "true");
+            }
             connection.setRequestProperty("Cache-Control", "no-store");
             if (token != null) connection.setRequestProperty("Authorization", "Bearer " + token);
             if (body != null) {
@@ -347,6 +352,8 @@ public final class NovaNotificationApiPlugin extends Plugin {
         String canonical = canonicalPath(pathWithQuery);
         if (canonical == null || !canonical.equals(pathWithQuery)) return false;
         String path = pathWithQuery.split("\\?", 2)[0];
+        if ("/api/shared-state/cart/finalize".equals(path)) return "POST".equals(method);
+        if (cartV2Path(path)) return "GET".equals(method) || "PUT".equals(method) || "DELETE".equals(method);
         if ("GET".equals(method) && (
             EXACT_GET.contains(path)
                 || "/api/notifications".equals(path)
@@ -374,6 +381,11 @@ public final class NovaNotificationApiPlugin extends Plugin {
 
     static boolean optionalAuthentication(String path, String method) {
         return "POST".equals(method) && OPTIONAL_AUTHENTICATION_POST.contains(path);
+    }
+
+    static boolean cartV2Path(String path) {
+        return "/api/shared-state/cart".equals(path) || "/api/shared-state/checkout".equals(path)
+            || "/api/shared-state/cart/finalize".equals(path);
     }
 
     static boolean unauthenticated(String path, String method) {

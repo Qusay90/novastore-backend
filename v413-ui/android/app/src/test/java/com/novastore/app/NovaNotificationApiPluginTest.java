@@ -11,6 +11,17 @@ import org.junit.Test;
 
 public final class NovaNotificationApiPluginTest {
     @Test
+    public void cartV2OnlyAllowsExactAuthenticatedRoutes() {
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/shared-state/cart", "GET"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/shared-state/cart", "PUT"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/shared-state/checkout", "DELETE"));
+        assertTrue(NovaNotificationApiPlugin.allowed("/api/shared-state/cart/finalize", "POST"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/shared-state/cart/finalize", "GET"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/shared-state/favorites", "PUT"));
+        assertFalse(NovaNotificationApiPlugin.allowed("/api/shared-state/cart?userId=2", "GET"));
+        assertFalse(NovaNotificationApiPlugin.unauthenticated("/api/shared-state/cart", "GET"));
+    }
+    @Test
     public void publicDiscoveryQueriesAreReadOnlyBoundedAndCannotSelectPrivateAuthority() {
         for (String path : new String[] {"/api/products?pagination=cursor&limit=20&q=%C3%87%C4%B1%C4%9F+%25_!&cursor=opaque_A", "/api/public/categories?format=tree", "/api/public/stores/store-b?limit=20&cursor=opaque_A", "/api/questions/product/21?pagination=cursor&limit=20", "/api/reviews/product/21?pagination=cursor&limit=20", "/api/products?categoryId=17&includeDescendants=true"}) {
             assertEquals(path, NovaNotificationApiPlugin.canonicalPath(path));

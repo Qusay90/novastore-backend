@@ -13,6 +13,7 @@ export type DeviceCartSnapshot = Readonly<{
 
 export type DeviceCartLine = {
   id: string;
+  storeId?: number;
   productId: string;
   variantId?: number;
   variantSelections?: readonly Readonly<{ group: string; value: string }>[];

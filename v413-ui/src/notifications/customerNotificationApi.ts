@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { CART_V2_CAPABILITIES } from '../checkout/cartV2Contract';
 import { publicReadKind, validPublicReadQuery } from "../adapters/publicReadQuery";
 import {
   clearStoredCustomerSession,
@@ -68,6 +69,9 @@ type NovaNotificationApiPlugin = Readonly<{
 
 const NovaNotificationApi = registerPlugin<NovaNotificationApiPlugin>("NovaNotificationApi");
 const EXACT_RULES = new Map<string, ReadonlySet<string>>([
+  ["/api/shared-state/cart", new Set(["GET", "PUT", "DELETE"])],
+  ["/api/shared-state/checkout", new Set(["GET", "PUT", "DELETE"])],
+  ["/api/shared-state/cart/finalize", new Set(["POST"])],
   ["/api/users/login", new Set(["POST"])],
   ["/api/users/refresh", new Set(["POST"])],
   ["/api/users/register", new Set(["POST"])],
@@ -277,6 +281,7 @@ async function transportCustomerApi(normalized: NormalizedRequest, body: Record<
         redirect: "error",
         headers: {
           accept: "application/json",
+          ...(/^\/api\/shared-state\/(?:cart(?:\/finalize)?|checkout)$/u.test(normalized.path) ? CART_V2_CAPABILITIES : {}),
           ...(body === undefined ? {} : { "content-type": "application/json" }),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
@@ -423,6 +428,7 @@ async function authenticatedRequest(
   allowRefresh: boolean,
   retryCount = 0,
   guard?: CustomerSessionGuard,
+  includeTransportContext = false,
 ): Promise<unknown> {
   const initial = currentCustomerSessionState();
   if (guard && !sessionStateMatchesGuard(initial, guard)) {
@@ -446,7 +452,7 @@ async function authenticatedRequest(
     if (currentCustomerSessionState().generation !== used.generation) {
       throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
     }
-    return result.payload;
+    return includeTransportContext ? result : result.payload;
   }
   if (result.status !== 401) throw responseError(result.status, result.payload, result.retryAfterSeconds);
 
@@ -455,12 +461,12 @@ async function authenticatedRequest(
     if (guard && !sessionStateMatchesGuard(current, guard)) {
       throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
     }
-    if (retryCount < 1 && current.session) return authenticatedRequest(normalized, body, false, retryCount + 1, guard);
+    if (retryCount < 1 && current.session) return authenticatedRequest(normalized, body, false, retryCount + 1, guard, includeTransportContext);
     throw responseError(result.status, result.payload, result.retryAfterSeconds);
   }
   if (allowRefresh && retryCount === 0 && customerSessionCanRefresh(used.session)) {
     await refreshCustomerSession(used.generation);
-    return authenticatedRequest(normalized, body, false, retryCount + 1, guard);
+    return authenticatedRequest(normalized, body, false, retryCount + 1, guard, includeTransportContext);
   }
   await clearCustomerSession(used.generation);
   throw responseError(result.status, result.payload, result.retryAfterSeconds);
@@ -473,6 +479,7 @@ async function requestCustomerApiInternal(
   authenticated = true,
   allowRefresh = true,
   guard?: CustomerSessionGuard,
+  includeTransportContext = false,
 ) {
   await initializeCustomerSession();
   if (guard && !sessionStateMatchesGuard(currentCustomerSessionState(), guard)) {
@@ -487,7 +494,7 @@ async function requestCustomerApiInternal(
     // stale A-side 401 may retry after A's token rotation, but never under a
     // newly logged-in Customer B.
     const operationGuard = guard ?? currentCustomerSessionGuard();
-    return authenticatedRequest(normalized, body, allowRefresh, 0, operationGuard);
+    return authenticatedRequest(normalized, body, allowRefresh, 0, operationGuard, includeTransportContext);
   }
   const result = await transportCustomerApi(normalized, body, "");
   if (guard && !sessionStateMatchesGuard(currentCustomerSessionState(), guard)) {
@@ -505,6 +512,14 @@ export async function requestCustomerApi(
   guard?: CustomerSessionGuard,
 ) {
   return requestCustomerApiInternal(path, method, body, authenticated, true, guard);
+}
+
+// Cart media needs the same native-validated API origin as public discovery.
+// Keep metadata opt-in and limited to the exact cart endpoints; existing
+// authenticated consumers continue receiving their unmodified payload shape.
+export async function requestCustomerCartV2(path: string, method = 'GET', body?: Record<string, unknown>, guard?: CustomerSessionGuard): Promise<TransportResult> {
+  if (!/^\/api\/shared-state\/cart(?:\/finalize)?$/u.test(path)) throw new CustomerNotificationApiError('Sepet yolu geçersiz.', 0, 'CART_PATH_INVALID');
+  return await requestCustomerApiInternal(path, method, body, true, true, guard, true) as TransportResult;
 }
 
 const request = requestCustomerApi;

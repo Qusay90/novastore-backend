@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
+import { unregisterConfiguredPushProvider } from "./pushProviderGuard";
 import {
   PushNotifications,
   type ActionPerformed,
@@ -67,6 +68,7 @@ type NotificationRuntimeValue = Readonly<{
 }>;
 
 const NotificationRuntimeContext = createContext<NotificationRuntimeValue | null>(null);
+const unregisterPushProvider = () => unregisterConfiguredPushProvider(getNativeNotificationCapability, () => PushNotifications.unregister());
 const PUSH_STATUS_TEXT: Record<AndroidPushState, string> = Object.freeze({
   "not-supported": "Bu cihaz sistem bildirimlerini desteklemiyor.",
   "not-requested": "Sistem bildirimleri kapalı. İstersen güvenli biçimde açabilirsin.",
@@ -211,7 +213,7 @@ async function retireDisabledPushRegistration(token: string) {
   let providerRevoked = false;
   try { await revokeFcmToken(token, () => false); serverRevoked = true; } catch { /* provider revoke remains a safe fallback */ }
   if (!cleanupStillCurrent()) return restoreAfterStaleCleanup();
-  try { await PushNotifications.unregister(); providerRevoked = true; } catch { /* server revoke remains a safe fallback */ }
+  try { await unregisterPushProvider(); providerRevoked = true; } catch { /* server revoke remains a safe fallback */ }
   if (!cleanupStillCurrent()) return restoreAfterStaleCleanup();
   if (!pushRevocationSatisfied(true, serverRevoked, providerRevoked)) {
     throw new CustomerNotificationApiError("Geç bildirim kaydı güvenle kaldırılamadı.", 0, "ANDROID_FCM_LATE_BIND_CLEANUP_REQUIRED");
@@ -232,7 +234,7 @@ async function bindPushRegistration(pending: NonNullable<typeof pendingPushRegis
 async function retireOrphanedPushDelivery(guard = currentCustomerSessionGuard()) {
   try {
     pushProviderRestoreRequired = true;
-    await PushNotifications.unregister();
+    await unregisterPushProvider();
     if (!customerSessionMatchesGuard(guard) && hasCustomerSession()) {
       // A newer login appeared while the old provider endpoint was being
       // retired. Re-register even during its pre-/me window so the stale
@@ -448,7 +450,7 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
       await restoreAfterStaleContinuation();
       return;
     }
-    try { await PushNotifications.unregister(); providerRevoked = true; } catch { /* server revocation can still make delivery impossible */ }
+    try { await unregisterPushProvider(); providerRevoked = true; } catch { /* server revocation can still make delivery impossible */ }
     if (!stillCurrent()) {
       await restoreAfterStaleContinuation();
       return;
@@ -480,7 +482,7 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
       if (!customerSessionMatchesGuard(guard)) {
         throw new CustomerNotificationApiError("Müşteri oturumu bu sırada değişti.", 0, "CUSTOMER_SESSION_GENERATION_STALE");
       }
-      try { await PushNotifications.unregister(); providerRevoked = true; } catch { /* server revocation can still make delivery impossible */ }
+      try { await unregisterPushProvider(); providerRevoked = true; } catch { /* server revocation can still make delivery impossible */ }
       if (!customerSessionMatchesGuard(guard)) {
         // The provider operation raced with a new Customer login. Restore the
         // current generation even while /me verification is still pending.
@@ -575,7 +577,7 @@ export default function CustomerNotificationRuntime({ children }: PropsWithChild
               setPushState("error");
             } else {
               let providerRevoked = false;
-              try { await PushNotifications.unregister(); providerRevoked = true; } catch { /* handled below */ }
+              try { await unregisterPushProvider(); providerRevoked = true; } catch { /* handled below */ }
               if (!customerSessionMatchesGuard(guard)) {
                 if (!await restoreCurrentPushProvider()) setPushState("error");
                 return;
