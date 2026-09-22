@@ -55,7 +55,7 @@ const TYPES = Object.freeze({
     header: ['title', 'subtitle', 'imageKey', 'imageAssetId', 'label', 'target'],
     hero: ['title', 'subtitle', 'imageKey', 'imageAssetId', 'label', 'target'],
     text: ['title', 'text'], image: ['imageKey', 'imageAssetId', 'alt', 'target'],
-    product_grid: ['title', 'productIds', 'columns'], category_grid: ['title', 'categoryIds', 'columns'],
+    product_grid: ['title', 'productIds', 'collectionIds', 'variants', 'columns'], category_grid: ['title', 'categoryIds', 'columns'],
     footer: ['title', 'text'], campaign: ['title', 'subtitle', 'imageKey', 'imageAssetId', 'label', 'target']
 });
 const tokens = (input) => {
@@ -86,7 +86,13 @@ const props = (input, type, base = false) => {
             if (!/^\/(?:home|shop|account|cart|help|category\/[a-z0-9-]+|product\/[a-z0-9-]+)$/u.test(value)) fail('THEME_INVALID_TARGET');
         }
         if (key === 'columns') integer(value, 1, 6);
-        if (key === 'productIds' || key === 'categoryIds') {
+        if (key === 'variants') {
+            if (!Array.isArray(value) || value.length > 100) fail('THEME_INVALID_REFERENCES');
+            const seen = new Set();
+            for (const tuple of value) { keys(tuple, ['productId', 'variantId'], ['productId', 'variantId']); integer(tuple.productId); integer(tuple.variantId);
+                const identity = `${tuple.productId}:${tuple.variantId}`; if (seen.has(identity)) fail('THEME_INVALID_REFERENCES'); seen.add(identity); }
+        }
+        if (key === 'productIds' || key === 'categoryIds' || key === 'collectionIds') {
             if (!Array.isArray(value) || value.length > 100 || new Set(value).size !== value.length) fail('THEME_INVALID_REFERENCES');
             value.forEach((id) => integer(id));
         }
@@ -99,6 +105,7 @@ const assetIds = (input) => {
     return input;
 };
 const document = (input) => {
+    if (input?.schemaVersion === 2) return require('./themePlatformStudioDocument').validateBase(input);
     keys(input, ['schemaVersion', 'tokens', 'components', 'assetIds'], ['schemaVersion', 'tokens', 'components', 'assetIds']);
     if (input.schemaVersion !== 1) fail('THEME_SCHEMA_UNSUPPORTED');
     tokens(input.tokens); assetIds(input.assetIds);
@@ -115,6 +122,7 @@ const document = (input) => {
     return input;
 };
 const overrides = (input, base) => {
+    if (base?.schemaVersion === 2) return require('./themePlatformStudioDocument').validateOverrides(input, base);
     keys(input, ['tokens', 'components', 'assetIds'], ['tokens', 'components', 'assetIds']);
     tokens(input.tokens); assetIds(input.assetIds);
     if (!Array.isArray(input.components) || input.components.length > 100) fail('THEME_INVALID_COMPONENTS');
@@ -131,8 +139,9 @@ const overrides = (input, base) => {
     if (Buffer.byteLength(canonical(input)) > 100000) fail('THEME_DOCUMENT_TOO_LARGE', 413);
     return input;
 };
-const references = (input) => [...new Set([...input.assetIds, ...input.components.map((item) => item.props.imageAssetId).filter(Boolean)])];
-const artifact = (base, input) => ({
+const references = (input) => input?.studio ? require('./themePlatformStudioDocument').assetRefs(input)
+    : [...new Set([...input.assetIds, ...input.components.map((item) => item.props.imageAssetId).filter(Boolean)])];
+const artifact = (base, input) => base?.schemaVersion === 2 ? require('./themePlatformStudioDocument').merge(base, input) : ({
     schemaVersion: 1, tokens: { ...base.tokens, ...input.tokens },
     components: base.components.map((component, index) => {
         const patch = input.components.find((item) => item.componentId === component.id);

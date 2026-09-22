@@ -1,0 +1,884 @@
+{
+  "schemaVersion": 1,
+  "provenance": "ACTUAL_BROWSER",
+  "buildManifestSHA256": "0290ed9ae04cd431e5df440f21507a831b3bf2ac4966730f553f247e1fb35150",
+  "rows": [
+    {
+      "actualWidth": 320,
+      "heading": "Yeni mevsim. Atelier kabul B.",
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 305,
+      "family": "atelier",
+      "page": "home",
+      "width": 320,
+      "url": "http://atelier.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-home-320.jpg",
+        "sha256": "f43caebfa7c8c03fc618f9c39e975633b8fd3f3fdb0836d6d41f568a56ea5648"
+      }
+    },
+    {
+      "actualWidth": 360,
+      "heading": "Yeni mevsim. Atelier kabul B.",
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 345,
+      "family": "atelier",
+      "page": "home",
+      "width": 360,
+      "url": "http://atelier.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-home-360.jpg",
+        "sha256": "a27dbf786f09dcbde20e86d41c69f5e4c62bfc8dfe3d7bd920b5f1c97cc6c835"
+      }
+    },
+    {
+      "actualWidth": 390,
+      "heading": "Yeni mevsim. Atelier kabul B.",
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 375,
+      "family": "atelier",
+      "page": "home",
+      "width": 390,
+      "url": "http://atelier.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-home-390.jpg",
+        "sha256": "4c8eb769b6be73b61eeb97f059edaab3de7139d0d761545279c7c1dce5246e90"
+      }
+    },
+    {
+      "actualWidth": 430,
+      "heading": "Yeni mevsim. Atelier kabul B.",
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 415,
+      "family": "atelier",
+      "page": "home",
+      "width": 430,
+      "url": "http://atelier.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-home-430.jpg",
+        "sha256": "b15469ab033672a7a72a758c483068f21c3073647526a5ed881790434bfbf43b"
+      }
+    },
+    {
+      "actualWidth": 768,
+      "heading": "Yeni mevsim. Atelier kabul B.",
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 753,
+      "family": "atelier",
+      "page": "home",
+      "width": 768,
+      "url": "http://atelier.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-home-768.jpg",
+        "sha256": "3ec887777b10fc8b217a4f50fc31066bc4f93e2b765fe187f9ee3d945f27ef33"
+      }
+    },
+    {
+      "actualWidth": 1024,
+      "heading": "Yeni mevsim. Atelier kabul B.",
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1009,
+      "family": "atelier",
+      "page": "home",
+      "width": 1024,
+      "url": "http://atelier.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-home-1024.jpg",
+        "sha256": "546e37ed74562858df8c761bded35ba51b938d0e9b598e704f3d8c7ce1ab788d"
+      }
+    },
+    {
+      "actualWidth": 1440,
+      "heading": "Yeni mevsim. Atelier kabul B.",
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1425,
+      "family": "atelier",
+      "page": "home",
+      "width": 1440,
+      "url": "http://atelier.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-home-1440.jpg",
+        "sha256": "45f7465ef8e70732dd1459d9fb770a0d37b48756046a80b6ea1b566611abbe31"
+      }
+    },
+    {
+      "actualWidth": 320,
+      "heading": "Koleksiyonu keşfet",
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 305,
+      "family": "atelier",
+      "page": "category",
+      "width": 320,
+      "url": "http://atelier.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-category-320.jpg",
+        "sha256": "421aa910ce533f7ffa61b97b60a1dbfde6109854ff1e4aa00bd15bc6854ed507"
+      }
+    },
+    {
+      "actualWidth": 360,
+      "heading": "Koleksiyonu keşfet",
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 345,
+      "family": "atelier",
+      "page": "category",
+      "width": 360,
+      "url": "http://atelier.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-category-360.jpg",
+        "sha256": "2042e4ac15f3d87df0b75bf3dd7142ed844b5d54f62d727ba63b2a85bf667562"
+      }
+    },
+    {
+      "actualWidth": 390,
+      "heading": "Koleksiyonu keşfet",
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 375,
+      "family": "atelier",
+      "page": "category",
+      "width": 390,
+      "url": "http://atelier.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-category-390.jpg",
+        "sha256": "0fe36e68740f2d4a081070bc4beff80f02274b3031ae789ed2aa0dab9128bae9"
+      }
+    },
+    {
+      "actualWidth": 430,
+      "heading": "Koleksiyonu keşfet",
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 415,
+      "family": "atelier",
+      "page": "category",
+      "width": 430,
+      "url": "http://atelier.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-category-430.jpg",
+        "sha256": "cabb3192c56dfcaf7979ea09a4579e97f9a74a4a6486fdf48ba8481523b929a5"
+      }
+    },
+    {
+      "actualWidth": 768,
+      "heading": "Koleksiyonu keşfet",
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 753,
+      "family": "atelier",
+      "page": "category",
+      "width": 768,
+      "url": "http://atelier.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-category-768.jpg",
+        "sha256": "8d27cc59e64c90ee6e2b4e3a88ea7b51f8278beda63bc4bdac971e29e4db7d8a"
+      }
+    },
+    {
+      "actualWidth": 1024,
+      "heading": "Koleksiyonu keşfet",
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1009,
+      "family": "atelier",
+      "page": "category",
+      "width": 1024,
+      "url": "http://atelier.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-category-1024.jpg",
+        "sha256": "171c54ebca60d5f8a78cef983239bad3df3e373f7eda230708ce89ca12cb3146"
+      }
+    },
+    {
+      "actualWidth": 1440,
+      "heading": "Koleksiyonu keşfet",
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1425,
+      "family": "atelier",
+      "page": "category",
+      "width": 1440,
+      "url": "http://atelier.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-category-1440.jpg",
+        "sha256": "12cbc475915e210a335313ef612dbd4ae6432cab2173040e9155684a1a1216dd"
+      }
+    },
+    {
+      "actualWidth": 320,
+      "heading": "Ürün bilgileri",
+      "images": [
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 305,
+      "family": "atelier",
+      "page": "product",
+      "width": 320,
+      "url": "http://atelier.localhost:62213/#/product/601",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-product-320.jpg",
+        "sha256": "29ac210c78623412ad99569dfb0caf1a394f838af1daec637dd35face96b1df9"
+      }
+    },
+    {
+      "actualWidth": 360,
+      "heading": "Oversize ceket",
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 345,
+      "family": "atelier",
+      "page": "product",
+      "width": 360,
+      "url": "http://atelier.localhost:62213/#/product/601",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-product-360.jpg",
+        "sha256": "031cb8a500cdbb7e336df494c550aad910485d2a1aea52dcfdf33c93defa96a2"
+      }
+    },
+    {
+      "actualWidth": 390,
+      "heading": "Oversize ceket",
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 375,
+      "family": "atelier",
+      "page": "product",
+      "width": 390,
+      "url": "http://atelier.localhost:62213/#/product/601",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-product-390.jpg",
+        "sha256": "dfcb49acb3c258cd395df99df61307224e64fec038932b4695ec006b7bf05e41"
+      }
+    },
+    {
+      "actualWidth": 430,
+      "heading": "Oversize ceket",
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 415,
+      "family": "atelier",
+      "page": "product",
+      "width": 430,
+      "url": "http://atelier.localhost:62213/#/product/601",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-product-430.jpg",
+        "sha256": "3759f87e3415b2c6fff96e9083f723111d556119cb9e29d395842b31e249ea34"
+      }
+    },
+    {
+      "actualWidth": 768,
+      "heading": "Oversize ceket",
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 753,
+      "family": "atelier",
+      "page": "product",
+      "width": 768,
+      "url": "http://atelier.localhost:62213/#/product/601",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-product-768.jpg",
+        "sha256": "fab7b1759cede76e2547bf28547b12418fd8e8cd35abd6f56aee523ed716df82"
+      }
+    },
+    {
+      "actualWidth": 1024,
+      "heading": "Oversize ceket",
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1009,
+      "family": "atelier",
+      "page": "product",
+      "width": 1024,
+      "url": "http://atelier.localhost:62213/#/product/601",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-product-1024.jpg",
+        "sha256": "7ffaa9428865cfe529024e1b6bbfdd40a9f06f50d442e61e1af426fb605899c0"
+      }
+    },
+    {
+      "actualWidth": 1440,
+      "heading": "Oversize ceket",
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Keten gömlek",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1425,
+      "family": "atelier",
+      "page": "product",
+      "width": 1440,
+      "url": "http://atelier.localhost:62213/#/product/601",
+      "status": "PASS",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/atelier-B-verified-product-1440.jpg",
+        "sha256": "7fb39231d8c7c7a0d8e6f0062727043379abd296cea479b0c30ec532e4291d35"
+      }
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+/* Original sector tokens. Layouts live in shared/core.css. */
+:root{--badge-bg:#b54c35;--badge-ink:#fff;--primary:#b54c35;--on-primary:#fff;--accent:#b54c35;--bg:#f3f0e9;--surface:#fff;--ink:#20201e;--muted:#78766f;--border:#e4e4e1;--soft:#f1f1ed;--display-font:Georgia, serif;--radius:4px;--button-radius:2px;--heading-weight:400;}
+
+:root{--primary:#b54c35;--on-primary:#ffffff;--badge-bg:#b54c35;--badge-ink:#ffffff;--bg:#f3f0e9;--surface:#faf9f5;--ink:#20201e;--muted:#78766f;}

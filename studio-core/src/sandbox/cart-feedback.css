@@ -1,0 +1,10 @@
+.toast.is-cart-feedback{display:flex;align-items:center;gap:14px;max-width:min(480px,calc(100vw - 32px));background:#fff;color:#18263b;border:1px solid #dfe5eb;border-left:4px solid #21805a;box-shadow:0 12px 40px #12263b30;padding:18px 20px;border-radius:12px;z-index:160;visibility:hidden;bottom:calc(96px + env(safe-area-inset-bottom,0px))!important}
+.toast.is-cart-feedback{transition:opacity .18s ease;transform:translateX(-50%)!important}
+.toast.is-cart-feedback.is-visible{pointer-events:auto;visibility:visible}
+.toast.is-cart-feedback>svg{color:#21805a;flex:none}
+.toast.is-cart-feedback>span{font-size:12px;line-height:1.5;min-width:0}
+.toast.is-cart-feedback strong{display:block;font-size:15px;margin-bottom:3px}
+.toast.is-cart-feedback>a{display:flex;align-items:center;min-height:44px;font-weight:700;font-size:12px;white-space:nowrap;text-decoration:underline;padding:12px 0}
+/* Keep the unchanged NovaBot launcher and mobile navigation outside the notice. */
+@media(max-width:620px){.toast.is-cart-feedback{bottom:calc(156px + env(safe-area-inset-bottom,0px))!important;padding:14px 16px;gap:10px}body:has(.assistant-widget.has-comparison:not(.is-open)) .toast.is-cart-feedback{bottom:calc(318px + env(safe-area-inset-bottom,0px))!important}}
+@media(prefers-reduced-motion:reduce){.toast.is-cart-feedback{transition:none!important;animation:none!important}}

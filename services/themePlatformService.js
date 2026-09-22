@@ -8,7 +8,7 @@ const emptyOverrides = () => ({ tokens: {}, components: [], assetIds: [] });
 const spec = Object.freeze({
     createTheme: ['catalog.write', null], createVersion: ['version.create', null], publishVersion: ['version.create', null],
     createService: ['service.manage', null], updateService: ['service.manage', 'service'],
-    assign: ['assignment.manage', 'service'], withdraw: ['assignment.manage', 'assignment'],
+    assign: ['assignment.manage', 'service'], retryAssignmentDelivery: ['assignment.manage', 'assignment'], withdraw: ['assignment.manage', 'assignment'],
     entitlement: ['entitlement.manage', 'service'], accept: ['assignment.accept', 'assignment'],
     saveDraft: ['draft.edit', 'draft', 'theme.editor'], preview: ['preview.create', 'draft', 'theme.editor'],
     registerAsset: ['asset.register', 'service', 'theme.editor'], publication: ['publication.request', 'draft', 'theme.publish'],
@@ -36,12 +36,14 @@ const validateCommand = (action, body, params, meta) => {
     const fields = {
         createTheme: ['slug', 'name'], createVersion: ['version', 'document', 'status'], publishVersion: ['expectedRevision'],
         createService: ['storeId', ...serviceFields], updateService: ['expectedRevision', ...serviceFields],
-        assign: ['themeVersionId', 'channel'], withdraw: ['expectedRevision'], accept: ['expectedRevision'],
+        assign: ['themeVersionId', 'channel'], retryAssignmentDelivery: ['expectedRevision'], withdraw: ['expectedRevision'], accept: ['expectedRevision'],
         entitlement: ['expectedRevision', 'effect', 'quota', 'startsAt', 'expiresAt'],
         saveDraft: ['expectedRevision', 'overrides'], preview: ['expectedRevision'], registerAsset: ['bytesBase64'],
         publication: ['expectedRevision'], rollback: []
     }[action];
-    v.keys(body, [...fields, 'reason'], [...fields, 'reason']); v.text(body.reason, 240);
+    const policyFields = action === 'assign' ? ['commerceMode'] : ['saveDraft', 'preview', 'publication'].includes(action) ? ['policyRevision'] : [];
+    v.keys(body, [...fields, ...policyFields, 'reason'], [...fields, 'reason']); v.text(body.reason, 240);
+    if (body.policyRevision !== undefined) v.integer(body.policyRevision);
     if (!/^[A-Za-z0-9._:-]{8,128}$/u.test(meta.idempotencyKey || '')) v.fail('THEME_IDEMPOTENCY_KEY_REQUIRED');
     if (body.expectedRevision !== undefined) {
         v.integer(body.expectedRevision);
@@ -56,7 +58,7 @@ const validateCommand = (action, body, params, meta) => {
         v.date(body.startsAt); v.date(body.expiresAt, true);
         if (body.expiresAt && Date.parse(body.expiresAt) <= Date.parse(body.startsAt)) v.fail('THEME_INVALID_SERVICE_WINDOW');
     }
-    if (action === 'assign') { v.uuid(body.themeVersionId); v.choice(body.channel, ['web', 'app']); }
+    if (action === 'assign') { v.uuid(body.themeVersionId); v.choice(body.channel, ['web', 'app']); if (body.commerceMode !== undefined) v.choice(body.commerceMode, ['SINGLE_STORE']); }
     if (action === 'entitlement') { v.choice(body.effect, ['ALLOW', 'DENY']); if (body.quota !== null) v.integer(body.quota, 0, Number.MAX_SAFE_INTEGER); }
     if (action === 'registerAsset') v.upload(body.bytesBase64);
     return body;
@@ -89,7 +91,10 @@ const loadScope = async (client, type, params, principal) => {
     const idSelector = v.uuid(params[`${type}Id`]);
     // Ownership is in the SQL predicate before reading a resource or locking its
     // service. Full live role/session validation still runs under locks below.
-    const resource = principal.kind === 'seller'
+    const bridge = require('./themeSellerBridgeService');
+    const resource = bridge.isThemeSellerBridgePrincipal(principal)
+        ? found(await bridge.loadThemeSellerBridgeResource(client,principal,resourceTables[type],idSelector))
+        : principal.kind === 'seller'
         ? found(await one(client, `SELECT resource.* FROM ${resourceTables[type]} resource WHERE resource.id=$1
             AND EXISTS(SELECT 1 FROM seller_sessions session
                 JOIN seller_memberships member ON member.id=session.membership_id AND member.organization_id=session.organization_id
@@ -112,12 +117,13 @@ const activeService = async (client, service) => {
     const { active } = await one(client, 'SELECT $1::timestamptz<=clock_timestamp() AND ($2::timestamptz IS NULL OR $2::timestamptz>clock_timestamp()) AS active', [service.starts_at, service.expires_at]);
     if (!active) v.fail('THEME_SERVICE_EXPIRED', 403);
 };
-const effective = async (client, service, code) => {
-    const feature = await one(client, 'SELECT * FROM feature_catalog WHERE code=$1 FOR SHARE', [code]);
+const effective = async (client, service, code, {readOnly=false}={}) => {
+    const lock=readOnly?'':' FOR SHARE';
+    const feature = await one(client, `SELECT * FROM feature_catalog WHERE code=$1${lock}`, [code]);
     if (!feature || !feature.enabled) return { code, allowed: false, quota: null, reason: 'UNKNOWN_OR_DISABLED' };
-    const plan = await one(client, 'SELECT * FROM plan_feature_defaults WHERE plan=$1 AND feature_code=$2 FOR SHARE', [service.plan, code]);
+    const plan = await one(client, `SELECT * FROM plan_feature_defaults WHERE plan=$1 AND feature_code=$2${lock}`, [service.plan, code]);
     const override = await one(client, `SELECT * FROM seller_feature_entitlements WHERE service_id=$1 AND feature_code=$2
-        AND starts_at<=clock_timestamp() AND (expires_at IS NULL OR expires_at>clock_timestamp()) FOR SHARE`, [service.id, code]);
+        AND starts_at<=clock_timestamp() AND (expires_at IS NULL OR expires_at>clock_timestamp())${lock}`, [service.id, code]);
     if (override?.effect === 'DENY' || plan?.effect === 'DENY') {
         // Explicit plan deny is a policy ceiling; an absent or ALLOW default can be overridden.
         return { code, allowed: false, quota: null, reason: 'EXPLICIT_DENY' };
@@ -127,9 +133,9 @@ const effective = async (client, service, code) => {
     const allowed = source?.effect === 'ALLOW' && (feature.kind !== 'quota' || (Number.isSafeInteger(quota) && quota >= 0));
     return { code, allowed, quota, reason: allowed ? 'GRANTED' : 'NO_GRANT' };
 };
-const requireFeature = async (client, service, code) => {
+const requireFeature = async (client, service, code, options) => {
     await activeService(client, service);
-    const value = await effective(client, service, code);
+    const value = await effective(client, service, code, options);
     if (!value.allowed) v.fail('THEME_FEATURE_DENIED', 403);
     return value;
 };
@@ -138,6 +144,22 @@ const assignmentActive = async (client, draftOrAssignment) => {
         ? found(await one(client, 'SELECT * FROM theme_assignments WHERE id=$1', [draftOrAssignment.assignment_id])) : draftOrAssignment;
     if (assignment.status === 'WITHDRAWN') v.fail('THEME_ASSIGNMENT_WITHDRAWN', 409);
     return assignment;
+};
+const validateAssignableVersion = async (client, service, { themeVersionId, channel, commerceMode }) => {
+    const presentations = require('./themePlatformPresentationService');
+    presentations.requireAssignablePresentation(await presentations.loadPresentation(client, themeVersionId, channel), channel);
+    const version = found(await one(client, `SELECT v.*,p.supported_channels,p.required_capabilities
+        FROM theme_versions v JOIN themes t ON t.id=v.theme_id LEFT JOIN theme_version_packages p ON p.theme_version_id=v.id
+        WHERE v.id=$1 AND v.status='PUBLISHED' AND t.status='ACTIVE' FOR SHARE OF v,t`, [themeVersionId]));
+    if (version.document.schemaVersion === 2 && !version.supported_channels) v.fail('THEME_PACKAGE_REQUIRED', 409);
+    if (version.supported_channels) {
+        if (!version.supported_channels.includes(channel)) v.fail('THEME_CHANNEL_UNSUPPORTED');
+        const policy = require('./themePlatformExperiencePolicy');
+        for (const code of version.required_capabilities) await requireFeature(client, service, policy.CATALOG[code]?.[1] || code);
+        if (channel === 'app') await requireFeature(client, service, 'theme.mobile_customization');
+        await require('./themePlatformExperienceService').validateCommerce(client, service,
+            { theme_version_id: version.id, channel, commerce_mode: commerceMode }, version.document);
+    }
 };
 const baseForDraft = async (client, draft) => {
     const assignment = await assignmentActive(client, draft);
@@ -152,6 +174,7 @@ const ensureAssets = async (client, service, input) => {
     if (owned.length !== ids.length) v.fail('THEME_ASSET_UNAVAILABLE', 404);
 };
 const verifyOverrideFeatures = async (client, service, overrides, base) => {
+    if (base.schemaVersion === 2) return;
     for (const item of overrides.components) {
         const type = base.components.find((part) => part.id === item.componentId)?.type;
         if (type === 'header') await requireFeature(client, service, 'theme.custom_header');
@@ -196,8 +219,19 @@ const verifyStoredResult = async (client, service, operation) => {
 };
 const auditMetadata = (value) => {
     if (!value) return null;
-    const permitted = ['id', 'status', 'revision', 'policy_revision', 'theme_version_id', 'channel', 'digest', 'feature_code', 'effect', 'quota', 'plan'];
-    return Object.fromEntries(permitted.filter((key) => Object.hasOwn(value, key)).map((key) => [key, value[key]]));
+    const permitted = ['id', 'status', 'revision', 'policy_revision', 'theme_version_id', 'channel', 'digest', 'feature_code', 'effect', 'quota', 'plan', 'profile_code', 'commerce_mode'];
+    const metadata = Object.fromEntries(permitted.filter((key) => Object.hasOwn(value, key)).map((key) => [key, value[key]]));
+    if (Object.hasOwn(value, 'editor_policy')) {
+        // Only verified feature decisions belong in policy audit snapshots. Never
+        // admit arbitrary draft overrides, text, credentials or asset payloads.
+        const input = value.editor_policy, policy = require('./themePlatformExperiencePolicy');
+        v.keys(input, ['capabilities', 'overrides', 'profile_revision']);
+        if (Object.hasOwn(input, 'capabilities')) policy.validateStates(input.capabilities);
+        if (Object.hasOwn(input, 'overrides')) policy.validateOverrides(input.overrides);
+        if (Object.hasOwn(input, 'profile_revision')) v.integer(input.profile_revision);
+        metadata.editor_policy = structuredClone(input);
+    }
+    return metadata;
 };
 const auditReason = (reason) => reason
     .replace(/\bBearer\s+\S+/giu, 'Bearer [REDACTED]')
@@ -252,9 +286,35 @@ const createThemePlatformService = (database) => {
                 const proposed = action === 'saveDraft' ? body.overrides : resource.overrides;
                 v.overrides(proposed, version.document);
                 await verifyOverrideFeatures(client, service, proposed, version.document);
+                const configured = (await client.query('SELECT service_id FROM theme_service_experiences WHERE service_id=$1', [service.id])).rowCount;
+                if (configured || version.document.schemaVersion === 2) {
+                    const policy = require('./themePlatformExperiencePolicy');
+                    if (action === 'saveDraft') await policy.enforceDraftPolicy(client, service, actor, resource, version.document, proposed, body.policyRevision, assignment.channel);
+                    else {
+                        if (Number(service.policy_revision) !== body.policyRevision) v.fail('THEME_POLICY_REVISION_CONFLICT', 409);
+                        const current = await policy.effectivePolicy(client, service, actor);
+                        policy.requireCapability(current, action === 'preview' ? 'theme.preview' : 'theme.publish');
+                    }
+                    await require('./themePlatformExperienceService').validateCommerce(client, service, assignment, v.artifact(version.document, proposed));
+                }
             }
-            if (action === 'registerAsset') await requireFeature(client, service, 'theme.asset_bytes');
+            if (action === 'registerAsset') {
+                await requireFeature(client, service, 'theme.asset_bytes');
+                if ((await client.query('SELECT service_id FROM theme_service_experiences WHERE service_id=$1', [service.id])).rowCount) {
+                    const policy = require('./themePlatformExperiencePolicy');
+                    policy.requireCapability(await policy.effectivePolicy(client, service, actor), 'theme.assets');
+                }
+            }
             if (action === 'accept') await assignmentActive(client, resource);
+            if (action === 'assign') {
+                await validateAssignableVersion(client, service, { ...body, commerceMode: 'SINGLE_STORE' });
+            }
+            if (action === 'retryAssignmentDelivery') {
+                await activeService(client, service); await assignmentActive(client, resource);
+                if (resource.commerce_mode !== 'SINGLE_STORE') v.fail('THEME_ASSIGNMENT_MODE_UNSUPPORTED', 409);
+                await validateAssignableVersion(client, service, { themeVersionId: resource.theme_version_id,
+                    channel: resource.channel, commerceMode: resource.commerce_mode });
+            }
             const scopeKey = service?.id || 'global';
             const requestHash = v.digest({ action, params, body });
             await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`theme:${scopeKey}:${actor.actorId}:${meta.idempotencyKey}`]);
@@ -297,16 +357,26 @@ const createThemePlatformService = (database) => {
                 target = { type: 'seller_theme_service', id: result.id };
             } else if (action === 'assign') {
                 await activeService(client, service);
-                found(await one(client, `SELECT version.id FROM theme_versions version JOIN themes theme ON theme.id=version.theme_id
+                const assignedVersion = found(await one(client, `SELECT version.id,version.document FROM theme_versions version JOIN themes theme ON theme.id=version.theme_id
                     WHERE version.id=$1 AND version.status='PUBLISHED' AND theme.status='ACTIVE' FOR SHARE`, [body.themeVersionId]));
-                const assignment = await one(client, `INSERT INTO theme_assignments(id,service_id,organization_id,store_id,theme_version_id,channel)
-                    VALUES($1,$2,$3,$4,$5,$6) RETURNING *`, [crypto.randomUUID(), ...scope(service), body.themeVersionId, body.channel]);
-                const overrides = emptyOverrides();
+                const assignment = await one(client, `INSERT INTO theme_assignments(id,service_id,organization_id,store_id,theme_version_id,channel,commerce_mode)
+                    VALUES($1,$2,$3,$4,$5,$6,'SINGLE_STORE') RETURNING *`, [crypto.randomUUID(), ...scope(service), body.themeVersionId, body.channel]);
+                const overrides = assignedVersion.document.schemaVersion === 2 ? { studio: {} } : emptyOverrides();
                 const draft = await one(client, `INSERT INTO theme_drafts(id,service_id,organization_id,store_id,assignment_id,overrides)
                     VALUES($1,$2,$3,$4,$5,$6) RETURNING *`, [crypto.randomUUID(), ...scope(service), assignment.id, overrides]);
                 await client.query(`INSERT INTO theme_draft_revisions(id,service_id,organization_id,store_id,draft_id,revision,overrides,digest)
                     VALUES($1,$2,$3,$4,$5,1,$6,$7)`, [crypto.randomUUID(), ...scope(service), draft.id, overrides, v.digest(overrides)]);
-                result = { assignment, draft }; target = { type: 'theme_assignment', id: assignment.id }; event = 'theme.assigned';
+                result = { assignment, draft, delivery:await require('./themeStockyDeliveryService').enqueueAssignment(client,{service,assignment,operationId}) };
+                target = { type: 'theme_assignment', id: assignment.id }; event = 'theme.assigned';
+            } else if (action === 'retryAssignmentDelivery') {
+                checkRevision(resource, body.expectedRevision);
+                if (await one(client, 'SELECT 1 AS present FROM theme_stocky_deliveries WHERE assignment_id=$1 LIMIT 1', [resource.id])) {
+                    v.fail('THEME_DELIVERY_ALREADY_QUEUED', 409);
+                }
+                const delivery = await require('./themeStockyDeliveryService').enqueueAssignment(client, { service, assignment: resource, operationId });
+                if (delivery.state !== 'DELIVERY_PENDING') v.fail('THEME_STOCKY_CONNECTION_REQUIRED', 409);
+                result = { assignment: resource, delivery };
+                target = { type: 'theme_assignment', id: resource.id }; event = 'theme.assignment.delivery.retried';
             } else if (action === 'withdraw' || action === 'accept') {
                 checkRevision(resource, body.expectedRevision); await assignmentActive(client, resource);
                 const nextStatus = action === 'accept' ? 'ACCEPTED' : 'WITHDRAWN';
@@ -315,6 +385,9 @@ const createThemePlatformService = (database) => {
                     accepted_at=CASE WHEN $2='ACCEPTED' THEN clock_timestamp() ELSE accepted_at END,
                     withdrawn_at=CASE WHEN $2='WITHDRAWN' THEN clock_timestamp() ELSE withdrawn_at END WHERE id=$1 RETURNING *`, [resource.id, nextStatus]);
                 target = { type: 'theme_assignment', id: resource.id };
+                if (action==='withdraw' && (await one(client,'SELECT 1 AS present FROM theme_stocky_deliveries WHERE assignment_id=$1 LIMIT 1',[resource.id]))) {
+                    await require('./themeStockyDeliveryService').enqueueAssignment(client,{service,assignment:result,operationId,revoked:true});
+                }
             } else if (action === 'entitlement') {
                 checkRevision(service, body.expectedRevision, 'policy_revision');
                 const catalog = found(await one(client, 'SELECT * FROM feature_catalog WHERE code=$1 FOR SHARE', [params.featureCode]));
@@ -362,7 +435,7 @@ const createThemePlatformService = (database) => {
             } else if (action === 'registerAsset') {
                 const media = v.upload(body.bytesBase64);
                 const capacity = await requireFeature(client, service, 'theme.asset_bytes');
-                const used = await one(client, "SELECT COALESCE(SUM(byte_size),0) AS total FROM theme_assets WHERE service_id=$1 AND status<>'REJECTED'", [service.id]);
+                const used = await one(client, "SELECT COALESCE(SUM(byte_size),0) AS total FROM theme_assets WHERE service_id=$1 AND (status<>'REJECTED' OR storage_backend='local-v1')", [service.id]);
                 if (Number(used.total) + media.byteSize > capacity.quota) v.fail('THEME_ASSET_QUOTA_EXCEEDED', 403);
                 const id = crypto.randomUUID();
                 result = await one(client, `INSERT INTO theme_assets(id,service_id,organization_id,store_id,detected_mime,byte_size,digest,storage_key,status)
@@ -419,13 +492,17 @@ const createThemePlatformService = (database) => {
         if (action === 'operation') {
             if (principal.kind === 'seller' && resource.actor_id !== actor.actorId) v.fail('THEME_RESOURCE_NOT_FOUND', 404);
             // Avoid exposing stored draft/asset/entitlement mutation payloads through a lower permission.
-            const required = spec[resource.type];
+            const required = spec[resource.type] || require('./themePlatformExperienceService').spec[resource.type];
             if (!required) v.fail('THEME_RESOURCE_NOT_FOUND', 404);
             await authorize(client, principal, required[0], service);
             if (principal.kind === 'seller' && required[2]) await requireFeature(client, service, required[2]);
             await verifyStoredResult(client, service, resource);
             return { id: resource.id, status: resource.status, type: resource.type, attempts: resource.attempts,
-                failureReason: resource.failure_reason, correlationId: resource.correlation_id, result: resource.result };
+                failureReason: resource.failure_reason, correlationId: resource.correlation_id, result: resource.result,
+                themeDelivery: await rows(client,`SELECT d.outbox_id AS "eventId",d.status,d.result_id AS "resultId",
+                    d.delivered_at AS "deliveredAt",d.acknowledged_at AS "acknowledgedAt",d.last_error_code AS "errorCode"
+                    FROM theme_stocky_deliveries d JOIN theme_outbox o ON o.id=d.outbox_id
+                    WHERE o.operation_id=$1 AND o.service_id=$2 ORDER BY d.created_at,d.outbox_id`,[resource.id,service?.id || null]) };
         }
         if (action === 'preview') {
             await verifyPreview(client, service, resource);
@@ -460,4 +537,5 @@ const createThemePlatformService = (database) => {
     return Object.freeze({ execute, read, receiveInbox });
 };
 
-module.exports = Object.freeze({ createThemePlatformService, effective, requireFeature, transaction, validateCommand, spec, readSpec });
+module.exports = Object.freeze({ createThemePlatformService, effective, requireFeature, transaction, validateCommand, spec, readSpec,
+    one, rows, found, scope, checkRevision, loadScope, activeService, baseForDraft, ensureAssets, assignmentActive, appendAudit, addOutbox });

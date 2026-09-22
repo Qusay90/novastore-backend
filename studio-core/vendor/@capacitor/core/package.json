@@ -1,0 +1,37 @@
+{
+  "name": "@capacitor/core",
+  "version": "8.4.2",
+  "description": "Capacitor: Cross-platform apps with JavaScript and the web",
+  "homepage": "https://capacitorjs.com",
+  "author": "Ionic Team <hi@ionic.io> (https://ionic.io)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ionic-team/capacitor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ionic-team/capacitor/issues"
+  },
+  "files": [
+    "dist/",
+    "types/",
+    "cookies.md",
+    "cordova.js",
+    "http.md",
+    "system-bars.md"
+  ],
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.js",
+  "types": "types/index.d.ts",
+  "unpkg": "dist/capacitor.js",
+  "dependencies": {
+    "tslib": "^2.1.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testRunner": "jest-jasmine2"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

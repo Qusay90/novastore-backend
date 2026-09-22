@@ -40,6 +40,9 @@ const {
     startStockyOrderDeliveryWorker,
     stopStockyOrderDeliveryWorker
 } = require('./services/stockyOrderDeliveryWorkerService');
+const { resolveThemeDeliveryRuntime } = require('./services/themeStockyDeliveryService');
+const { startThemeDeliveryWorker } = require('./services/themeStockyDeliveryWorkerService');
+let themeDeliveryWorker = null;
 const {
     startNotificationWorker,
     stopNotificationWorker
@@ -155,7 +158,20 @@ io.on('connection', (socket) => {
 // Middleware
 app.use(requestContext);
 app.use(stagingAccessGate);
+const themePlatformEnabled = String(process.env.NOVASTORE_THEME_PLATFORM_ENABLED || '').toLowerCase() === 'true';
+const themeRuntimeComposition=require('./services/themePlatformRuntimeComposition').createThemeRuntimeComposition({database:pool});
+const { createThemeStorefrontHostGuard } = require('./services/themePlatformCommerceService');
+app.use(createThemeStorefrontHostGuard({ database: pool, enabled: themePlatformEnabled,
+    servePublished:themeRuntimeComposition.serve,
+    trustedPlatformHosts: String(process.env.NOVASTORE_THEME_PLATFORM_TRUSTED_HOSTS || 'localhost,127.0.0.1,[::1]').split(',').map(value => value.trim()).filter(Boolean) }));
 app.use(cors(corsOptions));
+// Large parsing is confined to authenticated Theme Platform import/upload routes;
+// all other existing API bodies retain their established 1 MiB boundary.
+if (themePlatformEnabled) {
+    app.use('/api/admin/theme-platform/experience/packages', require('./middlewares/authMiddleware').authenticateAdmin, express.json({ limit: '24mb' }));
+    app.use(/^\/api\/(?:admin|seller\/v1)\/theme-platform\/services\/[a-f0-9-]+\/stored-assets$/u, express.json({ limit: '7mb' }));
+}
+app.use('/api/theme-seller-bridge/dispatch', express.json({ limit: '7mb',verify:(req,_res,bytes)=>{req.themeBridgeBodyBytes=bytes.length;} }));
 app.use(express.json({ limit: '1mb' }));
 app.use(sanitizeBody);
 app.use(simpleRateLimit({ windowMs: 60 * 1000, max: 240 }));
@@ -218,6 +234,47 @@ const setDenyFrameHeaders = (res) => {
     res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
     res.setHeader('X-Frame-Options', 'DENY');
 };
+
+if (themePlatformEnabled) {
+    // A nested workshop session must return to the existing root Admin login.
+    // No user supplied next/URL is forwarded by this fallback.
+    app.get('/studio-pro/admin-login.html', (_req, res) => {
+        setDenyFrameHeaders(res);
+        res.set('Cache-Control', 'private, no-store');
+        res.redirect(302, '/admin-login.html?reason=session-expired&next=admin-commerce-pro-live.html');
+    });
+    // The complete original authoring UI opens in a new tab. Its own preview
+    // frames and trusted, source-preserved gallery need same-origin framing.
+    // Only the seller-offers panel uses the authenticated Admin API adapter.
+    app.use('/studio-pro', (req, res, next) => {
+        res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; frame-src 'self' blob:; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'");
+        res.set('X-Frame-Options', 'SAMEORIGIN');
+        res.set('X-Content-Type-Options', 'nosniff');
+        res.set('Referrer-Policy', 'no-referrer');
+        res.set('Cache-Control', 'private, no-store');
+        next();
+    }, express.static(path.join(__dirname, 'studio-core', 'dist-workshop'), { index: 'index.html' }));
+    // Only the dedicated Studio entries permit same-origin embedding. Existing
+    // Admin, storefront and payment frame-deny policies remain unchanged.
+    app.use('/theme-studio', (req, res, next) => {
+        res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https:; font-src 'self'; connect-src 'self'; frame-src 'self' blob:; frame-ancestors 'self'; object-src 'none'; base-uri 'self'");
+        res.set('X-Frame-Options', 'SAMEORIGIN');
+        res.set('Cache-Control', 'private, no-store');
+        next();
+    }, express.static(path.join(__dirname, 'studio-core', 'dist'), { index: 'index.html' }));
+    app.use('/seller-theme', (req, res, next) => { setDenyFrameHeaders(res); res.set('Cache-Control', 'private, no-store'); next(); },
+        express.static(path.join(__dirname, 'seller-theme-web', 'dist'), { index: 'index.html' }));
+    app.get('/admin-commerce-pro-live.html', (_req, res) => {
+        setDenyFrameHeaders(res); res.set('Cache-Control', 'private, no-store');
+        res.sendFile(path.join(__dirname, 'admin-commerce-pro', 'dist-integrated', 'integrated.html'));
+    });
+    app.use('/assets', express.static(path.join(__dirname, 'admin-commerce-pro', 'dist-integrated', 'assets')));
+    for (const assetName of ['icons.js', 'favicon-96x96.png']) {
+        app.get(`/${assetName}`, (_req, res) => {
+            res.sendFile(path.join(__dirname, 'admin-commerce-pro', 'dist-integrated', assetName));
+        });
+    }
+}
 
 const sendCommerceProStorefront = (res) => {
     setDenyFrameHeaders(res);
@@ -459,9 +516,23 @@ const { assertRuntimeDatabaseIdentity } = require('./services/runtimeDatabaseIde
 const { createSellerTransportSecurityMiddleware } = require('./middlewares/sellerTransportSecurity');
 const configuredBindHost = String(process.env.NOVASTORE_BIND_HOST || '').trim();
 // Additive, default-off foundation. This flag never runs migrations or publishes themes.
-const themePlatformEnabled = String(process.env.NOVASTORE_THEME_PLATFORM_ENABLED || '').toLowerCase() === 'true';
 const { createAdminThemeRouter, createSellerThemeRouter } = require('./routes/themePlatformRoutes');
-app.use('/api/admin/theme-platform', createAdminThemeRouter({ database: pool, enabled: themePlatformEnabled }));
+app.use('/api/admin/theme-platform', createAdminThemeRouter({ database: pool, enabled: themePlatformEnabled,composition:themeRuntimeComposition }));
+const themeDeliveryRuntime = resolveThemeDeliveryRuntime({ environment: process.env, startupSafety });
+const themeSellerBridgeEnabled = themePlatformEnabled && themeDeliveryRuntime.enabled
+    && process.env.NOVASTORE_STOCKY_THEME_SELLER_BRIDGE_ENABLED === 'true';
+app.use('/api/theme-seller-bridge', require('./routes/themeSellerBridgeRoutes').createThemeSellerBridgeRouter({
+    database: pool, enabled: themeSellerBridgeEnabled, runtime: themeDeliveryRuntime
+}));
+app.use('/api/theme-storefront', require('./routes/themeStorefrontRoutes').createThemeStorefrontRouter({ database: pool, enabled: themePlatformEnabled,
+    customerRuntimeAuthority:themeRuntimeComposition.customerRuntimeAuthority,
+    referenceAdapter: document => require('./services/themePlatformStudioDocument').commerceReferences(document),
+    assetReader: async (client, scope, assetId) => {
+        const asset = (await client.query("SELECT * FROM theme_assets WHERE id=$1 AND service_id=$2 AND status='READY' AND storage_backend='local-v1'", [assetId, scope.service_id])).rows[0];
+        if (!asset) throw Object.assign(new Error('THEME_ASSET_UNAVAILABLE'), { code: 'THEME_ASSET_UNAVAILABLE', statusCode: 404 });
+        const storage = require('./services/themePlatformAssetStorage').createThemeAssetStorage({ rootDir: process.env.NOVASTORE_THEME_ASSET_ROOT });
+        return { bytes: await storage.readOwned({ serviceId: scope.service_id, storageKey: asset.storage_key, digest: asset.digest }), mimeType: asset.detected_mime };
+    } }));
 const sellerApiActivation = resolveSellerApiActivationPolicy({
     environment: process.env,
     startupSafety,
@@ -671,14 +742,18 @@ const start = async () => {
         });
         console.log(`Veritabani hedefi: ${startupSafety.target.label}`);
         await prepareDatabase(startupSafety, stockyCommerceRuntime);
-        if ((sellerApiActivation.requiresConnectedDatabaseIdentity || stockyCommerceRuntime.enabled)
+        if ((sellerApiActivation.requiresConnectedDatabaseIdentity || stockyCommerceRuntime.enabled || themeDeliveryRuntime.enabled)
             && !startupSafety.shouldVerifyDbConnection) {
             throw new Error('RUNTIME_DATABASE_IDENTITY_REQUIRED');
         }
-        if (sellerApiActivation.requiresConnectedDatabaseIdentity || stockyCommerceRuntime.enabled) {
+        if (sellerApiActivation.requiresConnectedDatabaseIdentity || stockyCommerceRuntime.enabled || themeDeliveryRuntime.enabled) {
             await assertRuntimeDatabaseIdentity({ database: pool, target: startupSafety.target });
         }
         configureSellerRoutes();
+        if (themeDeliveryRuntime.enabled) {
+            const schema = (await pool.query("SELECT to_regclass('theme_stocky_deliveries') IS NOT NULL AS delivery, to_regclass('theme_seller_bridge_sessions') IS NOT NULL AS bridge")).rows[0];
+            if (!schema?.delivery || (themeSellerBridgeEnabled && !schema?.bridge)) throw new Error('THEME_DELIVERY_SCHEMA_REQUIRED');
+        }
         if (!startupSafety.localPreviewMode) await socketRevocationService.start();
         if (startupSafety.shouldVerifyDbConnection) {
             startNotificationWorker({ database: pool, getIo: () => io });
@@ -687,6 +762,7 @@ const start = async () => {
                 runtime: stockyCommerceRuntime,
                 environment: process.env
             });
+            themeDeliveryWorker = startThemeDeliveryWorker({ database: pool, runtime: themeDeliveryRuntime });
         }
     } catch (err) {
         console.error('Veritabani hazirlama hatasi:', pool.formatError(err));
@@ -708,6 +784,7 @@ const shutdown = () => {
     if (shutdownPromise) return shutdownPromise;
     shutdownPromise = (async () => {
         stopStockyOrderDeliveryWorker();
+        await themeDeliveryWorker?.stop();
         stopNotificationWorker();
         await socketRevocationService.stop();
         await new Promise((resolve) => {

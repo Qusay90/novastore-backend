@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "sourcePackage": "theme-platform/packages/nova-classic-studio-web.json",
+  "sourcePackageSha256": "5127e0051828c8d41d928c1267361d8bc419a1be3d0ad7b13928fcb26693ce2a",
+  "target": "theme-platform/packages/nova-classic-studio-web-v1_1.json",
+  "targetSha256": "0d496a48cc7eeec11590b9956b24de555946da5875014017e4d24a15ff437a33",
+  "presentation": {
+    "id": "nova-classic",
+    "version": "1.0.0",
+    "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668"
+  },
+  "sourceFiles": [
+    {
+      "path": "themes/15-nova-classic/theme.js",
+      "sha256": "1ec6e19a513d5b7d67e977d06d528251f82ced35aa1a61ddeafb017622c940e1",
+      "bytes": 9637
+    },
+    {
+      "path": "themes/15-nova-classic/theme.css",
+      "sha256": "0e8844a79a87a5cf0f110cf2562a3313add1ddc9b696dbafd10a8b69ee19152c",
+      "bytes": 350
+    },
+    {
+      "path": "shared/core.js",
+      "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+      "bytes": 2569934
+    },
+    {
+      "path": "shared/core.css",
+      "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+      "bytes": 430940
+    },
+    {
+      "path": "shared/support-contract.js",
+      "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+      "bytes": 12873
+    },
+    {
+      "path": "shared/theme-host-bridge.js",
+      "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+      "bytes": 20105
+    }
+  ],
+  "mapping": "Original Classic presentation registry and typed editable hero/category/product/story slots; no demo commerce records or executable HTML/JS/CSS supplied by the package.",
+  "immutableUpgrade": "1.0.0-wave2 remains unchanged. Import 1.1.0-wave2 as a new theme_version and create a new offer/assignment explicitly."
+}

@@ -1,0 +1,105 @@
+:root {
+  --novastore-safe-top: 24px;
+  --novastore-safe-right: 0px;
+  --novastore-safe-bottom: 24px;
+  --novastore-safe-left: 0px;
+  --novastore-ime-height: 0px;
+  background: #f8f8f9;
+}
+
+html[data-novastore-runtime="native"],
+html[data-novastore-runtime="native"] body,
+html[data-novastore-runtime="native"] #root {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  background: #f8f8f9;
+  overscroll-behavior: none;
+}
+
+.native-mobile-runtime,
+.native-mobile-screen,
+.native-mobile-viewport {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.native-mobile-runtime {
+  background: #f8f8f9;
+  padding: 0 var(--novastore-safe-right) 0 var(--novastore-safe-left);
+}
+
+.native-mobile-screen {
+  top: var(--novastore-safe-top);
+  bottom: 0;
+  height: auto;
+  background: #f8f8f9;
+  isolation: isolate;
+}
+
+.native-mobile-viewport {
+  min-width: 0;
+}
+
+.native-mobile-runtime .cal-app {
+  --shell-status-safe-top: 0px;
+  --shell-content-top: max(8px, calc(34px - var(--novastore-safe-top)));
+  --shell-safe-bottom: var(--novastore-safe-bottom);
+  --shell-content-bottom-reserve: calc(83px + var(--novastore-safe-bottom));
+  --shell-sticky-bottom: calc(8px + var(--novastore-safe-bottom));
+}
+
+.native-mobile-runtime .mobile-scroll {
+  touch-action: pan-y;
+  user-select: auto;
+  overscroll-behavior-y: contain;
+}
+
+.native-mobile-runtime .mobile-carousel {
+  touch-action: none;
+}
+
+.native-mobile-runtime .cal-app :focus-visible {
+  outline: 2px solid var(--nova-deep) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.96) !important;
+}
+
+.native-mobile-runtime .cal-app :is(.search-field, .support-search, .composer) > input:focus,
+.native-mobile-runtime .cal-app :is(.search-field, .support-search, .composer) > input:focus-visible,
+.native-mobile-runtime .cal-app .store-search-field > input:focus,
+.native-mobile-runtime .cal-app .store-search-field > input:focus-visible {
+  outline: 0 !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
+.native-mobile-runtime .cal-app[data-focus-modality="keyboard"]
+  :is(.search-field, .support-search, .composer):has(> input:focus-visible) {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.96), 0 0 0 4px var(--nova-deep);
+}
+
+.native-mobile-runtime .bottom-sheet {
+  bottom: max(var(--novastore-safe-bottom), var(--novastore-ime-height));
+}
+
+@media (orientation: landscape) {
+  .native-mobile-runtime::before {
+    position: absolute;
+    z-index: 10000;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 32px;
+    color: #061e45;
+    background: #f8f8f9;
+    content: "NovaStore V4.13 dikey kullanım için hazırlanmıştır.";
+    text-align: center;
+    font: 600 18px/1.4 "Nova Lato", sans-serif;
+  }
+}

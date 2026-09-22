@@ -1,0 +1,100 @@
+@import './theme-families.css';
+/* Only the isolated copy is configurable. The V4.13 layout and assets remain authoritative. */
+.cal-app .home-hero,.cal-app .category-tile,.cal-app .product-image-wrap{border-radius:var(--trial-radius,12px)}
+.cal-app .trial-campaign-module + .trial-campaign-module{margin-top:14px}
+.trial-campaign-hero .trial-home-carousel{height:100%;overflow-x:auto;overflow-y:hidden}
+.trial-campaign-hero .mobile-carousel-content{height:100%}
+.trial-campaign-slide{height:100%;min-height:0;border:0;padding:0;background:transparent;display:block;flex-shrink:0;overflow:hidden}
+.trial-campaign-slide>img{width:100%;height:100%;object-fit:cover}
+/* This legacy raster already contains three dots. Crop its lower 12% through
+   framing; uploaded campaign images retain their original framing. */
+.trial-campaign-slide>img[src="/media/android-home-hero.png"],
+.trial-campaign-slide>img[src="/calibration-assets/extracts/home-hero.png"]{transform:scale(1.13);transform-origin:center top}
+.trial-carousel-dots{gap:2px;right:13px;bottom:7px}
+.trial-carousel-dots>button{position:relative;display:grid;place-items:center;min-width:24px;width:24px;height:24px;border:0;background:transparent;padding:0}
+.trial-carousel-dots>button:after{content:'';display:block;width:6px;height:6px;border-radius:50%;background:white}
+.trial-carousel-dots>button.is-active:after{background:var(--nova-orange)}
+.trial-campaign-copy,.trial-content-copy{padding:15px 2px 4px}
+.trial-campaign-copy>small,.trial-content-copy>small{display:block;font-size:calc(9px * var(--trial-font-scale,1));color:var(--nova-orange-text);letter-spacing:.08em;font-weight:600;margin-bottom:7px}
+.trial-campaign-copy>h2,.trial-content-copy>h2{font-size:calc(20px * var(--trial-font-scale,1));line-height:1.15;margin:0 0 9px;color:var(--nova-text)}
+.trial-campaign-copy>p,.trial-content-copy>p{color:#66768c;font-size:calc(12px * var(--trial-font-scale,1));line-height:1.65}
+.trial-campaign-copy>.primary{display:inline-flex;gap:12px;align-items:center;margin:14px 0 7px;min-height:42px;padding:10px 16px;background:var(--nova-deep);color:var(--trial-on-deep,#fff);font-size:12px;line-height:1.4}
+.trial-campaign-copy>.primary>svg{width:17px;height:17px}
+.trial-content-module{margin-top:18px;border-radius:var(--trial-radius,12px);overflow:hidden;background:#ffffffa6;border:1px solid #fff}
+.trial-module-image{display:block;width:100%;height:168px;border:0;padding:0;background:transparent}
+.trial-module-image img{display:block;width:100%;height:100%;object-fit:cover}
+.trial-content-copy{padding:16px 18px}
+.trial-content-action{display:inline-flex;align-items:center;gap:12px;min-height:40px;margin-top:8px;padding:3px 0;border:0;background:none;color:var(--nova-deep);font-size:calc(12px * var(--trial-font-scale,1));font-weight:600}
+.trial-content-action>svg{width:17px;height:17px;color:var(--nova-orange)}
+.trial-info-body{white-space:pre-wrap;line-height:1.8;font-size:14px}
+.trial-category-module>.section-title{margin-bottom:0}
+.trial-category-kicker{font-size:9px;color:var(--nova-orange-text);letter-spacing:.08em;margin-top:18px}
+.trial-category-description{font-size:11px;color:#66768c;margin:0 0 10px}
+.category-mosaic.trial-flexible-mosaic{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none;grid-auto-rows:130px}
+.trial-flexible-mosaic .category-tile{grid-column:auto;grid-row:auto}
+.cal-app.trial-compact .home-hero{height:188px}
+.cal-app.trial-compact .category-mosaic{grid-template-rows:99px 100px 78px}
+.cal-app.trial-compact .section-title{margin-top:22px}
+.cal-app.trial-no-motion *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+/* Keep full category names readable in the four narrow phone tiles. */
+@container (max-width:430px){
+  .category-mosaic:not(.trial-flexible-mosaic) :is(.tile-2,.tile-3,.tile-4,.tile-5)>b{top:8px;right:8px;bottom:auto}
+}
+/* Studio controls extend the copied app; the system font keeps its source typography. */
+.cal-app:not([data-trial-font="system"]) :is(button,input,textarea,select,h1,h2,h3,p,span,small,strong,summary,div){font-family:var(--trial-font-family)!important}
+.cal-app[data-show-search="false"] .glass-topbar button[aria-label="Ara"]{visibility:hidden;pointer-events:none}
+.cal-app[data-show-rating="false"] .product-card .rating{display:none}
+.cal-app[data-show-brand="false"] .product-copy>small{display:none}
+.cal-app[data-show-discount="false"] .product-card :is(.discount-badge,.price>del){display:none}
+.cal-app[data-show-quick-add="false"] .product-card :is(.add-cart,.cart-cutout-shadow){display:none}
+.cal-app[data-show-quick-add="false"] .product-copy:before{clip-path:none}
+.cal-app .product-copy:before,.cal-app .cart-cutout-shadow>i{background:var(--trial-surface)}
+.cal-app .product-card{border-color:var(--nova-line)}
+.trial-editable-module[data-custom-text="true"] :is(.product-title-action,.price,.trial-content-action){color:var(--trial-block-text)}
+.cal-app .product-media{aspect-ratio:var(--trial-image-ratio) / 1}
+.cal-app:not([data-image-ratio="square"]) .product-card{aspect-ratio:auto}
+.cal-app[data-trial-shadow="none"] :is(.product-card,.trial-content-module,.trial-rich-copy,.trial-template-intro){box-shadow:none}
+.cal-app[data-trial-shadow="strong"] :is(.product-card,.trial-content-module,.trial-rich-copy){box-shadow:0 12px 28px color-mix(in srgb,var(--nova-deep) 20%,transparent)}
+.cal-app[data-trial-button="outline"] .primary{background:transparent;color:var(--nova-deep);border:1px solid var(--nova-deep);box-shadow:none}
+.cal-app[data-trial-button="soft"] .primary{background:color-mix(in srgb,var(--nova-orange) 13%,var(--nova-page));color:var(--nova-deep);border:1px solid transparent;box-shadow:none}
+.trial-editable-module{position:relative;border-radius:var(--trial-radius,12px);color:var(--trial-block-text,var(--nova-text))}
+.trial-editable-module[data-custom-background="true"]>.trial-content-module{background:transparent;border-color:transparent}
+.trial-editable-module[data-custom-text="true"] :is(.trial-content-copy,.trial-rich-copy,.trial-campaign-copy,.section-title,.trial-category-description){color:inherit}
+.trial-editable-module[data-custom-text="true"] :is(h1,h2,h3,p,small){color:inherit}
+.cal-app[data-studio="true"] [data-module-id]:hover{outline:2px solid #4b6eff;outline-offset:-2px;cursor:pointer}
+.trial-rich-copy{padding:18px 16px;border-radius:var(--trial-radius,12px);color:inherit}
+.trial-rich-kicker{display:block;color:var(--nova-orange-text);font-size:calc(9px * var(--trial-font-scale));letter-spacing:.09em;margin-bottom:9px;font-weight:600}
+.trial-rich-copy>h2{font-size:calc(20px * var(--trial-font-scale) * var(--trial-heading-scale));line-height:1.18;margin:0 0 12px;color:inherit}
+.trial-rich-copy>p{font-size:calc(12px * var(--trial-font-scale));line-height:1.7;color:var(--nova-muted);white-space:pre-wrap}
+.trial-faq{margin-top:18px;border-top:1px solid var(--nova-line)}
+.trial-faq details{border-bottom:1px solid var(--nova-line)}
+.trial-faq summary{display:flex;gap:10px;align-items:center;justify-content:space-between;cursor:pointer;list-style:none;padding:15px 0;font-size:calc(12px * var(--trial-font-scale));font-weight:600;text-align:left}
+.trial-faq summary::-webkit-details-marker{display:none}
+.trial-faq summary>svg{flex-shrink:0;color:var(--nova-orange)}
+.trial-faq details[open] summary>svg{transform:rotate(45deg)}
+.trial-faq details>p{padding-bottom:17px;text-align:left;font-size:calc(12px * var(--trial-font-scale));line-height:1.7;color:var(--nova-muted);white-space:pre-wrap}
+.trial-feature-grid,.trial-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:calc(15px * var(--trial-spacing));margin-top:20px}
+.trial-feature-grid article{padding:16px 11px;background:var(--trial-surface);border:1px solid var(--nova-line);border-radius:var(--trial-radius);text-align:left}
+.trial-feature-grid article>svg{width:24px;height:24px;color:var(--nova-orange);margin-bottom:12px}
+.trial-feature-grid h3,.trial-stat-grid h3{font-size:calc(12px * var(--trial-font-scale));line-height:1.4;margin:0 0 7px}
+.trial-feature-grid p,.trial-stat-grid p{font-size:calc(10px * var(--trial-font-scale));line-height:1.65;color:var(--nova-muted);white-space:pre-wrap}
+.trial-stat-grid article{padding:18px 10px;border-left:2px solid var(--nova-line)}
+.trial-stat-grid strong{display:block;font-size:calc(27px * var(--trial-font-scale) * var(--trial-heading-scale));letter-spacing:-.04em;color:var(--nova-deep);margin-bottom:6px}
+.trial-testimonials{display:grid;gap:14px;margin-top:20px}
+.trial-testimonials figure{margin:0;padding:18px;background:var(--trial-surface);border:1px solid var(--nova-line);border-radius:var(--trial-radius);text-align:left}
+.trial-testimonials blockquote{font-size:calc(13px * var(--trial-font-scale));line-height:1.8;margin:0 0 15px;white-space:pre-wrap}
+.trial-testimonials figcaption{font-size:calc(11px * var(--trial-font-scale));font-weight:600;color:var(--nova-deep)}
+.trial-testimonials figcaption small{display:block;color:var(--nova-muted);font-weight:400;margin-top:3px}
+.trial-divider{border:0;border-top:1px solid var(--nova-line);margin:0 2px}
+.trial-content-module.trial-image-right{display:flex;flex-direction:column-reverse}
+.trial-content-module.trial-image-left{display:flex;flex-direction:column}
+.trial-module-image{flex-shrink:0}
+.trial-content-module.trial-content-text{background:transparent;border-color:transparent}
+.trial-content-copy>p{white-space:pre-wrap}
+.trial-template-intro{padding:20px 2px 23px;color:var(--nova-text)}
+.trial-template-intro>:is(h1,h2){font-size:calc(25px * var(--trial-font-scale) * var(--trial-heading-scale));line-height:1.15;margin:0 0 12px}
+.trial-template-intro>p,.trial-page-body{font-size:calc(13px * var(--trial-font-scale));line-height:1.8;color:var(--nova-muted);white-space:pre-wrap}
+.trial-global-announcement{padding:11px 14px;margin-bottom:14px;border-radius:var(--trial-radius);font-size:calc(11px * var(--trial-font-scale));line-height:1.6;text-align:center}
+.trial-template-content:empty{display:none}
+.trial-custom-page>.trial-page-body{margin:0 0 20px}
+.cal-app .trial-campaign-copy>h2,.cal-app .trial-content-copy>h2{font-size:calc(20px * var(--trial-font-scale) * var(--trial-heading-scale))}

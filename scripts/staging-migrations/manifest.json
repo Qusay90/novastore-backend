@@ -285,5 +285,54 @@
     "sha256": "6fedd1843e41ba8aaf3eb597d3f75923b991778518ffe0863538d0c3b19ec679",
     "mode": "transactional",
     "transactionWrapper": true
+  },
+  {
+    "id": "20260919_01_theme_platform_seller_experience",
+    "path": "migrations/20260919_01_theme_platform_seller_experience.sql",
+    "sha256": "126df4662ca9006224eb7807fabbb62dc6368261b6aa922d0a8c6e70d4516b45",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260919_variant_cart_v2",
+    "path": "migrations/20260919_variant_cart_v2.sql",
+    "sha256": "7fa3df922b899462b995f57595f4bceff0d35739bfd2db19f2940619da67e29e",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260919_wave2_theme_delivery",
+    "path": "migrations/20260919_wave2_theme_delivery.sql",
+    "sha256": "31606a7ffc7cf58ce065d3856abedd066f26054de81a75e83c3bdc24db47187c",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260919_wave2_theme_seller_bridge",
+    "path": "migrations/20260919_wave2_theme_seller_bridge.sql",
+    "sha256": "fe2ecf1f325907b7355338b411246e5b9b72ce2095807e845a3ce9d25bd692ac",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260919_wave2_theme_store_content",
+    "path": "migrations/20260919_wave2_theme_store_content.sql",
+    "sha256": "90e5f319b687f99fde75f813f70c00eb0a3e059b1e62640af5150994aa18ef72",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260919_wave2_zpublication_lifecycle",
+    "path": "migrations/20260919_wave2_zpublication_lifecycle.sql",
+    "sha256": "2b639cf1900fa9eabc29f9fbb0e1a2d30a1c46d4be15c14cba2bc64cc0c3de86",
+    "mode": "transactional",
+    "transactionWrapper": true
+  },
+  {
+    "id": "20260919_wave2_zzsupport_routing",
+    "path": "migrations/20260919_wave2_zzsupport_routing.sql",
+    "sha256": "48cacb1b3b9211f0981b45fd0761d0761576a5d0c37f40810fe5f3c41f04f04f",
+    "mode": "transactional",
+    "transactionWrapper": true
   }
 ]

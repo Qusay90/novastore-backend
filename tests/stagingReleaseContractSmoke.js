@@ -31,7 +31,8 @@ const {
 } = require('./helpers/stagingReleaseReplayProvenance');
 
 const root = path.resolve(__dirname, '..');
-const packageLockBlobSha = '702164e2cd2f4b10c1727f18f7f4d3f8d68933c4bb1d08125dc0fcb002b80b57';
+// Wave 2 adds the pinned Sharp raster decoder; seal the canonical Git bytes.
+const packageLockBlobSha = '81ddd94ff8b47b7389bbc60aa2dae09d5689e3bb34c6d51af7c7469d656e1572';
 const results = { pass: 0, fail: 0, skip: 0 };
 
 const runGit = (args, options = {}) => {
@@ -254,9 +255,9 @@ const createFakeGitReader = ({
         assert.equal(FORBIDDEN_PROVIDER_CREDENTIAL_NAMES, FORBIDDEN_PROVIDER_CREDENTIAL_KEYS);
     });
 
-    await check(5, 'migration bytes/checksums 41/41 exact', () => {
+    await check(5, 'migration bytes/checksums 43/43 exact', () => {
         const registry = loadRegistry();
-        assert.equal(registry.length, 41);
+    assert.equal(registry.length, 48);
         // Pre-commit foundation work can attest an immutable staged tree without
         // creating an untested commit. Release/CI defaults still attest HEAD.
         const migrationTree = process.env.NOVASTORE_TEST_MIGRATION_TREE || 'HEAD';
@@ -276,13 +277,23 @@ const createFakeGitReader = ({
     });
 
     await check(6, 'package-lock canonical blob and clean worktree exact', () => {
-        const blob = runGit(['show', 'HEAD:package-lock.json'], { encoding: null });
+        const artifactTree = process.env.NOVASTORE_TEST_ARTIFACT_TREE || 'HEAD';
+        if (artifactTree !== 'HEAD') {
+            assert(/^[0-9a-f]{40}$/.test(artifactTree), 'Full immutable artifact tree required.');
+            assert.equal(runGit(['cat-file', '-t', artifactTree]).trim(), 'tree');
+            assert.equal(runGit(['write-tree']).trim(), artifactTree, 'Artifact tree must equal the current index.');
+        }
+        const blob = runGit(['show', `${artifactTree}:package-lock.json`], { encoding: null });
         assert.equal(sha256(blob), packageLockBlobSha);
         const worktreeStatus = runGit(
-            ['status', '--porcelain=v1', '--untracked-files=all', '--', 'package-lock.json'],
+            artifactTree === 'HEAD'
+                ? ['status', '--porcelain=v1', '--untracked-files=all', '--', 'package-lock.json']
+                : ['diff', '--name-only', '--', 'package-lock.json'],
             { encoding: null }
         );
         assert.equal(worktreeStatus.length, 0);
+        assert.equal(runGit(['hash-object', '--path=package-lock.json', 'package-lock.json']).trim(),
+            runGit(['rev-parse', `${artifactTree}:package-lock.json`]).trim());
     });
 
     await check(7, 'required key names complete and unique', () => {

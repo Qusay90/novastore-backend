@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {createFormGuardTracker,formSnapshot} from '../admin-commerce-pro/src/theme-platform/studioFormGuard.js';
+let confirmations=0,answer=false,notices=[];
+const tracker=createFormGuardTracker({confirm:()=>{confirmations++;return answer;},notify:message=>notices.push(message)});
+const saved=formSnapshot({profile:'BASIC',overrides:{logo:{effect:'ALLOW',state:'EDITABLE'},header:{effect:'DENY'}}});
+const reordered=formSnapshot({overrides:{header:{effect:'DENY'},logo:{state:'EDITABLE',effect:'ALLOW'}},profile:'BASIC'});
+assert.equal(saved,reordered,'Server key ordering does not fabricate an unsaved change');
+tracker.update('offer',{dirty:false,pending:false});assert.equal(tracker.leave(),true);assert.equal(confirmations,0);
+tracker.update('offer',{dirty:saved!==formSnapshot({profile:'PRO',overrides:{}})});assert.equal(tracker.leave(),false,'Rejecting navigation protects edited offer fields');
+answer=true;assert.equal(tracker.leave(),true,'Explicit discard permits leaving');
+tracker.update('offer',{dirty:true,pending:true});const before=confirmations;assert.equal(tracker.leave(),false);assert.equal(confirmations,before,'In-flight mutation cannot be discarded');assert.equal(notices.length,1);
+tracker.update('offer',{dirty:true,pending:false});answer=false;assert.equal(tracker.leave(),false,'Failed save retains dirty form');
+tracker.update('offer',{dirty:false,pending:false});assert.equal(tracker.leave(),true,'Acknowledged save clears only that form');
+tracker.update('profile',{dirty:true,pending:false});tracker.update('policy',{dirty:true,pending:false});tracker.update('profile',null);assert.equal(tracker.leave(),false,'Unmounting one panel cannot erase another dirty panel');
+tracker.update('policy',null);assert.equal(tracker.leave(),true,'Cleanup removes only owned form state');
+tracker.update('profile',{dirty:false,pending:true});assert.equal(tracker.state().host.pending.profile,true,'beforeunload receives pending-only work');assert.equal(tracker.leave(),false);
+console.log(JSON.stringify({result:'PASS',checks:10,scope:'semantic form snapshots and composed leave guard; explicit confirmation test double; actual browser dialogs verified separately'}));

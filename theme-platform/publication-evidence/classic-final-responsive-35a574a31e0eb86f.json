@@ -1,0 +1,1519 @@
+{
+  "schemaVersion": 1,
+  "provenance": "ACTUAL_BROWSER",
+  "buildManifestSHA256": "0290ed9ae04cd431e5df440f21507a831b3bf2ac4966730f553f247e1fb35150",
+  "rows": [
+    {
+      "actualWidth": 320,
+      "heading": "Classic yaşam koleksiyonu — yerel kabul A",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 305,
+      "family": "classic",
+      "page": "home",
+      "width": 320,
+      "url": "http://classic.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-home-320.jpg",
+        "sha256": "da6d87c3eb3a7e325a8c7e0f4033dd89d1728f6dd8e074e0baa91604139385ce"
+      }
+    },
+    {
+      "actualWidth": 360,
+      "heading": "Classic yaşam koleksiyonu — yerel kabul A",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 345,
+      "family": "classic",
+      "page": "home",
+      "width": 360,
+      "url": "http://classic.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-home-360.jpg",
+        "sha256": "149b866ac0c566dd4e3c54967a46a6d85cbc9c6fb4c071e9852f457dfe583d95"
+      }
+    },
+    {
+      "actualWidth": 390,
+      "heading": "Classic yaşam koleksiyonu — yerel kabul A",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 375,
+      "family": "classic",
+      "page": "home",
+      "width": 390,
+      "url": "http://classic.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-home-390.jpg",
+        "sha256": "8f92e20706f7cdab598511948abdb328807e5c82b4507b50ebcf03b4dd33ae91"
+      }
+    },
+    {
+      "actualWidth": 430,
+      "heading": "Classic yaşam koleksiyonu — yerel kabul A",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 415,
+      "family": "classic",
+      "page": "home",
+      "width": 430,
+      "url": "http://classic.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-home-430.jpg",
+        "sha256": "2e963a2760ae7aebfec52aba694e2528b4b05d809f3ffc995fed1fcd4f63e4a4"
+      }
+    },
+    {
+      "actualWidth": 768,
+      "heading": "Classic yaşam koleksiyonu — yerel kabul A",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 753,
+      "family": "classic",
+      "page": "home",
+      "width": 768,
+      "url": "http://classic.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-home-768.jpg",
+        "sha256": "fb78bf17cf9904331987637ae6d1030fbe231d5f1fd33932f47bdf5b700a2637"
+      }
+    },
+    {
+      "actualWidth": 1024,
+      "heading": "Classic yaşam koleksiyonu — yerel kabul A",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1009,
+      "family": "classic",
+      "page": "home",
+      "width": 1024,
+      "url": "http://classic.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-home-1024.jpg",
+        "sha256": "1d5ff94328e41cbb52a77b91683cffe93d5a7d73179131c7398f3a53b177e35b"
+      }
+    },
+    {
+      "actualWidth": 1440,
+      "heading": "Classic yaşam koleksiyonu — yerel kabul A",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": false
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1425,
+      "family": "classic",
+      "page": "home",
+      "width": 1440,
+      "url": "http://classic.localhost:62213/#/home",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-home-1440.jpg",
+        "sha256": "6e9bcd292864cc3696c3879f9a9304cc5ca4513cf9239d0a00910fe03f5a88ec"
+      }
+    },
+    {
+      "actualWidth": 320,
+      "heading": "Mağaza",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 305,
+      "family": "classic",
+      "page": "category",
+      "width": 320,
+      "url": "http://classic.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-category-320.jpg",
+        "sha256": "d14bc73ead42f17a3af660fc171ab855106bb734f3919e1a4a3c26624c3eba3a"
+      }
+    },
+    {
+      "actualWidth": 360,
+      "heading": "Mağaza",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 345,
+      "family": "classic",
+      "page": "category",
+      "width": 360,
+      "url": "http://classic.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-category-360.jpg",
+        "sha256": "f5db222cd2e5de945e10da0c6064d21ae9f026882887d1825cb6089187d7ea91"
+      }
+    },
+    {
+      "actualWidth": 390,
+      "heading": "Mağaza",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 375,
+      "family": "classic",
+      "page": "category",
+      "width": 390,
+      "url": "http://classic.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-category-390.jpg",
+        "sha256": "55ef1c69d14aebfcadb1963495dc28c163f2a63ef271613f483476b62e60242e"
+      }
+    },
+    {
+      "actualWidth": 430,
+      "heading": "Mağaza",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 415,
+      "family": "classic",
+      "page": "category",
+      "width": 430,
+      "url": "http://classic.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-category-430.jpg",
+        "sha256": "133794c77c1d05a3e8882edec5968606c96b8415e0e42cc4b4c568fc7e060b00"
+      }
+    },
+    {
+      "actualWidth": 768,
+      "heading": "Mağaza",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 753,
+      "family": "classic",
+      "page": "category",
+      "width": 768,
+      "url": "http://classic.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-category-768.jpg",
+        "sha256": "d30384437f6a28dcae48e7b5408a7945fafbcfb93b6a4f6effb6e659875297ce"
+      }
+    },
+    {
+      "actualWidth": 1024,
+      "heading": "Mağaza",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1009,
+      "family": "classic",
+      "page": "category",
+      "width": 1024,
+      "url": "http://classic.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-category-1024.jpg",
+        "sha256": "e91051efda1207d14c36fbf30ab5575b99944ec3ddbeaaf3a576fe852fae29b1"
+      }
+    },
+    {
+      "actualWidth": 1440,
+      "heading": "Mağaza",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1425,
+      "family": "classic",
+      "page": "category",
+      "width": 1440,
+      "url": "http://classic.localhost:62213/#/catalog",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-category-1440.jpg",
+        "sha256": "e13fe01368f7dddce1c9f8afb1b514e3e29fc7bd70fa0e65bde4e8036b6a399e"
+      }
+    },
+    {
+      "actualWidth": 320,
+      "heading": "Ahşap Tasarım Sandalye",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 305,
+      "family": "classic",
+      "page": "product",
+      "width": 320,
+      "url": "http://classic.localhost:62213/#/product/501",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-product-320.jpg",
+        "sha256": "a1ec73379008c070821376ce955a61538bcb0cbce87d0fe70cc230467e84dd9e"
+      }
+    },
+    {
+      "actualWidth": 360,
+      "heading": "Ahşap Tasarım Sandalye",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 345,
+      "family": "classic",
+      "page": "product",
+      "width": 360,
+      "url": "http://classic.localhost:62213/#/product/501",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-product-360.jpg",
+        "sha256": "dcfb563bd42ed5e7218767ac338fc84fb883550a9b0fbaae5937ec48f53811a1"
+      }
+    },
+    {
+      "actualWidth": 390,
+      "heading": "Ahşap Tasarım Sandalye",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 375,
+      "family": "classic",
+      "page": "product",
+      "width": 390,
+      "url": "http://classic.localhost:62213/#/product/501",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-product-390.jpg",
+        "sha256": "203c5ffc35943f19d7472a338155a5340683c82d943ae86304a24e488400aea3"
+      }
+    },
+    {
+      "actualWidth": 430,
+      "heading": "Ahşap Tasarım Sandalye",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 415,
+      "family": "classic",
+      "page": "product",
+      "width": 430,
+      "url": "http://classic.localhost:62213/#/product/501",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-product-430.jpg",
+        "sha256": "a5d26b90f771ef822990b44e09d9107996b7d056fc57c4435f26aca23de91654"
+      }
+    },
+    {
+      "actualWidth": 768,
+      "heading": "Ahşap Tasarım Sandalye",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 753,
+      "family": "classic",
+      "page": "product",
+      "width": 768,
+      "url": "http://classic.localhost:62213/#/product/501",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-product-768.jpg",
+        "sha256": "3cda8092cf5fa8a9ea26ccac97cd0e929204f382f6debb08a8782da87c6441cc"
+      }
+    },
+    {
+      "actualWidth": 1024,
+      "heading": "Ahşap Tasarım Sandalye",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1009,
+      "family": "classic",
+      "page": "product",
+      "width": 1024,
+      "url": "http://classic.localhost:62213/#/product/501",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-product-1024.jpg",
+        "sha256": "20edf5454ed03bdb885d813d2eaf89df1026cad17cf13ba1364ac86ee63141b8"
+      }
+    },
+    {
+      "actualWidth": 1440,
+      "heading": "Ahşap Tasarım Sandalye",
+      "hiddenImages": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        },
+        {
+          "alt": "",
+          "excludedReason": "NO_RENDERED_BOX",
+          "loaded": true
+        }
+      ],
+      "images": [
+        {
+          "alt": "",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "loaded": true
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "loaded": true
+        },
+        {
+          "alt": "NovaBot",
+          "loaded": true
+        }
+      ],
+      "marketplaceUiAbsent": true,
+      "overflow": false,
+      "rootScrollWidth": 1425,
+      "family": "classic",
+      "page": "product",
+      "width": 1440,
+      "url": "http://classic.localhost:62213/#/product/501",
+      "status": "PASS",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/unified-final-runtime-1790088447236/classic-final-product-1440.jpg",
+        "sha256": "3c621fd27a1e9d8b564e771f6f3deb49f0eb8bee096be7a933758260a710d485"
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {createStudioLeaveGuard,hasUnsavedStudioWork} from '../admin-commerce-pro/src/theme-platform/studioNavigationGuard.js';
+let state=null,confirmation=false,asked=0,notices=[];
+const guard=createStudioLeaveGuard({readState:()=>state,confirm:()=>{asked++;return confirmation;},notify:value=>notices.push(value)});
+assert.equal(guard(),true);
+state={host:{dirty:{web:false,android:false},pending:{}}};assert.equal(guard(),true);assert.equal(asked,0);
+state.host.dirty.web=true;assert.equal(guard(),false);assert.equal(asked,1);
+confirmation=true;assert.equal(guard(),true);assert.equal(asked,2);
+state.host.dirty.web=false;state.host.dirty.android=true;confirmation=false;assert.equal(guard(),false);
+state.host.pending.web='request';confirmation=true;const count=asked;assert.equal(guard(),false);assert.equal(asked,count);assert.equal(notices.length,1);
+assert.equal(hasUnsavedStudioWork(state),true);
+state.host.dirty.android=false;state.host.pending={};assert.equal(guard(),true);
+const broken=createStudioLeaveGuard({readState:()=>{throw Error('unavailable');},confirm:()=>true,notify:()=>{}});assert.equal(broken(),false);
+console.log(JSON.stringify({result:'PASS',checks:9,scope:'pure navigation guard with explicit dialog test double; native browser dialog and cross-panel integration require actual browser acceptance'}));

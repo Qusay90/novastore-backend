@@ -1,0 +1,5454 @@
+{
+  "schemaVersion": 1,
+  "description": "Reviewed build-owned presentation identities. Package data cannot supply code, HTML, CSS URLs or runtime paths.",
+  "presentations": [
+    {
+      "id": "nova-classic",
+      "version": "1.0.0",
+      "sourceThemeId": "15-nova-classic",
+      "channels": [
+        "web"
+      ],
+      "sourceFiles": [
+        {
+          "path": "themes/15-nova-classic/theme.js",
+          "sha256": "1ec6e19a513d5b7d67e977d06d528251f82ced35aa1a61ddeafb017622c940e1",
+          "bytes": 9637
+        },
+        {
+          "path": "themes/15-nova-classic/theme.css",
+          "sha256": "0e8844a79a87a5cf0f110cf2562a3313add1ddc9b696dbafd10a8b69ee19152c",
+          "bytes": 350
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        }
+      ],
+      "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668"
+    },
+    {
+      "id": "nova-atelier",
+      "version": "1.0.0",
+      "sourceThemeId": "02-atelier",
+      "channels": [
+        "web"
+      ],
+      "sourceFiles": [
+        {
+          "path": "themes/02-atelier/theme.js",
+          "sha256": "7f1e69b2d2a3c22a2ffb214b839a681f2ed916982fad07e760ab509a066350d4",
+          "bytes": 9443
+        },
+        {
+          "path": "themes/02-atelier/theme.css",
+          "sha256": "b20737a86035bc188eb0a905e3fbd5da451d3d4bd5c30a5df6f85dd8cc343ae4",
+          "bytes": 350
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        }
+      ],
+      "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a"
+    }
+  ],
+  "inventorySchemaVersion": 1,
+  "readinessPolicy": "READY requires channel presentation AND canonical customer runtime acceptance; demo presence is not readiness.",
+  "authoringSources": {
+    "registry": "studio-core/src/sandbox/sectorThemeRegistry.json",
+    "registrySHA256": "723b1905002ae28f4ccec78a55c46d13575ad112fe52b216b42383dea3da7770",
+    "role": "AUTHORING_GALLERY_ONLY",
+    "runtimeAuthority": false
+  },
+  "inventory": [
+    {
+      "themeId": "01-nova",
+      "channel": "web",
+      "name": "Nova Market",
+      "industry": "Genel pazaryeri",
+      "sourceIdentity": "nova-store-sector-collection/01-nova/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/01-nova-tile.jpg",
+        "sourceEntry": "themes/01-nova/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/01-nova/theme.js",
+          "sha256": "023dc17360d98d02fea5be284a47d3fe78013542c59d6c925cfcbab4d55415aa",
+          "bytes": 9173
+        },
+        {
+          "path": "themes/01-nova/theme.css",
+          "sha256": "e57ee36c1c9490cae15e26e2ab2ee3b09a4c5302594e13be70ac5a9f2b5f9806",
+          "bytes": 351
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/01-nova/index.html",
+          "sha256": "9b9a8b38c9acf85d1b121bd44eb083b8965cd80756d548bc5fe48b0494e1ea55",
+          "bytes": 942
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "01-nova",
+      "channel": "app",
+      "name": "Nova Market",
+      "industry": "Genel pazaryeri",
+      "sourceIdentity": "nova-store-sector-collection/01-nova/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/01-nova-tile.jpg",
+        "sourceEntry": "themes/01-nova/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/01-nova/theme.js",
+          "sha256": "023dc17360d98d02fea5be284a47d3fe78013542c59d6c925cfcbab4d55415aa",
+          "bytes": 9173
+        },
+        {
+          "path": "themes/01-nova/theme.css",
+          "sha256": "e57ee36c1c9490cae15e26e2ab2ee3b09a4c5302594e13be70ac5a9f2b5f9806",
+          "bytes": 351
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/01-nova/app.html",
+          "sha256": "4eb6fe6b275dcc94afd2c7ec02494539a3396611b4d0441b9d3ee278a5136655",
+          "bytes": 942
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "02-atelier",
+      "channel": "web",
+      "name": "Atelier",
+      "industry": "Moda & giyim",
+      "sourceIdentity": "nova-store-sector-collection/02-atelier/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": "nova-atelier",
+      "rendererVersion": "1.0.0",
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "CANONICAL_CUSTOMER_RUNTIME",
+      "marketplaceSupport": false,
+      "editableCapabilities": {
+        "theme.logo": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.colors": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.typography": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.header": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.footer": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.navigation": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Canonical hero CTA only; fixed category menu is read-only."
+        },
+        "theme.product_grid": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Section copy and visibility; original fashion cards and canonical records retained."
+        },
+        "theme.category_grid": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Canonical category tiles and visibility; no foreign references."
+        },
+        "theme.banner": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.text": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.homepage_blocks": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Fixed slot visibility; sequence follows original Atelier source."
+        },
+        "theme.assets": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "MANAGE"
+        },
+        "theme.preview": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.save_draft": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.publish": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "PUBLISH",
+          "detail": "Same-core publication request only; readiness and Admin-only activation remain separate server gates."
+        },
+        "theme.advanced_blocks": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Visual styles for existing elements only; adding, replacing or reordering blocks and canonical text/media edits are rejected."
+        }
+      },
+      "unsupportedCapabilities": [
+        "theme.campaign_canvas",
+        "theme.mobile_editor",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/02-atelier-tile.jpg",
+        "sourceEntry": "themes/02-atelier/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/02-atelier/theme.js",
+          "sha256": "7f1e69b2d2a3c22a2ffb214b839a681f2ed916982fad07e760ab509a066350d4",
+          "bytes": 9443
+        },
+        {
+          "path": "themes/02-atelier/theme.css",
+          "sha256": "b20737a86035bc188eb0a905e3fbd5da451d3d4bd5c30a5df6f85dd8cc343ae4",
+          "bytes": 350
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/02-atelier/index.html",
+          "sha256": "947dbb98ac3b9d0b5994506937abf12a9edf9dc0c15ca56b72fcce675633ef41",
+          "bytes": 932
+        }
+      ],
+      "presentationReady": true,
+      "runtimeReady": true,
+      "assignmentEligible": true,
+      "status": "READY",
+      "presentationStatus": "READY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PASS",
+        "customerRuntime": "PASS",
+        "singleStoreRuntime": "PASS",
+        "publication": "PASS",
+        "proofSHA256": "c3eb9f6124cf2c33182e6c3e4bd22d23c98b8e40a235659288377c909c6cc131",
+        "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+        "artifactDigest": "a2487b4412203d5cf8fc2b0aba67e306e6086838e365de707e53889b9a2cf1ef",
+        "phase": "COMPATIBILITY_ACCEPTED_PRE_PUBLICATION",
+        "storeActivation": "NOT_ASSERTED"
+      },
+      "reason": "Bu derleme için sunum, müşteri işlemleri ve yayın öncesi uyumluluk doğrulandı. Mağaza yayını ayrıca yetkili etkinleştirme gerektirir."
+    },
+    {
+      "themeId": "02-atelier",
+      "channel": "app",
+      "name": "Atelier",
+      "industry": "Moda & giyim",
+      "sourceIdentity": "nova-store-sector-collection/02-atelier/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/02-atelier-tile.jpg",
+        "sourceEntry": "themes/02-atelier/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/02-atelier/theme.js",
+          "sha256": "7f1e69b2d2a3c22a2ffb214b839a681f2ed916982fad07e760ab509a066350d4",
+          "bytes": 9443
+        },
+        {
+          "path": "themes/02-atelier/theme.css",
+          "sha256": "b20737a86035bc188eb0a905e3fbd5da451d3d4bd5c30a5df6f85dd8cc343ae4",
+          "bytes": 350
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/02-atelier/app.html",
+          "sha256": "50a8bccbd9c281230cde02cbc5e04858452cdc4211397b7521bf900c73ad24aa",
+          "bytes": 932
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "03-volt",
+      "channel": "web",
+      "name": "VOLT",
+      "industry": "Elektronik & oyun",
+      "sourceIdentity": "nova-store-sector-collection/03-volt/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/03-volt-tile.jpg",
+        "sourceEntry": "themes/03-volt/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/03-volt/theme.js",
+          "sha256": "857332da899fbbbc401dff67a9250b436961ead6442e755888a0cbcfec78a859",
+          "bytes": 9082
+        },
+        {
+          "path": "themes/03-volt/theme.css",
+          "sha256": "b152310df476d08b320a3338b5549681dc5157cdc4a8b49c3e3d0d549a85eaf8",
+          "bytes": 352
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/03-volt/index.html",
+          "sha256": "c5368225fac90ed74462968395d8c9fccd2da45f0ca7a9656ebccdbcbc4e558f",
+          "bytes": 922
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "03-volt",
+      "channel": "app",
+      "name": "VOLT",
+      "industry": "Elektronik & oyun",
+      "sourceIdentity": "nova-store-sector-collection/03-volt/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/03-volt-tile.jpg",
+        "sourceEntry": "themes/03-volt/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/03-volt/theme.js",
+          "sha256": "857332da899fbbbc401dff67a9250b436961ead6442e755888a0cbcfec78a859",
+          "bytes": 9082
+        },
+        {
+          "path": "themes/03-volt/theme.css",
+          "sha256": "b152310df476d08b320a3338b5549681dc5157cdc4a8b49c3e3d0d549a85eaf8",
+          "bytes": 352
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/03-volt/app.html",
+          "sha256": "44ddc11025977413d003230222b8b8405b87d7a85d7cb89973a349ae0940dd59",
+          "bytes": 922
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "04-forma",
+      "channel": "web",
+      "name": "forma.",
+      "industry": "Mobilya & dekorasyon",
+      "sourceIdentity": "nova-store-sector-collection/04-forma/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/04-forma-tile.jpg",
+        "sourceEntry": "themes/04-forma/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/04-forma/theme.js",
+          "sha256": "314e6c564ce93612b9ad78f8a2c25bcc1c6495834b975d2d371903724a66df50",
+          "bytes": 9094
+        },
+        {
+          "path": "themes/04-forma/theme.css",
+          "sha256": "b8c0135fbe5782207dc56486a8fefb952a0daee608efe4364c2ccb181b5971cb",
+          "bytes": 338
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/04-forma/index.html",
+          "sha256": "4faf7e392405f22e9efd4ca6058027f95add8a96d2a3c4c71c1610fd92ac038e",
+          "bytes": 935
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "04-forma",
+      "channel": "app",
+      "name": "forma.",
+      "industry": "Mobilya & dekorasyon",
+      "sourceIdentity": "nova-store-sector-collection/04-forma/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/04-forma-tile.jpg",
+        "sourceEntry": "themes/04-forma/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/04-forma/theme.js",
+          "sha256": "314e6c564ce93612b9ad78f8a2c25bcc1c6495834b975d2d371903724a66df50",
+          "bytes": 9094
+        },
+        {
+          "path": "themes/04-forma/theme.css",
+          "sha256": "b8c0135fbe5782207dc56486a8fefb952a0daee608efe4364c2ccb181b5971cb",
+          "bytes": 338
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/04-forma/app.html",
+          "sha256": "8299072ca3f3bf406af8a473a981269cf08b734a896c7883b5bc5cb0d80370f8",
+          "bytes": 935
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "05-botanika",
+      "channel": "web",
+      "name": "botanika",
+      "industry": "Kozmetik & bakım",
+      "sourceIdentity": "nova-store-sector-collection/05-botanika/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/05-botanika-tile.jpg",
+        "sourceEntry": "themes/05-botanika/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/05-botanika/theme.js",
+          "sha256": "4df76a020fc4247315c473842426e8dd2e09f31e092f17982682d49c58ed3fbf",
+          "bytes": 9246
+        },
+        {
+          "path": "themes/05-botanika/theme.css",
+          "sha256": "5cd8a90f9d5ea959cd1e394a6ce7a8f86dcadd2803e3aad289a363562ff34643",
+          "bytes": 352
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/05-botanika/index.html",
+          "sha256": "891e6731ccea6650860a42eecffd8e5fea1662ee872f8daef0da1032fce8dde2",
+          "bytes": 937
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "05-botanika",
+      "channel": "app",
+      "name": "botanika",
+      "industry": "Kozmetik & bakım",
+      "sourceIdentity": "nova-store-sector-collection/05-botanika/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/05-botanika-tile.jpg",
+        "sourceEntry": "themes/05-botanika/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/05-botanika/theme.js",
+          "sha256": "4df76a020fc4247315c473842426e8dd2e09f31e092f17982682d49c58ed3fbf",
+          "bytes": 9246
+        },
+        {
+          "path": "themes/05-botanika/theme.css",
+          "sha256": "5cd8a90f9d5ea959cd1e394a6ce7a8f86dcadd2803e3aad289a363562ff34643",
+          "bytes": 352
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/05-botanika/app.html",
+          "sha256": "197b8ca8c396da78c49033a68b80c6f9340e894dfca4760cf1f2672ad7f2ab08",
+          "bytes": 937
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "06-pace",
+      "channel": "web",
+      "name": "PACE",
+      "industry": "Spor & aktif yaşam",
+      "sourceIdentity": "nova-store-sector-collection/06-pace/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/06-pace-tile.jpg",
+        "sourceEntry": "themes/06-pace/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/06-pace/theme.js",
+          "sha256": "9fc2bbd618f967c1c1b888970822b122c20708abae3b314d0104b1acf76cc335",
+          "bytes": 9211
+        },
+        {
+          "path": "themes/06-pace/theme.css",
+          "sha256": "af5ff2f5122ae3878aab04cb049b4c70450deec608468c3910f8f17db3423412",
+          "bytes": 350
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/06-pace/index.html",
+          "sha256": "b1eb698509ca19487936edc58a290ac44072430bf9e991d54c7ea34d0365d45c",
+          "bytes": 926
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "06-pace",
+      "channel": "app",
+      "name": "PACE",
+      "industry": "Spor & aktif yaşam",
+      "sourceIdentity": "nova-store-sector-collection/06-pace/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/06-pace-tile.jpg",
+        "sourceEntry": "themes/06-pace/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/06-pace/theme.js",
+          "sha256": "9fc2bbd618f967c1c1b888970822b122c20708abae3b314d0104b1acf76cc335",
+          "bytes": 9211
+        },
+        {
+          "path": "themes/06-pace/theme.css",
+          "sha256": "af5ff2f5122ae3878aab04cb049b4c70450deec608468c3910f8f17db3423412",
+          "bytes": 350
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/06-pace/app.html",
+          "sha256": "10b54b5129e6506a2a4771407f4f7d8fa493bc3e1bf626c0f6e42da713491fec",
+          "bytes": 926
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "07-taze",
+      "channel": "web",
+      "name": "taze.",
+      "industry": "Market & gıda",
+      "sourceIdentity": "nova-store-sector-collection/07-taze/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/07-taze-tile.jpg",
+        "sourceEntry": "themes/07-taze/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/07-taze/theme.js",
+          "sha256": "7a3130a148284c46c0567cda8fc597829d26f60a44614b8f0576a1db1c993e49",
+          "bytes": 9097
+        },
+        {
+          "path": "themes/07-taze/theme.css",
+          "sha256": "d1891cdefe334be94de864ab435dadf3e760e8596e41e15653c69b96c5d1f0d6",
+          "bytes": 352
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/07-taze/index.html",
+          "sha256": "1b05c194d978156331ff460cd0812ca366e674f35c2b7f8f0d6266613d068ca2",
+          "bytes": 925
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "07-taze",
+      "channel": "app",
+      "name": "taze.",
+      "industry": "Market & gıda",
+      "sourceIdentity": "nova-store-sector-collection/07-taze/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/07-taze-tile.jpg",
+        "sourceEntry": "themes/07-taze/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/07-taze/theme.js",
+          "sha256": "7a3130a148284c46c0567cda8fc597829d26f60a44614b8f0576a1db1c993e49",
+          "bytes": 9097
+        },
+        {
+          "path": "themes/07-taze/theme.css",
+          "sha256": "d1891cdefe334be94de864ab435dadf3e760e8596e41e15653c69b96c5d1f0d6",
+          "bytes": 352
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/07-taze/app.html",
+          "sha256": "9a2345fba5e0b41a28a60e88b263ef67171f6e5670c4e31576f453f23ac49c02",
+          "bytes": 925
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "08-minimo",
+      "channel": "web",
+      "name": "minimo",
+      "industry": "Bebek & çocuk",
+      "sourceIdentity": "nova-store-sector-collection/08-minimo/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/08-minimo-tile.jpg",
+        "sourceEntry": "themes/08-minimo/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/08-minimo/theme.js",
+          "sha256": "ce6c0411a0c0e5d9cc129bffb4fb057c37eaca9d75f4bc8ccab269df83a631d2",
+          "bytes": 9193
+        },
+        {
+          "path": "themes/08-minimo/theme.css",
+          "sha256": "50e0ed187767f93f1a35e31fa7b8ea834ceaef83ac2ea95ffce7ef45c5b61e81",
+          "bytes": 338
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/08-minimo/index.html",
+          "sha256": "b7c62812f9d41215dc7cfe6cb1b3b98db3c5e165eed3c2954a2704940f36f902",
+          "bytes": 926
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "08-minimo",
+      "channel": "app",
+      "name": "minimo",
+      "industry": "Bebek & çocuk",
+      "sourceIdentity": "nova-store-sector-collection/08-minimo/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/08-minimo-tile.jpg",
+        "sourceEntry": "themes/08-minimo/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/08-minimo/theme.js",
+          "sha256": "ce6c0411a0c0e5d9cc129bffb4fb057c37eaca9d75f4bc8ccab269df83a631d2",
+          "bytes": 9193
+        },
+        {
+          "path": "themes/08-minimo/theme.css",
+          "sha256": "50e0ed187767f93f1a35e31fa7b8ea834ceaef83ac2ea95ffce7ef45c5b61e81",
+          "bytes": 338
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/08-minimo/app.html",
+          "sha256": "f354f3e23d395ca2c7b411fc64475c782dce5217877ec67e5177828f03e4044c",
+          "bytes": 926
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "09-lune",
+      "channel": "web",
+      "name": "LUNÉ",
+      "industry": "Takı & aksesuar",
+      "sourceIdentity": "nova-store-sector-collection/09-lune/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/09-lune-tile.jpg",
+        "sourceEntry": "themes/09-lune/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/09-lune/theme.js",
+          "sha256": "c60bc0cd7a85384d171094af122fccd957902b8bbf0cf82772ca5e5cd2491098",
+          "bytes": 9060
+        },
+        {
+          "path": "themes/09-lune/theme.css",
+          "sha256": "052dc61a1898a3487d582588cc267687d6a8e1b1c9443ec19f88da9c7a700163",
+          "bytes": 336
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/09-lune/index.html",
+          "sha256": "a6e63b683ee05779c6111eff115089c45254669f99ef1ef7e7d17924c2643814",
+          "bytes": 927
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "09-lune",
+      "channel": "app",
+      "name": "LUNÉ",
+      "industry": "Takı & aksesuar",
+      "sourceIdentity": "nova-store-sector-collection/09-lune/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/09-lune-tile.jpg",
+        "sourceEntry": "themes/09-lune/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/09-lune/theme.js",
+          "sha256": "c60bc0cd7a85384d171094af122fccd957902b8bbf0cf82772ca5e5cd2491098",
+          "bytes": 9060
+        },
+        {
+          "path": "themes/09-lune/theme.css",
+          "sha256": "052dc61a1898a3487d582588cc267687d6a8e1b1c9443ec19f88da9c7a700163",
+          "bytes": 336
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/09-lune/app.html",
+          "sha256": "1dfe7f3415176eb5421a1d7a15c3a9fcbddf496b1e0d2b94e45535bb4b740a41",
+          "bytes": 927
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "10-folio",
+      "channel": "web",
+      "name": "folio",
+      "industry": "Kitap & kırtasiye",
+      "sourceIdentity": "nova-store-sector-collection/10-folio/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/10-folio-tile.jpg",
+        "sourceEntry": "themes/10-folio/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/10-folio/theme.js",
+          "sha256": "5da4adf6409488ff0072f96cf57988403e2921c61d46e4808dd71239d867281e",
+          "bytes": 9184
+        },
+        {
+          "path": "themes/10-folio/theme.css",
+          "sha256": "8c43e9dfcb03223cfa8755d1b72f99cde061e49c8d59554df480059651f5ab99",
+          "bytes": 336
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/10-folio/index.html",
+          "sha256": "7d587e87575184c35f6b699936dff42dd883fd589cf8bae2b14c8ea61830f419",
+          "bytes": 928
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "10-folio",
+      "channel": "app",
+      "name": "folio",
+      "industry": "Kitap & kırtasiye",
+      "sourceIdentity": "nova-store-sector-collection/10-folio/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/10-folio-tile.jpg",
+        "sourceEntry": "themes/10-folio/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/10-folio/theme.js",
+          "sha256": "5da4adf6409488ff0072f96cf57988403e2921c61d46e4808dd71239d867281e",
+          "bytes": 9184
+        },
+        {
+          "path": "themes/10-folio/theme.css",
+          "sha256": "8c43e9dfcb03223cfa8755d1b72f99cde061e49c8d59554df480059651f5ab99",
+          "bytes": 336
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/10-folio/app.html",
+          "sha256": "69056b53a915a86334e64c088a94f4e73cde4c722b683b7a4639879c6280b97c",
+          "bytes": 928
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "11-nomad",
+      "channel": "web",
+      "name": "NOMAD",
+      "industry": "Kamp & outdoor",
+      "sourceIdentity": "nova-store-sector-collection/11-nomad/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/11-nomad-tile.jpg",
+        "sourceEntry": "themes/11-nomad/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/11-nomad/theme.js",
+          "sha256": "ef88ee0d8ee84855e27b84049b0b8ac0c4d52515f418fc353fcacf5ebd2459ac",
+          "bytes": 9143
+        },
+        {
+          "path": "themes/11-nomad/theme.css",
+          "sha256": "08d10a8ca9a1cce657e5626943eeb09ba6c0f16346e76c75e3c432268baaa3cd",
+          "bytes": 336
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/11-nomad/index.html",
+          "sha256": "aab9ef7a9201395fbca16ad11c587115f4294c604be028e57c56643e3b5986fe",
+          "bytes": 926
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "11-nomad",
+      "channel": "app",
+      "name": "NOMAD",
+      "industry": "Kamp & outdoor",
+      "sourceIdentity": "nova-store-sector-collection/11-nomad/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/11-nomad-tile.jpg",
+        "sourceEntry": "themes/11-nomad/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/11-nomad/theme.js",
+          "sha256": "ef88ee0d8ee84855e27b84049b0b8ac0c4d52515f418fc353fcacf5ebd2459ac",
+          "bytes": 9143
+        },
+        {
+          "path": "themes/11-nomad/theme.css",
+          "sha256": "08d10a8ca9a1cce657e5626943eeb09ba6c0f16346e76c75e3c432268baaa3cd",
+          "bytes": 336
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/11-nomad/app.html",
+          "sha256": "890b31c88bbfd394421d28aebd8ccbcb6c89616a78b6e3c9bf7b43444e568d17",
+          "bytes": 926
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "12-paw",
+      "channel": "web",
+      "name": "pati.",
+      "industry": "Evcil hayvan",
+      "sourceIdentity": "nova-store-sector-collection/12-paw/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/12-paw-tile.jpg",
+        "sourceEntry": "themes/12-paw/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/12-paw/theme.js",
+          "sha256": "a4c9c43b71e099ca3ef12790f86e007defa3b33585247172c86fdb6b3e91c234",
+          "bytes": 7682
+        },
+        {
+          "path": "themes/12-paw/theme.css",
+          "sha256": "e09e2b389c291f56941a0e68d505f2716b04ce81b5968dbae7a71cb1a70f3d6f",
+          "bytes": 351
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/12-paw/index.html",
+          "sha256": "b5788343d88eb72d2f21ed5a9f4e04b9e77f01c27833faecdcf0244860e13df9",
+          "bytes": 645
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "12-paw",
+      "channel": "app",
+      "name": "pati.",
+      "industry": "Evcil hayvan",
+      "sourceIdentity": "nova-store-sector-collection/12-paw/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/12-paw-tile.jpg",
+        "sourceEntry": "themes/12-paw/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/12-paw/theme.js",
+          "sha256": "a4c9c43b71e099ca3ef12790f86e007defa3b33585247172c86fdb6b3e91c234",
+          "bytes": 7682
+        },
+        {
+          "path": "themes/12-paw/theme.css",
+          "sha256": "e09e2b389c291f56941a0e68d505f2716b04ce81b5968dbae7a71cb1a70f3d6f",
+          "bytes": 351
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/12-paw/app.html",
+          "sha256": "a5f06b7c1ae2a230bc0fc73809c31621a0a1314a5542577cbf71d84dc08655bf",
+          "bytes": 645
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "13-roast",
+      "channel": "web",
+      "name": "roast.",
+      "industry": "Kahve & demleme",
+      "sourceIdentity": "nova-store-sector-collection/13-roast/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/13-roast-tile.jpg",
+        "sourceEntry": "themes/13-roast/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/13-roast/theme.js",
+          "sha256": "e563d1afe45b1d955fa421ec252c2aa9cf65069789cd6abd9f9a132d65b5c800",
+          "bytes": 7892
+        },
+        {
+          "path": "themes/13-roast/theme.css",
+          "sha256": "fa5577b7b4e14c0452374ea7cbada5480c68153f54482bba635354cdfc431e5a",
+          "bytes": 336
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/13-roast/index.html",
+          "sha256": "109715b4ffeb8ff8837cc0590a72759536dd634cb4a41f61df2ba96b430384d6",
+          "bytes": 650
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "13-roast",
+      "channel": "app",
+      "name": "roast.",
+      "industry": "Kahve & demleme",
+      "sourceIdentity": "nova-store-sector-collection/13-roast/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/13-roast-tile.jpg",
+        "sourceEntry": "themes/13-roast/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/13-roast/theme.js",
+          "sha256": "e563d1afe45b1d955fa421ec252c2aa9cf65069789cd6abd9f9a132d65b5c800",
+          "bytes": 7892
+        },
+        {
+          "path": "themes/13-roast/theme.css",
+          "sha256": "fa5577b7b4e14c0452374ea7cbada5480c68153f54482bba635354cdfc431e5a",
+          "bytes": 336
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/13-roast/app.html",
+          "sha256": "442b5e3e8dc3e74b0e4a7050169bb727c20ce6507e10b235fc21b12b62ee19d0",
+          "bytes": 650
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "14-forge",
+      "channel": "web",
+      "name": "FORGE",
+      "industry": "Yapı & hırdavat",
+      "sourceIdentity": "nova-store-sector-collection/14-forge/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/14-forge-tile.jpg",
+        "sourceEntry": "themes/14-forge/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/14-forge/theme.js",
+          "sha256": "fa126bff224aaf577ba5478ab0e3e22be37876f27d06c74e3e5084a736bb9480",
+          "bytes": 7789
+        },
+        {
+          "path": "themes/14-forge/theme.css",
+          "sha256": "efa9e377efe78a74f04dcc6b703d7d2ac06bfc8948cb2c3c8ece8cee61684af0",
+          "bytes": 350
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/14-forge/index.html",
+          "sha256": "b281942a6a404d044584c61fcff48babec63a7bd14ebe79036df8c8f2f4bc1f5",
+          "bytes": 648
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "14-forge",
+      "channel": "app",
+      "name": "FORGE",
+      "industry": "Yapı & hırdavat",
+      "sourceIdentity": "nova-store-sector-collection/14-forge/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/14-forge-tile.jpg",
+        "sourceEntry": "themes/14-forge/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/14-forge/theme.js",
+          "sha256": "fa126bff224aaf577ba5478ab0e3e22be37876f27d06c74e3e5084a736bb9480",
+          "bytes": 7789
+        },
+        {
+          "path": "themes/14-forge/theme.css",
+          "sha256": "efa9e377efe78a74f04dcc6b703d7d2ac06bfc8948cb2c3c8ece8cee61684af0",
+          "bytes": 350
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/14-forge/app.html",
+          "sha256": "dad4d5731c3501527abedcc08ce24764e0b2f9a18af432a2e909e0c07084d687",
+          "bytes": 648
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "15-nova-classic",
+      "channel": "web",
+      "name": "Nova Classic",
+      "industry": "Ev, yaşam ve genel mağaza",
+      "sourceIdentity": "nova-store-sector-collection/15-nova-classic/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": "nova-classic",
+      "rendererVersion": "1.0.0",
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "CANONICAL_CUSTOMER_RUNTIME",
+      "marketplaceSupport": false,
+      "editableCapabilities": {
+        "theme.logo": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.colors": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.typography": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.header": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.footer": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.navigation": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Fixed canonical campaign links; menu structure remains read-only."
+        },
+        "theme.product_grid": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Section copy and visibility; canonical product records remain read-only."
+        },
+        "theme.category_grid": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Section copy and visibility; canonical categories remain read-only."
+        },
+        "theme.banner": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.text": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.homepage_blocks": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Fixed slot visibility only; reorder and arbitrary sections unsupported."
+        },
+        "theme.assets": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "MANAGE"
+        },
+        "theme.preview": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.save_draft": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.publish": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "PUBLISH",
+          "detail": "Same-core publication request only; readiness and Admin-only activation remain separate server gates."
+        },
+        "theme.advanced_blocks": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Visual styles for existing elements only; adding, replacing or reordering blocks and canonical text/media edits are rejected."
+        }
+      },
+      "unsupportedCapabilities": [
+        "theme.campaign_canvas",
+        "theme.mobile_editor",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/15-nova-classic-tile.jpg",
+        "sourceEntry": "themes/15-nova-classic/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/15-nova-classic/theme.js",
+          "sha256": "1ec6e19a513d5b7d67e977d06d528251f82ced35aa1a61ddeafb017622c940e1",
+          "bytes": 9637
+        },
+        {
+          "path": "themes/15-nova-classic/theme.css",
+          "sha256": "0e8844a79a87a5cf0f110cf2562a3313add1ddc9b696dbafd10a8b69ee19152c",
+          "bytes": 350
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/15-nova-classic/index.html",
+          "sha256": "751330f604566e3a728341dc13dc9b29dab334347cd38b469fadfc63472bf2aa",
+          "bytes": 668
+        }
+      ],
+      "presentationReady": true,
+      "runtimeReady": true,
+      "assignmentEligible": true,
+      "status": "READY",
+      "presentationStatus": "READY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PASS",
+        "customerRuntime": "PASS",
+        "singleStoreRuntime": "PASS",
+        "publication": "PASS",
+        "proofSHA256": "4e925177602f0a4e594db0ad7c6a8d93cd08ddb7f5998cbeea4cc66582a53c6a",
+        "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+        "artifactDigest": "48ef24bb75b9e8ff9974a1970e29b5eed57550efaef75e58866f7a1c2486887a",
+        "phase": "COMPATIBILITY_ACCEPTED_PRE_PUBLICATION",
+        "storeActivation": "NOT_ASSERTED"
+      },
+      "reason": "Bu derleme için sunum, müşteri işlemleri ve yayın öncesi uyumluluk doğrulandı. Mağaza yayını ayrıca yetkili etkinleştirme gerektirir."
+    },
+    {
+      "themeId": "15-nova-classic",
+      "channel": "app",
+      "name": "Nova Classic",
+      "industry": "Ev, yaşam ve genel mağaza",
+      "sourceIdentity": "nova-store-sector-collection/15-nova-classic/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/15-nova-classic-tile.jpg",
+        "sourceEntry": "themes/15-nova-classic/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/15-nova-classic/theme.js",
+          "sha256": "1ec6e19a513d5b7d67e977d06d528251f82ced35aa1a61ddeafb017622c940e1",
+          "bytes": 9637
+        },
+        {
+          "path": "themes/15-nova-classic/theme.css",
+          "sha256": "0e8844a79a87a5cf0f110cf2562a3313add1ddc9b696dbafd10a8b69ee19152c",
+          "bytes": 350
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/15-nova-classic/app.html",
+          "sha256": "797a6d732b5a61a677c4fee1214e61969dc89065558613d4e948b2a7ca25d920",
+          "bytes": 668
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "16-nova-paper",
+      "channel": "web",
+      "name": "Nova Paper",
+      "industry": "Kırtasiye ve okul",
+      "sourceIdentity": "nova-store-sector-collection/16-nova-paper/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/16-nova-paper-tile.jpg",
+        "sourceEntry": "themes/16-nova-paper/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/16-nova-paper/theme.js",
+          "sha256": "e4424e6cd8034428bbef3653aa0a6fe0bdd411a58094d01b8f8b26ea28071606",
+          "bytes": 9130
+        },
+        {
+          "path": "themes/16-nova-paper/theme.css",
+          "sha256": "fcfc131808a182b0da29b42ee7e13ab071b46fce4f7b8798aa275e726b77dc82",
+          "bytes": 273
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/16-nova-paper/index.html",
+          "sha256": "07cd0dd64276318c23c03bbe9ed1737abae020abcd02179352e756a30cff188c",
+          "bytes": 660
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "16-nova-paper",
+      "channel": "app",
+      "name": "Nova Paper",
+      "industry": "Kırtasiye ve okul",
+      "sourceIdentity": "nova-store-sector-collection/16-nova-paper/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/16-nova-paper-tile.jpg",
+        "sourceEntry": "themes/16-nova-paper/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/16-nova-paper/theme.js",
+          "sha256": "e4424e6cd8034428bbef3653aa0a6fe0bdd411a58094d01b8f8b26ea28071606",
+          "bytes": 9130
+        },
+        {
+          "path": "themes/16-nova-paper/theme.css",
+          "sha256": "fcfc131808a182b0da29b42ee7e13ab071b46fce4f7b8798aa275e726b77dc82",
+          "bytes": 273
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/16-nova-paper/app.html",
+          "sha256": "945061b1c9b3978e858294a8a3bae9eddcad823b7a3c9cb7e6aa66a8c5003c76",
+          "bytes": 660
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "17-nova-garage",
+      "channel": "web",
+      "name": "Nova Garage",
+      "industry": "Otomotiv ve araç bakımı",
+      "sourceIdentity": "nova-store-sector-collection/17-nova-garage/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/17-nova-garage-tile.jpg",
+        "sourceEntry": "themes/17-nova-garage/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/17-nova-garage/theme.js",
+          "sha256": "68f7cee182b6bc5471abfba8782fe090d726a4728e25e8cd9c95d8769a9f92c9",
+          "bytes": 9415
+        },
+        {
+          "path": "themes/17-nova-garage/theme.css",
+          "sha256": "948587d38d12523652447504a4a7cd6aebe2896df31eb6acc13487db2d81c59d",
+          "bytes": 286
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/17-nova-garage/index.html",
+          "sha256": "f9748264617a04ed850dc32a69cfe7ca4a46bb31ecff7e62668d85d51f22c7b9",
+          "bytes": 663
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "17-nova-garage",
+      "channel": "app",
+      "name": "Nova Garage",
+      "industry": "Otomotiv ve araç bakımı",
+      "sourceIdentity": "nova-store-sector-collection/17-nova-garage/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/17-nova-garage-tile.jpg",
+        "sourceEntry": "themes/17-nova-garage/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/17-nova-garage/theme.js",
+          "sha256": "68f7cee182b6bc5471abfba8782fe090d726a4728e25e8cd9c95d8769a9f92c9",
+          "bytes": 9415
+        },
+        {
+          "path": "themes/17-nova-garage/theme.css",
+          "sha256": "948587d38d12523652447504a4a7cd6aebe2896df31eb6acc13487db2d81c59d",
+          "bytes": 286
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/17-nova-garage/app.html",
+          "sha256": "d4f0f090d9df62547ea4396473f658fd3ba62f635221956979673943bce125d4",
+          "bytes": 663
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "18-nova-voyage",
+      "channel": "web",
+      "name": "Nova Voyage",
+      "industry": "Valiz ve şehir seyahati",
+      "sourceIdentity": "nova-store-sector-collection/18-nova-voyage/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/18-nova-voyage-tile.jpg",
+        "sourceEntry": "themes/18-nova-voyage/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/18-nova-voyage/theme.js",
+          "sha256": "dedbcb92ac7ced225447467f6f086cbe326a39260c74595f1b89451ac263254b",
+          "bytes": 9444
+        },
+        {
+          "path": "themes/18-nova-voyage/theme.css",
+          "sha256": "dd7f6c272b0fc8102d5a43f5e8803ae516e86feb23873e05defa4ae0368e9c73",
+          "bytes": 273
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/18-nova-voyage/index.html",
+          "sha256": "f71933dcece7a1d2f8584b12475d345a2e8fefb455664a7f2d83cd5cb43f37c3",
+          "bytes": 663
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "18-nova-voyage",
+      "channel": "app",
+      "name": "Nova Voyage",
+      "industry": "Valiz ve şehir seyahati",
+      "sourceIdentity": "nova-store-sector-collection/18-nova-voyage/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/18-nova-voyage-tile.jpg",
+        "sourceEntry": "themes/18-nova-voyage/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/18-nova-voyage/theme.js",
+          "sha256": "dedbcb92ac7ced225447467f6f086cbe326a39260c74595f1b89451ac263254b",
+          "bytes": 9444
+        },
+        {
+          "path": "themes/18-nova-voyage/theme.css",
+          "sha256": "dd7f6c272b0fc8102d5a43f5e8803ae516e86feb23873e05defa4ae0368e9c73",
+          "bytes": 273
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/18-nova-voyage/app.html",
+          "sha256": "56f03571d71c9b63cdadb79928063939488c70d56773aeaa0d5ce7a1960f6f68",
+          "bytes": 663
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "19-nova-flora",
+      "channel": "web",
+      "name": "Nova Flora",
+      "industry": "İç mekân bitkileri ve saksı",
+      "sourceIdentity": "nova-store-sector-collection/19-nova-flora/web",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/19-nova-flora-tile.jpg",
+        "sourceEntry": "themes/19-nova-flora/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/19-nova-flora/theme.js",
+          "sha256": "fd0ad30c77ddf8470b59900bea28d9ca8284a26130e6cd3e7d453356cda6ff4a",
+          "bytes": 9530
+        },
+        {
+          "path": "themes/19-nova-flora/theme.css",
+          "sha256": "41dbe74a3f36c81e90056ba362d4bb2bffffad9c35b6c94a01bf460267388f3c",
+          "bytes": 273
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/19-nova-flora/index.html",
+          "sha256": "7186696f9fbe43466d63f9fa099c0a87137f22da4f51f31809c7ba71ac0f69bc",
+          "bytes": 660
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "19-nova-flora",
+      "channel": "app",
+      "name": "Nova Flora",
+      "industry": "İç mekân bitkileri ve saksı",
+      "sourceIdentity": "nova-store-sector-collection/19-nova-flora/app",
+      "sourceVersion": "1.0.0-demo",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/19-nova-flora-tile.jpg",
+        "sourceEntry": "themes/19-nova-flora/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/19-nova-flora/theme.js",
+          "sha256": "fd0ad30c77ddf8470b59900bea28d9ca8284a26130e6cd3e7d453356cda6ff4a",
+          "bytes": 9530
+        },
+        {
+          "path": "themes/19-nova-flora/theme.css",
+          "sha256": "41dbe74a3f36c81e90056ba362d4bb2bffffad9c35b6c94a01bf460267388f3c",
+          "bytes": 273
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/19-nova-flora/app.html",
+          "sha256": "2a2538c6c49a100e67db2bd793adfe6f0cd8141ad6518652a445495e33b78bb7",
+          "bytes": 660
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "20-nova-agora",
+      "channel": "web",
+      "name": "Nova Agora",
+      "industry": "Genel pazaryeri",
+      "sourceIdentity": "nova-store-sector-collection/20-nova-agora/web",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/20-nova-agora-tile.jpg",
+        "sourceEntry": "themes/20-nova-agora/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/20-nova-agora/theme.js",
+          "sha256": "25eaf76888b61914760073a7f85688b5e9c19486035271bc9d568a681b53b710",
+          "bytes": 9340
+        },
+        {
+          "path": "themes/20-nova-agora/theme.css",
+          "sha256": "6d71deddd566ddda0fed8d066d6bb5bd5428bf5f9881f7b29c04fe04ba8af556",
+          "bytes": 501
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/20-nova-agora/index.html",
+          "sha256": "49c614a5fd628dfb08a9515406d1c4fcf450ae8a3251828dea0e4d7595822d47",
+          "bytes": 652
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "20-nova-agora",
+      "channel": "app",
+      "name": "Nova Agora",
+      "industry": "Genel pazaryeri",
+      "sourceIdentity": "nova-store-sector-collection/20-nova-agora/app",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/20-nova-agora-tile.jpg",
+        "sourceEntry": "themes/20-nova-agora/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/20-nova-agora/theme.js",
+          "sha256": "25eaf76888b61914760073a7f85688b5e9c19486035271bc9d568a681b53b710",
+          "bytes": 9340
+        },
+        {
+          "path": "themes/20-nova-agora/theme.css",
+          "sha256": "6d71deddd566ddda0fed8d066d6bb5bd5428bf5f9881f7b29c04fe04ba8af556",
+          "bytes": 501
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/20-nova-agora/app.html",
+          "sha256": "18501db86eef6f3cd4be7914968b9c9a47308c02f7429658255a442fbcd0dc83",
+          "bytes": 652
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "21-nova-bento",
+      "channel": "web",
+      "name": "Nova Bento",
+      "industry": "Elektronik & oyun",
+      "sourceIdentity": "nova-store-sector-collection/21-nova-bento/web",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/21-nova-bento-tile.jpg",
+        "sourceEntry": "themes/21-nova-bento/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/21-nova-bento/theme.js",
+          "sha256": "3ffcc8af5c2228753fb4b76edf5e458dda477beef437192927b9e82c6cf6f65b",
+          "bytes": 9182
+        },
+        {
+          "path": "themes/21-nova-bento/theme.css",
+          "sha256": "394be3299864abf513ac31f44f06741459587f4a616852dfe8b9df162f475950",
+          "bytes": 502
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/21-nova-bento/index.html",
+          "sha256": "6fdd120e718cd37bd7515692fdcfcdf5fbfb16c071450ab08fdb2d2156c0dc14",
+          "bytes": 652
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "21-nova-bento",
+      "channel": "app",
+      "name": "Nova Bento",
+      "industry": "Elektronik & oyun",
+      "sourceIdentity": "nova-store-sector-collection/21-nova-bento/app",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/21-nova-bento-tile.jpg",
+        "sourceEntry": "themes/21-nova-bento/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/21-nova-bento/theme.js",
+          "sha256": "3ffcc8af5c2228753fb4b76edf5e458dda477beef437192927b9e82c6cf6f65b",
+          "bytes": 9182
+        },
+        {
+          "path": "themes/21-nova-bento/theme.css",
+          "sha256": "394be3299864abf513ac31f44f06741459587f4a616852dfe8b9df162f475950",
+          "bytes": 502
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/21-nova-bento/app.html",
+          "sha256": "f4cde52b3a75c81b90285c17da40b4a47a0b0d4e8d1e147748ef2b9d5ee7fe55",
+          "bytes": 652
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "22-nova-pantry",
+      "channel": "web",
+      "name": "Nova Pantry",
+      "industry": "Market & gıda",
+      "sourceIdentity": "nova-store-sector-collection/22-nova-pantry/web",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/22-nova-pantry-tile.jpg",
+        "sourceEntry": "themes/22-nova-pantry/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/22-nova-pantry/theme.js",
+          "sha256": "5f7bcd1a500d6342e373f04865dbda595dd1507f4758e68912f6675183d2e2aa",
+          "bytes": 9200
+        },
+        {
+          "path": "themes/22-nova-pantry/theme.css",
+          "sha256": "ce55da346e49d7904d80e8f1ac250a21bb871387fc34d1298d080d334035ea67",
+          "bytes": 502
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/22-nova-pantry/index.html",
+          "sha256": "463af84d446ec00cd7fff044674d5f4736630698ead4e0a9e00cced3793a7416",
+          "bytes": 655
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "22-nova-pantry",
+      "channel": "app",
+      "name": "Nova Pantry",
+      "industry": "Market & gıda",
+      "sourceIdentity": "nova-store-sector-collection/22-nova-pantry/app",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/22-nova-pantry-tile.jpg",
+        "sourceEntry": "themes/22-nova-pantry/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/22-nova-pantry/theme.js",
+          "sha256": "5f7bcd1a500d6342e373f04865dbda595dd1507f4758e68912f6675183d2e2aa",
+          "bytes": 9200
+        },
+        {
+          "path": "themes/22-nova-pantry/theme.css",
+          "sha256": "ce55da346e49d7904d80e8f1ac250a21bb871387fc34d1298d080d334035ea67",
+          "bytes": 502
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/22-nova-pantry/app.html",
+          "sha256": "12bd18dade902aef9c4c88ceba94e9454e84932db60aaa06b9266e69780c8c46",
+          "bytes": 655
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "23-nova-archive",
+      "channel": "web",
+      "name": "Nova Archive",
+      "industry": "Kitap & kırtasiye",
+      "sourceIdentity": "nova-store-sector-collection/23-nova-archive/web",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/23-nova-archive-tile.jpg",
+        "sourceEntry": "themes/23-nova-archive/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/23-nova-archive/theme.js",
+          "sha256": "c913f36864334c1f43b4849a99c3846ff8625577b4016e3f2b0228f8705df86b",
+          "bytes": 9418
+        },
+        {
+          "path": "themes/23-nova-archive/theme.css",
+          "sha256": "87f7366e31beb2c88b50eb6e2b2a485059ddd7e1b10135ea8e5e2fb2c8f24d6c",
+          "bytes": 486
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/23-nova-archive/index.html",
+          "sha256": "a3786a58ed5495e394b87fe49e5a6a86e0dc1a3c265d10cd80accd583daf0238",
+          "bytes": 658
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "23-nova-archive",
+      "channel": "app",
+      "name": "Nova Archive",
+      "industry": "Kitap & kırtasiye",
+      "sourceIdentity": "nova-store-sector-collection/23-nova-archive/app",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/23-nova-archive-tile.jpg",
+        "sourceEntry": "themes/23-nova-archive/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/23-nova-archive/theme.js",
+          "sha256": "c913f36864334c1f43b4849a99c3846ff8625577b4016e3f2b0228f8705df86b",
+          "bytes": 9418
+        },
+        {
+          "path": "themes/23-nova-archive/theme.css",
+          "sha256": "87f7366e31beb2c88b50eb6e2b2a485059ddd7e1b10135ea8e5e2fb2c8f24d6c",
+          "bytes": 486
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/23-nova-archive/app.html",
+          "sha256": "336f4208977a68c42ba9f428e767b8266d2e8c7b7c09db1747f379bd4f85406b",
+          "bytes": 658
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "24-nova-monogram",
+      "channel": "web",
+      "name": "Nova Monogram",
+      "industry": "Takı & aksesuar",
+      "sourceIdentity": "nova-store-sector-collection/24-nova-monogram/web",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/24-nova-monogram-tile.jpg",
+        "sourceEntry": "themes/24-nova-monogram/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/24-nova-monogram/theme.js",
+          "sha256": "7f3c41aa427b6a78fc4f018d053f48c5872a8379ae09aa5e132944ae43c984e7",
+          "bytes": 9337
+        },
+        {
+          "path": "themes/24-nova-monogram/theme.css",
+          "sha256": "5d2ac923ea1edaebaa5606f9872e77ced2273fa842cf0a31162709b2a80b0c12",
+          "bytes": 486
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/24-nova-monogram/index.html",
+          "sha256": "10bf775a4ccf53a5904d60a2b0880f9e8622455e0919f713a4837d04289403d0",
+          "bytes": 661
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "24-nova-monogram",
+      "channel": "app",
+      "name": "Nova Monogram",
+      "industry": "Takı & aksesuar",
+      "sourceIdentity": "nova-store-sector-collection/24-nova-monogram/app",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/24-nova-monogram-tile.jpg",
+        "sourceEntry": "themes/24-nova-monogram/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/24-nova-monogram/theme.js",
+          "sha256": "7f3c41aa427b6a78fc4f018d053f48c5872a8379ae09aa5e132944ae43c984e7",
+          "bytes": 9337
+        },
+        {
+          "path": "themes/24-nova-monogram/theme.css",
+          "sha256": "5d2ac923ea1edaebaa5606f9872e77ced2273fa842cf0a31162709b2a80b0c12",
+          "bytes": 486
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/24-nova-monogram/app.html",
+          "sha256": "a1c1892ecf716cd8eac8ec7286b23ae749823105ce3951b91f3052a105717830",
+          "bytes": 661
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "25-nova-sound",
+      "channel": "web",
+      "name": "Nova Sound",
+      "industry": "Elektronik & oyun",
+      "sourceIdentity": "nova-store-sector-collection/25-nova-sound/web",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/25-nova-sound-tile.jpg",
+        "sourceEntry": "themes/25-nova-sound/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/25-nova-sound/theme.js",
+          "sha256": "cf165084074ebdcf3537b44105be558944ac2920f8289d2faf896bff54e3d28e",
+          "bytes": 9249
+        },
+        {
+          "path": "themes/25-nova-sound/theme.css",
+          "sha256": "5e44b40e5200902a6cc10bae722e6ea777821e207c3bbcf72aa592446bb1980f",
+          "bytes": 502
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/25-nova-sound/index.html",
+          "sha256": "86096031ea27e61086289953eea92d3d194c712d9f8e0f891f1ee6e96c041ee3",
+          "bytes": 652
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "25-nova-sound",
+      "channel": "app",
+      "name": "Nova Sound",
+      "industry": "Elektronik & oyun",
+      "sourceIdentity": "nova-store-sector-collection/25-nova-sound/app",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/25-nova-sound-tile.jpg",
+        "sourceEntry": "themes/25-nova-sound/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/25-nova-sound/theme.js",
+          "sha256": "cf165084074ebdcf3537b44105be558944ac2920f8289d2faf896bff54e3d28e",
+          "bytes": 9249
+        },
+        {
+          "path": "themes/25-nova-sound/theme.css",
+          "sha256": "5e44b40e5200902a6cc10bae722e6ea777821e207c3bbcf72aa592446bb1980f",
+          "bytes": 502
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/25-nova-sound/app.html",
+          "sha256": "2649db5ab66f9655fb9ed71af3cc90df36839405aa54d4962f5145e84d857060",
+          "bytes": 652
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "26-nova-terra",
+      "channel": "web",
+      "name": "Nova Terra",
+      "industry": "Kamp ve outdoor",
+      "sourceIdentity": "nova-store-sector-collection/26-nova-terra/web",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/26-nova-terra-tile.jpg",
+        "sourceEntry": "themes/26-nova-terra/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/26-nova-terra/theme.js",
+          "sha256": "716c76745e5eda60cdb20362433c286df5d8112ec06393a4038dfcb950778f3c",
+          "bytes": 9365
+        },
+        {
+          "path": "themes/26-nova-terra/theme.css",
+          "sha256": "adc6de6fbb353d24e2fe1b3841b6995f5911ab21fc2e959aea7482cc14e32c19",
+          "bytes": 486
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/26-nova-terra/index.html",
+          "sha256": "60bde09faca50eb021da307c14e8cea3aafae2921d366d2421ce67eea473a4a1",
+          "bytes": 652
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "26-nova-terra",
+      "channel": "app",
+      "name": "Nova Terra",
+      "industry": "Kamp ve outdoor",
+      "sourceIdentity": "nova-store-sector-collection/26-nova-terra/app",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/26-nova-terra-tile.jpg",
+        "sourceEntry": "themes/26-nova-terra/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/26-nova-terra/theme.js",
+          "sha256": "716c76745e5eda60cdb20362433c286df5d8112ec06393a4038dfcb950778f3c",
+          "bytes": 9365
+        },
+        {
+          "path": "themes/26-nova-terra/theme.css",
+          "sha256": "adc6de6fbb353d24e2fe1b3841b6995f5911ab21fc2e959aea7482cc14e32c19",
+          "bytes": 486
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/26-nova-terra/app.html",
+          "sha256": "d1acaae55d77af39ad6ba781f318784bb8b9044457de18c2a07d5e30776100fb",
+          "bytes": 652
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "27-nova-pop",
+      "channel": "web",
+      "name": "Nova Pop",
+      "industry": "Kırtasiye ve hediye",
+      "sourceIdentity": "nova-store-sector-collection/27-nova-pop/web",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": true,
+      "appSupport": false,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/27-nova-pop-tile.jpg",
+        "sourceEntry": "themes/27-nova-pop/index.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/27-nova-pop/theme.js",
+          "sha256": "414c246750d8e7148008533afb2e7466ab16357c00eb38871968f8e3898e7436",
+          "bytes": 9204
+        },
+        {
+          "path": "themes/27-nova-pop/theme.css",
+          "sha256": "ae405c8af02d806bb88767fdf8740b80dda53effa5b999cfd222ee4d83b6fdbc",
+          "bytes": 423
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/27-nova-pop/index.html",
+          "sha256": "76e1e1277e4458122ee44bf7a936a1072217515f0143a282b2bda4eb45391816",
+          "bytes": 646
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    },
+    {
+      "themeId": "27-nova-pop",
+      "channel": "app",
+      "name": "Nova Pop",
+      "industry": "Kırtasiye ve hediye",
+      "sourceIdentity": "nova-store-sector-collection/27-nova-pop/app",
+      "sourceVersion": "1.1.0-candidate",
+      "rendererId": null,
+      "rendererVersion": null,
+      "documentSchemaVersion": 2,
+      "webSupport": false,
+      "appSupport": true,
+      "singleStoreSupport": "NOT_CONNECTED",
+      "marketplaceSupport": false,
+      "editableCapabilities": {},
+      "unsupportedCapabilities": [
+        "theme.logo",
+        "theme.colors",
+        "theme.typography",
+        "theme.header",
+        "theme.footer",
+        "theme.navigation",
+        "theme.product_grid",
+        "theme.category_grid",
+        "theme.banner",
+        "theme.text",
+        "theme.homepage_blocks",
+        "theme.campaign_canvas",
+        "theme.advanced_blocks",
+        "theme.assets",
+        "theme.preview",
+        "theme.save_draft",
+        "theme.mobile_editor",
+        "theme.version_history",
+        "theme.publish",
+        "theme.direct_publish",
+        "theme.scheduling",
+        "theme.custom_css",
+        "theme.custom_html",
+        "theme.custom_js",
+        "theme.ai_builder"
+      ],
+      "previewAssets": {
+        "thumbnail": "/theme-library/previews/27-nova-pop-tile.jpg",
+        "sourceEntry": "themes/27-nova-pop/app.html"
+      },
+      "sourceHashes": [
+        {
+          "path": "themes/27-nova-pop/theme.js",
+          "sha256": "414c246750d8e7148008533afb2e7466ab16357c00eb38871968f8e3898e7436",
+          "bytes": 9204
+        },
+        {
+          "path": "themes/27-nova-pop/theme.css",
+          "sha256": "ae405c8af02d806bb88767fdf8740b80dda53effa5b999cfd222ee4d83b6fdbc",
+          "bytes": 423
+        },
+        {
+          "path": "shared/core.js",
+          "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+          "bytes": 2569934
+        },
+        {
+          "path": "shared/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "bytes": 430940
+        },
+        {
+          "path": "shared/support-contract.js",
+          "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+          "bytes": 12873
+        },
+        {
+          "path": "shared/theme-host-bridge.js",
+          "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+          "bytes": 20105
+        },
+        {
+          "path": "themes/27-nova-pop/app.html",
+          "sha256": "028d874e393394fe13a6bbead317d16d7a4ac4d003d404ad6fcb449bb5c9288e",
+          "bytes": 646
+        }
+      ],
+      "presentationReady": false,
+      "runtimeReady": false,
+      "assignmentEligible": false,
+      "status": "PARTIAL",
+      "presentationStatus": "SOURCE_ONLY",
+      "acceptance": {
+        "source": "VERIFIED",
+        "presentation": "PENDING",
+        "customerRuntime": "NOT_CONNECTED",
+        "singleStoreRuntime": "PENDING",
+        "publication": "BLOCKED"
+      },
+      "reason": "Kaynak demo korunuyor. Bu tema henüz canlı presentation için hazır değil."
+    }
+  ]
+}

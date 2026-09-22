@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "family": "classic",
+  "buildManifestSHA256": "0290ed9ae04cd431e5df440f21507a831b3bf2ac4966730f553f247e1fb35150",
+  "provenance": "ACTUAL_BROWSER_OWNER_REVIEWED",
+  "reviewer": "Codex, delegated local acceptance",
+  "result": "PASS",
+  "presentation": {
+    "id": "nova-classic",
+    "version": "1.0.0",
+    "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668"
+  },
+  "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+  "artifactDigest": "48ef24bb75b9e8ff9974a1970e29b5eed57550efaef75e58866f7a1c2486887a",
+  "marketplaceAbsent": "PASS",
+  "visualManual": "PASS",
+  "storeActivation": "NOT_ASSERTED",
+  "knownLimitations": {
+    "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+    "paymentInitiation": "DISABLED",
+    "orderFixture": "One synthetic Classic paid status fixture; no provider payment or fulfillment proof.",
+    "sellerEditor": "Final normal Stocky/Seller Studio re-acceptance remains pending; not proved by customer candidate."
+  },
+  "functional": {
+    "customerAuth": "PASS",
+    "persistentCart": "PASS",
+    "favorites": "PASS",
+    "variantSelection": "PASS",
+    "stockCheck": "PASS",
+    "checkoutPreparation": "PASS",
+    "orderHistory": "PASS",
+    "reviewPermission": "PASS",
+    "questions": "PASS",
+    "supportRouting": "PASS",
+    "singleStore": "PASS",
+    "productTransition": "PASS",
+    "pendingStatusRecovery": "PASS"
+  },
+  "evidence": [
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-account.txt",
+      "sha256": "2cfc61ffdbabe4667033eafa45bfc6135e8c942b2998e8309d4b521ed7f81ee4"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-cart-336.txt",
+      "sha256": "c18f12ac9eaabceb7ccea4f56af68b374d36eb83c2cf8b316a894293560f9254"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-cart-reload.txt",
+      "sha256": "21d9ceb67093fb7638af60fa4d9b83c1be0e851daefc45d83296d8ea530ee06b"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-checkout-quote.txt",
+      "sha256": "81e7c2894048a07d794b9b6d2e9a4420c39d4c200af61ab2a1318f14f5e123f8"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-favorites.txt",
+      "sha256": "fdec834cc8bf0cafc56fa705c1cdf5fc696aa47ed374e1d329b259d88655c28d"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-logout.txt",
+      "sha256": "0a4976cdf4d736f72a26a262aafcb6413a41e2da1647241bb363c0c8832b3c65"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-order-detail.txt",
+      "sha256": "f007e0c3604ab23ca4a85e86be9ac662725f58a7d1b416ce3d1a0b89af579087"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-orders.txt",
+      "sha256": "42096ea76f04fbeec986166e7ee3ebee04d2bdd3b25281dfd1c4b646afd0d33a"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-product-transition.txt",
+      "sha256": "87f830f7bb9854c1910b3ad0836708b2de141dcae9ca41f94d651d750d948832"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-quantity-561.txt",
+      "sha256": "b6ec902c1bb31683d9eb58f56f26a57d8973b42cd12b716433c9f5e3ea52ab22"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-question.txt",
+      "sha256": "4423407107614716c310dc8ef83e1f1e58355d63065fbc8690b80f4dd952c0c5"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-review-guard.txt",
+      "sha256": "a1f373ea3d293bae4fec5a13055645c9d01bf70552227e43a1340be399644f66"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-stock-boundary.txt",
+      "sha256": "a69c4c81d43517e2034eed47b57ce115fcdbc05c0a3a8890f8cfcb7704a277b0"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\classic-support.txt",
+      "sha256": "23bbf3d8ea89b9a6cb748eff1105a92addbdfdfc4ec357cfc8b722fb2df3c53d"
+    },
+    {
+      "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\read-only-scope-proof.json",
+      "sha256": "99a2cba45c2f1e90b95c87ed9f58837dd0c8ad473b6e9360f8b2b9fcb93f5d27"
+    }
+  ],
+  "reviewNotes": "Normal browser login/logout; refresh persisted cart; current canonical variants/stock, favorites, review denial, local questions/support, server quote without payment. Product transitions settle and mutation controls recover after completion. Actual 21-width/page measurements per family. Representative desktop home and mobile category/PDP screenshots visually inspected. No publication, Seller final acceptance, native Android or production readiness inferred."
+}

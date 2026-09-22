@@ -39,10 +39,13 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 (async () => {
     assert.equal(validateManifest(manifest), true);
     const registry = loadRegistry();
-    assert.equal(registry.length, 41);
+    assert.equal(registry.length, 48);
     assert.equal(registry[0].id, '20260628_staging_schema_baseline');
-    assert.equal(registry.at(-2).id, '20260915_01_stocky_system_commerce');
-    assert.equal(registry.at(-1).id, '20260918_01_theme_platform_foundation');
+    assert.equal(registry.at(-9).id, '20260915_01_stocky_system_commerce');
+    assert.equal(registry.at(-8).id, '20260918_01_theme_platform_foundation');
+    assert.equal(registry.at(-7).id, '20260919_01_theme_platform_seller_experience');
+    assert.equal(registry.at(-6).id, '20260919_variant_cart_v2');
+    assert.deepEqual(registry.slice(-5).map(entry=>entry.id), ['20260919_wave2_theme_delivery', '20260919_wave2_theme_seller_bridge', '20260919_wave2_theme_store_content', '20260919_wave2_zpublication_lifecycle', '20260919_wave2_zzsupport_routing']);
     assert.deepEqual(
         registry.filter((entry) => entry.id.startsWith('20260712_')).map((entry) => entry.path),
         [
@@ -53,7 +56,7 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
     );
     assert.equal(new Set(registry.map((entry) => entry.id)).size, registry.length);
     assert.equal(new Set(registry.map((entry) => entry.path)).size, registry.length);
-    assert.equal(registry.filter((entry) => entry.transactionWrapper).length, 35);
+    assert.equal(registry.filter((entry) => entry.transactionWrapper).length, 42);
     assert.deepEqual(
         registry.filter((entry) => entry.id.includes('_seller_')).map((entry) => entry.path),
         [
@@ -69,7 +72,9 @@ const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
             'migrations/20260830_01_seller_application_user_binding.sql',
             'migrations/20260901_01_seller_public_legal_identity.sql',
             'migrations/20260902_01_seller_package_delivery_status.sql',
-            'migrations/20260904_01_seller_reputation_questions.sql'
+            'migrations/20260904_01_seller_reputation_questions.sql',
+            'migrations/20260919_01_theme_platform_seller_experience.sql',
+            'migrations/20260919_wave2_theme_seller_bridge.sql'
         ]
     );
 

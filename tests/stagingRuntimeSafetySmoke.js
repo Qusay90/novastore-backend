@@ -535,10 +535,12 @@ const expectBlocked = (effect, env = syntheticStagingEnv()) => {
         assert.equal(packageJson.scripts['staging:bootstrap'], 'node scripts/stagingBootstrapCli.js');
     });
 
-    await check('runtime', '42 migration manifest remains the exact 41-file combined registry', () => {
+    await check('runtime', '42 migration manifest remains the exact 48-file combined registry', () => {
         const manifest = JSON.parse(read('scripts/staging-migrations/manifest.json'));
-        assert.equal(manifest.length, 41);
-        assert.equal(manifest.at(-1).id, '20260918_01_theme_platform_foundation');
+        assert.equal(manifest.length, 48);
+        assert.equal(manifest.at(-7).id, '20260919_01_theme_platform_seller_experience');
+        assert.equal(manifest.at(-6).id, '20260919_variant_cart_v2');
+    assert.deepEqual(manifest.slice(-5).map(entry=>entry.id), ['20260919_wave2_theme_delivery', '20260919_wave2_theme_seller_bridge', '20260919_wave2_theme_store_content', '20260919_wave2_zpublication_lifecycle', '20260919_wave2_zzsupport_routing']);
         assert.equal(new Set(manifest.map((item) => item.path)).size, manifest.length);
     });
 

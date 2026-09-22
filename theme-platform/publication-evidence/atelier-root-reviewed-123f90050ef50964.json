@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "reviewed": true,
+  "provenance": "ACTUAL_BROWSER_ROOT_REVIEWED",
+  "result": "PASS",
+  "environment": "LOCAL",
+  "phase": "BUILT_ARTIFACT_QA_PRE_ACTIVATION",
+  "storeActivation": "NOT_ASSERTED",
+  "reviewedAt": "2026-09-19T22:57:28.845Z",
+  "buildManifestSHA256": "90d86609b71869ec552ebc1ebf7b5c4acfcee06f18bc0f4468b8c753069f7827",
+  "presentation": {
+    "id": "nova-atelier",
+    "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a",
+    "version": "1.0.0"
+  },
+  "sourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+  "artifactDigest": "0d432d95612e09b6b3053ddd0613142c3dbcc1030ed0e644aba5047cb5e4e459",
+  "publicationId": "8698bd13-c502-47fc-8803-84400e61157c",
+  "visualManual": "PASS",
+  "marketplaceUiAbsent": true,
+  "pages": {
+    "home": "PASS",
+    "category": "PASS",
+    "product": "PASS"
+  },
+  "knownLimitations": {
+    "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+    "paymentInitiation": "DISABLED"
+  },
+  "observations": [
+    "All21 real browser cases passed width/overflow/visible image checks.",
+    "Direct visual review: home320/1440, category320, product390/1440; original Atelier editorial identity retained and product images contained.",
+    "Saved product shelf heading persists; canonical two product and one category fixture causes intentional empty grid slots.",
+    "Product descriptive fields are empty in canonical fixture; no made-up product or delivery claims."
+  ],
+  "manuallyViewedScreenshots": [
+    "atelier-0d432d95612e-home-320.jpg",
+    "atelier-0d432d95612e-home-1440.jpg",
+    "atelier-0d432d95612e-category-320.jpg",
+    "atelier-0d432d95612e-product-390.jpg",
+    "atelier-0d432d95612e-product-1440.jpg"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "reviewed": true,
+  "provenance": "ACTUAL_BROWSER_ROOT_REVIEWED",
+  "result": "PASS",
+  "environment": "LOCAL",
+  "phase": "BUILT_ARTIFACT_QA_PRE_ACTIVATION",
+  "storeActivation": "NOT_ASSERTED",
+  "reviewedAt": "2026-09-22T15:04:51.958Z",
+  "buildManifestSHA256": "0290ed9ae04cd431e5df440f21507a831b3bf2ac4966730f553f247e1fb35150",
+  "presentation": {
+    "id": "nova-atelier",
+    "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a",
+    "version": "1.0.0"
+  },
+  "sourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+  "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+  "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+  "visualManual": "PASS",
+  "marketplaceUiAbsent": true,
+  "pages": {
+    "home": "PASS",
+    "category": "PASS",
+    "product": "PASS"
+  },
+  "knownLimitations": {
+    "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+    "paymentInitiation": "DISABLED"
+  },
+  "notes": [
+    "21 actual B artifact browser checks PASS; width verified in selected browser tab after full candidate bootstrap reload.",
+    "Home1440, category320 and product390 screenshots manually inspected. Separate Atelier identity and B seller heading retained.",
+    "Earlier incorrect-width A-bootstrap capture retained as failed evidence and excluded from this acceptance.",
+    "Candidate wrapper changes no active pointer; this review asserts no activation."
+  ]
+}

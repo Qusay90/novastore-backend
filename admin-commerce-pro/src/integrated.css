@@ -1005,3 +1005,10 @@
 .live-delivery-detail dt { font-weight: 700; }
 .live-delivery-detail dd { margin: 0; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .live-delivery-detail p { overflow-wrap: anywhere; }
+
+/* Authenticated full Studio entry points preserve normal browser new-tab semantics. */
+.icon-rail .studio-workshop-link{position:relative;display:grid;place-items:center;flex:0 0 auto;width:48px;height:44px;padding:0;color:#c6d7e7;background:transparent;border:0;border-radius:9px;text-decoration:none}
+.icon-rail .studio-workshop-link:hover,.icon-rail .studio-workshop-link:focus-visible{color:#fff;background:rgba(255,255,255,.11)}
+.icon-rail .studio-workshop-link:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.icon-rail .studio-workshop-link .icon-wrap svg{width:21px;height:21px}
+@media(max-width:650px){.icon-rail .studio-workshop-link{width:46px}}

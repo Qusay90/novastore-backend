@@ -31,9 +31,12 @@ const env = {
     DATABASE_URL: connectionString
 };
 const registry = loadRegistry();
-assert.equal(registry.length, 41);
-assert.equal(registry.at(-2).id, '20260915_01_stocky_system_commerce');
-assert.equal(registry.at(-1).id, '20260918_01_theme_platform_foundation');
+    assert.equal(registry.length, 48);
+    assert.equal(registry.at(-9).id, '20260915_01_stocky_system_commerce');
+    assert.equal(registry.at(-8).id, '20260918_01_theme_platform_foundation');
+    assert.equal(registry.at(-7).id, '20260919_01_theme_platform_seller_experience');
+    assert.equal(registry.at(-6).id, '20260919_variant_cart_v2');
+    assert.deepEqual(registry.slice(-5).map(entry=>entry.id), ['20260919_wave2_theme_delivery', '20260919_wave2_theme_seller_bridge', '20260919_wave2_theme_store_content', '20260919_wave2_zpublication_lifecycle', '20260919_wave2_zzsupport_routing']);
 const silent = () => {};
 const admin = new Client({ connectionString, application_name: 'p4d1a_integration_assertions' });
 
@@ -271,6 +274,15 @@ const bootstrapSnapshot = async ({ productId, categoryId }) => {
         'seller_feature_entitlements', 'theme_assets', 'theme_previews', 'theme_publications',
         'theme_deployments', 'theme_operations', 'theme_outbox', 'theme_inbox',
         'theme_audit_events', 'theme_admin_roles', 'theme_seller_roles',
+        'theme_experience_profiles', 'theme_service_experiences', 'theme_offers',
+        'theme_version_packages', 'theme_package_assets', 'theme_domain_bindings',
+        'user_shared_state_v1_archive', 'user_cart_finalizations', 'theme_stocky_deliveries',
+        'theme_seller_bridge_mappings', 'theme_seller_bridge_sessions',
+        'theme_seller_bridge_requests', 'theme_seller_bridge_audit',
+        'theme_store_profiles', 'theme_store_legal_documents',
+        'theme_publication_artifacts', 'theme_publication_stage_events',
+        'theme_active_artifacts', 'theme_publication_activations', 'theme_asset_retention',
+        'theme_store_support_policies', 'theme_store_support_threads', 'theme_store_support_messages',
         'webhook_events', LEDGER_TABLE
     ].sort();
     const tables = await admin.query(

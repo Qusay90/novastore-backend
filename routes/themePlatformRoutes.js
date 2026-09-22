@@ -12,6 +12,7 @@ const adminRoutes = Object.freeze([
     ['get', '/services', 'services'], ['post', '/services', 'createService'],
     ['get', '/services/:serviceId', 'service'], ['patch', '/services/:serviceId', 'updateService'],
     ['post', '/services/:serviceId/assignments', 'assign'], ['post', '/assignments/:assignmentId/withdraw', 'withdraw'],
+    ['post', '/assignments/:assignmentId/delivery-retry', 'retryAssignmentDelivery'],
     ['get', '/services/:serviceId/entitlements', 'entitlements'], ['put', '/services/:serviceId/entitlements/:featureCode', 'entitlement'],
     ['get', '/operations/:operationId', 'operation'], ['get', '/services/:serviceId/audit', 'audit']
 ]);
@@ -30,7 +31,7 @@ const privateHeaders = (req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
     next();
 };
-const createRouter = ({ database, enabled, kind, auth, tenant }) => {
+const createRouter = ({ database, enabled, kind, auth, tenant, storageRoot, storage, composition }) => {
     const router = express.Router();
     router.use(privateHeaders);
     if (enabled !== true) {
@@ -43,7 +44,13 @@ const createRouter = ({ database, enabled, kind, auth, tenant }) => {
         if (!auth?.sellerAudienceAuthenticate || !auth?.requireLiveSellerSession || !tenant?.resolveServerTenantContext) throw new TypeError('Existing Seller auth and tenant middleware required');
         router.use(auth.sellerAudienceAuthenticate, auth.requireLiveSellerSession, tenant.resolveServerTenantContext);
     }
-    for (const [method, path, action] of kind === 'admin' ? adminRoutes : sellerRoutes) {
+    router.use(require('./themeExperienceRoutes').createThemeExperienceRouter({ database, kind, storageRoot, storage }));
+    router.use(require('./themeStoreContentRoutes').createThemeStoreContentRouter({ database, kind }));
+    router.use(require('./themeStoreSupportRoutes').createThemeStoreSupportRouter({ database, kind }));
+    router.use(require('./themePublicationRoutes').createThemePublicationRouter({database,kind,
+        composition:composition||require('../services/themePlatformRuntimeComposition').createThemeRuntimeComposition({database})}));
+    const adminEditorRoutes = sellerRoutes.filter(([, path]) => /^\/(?:drafts|previews|assets|publications)\//u.test(path));
+    for (const [method, path, action] of kind === 'admin' ? [...adminRoutes, ...adminEditorRoutes] : sellerRoutes) {
         router[method](path, async (req, res) => {
             try {
                 if (Object.keys(req.query).length) return res.status(400).json({ code: 'THEME_QUERY_NOT_SUPPORTED' });

@@ -1,5 +1,6 @@
 const INTEGRATED_ADMIN_PAGES = Object.freeze([
   "dashboard",
+  "themePlatform",
   "orders",
   "returns",
   "notifications",

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "reviewed": true,
+  "provenance": "ACTUAL_BROWSER_ROOT_REVIEWED",
+  "result": "PASS",
+  "environment": "LOCAL",
+  "phase": "BUILT_ARTIFACT_QA_PRE_ACTIVATION",
+  "storeActivation": "NOT_ASSERTED",
+  "reviewedAt": "2026-09-22T15:11:29.452Z",
+  "buildManifestSHA256": "0290ed9ae04cd431e5df440f21507a831b3bf2ac4966730f553f247e1fb35150",
+  "presentation": {
+    "id": "nova-classic",
+    "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668",
+    "version": "1.0.0"
+  },
+  "sourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+  "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+  "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+  "visualManual": "PASS",
+  "marketplaceUiAbsent": true,
+  "pages": {
+    "home": "PASS",
+    "category": "PASS",
+    "product": "PASS"
+  },
+  "knownLimitations": {
+    "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+    "paymentInitiation": "DISABLED"
+  },
+  "notes": [
+    "21 actual Classic artifact browser checks PASS; rendered images loaded by normal scrolling. Zero-layout hidden menu images listed separately in measurement.",
+    "Home1440, category320 and product390 screenshots manually inspected. Separate Classic identity and saved seller heading retained.",
+    "Actual responsive widths verified. Mobile category dialog opened and product suggestions inspected.",
+    "Candidate wrapper changes no active pointer; this review asserts no activation."
+  ]
+}

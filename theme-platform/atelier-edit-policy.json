@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "presentationId": "nova-atelier",
+  "presentationVersion": "1.0.0",
+  "errorCode": "THEME_PRESENTATION_EDIT_UNSUPPORTED",
+  "visualContent": {
+    "logoImage": [
+      "imageUrl",
+      "alt"
+    ]
+  },
+  "visualReplacementIds": [
+    "logo",
+    "logoImage"
+  ],
+  "visualReplacementPatterns": [
+    "^item:[a-zA-Z0-9_-]{1,100}:icon$"
+  ],
+  "heroCampaign": {
+    "customWhenNonempty": [
+      "title",
+      "description",
+      "image"
+    ],
+    "ctaFields": [
+      "buttonText",
+      "target"
+    ],
+    "targets": [
+      "home",
+      "categories",
+      "search",
+      "cart",
+      "account",
+      "support",
+      "favorites"
+    ],
+    "canonicalTargetKinds": [
+      "product",
+      "category"
+    ]
+  },
+  "mutablePaths": [
+    "studio.theme.accent",
+    "studio.theme.background",
+    "studio.theme.surface",
+    "studio.theme.text",
+    "studio.theme.muted",
+    "studio.theme.border",
+    "studio.theme.fontFamily",
+    "studio.theme.radius",
+    "studio.chrome.header.background",
+    "studio.chrome.header.textColor",
+    "studio.chrome.header.logoText",
+    "studio.chrome.header.showSearch",
+    "studio.chrome.footer.background",
+    "studio.chrome.footer.textColor",
+    "studio.design.name",
+    "studio.design.header",
+    "studio.design.footer",
+    "studio.design.navigation",
+    "studio.design.elements"
+  ],
+  "blocks": [
+    {
+      "id": "atelier-hero",
+      "type": "hero",
+      "mutableFields": [
+        "title",
+        "description",
+        "enabled",
+        "image",
+        "alt",
+        "buttonText",
+        "target"
+      ]
+    },
+    {
+      "id": "atelier-categories",
+      "type": "categories",
+      "mutableFields": [
+        "enabled"
+      ]
+    },
+    {
+      "id": "atelier-products",
+      "type": "products",
+      "mutableFields": [
+        "title",
+        "description",
+        "enabled"
+      ]
+    },
+    {
+      "id": "atelier-story",
+      "type": "editorial",
+      "mutableFields": [
+        "title",
+        "description",
+        "enabled"
+      ]
+    }
+  ]
+}

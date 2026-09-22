@@ -144,9 +144,12 @@ const setupSeller = async ({ pool, suffix, userId, legacyStoreId }) => {
         await admin.query('DROP SCHEMA public CASCADE');
         await admin.query('CREATE SCHEMA public');
         const registry = loadRegistry();
-        assert.equal(registry.length, 41);
-        assert.equal(registry.at(-2).id, '20260915_01_stocky_system_commerce');
-        assert.equal(registry.at(-1).id, '20260918_01_theme_platform_foundation');
+    assert.equal(registry.length, 48);
+    assert.equal(registry.at(-9).id, '20260915_01_stocky_system_commerce');
+    assert.equal(registry.at(-8).id, '20260918_01_theme_platform_foundation');
+    assert.equal(registry.at(-7).id, '20260919_01_theme_platform_seller_experience');
+    assert.equal(registry.at(-6).id, '20260919_variant_cart_v2');
+    assert.deepEqual(registry.slice(-5).map(entry=>entry.id), ['20260919_wave2_theme_delivery', '20260919_wave2_theme_seller_bridge', '20260919_wave2_theme_store_content', '20260919_wave2_zpublication_lifecycle', '20260919_wave2_zzsupport_routing']);
         const firstApply = await runApply({ env: migrationEnv, registry, output: () => {} });
         const secondApply = await runApply({ env: migrationEnv, registry, output: () => {} });
         assert.deepEqual(firstApply.applied, registry.map((entry) => entry.id));

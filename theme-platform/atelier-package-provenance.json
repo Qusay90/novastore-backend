@@ -1,0 +1,57 @@
+{
+  "sourceThemeId": "02-atelier",
+  "sourceStyle": "editorial",
+  "sourceFiles": [
+    {
+      "path": "themes/02-atelier/theme.js",
+      "sha256": "7f1e69b2d2a3c22a2ffb214b839a681f2ed916982fad07e760ab509a066350d4",
+      "bytes": 9443
+    },
+    {
+      "path": "themes/02-atelier/theme.css",
+      "sha256": "b20737a86035bc188eb0a905e3fbd5da451d3d4bd5c30a5df6f85dd8cc343ae4",
+      "bytes": 350
+    },
+    {
+      "path": "shared/core.js",
+      "sha256": "3a331e140216e11ee87155383e9cea2438c385b11de17babef80ef8a2cf9a09c",
+      "bytes": 2569934
+    },
+    {
+      "path": "shared/core.css",
+      "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+      "bytes": 430940
+    },
+    {
+      "path": "shared/support-contract.js",
+      "sha256": "87930ab4530e8e244d35d697fadc9e4eecf08626502fac0b9488028d9c0d88cb",
+      "bytes": 12873
+    },
+    {
+      "path": "shared/theme-host-bridge.js",
+      "sha256": "32f715015dc42d91be3ad1d3e11c648670f3a4fc6945f174955c918cc363f0d8",
+      "bytes": 20105
+    }
+  ],
+  "target": "theme-platform/packages/nova-atelier-studio-web-v1.json",
+  "targetSHA256": "ef44ad4642a6504ee7b214d0fdcd21357fc1ca32250cfd9f6a1f043619c8e312",
+  "assets": [
+    {
+      "key": "theme-assets/nova-atelier-studio-web/hero.png",
+      "mimeType": "image/png",
+      "sha256": "5028714af5e2899543d0031a0b9bccf2c53b32c50f0921a75a810707d77b1b3a",
+      "width": 1672,
+      "height": 941
+    },
+    {
+      "key": "theme-assets/nova-atelier-studio-web/web.jpg",
+      "mimeType": "image/jpeg",
+      "sha256": "202fc1df9dc2a4a4afb1fdb579231d1a903037bc161dbaddb741ce0fee5fdb00",
+      "width": 900,
+      "height": 548
+    }
+  ],
+  "thumbnailStatus": "STALE_DEMO_REFERENCE",
+  "runtimeReady": false,
+  "note": "Original Atelier header, editorial hero, fashion cards, footer and PDP templates. No demo product or category records enter the package."
+}

@@ -1,0 +1,490 @@
+{
+  "schemaVersion": 1,
+  "authority": "BUILD_OWNED_REVIEWED_EVIDENCE",
+  "acceptances": [
+    {
+      "presentation": {
+        "id": "nova-classic",
+        "version": "1.0.0",
+        "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668"
+      },
+      "channel": "web",
+      "rendererSourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "artifactDigest": "48ef24bb75b9e8ff9974a1970e29b5eed57550efaef75e58866f7a1c2486887a",
+      "phase": "COMPATIBILITY_ACCEPTED_PRE_PUBLICATION",
+      "storeActivation": "NOT_ASSERTED",
+      "gates": {
+        "presentation": {
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-current-browser-review-206d92903f26792e.json",
+            "sha256": "206d92903f26792e7f49d5b2df178489020d401229e92224632e9cba72df6d41"
+          }
+        },
+        "customerRuntime": {
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-current-browser-review-206d92903f26792e.json",
+            "sha256": "206d92903f26792e7f49d5b2df178489020d401229e92224632e9cba72df6d41"
+          }
+        },
+        "singleStoreRuntime": {
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-current-browser-review-206d92903f26792e.json",
+            "sha256": "206d92903f26792e7f49d5b2df178489020d401229e92224632e9cba72df6d41"
+          }
+        },
+        "publication": {
+          "status": "PASS",
+          "phase": "BUILD_VALIDATION_PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-build-validation-34a881159908f79c.json",
+            "sha256": "34a881159908f79c68dec003250253c5093b76c3e2f1cf6b6b254530bbc6a9b7"
+          },
+          "regression": {
+            "status": "PASS",
+            "provenance": "REAL_POSTGRES_WITH_EXPLICIT_AUTHORITY_DOUBLES",
+            "evidence": {
+              "path": "theme-platform/acceptance-evidence/publication-implementation-provenance-a41891c21f09a33a.json",
+              "sha256": "a41891c21f09a33a7f5ec4893f84880bce1f33e5271eaa13b9e23ad6ad2cf49e"
+            }
+          }
+        }
+      },
+      "responsive": [
+        {
+          "width": 320,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-home-320-2337beecdcd7f530.jpg",
+            "sha256": "2337beecdcd7f5307d59e69920793d3f77ec1425d09168e427dac3d12b6ee4ed"
+          }
+        },
+        {
+          "width": 360,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-home-360-36d5e6fd271b6873.jpg",
+            "sha256": "36d5e6fd271b6873b2595a48de3057a243efabb9348fbb7f90da4164f11f50fe"
+          }
+        },
+        {
+          "width": 390,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-home-390-3dd0b93d452333d3.jpg",
+            "sha256": "3dd0b93d452333d337816199d949eebd76fc050ba6b7c377f54dc26286132b7d"
+          }
+        },
+        {
+          "width": 430,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-home-430-a2b6c0aaba5952f1.jpg",
+            "sha256": "a2b6c0aaba5952f1f02412f957256be63b59ef4f5293faddf4a0b89e161d023d"
+          }
+        },
+        {
+          "width": 768,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-home-768-9ad9869fa34d320e.jpg",
+            "sha256": "9ad9869fa34d320e4d8d057f92dd458d1bdd4d1ce933c47bc6b594ff9e0167be"
+          }
+        },
+        {
+          "width": 1024,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-home-1024-dd588fdb790c1906.jpg",
+            "sha256": "dd588fdb790c19068dd00c2b501b63b2e89583bea2ea5c36642ae8121808942c"
+          }
+        },
+        {
+          "width": 1440,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-home-1440-67b4159457f6ad03.jpg",
+            "sha256": "67b4159457f6ad038e1eb927fb60a8702b972f93fa7edb35088c28234922efd5"
+          }
+        },
+        {
+          "width": 320,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-product-320-1c35c8f0db4cf532.jpg",
+            "sha256": "1c35c8f0db4cf532af943144855e9c14c1df40b22a5fa4435bc26499b43406fd"
+          }
+        },
+        {
+          "width": 360,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-product-360-a5ddf9693da5c931.jpg",
+            "sha256": "a5ddf9693da5c931c8ecde939a074e3f4fe89ddb25559b57f1bfdd352bddf399"
+          }
+        },
+        {
+          "width": 390,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-product-390-b81ee9cf3fadee11.jpg",
+            "sha256": "b81ee9cf3fadee11a980eead87cd72482050bf85a7a006cfd2bfcd6626613033"
+          }
+        },
+        {
+          "width": 430,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-product-430-898c70510b7d3fa8.jpg",
+            "sha256": "898c70510b7d3fa83e06d4d3f6b8ceb1ef8271978d97623a3919451f2101eec8"
+          }
+        },
+        {
+          "width": 768,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-product-768-b6cc74f3f943475e.jpg",
+            "sha256": "b6cc74f3f943475e28a0ad3bfd74913c400c1fb50367cdd4963158819a7f4657"
+          }
+        },
+        {
+          "width": 1024,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-product-1024-3037dd1be0d6ff58.jpg",
+            "sha256": "3037dd1be0d6ff5816798e80851b713e032f7f70ade37c4265037f3136aa51d6"
+          }
+        },
+        {
+          "width": 1440,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-product-1440-0f8dc0c1106a99ad.jpg",
+            "sha256": "0f8dc0c1106a99ad4b119c05756b53fdae91ae6350ed619ac780f124e6934fba"
+          }
+        },
+        {
+          "width": 320,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-category-320-d527aef6994bbf59.jpg",
+            "sha256": "d527aef6994bbf59baba4a14a2c27273705227cb6e9374fd576c08411e0e838b"
+          }
+        },
+        {
+          "width": 360,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-category-360-c6982899b2df8f8f.jpg",
+            "sha256": "c6982899b2df8f8f70430da1a5f3d9040f09c346abaae70c3c9c46a6229836d8"
+          }
+        },
+        {
+          "width": 390,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-category-390-3284c1f9402a6e6d.jpg",
+            "sha256": "3284c1f9402a6e6dd8e1af34cf0ca9f39052963bdeb90c4bcf768cb0f974d476"
+          }
+        },
+        {
+          "width": 430,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-category-430-86663c3157f92639.jpg",
+            "sha256": "86663c3157f9263918587eda5300b15141da9fb4515e04eef85381ff5e36af6a"
+          }
+        },
+        {
+          "width": 768,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-category-768-d3520decf7c215c3.jpg",
+            "sha256": "d3520decf7c215c3bba84754bd47dae6fd7276598b705aaa7a7121ad374374a1"
+          }
+        },
+        {
+          "width": 1024,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-category-1024-d6ecd65eb584a3e7.jpg",
+            "sha256": "d6ecd65eb584a3e73a3a4d9acbf0207dab356771f6eb0345de14413591c7d7e0"
+          }
+        },
+        {
+          "width": 1440,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/classic-category-1440-c242bec0a6ddf300.jpg",
+            "sha256": "c242bec0a6ddf300b24460f50c29f7c0f94b79e169f9cb6351e844254610caa3"
+          }
+        }
+      ]
+    },
+    {
+      "presentation": {
+        "id": "nova-atelier",
+        "version": "1.0.0",
+        "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a"
+      },
+      "channel": "web",
+      "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "artifactDigest": "a2487b4412203d5cf8fc2b0aba67e306e6086838e365de707e53889b9a2cf1ef",
+      "phase": "COMPATIBILITY_ACCEPTED_PRE_PUBLICATION",
+      "storeActivation": "NOT_ASSERTED",
+      "gates": {
+        "presentation": {
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-current-browser-review-564479556c7e34aa.json",
+            "sha256": "564479556c7e34aa801edac47471bf94317dcc43c9be6ebdd1b17613d4f7b8e4"
+          }
+        },
+        "customerRuntime": {
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-current-browser-review-564479556c7e34aa.json",
+            "sha256": "564479556c7e34aa801edac47471bf94317dcc43c9be6ebdd1b17613d4f7b8e4"
+          }
+        },
+        "singleStoreRuntime": {
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-current-browser-review-564479556c7e34aa.json",
+            "sha256": "564479556c7e34aa801edac47471bf94317dcc43c9be6ebdd1b17613d4f7b8e4"
+          }
+        },
+        "publication": {
+          "status": "PASS",
+          "phase": "BUILD_VALIDATION_PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-build-validation-d2a3043371d2e59a.json",
+            "sha256": "d2a3043371d2e59af3a80895082664f5230b94660828a0d0235956d2c189e4af"
+          },
+          "regression": {
+            "status": "PASS",
+            "provenance": "REAL_POSTGRES_WITH_EXPLICIT_AUTHORITY_DOUBLES",
+            "evidence": {
+              "path": "theme-platform/acceptance-evidence/publication-implementation-provenance-a41891c21f09a33a.json",
+              "sha256": "a41891c21f09a33a7f5ec4893f84880bce1f33e5271eaa13b9e23ad6ad2cf49e"
+            }
+          }
+        }
+      },
+      "responsive": [
+        {
+          "width": 320,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-product-320-9bfac87d6339cc30.jpg",
+            "sha256": "9bfac87d6339cc302e5ab74aeed268d651c41cdda326256d539cb7a4c33013f2"
+          }
+        },
+        {
+          "width": 360,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-product-360-44c86944c1464b29.jpg",
+            "sha256": "44c86944c1464b29b140307ab8c20ef8702e3628867475d97cbbe07c3f855cab"
+          }
+        },
+        {
+          "width": 390,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-product-390-f792dce2f687665f.jpg",
+            "sha256": "f792dce2f687665f0e6b98a5ad6fe954121b36c5fa37421a2debe4de5cbd8aa3"
+          }
+        },
+        {
+          "width": 430,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-product-430-27cdd7ade95cbfb3.jpg",
+            "sha256": "27cdd7ade95cbfb342742c5c348a816b116143aee34b532b306478e89cbbf779"
+          }
+        },
+        {
+          "width": 768,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-product-768-0e4b1dd3f0c94b55.jpg",
+            "sha256": "0e4b1dd3f0c94b55e56e29a34b6a11de852f250389f167b3da67e7497a4b0405"
+          }
+        },
+        {
+          "width": 1024,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-product-1024-d1b79e5565bd936f.jpg",
+            "sha256": "d1b79e5565bd936fafbf3f2dcced01be260f35197a811f4c8ed6526cd69412f6"
+          }
+        },
+        {
+          "width": 1440,
+          "route": "product",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-product-1440-0fa2c765c39ee06a.jpg",
+            "sha256": "0fa2c765c39ee06a2688c3cf3d60d4e4f4fcef9d3dd755f38cdabd9b1edae786"
+          }
+        },
+        {
+          "width": 320,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-category-320-65ebd3977f96a01c.jpg",
+            "sha256": "65ebd3977f96a01cc3311fa5ba2391bbf82fe6527a5af826f04fab4441e18042"
+          }
+        },
+        {
+          "width": 360,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-category-360-838694420505d25c.jpg",
+            "sha256": "838694420505d25c1f65d18d0926557e66852b8b43b7843bc85b53f54e40a15a"
+          }
+        },
+        {
+          "width": 390,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-category-390-75c810e9cfdfee13.jpg",
+            "sha256": "75c810e9cfdfee136939f0543772f9a5a5a7673fa71604bc425330fe736b5f4e"
+          }
+        },
+        {
+          "width": 430,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-category-430-1e5decb7845b11a7.jpg",
+            "sha256": "1e5decb7845b11a795e30448784131c06386d6cb23f82cc493cb3fa9d21dfd47"
+          }
+        },
+        {
+          "width": 768,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-category-768-9c5fd15b7f246f7d.jpg",
+            "sha256": "9c5fd15b7f246f7d712e2afc7204601c66d8374b0339bb0a0df7203bddfe5513"
+          }
+        },
+        {
+          "width": 1024,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-category-1024-90105065a3821d50.jpg",
+            "sha256": "90105065a3821d50da7f50185c522614ec8205328bc8092d6c55c4b5f166554c"
+          }
+        },
+        {
+          "width": 1440,
+          "route": "category",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-category-1440-88a9b0e311098071.jpg",
+            "sha256": "88a9b0e311098071c5845fe83a99839273f5521ff2946fe8cb7943c891d7ab52"
+          }
+        },
+        {
+          "width": 320,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-home-320-d5fae2676b15f705.jpg",
+            "sha256": "d5fae2676b15f705763565861bdee328122879227f3a5c30f9a8d9a03e48374c"
+          }
+        },
+        {
+          "width": 360,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-home-360-436cb8033d245a80.jpg",
+            "sha256": "436cb8033d245a80c2698093e9f0b57df8a41b758c4fff23ad7c65f81456d135"
+          }
+        },
+        {
+          "width": 390,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-home-390-5e2a2befb0e1aa2e.jpg",
+            "sha256": "5e2a2befb0e1aa2ea78b743935a2e035344b766cbf5cd209f74c39a725d392a5"
+          }
+        },
+        {
+          "width": 430,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-home-430-9647c2406d91a942.jpg",
+            "sha256": "9647c2406d91a9420e25984e8dc28fd89f1f46d42e723516b0e70421eda33ae2"
+          }
+        },
+        {
+          "width": 768,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-home-768-7ea50bdefaa03c9b.jpg",
+            "sha256": "7ea50bdefaa03c9b911797cbec6ee267afb375f82db74dbd11714349a165b31b"
+          }
+        },
+        {
+          "width": 1024,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-home-1024-2c6392bb61b61118.jpg",
+            "sha256": "2c6392bb61b61118d6f5124c33ebd1383db1bade31390416ed55c81e6dac6732"
+          }
+        },
+        {
+          "width": 1440,
+          "route": "home",
+          "status": "PASS",
+          "evidence": {
+            "path": "theme-platform/acceptance-evidence/atelier-home-1440-f06ce072b28f3890.jpg",
+            "sha256": "f06ce072b28f38909275acb777467f93f240d6a03dd820d979c742a3e0effdb9"
+          }
+        }
+      ]
+    }
+  ]
+}

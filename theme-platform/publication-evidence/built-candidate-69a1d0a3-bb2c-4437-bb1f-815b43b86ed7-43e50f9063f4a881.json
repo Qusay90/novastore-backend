@@ -1,0 +1,406 @@
+{
+  "result": "PASS_CANDIDATE_BYTES_VALIDATED_NOT_ACTIVE",
+  "recordedAt": "2026-09-22T14:50:51.091Z",
+  "readOnly": true,
+  "host": "http://atelier.localhost:62213/",
+  "publicationId": "69a1d0a3-bb2c-4437-bb1f-815b43b86ed7",
+  "serviceId": "ca97d489-6292-42e5-96e9-1e34f5412ba2",
+  "assignmentId": "7a99bc03-660d-433b-907f-f0b4f2297a2d",
+  "artifactId": "61c044f9-8737-49ca-abbd-01f262fbd84c",
+  "artifactDigest": "188a9bdb7e341c8748031aebbc6cb528ce049707bd6e822cc0bf3beab907a513",
+  "sourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+  "channel": "web",
+  "presentation": {
+    "id": "nova-atelier",
+    "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a",
+    "version": "1.0.0"
+  },
+  "manifestEntryPoint": "customer.html",
+  "manifestFileCount": 19,
+  "manifestSha256": "d8f112d72ff8e146d1d1e7d4b07a28063282ee7b47e21ceb08ad4cb9eaa78ec5",
+  "manifest": {
+    "files": [
+      {
+        "path": "assets/atelier-dom-By_xsji6.js",
+        "sha256": "82c44c26611ce21bcd95b32cdd25640b903012fe8fb5234a6051cb756c37a9ce",
+        "byteSize": 19861,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "assets/catalog-adapter-BmxpTtuA.js",
+        "sha256": "c91974ee165545bbdb3cb4c28a7c4d102caf88a575a82e94869055996cdef129",
+        "byteSize": 1097,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "assets/customer-NuO2JgXn.css",
+        "sha256": "8d56bde87bc8b031c2648c554914bd7c88d2d83bc5f88d994bbe2204fbac043a",
+        "byteSize": 4004,
+        "mimeType": "text/css"
+      },
+      {
+        "path": "assets/customer.js",
+        "sha256": "152def843eb5d173873a581af40180690d421690ce524e8d448beaa4e91562d0",
+        "byteSize": 74770,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "assets/modulepreload-polyfill-B5Qt9EMX.js",
+        "sha256": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0",
+        "byteSize": 711,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "assets/package/theme-assets/nova-atelier-studio-web/hero.png",
+        "sha256": "db1837e3ad3167b356b295720d01e0956a5ebafaf13f17be1dac1b3ad5d1f511",
+        "byteSize": 3474757,
+        "mimeType": "image/png"
+      },
+      {
+        "path": "assets/theme-kit-adapter-BGy5vAQ8.js",
+        "sha256": "1e1872f9b3107b3ba05260fe39e0cc86148b1b62a3322dbf22b4bd9dbf4adf6e",
+        "byteSize": 4485,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "customer.html",
+        "sha256": "6e9616d4ebc5cc3f8a319e95480ad5630ebc1ab03be68f39be82fa2de302228d",
+        "byteSize": 801,
+        "mimeType": "text/html"
+      },
+      {
+        "path": "novastore-content.json",
+        "sha256": "a7cd09fd57051957c5394539ffe819a0da579b64dd4ee5c40ac3ba01550bf115",
+        "byteSize": 2971,
+        "mimeType": "application/json"
+      },
+      {
+        "path": "novastore-document.json",
+        "sha256": "b56b797f237add1eb254c3dce86a0e14dd530ac786c9621acc6095112bec73e3",
+        "byteSize": 4155,
+        "mimeType": "application/json"
+      },
+      {
+        "path": "theme-kit/core.css",
+        "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+        "byteSize": 430940,
+        "mimeType": "text/css"
+      },
+      {
+        "path": "theme-kit/customer-projector.js",
+        "sha256": "3f9f5803204311f0f9aa9492f80b551c8eb273a621affdf5fe4ddbda4fd82479",
+        "byteSize": 20176,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "theme-kit/fonts.css",
+        "sha256": "4f8bd3d091eea9d69917cb28d3019c1e57ee834836d7fdfda56bf418a304762e",
+        "byteSize": 413,
+        "mimeType": "text/css"
+      },
+      {
+        "path": "theme-kit/fonts/inter_medium.ttf",
+        "sha256": "97ad806f526e41546d46365bb3a393145f75b7b1568913db74549ad8b8dba872",
+        "byteSize": 417300,
+        "mimeType": "font/ttf"
+      },
+      {
+        "path": "theme-kit/fonts/inter_regular.ttf",
+        "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+        "byteSize": 411640,
+        "mimeType": "font/ttf"
+      },
+      {
+        "path": "theme-kit/fonts/inter_semibold.ttf",
+        "sha256": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3",
+        "byteSize": 419744,
+        "mimeType": "font/ttf"
+      },
+      {
+        "path": "theme-kit/nova-atelier/customer.js",
+        "sha256": "fd394d21a3a86c5d2bbe8f289cb32115e181b8227ad3e1b09d598b22ec587d46",
+        "byteSize": 2571518,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "theme-kit/nova-atelier/presentation.json",
+        "sha256": "eecb34715aa6f802822a71466ce606e33cd38277d632f1b592f182a543717d1a",
+        "byteSize": 602,
+        "mimeType": "application/json"
+      },
+      {
+        "path": "theme-kit/nova-atelier/theme.css",
+        "sha256": "b20737a86035bc188eb0a905e3fbd5da451d3d4bd5c30a5df6f85dd8cc343ae4",
+        "byteSize": 350,
+        "mimeType": "text/css"
+      }
+    ],
+    "format": "novastore-local-artifact-v1",
+    "metadata": {
+      "assets": [
+        {
+          "key": "theme-assets/nova-atelier-studio-web/hero.png",
+          "kind": "package",
+          "digest": "db1837e3ad3167b356b295720d01e0956a5ebafaf13f17be1dac1b3ad5d1f511",
+          "byteSize": 3474757
+        }
+      ],
+      "format": "novastore-publication-validation-v1",
+      "channel": "web",
+      "draftId": "3be10a57-4d0a-486c-9178-6bde7476c339",
+      "storeId": "2",
+      "commerce": {
+        "validated": true,
+        "assetCount": 0,
+        "commerceMode": "SINGLE_STORE",
+        "productCount": 0,
+        "variantCount": 0,
+        "categoryCount": 0,
+        "collectionCount": 0
+      },
+      "serviceId": "ca97d489-6292-42e5-96e9-1e34f5412ba2",
+      "legalDigest": "a7cd09fd57051957c5394539ffe819a0da579b64dd4ee5c40ac3ba01550bf115",
+      "assignmentId": "7a99bc03-660d-433b-907f-f0b4f2297a2d",
+      "commerceMode": "SINGLE_STORE",
+      "presentation": {
+        "id": "nova-atelier",
+        "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a",
+        "version": "1.0.0"
+      },
+      "sourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "draftRevision": 2,
+      "packageDigest": "62787428e30ee1127178afb107e3c4ea0831bb487141f358e698bcaaef354dd0",
+      "publicationId": "69a1d0a3-bb2c-4437-bb1f-815b43b86ed7",
+      "rendererFiles": [
+        {
+          "path": "assets/atelier-dom-By_xsji6.js",
+          "sha256": "82c44c26611ce21bcd95b32cdd25640b903012fe8fb5234a6051cb756c37a9ce",
+          "byteSize": 19861
+        },
+        {
+          "path": "assets/catalog-adapter-BmxpTtuA.js",
+          "sha256": "c91974ee165545bbdb3cb4c28a7c4d102caf88a575a82e94869055996cdef129",
+          "byteSize": 1097
+        },
+        {
+          "path": "assets/customer-NuO2JgXn.css",
+          "sha256": "8d56bde87bc8b031c2648c554914bd7c88d2d83bc5f88d994bbe2204fbac043a",
+          "byteSize": 4004
+        },
+        {
+          "path": "assets/customer.js",
+          "sha256": "152def843eb5d173873a581af40180690d421690ce524e8d448beaa4e91562d0",
+          "byteSize": 74770
+        },
+        {
+          "path": "assets/modulepreload-polyfill-B5Qt9EMX.js",
+          "sha256": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0",
+          "byteSize": 711
+        },
+        {
+          "path": "assets/theme-kit-adapter-BGy5vAQ8.js",
+          "sha256": "1e1872f9b3107b3ba05260fe39e0cc86148b1b62a3322dbf22b4bd9dbf4adf6e",
+          "byteSize": 4485
+        },
+        {
+          "path": "customer.html",
+          "sha256": "6e9616d4ebc5cc3f8a319e95480ad5630ebc1ab03be68f39be82fa2de302228d",
+          "byteSize": 801
+        },
+        {
+          "path": "theme-kit/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "byteSize": 430940
+        },
+        {
+          "path": "theme-kit/customer-projector.js",
+          "sha256": "3f9f5803204311f0f9aa9492f80b551c8eb273a621affdf5fe4ddbda4fd82479",
+          "byteSize": 20176
+        },
+        {
+          "path": "theme-kit/fonts.css",
+          "sha256": "4f8bd3d091eea9d69917cb28d3019c1e57ee834836d7fdfda56bf418a304762e",
+          "byteSize": 413
+        },
+        {
+          "path": "theme-kit/fonts/inter_medium.ttf",
+          "sha256": "97ad806f526e41546d46365bb3a393145f75b7b1568913db74549ad8b8dba872",
+          "byteSize": 417300
+        },
+        {
+          "path": "theme-kit/fonts/inter_regular.ttf",
+          "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+          "byteSize": 411640
+        },
+        {
+          "path": "theme-kit/fonts/inter_semibold.ttf",
+          "sha256": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3",
+          "byteSize": 419744
+        },
+        {
+          "path": "theme-kit/nova-atelier/customer.js",
+          "sha256": "fd394d21a3a86c5d2bbe8f289cb32115e181b8227ad3e1b09d598b22ec587d46",
+          "byteSize": 2571518
+        },
+        {
+          "path": "theme-kit/nova-atelier/presentation.json",
+          "sha256": "eecb34715aa6f802822a71466ce606e33cd38277d632f1b592f182a543717d1a",
+          "byteSize": 602
+        },
+        {
+          "path": "theme-kit/nova-atelier/theme.css",
+          "sha256": "b20737a86035bc188eb0a905e3fbd5da451d3d4bd5c30a5df6f85dd8cc343ae4",
+          "byteSize": 350
+        }
+      ],
+      "documentDigest": "b56b797f237add1eb254c3dce86a0e14dd530ac786c9621acc6095112bec73e3",
+      "organizationId": "2",
+      "policyRevision": 2,
+      "themeVersionId": "018ed1d6-015e-45f1-be63-4e74f8b86389",
+      "legalReferences": [
+        {
+          "type": "business-information",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-22T14:20:52.560Z",
+          "documentId": "e7de213c-dd02-4820-98f7-306039534ec5",
+          "contentHash": "58b22b51a0ffb97329a1f29e72828d85aec6aa025ecc6e4cf71d5776aa89a0d0",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "contact",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-22T14:20:52.535Z",
+          "documentId": "5748964c-2371-421b-a40d-f651ab4d35dd",
+          "contentHash": "cf7d46a9ded4f2f20a125c34a2662a7342e2dd1c24cff7194c0ad6218a295b98",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "cookie",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-22T14:20:52.508Z",
+          "documentId": "32f8dd7b-1833-4578-a9e9-df0634e4dc27",
+          "contentHash": "0a718e58861d7a5f9bfbbd71a735aebd4994436a0b0b1027fbabdd057420d1b8",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "distance-sales",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-22T14:20:52.400Z",
+          "documentId": "8fc1a195-5e10-49ed-a9b1-219fb5f1d866",
+          "contentHash": "d5814a261c180d68c1a7eb706d2aefa2aa38cb1ac1e450f65c3c1196a81b8976",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "kvkk",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-22T14:20:52.481Z",
+          "documentId": "95fbac4a-b213-4974-9902-b822e59c7ef0",
+          "contentHash": "1a5998f9583fdb83cbb6bcc48a1220925987dd029980f516dc7411d1a3489ada",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "privacy",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-22T14:20:52.345Z",
+          "documentId": "f9843398-413f-4856-b860-865417fbe216",
+          "contentHash": "2c6018b5d0749f33eef2402c0c1d3d87145bc56b21e0bf4cee0e68d0be02fe48",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "returns",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-22T14:20:52.428Z",
+          "documentId": "d6390074-7219-40cd-bd55-51fd27a3739e",
+          "contentHash": "d58bb547d15c342b6886ebee462fbfa26020db3bb0f18fc48bf9581ad18b2936",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "shipping",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-22T14:20:52.454Z",
+          "documentId": "d40809d8-2b1d-41b8-992c-c55760cbd0f7",
+          "contentHash": "c60e36a658a32699f6dbe59cd761f0413022a3f2461c111b4d31a36f17f72e3f",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "terms",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-22T14:20:52.371Z",
+          "documentId": "73b0ae36-91bf-4286-a0ac-fb89b3162888",
+          "contentHash": "9dd56f1e1a9b2151002a1af7692a5de8f0bc2fe65a06082004d5e1cbc85c09d8",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        }
+      ],
+      "rendererEntryPoint": "customer.html",
+      "commerceCapabilities": {
+        "reviews": true,
+        "favorites": true,
+        "questions": true,
+        "stockCheck": true,
+        "singleStore": true,
+        "customerAuth": true,
+        "orderHistory": true,
+        "persistentCart": true,
+        "supportRouting": true,
+        "variantSelection": true,
+        "checkoutPreparation": true
+      }
+    },
+    "entryPoint": "customer.html",
+    "environment": "LOCAL"
+  },
+  "binding": {
+    "id": "07c62573-d665-4f11-adde-9bc6ae4e0c90",
+    "hostname": "atelier.localhost",
+    "service_id": "ca97d489-6292-42e5-96e9-1e34f5412ba2",
+    "organization_id": "2",
+    "store_id": "2",
+    "assignment_id": "7a99bc03-660d-433b-907f-f0b4f2297a2d",
+    "status": "VERIFIED",
+    "verified_at": "2026-09-22T14:44:03.190Z",
+    "verification_reference": "OWNED_LOOPBACK_FIXTURE_NOT_DNS_OR_PUBLICATION"
+  },
+  "before": {
+    "status": "DEPLOYING",
+    "revision": 6,
+    "policy_revision": 2,
+    "draft_revision": 2
+  },
+  "after": {
+    "status": "DEPLOYING",
+    "revision": 6,
+    "policy_revision": 2,
+    "draft_revision": 2
+  },
+  "activePointers": 0,
+  "exactReviewRecord": {
+    "serviceId": "ca97d489-6292-42e5-96e9-1e34f5412ba2",
+    "publicationId": "69a1d0a3-bb2c-4437-bb1f-815b43b86ed7",
+    "artifactDigest": "188a9bdb7e341c8748031aebbc6cb528ce049707bd6e822cc0bf3beab907a513",
+    "channel": "web"
+  },
+  "privateReviewManifestPath": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\unified-final-runtime-1790088447236\\local-candidate-review.json",
+  "reviewManifestWritten": false,
+  "publicationStateChanged": false,
+  "activePointerChanged": false,
+  "qaAcceptanceClaimed": false,
+  "allFilesVerifiedByCanonicalCandidateReader": true
+}

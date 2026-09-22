@@ -1,0 +1,787 @@
+{
+  "source": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/novastore-studio-pro-expanded-20260915/studio",
+  "description": "Exact original campaign raster files. Build allowlist only; uploaded through scoped server asset API before draft application.",
+  "packs": 108,
+  "files": [
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/arch.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/arch.webp",
+      "bytes": 178878,
+      "sha256": "363f5c56c78b6c361a62099cd9bccd455faf3b42a770a7d8a6b3bed1fd17954d"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/baby.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/baby.webp",
+      "bytes": 88688,
+      "sha256": "8d504c7a9b515c2f150b9d4e0672b3cb5d99d498fca07668b8a1d207f08359a9"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/botanical.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/botanical.webp",
+      "bytes": 170404,
+      "sha256": "403f420077bb54d4fab451c7ca2e6af48c6d37dc8892f28bb87f1f6789139a4c"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/coast.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/coast.webp",
+      "bytes": 167862,
+      "sha256": "f412e4ff2425bfbb9d4a5080f67a67649b0172a12a4340e841d3b6a753a65adf"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/confetti.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/confetti.webp",
+      "bytes": 115226,
+      "sha256": "d34c156ddf0087c1a852f28ae361aa6b6f37f7e0baed95d2a27e1e3ba55ed0e2"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/editorial.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/editorial.webp",
+      "bytes": 106706,
+      "sha256": "5b41b7ccb2620e788fdbe0628292a854ccb3c22ef0c676d3bddc39e939c0b864"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/family.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/family.webp",
+      "bytes": 141678,
+      "sha256": "852391b43bd48f2fd96c65b2eb9a0f3ab8fc09e52d63eb54af75721d3cb06583"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/gifts.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/gifts.webp",
+      "bytes": 103016,
+      "sha256": "c209f98c3f8c73d9fc3e7ff4c781c50dfe693526148b0863b63056e801822524"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/kids.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/kids.webp",
+      "bytes": 100906,
+      "sha256": "648afce41f1141e992eda0bd341b5821c0766c10b037766b4ed3ca0eb5634eaf"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/letter.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/letter.webp",
+      "bytes": 110814,
+      "sha256": "3ff0d003d3b1395fa8a937e1704c05efc20245c18f500922fb3af9317b8a2cc1"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/notebook.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/notebook.webp",
+      "bytes": 74982,
+      "sha256": "c00a168c976a0357b979ca1ee4b8f705719b09627bb59cd0e5da65f9e0a73218"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/parcel.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/parcel.webp",
+      "bytes": 111942,
+      "sha256": "8ec2f27e6dbc472f7c829c02f6f57733373cf8d46f9b102a085a44bd255d867b"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/pets.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/pets.webp",
+      "bytes": 141372,
+      "sha256": "ac3419eaf9fd05e3524939d301bfae23afce627b5ddfdba972ca2018f885bfde"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/postcard.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/postcard.webp",
+      "bytes": 108238,
+      "sha256": "9eb91507266ba3da8494ee83b2af7cde6c55281c55775221bb6144875eb6c8e2"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/record.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/record.webp",
+      "bytes": 95660,
+      "sha256": "08c0bf8ec334fe51c500b6d7e5f810946f2c0d61a20861706642f039ded8c78c"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/republic.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/republic.webp",
+      "bytes": 89976,
+      "sha256": "8b09ba8db427e35750048f757f0545ec4a5c1cc26c23f408dce61a75902c8cc6"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/ritual.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/ritual.webp",
+      "bytes": 96002,
+      "sha256": "cb8b7c36ce9a700b4321eeaf43865b6075d8a9780ca1a182d55e38aed5a0c65d"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/studio.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/studio.webp",
+      "bytes": 92534,
+      "sha256": "80a8ce7cbdd298e657b70eb18b1af452ad9b770b3c2b6bdf5bfcc1317b815333"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/table.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/table.webp",
+      "bytes": 128998,
+      "sha256": "659a39d1cb53c1c92d009bc96aa280f95b0a66f058602af2cb3f7e0215ecd8d0"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/ticket.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/ticket.webp",
+      "bytes": 99316,
+      "sha256": "4b7c61840d52ef0310f690651385bb593ea252285a0c26bbecc154a5dd3d19f2"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/trail.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/trail.webp",
+      "bytes": 127726,
+      "sha256": "a4dbe3e663449bb4999f7cf9d32028f3b5b2126bb979393d6607d8620a0e0a7d"
+    },
+    {
+      "sourcePath": "public/media/campaign-stages-20260915/window.webp",
+      "targetPath": "src/bundled-assets/media/campaign-stages-20260915/window.webp",
+      "bytes": 151212,
+      "sha256": "d65e44d9112d588942504bd5d210c475778623eeab6ac6000008a70da5ef64a5"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/artisan-shelf.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/artisan-shelf.webp",
+      "bytes": 196704,
+      "sha256": "c79fe1ec27d26b24df30b2f7ca4c53b74d2d7714ab283b267797ca09a1d91334"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/audio-world.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/audio-world.webp",
+      "bytes": 156490,
+      "sha256": "3316ae3b385017694fd16191c2d251458979e25da34bd732d6c15bd7f0c35396"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/autumn-baking.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/autumn-baking.webp",
+      "bytes": 189290,
+      "sha256": "3b39ccfa294a941d558ee6a1f39905123876547d0d3059a7fe7c41d7dd7249a6"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/autumn-coffee.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/autumn-coffee.webp",
+      "bytes": 146472,
+      "sha256": "a11687c4940716107d90489820480ce48efe5ee7e86164c030c682a6dad1f83c"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/autumn-craft.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/autumn-craft.webp",
+      "bytes": 267102,
+      "sha256": "1f04d90191ca72f4cca7b14dc764b6812d265b12c530ea3dfbd44e3013d5eb35"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/autumn-home.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/autumn-home.webp",
+      "bytes": 184080,
+      "sha256": "fb746e97a312de7b44aa94d7235f1dfeef2a0f45080f8c6fc4709c5541a3bf79"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/autumn-rain.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/autumn-rain.webp",
+      "bytes": 216864,
+      "sha256": "6d7b4b59386c9b38444f0c1d5373a8b7c55990eed6e8f90eae1b1f9d3ce85d57"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/autumn-reading.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/autumn-reading.webp",
+      "bytes": 151444,
+      "sha256": "1deb4c17b9f5221aca10d76b98d3076ec1581204b2e008d062a53e57ff7d9e30"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/baby-arrival.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/baby-arrival.webp",
+      "bytes": 126666,
+      "sha256": "a3808d1cd155420d7577fc5e9d49d3a55319aea67f698814f5d5984fa823ec37"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/balcony-break.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/balcony-break.webp",
+      "bytes": 261658,
+      "sha256": "df3fb8f903a7f6816c0d664c2050242c4231855bcd475a4922d56b7232e217aa"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/bathroom-ritual.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/bathroom-ritual.webp",
+      "bytes": 165766,
+      "sha256": "760f943e510738110d5ea790fbe31d33188667071d734bf1deee798f26569cb8"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/beauty-travel-kit.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/beauty-travel-kit.webp",
+      "bytes": 234760,
+      "sha256": "bcc83d4c8f7e34f9f33190a2ad57111f30ec3ecfd863a57487ea8fabe65cf5d6"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/bedroom-textures.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/bedroom-textures.webp",
+      "bytes": 202140,
+      "sha256": "6ac412b1ac04e3c4af9ca95f8a6a313901056088b89c0d53e541d8d6048dfe17"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/black-friday.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/black-friday.webp",
+      "bytes": 127636,
+      "sha256": "2e9ad252e557fde10ab307a97907c02ea26f72e34b42133ac4eb6ef5fa68dcb9"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/breakfast-weekend.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/breakfast-weekend.webp",
+      "bytes": 169984,
+      "sha256": "6d34e2372752a83a837c3c1ba79bb245b0a5b99dafbb0c54fef6e4321ef5c640"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/build-play.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/build-play.webp",
+      "bytes": 194990,
+      "sha256": "a13a5e13e51e9ebeba56c6c569145e05decba93cf741c07bb59d508682762d1f"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/cat-corner.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/cat-corner.webp",
+      "bytes": 206894,
+      "sha256": "466439e996507274ce7bf199938c6f24987ab7dce2ec0bfc468d24f8959caf6c"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/ceramic-table.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/ceramic-table.webp",
+      "bytes": 199746,
+      "sha256": "fd98b960bbc65818941809dc1b79d2e04c945eca76da5d491d040c748fa512a0"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/childrens-day.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/childrens-day.webp",
+      "bytes": 154356,
+      "sha256": "8d7f16fd09e5d9e7a6b1bf94eaa9ddfb0d239b0295564f1e2858f6fb56aeb064"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/city-cycling.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/city-cycling.webp",
+      "bytes": 185912,
+      "sha256": "142d40f67ca806331442da55c69a9948e308d031783f71d0e12ba9113247daca"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/creator-desk.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/creator-desk.webp",
+      "bytes": 138200,
+      "sha256": "1dc676962da38653e4759bba7616949c8410ee219f17404a40469dd7e439f8cd"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/cyber-monday.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/cyber-monday.webp",
+      "bytes": 62716,
+      "sha256": "6490e2b67d8b2a574752ed08aeee01ca0013f1728cba57aeb3344bbb0a6d2efa"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/desk-reset.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/desk-reset.webp",
+      "bytes": 129946,
+      "sha256": "9bea5d702c05031aae5948fdc1b7c7a62c6f5528a3f4574efb910edaf6afeee5"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/dog-walk.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/dog-walk.webp",
+      "bytes": 224624,
+      "sha256": "1c7d56729644a2fe370ed473ae94a8801f4227a3deff3dd083b8cd08b5f0464e"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/eid-gifts.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/eid-gifts.webp",
+      "bytes": 168126,
+      "sha256": "d3ca3377ffa839712107182dcbe0d3abd219716b2672fcad3ecf18e181347021"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/eid-style.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/eid-style.webp",
+      "bytes": 197062,
+      "sha256": "2d241fccaf9bdacec78a57f4dec7589b5814bcd985a5917a394c298d48304a79"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/eid-table-detail.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/eid-table-detail.webp",
+      "bytes": 185308,
+      "sha256": "eec752bef77d8eeb4fb3ac570f4c473e6498164d13a69673e84635c862e5a6b2"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/eid-visit.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/eid-visit.webp",
+      "bytes": 183160,
+      "sha256": "ebace255bc3a6d8b85186706b62275f634ad84e466bc6e6414f6e031e0230ad4"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/eid.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/eid.webp",
+      "bytes": 140650,
+      "sha256": "76995c1840848ab71b0d7726f8e82963398fc6e84b7073e481d05b491de1d7e1"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/entryway-order.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/entryway-order.webp",
+      "bytes": 208984,
+      "sha256": "fa061e7b455127ee5e3ac01f8745f54e91f96218780ca78f936d857970e6bc25"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/exam-focus.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/exam-focus.webp",
+      "bytes": 133758,
+      "sha256": "36c3d9964d59b2528ebc07f853097a954f9bcba0a515ae4d240861bd3f92d74e"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/family-time.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/family-time.webp",
+      "bytes": 163924,
+      "sha256": "3416bd3481892ead8dc88d755fd2919338fc209ddd1df71e6e7b417b6bfe88db"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/fathers-day.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/fathers-day.webp",
+      "bytes": 142314,
+      "sha256": "5795c7c3a89c47df536281d8e430aaf2c88089bb5030d9ea6f7505ab9b37746a"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/festival-ready.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/festival-ready.webp",
+      "bytes": 190248,
+      "sha256": "51f143589c7265f535a72deccf5dd410c27e01977aead49b79cbb418eff227c1"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/fresh-sips.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/fresh-sips.webp",
+      "bytes": 137244,
+      "sha256": "cebeefa4ab7e91ae5e942815fd1bd4d912887a04b74f5d492f0b4a8b7ef47f74"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/garden-play.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/garden-play.webp",
+      "bytes": 233516,
+      "sha256": "187bc406bc85fefa0e45ec4e74dba805c195027ca15fc749be4a107edf9341c0"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/gift-guide.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/gift-guide.webp",
+      "bytes": 169596,
+      "sha256": "5c614d04ac22609ac23eb2cb0dd94e27983d804b395165a791fce48eb1287fef"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/grill-gathering.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/grill-gathering.webp",
+      "bytes": 258192,
+      "sha256": "8e70c22a463d0be1c6ce15ce0163b9330f297c4c5834e083b867dcec3f8d580d"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/home-training.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/home-training.webp",
+      "bytes": 134188,
+      "sha256": "da51663e5ff17395963dcf03ca7831f4b956cf99858a4668c6d6b53d6d4d7968"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/jewelry-details.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/jewelry-details.webp",
+      "bytes": 149534,
+      "sha256": "f5a9b680e7d6608fad16e17f6402710224c8a63f283cb7f81597991969112500"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/kitchen-order.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/kitchen-order.webp",
+      "bytes": 188146,
+      "sha256": "87b2891dd05f3542d1ead4d7c4ad6bfc1e093af40fbfcab19897602aa5fa84d3"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/last-chance.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/last-chance.webp",
+      "bytes": 98766,
+      "sha256": "096b546fdd1fe4e88aab0fdd646ff4aaab8ab59c32d2ffef4020cbb8b9354144"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/lighting-corners.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/lighting-corners.webp",
+      "bytes": 135834,
+      "sha256": "238b822d7fa85933fd5b45b6fde697e34b90639fa562dc78447592830782f9c2"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/mothers-day.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/mothers-day.webp",
+      "bytes": 114388,
+      "sha256": "14d5ef0b35e95b10b0bf2c14d3a4d4c8a0535ee266748df45f03e479e2e12087"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/movie-evening.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/movie-evening.webp",
+      "bytes": 164786,
+      "sha256": "277a3ebfea56b1d98004d8fe761ac37f461630f9156d21e6fe86d0be8402f824"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/neighborhood-picks.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/neighborhood-picks.webp",
+      "bytes": 216908,
+      "sha256": "3b304c45295668db9d406f1ffd4f508141c984ab68053b10033b19b6e9819bc9"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/new-collection.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/new-collection.webp",
+      "bytes": 82034,
+      "sha256": "7c07de59ed1b19f3a2202fa494291250656efdd57f9a036bcf36d57617f5f65b"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/new-home.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/new-home.webp",
+      "bytes": 102580,
+      "sha256": "b6952c3b1671140e118735ce31f81e9814b20e2fd66f36b0d8d1a28cf0fa971f"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/new-year.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/new-year.webp",
+      "bytes": 151050,
+      "sha256": "ca1cb82800918ae5af8c3989a5f3baf3c3f1751af6720a70060dee65837a4de8"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/november-eleven.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/november-eleven.webp",
+      "bytes": 108370,
+      "sha256": "932001e955192878ec4e9fb899efa8deef9fc9c0bbce6876686d46f62b12f80d"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/pantry-season.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/pantry-season.webp",
+      "bytes": 264516,
+      "sha256": "74dce328bb1db430552824981e1196f62b2d6f91bb72a3c30ea87a7a73a41757"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/pet-care.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/pet-care.webp",
+      "bytes": 128128,
+      "sha256": "dd286a63d2b902238732219abc332d4afad268b4f4f03f14ba11b960c5a6d0ea"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/poolside-time.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/poolside-time.webp",
+      "bytes": 228630,
+      "sha256": "6bfa61c602588d741b9b1d2963497e7c2df5ec1008996378e1e52864ca8b83a7"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/preschool-first.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/preschool-first.webp",
+      "bytes": 168724,
+      "sha256": "e3148a1755dcdc1af04c2b1c2f232a571bdc674f46cf2a57d71dd6794f0b11e6"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/product-launch.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/product-launch.webp",
+      "bytes": 80324,
+      "sha256": "55ef2dbfc9896112c6accd5ecaa559eeb7dcb504ba310324ee965ef4f5c8fe07"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/ramadan-coffee.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/ramadan-coffee.webp",
+      "bytes": 156134,
+      "sha256": "883117c9c5b7e30d70f2cef7334e6c2e0b1b0913e862b4c34bb25e4842675264"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/ramadan-home.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/ramadan-home.webp",
+      "bytes": 166814,
+      "sha256": "e63857fa2ac6de83210b593848541ab2baaaf802a8f6eb37aeb5db6e3cf885cd"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/ramadan-sahur.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/ramadan-sahur.webp",
+      "bytes": 177112,
+      "sha256": "7c4bbd32daa597bcd494b3fac655cb29201966ca7c7b10623ebe75d5b254c743"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/ramadan-sharing.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/ramadan-sharing.webp",
+      "bytes": 155836,
+      "sha256": "e650639499a0806087069217220c39cbfe0f061fd6fc5bdd913f3d6af492d394"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/ramadan-table.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/ramadan-table.webp",
+      "bytes": 173892,
+      "sha256": "dd766a7757315700711ceaa3e7e567c07a545f78f47281418042762c6a6ecde3"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/ramadan.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/ramadan.webp",
+      "bytes": 168226,
+      "sha256": "59d46f03e2c455e776b9148f878c38dc052677905191d2c338d8a0cfd3bcc4ce"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/reading-notes.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/reading-notes.webp",
+      "bytes": 141572,
+      "sha256": "aef7896f23ed01c0ba03e1e6f1ee4af304262ce99a34aa40f0b3b6f1915407de"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/remote-work.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/remote-work.webp",
+      "bytes": 129626,
+      "sha256": "6cd23a4b7c9acb6ad6a342c59f4b93fb8335893dc8b85cd976584da471e31af6"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/republic-day.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/republic-day.webp",
+      "bytes": 129954,
+      "sha256": "65d26db92f5576201bc27859f0c6984ea4052798baaf56b6839cc375dc8abcc2"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/road-companions.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/road-companions.webp",
+      "bytes": 184032,
+      "sha256": "974d8e2f4bf92069f2ea3d8706bdcd619ee18acc579c535349c38302b4cbc31e"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/running-morning.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/running-morning.webp",
+      "bytes": 145720,
+      "sha256": "b3968ee0c3d948dfe89a20e536d000bef0162a9e86b797aaffca34fb669aa95f"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/sacrifice-feast.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/sacrifice-feast.webp",
+      "bytes": 162128,
+      "sha256": "78d880a2e0435909c35d88e7d729f3beb050271fc491dab945832d9d83c430df"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/school-art.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/school-art.webp",
+      "bytes": 135406,
+      "sha256": "4552d5f60385f9df43f1bbfdc6820840e3c2131028f695b43122226a72f2c332"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/school-bag.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/school-bag.webp",
+      "bytes": 157146,
+      "sha256": "c41eb8dda0c9d581c0c07362dde16cab2d847fdffeb2926283bdca919d00f421"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/school-desk.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/school-desk.webp",
+      "bytes": 194480,
+      "sha256": "1f4df744ca69eaa6443d5e73d2fdd9a8ac5032b001e297cba749d59fb9ee0b5d"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/school-lunch.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/school-lunch.webp",
+      "bytes": 149360,
+      "sha256": "a3bfdcba671fb9e58517a8446904668ee4c90473881a16fada6f41d4e025ad3c"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/school.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/school.webp",
+      "bytes": 206442,
+      "sha256": "80c50dd4b9736673e68fc3dd02d0a21b477688e83a448809f242186057599b5c"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/seed-to-green.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/seed-to-green.webp",
+      "bytes": 207372,
+      "sha256": "c0f6812684e380aff7c4b7f7dc81b859124a56a6916ac7000e2af07415218656"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/semester-break.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/semester-break.webp",
+      "bytes": 102108,
+      "sha256": "86b1117928b0c96c022baa74352a8ded862c748e37182a065c1a1796cf50ab25"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/skin-routine.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/skin-routine.webp",
+      "bytes": 115410,
+      "sha256": "7bf77d46311dac2e0ca43ed2a6ed927721569147c1bd5e1c61139d30082ec213"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/small-space.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/small-space.webp",
+      "bytes": 230196,
+      "sha256": "e76325a6a39029e7ba9e7f3b0b544ca11043745ab845d986f7fded15d9a09ce5"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/smart-home.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/smart-home.webp",
+      "bytes": 133512,
+      "sha256": "9bf4f94a4da3fd0019dbf3f3e1305c721ad8dd3c9a7315d00bfff5a60fe80e9f"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/snow-route.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/snow-route.webp",
+      "bytes": 216460,
+      "sha256": "548ceb11535eaebb3afef8d351d4c168f4de8bffe478a492ff44b6416939daaa"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/special-day.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/special-day.webp",
+      "bytes": 159500,
+      "sha256": "4622c1f27069ad6eea111e6d9e5755a6d03cebf99d2ca851559fb0196f2003b8"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/spring-garden.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/spring-garden.webp",
+      "bytes": 254766,
+      "sha256": "c5666f5fdc7b7adb482d73821f807c34ae73e659d4863fe80caf9117acfc323e"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/spring-organize.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/spring-organize.webp",
+      "bytes": 226836,
+      "sha256": "d2e20e697843cdcf9d3deb73ccada21e6034b62926ce3ad088f600016239f4ba"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/spring-refresh.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/spring-refresh.webp",
+      "bytes": 190072,
+      "sha256": "4fdbe6436a1dea0f3211a4f82677bca76ba62204aaae5769a25945a52e8427e3"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/spring-walk.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/spring-walk.webp",
+      "bytes": 199744,
+      "sha256": "43b1c1a9b2ea43e442af1813ccb40bbe4f3bf225ce1c78017ed3432a4d053bef"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/spring-wardrobe.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/spring-wardrobe.webp",
+      "bytes": 162594,
+      "sha256": "7e33104e4505e371a197bc27bcb0bd989120bd4ef9c25966f41b88f81ad204cc"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/store-anniversary.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/store-anniversary.webp",
+      "bytes": 149476,
+      "sha256": "315cb23753768d2d820d7eaef7ba0380aaa5996ad33fc5b572ae5e642ad750ad"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/summer-beach.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/summer-beach.webp",
+      "bytes": 342372,
+      "sha256": "3c8b3584f6a3d1c391af89ca6c23e9d27dcbe82143b161e786118cee7cc89844"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/summer-camping.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/summer-camping.webp",
+      "bytes": 175536,
+      "sha256": "1b289db44ee356655f2f751fffad69483a8e35d9561118542e9fec912d7a0cbf"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/summer-care.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/summer-care.webp",
+      "bytes": 125050,
+      "sha256": "86c6f2bebd7a68b9097228afa7ad51b28eb6d5fa19d6c848494ab6aa5337e93a"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/summer-table.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/summer-table.webp",
+      "bytes": 254298,
+      "sha256": "e17ea7b168a389c5e68bb89b61f28accaad2f09583e66ccfeec4e5d3b98d3b66"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/summer-travel.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/summer-travel.webp",
+      "bytes": 296516,
+      "sha256": "506a4ba52be4df5e1328a92dedba9676baf254208188a6ecbe7703834af0be99"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/summer.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/summer.webp",
+      "bytes": 269470,
+      "sha256": "28128dafbe66949fffd77b52cf8f427f7f2246478aa627e2124336e0d8436209"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/tea-ritual.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/tea-ritual.webp",
+      "bytes": 221704,
+      "sha256": "75e65f8dba511f6f0783ebd387723af59a201bd60f3518b70b2097a34ea7fd20"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/teachers-day.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/teachers-day.webp",
+      "bytes": 104132,
+      "sha256": "ef992393bf67faec5204ce2e0767678807d1f65543540967391b98e8affc8bad"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/university-tech.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/university-tech.webp",
+      "bytes": 71232,
+      "sha256": "034e8501d331caed396f25b5e603c14950167be0fd0c419a506286170d45e468"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/valentines.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/valentines.webp",
+      "bytes": 142460,
+      "sha256": "02049b74112a5789b9b4ac5210d5678407e5f1da2748f0b16019e5a8c9314438"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/wedding-season.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/wedding-season.webp",
+      "bytes": 137160,
+      "sha256": "523d315054676c01e0cab0207cb806b652eec5becff6596b9f79a05fdad934ef"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/weekend-discovery.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/weekend-discovery.webp",
+      "bytes": 213692,
+      "sha256": "cbb5c8c552b5034247639f0ef167c8ebd5421e212fe3b8712b28560cd601a999"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/weekend.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/weekend.webp",
+      "bytes": 141600,
+      "sha256": "6c40252d6fd2d4655d9206ffe50d3566800a802efff1b2d1362944d4ba87537c"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/winter-gaming.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/winter-gaming.webp",
+      "bytes": 65234,
+      "sha256": "c5f3f656ed4772d4ace7763d8c55b07571ffc155f13f2be15830936cd72b6184"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/winter-hobbies.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/winter-hobbies.webp",
+      "bytes": 176526,
+      "sha256": "80d9cb4a917014736d59fb4323d4307fe1a9d2749e2ebdf606b257faa71a675c"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/winter-knitting.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/winter-knitting.webp",
+      "bytes": 268214,
+      "sha256": "050dd7647de182a20ae40bbc0c7a031f272970a5cec443144ad9510a17bb7741"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/winter-outdoor.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/winter-outdoor.webp",
+      "bytes": 122760,
+      "sha256": "867143456abc5f805e935b552242e16fd6192d42de8f41d0f47568d3796b1a10"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/winter-prep.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/winter-prep.webp",
+      "bytes": 138556,
+      "sha256": "4029c68671dd773c9edbd5cb15178698444b3b54db5b9637be1aaf52fa8181ed"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/winter.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/winter.webp",
+      "bytes": 178132,
+      "sha256": "ff5fed625271e863c055e95fc972cbe64e82dd25a7edf3d35e69990b26339a86"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/womens-day.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/womens-day.webp",
+      "bytes": 149406,
+      "sha256": "d6415125f9fa1c152ddc3f8b9485474fff14cb1ab7f6922093c1a15a281567e4"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/year-end.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/year-end.webp",
+      "bytes": 193532,
+      "sha256": "47aedc2aa7550d79ac37fb4534587124ec41fea9da6e2c12405c27353da13814"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/yoga-pause.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/yoga-pause.webp",
+      "bytes": 223982,
+      "sha256": "f35a89c89cd446ca749a402009f91a572b7dbc16891a250382e331411c24f43b"
+    },
+    {
+      "sourcePath": "public/media/campaigns-20260915/youth-day.webp",
+      "targetPath": "src/bundled-assets/media/campaigns-20260915/youth-day.webp",
+      "bytes": 131538,
+      "sha256": "2e8afaa056657c778a27ac5e36274a3e40deda2e897817dbeb95f5ad91a85a77"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "mode": "CANDIDATE_RUNTIME",
+  "publicationAccepted": false,
+  "ownedDatabase": "novastore_theme_wave1_668de4b9a6095c9e_test",
+  "container": "novastore-theme-wave1-668de4b9a6095c9e",
+  "pid": 42752,
+  "port": 63993,
+  "createdAt": "2026-09-22T13:59:33.862Z",
+  "migrations": 48,
+  "buildManifestSHA256": "0290ed9ae04cd431e5df440f21507a831b3bf2ac4966730f553f247e1fb35150",
+  "stores": [
+    {
+      "family": "Classic",
+      "url": "http://127.0.0.1:63993/",
+      "storeId": 4,
+      "serviceId": "93c3e7cf-f7a3-4d6c-8729-6f540b91433e",
+      "assignmentId": "8bf12371-1c9f-4316-9a5f-9c946c3463c6",
+      "versionId": "2babd7ae-22f2-4886-94bb-b86d0a1fda2c",
+      "presentation": {
+        "id": "nova-classic",
+        "version": "1.0.0",
+        "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668"
+      },
+      "publicationId": "a41e87cb-cf21-42d9-8d31-b552c205ae9e",
+      "artifactId": "e295f85c-c263-4c9e-b553-34d5607ff63b",
+      "artifactDigest": "48ef24bb75b9e8ff9974a1970e29b5eed57550efaef75e58866f7a1c2486887a",
+      "sourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1"
+    },
+    {
+      "family": "Atelier",
+      "url": "http://localhost:63993/",
+      "storeId": 5,
+      "serviceId": "f6be17ac-0dd5-48cd-bc1d-9d9afd3c45eb",
+      "assignmentId": "f792095c-e580-45d1-aaea-d94f41f4dff0",
+      "versionId": "028e35df-e103-4402-b4b9-6f7fc3a4fefa",
+      "presentation": {
+        "id": "nova-atelier",
+        "version": "1.0.0",
+        "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a"
+      },
+      "publicationId": "d57a84d1-4b11-4731-ad61-4c35a3b0d384",
+      "artifactId": "e95e64d4-b630-4dc9-831d-23186f1539fc",
+      "artifactDigest": "a2487b4412203d5cf8fc2b0aba67e306e6086838e365de707e53889b9a2cf1ef",
+      "sourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605"
+    }
+  ],
+  "paidFixtureOrderId": 1,
+  "assetRoot": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\customer-candidate-assets-1790085570483",
+  "artifactRoot": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\customer-candidate-artifacts-1790085570555"
+}

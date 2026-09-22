@@ -1,3 +1,4 @@
+import {readStudioWorkshopLaunch} from './theme-platform/studioWorkshopLaunch.js';
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import OrderDeliveryDetail from "./OrderDeliveryDetail.jsx";
 import productCardFraming from "../../shared/productCardFraming.js";
@@ -2521,7 +2522,7 @@ const pageCapabilities = Object.freeze({
   coupons: "couponsRead",
   support: "supportRead",
 });
-const pageLabels = Object.freeze({ dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler", catalog: "Ürünler", catalogStructure: "Katalog yapısı", sellerApplications: "Satıcı mağazaları", reviews: "Yorumlar", questions: "Sorular", coupons: "Kuponlar", support: "Destek" });
+const pageLabels = Object.freeze({ themePlatform: "Studio Pro", dashboard: "Pano", orders: "Siparişler", returns: "İadeler", notifications: "Bildirimler", catalog: "Ürünler", catalogStructure: "Katalog yapısı", sellerApplications: "Satıcı mağazaları", reviews: "Yorumlar", questions: "Sorular", coupons: "Kuponlar", support: "Destek" });
 const notificationTargetPages = Object.freeze({
   order: "orders",
   payment: "orders",
@@ -2623,6 +2624,12 @@ export function IntegratedApp() {
   const sessionResource = useResource(loadSession, { preserveDataOnError: false });
   const sessionLoaded = sessionResource.phase === "ready";
   const capabilities = sessionResource.data?.capabilities || {};
+  const loadThemeAccess = useCallback(({signal}) => http.request('/api/admin/theme-platform/experience/catalog', {signal}), [http]);
+  const themeAccessResource = useResource(loadThemeAccess, {enabled: sessionLoaded, preserveDataOnError: false});
+  const themeEnabled = ['ready','empty'].includes(themeAccessResource.phase);
+  const loadStudioWorkshop = useCallback(async({signal}) => readStudioWorkshopLaunch(await http.request('/api/admin/theme-platform/workshop-launch', {signal})), [http]);
+  const studioWorkshopResource = useResource(loadStudioWorkshop, {enabled: sessionLoaded && themeEnabled, preserveDataOnError: false});
+  const studioWorkshop = studioWorkshopResource.phase === 'ready' ? studioWorkshopResource.data : null;
   const statsEnabled = sessionLoaded && hasCapability(capabilities, "dashboardRead");
   const ordersEnabled = sessionLoaded && hasCapability(capabilities, "ordersRead");
   const returnsEnabled = sessionLoaded && hasCapability(capabilities, "returnsRead");
@@ -2668,7 +2675,7 @@ export function IntegratedApp() {
   const supportLoaded = supportResource.phase === "ready" || supportResource.phase === "empty";
   const enabledPages = useMemo(() => Object.keys(pageCapabilities).filter((pageId) => (
     hasCapability(capabilities, pageCapabilities[pageId])
-  )), [capabilities]);
+  )).concat(themeEnabled ? ["themePlatform"] : []), [capabilities, themeEnabled]);
   const lastUpdatedAt = [ordersResource.updatedAt, returnsResource.updatedAt, notificationsResource.updatedAt, catalogResource.updatedAt, catalogStructureResource.updatedAt, storesResource.updatedAt, reviewsResource.updatedAt, questionsResource.updatedAt, couponsResource.updatedAt, supportResource.updatedAt]
     .filter(Boolean)
     .sort((left, right) => right.getTime() - left.getTime())[0] || null;
@@ -2685,7 +2692,8 @@ export function IntegratedApp() {
 
   useEffect(() => {
     const synchronizePage = () => {
-      setPage(readIntegratedPageFromLocation());
+      const nextPage = readIntegratedPageFromLocation();
+      setPage(nextPage);
       setNotificationTarget(notificationTargetFromHash());
     };
     window.addEventListener("popstate", synchronizePage);
@@ -2697,12 +2705,12 @@ export function IntegratedApp() {
   }, []);
 
   useEffect(() => {
-    if (!sessionLoaded) return;
+    if (!sessionLoaded || (page === "themePlatform" && ["idle", "loading"].includes(themeAccessResource.phase))) return;
     if (!enabledPages.includes(page) && enabledPages[0]) setPage(enabledPages[0]);
     if (!enabledPages.includes(page) && enabledPages[0]) {
       writeIntegratedPageToHistory(enabledPages[0], { replace: true });
     }
-  }, [enabledPages, page, sessionLoaded]);
+  }, [enabledPages, page, sessionLoaded, themeAccessResource.phase]);
 
   useEffect(() => {
     if (page !== "sellerApplications") setSelectedStoreId(null);
@@ -2742,7 +2750,7 @@ export function IntegratedApp() {
 
   const navigate = (next) => {
     const capability = pageCapabilities[next];
-    if (!capability || !hasCapability(capabilities, capability)) return;
+    if (next === "themePlatform" ? !themeEnabled : (!capability || !hasCapability(capabilities, capability))) return;
     writeIntegratedPageToHistory(next);
     setPage(next);
     setNotificationTarget(null);
@@ -2780,6 +2788,8 @@ export function IntegratedApp() {
   };
   const reloadAll = () => {
     sessionResource.reload();
+    if (sessionLoaded) themeAccessResource.reload();
+    if (themeEnabled) studioWorkshopResource.reload();
     if (statsEnabled) statsResource.reload();
     if (notificationsEnabled) notificationsResource.reload();
     if (notificationsEnabled) notificationUnreadResource.reload();
@@ -2802,6 +2812,8 @@ export function IntegratedApp() {
   let pageContent;
   if (!sessionLoaded) {
     pageContent = <StatePanel phase={sessionResource.phase} error={sessionResource.error} onRetry={sessionResource.reload} />;
+  } else if (page === "themePlatform") {
+    pageContent = studioWorkshop ? <section className="notice-card"><Icon name="grid" /><div><h2>Studio Pro</h2><p>Özgün tasarım atölyesi ve sunucuya bağlı mağaza sunumları aynı Studio Pro içinde açılır.</p><a className="primary-button" href={studioWorkshop.url} target="_blank" rel="noopener noreferrer">Studio Pro'yu yeni sekmede aç</a><p>Tasarım araçları yerel taslakları korur. Mağaza sunumları Studio içindeki mevcut bölümde sunucu kayıtlarıyla yönetilir; bu bağlantı canlı yayın yapmaz.</p></div></section> : <StatePanel phase={studioWorkshopResource.phase} error={studioWorkshopResource.error} onRetry={studioWorkshopResource.reload} />;
   } else if (enabledPages.length === 0) {
     pageContent = <StatePanel phase="forbidden" error={noSupportedModuleError} onRetry={sessionResource.reload} />;
   } else if (page === "dashboard") {
@@ -2876,8 +2888,9 @@ export function IntegratedApp() {
         <aside className="icon-rail" aria-label="Ana yönetim alanları">
           <div className="rail-logo"><Icon name="storefront" /><span>NOVA</span></div>
           <nav className="rail-nav">
+            {studioWorkshop ? <a className="studio-workshop-link" href={studioWorkshop.url} target="_blank" rel="noopener noreferrer" aria-label="Studio Pro · yeni sekmede aç" title="Studio Pro · özgün tasarım atölyesi · yeni sekme"><Icon name="grid" /></a> : <button disabled aria-label="Studio Pro" title={['idle','loading'].includes(studioWorkshopResource.phase)?'Studio Pro bağlantısı doğrulanıyor':'Özgün Studio atölyesi bu ortamda yapılandırılmamış veya erişim izni bulunmuyor'}><Icon name="grid" /></button>}
             {railItems.map((item) => {
-              const enabled = item.implemented && hasCapability(capabilities, item.capability);
+              const enabled = item.implemented && (item.id === "themePlatform" ? themeEnabled : hasCapability(capabilities, item.capability));
               if (["catalog", "catalogStructure", "sellerApplications"].includes(item.id) && !enabled) return null;
               return (
                 <button
@@ -2898,6 +2911,7 @@ export function IntegratedApp() {
         <aside ref={contextRef} className="context-rail" id="context-navigation" aria-label="Entegre yönetim menüsü" tabIndex="-1">
           <header className="context-title"><h1>Commerce Pro</h1><span className="live-mode-chip">ENTEGRE</span></header>
           <section className="context-nav">
+
             <button className={page === "dashboard" ? "active" : ""} onClick={() => navigate("dashboard")} disabled={!hasCapability(capabilities, "dashboardRead")}><Icon name="house" /><span>Genel Bakış</span></button>
             <button className={page === "orders" ? "active" : ""} onClick={() => navigate("orders")} disabled={!hasCapability(capabilities, "ordersRead")}><Icon name="orders" /><span>Siparişler</span><b>{ordersResource.data?.items.length || 0}</b></button>
             <button className={page === "returns" ? "active" : ""} onClick={() => navigate("returns")} disabled={!hasCapability(capabilities, "returnsRead")}><Icon name="refresh" /><span>İadeler</span><b>{returnsResource.data?.items.length || 0}</b></button>

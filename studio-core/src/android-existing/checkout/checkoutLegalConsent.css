@@ -1,0 +1,238 @@
+.checkout-provider-card,
+.checkout-legal-consent {
+  padding: 13px;
+  border: 1px solid rgba(15, 44, 78, .07);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 6px 17px rgba(15, 44, 78, .06);
+}
+
+.checkout-provider-card {
+  display: grid;
+  gap: 10px;
+}
+
+.checkout-provider-card > header,
+.checkout-legal-consent-heading {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+}
+
+.checkout-provider-card > header > svg,
+.checkout-legal-consent-heading > span {
+  width: 32px;
+  height: 32px;
+  padding: 8px;
+  border-radius: 11px;
+  color: #fff;
+  background: var(--nova-deep);
+}
+
+.checkout-legal-consent-heading > span {
+  display: grid;
+  place-items: center;
+}
+
+.checkout-legal-consent-heading > span > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.checkout-provider-card h2,
+.checkout-legal-consent h2 {
+  margin: 0;
+  color: var(--nova-deep);
+  font-size: 13px;
+  line-height: 17px;
+}
+
+.checkout-provider-card header p,
+.checkout-legal-consent-heading p {
+  margin: 2px 0 0;
+  color: var(--nova-muted);
+  font-size: 8.5px;
+  line-height: 1.4;
+}
+
+.checkout-provider-state {
+  margin: 0;
+  color: var(--nova-muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.checkout-provider-card > .secondary {
+  min-height: 42px;
+}
+
+.checkout-provider-privacy {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--nova-muted);
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.checkout-provider-privacy > svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  margin-top: 1px;
+}
+
+.checkout-legal-consent {
+  display: grid;
+  gap: 11px;
+}
+
+.checkout-legal-consent-list {
+  display: grid;
+  gap: 8px;
+}
+
+.checkout-legal-document {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--nova-line);
+  border-radius: 13px;
+  background: #f8fafc;
+  transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease;
+}
+
+.checkout-legal-document[data-accepted="true"] {
+  border-color: rgba(21, 148, 71, .42);
+  background: #f5fbf7;
+  box-shadow: inset 3px 0 0 var(--nova-success);
+}
+
+.checkout-legal-checkbox {
+  min-width: 0;
+  min-height: 58px;
+  padding: 10px 11px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  cursor: pointer;
+}
+
+.checkout-legal-checkbox > input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--nova-deep);
+  cursor: pointer;
+}
+
+.checkout-legal-checkbox > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.checkout-legal-checkbox strong {
+  overflow-wrap: anywhere;
+  color: var(--nova-deep);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.checkout-legal-checkbox small {
+  color: var(--nova-muted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.checkout-legal-disclosure {
+  border-top: 1px solid rgba(15, 44, 78, .08);
+}
+
+.checkout-legal-disclosure > summary {
+  min-height: 44px;
+  padding: 0 11px 0 40px;
+  list-style: none;
+  color: var(--nova-orange-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  font-size: 9.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.checkout-legal-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.checkout-legal-disclosure > summary > svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  transition: transform .16s ease;
+}
+
+.checkout-legal-disclosure[open] > summary > svg {
+  transform: rotate(90deg);
+}
+
+.checkout-legal-document-body {
+  max-height: 240px;
+  overflow: auto;
+  border-top: 1px solid rgba(15, 44, 78, .08);
+  background: #fff;
+}
+
+.checkout-legal-document-body pre {
+  margin: 0;
+  padding: 12px;
+  border: 0;
+  color: var(--nova-text);
+  background: transparent;
+  font-family: "Nova Inter", "Segoe UI", sans-serif;
+  font-size: 8px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.layout-tablet .checkout-provider-card,
+.layout-tablet .checkout-legal-consent {
+  padding: 22px;
+  border-radius: 20px;
+}
+
+.layout-tablet .checkout-provider-card h2,
+.layout-tablet .checkout-legal-consent h2 {
+  font-size: 18px;
+  line-height: 23px;
+}
+
+.layout-tablet .checkout-provider-card header p,
+.layout-tablet .checkout-legal-consent-heading p {
+  font-size: 12px;
+}
+
+.layout-tablet .checkout-legal-checkbox {
+  min-height: 72px;
+  padding: 14px 16px;
+}
+
+.layout-tablet .checkout-legal-checkbox strong {
+  font-size: 14px;
+}
+
+.layout-tablet .checkout-legal-checkbox small,
+.layout-tablet .checkout-provider-privacy {
+  font-size: 11px;
+}
+
+.layout-tablet .checkout-legal-disclosure > summary {
+  min-height: 48px;
+  padding-inline: 45px 16px;
+  font-size: 12px;
+}

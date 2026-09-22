@@ -1,0 +1,50 @@
+{
+  "mode": "CANDIDATE_RUNTIME",
+  "publicationAccepted": false,
+  "ownedDatabase": "novastore_theme_wave1_12378ae2c171a056_test",
+  "container": "novastore-theme-wave1-12378ae2c171a056",
+  "pid": 4240,
+  "port": 63993,
+  "createdAt": "2026-09-19T21:50:20.225Z",
+  "migrations": 48,
+  "buildManifestSHA256": "90d86609b71869ec552ebc1ebf7b5c4acfcee06f18bc0f4468b8c753069f7827",
+  "stores": [
+    {
+      "family": "Classic",
+      "url": "http://127.0.0.1:63993/",
+      "storeId": 4,
+      "serviceId": "9d8122d9-ac55-4256-a3d9-9d46bfa63d83",
+      "assignmentId": "1c0e82e6-5ba1-471e-88b3-9f6cfc846e01",
+      "versionId": "5e304401-8840-4e4a-ae17-6e68f9e0cb10",
+      "presentation": {
+        "id": "nova-classic",
+        "version": "1.0.0",
+        "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668"
+      },
+      "publicationId": "7a491f42-e542-4926-86c0-1cc04fdeb333",
+      "artifactId": "82eef360-d337-4ad9-9c47-5ec96649eeba",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "sourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b"
+    },
+    {
+      "family": "Atelier",
+      "url": "http://localhost:63993/",
+      "storeId": 5,
+      "serviceId": "f198c870-0b08-42cf-aa22-42086ec85abc",
+      "assignmentId": "0ebd676e-b8b9-451e-b4e8-f515fb352f60",
+      "versionId": "992eeb73-cf76-42e1-95ce-c2336f8c1d17",
+      "presentation": {
+        "id": "nova-atelier",
+        "version": "1.0.0",
+        "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a"
+      },
+      "publicationId": "0712578b-b992-4e5a-8d4b-ea31c912d324",
+      "artifactId": "63fbb113-523f-4830-ae8f-4fb7cb634611",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "sourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684"
+    }
+  ],
+  "paidFixtureOrderId": 1,
+  "assetRoot": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\variant-cart-v2-20260919\\web\\customer-candidate-assets-1789854618062",
+  "artifactRoot": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\variant-cart-v2-20260919\\web\\customer-candidate-artifacts-1789854618079"
+}

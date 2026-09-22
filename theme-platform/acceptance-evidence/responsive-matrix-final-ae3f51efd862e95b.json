@@ -1,0 +1,2920 @@
+{
+  "schemaVersion": 1,
+  "buildManifestSHA256": "90d86609b71869ec552ebc1ebf7b5c4acfcee06f18bc0f4468b8c753069f7827",
+  "provenance": "ACTUAL_BROWSER",
+  "measurementNotes": "Full-page PNG excludes scrollbar; rootScrollWidth is measured document.documentElement.scrollWidth, not clientWidth. Lazy images were viewed through normal section navigation before final Classic captures. Last case per family/page/width supersedes earlier invalid/interim captures; current renderer fully reloaded. Original screenshot tool returned JPEG bytes; byte-identical .jpg evidence copies now identify the actual format.",
+  "rows": [
+    {
+      "family": "atelier",
+      "page": "home",
+      "requestedWidth": 320,
+      "bodyWidth": 305,
+      "h1": "Yeni mevsim.\nKendi ritmin.",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "height": 604.0625,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 305
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 167.296875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 130.5
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 167.296875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 130.5
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 55,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 55
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 280,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 219
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 305,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 320,
+      "overflow": false,
+      "evidence": "atelier-home-320.png",
+      "actualWidth": 320,
+      "rootScrollWidth": 305,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-home-320.jpg",
+        "sha256": "30d0a2ab7874ce73ea2a2643d2c3ac426b3d5a25f173491e0a76b95cd23aaca3",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "home",
+      "requestedWidth": 360,
+      "bodyWidth": 345,
+      "h1": "Yeni mevsim.\nKendi ritmin.",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "height": 604.0625,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 345
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 192.9375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 150.5
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 192.9375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 150.5
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 55,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 55
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 280,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 259
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 345,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 360,
+      "overflow": false,
+      "evidence": "atelier-home-360.png",
+      "actualWidth": 360,
+      "rootScrollWidth": 345,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-home-360.jpg",
+        "sha256": "3b5363ee5ca341b73f5f104ece582d7e59dd0d4c8a586832cb7698da2c07b6c3",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "home",
+      "requestedWidth": 390,
+      "bodyWidth": 375,
+      "h1": "Yeni mevsim.\nKendi ritmin.",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "height": 604.0625,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 375
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 212.171875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 165.5
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 212.171875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 165.5
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 55,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 55
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 280,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 289
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 375,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 390,
+      "overflow": false,
+      "evidence": "atelier-home-390.png",
+      "actualWidth": 390,
+      "rootScrollWidth": 375,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-home-390.jpg",
+        "sha256": "b19f8ec960f51938377c6ae1e7d6d701b9efac7cc1dd48d4100292af7df329ac",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "home",
+      "requestedWidth": 430,
+      "bodyWidth": 415,
+      "h1": "Yeni mevsim.\nKendi ritmin.",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "height": 604.0625,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 415
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 237.8125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 185.5
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 237.8125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 185.5
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 55,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 55
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 280,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 329
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 415,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 430,
+      "overflow": false,
+      "evidence": "atelier-home-430.png",
+      "actualWidth": 430,
+      "rootScrollWidth": 415,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-home-430.jpg",
+        "sha256": "b5255dbe39bf196ba13508c04bc6f7a5f6f180268d44ec06e58ec49d637aa251",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "home",
+      "requestedWidth": 768,
+      "bodyWidth": 753,
+      "h1": "Yeni mevsim.\nKendi ritmin.",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "height": 648.78125,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 753
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 207.359375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 161.75
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 207.359375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 161.75
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 70,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 70
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 280,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 259.5
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 753,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 768,
+      "overflow": false,
+      "evidence": "atelier-home-768.png",
+      "actualWidth": 768,
+      "rootScrollWidth": 753,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-home-768.jpg",
+        "sha256": "3536164795f8899b36523202c9ffd2d056f3f61224e4885d0fb2e7cc260eb9a7",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "home",
+      "requestedWidth": 1024,
+      "bodyWidth": 1009,
+      "h1": "Yeni mevsim.\nKendi ritmin.",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "height": 648.78125,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 1009
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 289.421875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 225.75
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 289.421875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 225.75
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 70,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 70
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 280,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 387.5
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1009,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1024,
+      "overflow": false,
+      "evidence": "atelier-home-1024.png",
+      "actualWidth": 1024,
+      "rootScrollWidth": 1009,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-home-1024.jpg",
+        "sha256": "cbfd251fc327edb447d27bb6202767315520808b141d7a531db39ab91e25008c",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "home",
+      "requestedWidth": 1440,
+      "bodyWidth": 1425,
+      "h1": "Yeni mevsim.\nKendi ritmin.",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Nova Store Atelier koleksiyon kampanyası",
+          "height": 648.78125,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 1425
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 415.0625,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 323.75
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 415.0625,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 323.75
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 70,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 70
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 280,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 595.5
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1425,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1440,
+      "overflow": false,
+      "evidence": "atelier-home-1440.png",
+      "actualWidth": 1440,
+      "rootScrollWidth": 1425,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-home-1440.jpg",
+        "sha256": "84a290d45f6c7f45af76bb5c4d3119574c92c9b3731b3c39ab5de7b70639d304",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "category",
+      "requestedWidth": 320,
+      "bodyWidth": 305,
+      "h1": "Koleksiyonu keşfet",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "height": 167.296875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 130.5
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 167.296875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 130.5
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 305,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 320,
+      "overflow": false,
+      "evidence": "atelier-category-320.png",
+      "actualWidth": 320,
+      "rootScrollWidth": 305,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-category-320.jpg",
+        "sha256": "dcf6a7b2e6bf21ddf4b3438bb2cb9dce504070ca8e0538c4f0c615e4e4471db5",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "category",
+      "requestedWidth": 360,
+      "bodyWidth": 345,
+      "h1": "Koleksiyonu keşfet",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "height": 192.9375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 150.5
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 192.9375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 150.5
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 345,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 360,
+      "overflow": false,
+      "evidence": "atelier-category-360.png",
+      "actualWidth": 360,
+      "rootScrollWidth": 345,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-category-360.jpg",
+        "sha256": "33cbf476780b1b58947901b35429c9ffb00d344392920135db74b40e9e578aef",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "category",
+      "requestedWidth": 390,
+      "bodyWidth": 375,
+      "h1": "Koleksiyonu keşfet",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "height": 212.171875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 165.5
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 212.171875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 165.5
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 375,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 390,
+      "overflow": false,
+      "evidence": "atelier-category-390.png",
+      "actualWidth": 390,
+      "rootScrollWidth": 375,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-category-390.jpg",
+        "sha256": "d2c66dfdaf776217dd033118b3e6709d5daf8ec399c48ec33418e8968c4b526e",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "category",
+      "requestedWidth": 430,
+      "bodyWidth": 415,
+      "h1": "Koleksiyonu keşfet",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "height": 237.8125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 185.5
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 237.8125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 185.5
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 415,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 430,
+      "overflow": false,
+      "evidence": "atelier-category-430.png",
+      "actualWidth": 430,
+      "rootScrollWidth": 415,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-category-430.jpg",
+        "sha256": "76d3ea73d9e09bbeea1db6d886747a870c97718405b6e32ddb4591796c3bc0cb",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "category",
+      "requestedWidth": 768,
+      "bodyWidth": 753,
+      "h1": "Koleksiyonu keşfet",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "height": 282.46875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 220.328125
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 282.46875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 220.328125
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 753,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 768,
+      "overflow": false,
+      "evidence": "atelier-category-768.png",
+      "actualWidth": 768,
+      "rootScrollWidth": 753,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-category-768.jpg",
+        "sha256": "92a1ae5db294fc4134aa518cbf4913fef7750e4b68e5033cf0b9642abe67c6d8",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "category",
+      "requestedWidth": 1024,
+      "bodyWidth": 1009,
+      "h1": "Koleksiyonu keşfet",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "height": 391.859375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 305.65625
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 391.875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 305.671875
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1009,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1024,
+      "overflow": false,
+      "evidence": "atelier-category-1024.png",
+      "actualWidth": 1024,
+      "rootScrollWidth": 1009,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-category-1024.jpg",
+        "sha256": "59315215e08e80ea3b38514f2efa5cab835bcb08e96faa53fb2d7ceb46d5fde3",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "category",
+      "requestedWidth": 1440,
+      "bodyWidth": 1425,
+      "h1": "Koleksiyonu keşfet",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Keten gömlek",
+          "height": 500,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 439
+        },
+        {
+          "alt": "Oversize ceket",
+          "height": 500,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 439
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1425,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1440,
+      "overflow": false,
+      "evidence": "atelier-category-1440.png",
+      "actualWidth": 1440,
+      "rootScrollWidth": 1425,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-category-1440.jpg",
+        "sha256": "b0f521fa09e729a31666c06c26f7707a72a4f56b8a8e1e4d9b1c265c33cbdf8f",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "product",
+      "requestedWidth": 320,
+      "bodyWidth": 305,
+      "h1": "Oversize ceket",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "height": 237.390625,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 273
+        },
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 167.296875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 130.5
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 305,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 320,
+      "overflow": false,
+      "evidence": "atelier-product-320.png",
+      "actualWidth": 320,
+      "rootScrollWidth": 305,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-product-320.jpg",
+        "sha256": "9bcbff83f734d7641e732abe903df68c507a49e943ac72ec523385005095f1b0",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "product",
+      "requestedWidth": 360,
+      "bodyWidth": 345,
+      "h1": "Oversize ceket",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "height": 272.171875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 313
+        },
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 192.9375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 150.5
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 345,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 360,
+      "overflow": false,
+      "evidence": "atelier-product-360.png",
+      "actualWidth": 360,
+      "rootScrollWidth": 345,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-product-360.jpg",
+        "sha256": "44fb07875b478d0d24978248dd76aa94d0d9fa6678412fe3c4382dbb2de8f4e1",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "product",
+      "requestedWidth": 390,
+      "bodyWidth": 375,
+      "h1": "Oversize ceket",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "height": 298.25,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 343
+        },
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 212.171875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 165.5
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 375,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 390,
+      "overflow": false,
+      "evidence": "atelier-product-390.png",
+      "actualWidth": 390,
+      "rootScrollWidth": 375,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-product-390.jpg",
+        "sha256": "72fe228cfe82419c2070c12c484a984c0f39bc25140c6c31c74a423cd064e044",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "product",
+      "requestedWidth": 430,
+      "bodyWidth": 415,
+      "h1": "Oversize ceket",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "height": 333.03125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 383
+        },
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 237.8125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 185.5
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 415,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 430,
+      "overflow": false,
+      "evidence": "atelier-product-430.png",
+      "actualWidth": 430,
+      "rootScrollWidth": 415,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-product-430.jpg",
+        "sha256": "e81422e366c3f373ac6ba5c6bfdbbbea2ea28be8d0e4f1d42d2e9e570f4c4914",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "product",
+      "requestedWidth": 768,
+      "bodyWidth": 753,
+      "h1": "Oversize ceket",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "height": 331.828125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 331.828125
+        },
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 207.359375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 161.75
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 753,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 768,
+      "overflow": false,
+      "evidence": "atelier-product-768.png",
+      "actualWidth": 768,
+      "rootScrollWidth": 753,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-product-768.jpg",
+        "sha256": "1cd2459b75385cb39944cad74843877eeeabf16a19fb349c6ce465aacfa4dbb8",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "product",
+      "requestedWidth": 1024,
+      "bodyWidth": 1009,
+      "h1": "Oversize ceket",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "height": 461.71875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 461.71875
+        },
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 289.421875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 225.75
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1009,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1024,
+      "overflow": false,
+      "evidence": "atelier-product-1024.png",
+      "actualWidth": 1024,
+      "rootScrollWidth": 1009,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-product-1024.jpg",
+        "sha256": "e68d81c0f1681d6e5da2b3577c89856f92bf23e3ff54db84c0ed982867d95a7b",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "atelier",
+      "page": "product",
+      "requestedWidth": 1440,
+      "bodyWidth": 1425,
+      "h1": "Oversize ceket",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Oversize ceket",
+          "height": 500,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 657.0625
+        },
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Keten gömlek",
+          "height": 415.0625,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 323.75
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1425,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1440,
+      "overflow": false,
+      "evidence": "atelier-product-1440.png",
+      "actualWidth": 1440,
+      "rootScrollWidth": 1425,
+      "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/atelier-product-1440.jpg",
+        "sha256": "4fa06ef1678e09bd6ff2949b9eecd3eb0ed04109f5d886412c381883cdec8b5f",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "home",
+      "requestedWidth": 320,
+      "bodyWidth": 305,
+      "h1": "Ahşap Tasarım Sandalye",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 38,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 32
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 38,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 32
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 226.64801025390625,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 154.87611389160156
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 196.421875,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 275
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 142.921875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 131.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 142.921875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 131.5
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 270,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 275
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 260,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 275
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 275
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 275
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 275
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 305,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 320,
+      "overflow": false,
+      "evidence": "classic-home-320.png",
+      "actualWidth": 320,
+      "rootScrollWidth": 305,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-home-320.jpg",
+        "sha256": "000f7548ed8f7520933d79c0890be0ee56ee5303cf2d36dca0c337534a8e22af",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "home",
+      "requestedWidth": 360,
+      "bodyWidth": 345,
+      "h1": "Ahşap Tasarım Sandalye",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 38,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 32
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 38,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 32
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 234.3741455078125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 183.072265625
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 225,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 315
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 164.671875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 151.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 164.671875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 151.5
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 270,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 315
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 260,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 315
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 315
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 315
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 315
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 345,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 360,
+      "overflow": false,
+      "evidence": "classic-home-360.png",
+      "actualWidth": 360,
+      "rootScrollWidth": 345,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-home-360.jpg",
+        "sha256": "9835f9aa5482d492ee323e368c518969142d3040939c255bce7f0b1d6458c27b",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "home",
+      "requestedWidth": 390,
+      "bodyWidth": 375,
+      "h1": "Ahşap Tasarım Sandalye",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 38,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 32
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 38,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 32
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 235.125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 200.9012451171875
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 246.421875,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 345
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 180.96875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 166.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 180.96875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 166.5
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 270,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 345
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 260,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 345
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 345
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 345
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 345
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 375,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 390,
+      "overflow": false,
+      "evidence": "classic-home-390.png",
+      "actualWidth": 390,
+      "rootScrollWidth": 375,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-home-390.jpg",
+        "sha256": "6814de37dc0af946df7c5b09f17f06ff43a58295b7867e5dff912be0ad3ac9bf",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "home",
+      "requestedWidth": 430,
+      "bodyWidth": 415,
+      "h1": "Ahşap Tasarım Sandalye",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 38,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 32
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 38,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 32
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 235.125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 223.8912353515625
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 275,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 385
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 202.703125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 186.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 202.703125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 186.5
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 270,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 385
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 260,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 385
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 385
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 385
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 385
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 415,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 430,
+      "overflow": false,
+      "evidence": "classic-home-430.png",
+      "actualWidth": 430,
+      "rootScrollWidth": 415,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-home-430.jpg",
+        "sha256": "88b74af54d732c26ec75b8972b786b5f12b2ff7c57612eeb1a8c192c13f9d8e4",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "home",
+      "requestedWidth": 768,
+      "bodyWidth": 753,
+      "h1": "Minimal Dinlenme Koltuğu",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 41,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 41
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 41,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 41
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 430.1852416992187,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 197.95318603515625
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 349,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 349
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 183.421875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 163.25
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 183.421875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 163.25
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 450,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 334
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 380,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 334
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 210,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 223
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 210,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 223
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 210,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 223
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 753,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 768,
+      "overflow": false,
+      "evidence": "classic-home-768.png",
+      "actualWidth": 768,
+      "rootScrollWidth": 753,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-home-768.jpg",
+        "sha256": "2386b5ed2ee8276a22288d6e5acd78bc9e5657fa570529fcfa780dd7da7908bb",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "home",
+      "requestedWidth": 1024,
+      "bodyWidth": 1009,
+      "h1": "Minimal Dinlenme Koltuğu",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 41,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 41
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 41,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 41
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 443.098388671875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 319.69775390625
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 477,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 477
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 255.328125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 227.25
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 255.328125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 227.25
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 450,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 462
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 380,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 462
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 210,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 308.328125
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 210,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 308.328125
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 210,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 308.34375
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1009,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1024,
+      "overflow": false,
+      "evidence": "classic-home-1024.png",
+      "actualWidth": 1024,
+      "rootScrollWidth": 1009,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-home-1024.jpg",
+        "sha256": "cf24f1ac0c316192f1cd4b312770714a325ad1f5cfe390d8d7cdec7e0c2ad4ad",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "home",
+      "requestedWidth": 1440,
+      "bodyWidth": 1425,
+      "h1": "Minimal Dinlenme Koltuğu",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 41,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 41
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 41,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 41
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 450.39501953125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 415.07720947265625
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 500,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 590
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 320.21875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 285
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 320.21875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 285
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 450,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 565
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 380,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 565
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 380
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 380
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 250,
+          "loaded": true,
+          "objectFit": "cover",
+          "width": 380
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1425,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1440,
+      "overflow": false,
+      "evidence": "classic-home-1440.png",
+      "actualWidth": 1440,
+      "rootScrollWidth": 1425,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-home-1440.jpg",
+        "sha256": "7dc92172633fb14c0dfe4ba0bdee63d17ad072973cbb6091735bf0a5be8afa60",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "category",
+      "requestedWidth": 320,
+      "bodyWidth": 305,
+      "h1": "Mağaza",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 137.5,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 126.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 137.5,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 126.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 305,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 320,
+      "overflow": false,
+      "evidence": "classic-category-320.png",
+      "actualWidth": 320,
+      "rootScrollWidth": 305,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-category-320.jpg",
+        "sha256": "d14bc73ead42f17a3af660fc171ab855106bb734f3919e1a4a3c26624c3eba3a",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "category",
+      "requestedWidth": 360,
+      "bodyWidth": 345,
+      "h1": "Mağaza",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 159.234375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 146.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 159.234375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 146.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 345,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 360,
+      "overflow": false,
+      "evidence": "classic-category-360.png",
+      "actualWidth": 360,
+      "rootScrollWidth": 345,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-category-360.jpg",
+        "sha256": "7c8d56eb41be0efc9784ea461ed78cd544d323638b4751100b99dc5dfbc16b1d",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "category",
+      "requestedWidth": 390,
+      "bodyWidth": 375,
+      "h1": "Mağaza",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 175.53125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 161.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 175.53125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 161.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 375,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 390,
+      "overflow": false,
+      "evidence": "classic-category-390.png",
+      "actualWidth": 390,
+      "rootScrollWidth": 375,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-category-390.jpg",
+        "sha256": "55ef1c69d14aebfcadb1963495dc28c163f2a63ef271613f483476b62e60242e",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "category",
+      "requestedWidth": 430,
+      "bodyWidth": 415,
+      "h1": "Mağaza",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 197.28125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 181.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 197.28125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 181.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 415,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 430,
+      "overflow": false,
+      "evidence": "classic-category-430.png",
+      "actualWidth": 430,
+      "rootScrollWidth": 415,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-category-430.jpg",
+        "sha256": "133794c77c1d05a3e8882edec5968606c96b8415e0e42cc4b4c568fc7e060b00",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "category",
+      "requestedWidth": 768,
+      "bodyWidth": 753,
+      "h1": "Mağaza",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 183.421875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 163.25
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 183.421875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 163.25
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 753,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 768,
+      "overflow": false,
+      "evidence": "classic-category-768.png",
+      "actualWidth": 768,
+      "rootScrollWidth": 753,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-category-768.jpg",
+        "sha256": "7b8700e384c7ee1541ed1d5dc9f85a710088dbea51b6ac75178411cc8bcfa0ca",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "category",
+      "requestedWidth": 1024,
+      "bodyWidth": 1009,
+      "h1": "Mağaza",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 173.875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 154.75
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 173.875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 154.75
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1009,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1024,
+      "overflow": false,
+      "evidence": "classic-category-1024.png",
+      "actualWidth": 1024,
+      "rootScrollWidth": 1009,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-category-1024.jpg",
+        "sha256": "437501eca2c007a7256345de261c75b1fd0597f59dd384f10640659d8697dfc1",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "category",
+      "requestedWidth": 1440,
+      "bodyWidth": 1425,
+      "h1": "Mağaza",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 238.75,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 212.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 238.75,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 212.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1425,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1440,
+      "overflow": false,
+      "evidence": "classic-category-1440.png",
+      "actualWidth": 1440,
+      "rootScrollWidth": 1425,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-category-1440.jpg",
+        "sha256": "e13fe01368f7dddce1c9f8afb1b514e3e29fc7bd70fa0e65bde4e8036b6a399e",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "product",
+      "requestedWidth": 320,
+      "bodyWidth": 305,
+      "h1": "Ahşap Tasarım Sandalye",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 265,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 265
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 137.5,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 126.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 305,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 320,
+      "overflow": false,
+      "evidence": "classic-product-320.png",
+      "actualWidth": 320,
+      "rootScrollWidth": 305,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-product-320.jpg",
+        "sha256": "1c35c8f0db4cf532af943144855e9c14c1df40b22a5fa4435bc26499b43406fd",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "product",
+      "requestedWidth": 360,
+      "bodyWidth": 345,
+      "h1": "Ahşap Tasarım Sandalye",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 305,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 305
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 159.234375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 146.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 345,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 360,
+      "overflow": false,
+      "evidence": "classic-product-360.png",
+      "actualWidth": 360,
+      "rootScrollWidth": 345,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-product-360.jpg",
+        "sha256": "a5ddf9693da5c931c8ecde939a074e3f4fe89ddb25559b57f1bfdd352bddf399",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "product",
+      "requestedWidth": 390,
+      "bodyWidth": 375,
+      "h1": "Ahşap Tasarım Sandalye",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 335,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 335
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 175.53125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 161.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 375,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 390,
+      "overflow": false,
+      "evidence": "classic-product-390.png",
+      "actualWidth": 390,
+      "rootScrollWidth": 375,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-product-390.jpg",
+        "sha256": "69a9a57385b0b716ae1de47c732cd585be660549c7068ac53888c5ce83480568",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "product",
+      "requestedWidth": 430,
+      "bodyWidth": 415,
+      "h1": "Ahşap Tasarım Sandalye",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 375
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 197.28125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 181.5
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 415,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 430,
+      "overflow": false,
+      "evidence": "classic-product-430.png",
+      "actualWidth": 430,
+      "rootScrollWidth": 415,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-product-430.jpg",
+        "sha256": "898c70510b7d3fa83e06d4d3f6b8ceb1ef8271978d97623a3919451f2101eec8",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "product",
+      "requestedWidth": 768,
+      "bodyWidth": 753,
+      "h1": "Ahşap Tasarım Sandalye",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 599.5,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 545
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 183.421875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 163.25
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 753,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 768,
+      "overflow": false,
+      "evidence": "classic-product-768.png",
+      "actualWidth": 768,
+      "rootScrollWidth": 753,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-product-768.jpg",
+        "sha256": "d8ef57d2f1eae475c1d7225eb1070088d95d0116b3de58c42de8a3312180a95c",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "product",
+      "requestedWidth": 1024,
+      "bodyWidth": 1009,
+      "h1": "Ahşap Tasarım Sandalye",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 400.9375,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 364.5
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 255.328125,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 227.25
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1009,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1024,
+      "overflow": false,
+      "evidence": "classic-product-1024.png",
+      "actualWidth": 1024,
+      "rootScrollWidth": 1009,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-product-1024.jpg",
+        "sha256": "3037dd1be0d6ff5816798e80851b713e032f7f70ade37c4265037f3136aa51d6",
+        "format": "JPEG"
+      }
+    },
+    {
+      "family": "classic",
+      "page": "product",
+      "requestedWidth": 1440,
+      "bodyWidth": 1425,
+      "h1": "Ahşap Tasarım Sandalye",
+      "hasMisleadingDemoText": false,
+      "images": [
+        {
+          "alt": "",
+          "height": 64,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 64
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 528,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 480
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 320.21875,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 285
+        },
+        {
+          "alt": "Ahşap Tasarım Sandalye",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "Minimal Dinlenme Koltuğu",
+          "height": 65,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 65
+        },
+        {
+          "alt": "NovaBot",
+          "height": 46,
+          "loaded": true,
+          "objectFit": "contain",
+          "width": 46
+        }
+      ],
+      "mainWidth": 1425,
+      "marketplaceUi": [],
+      "pending": false,
+      "width": 1440,
+      "overflow": false,
+      "evidence": "classic-product-1440.png",
+      "actualWidth": 1440,
+      "rootScrollWidth": 1425,
+      "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+      "screenshot": {
+        "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-product-1440.jpg",
+        "sha256": "02ff427c4d0e300011b278c1416994994a4af9b1ed8d5e57361e83dbc8ed1af9",
+        "format": "JPEG"
+      }
+    }
+  ]
+}

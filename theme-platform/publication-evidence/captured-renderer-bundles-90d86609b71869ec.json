@@ -1,0 +1,375 @@
+{
+  "schemaVersion": 1,
+  "bundles": [
+    {
+      "presentation": {
+        "id": "nova-classic",
+        "version": "1.0.0",
+        "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668"
+      },
+      "channel": "web",
+      "sourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "entryPoint": "customer.html",
+      "commerceCapabilities": {
+        "customerAuth": true,
+        "persistentCart": true,
+        "favorites": true,
+        "variantSelection": true,
+        "stockCheck": true,
+        "checkoutPreparation": true,
+        "orderHistory": true,
+        "reviews": true,
+        "questions": true,
+        "supportRouting": true,
+        "singleStore": true
+      },
+      "requiredAssetKeys": [],
+      "files": [
+        {
+          "path": "assets/atelier-dom-By_xsji6.js",
+          "sha256": "82c44c26611ce21bcd95b32cdd25640b903012fe8fb5234a6051cb756c37a9ce",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "assets/catalog-adapter-BmxpTtuA.js",
+          "sha256": "c91974ee165545bbdb3cb4c28a7c4d102caf88a575a82e94869055996cdef129",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "assets/customer-NuO2JgXn.css",
+          "sha256": "8d56bde87bc8b031c2648c554914bd7c88d2d83bc5f88d994bbe2204fbac043a",
+          "mimeType": "text/css"
+        },
+        {
+          "path": "assets/customer.js",
+          "sha256": "152def843eb5d173873a581af40180690d421690ce524e8d448beaa4e91562d0",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "assets/modulepreload-polyfill-B5Qt9EMX.js",
+          "sha256": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "assets/theme-kit-adapter-BGy5vAQ8.js",
+          "sha256": "1e1872f9b3107b3ba05260fe39e0cc86148b1b62a3322dbf22b4bd9dbf4adf6e",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "customer.html",
+          "sha256": "6e9616d4ebc5cc3f8a319e95480ad5630ebc1ab03be68f39be82fa2de302228d",
+          "mimeType": "text/html"
+        },
+        {
+          "path": "theme-kit/classic-customer.js",
+          "sha256": "0f6e6b1ed86d3d5111f6a2de60db1ddf06a304c3bdead64c045b09a571741a38",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "theme-kit/classic-presentation.json",
+          "sha256": "aa4caab085a3f56e41c5a256966c5f81e2cad68730e71307d36cf461e4082d35",
+          "mimeType": "application/json"
+        },
+        {
+          "path": "theme-kit/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "mimeType": "text/css"
+        },
+        {
+          "path": "theme-kit/customer-projector.js",
+          "sha256": "3f9f5803204311f0f9aa9492f80b551c8eb273a621affdf5fe4ddbda4fd82479",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "theme-kit/fonts.css",
+          "sha256": "4f8bd3d091eea9d69917cb28d3019c1e57ee834836d7fdfda56bf418a304762e",
+          "mimeType": "text/css"
+        },
+        {
+          "path": "theme-kit/fonts/inter_medium.ttf",
+          "sha256": "97ad806f526e41546d46365bb3a393145f75b7b1568913db74549ad8b8dba872",
+          "mimeType": "font/ttf"
+        },
+        {
+          "path": "theme-kit/fonts/inter_regular.ttf",
+          "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+          "mimeType": "font/ttf"
+        },
+        {
+          "path": "theme-kit/fonts/inter_semibold.ttf",
+          "sha256": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3",
+          "mimeType": "font/ttf"
+        },
+        {
+          "path": "theme-kit/theme.css",
+          "sha256": "0e8844a79a87a5cf0f110cf2562a3313add1ddc9b696dbafd10a8b69ee19152c",
+          "mimeType": "text/css"
+        }
+      ],
+      "sourceFiles": [
+        {
+          "path": "studio-core/src/studio-integration/commerce-auth-base.js",
+          "sha256": "a1dd87cc90e9ac253e4c930f14d16bb2a600491a912bb0193e51d63ec3a440a9"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-cart-v2.js",
+          "sha256": "96a8069d6e20804013df110e0dd37ed3491c6b7f93b00a904ebe3ba0ba399c7b"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-checkout-base.js",
+          "sha256": "bba86c37e74be837894695873133c288f9e3cc2c8156563b1bdca2ce4af10ff8"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-dom.js",
+          "sha256": "4d2a0055d84521e4fb4018d41f11b9ec5a1b942c8157a16bf841d6648744612b"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-engine-bridge.js",
+          "sha256": "b40355892053b9256f37dc0e67700efd324315339b94fd0ac68cb159674efd97"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-entry.js",
+          "sha256": "6fd6f7c05d5f449382d3ffa6570feeee02eabc29cf2fbcd153d26dd37fceaf20"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-http-base.js",
+          "sha256": "cb8548f77b79cc62a099ae91563e3600c443921590714772ff4507e899d7961d"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-http.js",
+          "sha256": "c2868620ce9a9b183559d73a360d0ebdbc592d7feec41d4d2068e2a2cca02bf2"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-layout.js",
+          "sha256": "dc77daed4bc4efcf55891309bf2602dbf18a448cb1ad416a2de035f5d21cc110"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-runtime-source.mjs",
+          "sha256": "89758c2aebb1681110b29e098ddeae2bb570e3c1e279239017edd89e822a1eff"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-runtime.js",
+          "sha256": "31f91ecfdef640d760171fc5a8f0ed624359ba0df916a485a94a8cef3a707588"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-source-provenance.json",
+          "sha256": "498b5cb13eec26350c85e239bcd497480206e2c64ab456f60890e7450acab16a"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-variant-contract.js",
+          "sha256": "565f29316b8c643935fb4e6a89b20d65576cece2a5d6c57f5452f620593473c0"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce.css",
+          "sha256": "7c1d7e2077e614db73bdd7fa640fe3b4bc52520d9ce1247fb238df79f8cbde6e"
+        },
+        {
+          "path": "theme-platform/presentation-capabilities.json",
+          "sha256": "3c3190f82032b864ee180f1173658b3abb75e9d5a5a9f5782439cfcb80edcb6a"
+        },
+        {
+          "path": "studio-core/scripts/theme-kit-plugin.mjs",
+          "sha256": "fca4d9ea038a2a3462f95a0c38f4afaab0441e33ecc37e16e35fe8be485e8b55"
+        },
+        {
+          "path": "studio-core/scripts/build-commerce-manifest.mjs",
+          "sha256": "a5f998c5a9df60d6c3983f808e07047226afc158903244fccd7ea49b60cb0d73"
+        },
+        {
+          "path": "studio-core/vite.studio.config.mjs",
+          "sha256": "9f45f56799678dfcba5ac4dc6fc8fc88f3b77f1991fb8128bc725c15a8f4ab8e"
+        }
+      ],
+      "acceptance": {
+        "customerRuntime": "PENDING_ACTUAL_BROWSER_ACCEPTANCE",
+        "supportRouting": "BACKEND_PASS_BROWSER_PENDING",
+        "productionReady": false
+      }
+    },
+    {
+      "presentation": {
+        "id": "nova-atelier",
+        "version": "1.0.0",
+        "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a"
+      },
+      "channel": "web",
+      "sourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "entryPoint": "customer.html",
+      "commerceCapabilities": {
+        "customerAuth": true,
+        "persistentCart": true,
+        "favorites": true,
+        "variantSelection": true,
+        "stockCheck": true,
+        "checkoutPreparation": true,
+        "orderHistory": true,
+        "reviews": true,
+        "questions": true,
+        "supportRouting": true,
+        "singleStore": true
+      },
+      "requiredAssetKeys": [],
+      "files": [
+        {
+          "path": "assets/atelier-dom-By_xsji6.js",
+          "sha256": "82c44c26611ce21bcd95b32cdd25640b903012fe8fb5234a6051cb756c37a9ce",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "assets/catalog-adapter-BmxpTtuA.js",
+          "sha256": "c91974ee165545bbdb3cb4c28a7c4d102caf88a575a82e94869055996cdef129",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "assets/customer-NuO2JgXn.css",
+          "sha256": "8d56bde87bc8b031c2648c554914bd7c88d2d83bc5f88d994bbe2204fbac043a",
+          "mimeType": "text/css"
+        },
+        {
+          "path": "assets/customer.js",
+          "sha256": "152def843eb5d173873a581af40180690d421690ce524e8d448beaa4e91562d0",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "assets/modulepreload-polyfill-B5Qt9EMX.js",
+          "sha256": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "assets/theme-kit-adapter-BGy5vAQ8.js",
+          "sha256": "1e1872f9b3107b3ba05260fe39e0cc86148b1b62a3322dbf22b4bd9dbf4adf6e",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "customer.html",
+          "sha256": "6e9616d4ebc5cc3f8a319e95480ad5630ebc1ab03be68f39be82fa2de302228d",
+          "mimeType": "text/html"
+        },
+        {
+          "path": "theme-kit/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "mimeType": "text/css"
+        },
+        {
+          "path": "theme-kit/customer-projector.js",
+          "sha256": "3f9f5803204311f0f9aa9492f80b551c8eb273a621affdf5fe4ddbda4fd82479",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "theme-kit/fonts.css",
+          "sha256": "4f8bd3d091eea9d69917cb28d3019c1e57ee834836d7fdfda56bf418a304762e",
+          "mimeType": "text/css"
+        },
+        {
+          "path": "theme-kit/fonts/inter_medium.ttf",
+          "sha256": "97ad806f526e41546d46365bb3a393145f75b7b1568913db74549ad8b8dba872",
+          "mimeType": "font/ttf"
+        },
+        {
+          "path": "theme-kit/fonts/inter_regular.ttf",
+          "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+          "mimeType": "font/ttf"
+        },
+        {
+          "path": "theme-kit/fonts/inter_semibold.ttf",
+          "sha256": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3",
+          "mimeType": "font/ttf"
+        },
+        {
+          "path": "theme-kit/nova-atelier/customer.js",
+          "sha256": "31a3adfc309b79ee53c9924206ce04c0db1a2a9b6768ce6d3a08701eabebf023",
+          "mimeType": "application/javascript"
+        },
+        {
+          "path": "theme-kit/nova-atelier/presentation.json",
+          "sha256": "eecb34715aa6f802822a71466ce606e33cd38277d632f1b592f182a543717d1a",
+          "mimeType": "application/json"
+        },
+        {
+          "path": "theme-kit/nova-atelier/theme.css",
+          "sha256": "b20737a86035bc188eb0a905e3fbd5da451d3d4bd5c30a5df6f85dd8cc343ae4",
+          "mimeType": "text/css"
+        }
+      ],
+      "sourceFiles": [
+        {
+          "path": "studio-core/src/studio-integration/commerce-auth-base.js",
+          "sha256": "a1dd87cc90e9ac253e4c930f14d16bb2a600491a912bb0193e51d63ec3a440a9"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-cart-v2.js",
+          "sha256": "96a8069d6e20804013df110e0dd37ed3491c6b7f93b00a904ebe3ba0ba399c7b"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-checkout-base.js",
+          "sha256": "bba86c37e74be837894695873133c288f9e3cc2c8156563b1bdca2ce4af10ff8"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-dom.js",
+          "sha256": "4d2a0055d84521e4fb4018d41f11b9ec5a1b942c8157a16bf841d6648744612b"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-engine-bridge.js",
+          "sha256": "b40355892053b9256f37dc0e67700efd324315339b94fd0ac68cb159674efd97"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-entry.js",
+          "sha256": "6fd6f7c05d5f449382d3ffa6570feeee02eabc29cf2fbcd153d26dd37fceaf20"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-http-base.js",
+          "sha256": "cb8548f77b79cc62a099ae91563e3600c443921590714772ff4507e899d7961d"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-http.js",
+          "sha256": "c2868620ce9a9b183559d73a360d0ebdbc592d7feec41d4d2068e2a2cca02bf2"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-layout.js",
+          "sha256": "dc77daed4bc4efcf55891309bf2602dbf18a448cb1ad416a2de035f5d21cc110"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-runtime-source.mjs",
+          "sha256": "89758c2aebb1681110b29e098ddeae2bb570e3c1e279239017edd89e822a1eff"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-runtime.js",
+          "sha256": "31f91ecfdef640d760171fc5a8f0ed624359ba0df916a485a94a8cef3a707588"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-source-provenance.json",
+          "sha256": "498b5cb13eec26350c85e239bcd497480206e2c64ab456f60890e7450acab16a"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce-variant-contract.js",
+          "sha256": "565f29316b8c643935fb4e6a89b20d65576cece2a5d6c57f5452f620593473c0"
+        },
+        {
+          "path": "studio-core/src/studio-integration/commerce.css",
+          "sha256": "7c1d7e2077e614db73bdd7fa640fe3b4bc52520d9ce1247fb238df79f8cbde6e"
+        },
+        {
+          "path": "theme-platform/presentation-capabilities.json",
+          "sha256": "3c3190f82032b864ee180f1173658b3abb75e9d5a5a9f5782439cfcb80edcb6a"
+        },
+        {
+          "path": "studio-core/scripts/theme-kit-plugin.mjs",
+          "sha256": "fca4d9ea038a2a3462f95a0c38f4afaab0441e33ecc37e16e35fe8be485e8b55"
+        },
+        {
+          "path": "studio-core/scripts/build-commerce-manifest.mjs",
+          "sha256": "a5f998c5a9df60d6c3983f808e07047226afc158903244fccd7ea49b60cb0d73"
+        },
+        {
+          "path": "studio-core/vite.studio.config.mjs",
+          "sha256": "9f45f56799678dfcba5ac4dc6fc8fc88f3b77f1991fb8128bc725c15a8f4ab8e"
+        }
+      ],
+      "acceptance": {
+        "customerRuntime": "PENDING_ACTUAL_BROWSER_ACCEPTANCE",
+        "supportRouting": "BACKEND_PASS_BROWSER_PENDING",
+        "productionReady": false
+      }
+    }
+  ]
+}

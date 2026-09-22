@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const express = require('express');
 const startDisposable = require('./helpers/themePlatformDisposableDb');
+const historicalAssignment = require('./helpers/themeHistoricalAssignmentFixture');
 
 const gates = [];
 const expectedGateCount = 39;
@@ -181,9 +182,14 @@ const gate = async (name, run) => {
             await pool.query('DROP FUNCTION theme_test_reject_provision_event()');
         }
     });
-    await gate('G08 assignment creates separate isolated editable drafts', async () => {
-        ({ assignment: assignmentA, draft: draftA } = await result(`${adminPrefix}/services/${serviceA.id}/assignments`, { themeVersionId: version.id, channel: 'web', reason }));
-        ({ assignment: assignmentB, draft: draftB } = await result(`${adminPrefix}/services/${serviceB.id}/assignments`, { themeVersionId: version.id, channel: 'web', reason }));
+    await gate('G08 unreviewed new assignment denied; historical schema1 drafts retain isolated legacy contract', async () => {
+        for(const service of [serviceA,serviceB]){
+            const response=ok(await write(`${adminPrefix}/services/${service.id}/assignments`, { themeVersionId: version.id, channel: 'web', reason }),409);
+            assert.equal(response.code,'THEME_PRESENTATION_NOT_READY');
+            assert.equal(Number((await pool.query('SELECT COUNT(*) AS n FROM theme_assignments WHERE service_id=$1',[service.id])).rows[0].n),0);
+        }
+        ({ assignment: assignmentA, draft: draftA } = await historicalAssignment(pool,{service:serviceA,versionId:version.id,commerceMode:'MARKETPLACE'}));
+        ({ assignment: assignmentB, draft: draftB } = await historicalAssignment(pool,{service:serviceB,versionId:version.id,commerceMode:'MARKETPLACE'}));
         assert.notEqual(draftA.id, draftB.id); assert.notEqual(assignmentA.id, assignmentB.id);
         const own = ok(await request(`${sellerPrefix}/assignments`, { actor: a }));
         assert(JSON.stringify(own).includes(assignmentA.id)); assert(!JSON.stringify(own).includes(assignmentB.id));
@@ -452,7 +458,9 @@ const gate = async (name, run) => {
         await result(`${adminPrefix}/services/${serviceA.id}`, { expectedRevision: current.revision, plan: 'pro', status: 'ACTIVE', startsAt: start, expiresAt: farFuture, reason }, admin, 'PATCH');
     });
     await gate('G37 assignment withdrawal closes draft, preview and replay access', async () => {
-        const other = await result(`${adminPrefix}/services/${serviceB.id}/assignments`, { themeVersionId: version.id, channel: 'app', reason });
+        const denied=ok(await write(`${adminPrefix}/services/${serviceB.id}/assignments`, { themeVersionId: version.id, channel: 'app', reason }),409);
+        assert.equal(denied.code,'THEME_PRESENTATION_NOT_READY');
+        const other = await historicalAssignment(pool,{service:serviceB,versionId:version.id,channel:'app',commerceMode:'MARKETPLACE'});
         const key = crypto.randomUUID(), body = { expectedRevision: other.draft.revision, overrides: overrides('Will be withdrawn'), reason };
         const saved = ok(await write(`${sellerPrefix}/drafts/${other.draft.id}`, body, b, 'PUT', key)).result;
         const preview = await result(`${sellerPrefix}/drafts/${saved.id}/previews`, { expectedRevision: saved.revision, reason }, b);

@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 1,
+  "capabilityCodes": {
+    "theme.logo": true,
+    "theme.colors": true,
+    "theme.typography": true,
+    "theme.header": true,
+    "theme.footer": true,
+    "theme.navigation": true,
+    "theme.product_grid": true,
+    "theme.category_grid": true,
+    "theme.banner": true,
+    "theme.text": true,
+    "theme.homepage_blocks": true,
+    "theme.campaign_canvas": true,
+    "theme.advanced_blocks": true,
+    "theme.assets": true,
+    "theme.preview": true,
+    "theme.save_draft": true,
+    "theme.mobile_editor": true,
+    "theme.version_history": true,
+    "theme.publish": true,
+    "theme.direct_publish": true,
+    "theme.scheduling": true,
+    "theme.custom_css": true,
+    "theme.custom_html": true,
+    "theme.custom_js": true,
+    "theme.ai_builder": true
+  },
+  "presentations": {
+    "nova-classic": {
+      "version": "1.0.0",
+      "channels": [
+        "web"
+      ],
+      "policyFile": "presentation-edit-policy.json",
+      "referencePackage": "nova-classic-studio-web-v1_1.json",
+      "capabilities": {
+        "theme.logo": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.colors": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.typography": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.header": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.footer": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.navigation": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Fixed canonical campaign links; menu structure remains read-only."
+        },
+        "theme.product_grid": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Section copy and visibility; canonical product records remain read-only."
+        },
+        "theme.category_grid": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Section copy and visibility; canonical categories remain read-only."
+        },
+        "theme.banner": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.text": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.homepage_blocks": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Fixed slot visibility only; reorder and arbitrary sections unsupported."
+        },
+        "theme.assets": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "MANAGE"
+        },
+        "theme.preview": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.save_draft": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.version_history": {
+          "status": "READ_ONLY",
+          "maxState": "READ_ONLY"
+        },
+        "theme.publish": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "PUBLISH",
+          "detail": "Same-core publication request only; readiness and Admin-only activation remain separate server gates."
+        },
+        "theme.advanced_blocks": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Visual styles for existing elements only; adding, replacing or reordering blocks and canonical text/media edits are rejected."
+        }
+      }
+    },
+    "nova-atelier": {
+      "version": "1.0.0",
+      "channels": [
+        "web"
+      ],
+      "policyFile": "atelier-edit-policy.json",
+      "referencePackage": "nova-atelier-studio-web-v1.json",
+      "capabilities": {
+        "theme.logo": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.colors": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.typography": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.header": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.footer": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.navigation": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Canonical hero CTA only; fixed category menu is read-only."
+        },
+        "theme.product_grid": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Section copy and visibility; original fashion cards and canonical records retained."
+        },
+        "theme.category_grid": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Canonical category tiles and visibility; no foreign references."
+        },
+        "theme.banner": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.text": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.homepage_blocks": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Fixed slot visibility; sequence follows original Atelier source."
+        },
+        "theme.assets": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "MANAGE"
+        },
+        "theme.preview": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.save_draft": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE"
+        },
+        "theme.version_history": {
+          "status": "READ_ONLY",
+          "maxState": "READ_ONLY"
+        },
+        "theme.publish": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "PUBLISH",
+          "detail": "Same-core publication request only; readiness and Admin-only activation remain separate server gates."
+        },
+        "theme.advanced_blocks": {
+          "status": "SUPPORTED_EDIT",
+          "maxState": "EDITABLE",
+          "detail": "Visual styles for existing elements only; adding, replacing or reordering blocks and canonical text/media edits are rejected."
+        }
+      }
+    }
+  }
+}

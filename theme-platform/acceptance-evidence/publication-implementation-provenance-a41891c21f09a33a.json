@@ -1,0 +1,216 @@
+{
+  "result": "PASS_IMPLEMENTATION_WITH_EXPLICIT_TEST_AUTHORITY",
+  "pg": {
+    "result": "PASS",
+    "checks": 35,
+    "gates": [
+      {
+        "name": "P01 real local candidate build records durable stages without ACTIVE",
+        "status": "PASS"
+      },
+      {
+        "name": "P31 exact pre-publication candidate validates without QA or changing any state",
+        "status": "PASS"
+      },
+      {
+        "name": "P32 candidate rejects foreign unknown stale digest assignment channel and environment",
+        "status": "PASS"
+      },
+      {
+        "name": "P02 stored artifact and stage evidence are DB immutable",
+        "status": "PASS"
+      },
+      {
+        "name": "P03 isolated PARTIAL registry refuses activation while current reviewed registry is eligible",
+        "status": "PASS"
+      },
+      {
+        "name": "P04 missing or mismatched artifact QA evidence cannot activate",
+        "status": "PASS"
+      },
+      {
+        "name": "P05 explicit test authority enables one atomic LOCAL pointer only",
+        "status": "PASS"
+      },
+      {
+        "name": "P06 stale CAS leaves pointer and generation unchanged",
+        "status": "PASS"
+      },
+      {
+        "name": "P07 two concurrent requests cannot both claim same pointer generation",
+        "status": "PASS"
+      },
+      {
+        "name": "P08 rollback restores previous verified artifact without commerce mutation",
+        "status": "PASS"
+      },
+      {
+        "name": "P09 foreign Seller cannot activate or read tenant artifact",
+        "status": "PASS"
+      },
+      {
+        "name": "P10 changed legal authority blocks replay/read without moving pointer",
+        "status": "PASS"
+      },
+      {
+        "name": "P11 revoked publication permission blocks activation without unpublishing customer runtime",
+        "status": "PASS"
+      },
+      {
+        "name": "P12 incomplete legal/runtime authorities produce durable BLOCKED failure",
+        "status": "PASS"
+      },
+      {
+        "name": "P13 marketplace assignment cannot build single-store publication",
+        "status": "PASS"
+      },
+      {
+        "name": "P14 stale worker lease cannot be claimed twice",
+        "status": "PASS"
+      },
+      {
+        "name": "P15 unreferenced asset tombstones durably while original bytes retained",
+        "status": "PASS"
+      },
+      {
+        "name": "P16 current and historical references prevent asset deletion",
+        "status": "PASS"
+      },
+      {
+        "name": "P18 canonical CMS authority rejects missing then accepts approved effective versions",
+        "status": "PASS"
+      },
+      {
+        "name": "P33 candidate reader verifies canonical legal and exact live owned asset bytes",
+        "status": "PASS"
+      },
+      {
+        "name": "P19 store contact logo is retained and included as verified artifact bytes",
+        "status": "PASS"
+      },
+      {
+        "name": "P34 candidate reader refuses canonical revoked legal document",
+        "status": "PASS"
+      },
+      {
+        "name": "P20 canonical legal revoke blocks existing artifact activation",
+        "status": "PASS"
+      },
+      {
+        "name": "P21 valid own Seller request authority cannot directly activate or rollback",
+        "status": "PASS"
+      },
+      {
+        "name": "P22 operation ledger and audit reflect actual LOCAL activation only",
+        "status": "PASS"
+      },
+      {
+        "name": "P23 active artifact validates inside caller READ ONLY transaction without nested connection or locks",
+        "status": "PASS"
+      },
+      {
+        "name": "P24 real edit-grant revision leaves published A serving but blocks stale build and new activation",
+        "status": "PASS"
+      },
+      {
+        "name": "P25 current renderer B cannot alter serving A and new B activation still validates current bytes",
+        "status": "PASS"
+      },
+      {
+        "name": "P26 rollback to verified previous A uses its immutable renderer despite B dist and changed edit policy",
+        "status": "PASS"
+      },
+      {
+        "name": "P27 live editor feature denial preserves published bytes but prevents new builds and edits",
+        "status": "PASS"
+      },
+      {
+        "name": "P28 live service store organization and assignment revocations still block serving and rollback",
+        "status": "PASS"
+      },
+      {
+        "name": "P29 serving and rollback retain exact registry and artifact QA revocation checks",
+        "status": "PASS"
+      },
+      {
+        "name": "P30 contact and legal version changes still require republish after edit policy changes",
+        "status": "PASS"
+      },
+      {
+        "name": "P35 isolated future PARTIAL registry preserves sealed acceptance but denies new activation",
+        "status": "PASS"
+      },
+      {
+        "name": "P17 corrupted deployed bytes cannot be activated or served",
+        "status": "PASS"
+      }
+    ],
+    "postgresVersion": 160015,
+    "migrations": 48,
+    "testDoubles": [
+      "renderer bundle",
+      "legal authority",
+      "assignment compatibility",
+      "responsive evidence",
+      "frozen isolated PARTIAL/BLOCKED registry clones; no global/cache/file override"
+    ],
+    "realAssertions": [
+      "DB transactions",
+      "CAS concurrency",
+      "immutable records",
+      "raster bytes",
+      "artifact filesystem",
+      "live admin/seller authorization"
+    ],
+    "browserAcceptance": false,
+    "productionWrites": 0
+  },
+  "files": [
+    {
+      "path": "tests/themePlatformPublicationPostgresSmoke.js",
+      "sha256": "4be2e91f51a9e56525380143a3398f04f05d16c4063a0d1a2798a0c0fe9f1bbb"
+    },
+    {
+      "path": "services/themePlatformPublicationService.js",
+      "sha256": "da7de62b409541b2e723671f6a0bc83a668ff8e888a93c1c91b63174878cd5ed"
+    },
+    {
+      "path": "services/themePlatformPublicationValidation.js",
+      "sha256": "9beb8b6a7c9e8d3c6a8afacb277952f01c462f08c1b777b9bd0413faa8ed0350"
+    },
+    {
+      "path": "services/themePlatformAssetLifecycleService.js",
+      "sha256": "239838dbe6e01c583a2529abedf360d2006c04905c2715daae5478b19347d58a"
+    },
+    {
+      "path": "services/themePlatformService.js",
+      "sha256": "3f4c446619928e855901e8f2acebad56fd1688963bc266fa4fb269121d6be7ba"
+    },
+    {
+      "path": "services/themePlatformExperienceService.js",
+      "sha256": "1a1f28bb7181b91feb8f278fd7f9b09e79fd241043879ba6f375c94778a98e26"
+    },
+    {
+      "path": "services/themePlatformPresentationService.js",
+      "sha256": "790e5f8f9a4b03e7c1534a51f68f14ef3cb3a305e5c8d5d52a2cf89984c10441"
+    }
+  ],
+  "provenance": "HISTORICAL_UNCHANGED_PUBLICATION_EXECUTABLE_BYTES_NOT_FINAL_REGRESSION",
+  "historicalReport": {
+    "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\publication-reviewed-registry-report-20260920.json",
+    "sha256": "794274acef71c7bf976a3cbb2936719eb89d6e0a8a6743cc1a8a6820ac953009"
+  },
+  "historicalLog": {
+    "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\publication-reviewed-registry-regression-20260920.log",
+    "sha256": "8516e3b0d40308a058a62c7fdafaea825cfe939330b6d4089d8e300c18e39419"
+  },
+  "currentRegistryTest": "FAIL_EXPECTED_PRE_ACCEPTANCE_PARTIAL",
+  "currentFailedRun": {
+    "path": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\final-candidate-20260922\\publication-postgres.log",
+    "sha256": "ec9e2859226e69d3300a2b7921029ca488d4c83470fd1554738b91c696054c2c"
+  },
+  "registryExcludedReason": "Registry intentionally PARTIAL after cart source fix; historic READY assertion is not claimed current. New exact-source presentation acceptance precedes required final rerun.",
+  "finalRegressionRequired": true,
+  "productionWrites": 0,
+  "publicationPromotion": 0
+}

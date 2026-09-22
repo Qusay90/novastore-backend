@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
   const outputDirectory = integrated ? "dist-integrated" : "dist";
 
   return {
+    resolve: { dedupe: ["react", "react-dom"] },
     build: {
       outDir: outputDirectory,
       emptyOutDir: true,

@@ -1,0 +1,1771 @@
+{
+  "schemaVersion": 1,
+  "authority": "ROOT_REVIEWED_LOCAL_PUBLICATION_QA",
+  "acceptances": [
+    {
+      "presentation": {
+        "id": "nova-classic",
+        "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668",
+        "version": "1.0.0"
+      },
+      "channel": "web",
+      "artifactDigest": "e5f81b39e9e0615d22281d2a495f7f4d120d71893165ea6e337d3679916a2ba5",
+      "sourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "publicationId": "9519490c-67d2-4387-8e81-ec4f793b7088",
+      "metadata": {
+        "path": "theme-platform/publication-evidence/built-candidate-9519490c-67d2-4387-8e81-ec4f793b7088-1cddbade52e704ca.json",
+        "sha256": "1cddbade52e704ca196b2c9f58b3f666c0533060cf6d393e41a6aafba171206c"
+      },
+      "review": {
+        "path": "theme-platform/publication-evidence/classic-root-reviewed-892e4c076b01c035.json",
+        "sha256": "892e4c076b01c03556659402e0644ae90e8405c838648f35316eac953548d36e"
+      },
+      "matrix": {
+        "path": "theme-platform/publication-evidence/matrix-final-first-publications-9d6263ab2954bf44.json",
+        "sha256": "9d6263ab2954bf44803ea8473d5e44630303c2c6f0509c4006d9f5bce68c50ad"
+      },
+      "artifactManifest": {
+        "path": "theme-platform/publication-evidence/classic-publication-artifact-manifest-e5f81b39e9e0615d.json",
+        "sha256": "e5f81b39e9e0615d22281d2a495f7f4d120d71893165ea6e337d3679916a2ba5"
+      },
+      "capturedRendererManifest": {
+        "path": "theme-platform/publication-evidence/captured-renderer-bundles-90d86609b71869ec.json",
+        "sha256": "90d86609b71869ec552ebc1ebf7b5c4acfcee06f18bc0f4468b8c753069f7827"
+      },
+      "evidenceId": "local-reviewed-08951e82598d2f0dd0ef6edd4d645e17e660b750174e82206312236a891787a2",
+      "status": "PASS",
+      "widths": [
+        320,
+        360,
+        390,
+        430,
+        768,
+        1024,
+        1440
+      ],
+      "pages": {
+        "home": "PASS",
+        "category": "PASS",
+        "product": "PASS"
+      },
+      "marketplaceUiAbsent": true,
+      "environment": "LOCAL",
+      "phase": "BUILT_ARTIFACT_QA_PRE_ACTIVATION",
+      "storeActivation": "NOT_ASSERTED",
+      "reviewed": true,
+      "reviewedAt": "2026-09-19T22:51:32.533Z",
+      "knownLimitations": {
+        "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+        "paymentInitiation": "DISABLED"
+      },
+      "responsive": [
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-home-320-85f46bdea5bbafde.jpg",
+            "sha256": "85f46bdea5bbafde07962aecfb0ea6ea97d6729ecff9791e5a70a4799bbec356"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-home-360-03df92ce5f3fced6.jpg",
+            "sha256": "03df92ce5f3fced66c540283a94f4ca04c9ab6ff1bac9167198e520a276275d8"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-home-390-1823458d21c94eb0.jpg",
+            "sha256": "1823458d21c94eb03cc68ccf151dc38c94d7e5ddfcb778980b257a36f4d729f9"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-home-430-03a67f66311ad740.jpg",
+            "sha256": "03a67f66311ad740b6d7f4ec992783e8df71333f0db13f852a04a6e167dfdeda"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-home-768-a2c83a4260081c80.jpg",
+            "sha256": "a2c83a4260081c8024d7cdcfaa263846e04331bd5b545400676bef7548f2c8df"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-home-1024-8a5b668705523025.jpg",
+            "sha256": "8a5b66870552302577bb904211e722ab4d552800a2bfa3316c0513bb53241a29"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-home-1440-13c7393f6a5125df.jpg",
+            "sha256": "13c7393f6a5125dffd75fd36d58201df77faa9da8e3a1c2cfa4bfa700403c391"
+          }
+        },
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-category-320-971759e0e1cda643.jpg",
+            "sha256": "971759e0e1cda643a4038d4fe7671d3562a47945abc093096c58c8383686ca2d"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-category-360-c53aa0002ebfcff0.jpg",
+            "sha256": "c53aa0002ebfcff0f048be8355bc8b263013e834d6b6801913b91d166735e4ba"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-category-390-cc668d5f0ebde5b0.jpg",
+            "sha256": "cc668d5f0ebde5b0ae1662577fefa8fb884e8671f4c7cb1bc3bbbc103813b216"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-category-430-22807b000f2c0f63.jpg",
+            "sha256": "22807b000f2c0f63e79773851244b2665181c50c197ab1e3003fe8a18b5aa46f"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-category-768-b8981a6ae9e14694.jpg",
+            "sha256": "b8981a6ae9e14694231a8f521e7cb90ea0b9c413ccd29c10fd227f0ebcd94221"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-category-1024-94ab86eefa097878.jpg",
+            "sha256": "94ab86eefa097878fe583f5f719a1cabe5f815498bf4fb804cbb981d4060d967"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-category-1440-c4a4ab1bdded617f.jpg",
+            "sha256": "c4a4ab1bdded617fe9aeea44580e30934b33aabb0d682bb24a775a8b98b73758"
+          }
+        },
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-product-320-d0fd8e8816b1d21c.jpg",
+            "sha256": "d0fd8e8816b1d21c35bced52345499199c125cd3ac4835dd8e9d711284ac014a"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-product-360-f9d2afbe7c082104.jpg",
+            "sha256": "f9d2afbe7c082104e5f0579f678be8e85dc7e17ea39fcd13f9d822b2f61e7530"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-product-390-2c4868b286dc142b.jpg",
+            "sha256": "2c4868b286dc142bd756cd9ab93f1d2ccace3958c00fac3d7ffb92292b34adeb"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-product-430-c8bc72db01f8871d.jpg",
+            "sha256": "c8bc72db01f8871d2aa0617e44bdc2afdc5a54b7d730eb6e0e712b31d5c469c5"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-product-768-cf9dd97d505c3c9a.jpg",
+            "sha256": "cf9dd97d505c3c9a01c6f3bd06afa901881a061a2df5eb5fc2392f59d28ef720"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-product-1024-04c544266215ae31.jpg",
+            "sha256": "04c544266215ae316282d9247dcd98047b1786c1d248f24785151107c39870d2"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-e5f81b39e9e0-product-1440-c50024f84b6c9c62.jpg",
+            "sha256": "c50024f84b6c9c627be035dd488a727c5bef8827f95fdfd38b0c730bfa5ae10d"
+          }
+        }
+      ]
+    },
+    {
+      "presentation": {
+        "id": "nova-atelier",
+        "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a",
+        "version": "1.0.0"
+      },
+      "channel": "web",
+      "artifactDigest": "0d432d95612e09b6b3053ddd0613142c3dbcc1030ed0e644aba5047cb5e4e459",
+      "sourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+      "publicationId": "8698bd13-c502-47fc-8803-84400e61157c",
+      "metadata": {
+        "path": "theme-platform/publication-evidence/built-candidate-8698bd13-c502-47fc-8803-84400e61157c-e9a73770a6d0fe35.json",
+        "sha256": "e9a73770a6d0fe354d7aa06b0e702542c5e943fb166bbe958f951a4c7270d5fe"
+      },
+      "review": {
+        "path": "theme-platform/publication-evidence/atelier-root-reviewed-123f90050ef50964.json",
+        "sha256": "123f90050ef50964c0e3a4a2c1a6fbf20ab9880fcfba25fe7c8f2f99f3c76f89"
+      },
+      "matrix": {
+        "path": "theme-platform/publication-evidence/matrix-final-first-publications-9d6263ab2954bf44.json",
+        "sha256": "9d6263ab2954bf44803ea8473d5e44630303c2c6f0509c4006d9f5bce68c50ad"
+      },
+      "artifactManifest": {
+        "path": "theme-platform/publication-evidence/atelier-publication-artifact-manifest-0d432d95612e09b6.json",
+        "sha256": "0d432d95612e09b6b3053ddd0613142c3dbcc1030ed0e644aba5047cb5e4e459"
+      },
+      "capturedRendererManifest": {
+        "path": "theme-platform/publication-evidence/captured-renderer-bundles-90d86609b71869ec.json",
+        "sha256": "90d86609b71869ec552ebc1ebf7b5c4acfcee06f18bc0f4468b8c753069f7827"
+      },
+      "evidenceId": "local-reviewed-0df287f8502c56047996a1a116ea8c4e0f6e67d6c7d14a88d69d6c7cf317b16d",
+      "status": "PASS",
+      "widths": [
+        320,
+        360,
+        390,
+        430,
+        768,
+        1024,
+        1440
+      ],
+      "pages": {
+        "home": "PASS",
+        "category": "PASS",
+        "product": "PASS"
+      },
+      "marketplaceUiAbsent": true,
+      "environment": "LOCAL",
+      "phase": "BUILT_ARTIFACT_QA_PRE_ACTIVATION",
+      "storeActivation": "NOT_ASSERTED",
+      "reviewed": true,
+      "reviewedAt": "2026-09-19T22:57:28.845Z",
+      "knownLimitations": {
+        "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+        "paymentInitiation": "DISABLED"
+      },
+      "responsive": [
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-home-320-cb579274893074ea.jpg",
+            "sha256": "cb579274893074eacb7fc0c4c46e46afb38e9d7bc09c25a332bf334cba5a4ba5"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-home-360-2417c9de16b45287.jpg",
+            "sha256": "2417c9de16b452870280884f441e63f02bd12a8e22dedc3bc3e07dc2bbac3fdc"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-home-390-2a719682e362003d.jpg",
+            "sha256": "2a719682e362003d97ebd8956938949ddd16808b7601cb3700e4b9a48cdefcb7"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-home-430-5ee29bcdd3b4393b.jpg",
+            "sha256": "5ee29bcdd3b4393b17caeaab59d58c371cc7f348dd56d8eca2f1d17db5c04c6f"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-home-768-8b2cc4f3e3f53bcf.jpg",
+            "sha256": "8b2cc4f3e3f53bcf508831f4934d197e252face3386ddb8be100a28206cfde30"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-home-1024-26d4b9ecf8b4e876.jpg",
+            "sha256": "26d4b9ecf8b4e876236589215e0de34a90fbdf5ef0a8f1cc1e51fc65a009e337"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-home-1440-8c0b6859ed218892.jpg",
+            "sha256": "8c0b6859ed218892654866e751ce5d6847cf1cf13788ae8ddfe18e7238c5a2a9"
+          }
+        },
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-category-320-dcf6a7b2e6bf21dd.jpg",
+            "sha256": "dcf6a7b2e6bf21ddf4b3438bb2cb9dce504070ca8e0538c4f0c615e4e4471db5"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-category-360-33cbf476780b1b58.jpg",
+            "sha256": "33cbf476780b1b58947901b35429c9ffb00d344392920135db74b40e9e578aef"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-category-390-4772b9f0e15c59c4.jpg",
+            "sha256": "4772b9f0e15c59c4f2ca4d516780ffb32b751547c401045ccf13b6729c85ac7f"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-category-430-76d3ea73d9e09bbe.jpg",
+            "sha256": "76d3ea73d9e09bbeea1db6d886747a870c97718405b6e32ddb4591796c3bc0cb"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-category-768-63440608f8a103fa.jpg",
+            "sha256": "63440608f8a103faa85ab8212e3b9095f60bccd4c1828b942ff237e902a87c3c"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-category-1024-5179b2c42fbf1be6.jpg",
+            "sha256": "5179b2c42fbf1be6167b3c42bac63b052013e2fc1b5fea38461dc27fa3bc4675"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-category-1440-455fbd647a9c8184.jpg",
+            "sha256": "455fbd647a9c818463dc40e40732ef9b81205db73d1c396f95d741c174ba1bc4"
+          }
+        },
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-product-320-54fadf276d0485a0.jpg",
+            "sha256": "54fadf276d0485a0a89a70b08947acb61386d1d9cb74e19a7f3aaaa0f0018383"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-product-360-4fb16cd3cac204a1.jpg",
+            "sha256": "4fb16cd3cac204a1c605fdccc40125a60f7edf4190bc1dd462bc33ae1ad96545"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-product-390-88957a70277e1bf1.jpg",
+            "sha256": "88957a70277e1bf19c822be29611800554b9d05e65c621c77d83b561f02568f3"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-product-430-1398b1693682121c.jpg",
+            "sha256": "1398b1693682121c448f3e057a0f8003bbc66334be7c63448116caab2d1cd079"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-product-768-3030654572bc816f.jpg",
+            "sha256": "3030654572bc816fc6c43f14c08f17dcf372cadb6d86bc6d873119636cfc356c"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-product-1024-03cc009fc13951a1.jpg",
+            "sha256": "03cc009fc13951a1d04302b1ecbc2ac842ba25c8b56e2a9302592617a4816bfc"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-0d432d95612e-product-1440-cd98c8e6328d357d.jpg",
+            "sha256": "cd98c8e6328d357d70552d69ad8d6a220831112e91d26069e271a4096cdccf8d"
+          }
+        }
+      ]
+    },
+    {
+      "presentation": {
+        "id": "nova-atelier",
+        "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a",
+        "version": "1.0.0"
+      },
+      "channel": "web",
+      "artifactDigest": "188a9bdb7e341c8748031aebbc6cb528ce049707bd6e822cc0bf3beab907a513",
+      "sourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "publicationId": "69a1d0a3-bb2c-4437-bb1f-815b43b86ed7",
+      "metadata": {
+        "path": "theme-platform/publication-evidence/built-candidate-69a1d0a3-bb2c-4437-bb1f-815b43b86ed7-43e50f9063f4a881.json",
+        "sha256": "43e50f9063f4a8815abc6973ca18960f25a1abe002e1febfcc5adc3254f536ef"
+      },
+      "review": {
+        "path": "theme-platform/publication-evidence/atelier-A-root-review-b24d5436df2def09.json",
+        "sha256": "b24d5436df2def09c0357a5ac62887fedfbe86ba67866e60b6198646e5186cd5"
+      },
+      "matrix": {
+        "path": "theme-platform/publication-evidence/atelier-A-responsive-d5ddbeaa116f19b4.json",
+        "sha256": "d5ddbeaa116f19b409c277d71059c29cb0ca2e78a8f9d78602a5a40cbd865f37"
+      },
+      "artifactManifest": {
+        "path": "theme-platform/publication-evidence/atelier-publication-artifact-manifest-188a9bdb7e341c87.json",
+        "sha256": "188a9bdb7e341c8748031aebbc6cb528ce049707bd6e822cc0bf3beab907a513"
+      },
+      "capturedRendererManifest": {
+        "path": "theme-platform/publication-evidence/captured-renderer-bundles-0290ed9ae04cd431.json",
+        "sha256": "0290ed9ae04cd431e5df440f21507a831b3bf2ac4966730f553f247e1fb35150"
+      },
+      "evidenceId": "local-reviewed-ba50d5ed8ca4665279f63c2e174c6b0998350d8e12fb77efa609add0925a94c8",
+      "status": "PASS",
+      "widths": [
+        320,
+        360,
+        390,
+        430,
+        768,
+        1024,
+        1440
+      ],
+      "pages": {
+        "home": "PASS",
+        "category": "PASS",
+        "product": "PASS"
+      },
+      "marketplaceUiAbsent": true,
+      "environment": "LOCAL",
+      "phase": "BUILT_ARTIFACT_QA_PRE_ACTIVATION",
+      "storeActivation": "NOT_ASSERTED",
+      "reviewed": true,
+      "reviewedAt": "2026-09-22T14:51:19.858Z",
+      "knownLimitations": {
+        "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+        "paymentInitiation": "DISABLED"
+      },
+      "responsive": [
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-home-320-674e8464da3ff007.jpg",
+            "sha256": "674e8464da3ff0073c12a95841432e8960445b8795de2337f4203e1a944a56fe"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-home-360-bf34534e765f2903.jpg",
+            "sha256": "bf34534e765f2903751bdde82bf848db1d2e85cb76adb6ba4405ecd26a04eb34"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-home-390-e1627215326c7517.jpg",
+            "sha256": "e1627215326c751793b83d173352981d0a6f47d2e1239851ace614a3e407dfe8"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-home-430-f8d090cddbc81004.jpg",
+            "sha256": "f8d090cddbc8100446e051b9166c59b0b70a6f2e7238f9daede0246bd4c4fa1f"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-home-768-3f4bad5129c0515c.jpg",
+            "sha256": "3f4bad5129c0515ce097de4f4e04e5012a7fb468434de0f41df8ba10306b867c"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-home-1024-ad1588f9611c2a5e.jpg",
+            "sha256": "ad1588f9611c2a5ef556eda5b852858cd1bd4d6a14b1d2e376c65905b1a6b43e"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-home-1440-b658a54b953672cd.jpg",
+            "sha256": "b658a54b953672cdb1d9d1a88a71148d620a38f0c639d83cb58f27f119c4aecc"
+          }
+        },
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-category-320-bf2d0af8e2cdd40f.jpg",
+            "sha256": "bf2d0af8e2cdd40f76f7bcc8dc0b5f52da83e3d40a09062d25984c13bb43c10f"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-category-360-1cc052a2dae53110.jpg",
+            "sha256": "1cc052a2dae53110310e58842d84f315fb8f9f2e53ae1322cdd9ae37467714e6"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-category-390-6602ae7cac624ad1.jpg",
+            "sha256": "6602ae7cac624ad19a9e66c236dc16a9eee382be7f03503283466cac4b565220"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-category-430-109c067355afd04d.jpg",
+            "sha256": "109c067355afd04d660c3c7aad6f3f8396c29d9b406ff45084c68e0665030474"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-category-768-ee099e306488939e.jpg",
+            "sha256": "ee099e306488939e0a763002a14a5661baf1293cbcb5c3d0965107799fb53c6e"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-category-1024-9477e98229558968.jpg",
+            "sha256": "9477e98229558968752207d585675359d5406c5a0d3193895b489cf88b6ab083"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-category-1440-a3d96fd2dcf3898a.jpg",
+            "sha256": "a3d96fd2dcf3898a0e551789993105c319aac7d62457813732a1ef5dd8fd4e7e"
+          }
+        },
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-product-320-54fadf276d0485a0.jpg",
+            "sha256": "54fadf276d0485a0a89a70b08947acb61386d1d9cb74e19a7f3aaaa0f0018383"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-product-360-4fb16cd3cac204a1.jpg",
+            "sha256": "4fb16cd3cac204a1c605fdccc40125a60f7edf4190bc1dd462bc33ae1ad96545"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-product-390-88957a70277e1bf1.jpg",
+            "sha256": "88957a70277e1bf19c822be29611800554b9d05e65c621c77d83b561f02568f3"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-product-430-1398b1693682121c.jpg",
+            "sha256": "1398b1693682121c448f3e057a0f8003bbc66334be7c63448116caab2d1cd079"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-product-768-8fd2c59ff4f63999.jpg",
+            "sha256": "8fd2c59ff4f639992d99bbb7aeb1ae55a0aa06e6fe25ae2b68bf4e76b89871a3"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-product-1024-23b0fd7f896ea07b.jpg",
+            "sha256": "23b0fd7f896ea07bca900589f06e303d4522d5310b925cb3aa719d32a1e66b2f"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-A-product-1440-f90abd187faa6829.jpg",
+            "sha256": "f90abd187faa6829cdde89b539356ff4f8278f98723f559820ed7e2794e3dc35"
+          }
+        }
+      ]
+    },
+    {
+      "presentation": {
+        "id": "nova-atelier",
+        "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a",
+        "version": "1.0.0"
+      },
+      "channel": "web",
+      "artifactDigest": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db",
+      "sourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+      "publicationId": "dc1eadf4-8154-4da5-8c68-e4c3a28ada50",
+      "metadata": {
+        "path": "theme-platform/publication-evidence/built-candidate-dc1eadf4-8154-4da5-8c68-e4c3a28ada50-f4064312cab5ff20.json",
+        "sha256": "f4064312cab5ff20ece0b30b94195765c8fb16b63d198c1f32c0e5191c358665"
+      },
+      "review": {
+        "path": "theme-platform/publication-evidence/atelier-B-root-review-37669b21d06e3de4.json",
+        "sha256": "37669b21d06e3de4854da09260b824286fcc3db69a3218afe75bec1b7b89c25b"
+      },
+      "matrix": {
+        "path": "theme-platform/publication-evidence/atelier-B-responsive-verified-6bf191df93fa371b.json",
+        "sha256": "6bf191df93fa371bb49994f8ab845b7eaafe11482c0a34e78f19f52df55a1b3b"
+      },
+      "artifactManifest": {
+        "path": "theme-platform/publication-evidence/atelier-publication-artifact-manifest-ac972b9573cdba38.json",
+        "sha256": "ac972b9573cdba3825acc6dfc021f191053a225794ee585d9f9cc0034025b3db"
+      },
+      "capturedRendererManifest": {
+        "path": "theme-platform/publication-evidence/captured-renderer-bundles-0290ed9ae04cd431.json",
+        "sha256": "0290ed9ae04cd431e5df440f21507a831b3bf2ac4966730f553f247e1fb35150"
+      },
+      "evidenceId": "local-reviewed-e54c4b7642b3a25e271f7e47378039ff6b10fbd0ee028d43ccb315d3f4fcf40d",
+      "status": "PASS",
+      "widths": [
+        320,
+        360,
+        390,
+        430,
+        768,
+        1024,
+        1440
+      ],
+      "pages": {
+        "home": "PASS",
+        "category": "PASS",
+        "product": "PASS"
+      },
+      "marketplaceUiAbsent": true,
+      "environment": "LOCAL",
+      "phase": "BUILT_ARTIFACT_QA_PRE_ACTIVATION",
+      "storeActivation": "NOT_ASSERTED",
+      "reviewed": true,
+      "reviewedAt": "2026-09-22T15:04:51.958Z",
+      "knownLimitations": {
+        "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+        "paymentInitiation": "DISABLED"
+      },
+      "responsive": [
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-home-320-f43caebfa7c8c03f.jpg",
+            "sha256": "f43caebfa7c8c03fc618f9c39e975633b8fd3f3fdb0836d6d41f568a56ea5648"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-home-360-a27dbf786f09dcbd.jpg",
+            "sha256": "a27dbf786f09dcbde20e86d41c69f5e4c62bfc8dfe3d7bd920b5f1c97cc6c835"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-home-390-4c8eb769b6be73b6.jpg",
+            "sha256": "4c8eb769b6be73b61eeb97f059edaab3de7139d0d761545279c7c1dce5246e90"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-home-430-b15469ab033672a7.jpg",
+            "sha256": "b15469ab033672a7a72a758c483068f21c3073647526a5ed881790434bfbf43b"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-home-768-3ec887777b10fc8b.jpg",
+            "sha256": "3ec887777b10fc8b217a4f50fc31066bc4f93e2b765fe187f9ee3d945f27ef33"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-home-1024-546e37ed74562858.jpg",
+            "sha256": "546e37ed74562858df8c761bded35ba51b938d0e9b598e704f3d8c7ce1ab788d"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-home-1440-45f7465ef8e70732.jpg",
+            "sha256": "45f7465ef8e70732dd1459d9fb770a0d37b48756046a80b6ea1b566611abbe31"
+          }
+        },
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-category-320-421aa910ce533f7f.jpg",
+            "sha256": "421aa910ce533f7ffa61b97b60a1dbfde6109854ff1e4aa00bd15bc6854ed507"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-category-360-2042e4ac15f3d87d.jpg",
+            "sha256": "2042e4ac15f3d87df0b75bf3dd7142ed844b5d54f62d727ba63b2a85bf667562"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-category-390-0fe36e68740f2d4a.jpg",
+            "sha256": "0fe36e68740f2d4a081070bc4beff80f02274b3031ae789ed2aa0dab9128bae9"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-category-430-cabb3192c56dfcaf.jpg",
+            "sha256": "cabb3192c56dfcaf7979ea09a4579e97f9a74a4a6486fdf48ba8481523b929a5"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-category-768-8d27cc59e64c90ee.jpg",
+            "sha256": "8d27cc59e64c90ee6e2b4e3a88ea7b51f8278beda63bc4bdac971e29e4db7d8a"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-category-1024-171c54ebca60d5f8.jpg",
+            "sha256": "171c54ebca60d5f8a78cef983239bad3df3e373f7eda230708ce89ca12cb3146"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-category-1440-12cbc475915e210a.jpg",
+            "sha256": "12cbc475915e210a335313ef612dbd4ae6432cab2173040e9155684a1a1216dd"
+          }
+        },
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-product-320-29ac210c78623412.jpg",
+            "sha256": "29ac210c78623412ad99569dfb0caf1a394f838af1daec637dd35face96b1df9"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-product-360-031cb8a500cdbb7e.jpg",
+            "sha256": "031cb8a500cdbb7e336df494c550aad910485d2a1aea52dcfdf33c93defa96a2"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-product-390-dfcb49acb3c258cd.jpg",
+            "sha256": "dfcb49acb3c258cd395df99df61307224e64fec038932b4695ec006b7bf05e41"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-product-430-3759f87e3415b2c6.jpg",
+            "sha256": "3759f87e3415b2c6fff96e9083f723111d556119cb9e29d395842b31e249ea34"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-product-768-fab7b1759cede76e.jpg",
+            "sha256": "fab7b1759cede76e2547bf28547b12418fd8e8cd35abd6f56aee523ed716df82"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-product-1024-7ffaa9428865cfe5.jpg",
+            "sha256": "7ffaa9428865cfe529024e1b6bbfdd40a9f06f50d442e61e1af426fb605899c0"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://atelier.localhost:62213/#/product/601",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/atelier-B-verified-product-1440-7fb39231d8c7c7a0.jpg",
+            "sha256": "7fb39231d8c7c7a0d8e6f0062727043379abd296cea479b0c30ec532e4291d35"
+          }
+        }
+      ]
+    },
+    {
+      "presentation": {
+        "id": "nova-classic",
+        "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668",
+        "version": "1.0.0"
+      },
+      "channel": "web",
+      "artifactDigest": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d",
+      "sourceDigest": "80c8d21bc6fa188f62d800d77f6a3e1a27db5d869d44e8e3e34df2bc3688cda1",
+      "publicationId": "73791514-ff9d-49ab-95e1-12caf47f9cad",
+      "metadata": {
+        "path": "theme-platform/publication-evidence/built-candidate-73791514-ff9d-49ab-95e1-12caf47f9cad-1fcc9481757fd981.json",
+        "sha256": "1fcc9481757fd981bddcd8053fd017ea044e1b412103dbe9692656f0a1d233aa"
+      },
+      "review": {
+        "path": "theme-platform/publication-evidence/classic-final-root-review-36706f9390b33e8f.json",
+        "sha256": "36706f9390b33e8f85c6b53c3f5868a9527aaaa2a384b3d168d00918925cecd8"
+      },
+      "matrix": {
+        "path": "theme-platform/publication-evidence/classic-final-responsive-35a574a31e0eb86f.json",
+        "sha256": "35a574a31e0eb86f997949043b919390bf13f4213d76703a26d1a5171e6aacce"
+      },
+      "artifactManifest": {
+        "path": "theme-platform/publication-evidence/classic-publication-artifact-manifest-e96593377dbf8498.json",
+        "sha256": "e96593377dbf84980d76d0eabf76efcd5e9b5ce273175cf5f42c0d896d39032d"
+      },
+      "capturedRendererManifest": {
+        "path": "theme-platform/publication-evidence/captured-renderer-bundles-0290ed9ae04cd431.json",
+        "sha256": "0290ed9ae04cd431e5df440f21507a831b3bf2ac4966730f553f247e1fb35150"
+      },
+      "evidenceId": "local-reviewed-fce3aeee1f74c5245ca448d99fc88d70c93baa4724add293b9aee787bf16a6a7",
+      "status": "PASS",
+      "widths": [
+        320,
+        360,
+        390,
+        430,
+        768,
+        1024,
+        1440
+      ],
+      "pages": {
+        "home": "PASS",
+        "category": "PASS",
+        "product": "PASS"
+      },
+      "marketplaceUiAbsent": true,
+      "environment": "LOCAL",
+      "phase": "BUILT_ARTIFACT_QA_PRE_ACTIVATION",
+      "storeActivation": "NOT_ASSERTED",
+      "reviewed": true,
+      "reviewedAt": "2026-09-22T15:11:29.452Z",
+      "knownLimitations": {
+        "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+        "paymentInitiation": "DISABLED"
+      },
+      "responsive": [
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-home-320-da6d87c3eb3a7e32.jpg",
+            "sha256": "da6d87c3eb3a7e325a8c7e0f4033dd89d1728f6dd8e074e0baa91604139385ce"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-home-360-149b866ac0c566dd.jpg",
+            "sha256": "149b866ac0c566dd4e3c54967a46a6d85cbc9c6fb4c071e9852f457dfe583d95"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-home-390-8f92e20706f7cdab.jpg",
+            "sha256": "8f92e20706f7cdab598511948abdb328807e5c82b4507b50ebcf03b4dd33ae91"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-home-430-2e963a2760ae7aeb.jpg",
+            "sha256": "2e963a2760ae7aebfec52aba694e2528b4b05d809f3ffc995fed1fcd4f63e4a4"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-home-768-fb78bf17cf990433.jpg",
+            "sha256": "fb78bf17cf9904331987637ae6d1030fbe231d5f1fd33932f47bdf5b700a2637"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-home-1024-1d5ff94328e41cbb.jpg",
+            "sha256": "1d5ff94328e41cbb52a77b91683cffe93d5a7d73179131c7398f3a53b177e35b"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "home",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/home",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-home-1440-6e9bcd292864cc36.jpg",
+            "sha256": "6e9bcd292864cc3696c3879f9a9304cc5ca4513cf9239d0a00910fe03f5a88ec"
+          }
+        },
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-category-320-d14bc73ead42f17a.jpg",
+            "sha256": "d14bc73ead42f17a3af660fc171ab855106bb734f3919e1a4a3c26624c3eba3a"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-category-360-f5db222cd2e5de94.jpg",
+            "sha256": "f5db222cd2e5de945e10da0c6064d21ae9f026882887d1825cb6089187d7ea91"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-category-390-55ef1c69d14aebfc.jpg",
+            "sha256": "55ef1c69d14aebfcadb1963495dc28c163f2a63ef271613f483476b62e60242e"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-category-430-133794c77c1d05a3.jpg",
+            "sha256": "133794c77c1d05a3e8882edec5968606c96b8415e0e42cc4b4c568fc7e060b00"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-category-768-d30384437f6a28dc.jpg",
+            "sha256": "d30384437f6a28dcae48e7b5408a7945fafbcfb93b6a4f6effb6e659875297ce"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-category-1024-e91051efda1207d1.jpg",
+            "sha256": "e91051efda1207d14c36fbf30ab5575b99944ec3ddbeaaf3a576fe852fae29b1"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "category",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/catalog",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-category-1440-e13fe01368f7dddc.jpg",
+            "sha256": "e13fe01368f7dddce1c9f8afb1b514e3e29fc7bd70fa0e65bde4e8036b6a399e"
+          }
+        },
+        {
+          "width": 320,
+          "actualWidth": 320,
+          "rootScrollWidth": 305,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-product-320-a1ec73379008c070.jpg",
+            "sha256": "a1ec73379008c070821376ce955a61538bcb0cbce87d0fe70cc230467e84dd9e"
+          }
+        },
+        {
+          "width": 360,
+          "actualWidth": 360,
+          "rootScrollWidth": 345,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-product-360-dcfb563bd42ed5e7.jpg",
+            "sha256": "dcfb563bd42ed5e7218767ac338fc84fb883550a9b0fbaae5937ec48f53811a1"
+          }
+        },
+        {
+          "width": 390,
+          "actualWidth": 390,
+          "rootScrollWidth": 375,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-product-390-203c5ffc35943f19.jpg",
+            "sha256": "203c5ffc35943f19d7472a338155a5340683c82d943ae86304a24e488400aea3"
+          }
+        },
+        {
+          "width": 430,
+          "actualWidth": 430,
+          "rootScrollWidth": 415,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-product-430-a5d26b90f771ef82.jpg",
+            "sha256": "a5d26b90f771ef822990b44e09d9107996b7d056fc57c4435f26aca23de91654"
+          }
+        },
+        {
+          "width": 768,
+          "actualWidth": 768,
+          "rootScrollWidth": 753,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-product-768-3cda8092cf5fa8a9.jpg",
+            "sha256": "3cda8092cf5fa8a9ea26ccac97cd0e929204f382f6debb08a8782da87c6441cc"
+          }
+        },
+        {
+          "width": 1024,
+          "actualWidth": 1024,
+          "rootScrollWidth": 1009,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-product-1024-20edf5454ed03bdb.jpg",
+            "sha256": "20edf5454ed03bdb885d813d2eaf89df1026cad17cf13ba1364ac86ee63141b8"
+          }
+        },
+        {
+          "width": 1440,
+          "actualWidth": 1440,
+          "rootScrollWidth": 1425,
+          "route": "product",
+          "status": "PASS",
+          "url": "http://classic.localhost:62213/#/product/501",
+          "overflow": false,
+          "marketplaceUiAbsent": true,
+          "screenshot": {
+            "path": "theme-platform/publication-evidence/classic-final-product-1440-3c621fd27a1e9d8b.jpg",
+            "sha256": "3c621fd27a1e9d8b564e771f6f3deb49f0eb8bee096be7a933758260a710d485"
+          }
+        }
+      ]
+    }
+  ]
+}

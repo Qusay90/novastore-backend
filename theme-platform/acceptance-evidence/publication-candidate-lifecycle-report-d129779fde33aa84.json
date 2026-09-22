@@ -1,0 +1,205 @@
+{
+  "result": "PASS",
+  "sourceRoot": "C:/Users/kusay/source/NovaStore-Codex/android-customer-theme-20260722/theme-platform-seller-experience-wave-2",
+  "sourceSha256": {
+    "services/themePlatformPublicationService.js": "da7de62b409541b2e723671f6a0bc83a668ff8e888a93c1c91b63174878cd5ed",
+    "tests/themePlatformPublicationPostgresSmoke.js": "a4fde8a377be1191d83e55e22ff3373e10610c65afa06b1750fa4092ebba01d6",
+    "services/themePlatformPublicationValidation.js": "9beb8b6a7c9e8d3c6a8afacb277952f01c462f08c1b777b9bd0413faa8ed0350",
+    "services/themePlatformService.js": "3f4c446619928e855901e8f2acebad56fd1688963bc266fa4fb269121d6be7ba",
+    "tests/themeAssetLifecyclePostgresSmoke.js": "531420b9619d49580c55af67d7a4f7b2b480d4fdaf069734df724a4de1db8c72",
+    "services/themePlatformAssetLifecycleService.js": "239838dbe6e01c583a2529abedf360d2006c04905c2715daae5478b19347d58a",
+    "services/themePlatformExperienceService.js": "1a1f28bb7181b91feb8f278fd7f9b09e79fd241043879ba6f375c94778a98e26"
+  },
+  "postgres": {
+    "skip": 0,
+    "explicitTestDoubles": [
+      "renderer build",
+      "assignment compatibility at initial test activation",
+      "responsive evidence",
+      "legal authority except canonical CMS cases"
+    ],
+    "pass": 35,
+    "checks": 35,
+    "migrations": 48,
+    "fail": 0,
+    "log": "asset-lifecycle-publication-regression.log",
+    "postgresVersion": 160015,
+    "gates": [
+      {
+        "name": "P01 real local candidate build records durable stages without ACTIVE",
+        "status": "PASS"
+      },
+      {
+        "name": "P31 exact pre-publication candidate validates without QA or changing any state",
+        "status": "PASS"
+      },
+      {
+        "name": "P32 candidate rejects foreign unknown stale digest assignment channel and environment",
+        "status": "PASS"
+      },
+      {
+        "name": "P02 stored artifact and stage evidence are DB immutable",
+        "status": "PASS"
+      },
+      {
+        "name": "P03 real registry refuses PARTIAL theme activation",
+        "status": "PASS"
+      },
+      {
+        "name": "P04 missing or mismatched artifact QA evidence cannot activate",
+        "status": "PASS"
+      },
+      {
+        "name": "P05 explicit test authority enables one atomic LOCAL pointer only",
+        "status": "PASS"
+      },
+      {
+        "name": "P06 stale CAS leaves pointer and generation unchanged",
+        "status": "PASS"
+      },
+      {
+        "name": "P07 two concurrent requests cannot both claim same pointer generation",
+        "status": "PASS"
+      },
+      {
+        "name": "P08 rollback restores previous verified artifact without commerce mutation",
+        "status": "PASS"
+      },
+      {
+        "name": "P09 foreign Seller cannot activate or read tenant artifact",
+        "status": "PASS"
+      },
+      {
+        "name": "P10 changed legal authority blocks replay/read without moving pointer",
+        "status": "PASS"
+      },
+      {
+        "name": "P11 revoked publication permission blocks activation without unpublishing customer runtime",
+        "status": "PASS"
+      },
+      {
+        "name": "P12 incomplete legal/runtime authorities produce durable BLOCKED failure",
+        "status": "PASS"
+      },
+      {
+        "name": "P13 marketplace assignment cannot build single-store publication",
+        "status": "PASS"
+      },
+      {
+        "name": "P14 stale worker lease cannot be claimed twice",
+        "status": "PASS"
+      },
+      {
+        "name": "P15 unreferenced asset tombstones durably while original bytes retained",
+        "status": "PASS"
+      },
+      {
+        "name": "P16 current and historical references prevent asset deletion",
+        "status": "PASS"
+      },
+      {
+        "name": "P18 canonical CMS authority rejects missing then accepts approved effective versions",
+        "status": "PASS"
+      },
+      {
+        "name": "P33 candidate reader verifies canonical legal and exact live owned asset bytes",
+        "status": "PASS"
+      },
+      {
+        "name": "P19 store contact logo is retained and included as verified artifact bytes",
+        "status": "PASS"
+      },
+      {
+        "name": "P34 candidate reader refuses canonical revoked legal document",
+        "status": "PASS"
+      },
+      {
+        "name": "P20 canonical legal revoke blocks existing artifact activation",
+        "status": "PASS"
+      },
+      {
+        "name": "P21 valid own Seller request authority cannot directly activate or rollback",
+        "status": "PASS"
+      },
+      {
+        "name": "P22 operation ledger and audit reflect actual LOCAL activation only",
+        "status": "PASS"
+      },
+      {
+        "name": "P23 active artifact validates inside caller READ ONLY transaction without nested connection or locks",
+        "status": "PASS"
+      },
+      {
+        "name": "P24 real edit-grant revision leaves published A serving but blocks stale build and new activation",
+        "status": "PASS"
+      },
+      {
+        "name": "P25 current renderer B cannot alter serving A and new B activation still validates current bytes",
+        "status": "PASS"
+      },
+      {
+        "name": "P26 rollback to verified previous A uses its immutable renderer despite B dist and changed edit policy",
+        "status": "PASS"
+      },
+      {
+        "name": "P27 live editor feature denial preserves published bytes but prevents new builds and edits",
+        "status": "PASS"
+      },
+      {
+        "name": "P28 live service store organization and assignment revocations still block serving and rollback",
+        "status": "PASS"
+      },
+      {
+        "name": "P29 serving and rollback retain exact registry and artifact QA revocation checks",
+        "status": "PASS"
+      },
+      {
+        "name": "P30 contact and legal version changes still require republish after edit policy changes",
+        "status": "PASS"
+      },
+      {
+        "name": "P35 current real registry PARTIAL cannot revoke sealed acceptance but denies new activation",
+        "status": "PASS"
+      },
+      {
+        "name": "P17 corrupted deployed bytes cannot be activated or served",
+        "status": "PASS"
+      }
+    ],
+    "logSha256": "e04b2618728b37ff31085266b4516d8ab3e35dd184331c1ed9956c5ebff0636d"
+  },
+  "filesystem": {
+    "pass": 9,
+    "skip": 0,
+    "fail": 0,
+    "log": "publication-candidate-artifact-fs-final.log",
+    "logSha256": "7ec49ecd8a7e0e38c4bee655fe9bed4f80571efe6663dd37c117c4dde089e387"
+  },
+  "unifiedHttp": {
+    "browserAcceptance": false,
+    "normalPasswordLogin": true,
+    "pass": 27,
+    "fail": 0,
+    "path": "unified-final-runtime-1789854948968/http-preflight.json",
+    "realFrontendBytes": true
+  },
+  "semantics": {
+    "intentionalRevocation": "Current inventory BLOCKED, REVOKED, UNSUPPORTED, missing or unknown identity deny. Explicit current QA revocation still denies.",
+    "candidate": "Internal readBuiltCandidateOn only; exact accepted assignment and DEPLOYING artifact, current authoring policy and renderer bytes, live legal/assets. No QA or active-pointer assertion; no production HTTP route.",
+    "publishedRuntime": "Sealed artifact requires immutable scoped ACTIVATE proof, current exact known registry identity, live service and SINGLE_STORE assignment, exact artifact QA, live legal and assets. New-build PARTIAL does not revoke prior activation.",
+    "contactLegalChanges": "Changed version/hash or revocation require fresh publication; fail closed intentionally."
+  },
+  "runtime": {
+    "output": "unified-final-runtime-1789854948968",
+    "databasePreserved": true,
+    "noAssignmentsSeeded": true,
+    "stockyRelayRetargetedByThisAgent": false,
+    "port": 62213,
+    "candidateOwnerFile": "local-candidate-review.json"
+  },
+  "productionWrites": 0,
+  "publicationPromotion": 0,
+  "initialFailedRun": "publication-candidate-lifecycle-postgres.log: negative test attempted pointer mutation without mandatory generation/previous identity; corrected test to obey DB constraint inside rolled-back transaction. No trigger bypass.",
+  "refreshedAt": "2026-09-19T22:10:18.3298680Z",
+  "provenance": "Latest35 PostgreSQL suite ran after asset authorization and retained-byte quota fixes. All recorded source hashes revalidated; no test rerun or readiness promotion during this refresh."
+}

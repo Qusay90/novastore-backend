@@ -1,0 +1,68 @@
+{
+  "pass": 15,
+  "fail": 0,
+  "skip": 0,
+  "mode": "real gallery/visual editor; fake scoped host ports and renderer; no live backend or native Android",
+  "checks": [
+    {
+      "name": "same-origin mount initializes every registered gallery theme",
+      "status": "PASS"
+    },
+    {
+      "name": "raw demo-commerce previews disabled in explicit host mode",
+      "status": "PASS"
+    },
+    {
+      "name": "empty server library stays empty without local fallback",
+      "status": "PASS"
+    },
+    {
+      "name": "host working edits remain unsaved before explicit save",
+      "status": "PASS"
+    },
+    {
+      "name": "existing undo redo works in host workshop",
+      "status": "PASS"
+    },
+    {
+      "name": "01-nova: web/app edit, save-as, server persistence, candidate import",
+      "status": "PASS"
+    },
+    {
+      "name": "15-nova-classic: web/app edit, save-as, server persistence, candidate import",
+      "status": "PASS"
+    },
+    {
+      "name": "library version conflict shown without discarding current edits",
+      "status": "PASS"
+    },
+    {
+      "name": "workshop selection retains conflicting edit",
+      "status": "PASS"
+    },
+    {
+      "name": "candidate workflow never gains automatic production readiness",
+      "status": "PASS"
+    },
+    {
+      "name": "no browser localStorage writes in host gallery or preview",
+      "status": "PASS"
+    },
+    {
+      "name": "immutable gallery source preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "readonly gallery does not offer writable new workspaces",
+      "status": "PASS"
+    },
+    {
+      "name": "unavailable admin library fails closed visibly",
+      "status": "PASS"
+    },
+    {
+      "name": "no unhandled gallery UI errors",
+      "status": "PASS"
+    }
+  ]
+}

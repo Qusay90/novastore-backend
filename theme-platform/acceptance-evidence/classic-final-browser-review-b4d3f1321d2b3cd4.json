@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "family": "classic",
+  "buildManifestSHA256": "90d86609b71869ec552ebc1ebf7b5c4acfcee06f18bc0f4468b8c753069f7827",
+  "provenance": "ACTUAL_BROWSER_OWNER_REVIEWED",
+  "result": "PASS",
+  "presentation": {
+    "id": "nova-classic",
+    "version": "1.0.0",
+    "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668"
+  },
+  "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+  "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+  "marketplaceAbsent": "PASS",
+  "visualManual": "PASS",
+  "storeActivation": "NOT_ASSERTED",
+  "knownLimitations": {
+    "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+    "paymentInitiation": "DISABLED",
+    "orderFixture": "Classic fixture order preserves distinct canonical fields status=Ödeme Bekliyor and payment_status=PAID; synthetic test payment state does not prove a provider payment or preparation/shipment. UI correctly does not infer fulfillment."
+  },
+  "functional": {
+    "customerAuth": "PASS",
+    "persistentCart": "PASS",
+    "favorites": "PASS",
+    "variantSelection": "PASS",
+    "stockCheck": "PASS",
+    "checkoutPreparation": "PASS",
+    "orderHistory": "PASS",
+    "reviewPermission": "PASS",
+    "questions": "PASS",
+    "supportRouting": "PASS",
+    "singleStore": "PASS",
+    "productTransition": "PASS",
+    "pendingStatusRecovery": "PASS"
+  },
+  "evidence": [
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-add.txt",
+      "sha256": "7951ca5bbc337333fd6c62fe00507068e15efdb0821b2745cf76a559b29fd26b"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-cart-reload.txt",
+      "sha256": "a8ab627dcddfff30666860e19b1499540412ac19aa76c932011102c44adc0068"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-cart-sibling-preserved.txt",
+      "sha256": "d4bfbbec004e98ff53389092a7be3f2217a42619d82b7da7a68faf0da6ff4c47"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-checkout.txt",
+      "sha256": "88b5ebbd09fa04fb463064fbabf641a04de6145f7abfdbc3be7d88660515f953"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-favorites.txt",
+      "sha256": "cb020d8cabd9be79706fedde6bcaca84439dab96c7c8ed12f3d1e3c380ae50c5"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-login.txt",
+      "sha256": "1cf05741141f0999e8c867139564778e812ddb403f29d66f354096dc6a2de5fb"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-logout.txt",
+      "sha256": "0a4976cdf4d736f72a26a262aafcb6413a41e2da1647241bb363c0c8832b3c65"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-order-detail.txt",
+      "sha256": "acb67b45d2a50f94c869e3640bb2c38db258239916082e9560696df394d98e22"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-orders.txt",
+      "sha256": "5f5ba37d6b67e2b29b7f1e5611c01342f8440b833eeb8c58154717ebb369685f"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-product-transition.txt",
+      "sha256": "e6a3edc2b42b6b8cf8296dce69e049595817744c13efc06e57ee35f564200380"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-question.txt",
+      "sha256": "914fdadfa76be0bdccb36ff0ec728e8fdeeeb659eb1c13734f8936a9fdb52223"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-review-permission.txt",
+      "sha256": "64e8c971685fa4a089fc3f92c3ff85934e56c956f75101d11d273e3a701c2b68"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-stock-boundary.txt",
+      "sha256": "582ee7e39e6bef5d33a29256e8e5c2804e6903bc7e36fee5c3132df588432f29"
+    },
+    {
+      "path": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/theme-platform-wave2-closure-20260919/browser-customer/classic-final-support.txt",
+      "sha256": "77973c8b8e85b3b997502096abd2a894a8a4ce5dd8a8c54313dc9d43d1533625"
+    }
+  ],
+  "reviewNotes": "Normal browser login/logout; actual scoped PostgreSQL cart and variants, persisted favorites, canonical review denial, product question success, seller support thread creation, checkout 111+49.90=160.90 without payment; real viewport42 measurements paired with manual screenshots. No Android/device/publication readiness inferred."
+}

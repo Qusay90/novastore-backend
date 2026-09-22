@@ -1,0 +1,3 @@
+:root{--primary:#d94735;--on-primary:#fff;--accent:#d94735;--bg:#fffdf7;--surface:#fff;--ink:#202b25;--muted:#626961;--border:#deded5;--soft:#fffdf7;--display-font:Georgia, serif;--radius:12px;--button-radius:6px;--heading-weight:500;--badge-bg:#d94735;--badge-ink:#fff;}
+
+:root{--primary:#d94735;--on-primary:#000000;--badge-bg:#d94735;--badge-ink:#000000;--bg:#fffdf7;--surface:#fffdf7;--ink:#202b25;--muted:#626961;}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "result": "BUILD_VALIDATION_PASS",
+  "provenance": "ACTUAL_IMMUTABLE_CANDIDATE_ARTIFACT_VERIFIED",
+  "publicationAccepted": false,
+  "storeActivation": "NOT_ASSERTED",
+  "presentation": {
+    "id": "nova-classic",
+    "version": "1.0.0",
+    "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668"
+  },
+  "rendererSourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+  "artifactDigest": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424",
+  "candidateMetadata": {
+    "path": "theme-platform/acceptance-evidence/customer-candidate-public-72af90471e585316.json",
+    "sha256": "72af90471e5853161c747d54f8674208b51c3f19776f3d2e05699b883e1a2881"
+  },
+  "artifactManifest": {
+    "path": "theme-platform/acceptance-evidence/classic-candidate-artifact-manifest-7df6e686c65a630e.json",
+    "sha256": "7df6e686c65a630eb4542b73d05ad6849fa5e5baa7afdfc1d7627005fbfde424"
+  },
+  "publicationRegression": {
+    "path": "theme-platform/acceptance-evidence/publication-candidate-lifecycle-report-d129779fde33aa84.json",
+    "sha256": "d129779fde33aa842f18f68a8db3292e7ba541e4a6d9170c03717d492c4995a5"
+  }
+}

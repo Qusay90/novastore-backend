@@ -17,7 +17,7 @@ const permissions = Object.freeze([
     'entitlement.read', 'entitlement.manage', 'draft.read', 'draft.edit',
     'asset.read', 'asset.register', 'preview.read', 'preview.create',
     'publication.read', 'publication.request', 'rollback.request',
-    'operation.read', 'audit.read'
+    'operation.read', 'audit.read', 'support.inbox.read', 'support.reply', 'support.policy.manage'
 ]);
 const rolePermissions = Object.freeze({
     super_admin: permissions,
@@ -27,17 +27,17 @@ const rolePermissions = Object.freeze({
         'asset.read', 'preview.read', 'preview.create', 'publication.read',
         'operation.read', 'audit.read'
     ]),
-    support: Object.freeze(['catalog.read', 'service.read', 'audit.read']),
+    support: Object.freeze(['catalog.read', 'service.read', 'audit.read', 'support.inbox.read', 'support.reply']),
     seller_owner: Object.freeze([
         'service.read', 'assignment.read', 'assignment.accept', 'entitlement.read', 'draft.read',
         'draft.edit', 'asset.read', 'asset.register', 'preview.read', 'preview.create',
         'publication.read', 'publication.request', 'rollback.request',
-        'operation.read', 'audit.read'
+        'operation.read', 'audit.read', 'support.inbox.read', 'support.reply'
     ]),
     seller_admin: Object.freeze([
         'service.read', 'assignment.read', 'assignment.accept', 'draft.read', 'draft.edit',
         'asset.read', 'asset.register', 'preview.read', 'preview.create',
-        'publication.read', 'operation.read'
+        'publication.read', 'operation.read', 'support.inbox.read', 'support.reply'
     ]),
     seller_editor: Object.freeze([
         'service.read', 'assignment.read', 'assignment.accept', 'draft.read', 'draft.edit',
@@ -64,6 +64,7 @@ const sessionUuid = (value) => {
     return value.toLowerCase();
 };
 const one = (result) => result?.rows?.length === 1 ? result.rows[0] : null;
+const bridge = require('./themeSellerBridgeService');
 
 const principalFromAdmin = (req) => {
     const auth = req?.auth;
@@ -103,10 +104,14 @@ const authorizeAdmin = async (client, principal) => {
 };
 
 const authorizeSeller = async (client, principal, service) => {
-    const userId = positiveId(principal.userId), sessionId = sessionUuid(principal.sessionId);
+    const bridged = bridge.isThemeSellerBridgePrincipal(principal);
+    if (principal.authentication !== undefined && !bridged) fail('THEME_AUTH_REQUIRED', 401);
+    const userId = positiveId(principal.userId);
+    const sessionId = sessionUuid(bridged ? principal.bridgeSessionId : principal.sessionId);
     // This first read discovers the authoritative organization/member IDs only.
     // The session is read and locked again after locking its parent membership.
-    const discovered = one(await client.query(`/* theme-auth:seller-session-scope */
+    const bridgeScope = bridged ? await bridge.loadThemeSellerBridgeScope(client, principal) : null;
+    const discovered = bridgeScope || one(await client.query(`/* theme-auth:seller-session-scope */
         SELECT organization_id, membership_id FROM seller_sessions
         WHERE id = $1 AND user_id = $2 AND audience = 'seller'`, [sessionId, userId]));
     if (!discovered) fail('THEME_AUTH_REQUIRED', 401);
@@ -130,14 +135,19 @@ const authorizeSeller = async (client, principal, service) => {
     const user = one(await client.query(`/* theme-auth:seller-user */
         SELECT id, auth_enabled FROM users WHERE id = $1 FOR SHARE`, [userId]));
     if (!user || user.auth_enabled !== true) fail('THEME_AUTH_REQUIRED', 401);
-    const session = one(await client.query(`/* theme-auth:seller-live-session */
-        SELECT id, user_id, organization_id, membership_id, audience, status,
-               membership_revision, security_stamp, (expires_at > clock_timestamp()) AS unexpired
-        FROM seller_sessions WHERE id = $1 AND user_id = $2 FOR SHARE`, [sessionId, userId]));
-    if (!session || session.status !== 'active' || session.audience !== 'seller' || session.unexpired !== true
-        || positiveId(session.organization_id) !== organizationId || positiveId(session.membership_id) !== membershipId
-        || positiveId(session.membership_revision) !== positiveId(membership.membership_revision)
-        || session.security_stamp !== membership.security_stamp) fail('THEME_AUTH_REQUIRED', 401);
+    if (bridged) {
+        if (positiveId(bridgeScope.membership_revision) !== positiveId(membership.membership_revision)
+            || bridgeScope.security_stamp !== membership.security_stamp) fail('THEME_AUTH_REQUIRED', 401);
+    } else {
+        const session = one(await client.query(`/* theme-auth:seller-live-session */
+            SELECT id, user_id, organization_id, membership_id, audience, status,
+                   membership_revision, security_stamp, (expires_at > clock_timestamp()) AS unexpired
+            FROM seller_sessions WHERE id = $1 AND user_id = $2 FOR SHARE`, [sessionId, userId]));
+        if (!session || session.status !== 'active' || session.audience !== 'seller' || session.unexpired !== true
+            || positiveId(session.organization_id) !== organizationId || positiveId(session.membership_id) !== membershipId
+            || positiveId(session.membership_revision) !== positiveId(membership.membership_revision)
+            || session.security_stamp !== membership.security_stamp) fail('THEME_AUTH_REQUIRED', 401);
+    }
     const binding = one(await client.query(`/* theme-auth:seller-theme-role */
         SELECT role, publish_allowed, active, revision FROM theme_seller_roles
         WHERE organization_id = $1 AND membership_id = $2 FOR SHARE`, [organizationId, membershipId]));
@@ -159,7 +169,8 @@ const authorizeSeller = async (client, principal, service) => {
           AND scope.scope_kind = 'assigned' AND scope.revoked_at IS NULL
           AND store.status = 'active' AND store.closed_at IS NULL
         ORDER BY store.id FOR SHARE OF scope, store`, [organizationId, membershipId]);
-    const storeIds = Object.freeze([...new Set((scoped.rows || []).map(row => positiveId(row.store_id)))]);
+    const storeIds = Object.freeze([...new Set((scoped.rows || []).map(row => positiveId(row.store_id)))]
+        .filter(storeId => !bridged || storeId === positiveId(bridgeScope.store_id)));
     if (service) {
         if (positiveId(service.organization_id) !== organizationId || !storeIds.includes(positiveId(service.store_id))) {
             fail('THEME_RESOURCE_NOT_FOUND', 404);
@@ -184,6 +195,9 @@ const authorize = async (client, principal, permission, service = null) => {
     // These values are never accepted from a caller's precomputed authority cache.
     if (['role', 'permissions', 'organizationId', 'membershipId', 'storeIds', 'publishAllowed', 'delegated', 'credentialType']
         .some(key => Object.prototype.hasOwnProperty.call(principal, key))) fail('THEME_AUTH_REQUIRED', 401);
+    if ((principal.authentication !== undefined || principal.bridgeSessionId !== undefined)
+        && !bridge.isThemeSellerBridgePrincipal(principal)) fail('THEME_AUTH_REQUIRED', 401);
+    if (!bridge.permitsThemeSellerBridgeAction(principal, permission)) fail('THEME_PERMISSION_DENIED');
     if (!permissions.includes(permission)) fail('THEME_PERMISSION_DENIED');
     if (principal.kind === 'seller' && !service && !['assignment.read', 'service.read'].includes(permission)) {
         fail('THEME_RESOURCE_NOT_FOUND', 404);

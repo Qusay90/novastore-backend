@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "reviewed": true,
+  "provenance": "ACTUAL_BROWSER_ROOT_REVIEWED",
+  "result": "PASS",
+  "environment": "LOCAL",
+  "phase": "BUILT_ARTIFACT_QA_PRE_ACTIVATION",
+  "storeActivation": "NOT_ASSERTED",
+  "reviewedAt": "2026-09-19T22:51:32.533Z",
+  "buildManifestSHA256": "90d86609b71869ec552ebc1ebf7b5c4acfcee06f18bc0f4468b8c753069f7827",
+  "presentation": {
+    "id": "nova-classic",
+    "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668",
+    "version": "1.0.0"
+  },
+  "sourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+  "artifactDigest": "e5f81b39e9e0615d22281d2a495f7f4d120d71893165ea6e337d3679916a2ba5",
+  "publicationId": "9519490c-67d2-4387-8e81-ec4f793b7088",
+  "visualManual": "PASS",
+  "marketplaceUiAbsent": true,
+  "pages": {
+    "home": "PASS",
+    "category": "PASS",
+    "product": "PASS"
+  },
+  "knownLimitations": {
+    "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+    "paymentInitiation": "DISABLED"
+  },
+  "observations": [
+    "All 21 width/page combinations measured in the real browser; no horizontal overflow or unloaded visible images.",
+    "Direct visual review of 320/1440 home, 320 category, and390/1440 product screenshots; original Classic identity, readable controls and contained product imagery retained.",
+    "Canonical fixture has one category and two products; intentionally no fabricated products to fill desktop whitespace.",
+    "Saved seller category title persists in the immutable candidate."
+  ],
+  "manuallyViewedScreenshots": [
+    "classic-e5f81b39e9e0-home-320.jpg",
+    "classic-e5f81b39e9e0-home-1440.jpg",
+    "classic-e5f81b39e9e0-category-320.jpg",
+    "classic-e5f81b39e9e0-product-390.jpg",
+    "classic-e5f81b39e9e0-product-1440.jpg"
+  ]
+}

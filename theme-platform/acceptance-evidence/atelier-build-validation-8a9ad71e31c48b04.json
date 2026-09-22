@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "result": "BUILD_VALIDATION_PASS",
+  "provenance": "ACTUAL_IMMUTABLE_CANDIDATE_ARTIFACT_VERIFIED",
+  "publicationAccepted": false,
+  "storeActivation": "NOT_ASSERTED",
+  "presentation": {
+    "id": "nova-atelier",
+    "version": "1.0.0",
+    "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a"
+  },
+  "rendererSourceDigest": "6947e1fdbf49570c7a0b15845fc1f21277c7e30a19a3521425ca9c274a52c684",
+  "artifactDigest": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600",
+  "candidateMetadata": {
+    "path": "theme-platform/acceptance-evidence/customer-candidate-public-72af90471e585316.json",
+    "sha256": "72af90471e5853161c747d54f8674208b51c3f19776f3d2e05699b883e1a2881"
+  },
+  "artifactManifest": {
+    "path": "theme-platform/acceptance-evidence/atelier-candidate-artifact-manifest-73dde5c26b01917f.json",
+    "sha256": "73dde5c26b01917f5b285ffbd71a03b3c5d965c500aaa59d666a24a90bbca600"
+  },
+  "publicationRegression": {
+    "path": "theme-platform/acceptance-evidence/publication-candidate-lifecycle-report-d129779fde33aa84.json",
+    "sha256": "d129779fde33aa842f18f68a8db3292e7ba541e4a6d9170c03717d492c4995a5"
+  }
+}

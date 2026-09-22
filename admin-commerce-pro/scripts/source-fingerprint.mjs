@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
+import { parseAst } from "rollup/parseAst";
 
 export const imageNames = [
   "category-home.webp",
@@ -131,6 +132,7 @@ const sourceFilesForMode = (sourceFiles, mode) => sourceFiles.filter((relativePa
     || relativePath === "src/integrated.css"
     || relativePath === "src/main-integrated.jsx"
     || relativePath.startsWith("src/adapters/")
+    || relativePath.startsWith("src/theme-platform/")
     || relativePath.startsWith("src/integration/");
   const previewOnly = relativePath === "src/App.jsx"
     || relativePath === "src/main.jsx"
@@ -141,9 +143,47 @@ const sourceFilesForMode = (sourceFiles, mode) => sourceFiles.filter((relativePa
   return true;
 });
 
+// Rollup is already pinned by this application's Vite lockfile. Resolve the
+// actual imported shared modules rather than silently omitting validator/model
+// dependencies from the generated Admin artifact's source identity.
+export async function listSharedModuleClosure(repositoryRoot, entryPoints) {
+  const pending=[...entryPoints], seen=new Set();
+  while(pending.length) {
+    const relativePath=canonicalizeFingerprintPath(pending.pop());
+    if(!relativePath.startsWith('studio-core/'))throw new Error(`Paylaşılan modül kapsam dışında: ${relativePath}`);
+    if(seen.has(relativePath))continue;
+    const source=await readFile(path.join(repositoryRoot,...relativePath.split('/')),'utf8');
+    seen.add(relativePath);
+    if(path.posix.extname(relativePath)==='.json')continue;
+    if(!['.js','.mjs'].includes(path.posix.extname(relativePath)))throw new Error(`Paylaşılan modül çözücüsü bu türü desteklemiyor: ${relativePath}`);
+    const imports=[];
+    const visit=node=>{
+      if(!node||typeof node!=='object')return;
+      if(['ImportDeclaration','ExportNamedDeclaration','ExportAllDeclaration','ImportExpression'].includes(node.type)&&node.source){
+        if(node.source.type!=='Literal'||typeof node.source.value!=='string')throw new Error(`Dinamik modül yolu mühürlenemedi: ${relativePath}`);
+        imports.push(node.source.value);
+      }
+      for(const value of Object.values(node))if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')visit(value);
+    };
+    visit(parseAst(source));
+    for(const specifier of imports) {
+      if(!specifier.startsWith('.'))continue;
+      if(/[?#\\]/.test(specifier))throw new Error(`Paylaşılan modül yolu geçersiz: ${specifier}`);
+      const resolved=path.posix.normalize(path.posix.join(path.posix.dirname(relativePath),specifier));
+      if(!resolved.startsWith('studio-core/')||resolved.split('/').includes('..'))throw new Error(`Paylaşılan modül kapsam dışına çıkıyor: ${specifier}`);
+      pending.push(resolved);
+    }
+  }
+  return [...seen].sort(compareNames);
+}
+
 export async function createSourceFingerprint(root, { mode = "preview" } = {}) {
   if (!["preview", "integrated"].includes(mode)) throw new Error(`Bilinmeyen fingerprint modu: ${mode}`);
   const sourceFiles = sourceFilesForMode(await listSourceFiles(root), mode);
+  const sharedFiles=mode==='integrated'?await listSharedModuleClosure(path.dirname(root),[
+    'studio-core/src/studio-integration/platform-bridge.js',
+    'studio-core/src/studio-integration/navigation-guard.js',
+  ]):[];
   const fingerprintFiles = [
     mode === "integrated" ? "integrated.html" : "index.html",
     "package.json",
@@ -156,6 +196,8 @@ export async function createSourceFingerprint(root, { mode = "preview" } = {}) {
     "public/favicon-96x96.png",
     ...imageNames.map((name) => `public/assets/${name}`),
     ...fontNames.map((name) => `public/assets/fonts/${name}`),
+    ...sharedFiles,
+    ...(mode === "integrated" ? ["studio-core/package.json", "studio-core/package-lock.json"] : []),
   ].sort(compareNames);
   const fingerprint = createHash("sha256");
 
@@ -164,7 +206,7 @@ export async function createSourceFingerprint(root, { mode = "preview" } = {}) {
     updateSourceFingerprint(
       fingerprint,
       canonicalPath,
-      await readFile(path.join(root, ...canonicalPath.split("/"))),
+      await readFile(path.join(root, ...(canonicalPath.startsWith("studio-core/") ? [".."] : []), ...canonicalPath.split("/"))),
     );
   }
 

@@ -1,0 +1,536 @@
+{
+  "source": "C:/Users/kusay/Documents/Codex/2026-09-04/gp/outputs/novastore-studio-pro-expanded-20260915/studio",
+  "description": "One copied native Studio editor and presentation core. Hashes identify original bytes before integration patches.",
+  "files": [
+    {
+      "path": "src/android-existing/TrialCatalog.js",
+      "sha256": "be60eb69ce1fd739b669068b12cf02184e058b7b0802a954b5cd376b90bc07db",
+      "bytes": 7487
+    },
+    {
+      "path": "src/sandbox/CampaignScene.jsx",
+      "sha256": "0acdef52e2aebd7520978e608a15ea7761a046b26d65bc5ff6dd3055e31209a9",
+      "bytes": 388
+    },
+    {
+      "path": "src/sandbox/MerchantWorkspaces.jsx",
+      "sha256": "7048b5f2ddad0dc6708dc7d909d5020ccc81b74f647fa4ba919c296580821adb",
+      "bytes": 8375
+    },
+    {
+      "path": "src/sandbox/SectorProductCardV6.jsx",
+      "sha256": "ce0c86e34e8084fb1b8657532c724442c6718a4f217e9acb1502e6024a84f121",
+      "bytes": 9575
+    },
+    {
+      "path": "src/sandbox/SectorShowcaseV6.jsx",
+      "sha256": "86b85d47e81b57226194a4075d43f262d97a9ac0da580c2350eb4bde84daca8f",
+      "bytes": 12235
+    },
+    {
+      "path": "src/sandbox/campaignArtDirection.js",
+      "sha256": "326f6d0718bfc8c382a672deacd1d318a9d3be2b4625d32d16bdc228ead95007",
+      "bytes": 13026
+    },
+    {
+      "path": "src/sandbox/campaignCanvas.js",
+      "sha256": "3d2299e01cc19f19fba71dc43440862381b88eede560519463e8325eb4d24237",
+      "bytes": 18570
+    },
+    {
+      "path": "src/sandbox/campaignCanvasPresets.js",
+      "sha256": "efd20538e3f1aac1d2aeb54376f194bb83d98757c69167ef4087490fa8a27333",
+      "bytes": 22976
+    },
+    {
+      "path": "src/sandbox/campaignCopy.js",
+      "sha256": "3d3a805d182e84d1b05581bc0e3e7a27e166cfbc3973b40be83b4464750c2776",
+      "bytes": 6521
+    },
+    {
+      "path": "src/sandbox/campaignExpansion.js",
+      "sha256": "0b5bcc3da16a2f4ae019fb1b00e71bc84f81e8e6de9ff4103be114c1c0f1f1fe",
+      "bytes": 29202
+    },
+    {
+      "path": "src/sandbox/campaignLibrary.js",
+      "sha256": "1589b523494e02a126cce972708097658dd96ca0262913b7350d0cc0b28582e9",
+      "bytes": 16993
+    },
+    {
+      "path": "src/sandbox/campaignMedia.js",
+      "sha256": "4ffe769a9c7be02194909f2e80063928a7096853ebc8249a547c7bed69db0354",
+      "bytes": 59946
+    },
+    {
+      "path": "src/sandbox/campaignModel.js",
+      "sha256": "06a2ad396e3520f8da2bd13fd732e5d267c6d1ea9b92df77307794082682248d",
+      "bytes": 8924
+    },
+    {
+      "path": "src/sandbox/campaignShapeRenderer.js",
+      "sha256": "1d81ea0c3293ea7b31ff8e22a5ced99f18157fb289cc779cca24cdd7b5464f57",
+      "bytes": 3698
+    },
+    {
+      "path": "src/sandbox/campaignShapes.js",
+      "sha256": "49c5510f9d236e8034c41a8fee6db9e596ead950b04182bee931de4c32f3e36c",
+      "bytes": 12376
+    },
+    {
+      "path": "src/sandbox/designLibrary.js",
+      "sha256": "6ce89fe9935bca084114677864674db2b68da818ab961712330edc8d15355763",
+      "bytes": 13390
+    },
+    {
+      "path": "src/sandbox/documentModel.js",
+      "sha256": "7c5915b851fa81eb775717bbf3f524b9296549bfa3697164afdd01ba463023d0",
+      "bytes": 17614
+    },
+    {
+      "path": "src/sandbox/merchant-workspaces.css",
+      "sha256": "02c112cb3727f14244f1dbff25afd251dd145ef11f6c2c53f495e37f5af836bb",
+      "bytes": 8656
+    },
+    {
+      "path": "src/sandbox/merchantDesign.js",
+      "sha256": "788737018c7fc4a638f88e3f9786e3009a006da4466ff308b7fcf10c4edf5f5a",
+      "bytes": 2568
+    },
+    {
+      "path": "src/sandbox/merchantWorkspaces.js",
+      "sha256": "795da9b59703187fcfbde44cbef6e23c3bf02dcd96354332676b5f8595b360b8",
+      "bytes": 7257
+    },
+    {
+      "path": "src/sandbox/novaCampaignComposition.js",
+      "sha256": "d11a1e76c8dded9587f7b6766f11f25f8909f0ceadabcc77de39965951fbba05",
+      "bytes": 15494
+    },
+    {
+      "path": "src/sandbox/sectorCatalog.js",
+      "sha256": "dfc1dcd6f986eb150d9ea2d5baad50cf8591a9f99817ce988aef9b75cd1d0ac5",
+      "bytes": 21013
+    },
+    {
+      "path": "src/sandbox/sectorThemeRegistry.json",
+      "sha256": "723b1905002ae28f4ccec78a55c46d13575ad112fe52b216b42383dea3da7770",
+      "bytes": 27529
+    },
+    {
+      "path": "src/sandbox/sellerThemes/SellerThemeOffers.jsx",
+      "sha256": "002e4d8551d4790a210c4b3f1fc379fa0914ad67bcec557bf42676afa114a771",
+      "bytes": 17166
+    },
+    {
+      "path": "src/sandbox/sellerThemes/localAdapter.js",
+      "sha256": "2ef18e0d569d3acc434dd2c36d23a87b74870c2d056f9b63a55d80b9886443be",
+      "bytes": 841
+    },
+    {
+      "path": "src/sandbox/sellerThemes/model.js",
+      "sha256": "574d9f71d3a28fcc571dbab3bb6bc7b67d68593449134b3aca14cd2b68482f30",
+      "bytes": 10452
+    },
+    {
+      "path": "src/sandbox/sellerThemes/seller-themes.css",
+      "sha256": "36737eac3511fec9fad97903550508d328d9a1ca2b079e3cc1e662ecb54ead10",
+      "bytes": 8234
+    },
+    {
+      "path": "src/sandbox/sellerThemes/session.js",
+      "sha256": "53175c6eadfd86bbaed9f1a69603318bce398579fc6150d0cd5e0560b412a0ea",
+      "bytes": 12868
+    },
+    {
+      "path": "src/sandbox/sellerThemes/themeCatalog.js",
+      "sha256": "6fc30c169aa2fbe1c2b68dacd4c9d95c2e57ab264a12ed52f89b372c4afb270c",
+      "bytes": 986
+    },
+    {
+      "path": "src/sandbox/store.js",
+      "sha256": "632d6a9dba9429e7d20d1f6bf51a8d570b9abfcdf9f2d28d400d61f8f08dc201",
+      "bytes": 40722
+    },
+    {
+      "path": "src/sandbox/storeDemos.js",
+      "sha256": "8187aab3ede09775e003c423481b800b17efebade543c3269c8bc4fe52411785",
+      "bytes": 16093
+    },
+    {
+      "path": "src/sandbox/studio/CampaignCanvasEditor.jsx",
+      "sha256": "08a412971197a742cd75b2992135a7bccf9117f564be7459b6a6ba077ba0e191",
+      "bytes": 28064
+    },
+    {
+      "path": "src/sandbox/studio/CampaignColorField.jsx",
+      "sha256": "82c37d8d80eea4abd162396630d21e2b93b3d9423fc6cfa32ab14064d23c09d8",
+      "bytes": 2588
+    },
+    {
+      "path": "src/sandbox/studio/CampaignMediaPicker.jsx",
+      "sha256": "ddfd547d2fc45808a6ab1d14ec0465ec3e975c4447fe6e3eb4708873a528da4e",
+      "bytes": 7994
+    },
+    {
+      "path": "src/sandbox/studio/CampaignSettings.jsx",
+      "sha256": "62cb259c62bd06881ff145151e97b6abafd759a17723f3c639c6103189ed8b34",
+      "bytes": 5167
+    },
+    {
+      "path": "src/sandbox/studio/CampaignShapePicker.jsx",
+      "sha256": "75e1cb4cb399971cef18738bf0ace1700f279ede093804cbdeac58b2a3eed948",
+      "bytes": 8307
+    },
+    {
+      "path": "src/sandbox/studio/CampaignTextControls.jsx",
+      "sha256": "a670c2fd61aa52894ab0d68b47849287df5b6142d31a92a83a4c6f19336b8c31",
+      "bytes": 7044
+    },
+    {
+      "path": "src/sandbox/studio/Canvas.jsx",
+      "sha256": "2f814ec82e921a0a5f90a2248450d511ca36932becd5cc852193c01ad850005b",
+      "bytes": 11451
+    },
+    {
+      "path": "src/sandbox/studio/CanvasViewport.jsx",
+      "sha256": "b1993420254dfb435d2e68cf1c28756aecd2170cd139c2b0bba2e832ed0f3617",
+      "bytes": 3634
+    },
+    {
+      "path": "src/sandbox/studio/Controls.jsx",
+      "sha256": "337ef2ce82ea2d57c9045e3225de22fc973f2aa40fcf1b0bdc9b4f79fd385da4",
+      "bytes": 7350
+    },
+    {
+      "path": "src/sandbox/studio/DesignGallery.jsx",
+      "sha256": "5c435803cf0e26485b5cfc8a8af7a1e546d7f34898db16641993fd864880fe7e",
+      "bytes": 10997
+    },
+    {
+      "path": "src/sandbox/studio/EditedThemes.jsx",
+      "sha256": "5fb3701ea2dd0039df92fddc4eae3db7c01cccd98eb6242f79821382a12d9048",
+      "bytes": 2775
+    },
+    {
+      "path": "src/sandbox/studio/ElementInspector.jsx",
+      "sha256": "28c91ccfb3b4c637fb0ee4f6fea93235edb4de701663bcc7f81e881224416427",
+      "bytes": 12702
+    },
+    {
+      "path": "src/sandbox/studio/Inspector.jsx",
+      "sha256": "d026bae5b58f5d59f033647f6c32bf04b2ae6697ade55952196ccc7b1279bab5",
+      "bytes": 11376
+    },
+    {
+      "path": "src/sandbox/studio/IntegrationReadiness.jsx",
+      "sha256": "2366f43787c3c817e2f392d8b21cfe541d2f41c9717152a9a430ffa5c2793761",
+      "bytes": 4472
+    },
+    {
+      "path": "src/sandbox/studio/Library.jsx",
+      "sha256": "59f883980063c4b16154f674c021b0532ec5797212ca3e6d9e595b415771b22c",
+      "bytes": 18946
+    },
+    {
+      "path": "src/sandbox/studio/PackageEditor.jsx",
+      "sha256": "f6cb952d95ad4cfa5ec9d33ff48bdd29805a972311e56326199e6bfc9987f5ec",
+      "bytes": 21026
+    },
+    {
+      "path": "src/sandbox/studio/ProductSource.jsx",
+      "sha256": "c55a467597ced19ed035a8f771bd90fa8173bc511ddb49d51b9c752a5df26f88",
+      "bytes": 3799
+    },
+    {
+      "path": "src/sandbox/studio/Schedule.jsx",
+      "sha256": "d0e11b45f0e3a596da89ad1b8570140ee3b35f4f8e397b9a861d93e37da9d4ef",
+      "bytes": 6119
+    },
+    {
+      "path": "src/sandbox/studio/SectorThemeCollection.jsx",
+      "sha256": "d9eaac1872a87f27d16994524c829b078bcb79871708eb2fb3d952768ac969e5",
+      "bytes": 2345
+    },
+    {
+      "path": "src/sandbox/studio/Settings.jsx",
+      "sha256": "dd3f21938a6a6ad8ce82d7c633ccc30a4f435a4131ab337a59478f7cb48aa31b",
+      "bytes": 19394
+    },
+    {
+      "path": "src/sandbox/studio/SortableList.jsx",
+      "sha256": "0a31558db20b10eb817a165a46c21db09554ac881652f9a9ef1da740c09152e9",
+      "bytes": 5475
+    },
+    {
+      "path": "src/sandbox/studio/Studio.jsx",
+      "sha256": "1889dfae2fd0e29e9129a754def70481af2dee7904b12b649369481d6e3a0880",
+      "bytes": 38371
+    },
+    {
+      "path": "src/sandbox/studio/VisualAssetControls.jsx",
+      "sha256": "a4a706130fde672fa087fb967c96a31481dc3c3eaecfa48a3642ffcf011958c9",
+      "bytes": 8936
+    },
+    {
+      "path": "src/sandbox/studio/VisualIconLibrary.jsx",
+      "sha256": "8d6e55d78e1f4503d9aa13803833a036134a94f6af2bbd2f935560f37eb8819d",
+      "bytes": 7095
+    },
+    {
+      "path": "src/sandbox/studio/VisualMotionFields.jsx",
+      "sha256": "23d7428e0a0d07243f1833844d285e62ebad491ca8193ba0e900b6bb839d53bf",
+      "bytes": 4688
+    },
+    {
+      "path": "src/sandbox/studio/Workbench.jsx",
+      "sha256": "daae74fb70df1b2d0b6488e692093516883524db42d69d99ac7d1a098103e6ee",
+      "bytes": 2867
+    },
+    {
+      "path": "src/sandbox/studio/campaign-canvas.css",
+      "sha256": "791cfa679d5aab0a8b65a778362707f4fa3590dd1280b4024bb243660fe2ab03",
+      "bytes": 13328
+    },
+    {
+      "path": "src/sandbox/studio/campaign-gallery.css",
+      "sha256": "c4c2b8cdec73b408b17e0a8e258efbb5158973728434964fdf6855349e6e3111",
+      "bytes": 8273
+    },
+    {
+      "path": "src/sandbox/studio/campaign-media-picker.css",
+      "sha256": "17a2f1949885360ef3a6ffee69a8646a3c729a0cc9d1657659bd5d337a09a045",
+      "bytes": 9812
+    },
+    {
+      "path": "src/sandbox/studio/campaign-shape-picker.css",
+      "sha256": "e6a95125465b7afb29daca14ee29a97d489f1a01467adf1d42f8a5cac819a1ce",
+      "bytes": 9640
+    },
+    {
+      "path": "src/sandbox/studio/campaignCanvasActions.js",
+      "sha256": "ca40d0320a45cd1d763898f857992f064508767639bcd110bdc39347a08ad4aa",
+      "bytes": 3313
+    },
+    {
+      "path": "src/sandbox/studio/campaignCreation.js",
+      "sha256": "fe1b2ce058bdd3af12dfc575709a3a4827c2e374e828ab715c6c39f896d6f907",
+      "bytes": 1904
+    },
+    {
+      "path": "src/sandbox/studio/canvas-workspace.css",
+      "sha256": "3fa242326eb122e71927bac1fd2bae44bbc825967ea62766bb6e1550ce599cdf",
+      "bytes": 5587
+    },
+    {
+      "path": "src/sandbox/studio/design-gallery.css",
+      "sha256": "0d5bd72b7562d8a77f6e1e655249670103fd6e9b1cc98491d8146d96a0e54639",
+      "bytes": 9099
+    },
+    {
+      "path": "src/sandbox/studio/library.css",
+      "sha256": "6d0e47397a2240ad663b69884952505159853d983d4f9fc91d5207a95b6ab280",
+      "bytes": 39736
+    },
+    {
+      "path": "src/sandbox/studio/previewOrder.js",
+      "sha256": "ecfea739dd887329e9654a282bd88e016617665b3a0b7ac9d6afa671573a3dd8",
+      "bytes": 1846
+    },
+    {
+      "path": "src/sandbox/studio/studio-v4.css",
+      "sha256": "8352125dd78d7d9d754d40ff75ee4e9634fff9eccb49d5a4bcb60987c7ce2983",
+      "bytes": 4628
+    },
+    {
+      "path": "src/sandbox/studio/studio.css",
+      "sha256": "861166976bff3e7efe2415285d81ceeb86a4119eced9b59048319359698af70a",
+      "bytes": 42596
+    },
+    {
+      "path": "src/sandbox/studio/theme-workshop.css",
+      "sha256": "a910507644ecc86f8219753f5b985ddac773db488d2d61b0b0887a73bb7348fa",
+      "bytes": 1123
+    },
+    {
+      "path": "src/sandbox/studio/visual-assets.css",
+      "sha256": "e74eecfb6697a4cb096d386776aae3b1d50bbabe3336f20c84304c87b970520d",
+      "bytes": 7219
+    },
+    {
+      "path": "src/sandbox/studio/visual-editor.css",
+      "sha256": "9e869759fc6b4c3ac0d790b472b42e6c25a79f678543bb8a58df54ed90f4cd42",
+      "bytes": 5894
+    },
+    {
+      "path": "src/sandbox/studioDocumentStore.js",
+      "sha256": "f18250eb56331049d03044d6d5a3e5ee107130d0f0e01806b2675fccb7d170cc",
+      "bytes": 1921
+    },
+    {
+      "path": "src/sandbox/themeWorkshopStore.js",
+      "sha256": "429ad6d15273aaf6f4012149c0770ee7ed8d6a77f8b0b25d89c944e86c3e2d54",
+      "bytes": 5604
+    },
+    {
+      "path": "src/sandbox/useSandbox.js",
+      "sha256": "f4572c1ae2e80d8b173597b2b62923fe319370b453aa6bccaa8a74710b98c623",
+      "bytes": 2093
+    },
+    {
+      "path": "src/sandbox/visual/VisualEditingLayer.jsx",
+      "sha256": "2b02608e532d44e8ba223c982753a7dd51d5693c699f5354d4c5832e27e5ad0b",
+      "bytes": 7584
+    },
+    {
+      "path": "src/sandbox/visual/visual-assets.js",
+      "sha256": "ab3322958d27c70959d814a2e835b38bb948b0451c1b10c8a8cea36e5c800541",
+      "bytes": 257071
+    },
+    {
+      "path": "src/sandbox/visual/visualAssetRuntime.js",
+      "sha256": "f04e08d21c115db21047ed42b03bddfe2627577806e855dac7a0f55912303709",
+      "bytes": 14271
+    },
+    {
+      "path": "src/sandbox/visual/visualAssets.js",
+      "sha256": "97e3f753c7a7025b31b8dd8a1b6b3a847d4a33a3dcf119fe5eb0c8da4c02e6f6",
+      "bytes": 1441
+    },
+    {
+      "path": "src/sandbox/visual/visualTargets.js",
+      "sha256": "409647d60d447337bd9da30667cc57eafb11b79abce4d3c792b7e2f6edae53e7",
+      "bytes": 10309
+    },
+    {
+      "path": "src/sandbox/visualDesign.js",
+      "sha256": "25af64fe019d69189e3fa1d75583ae56ae1f1438865924d56f1b27075ec03f40",
+      "bytes": 17935
+    },
+    {
+      "path": "src/shared/productCardFraming.js",
+      "sha256": "1dd04dfb854a31262c47d52cebde9cc6eff61be89a5480dbfc7e3f0acb7dd6d1",
+      "bytes": 5709
+    },
+    {
+      "path": "src/storefront/src/CustomerFavoriteButton.jsx",
+      "sha256": "ce8e00cac2a24596510dba054fdbe0224200184e19bd140a7eadd53924f9d29e",
+      "bytes": 1994
+    },
+    {
+      "path": "src/storefront/src/CustomerIcon.jsx",
+      "sha256": "afdf76b56c92ffa509d2ad03f8e7a33b3fa189d956bfc903fb2e9bef3e8e7359",
+      "bytes": 5458
+    },
+    {
+      "path": "src/storefront/src/CustomerProductCard.jsx",
+      "sha256": "e5343f03d9dd3552cb70ff1728acaaeef8695cfaf800a693a2184715d4212f71",
+      "bytes": 19168
+    },
+    {
+      "path": "src/storefront/src/OriginalShowcase.jsx",
+      "sha256": "cab280ba40f672b3fc00d6629696132719dba18ec972612f061a243813e9d33b",
+      "bytes": 15936
+    },
+    {
+      "path": "src/storefront/src/StudioBlocks.jsx",
+      "sha256": "21bb533f8a36a69256774a348511133e07091b9ff448c6a554283519945f3185",
+      "bytes": 25178
+    },
+    {
+      "path": "src/storefront/src/StudioChrome.jsx",
+      "sha256": "6c3c2b991f8c675cdb20aa4ced542310bb54caf72e70e2618565ca5bb77142ab",
+      "bytes": 14633
+    },
+    {
+      "path": "src/storefront/src/StudioFamily.jsx",
+      "sha256": "e28ec5e05a165c70fbf63452b8c71e42a7c11944923c4ce82257e0bc1afcee15",
+      "bytes": 401
+    },
+    {
+      "path": "src/storefront/src/catalog.js",
+      "sha256": "548c786788f8ad8cb3c26f409d01240e48792d4becebb988b36e8b82cef41f34",
+      "bytes": 28365
+    },
+    {
+      "path": "src/storefront/src/customerProductCardModel.js",
+      "sha256": "39722b99826411b60bf31a91cecc87397935f42fdd5ad4d9057836ed65357c7b",
+      "bytes": 1983
+    },
+    {
+      "path": "src/storefront/src/integration/RuntimeComparisonContext.jsx",
+      "sha256": "a01a6ac846157080c5c6e3ebf1fddf8b7d175f1ae27c866b0f8e4dcd861d9ba2",
+      "bytes": 236
+    },
+    {
+      "path": "src/storefront/src/integration/runtimeCatalog.js",
+      "sha256": "2ab16e048868ea077e21037976e182c7da0a870d49b9e0245b95e6980e704618",
+      "bytes": 12249
+    },
+    {
+      "path": "src/studio-integration/HostControls.jsx",
+      "sha256": "4079c82075199ff403be4f943be4b402a998140a2f93646f58749f76f7113b58",
+      "bytes": 4966
+    },
+    {
+      "path": "src/studio-integration/context.js",
+      "sha256": "417add9b867362aa14818d68c69235c6a57a4ee59443aa920b1f4228c43afcb4",
+      "bytes": 1252
+    },
+    {
+      "path": "src/studio-integration/host-contract.d.ts",
+      "sha256": "b850f903225bb5129bd85d106856924c935a5d1f5337dde999001cef407ca812",
+      "bytes": 5267
+    },
+    {
+      "path": "src/studio-integration/host-mount.js",
+      "sha256": "39388486038428e857cc2080435aba247988b43cfcd95daa01f8ea2d1e6b4829",
+      "bytes": 1784
+    },
+    {
+      "path": "src/studio-integration/module-entry.jsx",
+      "sha256": "035674aee17f26c3852ad7aacd3d36bb184b3a77b41ebad1f76f9d8fe989063f",
+      "bytes": 2004
+    },
+    {
+      "path": "src/studio-integration/module.css",
+      "sha256": "c7680d44bd6c565001ae777413ba8c593547b72e604c88cb24c5f2ab0104d5e9",
+      "bytes": 1793
+    },
+    {
+      "path": "src/studio-integration/session.js",
+      "sha256": "d4600cdb080447cd39b799b253f33836b7f476d9efb7441e1f31ce22151f08fb",
+      "bytes": 12230
+    },
+    {
+      "path": "studio-module.html",
+      "sha256": "9d416504e4dbd43f05b258bddb645302888123bbac1348b08e1d15785d65786f",
+      "bytes": 421
+    },
+    {
+      "path": "vite.studio.config.mjs",
+      "sha256": "91513b2423e7e04b5e92bdb9ba04d03499bce7491b13e54985a9a3e47f439e82",
+      "bytes": 530
+    },
+    {
+      "path": "src/storefront/src/canonical.css",
+      "sha256": "5b8e0d4a4eb1fb954e089f5c0e9dbabcad8217032ef12e3a67a03d89072e0896",
+      "bytes": 474816
+    },
+    {
+      "path": "src/storefront/src/integrated.css",
+      "sha256": "b6c35ceea731e8a833b64e5163f2b3a5dc61430c4de952f714104412bfe50524",
+      "bytes": 172385
+    },
+    {
+      "path": "src/storefront/src/store-demos.css",
+      "sha256": "ea7d7fcfba82ca1cab7ddca4317a4ce2b27a31bf96432cb9493f052fce23cb00",
+      "bytes": 41445
+    },
+    {
+      "path": "src/storefront/src/pocket-web-v6.css",
+      "sha256": "06d698c26e1a07e3bb8087daed7bce9808fc735ef77a99fe70e72edaa94db999",
+      "bytes": 22499
+    }
+  ]
+}

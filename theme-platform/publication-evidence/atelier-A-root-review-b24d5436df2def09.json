@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "reviewed": true,
+  "provenance": "ACTUAL_BROWSER_ROOT_REVIEWED",
+  "result": "PASS",
+  "environment": "LOCAL",
+  "phase": "BUILT_ARTIFACT_QA_PRE_ACTIVATION",
+  "storeActivation": "NOT_ASSERTED",
+  "reviewedAt": "2026-09-22T14:51:19.858Z",
+  "buildManifestSHA256": "0290ed9ae04cd431e5df440f21507a831b3bf2ac4966730f553f247e1fb35150",
+  "presentation": {
+    "id": "nova-atelier",
+    "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a",
+    "version": "1.0.0"
+  },
+  "sourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+  "artifactDigest": "188a9bdb7e341c8748031aebbc6cb528ce049707bd6e822cc0bf3beab907a513",
+  "publicationId": "69a1d0a3-bb2c-4437-bb1f-815b43b86ed7",
+  "visualManual": "PASS",
+  "marketplaceUiAbsent": true,
+  "pages": {
+    "home": "PASS",
+    "category": "PASS",
+    "product": "PASS"
+  },
+  "knownLimitations": {
+    "sellerReviewWrite": "CANONICAL_GUARD_OFF",
+    "paymentInitiation": "DISABLED"
+  },
+  "notes": [
+    "21 actual browser measurements and full-page screenshots: 320,360,390,430,768,1024,1440",
+    "Representative home1440/category320/product390 images inspected directly; actual seller-edited Atelier A heading retained",
+    "Fixed mobile navigation overlays in full-page captures are viewport-fixed; no document overflow or failed images observed",
+    "This record does not assert ACTIVE or production readiness"
+  ]
+}

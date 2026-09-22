@@ -1,0 +1,555 @@
+/* V6 original Beauty, Outdoor and Kids shops. Import once, after existing store CSS. */
+/* The same operational pages keep each store's typography and spatial rhythm. */
+html[data-studio-theme="web"][data-studio-brand="hide"] .v6-product-brand,
+html[data-studio-theme="web"][data-studio-discount="hide"] .v6-product-card:not(.is-sold-out) .v6-product-badge,
+html[data-studio-theme="web"][data-studio-quick-add="hide"] .v6-card-add { display:none; }
+.demo-header-beauty .demo-editorial-masthead { min-height:108px; }
+html[data-studio-theme="web"] .demo-header-beauty .demo-brand .brand { font-weight:400;font-size:35px;letter-spacing:-1.5px; }
+.demo-header-beauty .demo-editorial-navigation { padding-bottom:18px; }
+.demo-header-beauty .demo-header-links { gap:32px; }
+.demo-header-beauty .demo-header-links>a { font-size:11px;letter-spacing:.055em;font-weight:500; }
+html[data-studio-theme="web"] .demo-header-beauty .search-box { border-radius:30px;background:color-mix(in srgb,var(--orange-500) 5%,var(--studio-surface));border-color:transparent; }
+.demo-header-beauty .search-box>button { border-radius:50%; }
+.demo-header-sport .demo-editorial-masthead { display:flex;gap:28px;min-height:88px; }
+.demo-header-sport .demo-editorial-masthead>.demo-brand { order:-1;text-align:left;margin-right:auto; }
+.demo-header-sport .demo-editorial-masthead>.demo-category-trigger { padding:10px 15px;border:1px solid var(--line);border-radius:4px; }
+html[data-studio-theme="web"] .demo-header-sport .demo-brand .brand { font-size:28px;font-weight:750;letter-spacing:-1.1px; }
+.demo-header-sport .demo-editorial-navigation { border-top:1px solid var(--line);padding-top:13px;gap:25px; }
+.demo-header-sport .demo-editorial-navigation>.demo-header-search { order:-1;max-width:340px; }
+.demo-header-sport .demo-header-links { gap:27px; }
+.demo-header-sport .demo-header-links>a { font-size:11px;font-weight:650; }
+.demo-header-sport .demo-header-actions :is(a,button) { border-radius:5px; }
+.demo-header-kids .demo-editorial-masthead { min-height:104px; }
+html[data-studio-theme="web"] .demo-header-kids .demo-brand .brand { font-size:33px;font-weight:750;letter-spacing:-1.2px; }
+.demo-header-kids .demo-editorial-masthead>.demo-category-trigger { border:1px solid var(--line);border-radius:30px;padding:10px 17px; }
+.demo-header-kids .demo-header-actions :is(a,button) { background:color-mix(in srgb,var(--orange-500) 7%,var(--studio-header-background));border-radius:50%; }
+.demo-header-kids .demo-header-links { gap:9px; }
+.demo-header-kids .demo-header-links>a { border-radius:30px;background:color-mix(in srgb,var(--orange-500) 6%,var(--studio-header-background));padding:9px 16px;min-height:37px;font-size:11px;font-weight:550; }
+html[data-studio-theme="web"] .demo-header-kids .search-box { border-radius:30px; }
+.demo-header-kids .search-box>button { border-radius:50%; }
+
+html[data-studio-theme="web"] .family-footer--beauty { border-top:1px solid var(--line);padding-top:50px; }
+.family-footer--beauty .family-gallery-footer-heading { gap:35px;padding-bottom:35px;align-items:center; }
+.family-footer--beauty .family-footer-discover { border:1px solid var(--line);padding:15px 22px;border-radius:30px;font-size:12px; }
+.family-footer--beauty .family-gallery-footer-links { padding-top:25px;gap:40px; }
+.family-footer--beauty .studio-footer-column>strong { font-size:11px;letter-spacing:.06em; }
+.family-footer--beauty .studio-footer-column>a { font-size:12px; }
+html[data-studio-theme="web"] .family-footer--sport { padding-top:36px;border-top:3px solid var(--orange-500); }
+.family-footer--sport .family-gallery-footer-heading { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;padding-bottom:28px; }
+.family-footer--sport .family-footer-discover { font-size:13px;font-weight:650;padding:15px;border:1px solid var(--line);border-radius:4px; }
+.family-footer--sport .family-gallery-footer-links { gap:20px;padding-top:25px; }
+.family-footer--sport .studio-footer-column { padding-left:22px;border-left:1px solid var(--line); }
+.family-footer--sport .studio-footer-column>strong { font-size:11px;font-weight:700; }
+html[data-studio-theme="web"] .family-footer--kids { padding-top:42px;border-radius:40px 40px 0 0;border-top:1px solid var(--line); }
+.family-footer--kids .family-gallery-footer-heading { align-items:center;gap:25px;padding-bottom:30px; }
+.family-footer--kids .family-footer-discover { padding:16px 23px;border:1px solid var(--line);border-radius:30px;font-size:12px; }
+.family-footer--kids .family-gallery-footer-links { gap:16px;padding-top:25px; }
+.family-footer--kids .studio-footer-column { padding:23px;border:1px solid var(--line);border-radius:20px; }
+
+.demo-account-page[data-flow-family="beauty"] .account-layout { grid-template-columns:235px minmax(0,1fr);gap:45px; }
+html[data-studio-theme="web"] .demo-account-page[data-flow-family="beauty"] .account-sidebar { background:transparent;border:0;border-radius:0;padding:0; }
+.demo-account-page[data-flow-family="beauty"] .account-sidebar h2 { font-size:28px;font-weight:400;padding-bottom:17px;border-bottom:1px solid var(--line); }
+.demo-account-page[data-flow-family="beauty"] .account-sidebar>a { padding:12px 0;border-radius:0;background:transparent;min-height:45px;font-size:12px;border-bottom:1px solid var(--line); }
+.demo-account-page[data-flow-family="beauty"] .account-sidebar>a.is-active { color:var(--orange-500);font-weight:650; }
+.demo-account-page[data-flow-family="beauty"] .account-stats { gap:14px; }
+.demo-account-page[data-flow-family="beauty"] :is(.account-stats>a,.order-card,.profile-card) { border-radius:18px; }
+.demo-account-page[data-flow-family="sport"] .account-layout { grid-template-columns:230px minmax(0,1fr);gap:24px;align-items:start; }
+html[data-studio-theme="web"] .demo-account-page[data-flow-family="sport"] .account-sidebar { border:1px solid var(--line);padding:15px;border-radius:5px;background:var(--studio-surface); }
+.demo-account-page[data-flow-family="sport"] .account-sidebar h2 { font-size:20px;padding:0 8px 15px;border-bottom:1px solid var(--line); }
+.demo-account-page[data-flow-family="sport"] .account-sidebar>a { font-size:11px;min-height:42px;padding:10px 8px;border-radius:4px; }
+.demo-account-page[data-flow-family="sport"] :is(.account-stats>a,.order-card,.profile-card) { border-radius:5px; }
+.demo-account-page[data-flow-family="sport"] .account-stats { gap:10px; }
+.demo-account-page[data-flow-family="kids"] .account-layout { grid-template-columns:minmax(0,1fr);gap:30px; }
+html[data-studio-theme="web"] .demo-account-page[data-flow-family="kids"] .account-sidebar { display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;border:0;padding:0;background:transparent; }
+.demo-account-page[data-flow-family="kids"] .account-sidebar h2 { grid-column:1 / -1;font-size:30px;margin-bottom:12px; }
+.demo-account-page[data-flow-family="kids"] .account-sidebar :is(a,.account-logout) { display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px;min-height:90px;padding:12px 8px;border:1px solid var(--line);border-radius:18px;text-align:center;font-size:11px;background:var(--studio-surface); }
+.demo-account-page[data-flow-family="kids"] .account-sidebar>a svg:last-child { display:none; }
+.demo-account-page[data-flow-family="kids"] .account-sidebar>a.is-active { border-color:var(--orange-500);background:var(--orange-100); }
+.demo-account-page[data-flow-family="kids"] :is(.account-stats>a,.order-card,.profile-card) { border-radius:22px; }
+
+.demo-cart-page[data-flow-family="beauty"] .cart-page-grid { grid-template-columns:minmax(0,1fr) 320px;gap:45px;align-items:start; }
+html[data-studio-theme="web"] .demo-cart-page[data-flow-family="beauty"] .cart-page-lines { border:0;background:transparent; }
+html[data-studio-theme="web"] .demo-cart-page[data-flow-family="beauty"] .cart-page-line { grid-template-columns:108px minmax(0,1fr) 120px;gap:22px;padding:24px 0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent; }
+.demo-cart-page[data-flow-family="beauty"] .cart-page-line>img { width:108px;height:145px;object-fit:contain;border-radius:60px 60px 8px 8px;background:var(--studio-surface); }
+.demo-cart-page[data-flow-family="beauty"] .cart-page-line__copy h2 { font-size:17px;font-weight:500;line-height:1.5; }
+html[data-studio-theme="web"] .demo-cart-page[data-flow-family="beauty"] .order-summary { padding:25px;border:1px solid var(--line);border-radius:22px;background:var(--studio-surface); }
+.demo-cart-page[data-flow-family="beauty"] :is(.quantity-control,.checkout-button) { border-radius:30px; }
+.demo-cart-page[data-flow-family="sport"] .cart-page-grid { grid-template-columns:minmax(0,1fr) 310px;gap:25px;align-items:start; }
+html[data-studio-theme="web"] .demo-cart-page[data-flow-family="sport"] .cart-page-lines { border:1px solid var(--line);border-radius:5px;overflow:hidden; }
+html[data-studio-theme="web"] .demo-cart-page[data-flow-family="sport"] .cart-page-line { grid-template-columns:90px minmax(0,1fr) 115px;gap:20px;padding:19px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:var(--studio-surface); }
+.demo-cart-page[data-flow-family="sport"] .cart-page-line>img { width:90px;height:110px;object-fit:contain;border-radius:3px; }
+.demo-cart-page[data-flow-family="sport"] .cart-page-line__copy h2 { font-size:15px;font-weight:650;line-height:1.45; }
+html[data-studio-theme="web"] .demo-cart-page[data-flow-family="sport"] .order-summary { border:1px solid var(--line);border-top:3px solid var(--orange-500);border-radius:5px;padding:25px;background:var(--studio-surface); }
+.demo-cart-page[data-flow-family="sport"] :is(.quantity-control,.checkout-button) { border-radius:4px; }
+.demo-cart-page[data-flow-family="kids"] .cart-page-grid { grid-template-columns:minmax(0,1fr) 330px;gap:28px;align-items:start; }
+html[data-studio-theme="web"] .demo-cart-page[data-flow-family="kids"] .cart-page-lines { display:grid;gap:13px;border:0;background:transparent; }
+html[data-studio-theme="web"] .demo-cart-page[data-flow-family="kids"] .cart-page-line { grid-template-columns:110px minmax(0,1fr) 115px;gap:20px;padding:20px;border:1px solid var(--line);border-radius:24px;background:var(--studio-surface); }
+.demo-cart-page[data-flow-family="kids"] .cart-page-line>img { width:110px;height:120px;object-fit:contain;border-radius:20px; }
+.demo-cart-page[data-flow-family="kids"] .cart-page-line__copy h2 { font-size:16px;font-weight:650;line-height:1.45; }
+html[data-studio-theme="web"] .demo-cart-page[data-flow-family="kids"] .order-summary { padding:27px;border:1px solid var(--line);border-radius:27px;background:var(--studio-surface); }
+.demo-cart-page[data-flow-family="kids"] :is(.quantity-control,.checkout-button) { border-radius:30px; }
+@media(max-width:1000px) {
+ .demo-account-page[data-flow-family="kids"] .account-sidebar { grid-template-columns:repeat(4,minmax(0,1fr)); }
+ .demo-cart-page:is([data-flow-family="beauty"],[data-flow-family="sport"],[data-flow-family="kids"]) .cart-page-grid { grid-template-columns:minmax(0,1fr);gap:24px; }
+ .demo-header-sport .demo-editorial-navigation { gap:18px; }
+ .demo-header-sport .demo-editorial-navigation>.demo-header-search { max-width:260px; }
+}
+@media(max-width:800px) {
+ .demo-header-beauty .demo-editorial-masthead,.demo-header-kids .demo-editorial-masthead { min-height:78px; }
+ html[data-studio-theme="web"] :is(.demo-header-beauty,.demo-header-kids) .demo-brand .brand { font-size:25px; }
+ .demo-header-sport .demo-editorial-masthead { min-height:77px;gap:13px; }
+ html[data-studio-theme="web"] .demo-header-sport .demo-brand .brand { font-size:24px; }
+ .demo-header-sport .demo-editorial-navigation { flex-direction:column;align-items:stretch;gap:12px; }
+ .demo-header-sport .demo-editorial-navigation>.demo-header-search { max-width:none; }
+ .demo-header-sport .demo-header-links { gap:24px; }
+ .demo-header-sport .demo-editorial-masthead>.demo-category-trigger { padding:8px;min-width:38px;min-height:38px; }
+ .demo-header-sport .demo-editorial-masthead>.demo-category-trigger span { display:none; }
+ .demo-header-kids .demo-header-links>a { font-size:10px;padding:8px 13px;min-height:34px; }
+ .demo-account-page:is([data-flow-family="beauty"],[data-flow-family="sport"],[data-flow-family="kids"]) .account-layout { grid-template-columns:minmax(0,1fr);gap:25px; }
+ .demo-account-page[data-flow-family="kids"] .account-sidebar { grid-template-columns:repeat(3,minmax(0,1fr)); }
+ .demo-account-page[data-flow-family="kids"] .account-sidebar :is(a,.account-logout) { min-height:86px;border-radius:14px; }
+ html[data-studio-theme="web"] .demo-cart-page:is([data-flow-family="beauty"],[data-flow-family="sport"],[data-flow-family="kids"]) .cart-page-line { grid-template-columns:80px minmax(0,1fr);gap:14px;padding:17px; }
+ .demo-cart-page:is([data-flow-family="beauty"],[data-flow-family="sport"],[data-flow-family="kids"]) .cart-page-line>img { width:80px;height:100px; }
+ .demo-cart-page:is([data-flow-family="beauty"],[data-flow-family="sport"],[data-flow-family="kids"]) .cart-page-line__end { grid-column:2;display:flex;align-items:center;justify-content:space-between;flex-direction:row;gap:10px; }
+ .demo-cart-page:is([data-flow-family="beauty"],[data-flow-family="sport"],[data-flow-family="kids"]) .cart-page-line__copy h2 { font-size:14px; }
+ :is(.family-footer--beauty,.family-footer--sport,.family-footer--kids) .family-gallery-footer-heading { display:flex;flex-direction:column;align-items:start;gap:22px; }
+ .family-footer--kids .studio-footer-column { padding:18px;border-radius:15px; }
+}
+.v6-showcase,.v6-collection,.v6-story,.v6-category-section,.v6-product-card { --v6-line:color-mix(in srgb,var(--ink) 13%,transparent);--v6-soft:color-mix(in srgb,var(--orange-500) 5%,var(--studio-surface,#fff));--v6-tint:color-mix(in srgb,var(--orange-500) 12%,var(--studio-surface,#fff));min-width:0; }
+.v6-showcase *,.v6-story *,.v6-category-section *,.v6-product-card * { box-sizing:border-box; }
+:is(.v6-showcase,.v6-story,.v6-category-section,.v6-collection,.v6-product-card) :is(a,button,input):focus-visible { outline:2px solid var(--ink);outline-offset:4px; }
+:is(.v6-showcase,.v6-story,.v6-category-section,.v6-collection) a { color:inherit;text-decoration:none; }
+.v6-eyebrow { display:block;font-size:10px;line-height:1.5;font-weight:650;letter-spacing:.16em;color:var(--orange-500,var(--ink)); }
+.v6-showcase-copy { text-align:var(--block-align,left);min-width:0; }
+html[data-studio-theme="web"] .studio-block .v6-showcase-copy :is(h1,h2) { font-size:calc(clamp(34px,4.1vw,66px) * var(--studio-heading-scale,1));font-weight:500;line-height:1.05;letter-spacing:-.055em;margin:16px 0 21px; }
+html[data-studio-theme="web"] .studio-block .v6-showcase-copy p { font-size:calc(14px * var(--sandbox-font-scale,1));line-height:1.8;color:var(--muted);margin:0;max-width:440px; }
+.v6-showcase-actions { display:flex;flex-wrap:wrap;gap:15px 22px;align-items:center;margin-top:27px; }
+.v6-action,.v6-secondary-action { display:inline-flex;align-items:center;justify-content:space-between;gap:22px;min-height:46px;font-size:12px;font-weight:600; }
+.v6-action { background:var(--orange-500,var(--ink));color:var(--studio-accent-ink,#fff)!important;border:1px solid var(--orange-500,var(--ink));border-radius:4px;padding:13px 19px; }
+.v6-secondary-action { border-bottom:1px solid var(--v6-line); }
+.v6-action svg,.v6-secondary-action svg { flex-shrink:0;transition:transform .2s ease; }
+.v6-action:hover svg,.v6-secondary-action:hover svg { transform:translate(2px,-2px); }
+.v6-section-heading { display:flex;align-items:flex-end;justify-content:space-between;gap:25px;margin-bottom:27px; }
+html[data-studio-theme="web"] .studio-block .v6-section-heading .v6-showcase-copy h2 { font-size:calc(clamp(28px,2.8vw,43px) * var(--studio-heading-scale,1));margin-bottom:0; }
+.v6-section-heading .v6-showcase-copy p { margin-top:13px!important; }
+.v6-section-heading .v6-showcase-actions { margin:0;flex-shrink:0; }
+.v6-section-heading .v6-action { background:transparent;color:var(--ink)!important;border:0;border-bottom:1px solid var(--v6-line);padding-inline:0;border-radius:0; }
+.v6-showcase picture { display:block;width:100%;height:100%; }
+.v6-showcase picture img { display:block;width:100%;height:100%;object-fit:cover; }
+.v6-linked-product { position:relative;display:grid;grid-template-columns:65px minmax(0,1fr) 18px;gap:13px;align-items:center;min-width:0;border-bottom:1px solid var(--v6-line);padding:14px 0; }
+.v6-linked-product>img { width:65px;height:76px;object-fit:contain;background:var(--v6-soft);border-radius:4px; }
+.v6-linked-product>span:not(.v6-linked-number) { min-width:0; }
+.v6-linked-product small,.v6-linked-product strong,.v6-linked-product b { display:block; }
+.v6-linked-product small { font-size:9px;letter-spacing:.04em;color:var(--muted);margin-bottom:7px; }
+.v6-linked-product strong { font-size:12px;line-height:1.5;font-weight:550; }
+.v6-linked-product b { font-size:12px;font-weight:650;margin-top:8px; }
+.v6-linked-number { position:absolute;top:10px;left:0;background:var(--studio-surface,#fff);font-size:8px;padding:4px; }
+.v6-group-tabs { display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin:0 0 25px; }
+.v6-group-tabs button { display:flex;align-items:center;gap:14px;background:transparent;border:1px solid var(--v6-line);color:var(--ink);border-radius:4px;padding:11px 16px;min-height:42px;font:inherit;font-size:12px;cursor:pointer; }
+.v6-group-tabs button small { font-size:9px;opacity:.65; }
+.v6-group-tabs button[aria-pressed="true"] { color:var(--studio-accent-ink,#fff);background:var(--orange-500,var(--ink));border-color:var(--orange-500,var(--ink)); }
+.v6-empty { font-size:13px;color:var(--muted);padding:25px 0; }
+.v6-sr-only { position:absolute;width:1px;height:1px;margin:-1px;padding:0;clip-path:inset(50%);overflow:hidden;white-space:nowrap;border:0; }
+/* Beauty: an editorial bottle portrait, a linked companion and a numbered routine. */
+.v6-showcase--beauty { display:grid;grid-template-columns:.8fr 1.2fr;gap:34px 65px;align-items:center; }
+.v6-beauty-intro { padding:25px 0; }
+.v6-beauty-intro .v6-action { border-radius:40px;padding-inline:24px; }
+.v6-beauty-route-label { display:flex;align-items:center;gap:12px;margin-top:43px;color:var(--muted);font-size:10px; }
+.v6-line { width:40px;height:1px;background:var(--v6-line); }
+.v6-beauty-cover { position:relative;height:560px;border-radius:180px 180px 8px 8px;overflow:hidden;background:var(--v6-soft); }
+.v6-beauty-cover picture img { object-fit:cover; }
+.v6-beauty-feature { position:absolute;right:22px;bottom:22px;left:22px;display:grid;grid-template-columns:72px minmax(0,1fr) 22px;align-items:center;gap:16px;padding:15px 20px;background:var(--studio-surface,#fff);border-radius:9px; }
+.v6-beauty-feature>img { width:72px;height:83px;object-fit:contain; }
+.v6-beauty-feature small { display:block;font-size:8px;letter-spacing:.1em;color:var(--muted);margin-bottom:9px; }
+.v6-beauty-feature strong { display:block;font-size:15px;font-weight:500;line-height:1.4; }
+.v6-beauty-feature b { display:block;font-size:12px;font-weight:600;margin-top:10px; }
+.v6-beauty-steps { grid-column:1 / -1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--v6-line);border-bottom:1px solid var(--v6-line); }
+.v6-beauty-steps>a { display:flex;gap:20px;align-items:center;padding:23px 26px;border-right:1px solid var(--v6-line);min-width:0; }
+.v6-beauty-steps>a:first-child { padding-left:0; }
+.v6-beauty-steps>a:last-child { border-right:0; }
+.v6-beauty-steps>a>span { font-size:30px;font-weight:300;letter-spacing:-.07em;color:var(--orange-500); }
+.v6-beauty-steps>a>div { flex:1;min-width:0; }
+.v6-beauty-steps small { display:block;font-size:9px;color:var(--muted);margin-bottom:7px; }
+.v6-beauty-steps strong { display:block;font-size:12px;font-weight:500;line-height:1.4; }
+.v6-beauty-steps>a>svg { flex-shrink:0; }
+/* Outdoor: a gear cover followed by an interactive activity selector. */
+.v6-showcase--sport { display:grid;grid-template-columns:.85fr 1.15fr;gap:0;background:var(--v6-soft);padding:0;border:1px solid var(--v6-line);border-radius:6px;overflow:hidden; }
+.v6-sport-intro { padding:40px 43px;display:flex;flex-direction:column;justify-content:center; }
+.v6-sport-compass { display:flex;align-items:center;gap:13px;margin-bottom:28px; }
+.v6-sport-compass>span { font-size:8px;line-height:1.6;letter-spacing:.12em; }
+.v6-sport-cover { position:relative;height:490px;background:var(--studio-surface,#fff); }
+.v6-sport-cover picture img { object-fit:cover; }
+.v6-sport-cover-link { position:absolute;bottom:19px;right:22px;left:22px;display:flex;align-items:center;justify-content:space-between;gap:15px;background:var(--studio-surface,#fff);border:1px solid var(--v6-line);padding:15px 18px;font-size:12px;font-weight:600; }
+.v6-sport-activity { grid-column:1 / -1;display:grid;grid-template-columns:.85fr 1.15fr;gap:12px 35px;border-top:1px solid var(--v6-line);background:var(--studio-surface,#fff);padding:23px 35px; }
+.v6-sport-activity-heading { display:flex;justify-content:space-between;align-items:center;gap:10px; }
+html[data-studio-theme="web"] .studio-block .v6-sport-activity-heading h2 { font-size:20px;letter-spacing:-.035em;font-weight:600;margin:0; }
+.v6-sport-activity-heading>span { font-size:9px;color:var(--muted); }
+.v6-sport-activity .v6-group-tabs { grid-column:1;grid-row:2;margin:0;gap:6px;align-content:start;align-items:start; }
+.v6-sport-activity .v6-group-tabs button { min-height:33px;padding:8px 11px;font-size:10px;gap:9px; }
+.v6-sport-activity-products { grid-column:2;grid-row:1 / span 2;display:grid;grid-template-columns:1fr 1fr;gap:18px; }
+.v6-sport-activity-products .v6-linked-product { border:0;padding:0;grid-template-columns:55px minmax(0,1fr) 16px;gap:10px; }
+.v6-sport-activity-products img { width:55px;height:78px; }
+.v6-sport-activity-products .v6-linked-product strong { font-size:11px; }
+/* Kids: three linked discovery zones, with age options from the actual catalog. */
+.v6-showcase--kids { display:grid;grid-template-columns:.88fr 1.03fr .64fr;gap:32px;align-items:center; }
+.v6-kids-hero-photo { position:relative;height:495px;border-radius:140px 140px 110px 12px;overflow:hidden;background:var(--v6-soft); }
+.v6-kids-photo-mark { position:absolute;right:20px;top:25px;display:grid;place-items:center;width:50px;height:50px;border-radius:50%;background:var(--studio-surface,#fff);color:var(--orange-500); }
+.v6-kids-intro { padding:15px 0; }
+html[data-studio-theme="web"] .studio-block .v6-kids-intro .v6-showcase-copy :is(h1,h2) { font-size:calc(clamp(34px,3.6vw,56px) * var(--studio-heading-scale,1));font-weight:650;letter-spacing:-.055em; }
+.v6-kids-intro .v6-action { border-radius:30px; }
+.v6-kids-age-finder { margin-top:30px;border-top:1px solid var(--v6-line);padding-top:20px; }
+.v6-kids-age-finder>span { display:block;font-size:10px;font-weight:600;margin-bottom:12px; }
+.v6-group-tabs--kids { gap:7px; }
+.v6-group-tabs--kids button { border-radius:30px;padding:10px 14px;min-height:38px;font-size:11px;gap:9px; }
+.v6-kids-age-finder .v6-group-tabs { margin-bottom:0; }
+.v6-kids-featured { padding:23px;border-radius:20px;background:var(--v6-tint); }
+.v6-kids-featured>div { display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px; }
+.v6-kids-featured>div>small { color:var(--muted);font-size:9px; }
+.v6-kids-featured .v6-linked-product { display:block;min-height:0;padding:13px 0 18px; }
+.v6-kids-featured .v6-linked-product>img { width:100%;height:115px;border-radius:10px;object-fit:contain;margin-bottom:12px;background:var(--studio-surface,#fff); }
+.v6-kids-featured .v6-linked-product:last-child { border:0;padding-bottom:0; }
+.v6-kids-featured .v6-linked-product>svg { position:absolute;bottom:17px;right:0; }
+.v6-kids-featured .v6-linked-product:last-child>svg { bottom:0; }
+.v6-kids-featured .v6-linked-number { top:20px;left:7px;font-size:8px; }
+/* Category systems. */
+.sandbox-categories-page .v6-category-section { width:100%;max-width:none;padding-inline:0; }
+.v6-category-grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:19px; }
+.v6-category-grid>a { position:relative;display:flex;flex-direction:column;min-width:0; }
+.v6-category-grid img { display:block;width:100%;height:190px;object-fit:contain;background:var(--v6-soft); }
+.v6-category-grid>a>div { display:flex;flex-direction:column;gap:8px;padding:17px 0 0; }
+.v6-category-grid strong { font-size:16px;line-height:1.4;font-weight:550;letter-spacing:-.025em; }
+.v6-category-grid small { font-size:10px;line-height:1.5;color:var(--muted); }
+.v6-category-number { display:block;font-size:10px;margin-bottom:10px;color:var(--muted); }
+.v6-category-grid>a>svg { position:absolute;right:12px;top:37px;display:block;background:var(--studio-surface,#fff);padding:5px;width:31px;height:31px;border-radius:50%; }
+.v6-category-grid--beauty { gap:0;border-top:1px solid var(--v6-line);border-bottom:1px solid var(--v6-line); }
+.v6-category-grid--beauty>a { display:grid;grid-template-columns:65px minmax(0,1fr);gap:12px;padding:23px;border-right:1px solid var(--v6-line); }
+.v6-category-grid--beauty>a:last-child { border:0; }
+.v6-category-grid--beauty img { width:65px;height:110px;grid-column:1;grid-row:1 / span 2;border-radius:50px 50px 8px 8px; }
+.v6-category-grid--beauty .v6-category-number { grid-column:2;grid-row:1;margin:0;align-self:start; }
+.v6-category-grid--beauty>a>div { grid-column:2;grid-row:2;padding:0;align-self:end; }
+.v6-category-grid--beauty strong { font-size:14px; }
+.v6-category-grid--beauty>a>svg { right:12px;top:15px;background:transparent;width:25px;height:25px; }
+.v6-category-grid--sport { gap:13px; }
+.v6-category-grid--sport>a { border:1px solid var(--v6-line);padding:17px;border-radius:4px;background:var(--studio-surface,#fff); }
+.v6-category-grid--sport img { height:160px;background:transparent; }
+.v6-category-grid--sport>a>div { flex-direction:row;justify-content:space-between;align-items:center;border-top:1px solid var(--v6-line);margin-top:14px;padding-top:14px;gap:9px; }
+.v6-category-grid--sport strong { font-size:14px; }
+.v6-category-grid--sport>a>svg { top:10px;right:9px; }
+.v6-category-grid--kids { gap:22px; }
+.v6-category-grid--kids img { border-radius:65px 65px 30px 30px;height:215px; }
+.v6-category-grid--kids>a:nth-child(even) img { border-radius:30px 30px 65px 65px; }
+.v6-category-grid--kids .v6-category-number { display:none; }
+.v6-category-grid--kids>a>svg { top:15px;right:15px; }
+.v6-category-grid--kids>a>div { text-align:center;padding-inline:12px; }
+/* Product cards preserve existing purchase, stock, favourite and comparison contracts. */
+.v6-product-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:27px;align-items:stretch; }
+.v6-product-grid--sport { grid-template-columns:repeat(2,minmax(0,1fr));gap:18px; }
+.v6-collection--beauty .v6-group-tabs { justify-content:center;border-bottom:1px solid var(--v6-line);padding-bottom:18px; }
+.v6-group-tabs--beauty button { border:0;border-radius:25px; }
+.v6-collection--kids .v6-group-tabs { justify-content:center; }
+html[data-studio-theme="web"] .v6-product-card { display:flex;flex-direction:column;position:relative;background:var(--studio-surface,#fff);color:var(--ink);border:1px solid var(--v6-line);border-radius:14px;box-shadow:none;overflow:hidden;min-width:0;transform:none; }
+html[data-studio-theme="web"] .v6-product-card:hover { transform:none;box-shadow:none; }
+.v6-product-media { position:relative;min-width:0;overflow:hidden;background:var(--v6-soft); }
+.v6-product-photo { position:relative;display:block;aspect-ratio:1.06;width:100%;height:auto;overflow:hidden; }
+.v6-product-photo>img { display:block;width:100%;height:100%;position:absolute;inset:0;object-fit:contain;transition:transform .25s ease; }
+.v6-card-media-empty { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;position:absolute;inset:0;color:var(--muted); }
+.v6-card-media-empty small { font-size:11px; }
+.v6-product-badge { position:absolute;left:13px;top:13px;z-index:2;min-height:26px;display:grid;place-items:center;padding:5px 8px;border-radius:4px;color:var(--ink);background:var(--studio-surface,#fff);border:1px solid var(--v6-line);font-size:10px;font-weight:600; }
+html[data-studio-theme="web"] .v6-product-card .v6-favorite { right:12px;top:12px;left:auto;bottom:auto;width:35px;height:35px;min-width:35px;min-height:35px;border:1px solid var(--v6-line);background:var(--studio-surface,#fff);color:var(--ink);border-radius:50%;z-index:3; }
+html[data-studio-theme="web"] .v6-product-card .v6-favorite svg { width:19px;height:19px; }
+html[data-studio-theme="web"] .v6-product-card .v6-favorite.is-active { color:var(--orange-500); }
+.v6-card-media-controls { display:flex;align-items:center;gap:13px;position:absolute;bottom:12px;left:50%;transform:translateX(-50%);border:1px solid var(--v6-line);background:var(--studio-surface,#fff);border-radius:24px;padding:2px 4px; }
+.v6-card-media-controls button { display:grid;place-items:center;background:transparent;border:0;color:var(--ink);padding:0;width:29px;height:29px;cursor:pointer; }
+.v6-card-media-controls>span { font-size:9px;white-space:nowrap; }
+.v6-card-body { display:flex;flex-direction:column;min-width:0;flex:1;padding:22px; }
+.v6-product-brand { display:block;font-size:9px;line-height:1.5;color:var(--muted);letter-spacing:.09em;text-transform:uppercase;margin-bottom:9px; }
+html[data-studio-theme="web"] :is(.page,.studio-template-content) .v6-product-card h3 { font-size:calc(16px * var(--sandbox-font-scale,1));font-weight:550;line-height:1.4;letter-spacing:-.025em;min-height:0;margin:0 0 12px; }
+html[data-studio-theme="web"] .v6-product-card h3 a { color:inherit;text-decoration:none; }
+html[data-studio-theme="web"] :is(.page,.studio-template-content) .v6-product-card .v6-card-description { font-size:calc(11px * var(--sandbox-font-scale,1));line-height:1.65;margin:0 0 17px;color:var(--muted); }
+.v6-card-specs { display:grid;gap:7px;margin:0 0 21px;padding:0; }
+.v6-card-specs>div { display:flex;justify-content:space-between;align-items:flex-start;gap:12px;font-size:10px;line-height:1.5; }
+.v6-card-specs dt { color:var(--muted); }
+.v6-card-specs dd { margin:0;text-align:right;font-weight:500; }
+.v6-product-price { display:flex;align-items:baseline;flex-wrap:wrap;gap:5px 10px;min-width:0; }
+.v6-product-price strong { font-size:21px;letter-spacing:-.045em;line-height:1.2;font-weight:650;white-space:nowrap; }
+.v6-product-price del { color:var(--muted);font-size:10px;white-space:nowrap; }
+.v6-card-buy { margin-top:auto;display:grid;gap:17px;padding-top:17px;border-top:1px solid var(--v6-line); }
+.v6-product-controls { display:flex;gap:7px;min-width:0; }
+.v6-product-controls>button { display:flex;align-items:center;justify-content:center;gap:9px;min-height:43px;border:1px solid var(--v6-line);border-radius:5px;background:transparent;color:var(--ink);padding:10px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer; }
+.v6-product-controls>.v6-compare { flex:0 0 39px; }
+.v6-product-controls>.v6-compare[aria-pressed="true"] { border-color:var(--orange-500);background:var(--v6-tint); }
+.v6-product-controls>.v6-card-add { flex:1;min-width:0;background:var(--orange-500,var(--ink));border-color:var(--orange-500,var(--ink));color:var(--studio-accent-ink,#fff); }
+.v6-product-controls>.v6-card-add svg { flex-shrink:0; }
+.v6-product-controls>.v6-card-add.is-pending svg { animation:v6-spin .8s linear infinite; }
+.v6-product-card button:disabled { opacity:.4;cursor:default; }
+.v6-card-variants { border:0;padding:0;margin:0 0 15px;display:flex;gap:7px; }
+.v6-card-variants legend { font-size:10px;color:var(--muted);padding:0;margin-bottom:9px; }
+.v6-card-variants button { min-width:34px;min-height:33px;border:1px solid var(--v6-line);background:transparent;color:var(--ink);font-size:10px;padding:5px 10px;cursor:pointer; }
+.v6-card-variants button[aria-pressed="true"] { background:var(--orange-500);border-color:var(--orange-500);color:var(--studio-accent-ink,#fff); }
+.v6-card-preview-note { color:var(--muted);font-size:11px;margin:0; }
+.v6-beauty-card-top { display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 20px;background:var(--v6-soft); }
+.v6-beauty-card-top>span { font-size:10px;font-weight:600;letter-spacing:.07em; }
+.v6-beauty-card-top>small { font-size:9px;color:var(--muted); }
+html[data-studio-theme="web"] .v6-product-card--beauty { border:0;background:transparent;border-radius:0; }
+.v6-product-card--beauty .v6-product-media { border-radius:0 0 90px 90px; }
+.v6-product-card--beauty .v6-product-photo { aspect-ratio:1.05; }
+.v6-product-card--beauty .v6-card-body { padding:23px 5px 0; }
+.v6-product-card--beauty .v6-card-buy { grid-template-columns:minmax(0,1fr) 150px;align-items:center;gap:12px;padding-top:20px; }
+.v6-product-card--beauty .v6-product-price { align-items:flex-start;flex-direction:column; }
+.v6-product-card--beauty .v6-product-controls>button { border-radius:25px; }
+.v6-product-card--beauty .v6-product-controls>.v6-compare { flex-basis:34px;padding:7px; }
+.v6-product-card--beauty .v6-product-controls>.v6-card-add { font-size:10px;padding:9px;gap:6px; }
+html[data-studio-theme="web"] .v6-product-card--sport { display:grid;grid-template-columns:42% minmax(0,1fr);border-radius:5px; }
+.v6-product-card--sport .v6-product-media { min-height:100%; }
+.v6-product-card--sport .v6-product-photo { min-height:100%;aspect-ratio:auto;height:100%; }
+.v6-product-card--sport .v6-product-photo>img { min-height:240px; }
+.v6-sport-card-heading { display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:14px;margin-bottom:15px;border-bottom:1px solid var(--v6-line); }
+.v6-sport-card-heading>span { font-size:9px;letter-spacing:.07em;font-weight:600;text-transform:uppercase; }
+.v6-sport-card-heading>small { font-size:9px;color:var(--muted); }
+.v6-sport-card-bottom { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:15px 10px;margin-top:auto; }
+.v6-sport-card-bottom .v6-product-price { flex-direction:column;align-items:flex-start;gap:4px; }
+.v6-sport-card-bottom .v6-product-price strong { font-size:19px; }
+.v6-sport-card-bottom .v6-product-controls { grid-column:1 / -1; }
+.v6-quantity { display:grid;grid-template-columns:28px 22px 28px;align-items:center;justify-items:center;border:1px solid var(--v6-line);border-radius:3px;height:35px; }
+.v6-quantity button { width:28px;height:33px;display:grid;place-items:center;background:transparent;border:0;padding:0;color:var(--ink);cursor:pointer; }
+.v6-quantity>span { font-size:11px;font-variant-numeric:tabular-nums; }
+html[data-studio-theme="web"] .v6-product-card--kids { border-radius:20px;background:var(--studio-surface,#fff); }
+.v6-kids-card-photo { position:relative;padding:12px 12px 0; }
+.v6-kids-card-photo .v6-product-media { border-radius:14px;background:var(--v6-soft); }
+.v6-kids-age { display:inline-flex;align-items:center;position:absolute;bottom:12px;left:24px;z-index:2;border:1px solid var(--v6-line);border-radius:30px;padding:7px 10px;background:var(--studio-surface,#fff);font-size:9px;font-weight:600; }
+.v6-product-card--kids .v6-card-body { padding:22px; }
+.v6-product-card--kids .v6-product-controls>button { border-radius:12px; }
+.v6-product-card--kids .v6-card-buy { grid-template-columns:minmax(0,1fr) 160px;align-items:center;gap:12px; }
+.v6-product-card--kids .v6-product-price { flex-direction:column;gap:5px; }
+.v6-product-card--kids .v6-product-controls>.v6-compare { flex-basis:33px;padding:7px; }
+.v6-product-card--kids .v6-product-controls>.v6-card-add { font-size:10px;padding:9px;gap:6px; }
+/* Beauty module: prices are computed from the selected real products. */
+.v6-story--beauty { border-top:1px solid var(--v6-line);padding-top:30px; }
+.v6-routine-items { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px; }
+.v6-routine-item { position:relative;border:1px solid var(--v6-line);border-radius:8px;overflow:hidden;background:var(--studio-surface,#fff); }
+.v6-routine-item.is-selected { border-color:var(--orange-500); }
+.v6-routine-item>label { display:flex;flex-direction:column;cursor:pointer;padding:20px; }
+.v6-routine-item input { position:absolute;width:1px;height:1px;opacity:0; }
+.v6-routine-check { position:absolute;right:17px;top:16px;display:grid;place-items:center;width:23px;height:23px;border:1px solid var(--v6-line);border-radius:50%;color:var(--ink);background:var(--studio-surface,#fff); }
+.v6-routine-item.is-selected .v6-routine-check { border-color:var(--orange-500);background:var(--orange-500);color:var(--studio-accent-ink,#fff); }
+.v6-routine-item input:focus-visible+.v6-routine-check { outline:2px solid var(--ink);outline-offset:3px; }
+.v6-routine-number { font-size:8px;letter-spacing:.11em;color:var(--muted);padding-right:28px; }
+.v6-routine-item img { width:100%;height:185px;object-fit:contain;margin:17px 0; }
+.v6-routine-item label>small { font-size:9px;letter-spacing:.07em;color:var(--muted);margin-bottom:9px; }
+.v6-routine-item label>strong { font-size:14px;line-height:1.5;font-weight:500;padding-right:16px; }
+.v6-routine-item label>b { font-size:14px;font-weight:600;margin-top:15px; }
+.v6-routine-item>a { display:grid;place-items:center;position:absolute;right:13px;bottom:16px;width:28px;height:28px; }
+.v6-routine-summary { display:flex;align-items:center;justify-content:space-between;gap:25px;padding:25px 0 0; }
+.v6-routine-summary>div>span { display:block;font-size:10px;color:var(--muted);margin-bottom:7px; }
+.v6-routine-summary>div>strong { font-size:28px;font-weight:550;letter-spacing:-.045em; }
+html[data-studio-theme="web"] .studio-block .v6-routine-summary>p { font-size:12px;line-height:1.6;color:var(--muted);margin:0; }
+.v6-routine-summary>button { display:flex;align-items:center;justify-content:center;gap:17px;border:0;border-radius:30px;padding:14px 24px;min-height:47px;background:var(--orange-500);color:var(--studio-accent-ink,#fff);font-size:12px;font-weight:600;cursor:pointer; }
+.v6-routine-summary>button:disabled { opacity:.45;cursor:default; }
+html[data-studio-theme="web"] .studio-block .v6-operation-status { margin:10px 0 0;font-size:11px;color:var(--muted);min-height:17px; }
+/* Outdoor specification board and Kids learning shelf. */
+.v6-story--sport { display:grid;grid-template-columns:.7fr 1.3fr;gap:40px;align-items:center; }
+.v6-sport-specification-board { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px; }
+.v6-sport-specification-board>a { border:1px solid var(--v6-line);padding:19px;background:var(--studio-surface,#fff);border-radius:5px; }
+.v6-specification-number { display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--muted); }
+.v6-sport-specification-board img { width:100%;height:165px;object-fit:contain;margin:17px 0; }
+html[data-studio-theme="web"] .studio-block .v6-sport-specification-board h3 { font-size:13px;font-weight:550;line-height:1.5;letter-spacing:-.02em;margin:0 0 18px;min-height:39px; }
+.v6-sport-specification-board dl { display:grid;gap:10px;margin:0 0 20px; }
+.v6-sport-specification-board dl>div { border-top:1px solid var(--v6-line);padding-top:9px; }
+.v6-sport-specification-board dt { font-size:9px;color:var(--muted); }
+.v6-sport-specification-board dd { font-size:10px;margin:5px 0 0;font-weight:500; }
+.v6-sport-specification-board a>strong { font-size:17px; }
+.v6-story--kids { display:grid;grid-template-columns:.7fr 1.3fr;gap:45px;align-items:center;padding:38px;background:var(--v6-soft);border-radius:24px; }
+.v6-kids-story-copy>svg { margin-bottom:15px;color:var(--orange-500); }
+.v6-kids-learning-grid { display:grid;gap:13px; }
+.v6-kids-learning-grid>a { position:relative;display:grid;grid-template-columns:87px minmax(0,1fr) 23px;gap:19px;align-items:center;min-width:0;background:var(--studio-surface,#fff);border:1px solid var(--v6-line);border-radius:15px;padding:17px 20px; }
+.v6-kids-learning-grid>a>img { width:87px;height:91px;object-fit:contain;border-radius:9px; }
+.v6-learning-number { position:absolute;top:12px;left:12px;background:var(--v6-tint);font-size:8px;padding:5px;border-radius:50%; }
+.v6-kids-learning-grid small { display:block;color:var(--orange-500);font-size:9px;letter-spacing:.05em;margin-bottom:8px; }
+.v6-kids-learning-grid strong { display:block;font-size:14px;line-height:1.4;font-weight:600; }
+html[data-studio-theme="web"] .studio-block .v6-kids-learning-grid p { margin:8px 0 0;font-size:11px;color:var(--muted);line-height:1.6; }
+@keyframes v6-spin { to {transform:rotate(360deg);} }
+@media (max-width:1150px) {
+  .v6-showcase--beauty { gap:28px 35px; }
+  .v6-beauty-cover { height:510px; }
+  .v6-showcase--kids { grid-template-columns:.8fr 1.2fr;gap:28px; }
+  .v6-kids-hero-photo { height:470px; }
+  .v6-kids-featured { grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;gap:12px 25px; }
+  .v6-kids-featured>div { grid-column:1 / -1; }
+  .v6-kids-featured .v6-linked-product { display:grid;grid-template-columns:75px minmax(0,1fr) 18px;gap:15px;border:0;padding:0; }
+  .v6-kids-featured .v6-linked-product>img { width:75px;height:90px;margin:0; }
+  .v6-kids-featured .v6-linked-product>svg,.v6-kids-featured .v6-linked-product:last-child>svg { position:static; }
+  .v6-kids-featured .v6-linked-number { top:5px;left:4px; }
+  .v6-sport-intro { padding:33px; }
+  .v6-sport-cover { height:470px; }
+  .v6-sport-activity { gap:16px 25px;padding:23px;grid-template-columns:1fr 1fr; }
+  .v6-sport-activity-products { grid-template-columns:1fr;gap:12px; }
+  .v6-sport-activity-products .v6-linked-product>img { height:55px; }
+  .v6-product-grid { gap:20px; }
+  .v6-product-card--beauty .v6-card-buy,.v6-product-card--kids .v6-card-buy { grid-template-columns:1fr;gap:15px; }
+  .v6-product-card--beauty .v6-product-price,.v6-product-card--kids .v6-product-price { flex-direction:row;align-items:baseline;gap:10px; }
+  .v6-card-body { padding:18px; }
+  html[data-studio-theme="web"] .v6-product-card--sport { grid-template-columns:37% minmax(0,1fr); }
+  .v6-sport-card-bottom { grid-template-columns:1fr;gap:12px; }
+  .v6-quantity { justify-self:start; }
+  .v6-category-grid--beauty>a { grid-template-columns:45px minmax(0,1fr);padding:18px 14px;gap:10px; }
+  .v6-category-grid--beauty img { width:45px;height:85px; }
+  .v6-category-grid--beauty strong { font-size:12px; }
+  .v6-category-grid--kids img { height:180px; }
+  .v6-story--sport { grid-template-columns:1fr;gap:30px; }
+  .v6-story--kids { grid-template-columns:.8fr 1.2fr;gap:30px;padding:30px; }
+}
+@media (max-width:800px) {
+  html[data-studio-theme="web"] .studio-block .v6-showcase-copy :is(h1,h2) { font-size:calc(39px * var(--studio-heading-scale,1));line-height:1.07;letter-spacing:-.05em;margin:12px 0 16px; }
+  html[data-studio-theme="web"] .studio-block .v6-showcase-copy p { font-size:12px;line-height:1.8; }
+  .v6-eyebrow { font-size:9px; }
+  .v6-showcase-actions { margin-top:22px;gap:12px 18px; }
+  .v6-action,.v6-secondary-action { min-height:43px;font-size:11px;gap:17px; }
+  .v6-action { padding:12px 16px; }
+  .v6-section-heading { display:block;margin-bottom:23px; }
+  html[data-studio-theme="web"] .studio-block .v6-section-heading .v6-showcase-copy h2 { font-size:calc(28px * var(--studio-heading-scale,1)); }
+  .v6-section-heading .v6-showcase-actions { margin-top:13px; }
+  .v6-section-heading .v6-action { min-height:32px;padding-block:8px; }
+  .v6-showcase--beauty { grid-template-columns:1fr;gap:23px; }
+  .v6-beauty-intro { padding:0; }
+  .v6-beauty-route-label { margin-top:23px;font-size:9px; }
+  .v6-beauty-cover { height:420px;border-radius:135px 135px 8px 8px; }
+  .v6-beauty-feature { left:15px;right:15px;bottom:15px;grid-template-columns:54px minmax(0,1fr) 19px;gap:12px;padding:13px; }
+  .v6-beauty-feature>img { width:54px;height:67px; }
+  .v6-beauty-feature strong { font-size:13px; }
+  .v6-beauty-feature small { font-size:7px;margin-bottom:7px; }
+  .v6-beauty-feature b { font-size:11px;margin-top:8px; }
+  .v6-beauty-steps { grid-template-columns:1fr; }
+  .v6-beauty-steps>a { border-right:0;border-bottom:1px solid var(--v6-line);padding:17px 0;gap:18px; }
+  .v6-beauty-steps>a:last-child { border-bottom:0; }
+  .v6-beauty-steps>a>span { font-size:25px; }
+  .v6-showcase--sport { grid-template-columns:1fr; }
+  .v6-sport-intro { padding:26px; }
+  .v6-sport-compass { margin-bottom:21px; }
+  .v6-sport-cover { height:355px; }
+  .v6-sport-cover-link { left:17px;right:17px;bottom:17px;padding:13px 16px;font-size:11px; }
+  .v6-sport-activity { grid-template-columns:1fr;padding:23px;gap:17px; }
+  .v6-sport-activity .v6-group-tabs { grid-column:1;grid-row:2; }
+  .v6-sport-activity-products { grid-column:1;grid-row:3;grid-template-columns:1fr;gap:17px; }
+  .v6-sport-activity-products .v6-linked-product { grid-template-columns:65px minmax(0,1fr) 20px;gap:15px; }
+  .v6-sport-activity-products .v6-linked-product>img { width:65px;height:74px; }
+  .v6-showcase--kids { grid-template-columns:1fr;gap:24px; }
+  .v6-kids-hero-photo { height:370px;border-radius:120px 120px 75px 10px; }
+  .v6-kids-intro { padding:0; }
+  html[data-studio-theme="web"] .studio-block .v6-kids-intro .v6-showcase-copy :is(h1,h2) { font-size:calc(42px * var(--studio-heading-scale,1)); }
+  .v6-kids-age-finder { margin-top:25px;padding-top:20px; }
+  .v6-kids-featured { grid-template-columns:1fr;padding:19px;gap:14px; }
+  .v6-kids-featured .v6-linked-product { grid-template-columns:80px minmax(0,1fr) 18px; }
+  .v6-kids-featured .v6-linked-product>img { width:80px;height:88px; }
+  .v6-category-grid { grid-template-columns:1fr 1fr;gap:20px 13px; }
+  .v6-category-grid img { height:150px; }
+  .v6-category-grid strong { font-size:14px; }
+  .v6-category-grid small { font-size:9px; }
+  .v6-category-grid--beauty { gap:0; }
+  .v6-category-grid--beauty>a { grid-template-columns:44px minmax(0,1fr);padding:16px 13px;gap:10px;border-bottom:1px solid var(--v6-line); }
+  .v6-category-grid--beauty>a:nth-child(even) { border-right:0; }
+  .v6-category-grid--beauty>a:nth-child(3) { border-bottom:0; }
+  .v6-category-grid--beauty img { width:44px;height:80px; }
+  .v6-category-grid--beauty strong { font-size:12px; }
+  .v6-category-grid--beauty>a>svg { right:6px;top:8px;width:20px;height:20px; }
+  .v6-category-grid--sport { gap:12px; }
+  .v6-category-grid--sport>a { padding:13px; }
+  .v6-category-grid--sport img { height:135px; }
+  .v6-category-grid--sport>a>div { flex-direction:column;align-items:flex-start;gap:6px;margin-top:12px;padding-top:12px; }
+  .v6-category-grid--sport strong { font-size:13px; }
+  .v6-category-grid--kids { gap:25px 15px; }
+  .v6-category-grid--kids img { height:175px;border-radius:50px 50px 20px 20px; }
+  .v6-category-grid--kids>a:nth-child(even) img { border-radius:20px 20px 50px 50px; }
+  .v6-category-grid--kids>a>div { padding-inline:5px; }
+  .v6-category-grid--kids strong { font-size:14px; }
+  .v6-group-tabs { flex-wrap:nowrap;overflow:auto;padding-bottom:5px;gap:7px; }
+  .v6-group-tabs button { flex-shrink:0;font-size:10px;min-height:36px;padding:9px 12px;gap:10px; }
+  .v6-kids-age-finder .v6-group-tabs,.v6-sport-activity .v6-group-tabs { flex-wrap:wrap;overflow:visible; }
+  .v6-collection--beauty .v6-group-tabs,.v6-collection--kids .v6-group-tabs { justify-content:flex-start; }
+  .v6-product-grid { grid-template-columns:1fr 1fr;gap:28px 13px; }
+  .v6-product-grid--sport { grid-template-columns:1fr;gap:15px; }
+  .v6-product-badge { top:9px;left:9px;font-size:8px;padding:4px 6px;min-height:22px; }
+  html[data-studio-theme="web"] .v6-product-card .v6-favorite { right:8px;top:8px;width:30px;height:30px;min-width:30px;min-height:30px; }
+  html[data-studio-theme="web"] .v6-product-card .v6-favorite svg { width:17px;height:17px; }
+  .v6-card-body { padding:14px; }
+  html[data-studio-theme="web"] :is(.page,.studio-template-content) .v6-product-card h3 { font-size:12px;line-height:1.5;margin-bottom:10px; }
+  .v6-product-brand { font-size:8px;line-height:1.5;letter-spacing:.05em;margin-bottom:8px; }
+  html[data-studio-theme="web"] :is(.page,.studio-template-content) .v6-product-card .v6-card-description { font-size:10px;line-height:1.6;margin-bottom:13px; }
+  .v6-card-specs { gap:8px;margin-bottom:15px; }
+  .v6-card-specs>div { display:block;font-size:9px; }
+  .v6-card-specs dd { margin-top:2px;text-align:left; }
+  .v6-product-price strong { font-size:17px; }
+  .v6-product-price del { font-size:9px; }
+  .v6-card-buy { padding-top:14px;gap:14px; }
+  .v6-product-controls { gap:5px; }
+  .v6-product-controls>button { min-height:38px;gap:5px;padding:7px;font-size:9px; }
+  .v6-product-controls>button svg { width:14px;height:14px; }
+  .v6-product-controls>.v6-compare { flex-basis:28px; }
+  .v6-beauty-card-top { padding:12px 11px;gap:6px; }
+  .v6-beauty-card-top>span { font-size:8px; }
+  .v6-beauty-card-top>small { font-size:8px; }
+  .v6-product-card--beauty .v6-product-media { border-radius:0 0 55px 55px; }
+  .v6-product-card--beauty .v6-card-body { padding:17px 2px 0; }
+  .v6-product-card--beauty .v6-card-buy { padding-top:14px;gap:13px; }
+  .v6-product-card--beauty .v6-product-price { flex-direction:column;gap:5px; }
+  .v6-product-card--beauty .v6-product-controls>.v6-compare,.v6-product-card--kids .v6-product-controls>.v6-compare { flex-basis:27px;padding:6px; }
+  .v6-product-card--beauty .v6-product-controls>.v6-card-add,.v6-product-card--kids .v6-product-controls>.v6-card-add { font-size:9px;padding:7px 5px;gap:4px; }
+  html[data-studio-theme="web"] .v6-product-card--sport { grid-template-columns:38% minmax(0,1fr); }
+  html[data-studio-theme="web"] :is(.page,.studio-template-content) .v6-product-card--sport h3 { font-size:14px; }
+  .v6-product-card--sport .v6-card-body { padding:17px; }
+  .v6-product-card--sport .v6-card-specs>div { display:flex;gap:9px; }
+  .v6-product-card--sport .v6-card-specs dd { text-align:right;margin-top:0; }
+  .v6-sport-card-heading { gap:8px;padding-bottom:11px;margin-bottom:12px; }
+  .v6-sport-card-heading>span { font-size:8px; }
+  .v6-sport-card-heading>small { font-size:8px; }
+  .v6-sport-card-bottom { grid-template-columns:1fr;gap:12px; }
+  .v6-sport-card-bottom .v6-product-price strong { font-size:19px; }
+  .v6-sport-card-bottom .v6-product-price { flex-direction:row;align-items:baseline;gap:9px; }
+  .v6-kids-card-photo { padding:8px 8px 0; }
+  .v6-kids-card-photo .v6-product-media { border-radius:11px; }
+  .v6-kids-age { bottom:8px;left:16px;font-size:8px;padding:5px 7px; }
+  html[data-studio-theme="web"] .v6-product-card--kids { border-radius:15px; }
+  .v6-product-card--kids .v6-card-body { padding:15px 12px; }
+  .v6-product-card--kids .v6-product-price { flex-direction:column;gap:5px; }
+  .v6-routine-items { grid-template-columns:1fr 1fr;gap:12px; }
+  .v6-routine-item>label { padding:15px 13px; }
+  .v6-routine-check { right:11px;top:11px;width:21px;height:21px; }
+  .v6-routine-number { font-size:7px;letter-spacing:.05em; }
+  .v6-routine-item img { height:145px;margin:15px 0; }
+  .v6-routine-item label>small { font-size:8px; }
+  .v6-routine-item label>strong { font-size:12px; }
+  .v6-routine-item label>b { font-size:13px;margin-top:13px; }
+  .v6-routine-item>a { right:7px;bottom:10px;width:24px;height:24px; }
+  .v6-routine-summary { display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px 14px;padding-top:23px; }
+  .v6-routine-summary>div>strong { font-size:25px; }
+  html[data-studio-theme="web"] .studio-block .v6-routine-summary>p { font-size:10px; }
+  .v6-routine-summary>button { grid-column:1 / -1;min-height:46px; }
+  .v6-story--sport { grid-template-columns:1fr;gap:25px; }
+  .v6-sport-specification-board { grid-template-columns:1fr;gap:13px; }
+  .v6-sport-specification-board>a { display:grid;grid-template-columns:80px minmax(0,1fr);gap:12px 17px;padding:18px; }
+  .v6-specification-number { grid-column:1 / -1; }
+  .v6-sport-specification-board img { grid-column:1;grid-row:2 / span 3;width:80px;height:140px;margin:0; }
+  html[data-studio-theme="web"] .studio-block .v6-sport-specification-board h3 { grid-column:2;font-size:13px;min-height:0;margin:0; }
+  .v6-sport-specification-board dl { grid-column:2;display:flex;flex-wrap:wrap;gap:10px;margin:0; }
+  .v6-sport-specification-board dl>div { border:0;padding:0; }
+  .v6-sport-specification-board dt { font-size:8px; }
+  .v6-sport-specification-board dd { font-size:9px;margin-top:3px; }
+  .v6-sport-specification-board a>strong { grid-column:2;font-size:16px; }
+  .v6-story--kids { grid-template-columns:1fr;gap:26px;padding:24px;border-radius:18px; }
+  .v6-kids-learning-grid>a { grid-template-columns:65px minmax(0,1fr) 17px;padding:15px;gap:13px; }
+  .v6-kids-learning-grid>a>img { width:65px;height:83px; }
+  .v6-kids-learning-grid strong { font-size:12px; }
+  .v6-kids-learning-grid small { font-size:8px; }
+  html[data-studio-theme="web"] .studio-block .v6-kids-learning-grid p { font-size:10px; }
+}
+@media (max-width:370px) {
+  .v6-product-grid { gap:24px 10px; }
+  .v6-product-card--kids .v6-card-body { padding:13px 9px; }
+  .v6-product-controls>button svg { width:13px;height:13px; }
+  .v6-product-card--beauty .v6-product-controls>.v6-compare,.v6-product-card--kids .v6-product-controls>.v6-compare { flex-basis:24px;padding:5px; }
+  .v6-product-card--beauty .v6-product-controls>.v6-card-add,.v6-product-card--kids .v6-product-controls>.v6-card-add { font-size:8px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .v6-action svg,.v6-secondary-action svg,.v6-product-photo>img { transition:none; }
+  .v6-action:hover svg,.v6-secondary-action:hover svg { transform:none; }
+  .v6-product-controls>.v6-card-add.is-pending svg { animation:none; }
+}

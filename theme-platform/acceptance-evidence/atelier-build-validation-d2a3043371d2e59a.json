@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "result": "BUILD_VALIDATION_PASS",
+  "provenance": "ACTUAL_IMMUTABLE_CANDIDATE_ARTIFACT_VERIFIED",
+  "publicationAccepted": false,
+  "storeActivation": "NOT_ASSERTED",
+  "presentation": {
+    "id": "nova-atelier",
+    "version": "1.0.0",
+    "digest": "2326b50c5f74609018b2b3d2cb6f771016147166d063b690b1ec9a7fa617d97a"
+  },
+  "rendererSourceDigest": "167498da1fb4af9a3beeb987c964e1fc518fc0a102c38f3d63b311e4f2050605",
+  "artifactDigest": "a2487b4412203d5cf8fc2b0aba67e306e6086838e365de707e53889b9a2cf1ef",
+  "candidateMetadata": {
+    "path": "theme-platform/acceptance-evidence/customer-candidate-public-5e496e9489a19956.json",
+    "sha256": "5e496e9489a199568431987d5a5fbe9e7f33ea1471d6a01af2efb741fa7c8f70"
+  },
+  "artifactManifest": {
+    "path": "theme-platform/acceptance-evidence/atelier-candidate-artifact-manifest-a2487b4412203d5c.json",
+    "sha256": "a2487b4412203d5cf8fc2b0aba67e306e6086838e365de707e53889b9a2cf1ef"
+  },
+  "publicationRegression": {
+    "path": "theme-platform/acceptance-evidence/publication-implementation-provenance-a41891c21f09a33a.json",
+    "sha256": "a41891c21f09a33a7f5ec4893f84880bce1f33e5271eaa13b9e23ad6ad2cf49e"
+  }
+}

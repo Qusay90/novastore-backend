@@ -1,0 +1,714 @@
+{
+  "schemaVersion": 1,
+  "libraryId": "nova-store-sector-collection",
+  "version": "1.1.0-candidate",
+  "brand": "Nova Store",
+  "locale": "tr-TR",
+  "runtime": "isolated-html",
+  "status": "demo-candidate",
+  "productionReady": false,
+  "themes": [
+    {
+      "id": "01-nova",
+      "name": "Nova Market",
+      "sector": "Genel pazaryeri",
+      "description": "Günün fırsatları, evine ve hayatına iyi gelen seçimler. Favorilerin burada.",
+      "cardStyle": "market",
+      "layout": "marketplace",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/01-nova/index.html",
+        "app": "themes/01-nova/app.html"
+      },
+      "editor": "?editTheme=01-nova",
+      "thumbnail": "/theme-library/previews/01-nova-tile.jpg",
+      "source": {
+        "content": "themes/01-nova/theme.js",
+        "tokens": "themes/01-nova/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "02-atelier",
+      "name": "Atelier",
+      "sector": "Moda & giyim",
+      "description": "Zahmetsiz silüetler. Her gün sana eşlik eden parçalar. Stilin, senin hikâyen.",
+      "cardStyle": "fashion",
+      "layout": "editorial",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/02-atelier/index.html",
+        "app": "themes/02-atelier/app.html"
+      },
+      "editor": "?editTheme=02-atelier",
+      "thumbnail": "/theme-library/previews/02-atelier-tile.jpg",
+      "source": {
+        "content": "themes/02-atelier/theme.js",
+        "tokens": "themes/02-atelier/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "03-volt",
+      "name": "VOLT",
+      "sector": "Elektronik & oyun",
+      "description": "Çalışırken, üretirken, oynarken. Doğru teknoloji yanında. Bir adım ilerisini keşfet.",
+      "cardStyle": "tech",
+      "layout": "tech",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/03-volt/index.html",
+        "app": "themes/03-volt/app.html"
+      },
+      "editor": "?editTheme=03-volt",
+      "thumbnail": "/theme-library/previews/03-volt-tile.jpg",
+      "source": {
+        "content": "themes/03-volt/theme.js",
+        "tokens": "themes/03-volt/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "04-forma",
+      "name": "forma.",
+      "sector": "Mobilya & dekorasyon",
+      "description": "Doğal dokular, dingin renkler. Kendin gibi hissettiren bir ev. Evine iyi gelecek.",
+      "cardStyle": "interior",
+      "layout": "interior",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/04-forma/index.html",
+        "app": "themes/04-forma/app.html"
+      },
+      "editor": "?editTheme=04-forma",
+      "thumbnail": "/theme-library/previews/04-forma-tile.jpg",
+      "source": {
+        "content": "themes/04-forma/theme.js",
+        "tokens": "themes/04-forma/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "05-botanika",
+      "name": "botanika",
+      "sector": "Kozmetik & bakım",
+      "description": "Günlük bakımın için özenle seçilmiş sade ritüeller. Küçük bir bakım molası.",
+      "cardStyle": "beauty",
+      "layout": "beauty",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/05-botanika/index.html",
+        "app": "themes/05-botanika/app.html"
+      },
+      "editor": "?editTheme=05-botanika",
+      "thumbnail": "/theme-library/previews/05-botanika-tile.jpg",
+      "source": {
+        "content": "themes/05-botanika/theme.js",
+        "tokens": "themes/05-botanika/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "06-pace",
+      "name": "PACE",
+      "sector": "Spor & aktif yaşam",
+      "description": "Her antrenman yeni bir başlangıç. İlk adımı bugün at. Harekete devam.",
+      "cardStyle": "sport",
+      "layout": "sport",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/06-pace/index.html",
+        "app": "themes/06-pace/app.html"
+      },
+      "editor": "?editTheme=06-pace",
+      "thumbnail": "/theme-library/previews/06-pace-tile.jpg",
+      "source": {
+        "content": "themes/06-pace/theme.js",
+        "tokens": "themes/06-pace/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "07-taze",
+      "name": "taze.",
+      "sector": "Market & gıda",
+      "description": "Taze seçimler, iyi fiyatlar. Günün ihtiyaçları bir arada. Bugün ne pişirsek?",
+      "cardStyle": "grocery",
+      "layout": "grocery",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/07-taze/index.html",
+        "app": "themes/07-taze/app.html"
+      },
+      "editor": "?editTheme=07-taze",
+      "thumbnail": "/theme-library/previews/07-taze-tile.jpg",
+      "source": {
+        "content": "themes/07-taze/theme.js",
+        "tokens": "themes/07-taze/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "08-minimo",
+      "name": "minimo",
+      "sector": "Bebek & çocuk",
+      "description": "Yumuşacık dokular, neşeli keşifler. Birlikte büyüyen bir dünya. Sevgiyle seçildi.",
+      "cardStyle": "kids",
+      "layout": "kids",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/08-minimo/index.html",
+        "app": "themes/08-minimo/app.html"
+      },
+      "editor": "?editTheme=08-minimo",
+      "thumbnail": "/theme-library/previews/08-minimo-tile.jpg",
+      "source": {
+        "content": "themes/08-minimo/theme.js",
+        "tokens": "themes/08-minimo/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "09-lune",
+      "name": "LUNÉ",
+      "sector": "Takı & aksesuar",
+      "description": "Her güne eşlik eden zarif detaylar. Hikâyenin bir parçası.",
+      "cardStyle": "jewels",
+      "layout": "jewelry",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/09-lune/index.html",
+        "app": "themes/09-lune/app.html"
+      },
+      "editor": "?editTheme=09-lune",
+      "thumbnail": "/theme-library/previews/09-lune-tile.jpg",
+      "source": {
+        "content": "themes/09-lune/theme.js",
+        "tokens": "themes/09-lune/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "10-folio",
+      "name": "folio",
+      "sector": "Kitap & kırtasiye",
+      "description": "Bir kitap aç. Yeni bir dünyaya yer ver. Bir sonraki iyi kitap.",
+      "cardStyle": "book",
+      "layout": "books",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/10-folio/index.html",
+        "app": "themes/10-folio/app.html"
+      },
+      "editor": "?editTheme=10-folio",
+      "thumbnail": "/theme-library/previews/10-folio-tile.jpg",
+      "source": {
+        "content": "themes/10-folio/theme.js",
+        "tokens": "themes/10-folio/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "11-nomad",
+      "name": "NOMAD",
+      "sector": "Kamp & outdoor",
+      "description": "Açık havada geçirilen güzel günler için güvenilir yol arkadaşları. Keşfetmeye devam.",
+      "cardStyle": "outdoor",
+      "layout": "outdoor",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/11-nomad/index.html",
+        "app": "themes/11-nomad/app.html"
+      },
+      "editor": "?editTheme=11-nomad",
+      "thumbnail": "/theme-library/previews/11-nomad-tile.jpg",
+      "source": {
+        "content": "themes/11-nomad/theme.js",
+        "tokens": "themes/11-nomad/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "12-paw",
+      "name": "pati.",
+      "sector": "Evcil hayvan",
+      "description": "Birlikte geçen her gün için güzel seçimler. Dostuna iyi gelecek.",
+      "cardStyle": "pet",
+      "layout": "pets",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/12-paw/index.html",
+        "app": "themes/12-paw/app.html"
+      },
+      "editor": "?editTheme=12-paw",
+      "thumbnail": "/theme-library/previews/12-paw-tile.jpg",
+      "source": {
+        "content": "themes/12-paw/theme.js",
+        "tokens": "themes/12-paw/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "13-roast",
+      "name": "roast.",
+      "sector": "Kahve & demleme",
+      "description": "İyi çekirdekler, yavaş sabahlar ve sana ait bir kahve molası. Küçük bir kahve molası.",
+      "cardStyle": "coffee",
+      "layout": "coffee",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/13-roast/index.html",
+        "app": "themes/13-roast/app.html"
+      },
+      "editor": "?editTheme=13-roast",
+      "thumbnail": "/theme-library/previews/13-roast-tile.jpg",
+      "source": {
+        "content": "themes/13-roast/theme.js",
+        "tokens": "themes/13-roast/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "14-forge",
+      "name": "FORGE",
+      "sector": "Yapı & hırdavat",
+      "description": "Atölyeden bahçeye, sıradaki projen için ekipmanlar. Sıradaki projene hazır.",
+      "cardStyle": "tool",
+      "layout": "tools",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/14-forge/index.html",
+        "app": "themes/14-forge/app.html"
+      },
+      "editor": "?editTheme=14-forge",
+      "thumbnail": "/theme-library/previews/14-forge-tile.jpg",
+      "source": {
+        "content": "themes/14-forge/theme.js",
+        "tokens": "themes/14-forge/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "15-nova-classic",
+      "name": "Nova Classic",
+      "sector": "Ev, yaşam ve genel mağaza",
+      "description": "Kavisli meşe detayları ve sıcacık dokusu. Yaşam alanına zamansız bir eşlikçi. Doğal çizgiler. Güzel seçimler.",
+      "cardStyle": "classic",
+      "layout": "classic",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/15-nova-classic/index.html",
+        "app": "themes/15-nova-classic/app.html"
+      },
+      "editor": "?editTheme=15-nova-classic",
+      "thumbnail": "/theme-library/previews/15-nova-classic-tile.jpg",
+      "source": {
+        "content": "themes/15-nova-classic/theme.js",
+        "tokens": "themes/15-nova-classic/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "16-nova-paper",
+      "name": "Nova Paper",
+      "sector": "Kırtasiye ve okul",
+      "description": "Masana renk, planlarına yer aç. Her gün kullanmaktan keyif alacağın küçük ayrıntılar.",
+      "cardStyle": "next-paper",
+      "layout": "paper",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/16-nova-paper/index.html",
+        "app": "themes/16-nova-paper/app.html"
+      },
+      "editor": "?editTheme=16-nova-paper",
+      "thumbnail": "/theme-library/previews/16-nova-paper-tile.jpg",
+      "source": {
+        "content": "themes/16-nova-paper/theme.js",
+        "tokens": "themes/16-nova-paper/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "17-nova-garage",
+      "name": "Nova Garage",
+      "sector": "Otomotiv ve araç bakımı",
+      "description": "Araç içinden bakım köşene kadar ihtiyaçlarını tek yerde bul. Düzenli bir araç, rahat bir yolculuk.",
+      "cardStyle": "next-garage",
+      "layout": "garage",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/17-nova-garage/index.html",
+        "app": "themes/17-nova-garage/app.html"
+      },
+      "editor": "?editTheme=17-nova-garage",
+      "thumbnail": "/theme-library/previews/17-nova-garage-tile.jpg",
+      "source": {
+        "content": "themes/17-nova-garage/theme.js",
+        "tokens": "themes/17-nova-garage/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "18-nova-voyage",
+      "name": "Nova Voyage",
+      "sector": "Valiz ve şehir seyahati",
+      "description": "Hafta sonu kaçamaklarından uzun yolculuklara, birlikte güzel anılar biriktireceğin yol arkadaşları.",
+      "cardStyle": "next-voyage",
+      "layout": "voyage",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/18-nova-voyage/index.html",
+        "app": "themes/18-nova-voyage/app.html"
+      },
+      "editor": "?editTheme=18-nova-voyage",
+      "thumbnail": "/theme-library/previews/18-nova-voyage-tile.jpg",
+      "source": {
+        "content": "themes/18-nova-voyage/theme.js",
+        "tokens": "themes/18-nova-voyage/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "19-nova-flora",
+      "name": "Nova Flora",
+      "sector": "İç mekân bitkileri ve saksı",
+      "description": "Küçük bir yaprakla başlayan büyük bir değişim. Alanına ve günlük ritmine eşlik edecek seçimleri keşfet.",
+      "cardStyle": "next-flora",
+      "layout": "flora",
+      "version": "1.0.0-demo",
+      "entries": {
+        "web": "themes/19-nova-flora/index.html",
+        "app": "themes/19-nova-flora/app.html"
+      },
+      "editor": "?editTheme=19-nova-flora",
+      "thumbnail": "/theme-library/previews/19-nova-flora-tile.jpg",
+      "source": {
+        "content": "themes/19-nova-flora/theme.js",
+        "tokens": "themes/19-nova-flora/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "20-nova-agora",
+      "name": "Nova Agora",
+      "sector": "Genel pazaryeri",
+      "description": "Günün fırsatları, evine ve hayatına iyi gelen seçimler. Favorilerin burada.",
+      "cardStyle": "agora",
+      "layout": "expansion-agora",
+      "version": "1.1.0-candidate",
+      "entries": {
+        "web": "themes/20-nova-agora/index.html",
+        "app": "themes/20-nova-agora/app.html"
+      },
+      "editor": "?editTheme=20-nova-agora",
+      "thumbnail": "/theme-library/previews/20-nova-agora-tile.jpg",
+      "source": {
+        "content": "themes/20-nova-agora/theme.js",
+        "tokens": "themes/20-nova-agora/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "21-nova-bento",
+      "name": "Nova Bento",
+      "sector": "Elektronik & oyun",
+      "description": "Çalışırken, üretirken, oynarken. Doğru teknoloji yanında. Bir adım ilerisini keşfet.",
+      "cardStyle": "bento",
+      "layout": "expansion-bento",
+      "version": "1.1.0-candidate",
+      "entries": {
+        "web": "themes/21-nova-bento/index.html",
+        "app": "themes/21-nova-bento/app.html"
+      },
+      "editor": "?editTheme=21-nova-bento",
+      "thumbnail": "/theme-library/previews/21-nova-bento-tile.jpg",
+      "source": {
+        "content": "themes/21-nova-bento/theme.js",
+        "tokens": "themes/21-nova-bento/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "22-nova-pantry",
+      "name": "Nova Pantry",
+      "sector": "Market & gıda",
+      "description": "Taze seçimler, iyi fiyatlar. Günün ihtiyaçları bir arada. Bugün ne pişirsek?",
+      "cardStyle": "pantry",
+      "layout": "expansion-pantry",
+      "version": "1.1.0-candidate",
+      "entries": {
+        "web": "themes/22-nova-pantry/index.html",
+        "app": "themes/22-nova-pantry/app.html"
+      },
+      "editor": "?editTheme=22-nova-pantry",
+      "thumbnail": "/theme-library/previews/22-nova-pantry-tile.jpg",
+      "source": {
+        "content": "themes/22-nova-pantry/theme.js",
+        "tokens": "themes/22-nova-pantry/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "23-nova-archive",
+      "name": "Nova Archive",
+      "sector": "Kitap & kırtasiye",
+      "description": "Başlıkları, baskıları ve küçük nesneleri numaralı bir arşiv düzeninde keşfet.",
+      "cardStyle": "archive",
+      "layout": "expansion-archive",
+      "version": "1.1.0-candidate",
+      "entries": {
+        "web": "themes/23-nova-archive/index.html",
+        "app": "themes/23-nova-archive/app.html"
+      },
+      "editor": "?editTheme=23-nova-archive",
+      "thumbnail": "/theme-library/previews/23-nova-archive-tile.jpg",
+      "source": {
+        "content": "themes/23-nova-archive/theme.js",
+        "tokens": "themes/23-nova-archive/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "24-nova-monogram",
+      "name": "Nova Monogram",
+      "sector": "Takı & aksesuar",
+      "description": "Az ama özenli seçimler; merkezde bir monogram, kenarlarda sakin bir görsel ritim.",
+      "cardStyle": "monogram",
+      "layout": "expansion-monogram",
+      "version": "1.1.0-candidate",
+      "entries": {
+        "web": "themes/24-nova-monogram/index.html",
+        "app": "themes/24-nova-monogram/app.html"
+      },
+      "editor": "?editTheme=24-nova-monogram",
+      "thumbnail": "/theme-library/previews/24-nova-monogram-tile.jpg",
+      "source": {
+        "content": "themes/24-nova-monogram/theme.js",
+        "tokens": "themes/24-nova-monogram/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "25-nova-sound",
+      "name": "Nova Sound",
+      "sector": "Elektronik & oyun",
+      "description": "Karanlık bir split-stage, kontrol paneli ve hızlı okunabilen yatay teknik özellik satırları.",
+      "cardStyle": "sound",
+      "layout": "expansion-sound",
+      "version": "1.1.0-candidate",
+      "entries": {
+        "web": "themes/25-nova-sound/index.html",
+        "app": "themes/25-nova-sound/app.html"
+      },
+      "editor": "?editTheme=25-nova-sound",
+      "thumbnail": "/theme-library/previews/25-nova-sound-tile.jpg",
+      "source": {
+        "content": "themes/25-nova-sound/theme.js",
+        "tokens": "themes/25-nova-sound/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "26-nova-terra",
+      "name": "Nova Terra",
+      "sector": "Kamp ve outdoor",
+      "description": "Rotana, mevsime ve günlük macerana eşlik edecek güvenilir ekipmanları seç.",
+      "cardStyle": "terra",
+      "layout": "expansion-terra",
+      "version": "1.1.0-candidate",
+      "entries": {
+        "web": "themes/26-nova-terra/index.html",
+        "app": "themes/26-nova-terra/app.html"
+      },
+      "editor": "?editTheme=26-nova-terra",
+      "thumbnail": "/theme-library/previews/26-nova-terra-tile.jpg",
+      "source": {
+        "content": "themes/26-nova-terra/theme.js",
+        "tokens": "themes/26-nova-terra/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    },
+    {
+      "id": "27-nova-pop",
+      "name": "Nova Pop",
+      "sector": "Kırtasiye ve hediye",
+      "description": "Renkli, kullanışlı ve paylaşmaya hazır bir Nova Store seçkisi.",
+      "cardStyle": "pop",
+      "layout": "expansion-pop",
+      "version": "1.1.0-candidate",
+      "entries": {
+        "web": "themes/27-nova-pop/index.html",
+        "app": "themes/27-nova-pop/app.html"
+      },
+      "editor": "?editTheme=27-nova-pop",
+      "thumbnail": "/theme-library/previews/27-nova-pop-tile.jpg",
+      "source": {
+        "content": "themes/27-nova-pop/theme.js",
+        "tokens": "themes/27-nova-pop/theme.css",
+        "presentation": "shared/core.js",
+        "styles": "shared/core.css"
+      },
+      "editorModel": "channel-route-element-overrides-v1",
+      "commerceAdapter": "host-ready-opt-in",
+      "commerceHostContract": "novastore-theme-host/1",
+      "editorHostContract": "novastore-gallery-host/1",
+      "publishable": false
+    }
+  ]
+}

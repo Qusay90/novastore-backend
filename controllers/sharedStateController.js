@@ -1,10 +1,22 @@
 const pool = require('../config/db');
+const cartV2 = require('../services/variantCartV2Service');
 
 const ALLOWED_STATE_KEYS = new Set(['cart', 'checkout']);
 const MAX_ITEMS = 200;
 const SHARED_STATE_SCHEMA_ERROR = '42P01';
 
 const sendSharedStateError = (res, error, fallbackMessage) => {
+    if (error?.statusCode && error?.code) {
+        return res.status(error.statusCode).json({
+            error: error.code === 'CART_CLIENT_UPGRADE_REQUIRED'
+                ? 'Sepetinizi korumak için uygulamanızı güncelleyin.'
+                : error.code === 'CART_REVISION_CONFLICT'
+                    ? 'Sepet başka bir cihazda değişti. Güncel sepeti yükleyip tekrar deneyin.'
+                    : 'Sepet işlemi tamamlanamadı.',
+            code: error.code,
+            ...(Number.isSafeInteger(error.revision) ? { revision: error.revision } : {})
+        });
+    }
     if (error?.code === SHARED_STATE_SCHEMA_ERROR) {
         return res.status(503).json({
             error: 'Ortak müşteri durumu geçici olarak kullanılamıyor.',
@@ -48,6 +60,9 @@ const normalizeCartItem = (item) => {
 };
 
 const normalizeCartPayload = (payload) => {
+    if (cartV2.schemaOf(payload) !== 1) {
+        throw Object.assign(new Error('CART_CLIENT_UPGRADE_REQUIRED'), { code: 'CART_CLIENT_UPGRADE_REQUIRED', statusCode: 426 });
+    }
     const rawItems = Array.isArray(payload?.items)
         ? payload.items
         : Array.isArray(payload?.cartItems)
@@ -96,78 +111,31 @@ const normalizePayload = (key, payload) => {
     return null;
 };
 
-const getSharedState = async (req, res) => {
+const handleSharedState = (method) => async (req, res) => {
     const key = normalizeStateKey(req.params.key);
     if (!key) return res.status(400).json({ error: 'Gecersiz ortak durum anahtari.' });
 
     try {
-        const result = await pool.query(
-            'SELECT payload, updated_at FROM user_shared_state WHERE user_id = $1 AND state_key = $2',
-            [req.user.id, key]
-        );
-
-        const row = result.rows[0];
-        res.json({
-            key,
-            exists: Boolean(row),
-            payload: row?.payload || normalizePayload(key, {}),
-            updatedAt: row?.updated_at || null
-        });
+        const result = await cartV2.execute({ database: pool, userId: req.user.id, key,
+            method, headers: req.headers, body: req.body, legacyNormalize: normalizePayload });
+        res.set?.('Cache-Control', 'no-store');
+        res.json(result);
     } catch (error) {
-        console.error('Ortak durum alinamadi:', error);
-        sendSharedStateError(res, error, 'Ortak durum alinamadi.');
+        // Do not log account/cart contents or database statements with parameters.
+        if (!error?.statusCode) console.error('Ortak durum işlemi başarısız:', error?.code || 'INTERNAL_ERROR');
+        sendSharedStateError(res, error, 'Ortak durum işlemi tamamlanamadı.');
     }
 };
-
-const putSharedState = async (req, res) => {
-    const key = normalizeStateKey(req.params.key);
-    if (!key) return res.status(400).json({ error: 'Gecersiz ortak durum anahtari.' });
-
-    const payload = normalizePayload(key, req.body?.payload ?? req.body);
-    if (!payload) return res.status(400).json({ error: 'Gecersiz ortak durum verisi.' });
-
-    try {
-        const result = await pool.query(
-            `INSERT INTO user_shared_state (user_id, state_key, payload, updated_at)
-             VALUES ($1, $2, $3::jsonb, CURRENT_TIMESTAMP)
-             ON CONFLICT (user_id, state_key)
-             DO UPDATE SET payload = EXCLUDED.payload, updated_at = CURRENT_TIMESTAMP
-             RETURNING payload, updated_at`,
-            [req.user.id, key, JSON.stringify(payload)]
-        );
-
-        res.json({
-            key,
-            exists: true,
-            payload: result.rows[0].payload,
-            updatedAt: result.rows[0].updated_at
-        });
-    } catch (error) {
-        console.error('Ortak durum kaydedilemedi:', error);
-        sendSharedStateError(res, error, 'Ortak durum kaydedilemedi.');
-    }
-};
-
-const deleteSharedState = async (req, res) => {
-    const key = normalizeStateKey(req.params.key);
-    if (!key) return res.status(400).json({ error: 'Gecersiz ortak durum anahtari.' });
-
-    try {
-        await pool.query(
-            'DELETE FROM user_shared_state WHERE user_id = $1 AND state_key = $2',
-            [req.user.id, key]
-        );
-        res.json({ key, exists: false, deleted: true });
-    } catch (error) {
-        console.error('Ortak durum silinemedi:', error);
-        sendSharedStateError(res, error, 'Ortak durum silinemedi.');
-    }
-};
+const getSharedState = handleSharedState('GET');
+const putSharedState = handleSharedState('PUT');
+const deleteSharedState = handleSharedState('DELETE');
+const finalizeCart = handleSharedState('FINALIZE');
 
 module.exports = {
     getSharedState,
     putSharedState,
     deleteSharedState,
+    finalizeCart,
     __test: {
         normalizeStateKey,
         normalizeCartPayload,

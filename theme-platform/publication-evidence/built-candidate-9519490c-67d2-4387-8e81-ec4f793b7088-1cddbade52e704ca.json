@@ -1,0 +1,393 @@
+{
+  "result": "PASS_CANDIDATE_BYTES_VALIDATED_NOT_ACTIVE",
+  "recordedAt": "2026-09-19T22:33:10.781Z",
+  "readOnly": true,
+  "host": "http://classic.localhost:62213/",
+  "publicationId": "9519490c-67d2-4387-8e81-ec4f793b7088",
+  "serviceId": "1d3a22dd-b233-4e12-a9c1-dff203b391c3",
+  "assignmentId": "30b37cbb-4449-425e-977e-e707e0d72bed",
+  "artifactId": "c032f6cb-2479-460f-8a20-09b7ecd058de",
+  "artifactDigest": "e5f81b39e9e0615d22281d2a495f7f4d120d71893165ea6e337d3679916a2ba5",
+  "sourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+  "channel": "web",
+  "presentation": {
+    "id": "nova-classic",
+    "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668",
+    "version": "1.0.0"
+  },
+  "manifestEntryPoint": "customer.html",
+  "manifestFileCount": 18,
+  "manifestSha256": "2c15479bdfc12889f42030c10d5bd3882e8df87e648bd3cc60a043a84f4e8d37",
+  "manifest": {
+    "files": [
+      {
+        "path": "assets/atelier-dom-By_xsji6.js",
+        "sha256": "82c44c26611ce21bcd95b32cdd25640b903012fe8fb5234a6051cb756c37a9ce",
+        "byteSize": 19861,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "assets/catalog-adapter-BmxpTtuA.js",
+        "sha256": "c91974ee165545bbdb3cb4c28a7c4d102caf88a575a82e94869055996cdef129",
+        "byteSize": 1097,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "assets/customer-NuO2JgXn.css",
+        "sha256": "8d56bde87bc8b031c2648c554914bd7c88d2d83bc5f88d994bbe2204fbac043a",
+        "byteSize": 4004,
+        "mimeType": "text/css"
+      },
+      {
+        "path": "assets/customer.js",
+        "sha256": "152def843eb5d173873a581af40180690d421690ce524e8d448beaa4e91562d0",
+        "byteSize": 74770,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "assets/modulepreload-polyfill-B5Qt9EMX.js",
+        "sha256": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0",
+        "byteSize": 711,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "assets/theme-kit-adapter-BGy5vAQ8.js",
+        "sha256": "1e1872f9b3107b3ba05260fe39e0cc86148b1b62a3322dbf22b4bd9dbf4adf6e",
+        "byteSize": 4485,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "customer.html",
+        "sha256": "6e9616d4ebc5cc3f8a319e95480ad5630ebc1ab03be68f39be82fa2de302228d",
+        "byteSize": 801,
+        "mimeType": "text/html"
+      },
+      {
+        "path": "novastore-content.json",
+        "sha256": "ffb14c3c6a5758e054e5a6fdc004ca272e8c4ab96647e21027285e78e4e01a3d",
+        "byteSize": 3052,
+        "mimeType": "application/json"
+      },
+      {
+        "path": "novastore-document.json",
+        "sha256": "86f2686124aac2eac30c55df1d58380f161f71160fea2d76fbd954137c47cd9e",
+        "byteSize": 4220,
+        "mimeType": "application/json"
+      },
+      {
+        "path": "theme-kit/classic-customer.js",
+        "sha256": "0f6e6b1ed86d3d5111f6a2de60db1ddf06a304c3bdead64c045b09a571741a38",
+        "byteSize": 2571394,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "theme-kit/classic-presentation.json",
+        "sha256": "aa4caab085a3f56e41c5a256966c5f81e2cad68730e71307d36cf461e4082d35",
+        "byteSize": 600,
+        "mimeType": "application/json"
+      },
+      {
+        "path": "theme-kit/core.css",
+        "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+        "byteSize": 430940,
+        "mimeType": "text/css"
+      },
+      {
+        "path": "theme-kit/customer-projector.js",
+        "sha256": "3f9f5803204311f0f9aa9492f80b551c8eb273a621affdf5fe4ddbda4fd82479",
+        "byteSize": 20176,
+        "mimeType": "application/javascript"
+      },
+      {
+        "path": "theme-kit/fonts.css",
+        "sha256": "4f8bd3d091eea9d69917cb28d3019c1e57ee834836d7fdfda56bf418a304762e",
+        "byteSize": 413,
+        "mimeType": "text/css"
+      },
+      {
+        "path": "theme-kit/fonts/inter_medium.ttf",
+        "sha256": "97ad806f526e41546d46365bb3a393145f75b7b1568913db74549ad8b8dba872",
+        "byteSize": 417300,
+        "mimeType": "font/ttf"
+      },
+      {
+        "path": "theme-kit/fonts/inter_regular.ttf",
+        "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+        "byteSize": 411640,
+        "mimeType": "font/ttf"
+      },
+      {
+        "path": "theme-kit/fonts/inter_semibold.ttf",
+        "sha256": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3",
+        "byteSize": 419744,
+        "mimeType": "font/ttf"
+      },
+      {
+        "path": "theme-kit/theme.css",
+        "sha256": "0e8844a79a87a5cf0f110cf2562a3313add1ddc9b696dbafd10a8b69ee19152c",
+        "byteSize": 350,
+        "mimeType": "text/css"
+      }
+    ],
+    "format": "novastore-local-artifact-v1",
+    "metadata": {
+      "assets": [],
+      "format": "novastore-publication-validation-v1",
+      "channel": "web",
+      "draftId": "20857910-c2f8-494e-9ac5-9638de1f9941",
+      "storeId": "1",
+      "commerce": {
+        "validated": true,
+        "assetCount": 0,
+        "commerceMode": "SINGLE_STORE",
+        "productCount": 0,
+        "variantCount": 0,
+        "categoryCount": 0,
+        "collectionCount": 0
+      },
+      "serviceId": "1d3a22dd-b233-4e12-a9c1-dff203b391c3",
+      "legalDigest": "ffb14c3c6a5758e054e5a6fdc004ca272e8c4ab96647e21027285e78e4e01a3d",
+      "assignmentId": "30b37cbb-4449-425e-977e-e707e0d72bed",
+      "commerceMode": "SINGLE_STORE",
+      "presentation": {
+        "id": "nova-classic",
+        "digest": "d8c72698fc9a4be3f6393dbe47b6ff5ed981d67ea24896e0fb8ef159daf91668",
+        "version": "1.0.0"
+      },
+      "sourceDigest": "6865f88c9814d05a5b2387d351d660afa0cd4847ca7bbbaf843f0643ba37a35b",
+      "draftRevision": 2,
+      "packageDigest": "e161a82d44485363f91028749fbaa778ec8eeb3a83925b370427c6fccc999a4b",
+      "publicationId": "9519490c-67d2-4387-8e81-ec4f793b7088",
+      "rendererFiles": [
+        {
+          "path": "assets/atelier-dom-By_xsji6.js",
+          "sha256": "82c44c26611ce21bcd95b32cdd25640b903012fe8fb5234a6051cb756c37a9ce",
+          "byteSize": 19861
+        },
+        {
+          "path": "assets/catalog-adapter-BmxpTtuA.js",
+          "sha256": "c91974ee165545bbdb3cb4c28a7c4d102caf88a575a82e94869055996cdef129",
+          "byteSize": 1097
+        },
+        {
+          "path": "assets/customer-NuO2JgXn.css",
+          "sha256": "8d56bde87bc8b031c2648c554914bd7c88d2d83bc5f88d994bbe2204fbac043a",
+          "byteSize": 4004
+        },
+        {
+          "path": "assets/customer.js",
+          "sha256": "152def843eb5d173873a581af40180690d421690ce524e8d448beaa4e91562d0",
+          "byteSize": 74770
+        },
+        {
+          "path": "assets/modulepreload-polyfill-B5Qt9EMX.js",
+          "sha256": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0",
+          "byteSize": 711
+        },
+        {
+          "path": "assets/theme-kit-adapter-BGy5vAQ8.js",
+          "sha256": "1e1872f9b3107b3ba05260fe39e0cc86148b1b62a3322dbf22b4bd9dbf4adf6e",
+          "byteSize": 4485
+        },
+        {
+          "path": "customer.html",
+          "sha256": "6e9616d4ebc5cc3f8a319e95480ad5630ebc1ab03be68f39be82fa2de302228d",
+          "byteSize": 801
+        },
+        {
+          "path": "theme-kit/classic-customer.js",
+          "sha256": "0f6e6b1ed86d3d5111f6a2de60db1ddf06a304c3bdead64c045b09a571741a38",
+          "byteSize": 2571394
+        },
+        {
+          "path": "theme-kit/classic-presentation.json",
+          "sha256": "aa4caab085a3f56e41c5a256966c5f81e2cad68730e71307d36cf461e4082d35",
+          "byteSize": 600
+        },
+        {
+          "path": "theme-kit/core.css",
+          "sha256": "8ce94d9f750a4b46252e94baae90a16e40341299c46776d3c8270a7d8e8244d0",
+          "byteSize": 430940
+        },
+        {
+          "path": "theme-kit/customer-projector.js",
+          "sha256": "3f9f5803204311f0f9aa9492f80b551c8eb273a621affdf5fe4ddbda4fd82479",
+          "byteSize": 20176
+        },
+        {
+          "path": "theme-kit/fonts.css",
+          "sha256": "4f8bd3d091eea9d69917cb28d3019c1e57ee834836d7fdfda56bf418a304762e",
+          "byteSize": 413
+        },
+        {
+          "path": "theme-kit/fonts/inter_medium.ttf",
+          "sha256": "97ad806f526e41546d46365bb3a393145f75b7b1568913db74549ad8b8dba872",
+          "byteSize": 417300
+        },
+        {
+          "path": "theme-kit/fonts/inter_regular.ttf",
+          "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+          "byteSize": 411640
+        },
+        {
+          "path": "theme-kit/fonts/inter_semibold.ttf",
+          "sha256": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3",
+          "byteSize": 419744
+        },
+        {
+          "path": "theme-kit/theme.css",
+          "sha256": "0e8844a79a87a5cf0f110cf2562a3313add1ddc9b696dbafd10a8b69ee19152c",
+          "byteSize": 350
+        }
+      ],
+      "documentDigest": "86f2686124aac2eac30c55df1d58380f161f71160fea2d76fbd954137c47cd9e",
+      "organizationId": "1",
+      "policyRevision": 8,
+      "themeVersionId": "0ef98fa7-7e2f-4f59-b401-1f81097f943c",
+      "legalReferences": [
+        {
+          "type": "business-information",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-19T21:21:59.305Z",
+          "documentId": "4daf099b-03fd-453b-9ada-850d8ed4e6b7",
+          "contentHash": "58b22b51a0ffb97329a1f29e72828d85aec6aa025ecc6e4cf71d5776aa89a0d0",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "contact",
+          "locale": "tr-TR",
+          "version": 2,
+          "expiresAt": null,
+          "approvedAt": "2026-09-19T22:15:35.250Z",
+          "documentId": "9a3a29d7-9e04-4e72-93b2-20465df4c58b",
+          "contentHash": "1c546b0e4368df3003062c81edc82d13a96e765becf69f1f82944a14b1394f17",
+          "effectiveAt": "2026-09-19T09:00:00.000Z"
+        },
+        {
+          "type": "cookie",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-19T21:21:59.229Z",
+          "documentId": "05a9deca-5820-4c63-a791-00eb61345531",
+          "contentHash": "0a718e58861d7a5f9bfbbd71a735aebd4994436a0b0b1027fbabdd057420d1b8",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "distance-sales",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-19T21:21:59.064Z",
+          "documentId": "2aeb46f8-ca45-4f01-a8b9-023fe7e39a1f",
+          "contentHash": "d5814a261c180d68c1a7eb706d2aefa2aa38cb1ac1e450f65c3c1196a81b8976",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "kvkk",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-19T21:21:59.188Z",
+          "documentId": "9800aad6-c2d7-4c29-857c-7b893ae86289",
+          "contentHash": "1a5998f9583fdb83cbb6bcc48a1220925987dd029980f516dc7411d1a3489ada",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "privacy",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-19T21:21:58.969Z",
+          "documentId": "7154f604-2a27-4caa-9842-323a88389563",
+          "contentHash": "2c6018b5d0749f33eef2402c0c1d3d87145bc56b21e0bf4cee0e68d0be02fe48",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "returns",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-19T21:21:59.105Z",
+          "documentId": "4326942f-b0bb-4c2c-aa84-79bb98b75170",
+          "contentHash": "d58bb547d15c342b6886ebee462fbfa26020db3bb0f18fc48bf9581ad18b2936",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "shipping",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-19T21:21:59.151Z",
+          "documentId": "97ec3273-578d-431f-bd3b-f6d1b39881d4",
+          "contentHash": "c60e36a658a32699f6dbe59cd761f0413022a3f2461c111b4d31a36f17f72e3f",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        },
+        {
+          "type": "terms",
+          "locale": "tr-TR",
+          "version": 1,
+          "expiresAt": null,
+          "approvedAt": "2026-09-19T21:21:59.013Z",
+          "documentId": "954eafa3-cc9b-4450-8a7e-f51bbfd80260",
+          "contentHash": "9dd56f1e1a9b2151002a1af7692a5de8f0bc2fe65a06082004d5e1cbc85c09d8",
+          "effectiveAt": "2026-01-01T00:00:00.000Z"
+        }
+      ],
+      "rendererEntryPoint": "customer.html",
+      "commerceCapabilities": {
+        "reviews": true,
+        "favorites": true,
+        "questions": true,
+        "stockCheck": true,
+        "singleStore": true,
+        "customerAuth": true,
+        "orderHistory": true,
+        "persistentCart": true,
+        "supportRouting": true,
+        "variantSelection": true,
+        "checkoutPreparation": true
+      }
+    },
+    "entryPoint": "customer.html",
+    "environment": "LOCAL"
+  },
+  "binding": {
+    "id": "6137628b-e297-4521-a984-5f07f4a91bda",
+    "hostname": "classic.localhost",
+    "service_id": "1d3a22dd-b233-4e12-a9c1-dff203b391c3",
+    "organization_id": "1",
+    "store_id": "1",
+    "assignment_id": "30b37cbb-4449-425e-977e-e707e0d72bed",
+    "status": "VERIFIED",
+    "verified_at": "2026-09-19T22:26:29.956Z",
+    "verification_reference": "OWNED_LOOPBACK_FIXTURE_NOT_DNS_OR_PUBLICATION"
+  },
+  "before": {
+    "status": "DEPLOYING",
+    "revision": 6,
+    "policy_revision": 8,
+    "draft_revision": 2
+  },
+  "after": {
+    "status": "DEPLOYING",
+    "revision": 6,
+    "policy_revision": 8,
+    "draft_revision": 2
+  },
+  "activePointers": 0,
+  "exactReviewRecord": {
+    "serviceId": "1d3a22dd-b233-4e12-a9c1-dff203b391c3",
+    "publicationId": "9519490c-67d2-4387-8e81-ec4f793b7088",
+    "artifactDigest": "e5f81b39e9e0615d22281d2a495f7f4d120d71893165ea6e337d3679916a2ba5",
+    "channel": "web"
+  },
+  "privateReviewManifestPath": "C:\\Users\\kusay\\Documents\\Codex\\2026-09-04\\gp\\outputs\\theme-platform-wave2-closure-20260919\\unified-final-runtime-1789856242001\\local-candidate-review.json",
+  "reviewManifestWritten": false,
+  "publicationStateChanged": false,
+  "activePointerChanged": false,
+  "qaAcceptanceClaimed": false,
+  "allFilesVerifiedByCanonicalCandidateReader": true
+}

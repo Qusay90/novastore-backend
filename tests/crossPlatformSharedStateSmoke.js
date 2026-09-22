@@ -5,6 +5,7 @@ const sharedStateController = require('../controllers/sharedStateController');
 
 const favorites = new Map();
 const sharedRows = new Map();
+const transactions = { begin: 0, commit: 0, rollback: 0, released: 0 };
 const products = new Map([
     [101, { id: 101, name: 'Urun 101', price: 100, old_price: 120, image_url: '101.png', stock: 8, category: 'test' }],
     [102, { id: 102, name: 'Urun 102', price: 200, old_price: null, image_url: '102.png', stock: 5, category: 'test' }]
@@ -14,6 +15,11 @@ const favKey = (userId, productId) => `${userId}:${productId}`;
 const sharedKey = (userId, stateKey) => `${userId}:${stateKey}`;
 
 pool.query = async (sql, params = []) => {
+    if (/^(BEGIN|COMMIT|ROLLBACK)$/i.test(sql)) {
+        transactions[sql.toLowerCase()] += 1;
+        return { rows: [], rowCount: 0 };
+    }
+    if (/SELECT pg_advisory_xact_lock/i.test(sql)) return { rows: [], rowCount: 1 };
     if (/SELECT id FROM products WHERE id = \$1/i.test(sql)) {
         const product = products.get(Number(params[0]));
         return { rows: product ? [{ id: product.id }] : [], rowCount: product ? 1 : 0 };
@@ -48,14 +54,17 @@ pool.query = async (sql, params = []) => {
         return { rows, rowCount: rows.length };
     }
 
-    if (/SELECT payload, updated_at FROM user_shared_state/i.test(sql)) {
-        const row = sharedRows.get(sharedKey(params[0], params[1]));
-        return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+    if (/SELECT state_key,payload,cart_schema_version,revision,updated_at FROM user_shared_state/i.test(sql)) {
+        const selected = [...sharedRows.entries()].filter(([key]) => key.startsWith(`${params[0]}:`)).map(([, row]) => row);
+        return { rows: selected, rowCount: selected.length };
     }
 
     if (/INSERT INTO user_shared_state/i.test(sql)) {
         const row = {
+            state_key: params[1],
             payload: JSON.parse(params[2]),
+            cart_schema_version: 1,
+            revision: (sharedRows.get(sharedKey(params[0], params[1]))?.revision ?? -1) + 1,
             updated_at: new Date('2026-06-22T00:00:00.000Z')
         };
         sharedRows.set(sharedKey(params[0], params[1]), row);
@@ -64,6 +73,9 @@ pool.query = async (sql, params = []) => {
 
     throw new Error(`Unhandled fake pool SQL: ${sql}`);
 };
+// A transparent client double keeps every legacy success assertion. Concurrency
+// is validated separately with real PostgreSQL, never inferred from this fake.
+pool.connect = async () => ({ query: (...args) => pool.query(...args), release: () => { transactions.released += 1; } });
 
 const createReq = (userId, params = {}, body = {}) => ({
     user: { id: userId, role: 'customer' },
@@ -140,6 +152,11 @@ const getState = async (userId, key) => {
         items: [{ id: 102, name: 'Urun 102', price: 200, image: '102.png', quantity: 2 }]
     });
     assert.strictEqual((await getState(userId, 'cart')).items[0].productId, 102);
+
+    assert.deepStrictEqual((await getState(userId + 1, 'cart')).items, []);
+    assert.strictEqual(transactions.begin, transactions.commit);
+    assert.strictEqual(transactions.rollback, 0);
+    assert.strictEqual(transactions.released, transactions.begin);
 
     await putState(userId, 'checkout', {
         items: [{ id: 102, name: 'Urun 102', price: 200, image: '102.png', quantity: 2 }],

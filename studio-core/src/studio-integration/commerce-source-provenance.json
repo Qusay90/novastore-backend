@@ -1,0 +1,46 @@
+{
+  "sourceCommit": "493164b26aee16ca25225e01aeb03d6e28f3f9aa",
+  "sourceTree": "8462a3067f567d3dfb95ddd03052d2368e96234d",
+  "role": "B03 behavior only; no existing UI imported",
+  "entries": [
+    {
+      "path": "storefront-commerce-pro/src/adapters/variantContract.js",
+      "target": "studio-core/src/studio-integration/commerce-variant-contract.js",
+      "sourceSHA256": "565f29316b8c643935fb4e6a89b20d65576cece2a5d6c57f5452f620593473c0",
+      "targetSHA256": "565f29316b8c643935fb4e6a89b20d65576cece2a5d6c57f5452f620593473c0",
+      "importRelocations": {}
+    },
+    {
+      "path": "storefront-commerce-pro/src/adapters/cartV2Adapter.js",
+      "target": "studio-core/src/studio-integration/commerce-cart-v2.js",
+      "sourceSHA256": "f350cf15e44e23afa4319c04c5c01e501b5edf7c361c16f20ad7f48b9031ba12",
+      "targetSHA256": "96a8069d6e20804013df110e0dd37ed3491c6b7f93b00a904ebe3ba0ba399c7b",
+      "importRelocations": {
+        "./variantContract.js": "./commerce-variant-contract.js"
+      }
+    },
+    {
+      "path": "storefront-commerce-pro/src/adapters/checkoutAdapter.js",
+      "target": "studio-core/src/studio-integration/commerce-checkout-base.js",
+      "sourceSHA256": "b95e2bfd4f38a79b819d14de72137f1e4e2a3002b54c834fb832738ca5d1d681",
+      "targetSHA256": "bba86c37e74be837894695873133c288f9e3cc2c8156563b1bdca2ce4af10ff8",
+      "importRelocations": {
+        "./variantContract.js": "./commerce-variant-contract.js"
+      }
+    },
+    {
+      "path": "storefront-commerce-pro/src/adapters/authAdapter.js",
+      "target": "studio-core/src/studio-integration/commerce-auth-base.js",
+      "sourceSHA256": "a1dd87cc90e9ac253e4c930f14d16bb2a600491a912bb0193e51d63ec3a440a9",
+      "targetSHA256": "a1dd87cc90e9ac253e4c930f14d16bb2a600491a912bb0193e51d63ec3a440a9",
+      "importRelocations": {}
+    },
+    {
+      "path": "storefront-commerce-pro/src/integration/customerHttp.js",
+      "target": "studio-core/src/studio-integration/commerce-http-base.js",
+      "sourceSHA256": "cb8548f77b79cc62a099ae91563e3600c443921590714772ff4507e899d7961d",
+      "targetSHA256": "cb8548f77b79cc62a099ae91563e3600c443921590714772ff4507e899d7961d",
+      "importRelocations": {}
+    }
+  ]
+}

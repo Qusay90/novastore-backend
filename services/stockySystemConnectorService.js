@@ -25,6 +25,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0
 const LOCAL_HOSTS = new Set(['127.0.0.1']);
 const STATUS_PATH_PREFIX = '/api/integrations/novastore/v1/orders/events/';
 const EVENT_PATH = '/api/integrations/novastore/v1/orders/events';
+const THEME_EVENT_PATH = '/api/integrations/novastore/v1/themes/events';
 
 class StockySystemConnectorError extends Error {
     constructor(code, statusCode = 409, details = null) {
@@ -86,6 +87,29 @@ const assertStockyRequestTarget = ({ method, path, body = '' }) => {
     return Object.freeze({ method: normalizedMethod, path: normalizedPath });
 };
 
+// A separate, finite transport domain. Order callers retain their original
+// allowlist; neither public callers nor environment settings provide URL paths.
+const assertStockyThemeRequestTarget = ({ method, path, body = '' }) => {
+    const normalizedMethod = String(method || '').trim().toUpperCase();
+    const normalizedPath = requiredText(path, 768, 'STOCKY_CONNECTOR_REQUEST_TARGET_INVALID');
+    const eventId = '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+    const statusPattern = new RegExp(`^${THEME_EVENT_PATH}/${eventId}$`, 'u');
+    const receiptPattern = new RegExp(`^${THEME_EVENT_PATH}/${eventId}/receipt$`, 'u');
+    if (!((normalizedMethod === 'POST' && normalizedPath === THEME_EVENT_PATH)
+        || (normalizedMethod === 'GET' && statusPattern.test(normalizedPath) && body === '')
+        || (normalizedMethod === 'POST' && receiptPattern.test(normalizedPath)))) {
+        throw new StockySystemConnectorError('STOCKY_CONNECTOR_REQUEST_TARGET_INVALID', 400);
+    }
+    return Object.freeze({ method: normalizedMethod, path: normalizedPath });
+};
+
+const assertStockyThemeSellerRequestTarget = ({ method, path }) => {
+    if (method !== 'POST' || path !== '/api/integrations/novastore/v1/theme-seller-session/introspect') {
+        throw new StockySystemConnectorError('STOCKY_CONNECTOR_REQUEST_TARGET_INVALID', 400);
+    }
+    return Object.freeze({ method, path });
+};
+
 const readResponse = (response, maximumBytes = 1024 * 1024) => new Promise((resolve, reject) => {
     const chunks = [];
     let bytes = 0;
@@ -101,7 +125,7 @@ const readResponse = (response, maximumBytes = 1024 * 1024) => new Promise((reso
     response.on('error', reject);
 });
 
-const createSafeStockyTransport = ({ lookup = dns.promises.lookup, timeoutMs = 10000 } = {}) => async ({
+const createTransportForDomain = (assertTarget, { lookup = dns.promises.lookup, timeoutMs = 10000 } = {}) => async ({
     url,
     method,
     headers,
@@ -114,7 +138,7 @@ const createSafeStockyTransport = ({ lookup = dns.promises.lookup, timeoutMs = 1
         throw new StockySystemConnectorError('STOCKY_CONNECTOR_REQUEST_TARGET_INVALID', 400);
     }
     validateEndpointOrigin(endpoint.origin, runtime);
-    assertStockyRequestTarget({ method, path: endpoint.pathname, body });
+    assertTarget({ method, path: endpoint.pathname, body });
     const hostname = endpoint.hostname.toLowerCase().replace(/^\[|\]$/gu, '').replace(/\.$/u, '');
     let pinned = null;
     if (runtime?.localOnly) {
@@ -163,6 +187,10 @@ const createSafeStockyTransport = ({ lookup = dns.promises.lookup, timeoutMs = 1
         request.end();
     });
 };
+
+const createSafeStockyTransport = (options) => createTransportForDomain(assertStockyRequestTarget, options);
+const createSafeStockyThemeTransport = (options) => createTransportForDomain(assertStockyThemeRequestTarget, options);
+const createSafeStockyThemeSellerTransport = (options) => createTransportForDomain(assertStockyThemeSellerRequestTarget, options);
 
 const parseSecrets = (value) => {
     let parsed;
@@ -365,10 +393,10 @@ const canonicalSignatureInput = ({ method, path, host, connectionId, keyId, time
     sha256Hex(body || '')
 ].join('\n');
 
-const signStockyRequest = ({ method, path, body = '', connection, runtime, nonce = crypto.randomBytes(24).toString('base64url'), timestamp = Math.floor(Date.now() / 1000) }) => {
+const signRequestForDomain = (assertTarget, { method, path, body = '', connection, runtime, nonce = crypto.randomBytes(24).toString('base64url'), timestamp = Math.floor(Date.now() / 1000) }) => {
     if (!runtime?.enabled) throw new StockySystemConnectorError('STOCKY_CONNECTOR_DISABLED', 503);
     const endpoint = validateEndpointOrigin(connection?.endpoint_origin, runtime);
-    const target = assertStockyRequestTarget({ method, path, body });
+    const target = assertTarget({ method, path, body });
     const connectionId = requiredUuid(connection?.id);
     const keyId = requiredText(connection?.key_id, 64);
     const secret = runtime.secretsByRef[connection?.secret_ref];
@@ -394,6 +422,10 @@ const signStockyRequest = ({ method, path, body = '', connection, runtime, nonce
         })
     });
 };
+
+const signStockyRequest = (input) => signRequestForDomain(assertStockyRequestTarget, input);
+const signStockyThemeRequest = (input) => signRequestForDomain(assertStockyThemeRequestTarget, input);
+const signStockyThemeSellerRequest = (input) => signRequestForDomain(assertStockyThemeSellerRequestTarget, input);
 
 const getHeader = (headers, name) => {
     if (headers && typeof headers.get === 'function') return headers.get(name);
@@ -441,6 +473,7 @@ const verifyStockyResponse = ({ statusCode, path, rawBody, headers, connection, 
 module.exports = Object.freeze({
     CONNECTION_HEADER,
     EVENT_PATH,
+    THEME_EVENT_PATH,
     KEY_ID_HEADER,
     NONCE_HEADER,
     REQUEST_NONCE_HEADER,
@@ -451,8 +484,12 @@ module.exports = Object.freeze({
     TIMESTAMP_HEADER,
     StockySystemConnectorError,
     assertStockyRequestTarget,
+    assertStockyThemeRequestTarget,
+    assertStockyThemeSellerRequestTarget,
     canonicalSignatureInput,
     createSafeStockyTransport,
+    createSafeStockyThemeTransport,
+    createSafeStockyThemeSellerTransport,
     createStockyConnectorBinding,
     getHeader,
     isPublicAddress,
@@ -460,6 +497,8 @@ module.exports = Object.freeze({
     resolveStockySystemCommerceRuntime,
     sha256Hex,
     signStockyRequest,
+    signStockyThemeRequest,
+    signStockyThemeSellerRequest,
     stableStringify,
     validateEndpointOrigin,
     verifyStockyResponse

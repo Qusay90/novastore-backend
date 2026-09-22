@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const vm = require('node:vm');
+const { collectPreviewSourceGraph } = require('./helpers/adminCommerceProPreviewGraph');
 
 const repositoryRoot = path.join(__dirname, '..');
 const previewPath = process.env.COMMERCE_PRO_PREVIEW_PATH
@@ -217,9 +218,20 @@ function assertRawByteArtifactMatrix() {
     try {
         const headCommit = executeText('git', ['rev-parse', 'HEAD']).trim();
         assert.match(headCommit, /^[0-9a-f]{40,64}$/, 'HEAD tam commit kimliği olmalı');
+        // Pre-commit acceptance may attest an immutable, fully staged tree.
+        // The default remains the exact HEAD seal; neither branch skips any
+        // blob/checkout/build byte, CR or missing-entry assertion below.
+        const artifactTree = process.env.NOVASTORE_TEST_ARTIFACT_TREE || null;
+        if (artifactTree) {
+            assert.match(artifactTree, /^[0-9a-f]{40}$/, 'Tam immutable tree kimliği gerekli');
+            assert.equal(executeText('git', ['cat-file', '-t', artifactTree]).trim(), 'tree');
+            assert.equal(executeText('git', ['write-tree']).trim(), artifactTree, 'Index doğrulanacak tree ile aynı olmalı');
+            assert.equal(executeText('git', ['diff', '--name-only']), '', 'Test edilen kaynaklarda unstaged değişiklik olamaz');
+        }
+        const artifactAuthority = artifactTree || headCommit;
         const blobs = Object.fromEntries(Object.entries(rawByteArtifactDefinitions).map(([artifactKey, definition]) => [
             artifactKey,
-            executeBuffer('git', ['cat-file', 'blob', `HEAD:${definition.relativePath}`])
+            executeBuffer('git', ['cat-file', 'blob', `${artifactAuthority}:${definition.relativePath}`])
         ]));
 
         executeBuffer(
@@ -231,11 +243,19 @@ function assertRawByteArtifactMatrix() {
         assert.equal(executeText('git', ['config', '--get', 'core.autocrlf'], checkoutRoot).trim(), 'true');
         executeBuffer('git', ['checkout', '--detach', headCommit], checkoutRoot);
         assert.equal(executeText('git', ['rev-parse', 'HEAD'], checkoutRoot).trim(), headCommit, 'checkout exact HEAD commit olmalı');
-        assert.equal(
-            executeText('git', ['status', '--porcelain=v1', '--untracked-files=all'], checkoutRoot),
-            '',
-            'clean Windows checkout status temiz olmalı'
-        );
+        if (artifactTree) {
+            executeBuffer('git', ['read-tree', '--reset', '-u', artifactTree], checkoutRoot);
+            assert.equal(executeText('git', ['write-tree'], checkoutRoot).trim(), artifactTree);
+        }
+        const assertCheckoutClean = () => {
+            if (!artifactTree) assert.equal(executeText('git', ['status', '--porcelain=v1', '--untracked-files=all'], checkoutRoot), '', 'clean Windows checkout status temiz olmalı');
+            else {
+                assert.equal(executeText('git', ['write-tree'], checkoutRoot).trim(), artifactTree, 'Geçici index exact tree olarak kalmalı');
+                assert.equal(executeText('git', ['diff', '--name-only'], checkoutRoot), '', 'Checkout index ile eşleşmeli');
+                assert.equal(executeText('git', ['ls-files', '--others', '--exclude-standard'], checkoutRoot), '', 'Geçici checkout untracked dosya içermemeli');
+            }
+        };
+        assertCheckoutClean();
 
         const checkoutAttributes = parseNullDelimitedGitAttributes(
             executeBuffer('git', ['check-attr', '-z', 'text', 'eol', '--', ...artifactPaths], checkoutRoot),
@@ -264,11 +284,7 @@ function assertRawByteArtifactMatrix() {
                 + `eol=${checkoutAttributes.get(definition.relativePath).get('eol')}`
             );
         }
-        assert.equal(
-            executeText('git', ['status', '--porcelain=v1', '--untracked-files=all'], checkoutRoot),
-            '',
-            'matrix sonunda disposable checkout temiz kalmalı'
-        );
+        assertCheckoutClean();
 
         const missingEntryMatrix = {
             preview: {
@@ -299,6 +315,7 @@ function assertRawByteArtifactMatrix() {
         console.log('MISSING_MATRIX_ENTRY_FAIL_CLOSED=PASS');
         console.log('CR_MISMATCH_FAIL_CLOSED=PASS');
         console.log('RAW_BYTE_MATRIX=PASS');
+        console.log(`ARTIFACT_AUTHORITY=${artifactAuthority}${artifactTree ? ' (immutable staged tree; not a commit)' : ' (HEAD commit)'}`);
     } catch (error) {
         operationError = error;
         throw error;
@@ -386,19 +403,10 @@ const previewSource = previewBytes.toString('utf8');
 const adminSource = fs.readFileSync(adminPath, 'utf8');
 const sourceModuleFiles = listSourceModules(sourceRoot);
 const sourceFiles = listSourceFiles(sourceRoot);
-const isPreviewSource = (relativePath) => (
-    relativePath !== 'src/IntegratedApp.jsx'
-    && relativePath !== 'src/integrated.css'
-    && relativePath !== 'src/main-integrated.jsx'
-    && !relativePath.startsWith('src/adapters/')
-    && !relativePath.startsWith('src/integration/')
-);
-const sourceModules = sourceModuleFiles.map((relativePath) => ({
-    relativePath,
-    source: fs.readFileSync(path.join(commerceProRoot, relativePath), 'utf8')
-}));
-const previewSourceModules = sourceModules.filter(({ relativePath }) => isPreviewSource(relativePath));
-const previewSourceFiles = sourceFiles.filter(isPreviewSource);
+const { modules: previewSourceModules, files: previewSourceFiles } = collectPreviewSourceGraph(commerceProRoot);
+assert.ok(previewSourceFiles.includes('src/App.jsx') && previewSourceFiles.includes('src/main.jsx'), 'Preview gerçek App + main girişini incelemeli');
+assert.ok(previewSourceFiles.includes('src/integration/inputModality.js'), 'Preview tarafından kullanılan ortak kod klasör adına göre denetimden çıkarılamaz');
+assert.ok(previewSourceFiles.every(relativePath => !relativePath.startsWith('src/theme-platform/')), 'Canlı tema entegrasyonu preview girişinden erişilemez olmalı');
 const applicationSource = previewSourceModules
     .map(({ relativePath, source }) => `/* ${relativePath} */\n${source}`)
     .join('\n');
