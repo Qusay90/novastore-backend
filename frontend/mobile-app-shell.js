@@ -404,7 +404,7 @@
                 '</div>',
                 '<div class="native-about-list">',
                 '<a href="mailto:destek@novastore.tr"><span>@</span><div><strong>E-Posta</strong><em>destek@novastore.tr</em></div></a>',
-                '<a href="tel:+905314642430"><span>TR</span><div><strong>Telefon</strong><em>0531 464 24 30</em></div></a>',
+                '<a href="tel:+905551772430"><span>TR</span><div><strong>Telefon</strong><em>0555 177 24 30</em></div></a>',
                 '<a href="https://www.instagram.com/novastore.tr/" target="_blank" rel="noopener noreferrer"><span>IG</span><div><strong>Instagram</strong><em>@novastore.tr</em></div></a>',
                 '<a href="https://www.youtube.com/@novastoretr" target="_blank" rel="noopener noreferrer"><span>YT</span><div><strong>YouTube</strong><em>@novastoretr</em></div></a>',
                 '</div>'

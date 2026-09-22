@@ -1,0 +1,11 @@
+.public-continuation { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; padding: 24px 0 88px; }
+.public-continuation p { flex-basis: 100%; text-align: center; overflow-wrap: anywhere; }
+.public-continuation button { min-height: 44px; max-width: 100%; white-space: normal; display: inline-flex; align-items: center; justify-content: center; padding: 12px 18px; border: 1px solid #d8e3eb; border-radius: 12px; background: #fff; color: #00243e; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.public-continuation button:hover { background: #f3f7fa; }
+.public-continuation button:focus-visible, .public-attribute-filters input:focus-visible { outline: 3px solid var(--blue, #2563eb); outline-offset: 3px; }
+.public-continuation [aria-disabled="true"] { opacity: .65; cursor: progress; }
+.public-attribute-filters .filter-section__body { display: grid; gap: 8px; padding: 0 16px 16px; }
+.public-attribute-filters > p { padding: 16px; margin: 0; font-size: 13px; }
+.public-attribute-filters h3 { padding: 16px; margin: 0; font-size: 14px; }
+.public-attribute-filters label, .public-attribute-filters p { overflow-wrap: anywhere; min-width: 0; }
+.public-attribute-filters input[type="number"], .public-attribute-filters input[type="text"] { width: 100%; min-width: 0; }

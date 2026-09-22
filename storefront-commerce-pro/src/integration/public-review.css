@@ -1,0 +1,8 @@
+.public-review-steps{display:flex;gap:12px;flex-wrap:wrap;margin:24px 0}
+.public-review-items{padding:0;list-style:none}
+.public-review-items li{display:flex;justify-content:space-between;gap:18px;border-bottom:1px solid #e3e8ed;padding:16px 0}
+.public-review-items a{max-width:70%;overflow-wrap:anywhere}
+.public-review-contact{grid-column:1/-1;max-width:100%;overflow-wrap:anywhere}
+.public-review-contact p{max-width:100%}
+.breadcrumbs a{display:inline-flex;align-items:center;min-height:24px;padding:4px 0}
+@media(max-width:600px){.public-review-items li{flex-direction:column}.public-review-items a{max-width:100%}.public-review-steps{flex-direction:column}}

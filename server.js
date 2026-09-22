@@ -31,6 +31,9 @@ const pool = require('./config/db');
 const { getAllowedOrigins } = require('./config/appConfig');
 const { getPublicCategoryBySlug } = require('./services/categoryService');
 const { getPublicCollection } = require('./services/collectionService');
+const { isPublicReviewRelease } = require('./config/publicReviewConfig');
+const { createPublicReviewRouter } = require('./routes/publicReviewRoutes');
+const { createPublicReviewWebRouter } = require('./routes/publicReviewWebRoutes');
 const {
     authenticateSocket,
     autoJoinAllowedRooms,
@@ -96,6 +99,8 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(sanitizeBody);
 app.use(simpleRateLimit({ windowMs: 60 * 1000, max: 240 }));
+app.use(createPublicReviewRouter());
+app.use(createPublicReviewWebRouter());
 app.get('/favicon.ico', (req, res) => {
     res.type('image/png');
     res.sendFile(path.join(__dirname, 'frontend', 'favicon-96x96.png'));
@@ -282,6 +287,13 @@ const createCommerceSchema = require('./models/createCommerceDb');
 const createAnalyticsSchema = require('./models/createAnalyticsDb');
 
 const prepareDatabase = async (startupSafety) => {
+    if (isPublicReviewRelease()) {
+        // This code-only candidate must never run a schema initializer, even locally.
+        if (startupSafety.shouldRunSchemaInit) throw new Error('Review release refuses schema initialization.');
+        await pool.query('SELECT 1');
+        console.log('Review database connection verified; schema initialization disabled.');
+        return;
+    }
     if (!startupSafety.shouldVerifyDbConnection) {
         console.log('Veritabani baglantisi ve schema init SKIP_SCHEMA_INIT=true ile atlandi.');
         return;

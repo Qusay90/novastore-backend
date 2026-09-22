@@ -1,0 +1,28 @@
+# R38-R1 test reconciliation
+
+The stopped 139/145 run is historical only. Final authoritative Web suite: **153/153 PASS**, zero skipped/cancelled/unexplained failures. Evidence: `artifacts/r38-r1/web-tests-final.log`.
+
+| Previous failure | Classification and resolution |
+|---|---|
+| R2 question/review ownership | B: imported test expected newer session middleware. Assert exact legacy JWT verification, owner query, self/admin rejection and review API no-store instead. Disposable HTTP tests prove anonymous 401 and cross-customer 403; no R31 session table was imported. |
+| Canonical upload/preview byte identity | C: regenerate canonical preview with `npm run build`; original canonical HTML/App/CSS hashes and exact-source assertions remain unchanged. |
+| Runtime catalog failure / independent public page | B: expected legal DTO omitted `consentEligible:false`. Retain explicit refusal semantics in the expected DTO; default catalog failures still reject. |
+| Legal adapter/footer contract | B: retain explicit false consent eligibility and assert conditional review public paths. Unsafe paths are rejected; unpublished documents cannot become consent eligible. |
+| Public Store route owner | B: review Web document routes are in `routes/publicReviewWebRoutes.js`, preceding the legacy static server. Assert that owner and preserve one PublicStorePage path. This review runtime exposes no Store DTO and shows a preparation state. |
+| Comparison tray / content order | A: the preserved stopped source had been changed after the historical run. Final source places the tray before content; the original order assertion passes unchanged. |
+
+R1 added eight meaningful Web boundary tests: proven unbounded legacy authority, ambiguous arrays/identities, opaque cursor envelopes, empty real navigation fallback, descriptive variants/default media, guest GET-only cart/runtime behavior, ineligible legal documents/unsafe URIs, and safe readable legacy HTML descriptions. The R6 navigation expectation now verifies the explicit review-only marketplace information destination while preserving the normal integration Seller constant. No test was deleted or skipped to obtain green.
+
+Canonical, integration and fixture builds all complete from source. The two independent clean public-review builds and the browser-tested production artifact are byte-identical: SHA256 `2900017ad5f00c6e5e0f0b01c6b3a4d63458fb713a19479ef7e0274f28b52cad` (5,271,557 bytes).
+
+Exact data-free R36 schema fingerprint `4bdfb53e2823836fc7560570667d65a1ea332ba2ba18632d4dd163389517d56a`: actual final server boots with schema initialization disabled, 57 HTTP checks pass, existing disposable customer login/account reads and admin authorization remain intact. The application database role defaults to read-only. Every table row count and schema fingerprint remain unchanged after browser QA. Disposable fixture includes the actual empty main menu and attested category counters. Production data is never seeded or mutated.
+
+Root smoke checks pass: `startupSafetySmoke.js`, `adminSessionAuthSmoke.js`, `paymentProviderConfigSmoke.js`, and `publicReviewReleaseSmoke.js`. The latter proves 12 complete no-JS legal documents plus Contact, links/contact/roles, escaped content, false consent flags, registration/order/provider denial before downstream handlers, existing-login presentation, exact Web bytes and development-preview isolation. Destructive legacy DB smoke scripts were not run against a shared database; their relevant public/auth boundaries were exercised against the exact disposable schema.
+
+Browser: 21 routes at each of 1440×1000, 1280×720, 1024×768, 768×1024, 390×844 and 360×800, plus existing login and unsupported Store state. All 128 measurements show zero document horizontal overflow, critical clipping candidates, broken images or card fields. Real search, gallery thumbnail/lightbox, cart and all review checkout steps were exercised. 740 recorded application requests after the final QA baseline are GET/HEAD only, with zero HTTP failures. The user journey creates no order, payment or shared customer state.
+
+Accessibility: axe-core WCAG 2 A/AA, 2.1 A/AA and 2.2 AA, 31 final desktop/mobile page runs, zero violations including zero critical. To keep browser control on the supported surface, axe runs on complete frozen rendered DOM snapshots with the exact captured CSS; live interaction is checked separately. Mobile breadcrumb targets and the unavailable assistant overlapping checkout search were fixed. Remaining axe manual-review categories concern gradient/image contrast and aria-controls for unopened popups; dialogs, textual statuses, focus behavior and screenshots were reviewed. This is bounded automated evidence, not a blanket WCAG certification.
+
+Contact is the owner's approved Samsun address, `0555 177 24 30`, `tel:+905551772430`, `destek@novastore.tr`; legal/company identifiers remain null/pending. Documents retain `review_template`, `consentEligible:false`, `requiredForCheckout:false`, `lawyerApproved:false`. General review wording was checked against the [Ministry of Trade distance-contract information](https://tuketici.ticaret.gov.tr/yayinlar/tuketici-bilgi-rehberi/mesafeli-sozlesmeler-hakkinda-bilgilendirme) and [KVKK disclosure-duty notice](https://www.kvkk.gov.tr/Icerik/6765/AYDINLATMA-YUKUMLULUGUNUN-YERINE-GETIRILMESI-HAKKINDA-KAMUOYU-DUYURUSU); company formation and final legal approval remain outstanding.
+
+Production review publication does not activate payments, registrations, R31 schema, Stocky S10 or first-sale readiness. Permanent Admin direction remains Commerce Pro Admin. Legacy Admin receives no new feature or redesign.

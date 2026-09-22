@@ -54,3 +54,8 @@ veri tabanı giriş şifresi.txt
 /frontend/cordova_plugins.js
 
 graphify-out/
+
+# Rebuilt local Commerce Pro verification previews, never release source.
+/frontend/commerce-pro-preview/
+/frontend/commerce-pro-integration-preview/
+/frontend/commerce-pro-fixture/

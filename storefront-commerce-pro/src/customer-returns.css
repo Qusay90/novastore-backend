@@ -1,0 +1,24 @@
+/* Customer return history is independent of order eligibility. */
+.customer-returns, .customer-returns article, .customer-return-list li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.customer-returns nav { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+.customer-return-list { display: grid; gap: 16px; list-style: none; padding: 0; }
+.customer-return-list article, .customer-return-detail { border: 1px solid #d9dfe7; border-radius: 14px; padding: 20px; background: #fff; }
+.customer-return-list h2 { font-size: 18px; }
+.customer-returns p { line-height: 1.6; }
+.customer-returns a, .return-create-confirmation a { text-decoration: underline; text-underline-offset: 3px; }
+.customer-return-detail dl { margin: 0; display: grid; gap: 16px; }
+.customer-return-detail dl > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; }
+.customer-return-detail dt { font-weight: 700; }
+.customer-return-detail dd { margin: 0; white-space: pre-wrap; }
+.customer-returns button { min-height: 44px; padding: 10px 16px; cursor: pointer; border: 1px solid #ccd7e3; border-radius: 10px; background: #fff; color: #0b2b43; font: inherit; font-weight: 600; }
+.customer-returns :is(a, button):focus-visible, .return-create-confirmation a:focus-visible { outline: 3px solid #315bea; outline-offset: 3px; }
+.return-create-confirmation { display: block; overflow-wrap: anywhere; }
+@media (max-width: 620px) {
+  .customer-return-detail dl > div { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+  .customer-return-list article, .customer-return-detail { padding: 14px; }
+}
+
+.return-history-entry { display: flex; align-items: center; gap: 12px; padding: 16px; margin: 20px 0; border: 1px solid #ccd7e3; border-radius: 12px; background: #fff; }
+.return-history-entry span { flex: 1; min-width: 0; }
+.return-history-entry small { display: block; margin-top: 4px; }
+.return-history-entry:focus-visible { outline: 3px solid #315bea; outline-offset: 3px; }

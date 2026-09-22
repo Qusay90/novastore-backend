@@ -1,0 +1,11 @@
+.runtime-product-media-stage { touch-action: pan-y; }
+.runtime-product-media-stage > .runtime-gallery-current { opacity: 0; transition: opacity 200ms ease; }
+.runtime-product-media-stage > .runtime-gallery-current.is-entered { opacity: 1; }
+.runtime-product-media-stage > .runtime-gallery-previous { pointer-events: none; }
+.runtime-gallery-pending { position: absolute; z-index: 2; inset: auto 12px 12px; padding: 6px 10px; border-radius: 8px; background: #fff; color: #253047; font-size: 12px; }
+.runtime-gallery-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #475569; font-size: 14px; }
+.runtime-product-thumbnails { min-height: 74px; }
+@media (prefers-reduced-motion: reduce) {
+  .runtime-product-media-stage > .runtime-gallery-current { transition: none; opacity: 1; }
+  .runtime-product-media-stage > .runtime-gallery-previous { display: none; }
+}

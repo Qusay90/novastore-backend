@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "purpose": "public-provider-review",
+  "legacyBaseCommit": "9a19471aa5e9c06c0e49b8ff0e0281991c0e2dd4",
+  "legacyCatalogContract": "unbounded-public-array",
+  "registrationEnabled": false,
+  "paymentEnabled": false,
+  "productionMigrations": 0
+}

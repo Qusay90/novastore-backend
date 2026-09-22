@@ -1,0 +1,67 @@
+import { catalogAdapterTestUtils } from "./catalogAdapter.js";
+import { normalizePagination, pageQuery } from "./publicPagination.js";
+
+const asArray = (value) => Array.isArray(value) ? value : [];
+
+export function normalizePublicStoreSlug(value) {
+  const normalized = String(value ?? "").trim().toLocaleLowerCase("en-US");
+  return normalized.length <= 160 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalized)
+    ? normalized
+    : null;
+}
+
+const text = (value, maxLength) => String(value ?? "")
+  .replace(/[\u0000-\u001f\u007f]/g, " ")
+  .replace(/\s+/g, " ")
+  .trim()
+  .slice(0, maxLength);
+
+const normalizeStore = (value) => {
+  const slug = normalizePublicStoreSlug(value?.slug);
+  const name = text(value?.name, 160);
+  if (!slug || !name) throw new Error("Public mağaza kimliği geçerli değil.");
+  return Object.freeze({
+    slug,
+    name,
+    description: text(value?.description, 2000),
+    logoUrl: null,
+    bannerUrl: null,
+    status: value?.status === "open" ? "open" : "open",
+    rating: value?.rating === null ? null : Math.min(5, Math.max(0, Number(value?.rating) || 0)),
+    reviewCount: Math.max(0, Number.parseInt(value?.review_count, 10) || 0),
+    followerCount: Math.max(0, Number.parseInt(value?.follower_count, 10) || 0),
+    totalUnitsSold: Math.max(0, Number.parseInt(value?.total_units_sold, 10) || 0),
+    productCount: Math.max(0, Number.parseInt(value?.product_count, 10) || 0),
+    shippingSummary: text(value?.shipping_summary, 2000),
+    returnSummary: text(value?.return_summary, 2000),
+  });
+};
+
+export function createPublicStoreAdapter(http) {
+  if (!http || typeof http.request !== "function") {
+    throw new TypeError("Public mağaza adapterı için storefront HTTP istemcisi gereklidir.");
+  }
+
+  const load = async (storeSlug, { catalog, signal, cursor, cursorPagination = false } = {}) => {
+    const slug = normalizePublicStoreSlug(storeSlug);
+    if (!slug) throw new TypeError("Geçerli bir public mağaza slug değeri gereklidir.");
+    const payload = await http.request(`/api/public/stores/${encodeURIComponent(slug)}${cursorPagination ? `?${pageQuery({ cursor })}` : ""}`, { signal });
+    const categories = Array.isArray(catalog?.categories) ? catalog.categories : [];
+    const products = catalogAdapterTestUtils.normalizeProducts(
+      asArray(payload?.products),
+      categories,
+      [],
+    );
+    const store = normalizeStore(payload?.store);
+    if (store.slug !== slug) throw new Error("Mağaza kimliği doğrulanamadı.");
+    return Object.freeze({
+      store,
+      products: Object.freeze(products),
+      pagination: normalizePagination(payload?.pagination, { legacy: !payload?.pagination }),
+    });
+  };
+
+  return Object.freeze({ load });
+}
+
+export const publicStoreAdapterTestUtils = Object.freeze({ normalizeStore, text });

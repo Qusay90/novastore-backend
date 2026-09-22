@@ -423,7 +423,7 @@
                                 <span class="nova-footer-contact-icon">TR</span>
                                 <div class="nova-footer-contact-copy">
                                     <strong>Telefon</strong>
-                                    <a href="tel:+905314642430">0531 464 24 30</a>
+                                    <a href="tel:+905551772430">0555 177 24 30</a>
                                 </div>
                             </li>
                         </ul>
