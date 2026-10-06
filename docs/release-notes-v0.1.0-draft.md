@@ -32,6 +32,7 @@ The default-branch CI run for commit f25385bd, dated 2026-08-20, completed succe
 - A reusable theme-authoring platform is not verified as an implemented capability.
 - Admin and Android capabilities are partial; provider behavior depends on local deployment configuration.
 - A clean-room install and release-candidate review are still required.
+- The current main tree contains tracked Chromium profile files under `artifacts/chrome-profile/`, including cookie, login-data, and history databases. The release tree must exclude them, and any session or personal-state exposure in public history must be assessed.
 - No public adoption metrics are verified in the repository evidence snapshot.
 
 ## Next contributor work
@@ -46,5 +47,6 @@ The default-branch CI run for commit f25385bd, dated 2026-08-20, completed succe
 - Confirm the exact release commit and supported setup instructions.
 - Run CI on the release candidate and review all results.
 - Verify installation from a clean clone and inspect the release artifact contents.
+- Remove `artifacts/chrome-profile/` from the release tree and assess its public Git history for exposed session, credential, or personal state.
 - Recheck the public demo, metadata, limitations, and adoption figures.
 - Obtain maintainer sign-off, then create the v0.1.0 tag and GitHub release explicitly.

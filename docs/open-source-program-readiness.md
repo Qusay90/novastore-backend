@@ -23,8 +23,9 @@ This is a maintainer evidence sheet, not a marketing claim. It separates reposit
 | Roadmap and changelog | ROADMAP.md and CHANGELOG.md are present on this preparation branch; confirm merge before citing them as public |
 | Code of Conduct and templates | Added on this preparation branch; not yet merged to main |
 | CI | GitHub Actions workflow covers backend/storefront smoke checks, Commerce Pro admin build and checks, and Android unit tests |
-| Latest main CI observed | Successful run for f25385bd on 2026-08-20; no result for this local preparation branch |
+| Latest main CI observed | Latest successful main run: f25385bd on 2026-08-20. Check the current preparation-branch PR for its separate CI status. |
 | Releases | No GitHub release and no versioned semantic release tag |
+| Release artifact hygiene | The main tree tracks 243 files under `artifacts/chrome-profile/` (about 11.8 MB), including browser cookie, login-data, and history database files. Exclude this tree from any release artifact and assess public-history exposure before a release. File contents were not inspected in this audit. |
 | Homepage | novastore.tr; HTTP HEAD returned 200 on 2026-10-06. This confirms reachability, not feature acceptance or production readiness. |
 | Repository description | Open-source commerce platform with a Node.js API, web storefront, React admin foundation, Android app, and PostgreSQL-compatible data layer |
 | Topics | android, commerce-platform, ecommerce, express, kotlin, nodejs, open-source, postgresql, react, storefront, supabase |
@@ -71,3 +72,5 @@ The Codex for Open Source program currently says it considers meaningful usage, 
 Zero stars, forks, or downloads do not prove that software has no value or use, but they are weak public adoption signals. The 26 merged PRs show activity by the repository owner; they are not evidence of broad community contribution. The latest main commit and successful main CI run are both dated 2026-08-20, so a claim of current active maintenance would be stronger after new reviewed work lands on main.
 
 Before submitting, refresh repository metrics and the demo's feature-level status, confirm the applicant's maintainer role, and add any genuine evidence of usage or external ecosystem relevance. Do not substitute local branch activity for merged public maintenance evidence.
+
+Before any versioned release, remove the tracked browser profile from the release tree and assess whether its public history contains session, credential, or personal state. Removing it from a later tree alone would not remove earlier public Git objects.
