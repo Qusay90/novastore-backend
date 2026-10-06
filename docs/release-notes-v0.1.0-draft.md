@@ -33,6 +33,7 @@ The default-branch CI run for commit f25385bd, dated 2026-08-20, completed succe
 - Admin and Android capabilities are partial; provider behavior depends on local deployment configuration.
 - A clean-room install and release-candidate review are still required.
 - The current main tree contains tracked Chromium profile files under `artifacts/chrome-profile/`, including cookie, login-data, and history databases. The release tree must exclude them, and any session or personal-state exposure in public history must be assessed.
+- Resolve release-version policy: the private root `package.json` and `package-lock.json` report 1.0.0, while the private `admin-commerce-pro/package.json` reports 0.0.0. Decide whether these package versions should track the repository tag or be explicitly treated as private package metadata.
 - No public adoption metrics are verified in the repository evidence snapshot.
 
 ## Next contributor work
@@ -48,5 +49,6 @@ The default-branch CI run for commit f25385bd, dated 2026-08-20, completed succe
 - Run CI on the release candidate and review all results.
 - Verify installation from a clean clone and inspect the release artifact contents.
 - Remove `artifacts/chrome-profile/` from the release tree and assess its public Git history for exposed session, credential, or personal state.
+- Decide whether to align the root and admin package versions with the repository release or document that the private package versions are independent of repository tags.
 - Recheck the public demo, metadata, limitations, and adoption figures.
 - Obtain maintainer sign-off, then create the v0.1.0 tag and GitHub release explicitly.
