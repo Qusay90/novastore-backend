@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a reproducible problem in NovaStore.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove secrets, personal information, and customer data. Do not test against production services.
+  - type: input
+    id: area
+    attributes:
+      label: Affected area
+      description: API, storefront, admin, Android, database, or other.
+      placeholder: Storefront
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system and relevant runtime or app version.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the smallest safe sequence that shows the problem.
+      placeholder: |
+        1. Start with a disposable local environment.
+        2. Open ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and observed behavior
+      description: State what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Redact credentials, tokens, customer data, and private identifiers.
+    validations:
+      required: false
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed secrets and personal or customer data, and did not perform unauthorized production testing.
+          required: true

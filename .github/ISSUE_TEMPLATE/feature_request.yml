@@ -1,0 +1,44 @@
+name: Feature request
+description: Propose an outcome that would improve NovaStore.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues first. For a large feature or a change involving payments, authorization, migrations, or production operations, discuss the approach before implementation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Who encounters this problem, and in what workflow?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the result without prescribing an implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected project surface
+      multiple: true
+      options:
+        - Backend API
+        - Web storefront
+        - Commerce admin
+        - Android
+        - Database or migrations
+        - Documentation or contributor workflow
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Compatibility, security, or operational constraints
+      description: Note relevant ownership, privacy, migration, or provider boundaries.
+    validations:
+      required: false
