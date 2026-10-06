@@ -2,6 +2,8 @@
 
 Thank you for helping improve NovaStore. The project spans a backend API, customer storefront, administration interface, PostgreSQL migrations, and a native Android application. Changes should remain narrow, testable, and safe across those boundaries.
 
+Participation in project spaces is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Before you start
 
 - Search existing issues and pull requests before creating a duplicate.
