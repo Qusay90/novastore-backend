@@ -1838,7 +1838,7 @@ export function CommerceProRuntimeApp({
     : authReturn("/destek");
   else content = <CanonicalNotFound />;
 
-  if (PUBLIC_REVIEW_RELEASE && runtime.reviewMode && ['auth','account','tracking','support','password','payment-result'].includes(route.type)) {
+  if (PUBLIC_REVIEW_RELEASE && runtime.reviewMode && ['payment-result'].includes(route.type)) {
     content = <PublicReviewAccount registration={route.mode === 'register'} />;
   }
   if (PUBLIC_REVIEW_RELEASE && runtime.reviewMode && route.type === 'public-store') content = <PublicReviewStoreUnavailable />;

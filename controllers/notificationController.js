@@ -45,6 +45,18 @@ const createNotification = async (userId, type, message, io = null) => {
 };
 
 // GET /api/notifications/user/:userId
+const getUnreadCount = async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT COUNT(*)::integer AS count FROM notifications WHERE user_id = $1 AND is_read = FALSE',
+            [req.user.id]
+        );
+        res.status(200).json({ unreadCount: result.rows[0].count });
+    } catch (err) {
+        res.status(500).json({ error: 'Bildirim sayısı getirilemedi.' });
+    }
+};
+
 const getUserNotifications = async (req, res) => {
     try {
         const userId = Number(req.params.userId);
@@ -153,6 +165,7 @@ const sendTestNotification = async (req, res) => {
 
 module.exports = {
     createNotification,
+    getUnreadCount,
     getUserNotifications,
     getAdminNotifications,
     markAsRead,

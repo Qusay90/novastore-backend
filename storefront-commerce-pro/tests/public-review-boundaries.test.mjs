@@ -74,7 +74,7 @@ test('R38 descriptive attributes never become purchase variants or variant media
 
 test('R38 review runtime uses no account credentials, remote cart writes, orders or provider calls',async()=>{
   const values=new Map();const calls=[];const location={origin:'https://novastore.tr',hash:''};
-  const storage={getItem:key=>{assert.match(key,/^novastore_public_review_/);return values.get(key)||null;},setItem:(key,value)=>values.set(key,value)};
+  const storage={getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
   const http=makeHttp();
   const runtime=await createPublicReviewRuntime({root:{},storage,location,fetchImpl:async(route,options={})=>{
     calls.push({route,method:options.method||'GET',credentials:options.credentials,headers:options.headers});
@@ -91,6 +91,34 @@ test('R38 review runtime uses no account credentials, remote cart writes, orders
   assert.ok(calls.every(call=>call.method==='GET'&&call.credentials==='omit'));
   assert.ok(calls.every(call=>!JSON.stringify(call.headers||{}).includes('Authorization')));
   assert.ok(calls.every(call=>!/(payments|orders|shared-state|public\/stores)/.test(call.route)));
+});
+
+test('review customer login and owned order reads use the existing session without migrating legacy addresses',async()=>{
+  const values=new Map([['novastore_user_addresses',JSON.stringify([{title:'Old local address',city:'Test'}])]]),calls=[];
+  const storage={getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
+  const http=makeHttp(); const location={origin:'https://novastore.tr',hash:''};
+  const fetchImpl=async(route,options={})=>{
+    calls.push({route,method:options.method||'GET',authorization:options.headers?.Authorization});
+    let data;
+    if(route==='/api/business-identity')data=getPublicReviewProjection();
+    else if(route==='/api/users/login')data={token:'synthetic-test-token',user:{id:42,fullName:'Test Customer',email:'test@example.invalid'}};
+    else if(route==='/api/users/me')data={id:42,fullName:'Test Customer',email:'test@example.invalid'};
+    else if(route==='/api/orders/user/42')data=[{id:9,status:'Hazırlanıyor',total_amount:12,items:[]}];
+    else if(route==='/api/addresses')data=[];
+    else data=await http.request(route);
+    return new Response(JSON.stringify(data),{headers:{'content-type':'application/json'}});
+  };
+  let runtime=await createPublicReviewRuntime({root:{},storage,location,fetchImpl}).initialize();
+  const session=await runtime.customer.login({email:'test@example.invalid',password:'test-only'});
+  assert.equal(session.user.id,42);
+  assert.equal((await runtime.customer.listOrders(session))[0].id,9);
+  assert.deepEqual(await runtime.customer.listAddresses(),[]);
+  assert.ok(values.has('novastore_user_addresses'));
+  assert.equal(calls.filter(call=>call.route==='/api/addresses'&&call.method!=='GET').length,0);
+  runtime=await createPublicReviewRuntime({root:{},storage,location,fetchImpl}).initialize();
+  assert.equal(runtime.session.status,'authenticated');
+  assert.ok(calls.some(call=>call.route==='/api/users/me'&&call.authorization==='Bearer synthetic-test-token'));
+  assert.ok(calls.filter(call=>call.route.startsWith('/api/products')).every(call=>!call.authorization));
 });
 
 test('R38 review legal documents stay consent ineligible and unsafe link targets are rejected',()=>{

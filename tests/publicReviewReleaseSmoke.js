@@ -42,12 +42,12 @@ const plain=value=>value.replace(/<[^>]+>/g,' ').replace(/&(?:amp|lt|gt|quot|#39
   }
   checks.push('registration-order-provider-and-analytics-denial');
   const capability=await(await fetch(origin+'/api/payments/capability')).json();assert.equal(capability.realPaymentReady,false);assert.equal(capability.provider,null);
-  const loginHtml=await(await fetch(origin+'/login.html')).text();assert.match(loginHtml,/Mevcut müşteri hesabınıza giriş yapın/);assert(!/register-form|autocomplete="new-password"/.test(loginHtml));checks.push('existing-login-registration-presentation');
   const bytes=fs.readFileSync(path.join(__dirname,'../frontend/public-review/index.html'));
-  for(const route of ['/','/arama','/kategori/elektronik','/urun/38','/sepet','/odeme','/uye-ol','/checkout.html','/paytr-checkout.html','/payment-result.html']){const response=await fetch(origin+route);assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes);}
+  for(const route of ['/','/arama','/kategori/elektronik','/urun/38','/sepet','/odeme','/uye-ol','/login.html','/profile.html','/forgot-password.html','/reset-password.html','/checkout.html','/paytr-checkout.html','/payment-result.html']){const response=await fetch(origin+route);assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),bytes);}
+  checks.push('integrated-customer-entrypoints');
   for(const route of ['/commerce-pro-preview/','/commerce-pro-integration-preview/','/commerce-pro-fixture/','/public-review/index.html'])assert.equal((await fetch(origin+route)).status,404);
   assert.equal(dangerousHandlerCalls,0);checks.push('exact-built-route-delivery-and-preview-isolation');
   const result={status:'PASS',legalPages:13,checks,dangerousHandlerCalls,providerCalls:0,orderCreation:0,registrationCreation:0};
-  fs.writeFileSync(path.join(__dirname,'../artifacts/r38-r1/legal-tests.json'),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));
+  if (process.env.NOVASTORE_SKIP_EVIDENCE_WRITE !== 'true') fs.writeFileSync(path.join(__dirname,'../artifacts/r38-r1/legal-tests.json'),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));
  } finally {await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

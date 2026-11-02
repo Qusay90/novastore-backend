@@ -15,7 +15,7 @@ function createPublicReviewWebRouter({env=process.env}={}) {
         }
         return next();
     });
-    router.get(['/','/index.html','/commerce-pro','/commerce-pro/','/checkout.html','/paytr-checkout.html','/payment-result.html','/product.html','/categories.html',
+    router.get(['/','/index.html','/commerce-pro','/commerce-pro/','/login.html','/profile.html','/forgot-password.html','/reset-password.html','/checkout.html','/paytr-checkout.html','/payment-result.html','/product.html','/categories.html',
         /^\/(?:kategori|urun|koleksiyon|magaza)(?:\/.*)?$/, /^\/(?:arama|sepet|odeme|giris|uye-ol|kayit|favoriler|hesabim|siparis|yardim|siparis-takibi|destek)(?:\/.*)?$/],(req,res)=>{
         if (!fs.existsSync(webPath)) return res.status(503).type('text/plain').send('NovaStore yayına hazırlanıyor. Lütfen daha sonra tekrar ziyaret edin.');
         const html = fs.readFileSync(webPath, 'utf8');

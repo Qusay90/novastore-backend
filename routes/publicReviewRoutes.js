@@ -25,11 +25,6 @@ function createPublicReviewRouter({ env = process.env } = {}) {
     });
     router.get('/api/business-identity', (_req,res)=>res.json(getPublicReviewProjection()));
     router.get('/api/payments/capability', (_req,res)=>res.json({available:false,enabled:false,ready:false,realPaymentReady:false,provider:null,reason:'Yayına hazırlık süresince gerçek ödeme kapalıdır.'}));
-    router.get('/login.html',(_req,res)=>{
-        res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY',
-            'Content-Security-Policy':"default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"});
-        return res.sendFile(path.join(__dirname,'../frontend/public-review-login.html'));
-    });
     router.get('/api/public/legal', (_req,res)=>res.json({documents:listLegalDocuments()}));
     router.get('/api/public/legal/:slug', (req,res)=>{
         const document = getLegalDocument(req.params.slug);

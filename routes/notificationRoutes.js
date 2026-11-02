@@ -1,6 +1,7 @@
 ﻿const express = require('express');
 const router = express.Router();
 const {
+    getUnreadCount,
     getUserNotifications,
     getAdminNotifications,
     markAsRead,
@@ -11,6 +12,7 @@ const { authenticate, requireAdmin, requireSelfOrAdmin } = require('../middlewar
 const { requireCurrentAdmin, requireCurrentAdminIfClaimed } = require('../middlewares/currentAdmin');
 
 // Kullanici bildirimleri
+router.get('/unread-count', authenticate, requireCurrentAdminIfClaimed, getUnreadCount);
 router.get('/user/:userId', authenticate, requireSelfOrAdmin('userId'), requireCurrentAdminIfClaimed, getUserNotifications);
 
 // Admin bildirimleri

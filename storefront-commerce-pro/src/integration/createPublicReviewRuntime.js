@@ -2,6 +2,9 @@ import { createStorefrontHttp } from './storefrontHttp.js';
 import { createReviewCatalogAdapter } from '../adapters/reviewCatalogAdapter.js';
 import { createBusinessIdentityAdapter } from '../adapters/businessIdentityAdapter.js';
 import { createLegalAdapter } from '../adapters/legalAdapter.js';
+import { createAuthAdapter } from '../adapters/authAdapter.js';
+import { createCustomerAccountAdapter } from '../adapters/customerAccountAdapter.js';
+import { createCustomerHttp } from './customerHttp.js';
 import { configureRuntimeCatalog } from './runtimeCatalog.js';
 import { assertProductVariant, cartIdentity, cartLineKey } from '../adapters/variantContract.js';
 
@@ -13,6 +16,10 @@ const readArray = (storage,key) => { try {const value=JSON.parse(storage.getItem
 export function createPublicReviewRuntime({root=globalThis, storage=root.localStorage, fetchImpl=root.fetch?.bind(root), location=root.location}={}) {
   // Review browsing never sends an existing account credential or writes shared state.
   const http=createStorefrontHttp({fetchImpl:(url,options)=>fetchImpl(url,{...options,credentials:'omit'}),storage:null,eventTarget:root,origin:location.origin});
+  const authHttp=createStorefrontHttp({fetchImpl,storage,eventTarget:root,origin:location.origin});
+  const customerHttp=createCustomerHttp({fetchImpl,storage,eventTarget:root,origin:location.origin});
+  const authAdapter=createAuthAdapter({http:authHttp,storage,location});
+  const customer=createCustomerAccountAdapter({http:customerHttp,storage,eventTarget:root,allowLegacyAddressMigration:false});
   const initialize=async ({signal,allowUnavailableCatalog=false}={})=>{
     const businessIdentity=await createBusinessIdentityAdapter(http).load({signal});
     if (businessIdentity.reviewRelease!==true) throw new Error('Yayına hazırlık bilgileri doğrulanamadı.');
@@ -47,12 +54,13 @@ export function createPublicReviewRuntime({root=globalThis, storage=root.localSt
       loadFilters:adapter.loadFilters,
       loadCollection:async (slug,options={})=>{const result=await adapter.loadCollection(slug,{catalog,signal:options.signal});if(!options.signal?.aborted)register(result.products);return result;},
     };
+    const session=await authAdapter.load({signal});
     return Object.freeze({catalog:runtimeCatalog,businessIdentity,legal:createLegalAdapter(http),reviewMode:true,
-      session:{status:'guest',user:null,warning:null},warnings:catalog.warnings||[],readOnlyPreview:false,
+      session,warnings:catalog.warnings||[],readOnlyPreview:false,
       favorites:{initialIds:favorites,set:async (id,value)=>{if(!products.has(id))throw new Error('Ürün bulunamadı.');value?favorites.add(id):favorites.delete(id);storage.setItem(FAVORITES_KEY,JSON.stringify([...favorites]));return new Set(favorites);}},
       cart:{initialItems:cartItems,persist,subscribe:()=>()=>{},handoffToCheckout:async items=>{await persist(items);location.hash='#/odeme/teslimat';}},
-      auth:{openAccount:()=>{location.hash='#/giris';}},
-      customer:{},checkout:{},
+      auth:{openAccount:()=>authAdapter.openAccount(session)},
+      customer,checkout:{},
       community:{reviewOnly:true},
       publicStore:{load:async()=>{throw Object.assign(new Error('Mağaza bilgileri yayına hazırlık aşamasındadır.'),{code:'PUBLIC_STORE_UNAVAILABLE',status:503});},follow:{load:unavailable,set:unavailable}},
       assistant:{getCapability:async()=>({available:false,provider:{configured:false,ready:false},modes:[],defaultModeId:null,advancedModesAvailable:false,modeSelectionAvailable:false,unavailableReason:'Yayına hazırlık aşamasında'}),chat:unavailable,escalate:unavailable},

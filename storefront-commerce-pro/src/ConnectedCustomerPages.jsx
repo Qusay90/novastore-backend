@@ -217,7 +217,7 @@ export function CustomerAuthPage(props) {
   };
 
   return <main id="main-content" className="page auth-page"><div className="shell auth-layout">
-    <AuthHero kicker="NovaStore hesabı" title={mode === "register" ? "Alışverişini tek hesapta yönet." : "Tekrar hoş geldin."} copy={mode === "register" ? "Siparişlerini, adreslerini, sepetini ve favorilerini tek hesapta yönet." : "Siparişlerine, adreslerine ve güvenli ödeme akışına kaldığın yerden devam et."} />
+    <AuthHero kicker="NovaStore hesabı" title={mode === "register" ? "Alışverişini tek hesapta yönet." : "Tekrar hoş geldin."} copy={mode === "register" ? "Siparişlerini, adreslerini, sepetini ve favorilerini tek hesapta yönet." : props.publicReview ? "Siparişlerine ve hesap bilgilerine buradan ulaşabilirsin." : "Siparişlerine, adreslerine ve güvenli ödeme akışına kaldığın yerden devam et."} />
     <section className="auth-card" aria-labelledby="auth-title">
       <div className="auth-tabs" role="tablist" aria-label="Hesap işlemleri">
         <button role="tab" aria-selected={mode === "login"} className={mode === "login" ? "is-active" : ""} type="button" onClick={() => { setMode("login"); setError(""); setMessage(""); }}>Giriş yap</button>

@@ -339,6 +339,7 @@ export function createCustomerAccountAdapter({
   http,
   storage = globalThis.localStorage,
   eventTarget = globalThis,
+  allowLegacyAddressMigration = true,
 } = {}) {
   if (!http || typeof http.request !== "function") {
     throw new TypeError("Müşteri hesap adapterı HTTP istemcisi gerektirir.");
@@ -449,6 +450,7 @@ export function createCustomerAccountAdapter({
   const listAddresses = async (options = {}) => {
     const payload = await http.request("/api/addresses", { signal: options.signal });
     let addresses = (Array.isArray(payload) ? payload : []).map(normalizeCustomerAddress).filter(Boolean);
+    if (!allowLegacyAddressMigration) return Object.freeze(addresses);
     const userId = readStoredUserId(storage);
     const migrationKey = userId ? `novastore_addresses_migrated_${userId}` : null;
     if (!migrationKey || storage?.getItem?.(migrationKey) === "1") return Object.freeze(addresses);
