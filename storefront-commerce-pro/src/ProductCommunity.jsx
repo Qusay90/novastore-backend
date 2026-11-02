@@ -107,7 +107,7 @@ function QuestionComposer({ productId, authenticated, community, onSubmitted }) 
     return (
       <div className="community-gate">
         <Question />
-        <div><strong>Ürün hakkında soru sor</strong><p>Sorunu mağazaya iletmek ve yanıt durumunu takip etmek için giriş yap.</p></div>
+        <div><strong>Ürün hakkında soru sor</strong><p>Sorunu {community.reviewRelease ? 'NovaStore ekibine' : 'mağazaya'} iletmek ve yanıt durumunu takip etmek için giriş yap.</p></div>
         <a className="secondary-button" href={`#/giris?return=${encodeURIComponent(`/urun-id/${productId}`)}`}>Giriş yap</a>
       </div>
     );
@@ -134,7 +134,7 @@ function QuestionComposer({ productId, authenticated, community, onSubmitted }) 
       <div><span className="section-kicker">Ürün danışmanı</span><h3>Merak ettiğini sor</h3></div>
       <label>Sorun <textarea required minLength="5" maxLength="1000" rows="4" value={question} placeholder="Ölçü, uyumluluk veya ürün özelliği hakkında sorabilirsin" onChange={(event) => setQuestion(event.target.value)} /><small>{question.length}/1000</small></label>
       {message && <p className={`form-message is-${phase}`} role={phase === "error" ? "alert" : "status"}>{message}</p>}
-      <button className="primary-button" type="submit" disabled={phase === "saving" || question.trim().length < 5}>{phase === "saving" ? "İletiliyor…" : "Soruyu mağazaya ilet"}</button>
+      <button className="primary-button" type="submit" disabled={phase === "saving" || question.trim().length < 5}>{phase === "saving" ? "İletiliyor…" : community.reviewRelease ? "Soruyu NovaStore ekibine ilet" : "Soruyu mağazaya ilet"}</button>
     </form>
   );
 }
@@ -171,7 +171,7 @@ function QuestionPanel({ data, productId, authenticated, community, onReload, pa
   return (
     <div id="community-panel-questions" role="tabpanel" aria-labelledby="community-tab-questions" className="community-panel">
       <div className="community-overview-grid is-questions">
-        <article className="community-question-intro"><Question /><span className="section-kicker">Soru & cevap</span><h3>Karar vermeden önce netleştir</h3><p>Yanıtlar mağaza ekibi tarafından verilir. Kişisel bilgi veya sipariş bilgisi paylaşma.</p><b>{data.questions.length} yanıtlanmış soru yüklendi</b></article>
+        <article className="community-question-intro"><Question /><span className="section-kicker">Soru & cevap</span><h3>Karar vermeden önce netleştir</h3><p>Yanıtlar {community.reviewRelease ? 'NovaStore ekibi' : 'mağaza ekibi'} tarafından verilir. Kişisel bilgi veya sipariş bilgisi paylaşma.</p><b>{data.questions.length} yanıtlanmış soru yüklendi</b></article>
         <QuestionComposer productId={productId} authenticated={authenticated} community={community} onSubmitted={onReload} />
       </div>
       <div className="community-list-head"><div><span className="section-kicker">Ürün hakkında</span><h3>Müşterilerin merak ettikleri</h3></div><span>{data.questions.length} soru yüklendi{page.pagination?.hasMore ? "; daha fazlası var" : ""}</span></div>
@@ -180,7 +180,7 @@ function QuestionPanel({ data, productId, authenticated, community, onReload, pa
           <div className="question-line"><span>S</span><div><strong>{item.question}</strong><small>{item.customerName} · <time dateTime={item.createdAt || undefined}>{formatDate(item.createdAt)}</time></small></div></div>
           {item.status === "answered" ? <div className="answer-line"><span>C</span><div><p>{item.answer}</p><small><CheckCircle weight="fill" /> NovaStore mağaza yanıtı · <time dateTime={item.answeredAt || undefined}>{formatDate(item.answeredAt)}</time></small></div></div> : <div className="question-pending"><Question /> Mağaza yanıtı bekleniyor</div>}
         </article>
-      ))}</div> : page.data ? <div className="community-empty"><Question /><h3>Henüz soru sorulmamış</h3><p>Ürün hakkında merak ettiğin ilk soruyu mağazaya iletebilirsin.</p></div> : null}
+      ))}</div> : page.data ? <div className="community-empty"><Question /><h3>Henüz yanıtlanmış soru yok</h3><p>Ürün hakkında merak ettiğin bir soruyu {community.reviewRelease ? 'NovaStore ekibine' : 'mağazaya'} iletebilirsin.</p></div> : null}
       <PageContinuation page={page} label="soru" />
     </div>
   );
@@ -216,7 +216,7 @@ export function ProductCommunity({ productId, productName, session, community, s
 
   return (
     <section className="product-community" id={sectionId} aria-labelledby="community-title">
-      <div className="community-heading"><div><span className="section-kicker">NovaStore topluluğu</span><h2 id="community-title">{productName} yorumları ve soruları</h2><p>Gerçek API verisi, doğrulanmış müşteri uygunluğu ve mağaza yanıtları.</p></div></div>
+      <div className="community-heading"><div><span className="section-kicker">NovaStore topluluğu</span><h2 id="community-title">{productName} yorumları ve soruları</h2><p>Ürün değerlendirmeleri ve yanıtlanmış sorular.</p></div></div>
       <div className="community-tabs" role="tablist" aria-label="Ürün değerlendirmeleri ve soruları">
         <button id="community-tab-reviews" type="button" role="tab" aria-selected={activeTab === "reviews"} aria-controls="community-panel-reviews" tabIndex={activeTab === "reviews" ? 0 : -1} className={activeTab === "reviews" ? "is-active" : ""} onClick={() => setActiveTab("reviews")} onKeyDown={(event) => switchTabFromKeyboard(event, "reviews")}><Star weight="fill" /> Değerlendirmeler {state.data ? <b>{state.data.totalReviews}</b> : null}</button>
         <button id="community-tab-questions" type="button" role="tab" aria-selected={activeTab === "questions"} aria-controls="community-panel-questions" tabIndex={activeTab === "questions" ? 0 : -1} className={activeTab === "questions" ? "is-active" : ""} onClick={() => setActiveTab("questions")} onKeyDown={(event) => switchTabFromKeyboard(event, "questions")}><Question /> Soru & cevap {state.data ? <b>{state.data.questions.length}{questions.pagination?.hasMore ? "+" : ""}</b> : null}</button>

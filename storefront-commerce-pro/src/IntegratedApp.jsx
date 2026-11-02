@@ -1472,7 +1472,7 @@ function LocalReviewPaymentBoundary() {
 
 function Footer({ businessIdentity = null }) {
   const identity = businessIdentity?.status === "configured" ? businessIdentity.identity : null;
-  const legalHref = (route) => businessIdentity?.reviewRelease ? route : `#${route}`;
+  const legalHref = (route) => `#${route}`;
   return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Doğru ürünü bulmanın daha kolay yolu.</p></div><div><strong>NovaStore</strong><a href={legalHref("/hakkimizda")}>Hakkımızda</a><a href={legalHref("/iletisim")}>İletişim</a><a href={legalHref("/pazaryeri-bilgilendirmesi")}>Pazaryeri bilgilendirmesi</a><a href={legalHref("/satici-sozlesmesi")}>Satıcı sözleşmesi</a></div><div><strong>Yasal</strong><a href={legalHref("/gizlilik-politikasi")}>Gizlilik politikası</a><a href={legalHref("/kvkk-aydinlatma-metni")}>KVKK aydınlatma metni</a><a href={legalHref("/cerez-politikasi")}>Çerez politikası</a><a href={legalHref("/kullanim-ve-uyelik-kosullari")}>Kullanım ve üyelik koşulları</a></div><div><strong>Alışveriş koşulları</strong><a href={legalHref("/on-bilgilendirme-formu")}>Ön bilgilendirme formu</a><a href={legalHref("/mesafeli-satis-sozlesmesi")}>Mesafeli satış sözleşmesi</a><a href={legalHref("/iptal-iade-cayma-politikasi")}>İptal, iade ve cayma</a><a href={legalHref("/teslimat-ve-kargo-kosullari")}>Teslimat ve kargo</a><a href={legalHref("/islem-rehberi")}>İşlem rehberi</a></div><div><strong>Destek</strong><a href="#/siparis-takibi">Sipariş takibi</a><a href="#/destek">Güvenli müşteri desteği</a><a href="#/yardim">Yardım merkezi</a><p>Ödeme bilgileri NovaStore sayfasında toplanmaz.</p></div>{businessIdentity?.reviewRelease && <PublicReviewContact contact={businessIdentity.publicContact} />}{identity && <address className="footer-business-identity"><strong>{identity.legalCompanyName}</strong><span>Ticari unvan: {identity.tradeName}</span><span>VKN: {identity.taxNumber}{identity.taxOffice ? ` · Vergi dairesi: ${identity.taxOffice}` : ""} · MERSİS: {identity.mersisNumber}</span><span>{identity.registeredAddress}</span><a href={`mailto:${identity.kepAddress}`}>KEP: {identity.kepAddress}</a><a href={`tel:${identity.phone}`}>{identity.phone}</a><a href={`mailto:${identity.email}`}>{identity.email}</a></address>}</div><div className="shell footer-bottom"><span>© 2026 NovaStore.</span><span>{identity ? "İşletme iletişim ve kimlik bilgileri yukarıda yer alır." : "Şirket kimliği ve onaylı yasal metinler tamamlandığında burada yayımlanacaktır."}</span></div></footer>;
 }
 
@@ -1792,7 +1792,7 @@ export function CommerceProRuntimeApp({
   let content;
   if (loading) content = <CanonicalLoadingPage />;
   else if (route.type === "home") content = <CanonicalHomePage favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
-  else if (route.type === "public-store") content = <PublicStorePage slug={route.slug} previewMode={route.preview} loadStore={runtime.publicStore.load} followStore={runtime.publicStore.follow} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
+  else if (route.type === "public-store") content = <PublicStorePage slug={route.slug} previewMode={route.preview} reviewRelease={runtime.reviewMode} loadStore={runtime.publicStore.load} followStore={runtime.publicStore.follow} session={session} favorites={favorites} onFavorite={toggleFavorite} onAdd={addToCart} />;
   else if (route.type === "product" || route.type === "product-id") {
     const product = (route.type === "product"
       ? getVisibleProducts().find((item) => item.slug === route.slug)
@@ -1841,7 +1841,6 @@ export function CommerceProRuntimeApp({
   if (PUBLIC_REVIEW_RELEASE && runtime.reviewMode && ['payment-result'].includes(route.type)) {
     content = <PublicReviewAccount registration={route.mode === 'register'} />;
   }
-  if (PUBLIC_REVIEW_RELEASE && runtime.reviewMode && route.type === 'public-store') content = <PublicReviewStoreUnavailable />;
 
   return (
     <RuntimeComparisonContext.Provider value={comparisonContext}>

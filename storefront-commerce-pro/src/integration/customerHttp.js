@@ -32,6 +32,7 @@ const RULES = Object.freeze([
   { methods: ["GET"], pattern: /^\/api\/reviews\/user\/\d+$/, authenticated: true },
   { methods: ["POST"], pattern: /^\/api\/reviews$/, authenticated: true },
   { methods: ["GET"], pattern: /^\/api\/questions\/product\/\d+$/, authenticated: "optional", queryKeys: ["pagination", "limit", "cursor"] },
+  { methods: ["GET"], pattern: /^\/api\/public\/review\/questions\/[1-9]\d*$/, authenticated: false, queryKeys: ["cursor"] },
   { methods: ["GET"], pattern: /^\/api\/questions\/user$/, authenticated: true },
   { methods: ["POST"], pattern: /^\/api\/questions\/ask$/, authenticated: true },
   { methods: ["GET"], pattern: /^\/api\/assistant\/capability$/, authenticated: false },

@@ -1506,7 +1506,7 @@ test("public legal adapter ve footer aynı sürümlü hukuk rota sözleşmesini 
     assert.ok(integratedApp.includes(`["${path}", "${slug}"]`), `public hukuk route eşlemesi eksik: ${path}`);
     assert.ok(integratedApp.includes(`href={legalHref("${path}")}`), `footer hukuk bağlantısı eksik: ${path}`);
   }
-  assert.match(integratedApp, /businessIdentity\?\.reviewRelease \? route : `#\$\{route\}`/);
+  assert.match(integratedApp, /const legalHref = \(route\) => `#\$\{route\}`/);
 });
 
 test("aranabilir Türkiye konum sözleşmesi 81 il ve 973 ilçeyi eksiksiz korur", async () => {

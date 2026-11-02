@@ -24,7 +24,7 @@ exports.askQuestion = async (req, res) => {
             return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
         }
 
-        if (!product_id || !question) {
+        if (!Number.isSafeInteger(Number(product_id)) || Number(product_id) < 1 || typeof question !== 'string' || question.trim().length < 5 || question.trim().length > 1000) {
             return res.status(400).json({ error: 'Ürün ID ve soru içeriği gereklidir.' });
         }
 
@@ -35,7 +35,7 @@ exports.askQuestion = async (req, res) => {
              WHERE products.id = $1
                AND ${buildPublicProductSqlPredicate('products')}
              RETURNING *`,
-            [product_id, user_id, question]
+            [product_id, user_id, question.trim()]
         );
 
         if (newQuestion.rows.length === 0) {

@@ -78,19 +78,20 @@ test('R38 review runtime uses no account credentials, remote cart writes, orders
   const http=makeHttp();
   const runtime=await createPublicReviewRuntime({root:{},storage,location,fetchImpl:async(route,options={})=>{
     calls.push({route,method:options.method||'GET',credentials:options.credentials,headers:options.headers});
-    const payload=route==='/api/business-identity'?getPublicReviewProjection():await http.request(route);
+    const payload=route==='/api/business-identity'?getPublicReviewProjection():route==='/api/public/stores/test-store?pagination=cursor&limit=20'?{store:{slug:'test-store',name:'Test',product_count:1},products:[products[0]],pagination:{limit:20,hasMore:false,nextCursor:null}}:await http.request(route);
     return new Response(JSON.stringify(payload),{headers:{'content-type':'application/json'}});
   }}).initialize();
   await runtime.cart.persist([{productId:1,quantity:2}]);
   await runtime.cart.handoffToCheckout([{productId:1,quantity:2}]);
   await runtime.favorites.set(1,true);
   assert.equal(location.hash,'#/odeme/teslimat');
-  await assert.rejects(()=>runtime.publicStore.load('invented'),error=>error.code==='PUBLIC_STORE_UNAVAILABLE');
+  const shop=await runtime.publicStore.load('test-store');
+  assert.equal(shop.store.name,'Test');assert.equal(shop.products.length,1);
   assert.equal(runtime.reviewMode,true);assert.equal(runtime.session.status,'guest');
   assert.equal(runtime.catalog.products[0].variantSelectionRequired,false);
   assert.ok(calls.every(call=>call.method==='GET'&&call.credentials==='omit'));
   assert.ok(calls.every(call=>!JSON.stringify(call.headers||{}).includes('Authorization')));
-  assert.ok(calls.every(call=>!/(payments|orders|shared-state|public\/stores)/.test(call.route)));
+  assert.ok(calls.every(call=>!/(payments|orders|shared-state)/.test(call.route)));
 });
 
 test('review customer login and owned order reads use the existing session without migrating legacy addresses',async()=>{

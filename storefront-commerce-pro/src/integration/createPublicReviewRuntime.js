@@ -5,6 +5,9 @@ import { createLegalAdapter } from '../adapters/legalAdapter.js';
 import { createAuthAdapter } from '../adapters/authAdapter.js';
 import { createCustomerAccountAdapter } from '../adapters/customerAccountAdapter.js';
 import { createCustomerHttp } from './customerHttp.js';
+import { createProductCommunityAdapter } from '../adapters/productCommunityAdapter.js';
+import { createPublicStoreAdapter } from '../adapters/publicStoreAdapter.js';
+import { normalizePagination } from '../adapters/publicPagination.js';
 import { configureRuntimeCatalog } from './runtimeCatalog.js';
 import { assertProductVariant, cartIdentity, cartLineKey } from '../adapters/variantContract.js';
 
@@ -20,6 +23,8 @@ export function createPublicReviewRuntime({root=globalThis, storage=root.localSt
   const customerHttp=createCustomerHttp({fetchImpl,storage,eventTarget:root,origin:location.origin});
   const authAdapter=createAuthAdapter({http:authHttp,storage,location});
   const customer=createCustomerAccountAdapter({http:customerHttp,storage,eventTarget:root,allowLegacyAddressMigration:false});
+  const communityAdapter=createProductCommunityAdapter({http:customerHttp});
+  const storeAdapter=createPublicStoreAdapter(http);
   const initialize=async ({signal,allowUnavailableCatalog=false}={})=>{
     const businessIdentity=await createBusinessIdentityAdapter(http).load({signal});
     if (businessIdentity.reviewRelease!==true) throw new Error('Yayına hazırlık bilgileri doğrulanamadı.');
@@ -49,7 +54,7 @@ export function createPublicReviewRuntime({root=globalThis, storage=root.localSt
     const persist=async items=>{cartItems=compact(items);storage.setItem(CART_KEY,JSON.stringify(cartItems));return cartItems;};
     const runtimeCatalog={...catalog,
       subscribe:listener=>{listeners.add(listener);return()=>listeners.delete(listener);},version:()=>version,
-      loadProduct:async (id,options={})=>{const product=await adapter.loadProduct(id,{catalog,signal:options.signal});if(!options.signal?.aborted)register([product]);return product;},
+      loadProduct:async (id,options={})=>{let product=await adapter.loadProduct(id,{catalog,signal:options.signal});try {const result=await http.request(`/api/public/review/products/${id}/store`,{signal:options.signal});const store=result?.store;if(store && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(store.slug||'')) && typeof store.name==='string' && store.name.trim()) product=Object.freeze({...product,store:{slug:store.slug,name:store.name}});} catch(error) {if(options.signal?.aborted)throw error;}if(!options.signal?.aborted)register([product]);return product;},
       loadPage:async query=>{const page=await adapter.loadPage({...query,catalog});if(!query?.signal?.aborted)register(page.items);return page;},
       loadFilters:adapter.loadFilters,
       loadCollection:async (slug,options={})=>{const result=await adapter.loadCollection(slug,{catalog,signal:options.signal});if(!options.signal?.aborted)register(result.products);return result;},
@@ -61,8 +66,8 @@ export function createPublicReviewRuntime({root=globalThis, storage=root.localSt
       cart:{initialItems:cartItems,persist,subscribe:()=>()=>{},handoffToCheckout:async items=>{await persist(items);location.hash='#/odeme/teslimat';}},
       auth:{openAccount:()=>authAdapter.openAccount(session)},
       customer,checkout:{},
-      community:{reviewOnly:true},
-      publicStore:{load:async()=>{throw Object.assign(new Error('Mağaza bilgileri yayına hazırlık aşamasındadır.'),{code:'PUBLIC_STORE_UNAVAILABLE',status:503});},follow:{load:unavailable,set:unavailable}},
+      community:{...communityAdapter,reviewRelease:true,loadQuestions:async(id,{signal,cursor}={})=>{const payload=await customerHttp.request(`/api/public/review/questions/${id}${cursor?`?cursor=${encodeURIComponent(cursor)}`:''}`,{signal});if(!Array.isArray(payload?.items))throw new Error('Sorular alınamadı.');return {items:payload.items.map(row=>({id:row.id,question:row.question,answer:row.answer,customerName:row.user_name,createdAt:row.created_at,answeredAt:row.answered_at,status:'answered'})),pagination:normalizePagination(payload.pagination)};},askQuestion:async(...args)=>{await communityAdapter.askQuestion(...args);return {mesaj:'Sorun NovaStore ekibine iletildi.'};}},
+      publicStore:{load:async(slug,options={})=>{const result=await storeAdapter.load(slug,{...options,catalog,cursorPagination:true});if(!options.signal?.aborted)register(result.products);return result;},follow:{load:unavailable,set:unavailable}},
       assistant:{getCapability:async()=>({available:false,provider:{configured:false,ready:false},modes:[],defaultModeId:null,advancedModesAvailable:false,modeSelectionAvailable:false,unavailableReason:'Yayına hazırlık aşamasında'}),chat:unavailable,escalate:unavailable},
       refreshCustomerState:async()=>({favoriteIds:new Set(favorites),cartItems}),
     });

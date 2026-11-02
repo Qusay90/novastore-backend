@@ -86,7 +86,7 @@ function FollowAction({ slug, previewMode, authenticated, followState, onToggle,
   );
 }
 
-export function PublicStorePage({ slug, previewMode = false, loadStore, followStore, session, favorites, onFavorite, onAdd }) {
+export function PublicStorePage({ slug, previewMode = false, reviewRelease = false, loadStore, followStore, session, favorites, onFavorite, onAdd }) {
   const [followAttempt, setFollowAttempt] = useState(0);
   const load = useCallback(async (options) => {
     const detail = await loadStore(slug, options);
@@ -98,7 +98,7 @@ export function PublicStorePage({ slug, previewMode = false, loadStore, followSt
   const authenticated = isAuthenticatedSession(session);
 
   useEffect(() => {
-    if (previewMode || !authenticated || state.phase !== "ready") {
+    if (previewMode || reviewRelease || !authenticated || state.phase !== "ready") {
       setFollowState({ phase: "idle", following: false, followerCount: null });
       return undefined;
     }
@@ -114,7 +114,7 @@ export function PublicStorePage({ slug, previewMode = false, loadStore, followSt
         setFollowState((current) => ({ ...current, phase: "error" }));
       });
     return () => { active = false; controller.abort("public-store-follow-change"); };
-  }, [authenticated, followAttempt, followStore, previewMode, slug, state.phase]);
+  }, [authenticated, followAttempt, followStore, previewMode, reviewRelease, slug, state.phase]);
 
   useEffect(() => {
     if (!previewMode) return undefined;
@@ -163,12 +163,12 @@ export function PublicStorePage({ slug, previewMode = false, loadStore, followSt
     }
   };
   const metrics = [
-    { key: "followers", icon: Users, value: integer.format(followerCount), label: "takipçi" },
-    { key: "sold", icon: ShoppingBagOpen, value: integer.format(store.totalUnitsSold), label: "ürün satıldı" },
+    { key: "followers", icon: Users, value: reviewRelease ? "—" : integer.format(followerCount), label: reviewRelease ? "takipçi bilgisi hazırlanıyor" : "takipçi" },
+    { key: "sold", icon: ShoppingBagOpen, value: reviewRelease ? "—" : integer.format(store.totalUnitsSold), label: reviewRelease ? "satış bilgisi hazırlanıyor" : "ürün satıldı" },
     { key: "products", icon: Package, value: integer.format(store.productCount), label: "yayında ürün" },
-    store.reviewCount > 0
+    ...(reviewRelease ? [{ key: "rating", icon: Star, value: "—", label: "mağaza puanı hazırlanıyor" }] : [store.reviewCount > 0
       ? { key: "rating", icon: Star, value: store.rating.toFixed(1), label: `${integer.format(store.reviewCount)} değerlendirme` }
-      : { key: "rating", icon: Star, value: "Yeni", label: "henüz değerlendirme yok" },
+      : { key: "rating", icon: Star, value: "Yeni", label: "henüz değerlendirme yok" }]),
   ];
 
   return (
@@ -178,20 +178,20 @@ export function PublicStorePage({ slug, previewMode = false, loadStore, followSt
         <div className="shell public-store-hero__content">
           <div className="public-store-emblem" aria-hidden="true"><Storefront weight="duotone" /></div>
           <div className="public-store-hero__copy">
-            <span className="section-kicker">NovaStore doğrulanmış mağaza vitrini</span>
+            <span className="section-kicker">{reviewRelease ? "NovaStore mağaza vitrini" : "NovaStore doğrulanmış mağaza vitrini"}</span>
             <div className="public-store-title-row">
               <h1 id="public-store-title">{store.name}</h1>
               <span className="public-store-status"><i /> Açık</span>
             </div>
             <p>{store.description || "Bu mağazanın seçkisini, teslimat ve iade bilgilerini tek vitrinde inceleyebilirsin."}</p>
-            <FollowAction
+            {reviewRelease ? <button className="public-store-follow-button is-preview" type="button" disabled><ShieldCheck /> Takip yakında</button> : <FollowAction
               slug={slug}
               previewMode={previewMode}
               authenticated={authenticated}
               followState={followState}
               onToggle={toggleFollow}
               onRetry={() => setFollowAttempt((value) => value + 1)}
-            />
+            />}
           </div>
           <ul className="public-store-metrics" aria-label="Mağaza özeti">
             {metrics.map(({ key, icon: Icon, value, label }) => (
